@@ -1,6 +1,6 @@
 
 import { Layout } from '@/components/layout/Layout';
-import { PayrollCalculator } from '@/components/payroll/PayrollCalculator';
+import { PayrollLiquidation } from '@/components/payroll/PayrollLiquidation';
 
 const PayrollPage = () => {
   const mockUser = {
@@ -13,7 +13,7 @@ const PayrollPage = () => {
 
   return (
     <Layout userRole="company" user={mockUser}>
-      <PayrollCalculator />
+      <PayrollLiquidation />
     </Layout>
   );
 };
