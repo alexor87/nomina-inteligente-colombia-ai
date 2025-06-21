@@ -1,18 +1,14 @@
 
 import { Button } from '@/components/ui/button';
-import { CheckCircle, RefreshCw, Eye, EyeOff, Save } from 'lucide-react';
+import { RefreshCw, Eye, EyeOff, Save } from 'lucide-react';
 
 interface PayrollActionsProps {
-  isValid: boolean;
-  onApprove: () => void;
   onRecalculate: () => void;
   onToggleSummary: () => void;
   showSummary: boolean;
 }
 
 export const PayrollActions = ({ 
-  isValid, 
-  onApprove, 
   onRecalculate, 
   onToggleSummary,
   showSummary 
@@ -52,16 +48,6 @@ export const PayrollActions = ({
           Guardado automático
         </div>
       </div>
-
-      {isValid && (
-        <Button
-          onClick={onApprove}
-          className="bg-green-600 hover:bg-green-700 text-white"
-        >
-          <CheckCircle className="h-4 w-4 mr-2" />
-          Aprobar y cerrar período
-        </Button>
-      )}
     </div>
   );
 };

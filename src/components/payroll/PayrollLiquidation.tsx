@@ -26,6 +26,8 @@ export const PayrollLiquidation = () => {
       <PayrollPeriodHeader 
         period={currentPeriod}
         isLoading={isLoading}
+        isValid={isValid}
+        onApprove={approvePeriod}
       />
 
       {/* Contenido principal */}
@@ -50,8 +52,6 @@ export const PayrollLiquidation = () => {
 
       {/* Acciones flotantes */}
       <PayrollActions
-        isValid={isValid}
-        onApprove={approvePeriod}
         onRecalculate={recalculateAll}
         onToggleSummary={() => setShowSummary(!showSummary)}
         showSummary={showSummary}

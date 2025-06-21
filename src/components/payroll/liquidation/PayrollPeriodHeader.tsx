@@ -7,6 +7,8 @@ import { PayrollPeriod } from '@/types/payroll';
 interface PayrollPeriodHeaderProps {
   period: PayrollPeriod;
   isLoading: boolean;
+  isValid: boolean;
+  onApprove: () => void;
 }
 
 const statusConfig = {
@@ -16,7 +18,7 @@ const statusConfig = {
   approved: { label: 'Aprobado', color: 'bg-green-100 text-green-800', icon: CheckCircle }
 };
 
-export const PayrollPeriodHeader = ({ period, isLoading }: PayrollPeriodHeaderProps) => {
+export const PayrollPeriodHeader = ({ period, isLoading, isValid, onApprove }: PayrollPeriodHeaderProps) => {
   const config = statusConfig[period.status];
   const StatusIcon = config.icon;
 
@@ -50,6 +52,17 @@ export const PayrollPeriodHeader = ({ period, isLoading }: PayrollPeriodHeaderPr
       </div>
 
       <div className="flex items-center space-x-3">
+        {isValid && period.status !== 'approved' && (
+          <Button
+            onClick={onApprove}
+            className="bg-green-600 hover:bg-green-700 text-white"
+            disabled={isLoading}
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Aprobar y cerrar período
+          </Button>
+        )}
+        
         <Button 
           variant="outline" 
           size="sm"
