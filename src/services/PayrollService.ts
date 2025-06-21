@@ -1,4 +1,3 @@
-
 import { PORCENTAJES_NOMINA, SALARIO_MINIMO_2024, AUXILIO_TRANSPORTE_2024 } from '@/constants';
 import { PayrollCalculation, LegalValidation, Payroll } from '@/types';
 
@@ -31,19 +30,18 @@ export class PayrollService {
     const pagoRecargoNocturno = recargoNocturno;
     const pagoRecargoDominical = recargoDominical;
 
-    // Base para prestaciones sociales (salario + auxilio de transporte, sin horas extra ni recargos)
+    // Base para prestaciones sociales (salario + auxilio de transporte)
     const baseParaPrestaciones = salarioProporcional + auxilioTransporte;
 
-    // Prestaciones sociales - se calculan sobre el salario base mensual, no proporcional
+    // PROVISIONES DEL EMPLEADOR (NO se pagan al empleado, se apartan)
     const cesantias = (baseParaPrestaciones * PORCENTAJES_NOMINA.CESANTIAS) * (diasTrabajados / 30);
     const interesesCesantias = (cesantias * PORCENTAJES_NOMINA.INTERESES_CESANTIAS);
     const prima = (baseParaPrestaciones * PORCENTAJES_NOMINA.PRIMA) * (diasTrabajados / 30);
     const vacaciones = (salarioBase * PORCENTAJES_NOMINA.VACACIONES) * (diasTrabajados / 30);
 
-    // Total devengado
+    // TOTAL A PAGAR AL EMPLEADO (sin provisiones)
     const totalDevengado = salarioProporcional + auxilioTransporte + pagoHorasExtra + 
-                          pagoRecargoNocturno + pagoRecargoDominical + bonificaciones +
-                          cesantias + interesesCesantias + prima + vacaciones;
+                          pagoRecargoNocturno + pagoRecargoDominical + bonificaciones;
 
     // Deducciones - se calculan sobre el salario base mensual completo, no proporcional
     const saludEmpleado = salarioBase * PORCENTAJES_NOMINA.SALUD_EMPLEADO;
