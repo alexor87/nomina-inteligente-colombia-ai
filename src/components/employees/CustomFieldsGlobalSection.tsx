@@ -1,113 +1,169 @@
 
 import { useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Trash, Edit, Plus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CustomField, CUSTOM_FIELD_TYPES } from '@/types/employee-config';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 
 interface CustomFieldsGlobalSectionProps {
-  fields: CustomField[];
-  onAdd: (field: Omit<CustomField, 'id'>) => void;
-  onUpdate: (id: string, updates: Partial<CustomField>) => void;
-  onRemove: (id: string) => void;
+  customFields: CustomField[];
+  onUpdateCustomFields: (fields: CustomField[]) => void;
 }
 
 export const CustomFieldsGlobalSection = ({ 
-  fields, 
-  onAdd, 
-  onUpdate, 
-  onRemove 
+  customFields, 
+  onUpdateCustomFields 
 }: CustomFieldsGlobalSectionProps) => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<CustomField | null>(null);
-  const [fieldForm, setFieldForm] = useState({
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newField, setNewField] = useState<Partial<CustomField>>({
     name: '',
-    type: 'text' as const,
+    type: 'text',
     required: false,
     visibleOnlyToHR: false,
-    editableByEmployee: true,
-    options: ['']
+    editableByEmployee: false,
+    options: []
   });
 
-  const handleOpenDialog = (field?: CustomField) => {
-    if (field) {
-      setEditingField(field);
-      setFieldForm({
-        name: field.name,
-        type: field.type,
-        required: field.required,
-        visibleOnlyToHR: field.visibleOnlyToHR,
-        editableByEmployee: field.editableByEmployee,
-        options: field.options || ['']
-      });
-    } else {
-      setEditingField(null);
-      setFieldForm({
-        name: '',
-        type: 'text',
-        required: false,
-        visibleOnlyToHR: false,
-        editableByEmployee: true,
-        options: ['']
-      });
-    }
-    setIsDialogOpen(true);
-  };
-
   const handleSaveField = () => {
-    const fieldData = {
-      name: fieldForm.name,
-      type: fieldForm.type,
-      required: fieldForm.required,
-      visibleOnlyToHR: fieldForm.visibleOnlyToHR,
-      editableByEmployee: fieldForm.editableByEmployee,
-      options: fieldForm.type === 'list' ? fieldForm.options.filter(opt => opt.trim()) : undefined
+    if (!newField.name) return;
+
+    const field: CustomField = {
+      id: editingField?.id || Date.now().toString(),
+      name: newField.name,
+      type: newField.type as any,
+      required: newField.required || false,
+      visibleOnlyToHR: newField.visibleOnlyToHR || false,
+      editableByEmployee: newField.editableByEmployee || false,
+      options: newField.type === 'list' ? newField.options : undefined
     };
 
     if (editingField) {
-      onUpdate(editingField.id, fieldData);
+      onUpdateCustomFields(customFields.map(f => f.id === editingField.id ? field : f));
     } else {
-      onAdd(fieldData);
+      onUpdateCustomFields([...customFields, field]);
     }
-    
+
+    resetForm();
+  };
+
+  const handleDeleteField = (fieldId: string) => {
+    onUpdateCustomFields(customFields.filter(f => f.id !== fieldId));
+  };
+
+  const resetForm = () => {
+    setNewField({
+      name: '',
+      type: 'text',
+      required: false,
+      visibleOnlyToHR: false,
+      editableByEmployee: false,
+      options: []
+    });
+    setEditingField(null);
     setIsDialogOpen(false);
   };
 
+  const handleEditField = (field: CustomField) => {
+    setEditingField(field);
+    setNewField({
+      name: field.name,
+      type: field.type,
+      required: field.required,
+      visibleOnlyToHR: field.visibleOnlyToHR,
+      editableByEmployee: field.editableByEmployee,
+      options: field.options || []
+    });
+    setIsDialogOpen(true);
+  };
+
   const addOption = () => {
-    setFieldForm(prev => ({
+    setNewField(prev => ({
       ...prev,
-      options: [...prev.options, '']
+      options: [...(prev.options || []), '']
     }));
   };
 
   const updateOption = (index: number, value: string) => {
-    setFieldForm(prev => ({
+    setNewField(prev => ({
       ...prev,
-      options: prev.options.map((opt, i) => i === index ? value : opt)
+      options: prev.options?.map((opt, i) => i === index ? value : opt) || []
     }));
   };
 
   const removeOption = (index: number) => {
-    setFieldForm(prev => ({
+    setNewField(prev => ({
       ...prev,
-      options: prev.options.filter((_, i) => i !== index)
+      options: prev.options?.filter((_, i) => i !== index) || []
     }));
   };
 
   return (
-    <Card className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium">🧩 Campos Personalizados Globales</h3>
+    <Card>
+      <CardHeader>
+        <CardTitle>Campos Personalizados Globales</CardTitle>
+        <CardDescription>
+          Define campos adicionales que aparecerán en la ficha de todos los empleados
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {customFields.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No hay campos personalizados definidos
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {customFields.map((field) => (
+              <div key={field.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">{field.name}</span>
+                    <Badge variant="outline">
+                      {CUSTOM_FIELD_TYPES.find(t => t.value === field.type)?.label}
+                    </Badge>
+                    {field.required && <Badge variant="secondary">Obligatorio</Badge>}
+                    {field.visibleOnlyToHR && <Badge variant="secondary">Solo RRHH</Badge>}
+                    {field.editableByEmployee && <Badge variant="secondary">Editable</Badge>}
+                  </div>
+                  {field.type === 'list' && field.options && (
+                    <div className="text-sm text-gray-600">
+                      Opciones: {field.options.join(', ')}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditField(field)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteField(field.id)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
+            <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Agregar Campo
+              Agregar Campo Personalizado
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
@@ -115,22 +171,28 @@ export const CustomFieldsGlobalSection = ({
               <DialogTitle>
                 {editingField ? 'Editar Campo' : 'Nuevo Campo Personalizado'}
               </DialogTitle>
+              <DialogDescription>
+                Define un campo adicional para la ficha de empleados
+              </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div>
                 <Label htmlFor="fieldName">Nombre del campo</Label>
                 <Input
                   id="fieldName"
-                  value={fieldForm.name}
-                  onChange={(e) => setFieldForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Ej: Número de cuenta bancaria"
+                  value={newField.name}
+                  onChange={(e) => setNewField(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ej: Número de hijos"
                 />
               </div>
 
               <div>
                 <Label htmlFor="fieldType">Tipo de campo</Label>
-                <Select value={fieldForm.type} onValueChange={(value: any) => setFieldForm(prev => ({ ...prev, type: value }))}>
+                <Select
+                  value={newField.type}
+                  onValueChange={(value) => setNewField(prev => ({ ...prev, type: value as any }))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -144,120 +206,81 @@ export const CustomFieldsGlobalSection = ({
                 </Select>
               </div>
 
-              {fieldForm.type === 'list' && (
+              {newField.type === 'list' && (
                 <div>
                   <Label>Opciones de la lista</Label>
-                  <div className="space-y-2 mt-2">
-                    {fieldForm.options.map((option, index) => (
-                      <div key={index} className="flex gap-2">
+                  <div className="space-y-2">
+                    {(newField.options || []).map((option, index) => (
+                      <div key={index} className="flex items-center space-x-2">
                         <Input
                           value={option}
                           onChange={(e) => updateOption(index, e.target.value)}
                           placeholder={`Opción ${index + 1}`}
                         />
-                        {fieldForm.options.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeOption(index)}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeOption(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
-                    <Button type="button" variant="outline" size="sm" onClick={addOption}>
-                      + Agregar opción
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addOption}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar opción
                     </Button>
                   </div>
                 </div>
               )}
 
               <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="required">Campo obligatorio</Label>
+                  <Switch
                     id="required"
-                    checked={fieldForm.required}
-                    onCheckedChange={(checked) => setFieldForm(prev => ({ ...prev, required: !!checked }))}
+                    checked={newField.required}
+                    onCheckedChange={(checked) => setNewField(prev => ({ ...prev, required: checked }))}
                   />
-                  <Label htmlFor="required">¿Es obligatorio?</Label>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="visibleOnlyToHR"
-                    checked={fieldForm.visibleOnlyToHR}
-                    onCheckedChange={(checked) => setFieldForm(prev => ({ ...prev, visibleOnlyToHR: !!checked }))}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="hrOnly">Visible solo para RRHH</Label>
+                  <Switch
+                    id="hrOnly"
+                    checked={newField.visibleOnlyToHR}
+                    onCheckedChange={(checked) => setNewField(prev => ({ ...prev, visibleOnlyToHR: checked }))}
                   />
-                  <Label htmlFor="visibleOnlyToHR">¿Visible solo para RRHH?</Label>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="editableByEmployee"
-                    checked={fieldForm.editableByEmployee}
-                    onCheckedChange={(checked) => setFieldForm(prev => ({ ...prev, editableByEmployee: !!checked }))}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="editable">Editable por empleado</Label>
+                  <Switch
+                    id="editable"
+                    checked={newField.editableByEmployee}
+                    onCheckedChange={(checked) => setNewField(prev => ({ ...prev, editableByEmployee: checked }))}
                   />
-                  <Label htmlFor="editableByEmployee">¿Puede editarlo el empleado?</Label>
                 </div>
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button onClick={handleSaveField} disabled={!fieldForm.name.trim()}>
-                  {editingField ? 'Actualizar' : 'Crear Campo'}
-                </Button>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
               </div>
             </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={resetForm}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveField} disabled={!newField.name}>
+                {editingField ? 'Guardar Cambios' : 'Crear Campo'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-
-      {fields.length > 0 ? (
-        <div className="space-y-3">
-          {fields.map((field) => (
-            <div
-              key={field.id}
-              className="flex items-center justify-between p-3 border rounded-lg bg-gray-50"
-            >
-              <div className="flex-1">
-                <div className="font-medium">{field.name}</div>
-                <div className="text-sm text-gray-600">
-                  Tipo: {CUSTOM_FIELD_TYPES.find(t => t.value === field.type)?.label}
-                  {field.required && ' • Obligatorio'}
-                  {field.visibleOnlyToHR && ' • Solo RRHH'}
-                  {!field.editableByEmployee && ' • No editable por empleado'}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleOpenDialog(field)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onRemove(field.id)}
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-8 text-gray-500">
-          No hay campos personalizados configurados.
-          <br />
-          <span className="text-sm">Haz clic en "Agregar Campo" para crear el primero.</span>
-        </div>
-      )}
+      </CardContent>
     </Card>
   );
 };

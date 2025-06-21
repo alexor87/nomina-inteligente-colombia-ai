@@ -55,14 +55,14 @@ export const EmployeeFiltersComponent = ({
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">Estado</label>
             <Select 
-              value={filters.estado || ''} 
-              onValueChange={(value) => onUpdateFilters({ estado: value || undefined })}
+              value={filters.estado || 'all'} 
+              onValueChange={(value) => onUpdateFilters({ estado: value === 'all' ? undefined : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos los estados" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="all">Todos los estados</SelectItem>
                 {ESTADOS_EMPLEADO.map((estado) => (
                   <SelectItem key={estado.value} value={estado.value}>
                     {estado.label}
@@ -75,14 +75,14 @@ export const EmployeeFiltersComponent = ({
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">Tipo de Contrato</label>
             <Select 
-              value={filters.tipoContrato || ''} 
-              onValueChange={(value) => onUpdateFilters({ tipoContrato: value || undefined })}
+              value={filters.tipoContrato || 'all'} 
+              onValueChange={(value) => onUpdateFilters({ tipoContrato: value === 'all' ? undefined : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos los contratos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los contratos</SelectItem>
+                <SelectItem value="all">Todos los contratos</SelectItem>
                 {CONTRACT_TYPES.map((tipo) => (
                   <SelectItem key={tipo.value} value={tipo.value}>
                     {tipo.label}
@@ -95,14 +95,14 @@ export const EmployeeFiltersComponent = ({
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">Centro de Costo</label>
             <Select 
-              value={filters.centroCosto || ''} 
-              onValueChange={(value) => onUpdateFilters({ centroCosto: value || undefined })}
+              value={filters.centroCosto || 'all'} 
+              onValueChange={(value) => onUpdateFilters({ centroCosto: value === 'all' ? undefined : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos los centros" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los centros</SelectItem>
+                <SelectItem value="all">Todos los centros</SelectItem>
                 {CENTROS_COSTO.map((centro) => (
                   <SelectItem key={centro} value={centro}>
                     {centro}
@@ -115,14 +115,14 @@ export const EmployeeFiltersComponent = ({
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">Nivel Riesgo ARL</label>
             <Select 
-              value={filters.nivelRiesgoARL || ''} 
-              onValueChange={(value) => onUpdateFilters({ nivelRiesgoARL: value || undefined })}
+              value={filters.nivelRiesgoARL || 'all'} 
+              onValueChange={(value) => onUpdateFilters({ nivelRiesgoARL: value === 'all' ? undefined : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos los niveles" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los niveles</SelectItem>
+                <SelectItem value="all">Todos los niveles</SelectItem>
                 {ARL_RISK_LEVELS.map((nivel) => (
                   <SelectItem key={nivel.value} value={nivel.value}>
                     {nivel.label}
@@ -156,10 +156,10 @@ export const EmployeeFiltersComponent = ({
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">Afiliación</label>
             <Select 
-              value={filters.afiliacionIncompleta === undefined ? '' : filters.afiliacionIncompleta.toString()} 
+              value={filters.afiliacionIncompleta === undefined ? 'all' : filters.afiliacionIncompleta.toString()} 
               onValueChange={(value) => 
                 onUpdateFilters({ 
-                  afiliacionIncompleta: value === '' ? undefined : value === 'true' 
+                  afiliacionIncompleta: value === 'all' ? undefined : value === 'true' 
                 })
               }
             >
@@ -167,7 +167,7 @@ export const EmployeeFiltersComponent = ({
                 <SelectValue placeholder="Todas las afiliaciones" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las afiliaciones</SelectItem>
+                <SelectItem value="all">Todas las afiliaciones</SelectItem>
                 <SelectItem value="false">Solo afiliaciones completas</SelectItem>
                 <SelectItem value="true">Solo afiliaciones incompletas</SelectItem>
               </SelectContent>
