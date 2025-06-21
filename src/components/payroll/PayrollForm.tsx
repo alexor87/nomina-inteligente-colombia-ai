@@ -1,6 +1,6 @@
 
 import { PayrollCalculation } from '@/types';
-import { SALARIO_MINIMO_2024 } from '@/constants';
+import { ConfigurationService } from '@/services/ConfigurationService';
 
 interface PayrollFormProps {
   calculation: PayrollCalculation;
@@ -9,6 +9,8 @@ interface PayrollFormProps {
 }
 
 export const PayrollForm = ({ calculation, onInputChange, onCalculate }: PayrollFormProps) => {
+  const config = ConfigurationService.getConfiguration();
+  
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">Datos del Empleado</h2>
@@ -23,10 +25,10 @@ export const PayrollForm = ({ calculation, onInputChange, onCalculate }: Payroll
             value={calculation.salarioBase}
             onChange={(e) => onInputChange('salarioBase', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            min={SALARIO_MINIMO_2024}
+            min={config.salarioMinimo}
           />
           <p className="text-xs text-gray-500 mt-1">
-            Salario mínimo 2024: ${SALARIO_MINIMO_2024.toLocaleString()}
+            Salario mínimo vigente: ${config.salarioMinimo.toLocaleString()}
           </p>
         </div>
 
