@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
 import { PayrollTable } from './liquidation/PayrollTable';
-import { PayrollSummaryPanel } from './liquidation/PayrollSummaryPanel';
+import { PayrollSummaryCards } from './liquidation/PayrollSummaryCards';
 import { PayrollActions } from './liquidation/PayrollActions';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 
@@ -18,8 +18,6 @@ export const PayrollLiquidation = () => {
     isLoading
   } = usePayrollLiquidation();
 
-  const [showSummary, setShowSummary] = useState(true);
-
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header fijo */}
@@ -29,6 +27,9 @@ export const PayrollLiquidation = () => {
         isValid={isValid}
         onApprove={approvePeriod}
       />
+
+      {/* Resumen en tarjetas */}
+      <PayrollSummaryCards summary={summary} />
 
       {/* Contenido principal */}
       <div className="flex-1 flex overflow-hidden">
@@ -40,21 +41,13 @@ export const PayrollLiquidation = () => {
             isLoading={isLoading}
           />
         </div>
-
-        {/* Panel lateral */}
-        {showSummary && (
-          <PayrollSummaryPanel
-            summary={summary}
-            onClose={() => setShowSummary(false)}
-          />
-        )}
       </div>
 
       {/* Acciones flotantes */}
       <PayrollActions
         onRecalculate={recalculateAll}
-        onToggleSummary={() => setShowSummary(!showSummary)}
-        showSummary={showSummary}
+        onToggleSummary={() => {}} // No longer needed but keeping for compatibility
+        showSummary={true}
       />
     </div>
   );
