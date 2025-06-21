@@ -42,6 +42,21 @@ interface PayrollSummary {
   totalPayrollCost: number;
 }
 
+// Base employee data type for calculations
+interface BaseEmployeeData {
+  id: string;
+  name: string;
+  position: string;
+  baseSalary: number;
+  workedDays: number;
+  extraHours: number;
+  disabilities: number;
+  bonuses: number;
+  absences: number;
+  eps?: string;
+  afp?: string;
+}
+
 // Mock data inicial
 const mockPeriod: PayrollPeriod = {
   id: '1',
@@ -51,7 +66,7 @@ const mockPeriod: PayrollPeriod = {
   type: 'quincenal'
 };
 
-const mockEmployeesBase = [
+const mockEmployeesBase: BaseEmployeeData[] = [
   {
     id: '1',
     name: 'María García',
@@ -100,7 +115,7 @@ export const usePayrollLiquidation = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Función para calcular un empleado usando el servicio
-  const calculateEmployee = useCallback((baseEmployee: typeof mockEmployeesBase[0]): PayrollEmployee => {
+  const calculateEmployee = useCallback((baseEmployee: BaseEmployeeData): PayrollEmployee => {
     const input: PayrollCalculationInput = {
       baseSalary: baseEmployee.baseSalary,
       workedDays: baseEmployee.workedDays,
@@ -172,7 +187,20 @@ export const usePayrollLiquidation = () => {
   const updateEmployee = useCallback(async (id: string, field: string, value: number) => {
     setEmployees(prev => prev.map(emp => {
       if (emp.id === id) {
-        const updated = { ...emp, [field]: value };
+        const updated: BaseEmployeeData = {
+          id: emp.id,
+          name: emp.name,
+          position: emp.position,
+          baseSalary: emp.baseSalary,
+          workedDays: emp.workedDays,
+          extraHours: emp.extraHours,
+          disabilities: emp.disabilities,
+          bonuses: emp.bonuses,
+          absences: emp.absences,
+          eps: emp.eps,
+          afp: emp.afp,
+          [field]: value
+        };
         return calculateEmployee(updated);
       }
       return emp;
@@ -196,7 +224,22 @@ export const usePayrollLiquidation = () => {
       
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      setEmployees(prev => prev.map(emp => calculateEmployee(emp)));
+      setEmployees(prev => prev.map(emp => {
+        const baseData: BaseEmployeeData = {
+          id: emp.id,
+          name: emp.name,
+          position: emp.position,
+          baseSalary: emp.baseSalary,
+          workedDays: emp.workedDays,
+          extraHours: emp.extraHours,
+          disabilities: emp.disabilities,
+          bonuses: emp.bonuses,
+          absences: emp.absences,
+          eps: emp.eps,
+          afp: emp.afp
+        };
+        return calculateEmployee(baseData);
+      }));
 
       toast({
         title: "Recálculo completado",
