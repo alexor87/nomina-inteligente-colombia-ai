@@ -1,21 +1,44 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ConfigurationService } from '@/services/ConfigurationService';
+import { ConfigurationService, PayrollConfiguration } from '@/services/ConfigurationService';
+import { Plus, Trash2, Copy } from 'lucide-react';
 
 export const ParametrosLegalesSettings = () => {
   const { toast } = useToast();
-  const [config, setConfig] = useState(() => ConfigurationService.getConfiguration());
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('2025');
+  const [config, setConfig] = useState<PayrollConfiguration>(() => 
+    ConfigurationService.getConfiguration('2025')
+  );
+  const [newYear, setNewYear] = useState('');
+  const [showNewYearForm, setShowNewYearForm] = useState(false);
+
+  useEffect(() => {
+    loadAvailableYears();
+  }, []);
+
+  useEffect(() => {
+    const yearConfig = ConfigurationService.getConfiguration(selectedYear);
+    setConfig(yearConfig);
+  }, [selectedYear]);
+
+  const loadAvailableYears = () => {
+    const years = ConfigurationService.getAvailableYears();
+    setAvailableYears(years);
+    if (years.length > 0 && !years.includes(selectedYear)) {
+      setSelectedYear(years[0]);
+    }
+  };
 
   const handleSave = () => {
     try {
-      ConfigurationService.updateConfiguration(config);
+      ConfigurationService.updateYearConfiguration(selectedYear, config);
       toast({
         title: "Parámetros legales guardados",
         description: `Los valores para el año ${selectedYear} han sido actualizados correctamente.`,
@@ -24,6 +47,65 @@ export const ParametrosLegalesSettings = () => {
       toast({
         title: "Error",
         description: "No se pudieron guardar los parámetros legales.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateNewYear = () => {
+    if (!newYear || newYear.length !== 4 || isNaN(parseInt(newYear))) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa un año válido (4 dígitos).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      ConfigurationService.createNewYear(newYear, selectedYear);
+      loadAvailableYears();
+      setSelectedYear(newYear);
+      setNewYear('');
+      setShowNewYearForm(false);
+      toast({
+        title: "Año creado",
+        description: `El año ${newYear} ha sido creado exitosamente.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteYear = (year: string) => {
+    if (availableYears.length <= 1) {
+      toast({
+        title: "Error",
+        description: "No se puede eliminar el último año configurado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      ConfigurationService.deleteYear(year);
+      loadAvailableYears();
+      const remainingYears = ConfigurationService.getAvailableYears();
+      if (remainingYears.length > 0) {
+        setSelectedYear(remainingYears[0]);
+      }
+      toast({
+        title: "Año eliminado",
+        description: `El año ${year} ha sido eliminado.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
         variant: "destructive",
       });
     }
@@ -58,7 +140,7 @@ export const ParametrosLegalesSettings = () => {
     setConfig(recommendedConfig);
     toast({
       title: "Valores recomendados cargados",
-      description: "Se han cargado los valores oficiales para 2025.",
+      description: `Se han cargado los valores oficiales para ${selectedYear}.`,
     });
   };
 
@@ -69,22 +151,94 @@ export const ParametrosLegalesSettings = () => {
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">📅 Parámetros Legales del Año</h2>
           <p className="text-gray-600">Mantén actualizado el sistema con la legislación vigente</p>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <Label htmlFor="year">Año:</Label>
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2025">2025</SelectItem>
-              <SelectItem value="2024">2024</SelectItem>
-              <SelectItem value="2023">2023</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
+      {/* Gestión de Años */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">Años Configurados</h3>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowNewYearForm(!showNewYearForm)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Año
+          </Button>
+        </div>
+
+        {showNewYearForm && (
+          <div className="bg-gray-50 p-4 rounded-lg mb-4 border-2 border-dashed border-gray-300">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <Label htmlFor="newYear">Año</Label>
+                <Input
+                  id="newYear"
+                  type="number"
+                  placeholder="2026"
+                  value={newYear}
+                  onChange={(e) => setNewYear(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex gap-2 mt-6">
+                <Button onClick={handleCreateNewYear} size="sm">
+                  Crear
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setShowNewYearForm(false);
+                    setNewYear('');
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              Se copiarán los valores del año {selectedYear} como base
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {availableYears.map((year) => (
+            <div 
+              key={year} 
+              className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                selectedYear === year 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => setSelectedYear(year)}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-lg">{year}</span>
+                {availableYears.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteYear(year);
+                    }}
+                    className="text-red-500 hover:text-red-700 h-8 w-8 p-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              {selectedYear === year && (
+                <div className="text-xs text-blue-600 mt-1">Seleccionado</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Configuración del Año Seleccionado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Valores Base {selectedYear}</h3>
@@ -221,7 +375,7 @@ export const ParametrosLegalesSettings = () => {
               max="100"
               value={(config.porcentajes.prima * 100).toFixed(4)}
               onChange={(e) => handlePercentageChange('prima', e.target.value)}
-              className="mt1"
+              className="mt-1"
             />
           </div>
 
@@ -287,7 +441,17 @@ export const ParametrosLegalesSettings = () => {
         <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
           Guardar Parámetros {selectedYear}
         </Button>
-        <Button variant="outline">
+        <Button 
+          variant="outline"
+          onClick={() => {
+            const yearConfig = ConfigurationService.getConfiguration(selectedYear);
+            setConfig(yearConfig);
+            toast({
+              title: "Cambios revertidos",
+              description: `Se han restaurado los valores guardados para ${selectedYear}.`,
+            });
+          }}
+        >
           Revertir Cambios
         </Button>
         <Button variant="secondary" onClick={loadRecommendedValues}>

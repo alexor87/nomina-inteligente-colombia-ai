@@ -19,10 +19,14 @@ export interface PayrollConfiguration {
   };
 }
 
-const DEFAULT_CONFIG: PayrollConfiguration = {
-  salarioMinimo: 1300000, // 2024
-  auxilioTransporte: 200000, // 2025
-  uvt: 47065, // 2024
+export interface YearlyConfiguration {
+  [year: string]: PayrollConfiguration;
+}
+
+const DEFAULT_CONFIG_2025: PayrollConfiguration = {
+  salarioMinimo: 1300000,
+  auxilioTransporte: 200000,
+  uvt: 47065,
   porcentajes: {
     saludEmpleado: 0.04,
     pensionEmpleado: 0.04,
@@ -39,41 +43,88 @@ const DEFAULT_CONFIG: PayrollConfiguration = {
   }
 };
 
-export class ConfigurationService {
-  private static readonly STORAGE_KEY = 'payroll_configuration';
+const DEFAULT_YEARLY_CONFIG: YearlyConfiguration = {
+  '2025': DEFAULT_CONFIG_2025,
+  '2024': {
+    ...DEFAULT_CONFIG_2025,
+    salarioMinimo: 1160000,
+    auxilioTransporte: 162000,
+    uvt: 42412,
+  }
+};
 
-  static getConfiguration(): PayrollConfiguration {
+export class ConfigurationService {
+  private static readonly STORAGE_KEY = 'payroll_yearly_configuration';
+
+  static getYearlyConfiguration(): YearlyConfiguration {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) {
         const config = JSON.parse(stored);
-        // Merge with defaults to ensure all properties exist
-        return {
-          ...DEFAULT_CONFIG,
-          ...config,
-          porcentajes: {
-            ...DEFAULT_CONFIG.porcentajes,
-            ...config.porcentajes
-          }
-        };
+        return { ...DEFAULT_YEARLY_CONFIG, ...config };
       }
     } catch (error) {
-      console.error('Error loading configuration:', error);
+      console.error('Error loading yearly configuration:', error);
     }
-    return DEFAULT_CONFIG;
+    return DEFAULT_YEARLY_CONFIG;
   }
 
-  static updateConfiguration(config: PayrollConfiguration): void {
+  static getConfiguration(year: string = '2025'): PayrollConfiguration {
+    const yearlyConfig = this.getYearlyConfiguration();
+    return yearlyConfig[year] || DEFAULT_CONFIG_2025;
+  }
+
+  static updateYearConfiguration(year: string, config: PayrollConfiguration): void {
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
+      const yearlyConfig = this.getYearlyConfiguration();
+      yearlyConfig[year] = config;
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(yearlyConfig));
     } catch (error) {
-      console.error('Error saving configuration:', error);
+      console.error('Error saving yearly configuration:', error);
       throw new Error('No se pudo guardar la configuración');
     }
   }
 
-  static resetToDefaults(): PayrollConfiguration {
+  static createNewYear(year: string, baseYear?: string): PayrollConfiguration {
+    const yearlyConfig = this.getYearlyConfiguration();
+    
+    if (yearlyConfig[year]) {
+      throw new Error(`El año ${year} ya existe`);
+    }
+
+    const baseConfig = baseYear && yearlyConfig[baseYear] 
+      ? yearlyConfig[baseYear] 
+      : DEFAULT_CONFIG_2025;
+
+    yearlyConfig[year] = { ...baseConfig };
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(yearlyConfig));
+    
+    return yearlyConfig[year];
+  }
+
+  static deleteYear(year: string): void {
+    const yearlyConfig = this.getYearlyConfiguration();
+    
+    if (Object.keys(yearlyConfig).length <= 1) {
+      throw new Error('No se puede eliminar el último año configurado');
+    }
+
+    delete yearlyConfig[year];
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(yearlyConfig));
+  }
+
+  static getAvailableYears(): string[] {
+    const yearlyConfig = this.getYearlyConfiguration();
+    return Object.keys(yearlyConfig).sort((a, b) => parseInt(b) - parseInt(a));
+  }
+
+  // Método de compatibilidad
+  static updateConfiguration(config: PayrollConfiguration): void {
+    this.updateYearConfiguration('2025', config);
+  }
+
+  static resetToDefaults(): YearlyConfiguration {
     localStorage.removeItem(this.STORAGE_KEY);
-    return DEFAULT_CONFIG;
+    return DEFAULT_YEARLY_CONFIG;
   }
 }
