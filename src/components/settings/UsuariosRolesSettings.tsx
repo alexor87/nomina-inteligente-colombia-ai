@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,17 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -31,8 +42,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Edit, Trash2, User } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, User, UserX, Mail, AlertCircle } from 'lucide-react';
 
 interface Usuario {
   id: string;
@@ -41,6 +51,8 @@ interface Usuario {
   rol: string;
   estado: 'Activo' | 'Invitación pendiente' | 'Suspendido';
   ultimoAcceso: string;
+  fechaInvitacion?: string;
+  fechaRegistro?: string;
 }
 
 interface ActividadAuditoria {
@@ -49,83 +61,371 @@ interface ActividadAuditoria {
   accion: string;
   fecha: string;
   resultado: 'Éxito' | 'Error';
+  detalles?: string;
+}
+
+interface FormularioInvitacion {
+  email: string;
+  rol: string;
+  nombreCompleto: string;
+}
+
+interface EditarUsuario {
+  id: string;
+  nombreCompleto: string;
+  rol: string;
+  estado: Usuario['estado'];
 }
 
 const rolesDisponibles = [
-  { value: 'administrador', label: 'Administrador', descripcion: 'Acceso total a todas las secciones y configuraciones' },
-  { value: 'rrhh', label: 'RRHH', descripcion: 'Gestión de empleados, contratos, novedades, vacaciones' },
-  { value: 'contador', label: 'Contador', descripcion: 'Revisión de nómina, generación de reportes y archivos' },
-  { value: 'visualizador', label: 'Visualizador', descripcion: 'Solo lectura (empleados, reportes, configuración)' },
-  { value: 'soporte', label: 'Soporte externo', descripcion: 'Acceso limitado y temporal, sin ver datos personales' }
+  { 
+    value: 'administrador', 
+    label: 'Administrador', 
+    descripcion: 'Acceso total a todas las secciones y configuraciones',
+    permisos: ['crear', 'editar', 'eliminar', 'configurar', 'invitar']
+  },
+  { 
+    value: 'rrhh', 
+    label: 'RRHH', 
+    descripcion: 'Gestión de empleados, contratos, novedades, vacaciones',
+    permisos: ['empleados', 'contratos', 'novedades', 'vacaciones']
+  },
+  { 
+    value: 'contador', 
+    label: 'Contador', 
+    descripcion: 'Revisión de nómina, generación de reportes y archivos',
+    permisos: ['nomina', 'reportes', 'archivos']
+  },
+  { 
+    value: 'visualizador', 
+    label: 'Visualizador', 
+    descripcion: 'Solo lectura (empleados, reportes, configuración)',
+    permisos: ['lectura']
+  },
+  { 
+    value: 'soporte', 
+    label: 'Soporte externo', 
+    descripcion: 'Acceso limitado y temporal, sin ver datos personales',
+    permisos: ['soporte']
+  }
 ];
+
+const STORAGE_KEY = 'empresa_usuarios';
+const AUDIT_KEY = 'empresa_auditoria';
 
 export const UsuariosRolesSettings = () => {
   const { toast } = useToast();
+  
+  // Estados principales
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [historialAuditoria, setHistorialAuditoria] = useState<ActividadAuditoria[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Estados de modales
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [usuarioEditando, setUsuarioEditando] = useState<EditarUsuario | null>(null);
+  
+  // Estados de filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroRol, setFiltroRol] = useState('todos');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   
-  // Datos mock de usuarios
-  const [usuarios, setUsuarios] = useState<Usuario[]>([
-    {
-      id: '1',
-      nombreCompleto: 'Admin Usuario',
-      email: 'admin@empresa.com',
-      rol: 'administrador',
-      estado: 'Activo',
-      ultimoAcceso: '2024-01-20'
-    },
-    {
-      id: '2',
-      nombreCompleto: 'María González',
-      email: 'maria.gonzalez@empresa.com',
-      rol: 'rrhh',
-      estado: 'Activo',
-      ultimoAcceso: '2024-01-19'
-    },
-    {
-      id: '3',
-      nombreCompleto: 'Carlos Pérez',
-      email: 'carlos.perez@empresa.com',
-      rol: 'contador',
-      estado: 'Invitación pendiente',
-      ultimoAcceso: 'N/A'
-    }
-  ]);
-
-  // Historial de auditoría mock
-  const [historialAuditoria] = useState<ActividadAuditoria[]>([
-    {
-      id: '1',
-      usuario: 'admin@empresa.com',
-      accion: 'Invitó a nuevo usuario: carlos.perez@empresa.com',
-      fecha: '2024-01-20 10:30',
-      resultado: 'Éxito'
-    },
-    {
-      id: '2',
-      usuario: 'maria.gonzalez@empresa.com',
-      accion: 'Modificó contrato de Juan Pérez',
-      fecha: '2024-01-19 14:15',
-      resultado: 'Éxito'
-    },
-    {
-      id: '3',
-      usuario: 'admin@empresa.com',
-      accion: 'Cambió configuración de aportes',
-      fecha: '2024-01-18 09:45',
-      resultado: 'Error'
-    }
-  ]);
-
-  // Estados del formulario de invitación
-  const [inviteForm, setInviteForm] = useState({
+  // Estados de formularios
+  const [inviteForm, setInviteForm] = useState<FormularioInvitacion>({
     email: '',
     rol: '',
     nombreCompleto: ''
   });
+  
+  // Estados de validación
+  const [erroresValidacion, setErroresValidacion] = useState<Record<string, string>>({});
 
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    cargarDatos();
+  }, []);
+
+  const cargarDatos = () => {
+    try {
+      // Cargar usuarios
+      const usuariosGuardados = localStorage.getItem(STORAGE_KEY);
+      if (usuariosGuardados) {
+        setUsuarios(JSON.parse(usuariosGuardados));
+      } else {
+        // Datos iniciales si no existen
+        const usuariosIniciales: Usuario[] = [
+          {
+            id: '1',
+            nombreCompleto: 'Admin Usuario',
+            email: 'admin@empresa.com',
+            rol: 'administrador',
+            estado: 'Activo',
+            ultimoAcceso: new Date().toISOString().split('T')[0],
+            fechaRegistro: '2024-01-01'
+          }
+        ];
+        setUsuarios(usuariosIniciales);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(usuariosIniciales));
+      }
+
+      // Cargar auditoría
+      const auditoriaGuardada = localStorage.getItem(AUDIT_KEY);
+      if (auditoriaGuardada) {
+        setHistorialAuditoria(JSON.parse(auditoriaGuardada));
+      }
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos de usuarios",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const guardarUsuarios = (nuevosUsuarios: Usuario[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nuevosUsuarios));
+      setUsuarios(nuevosUsuarios);
+    } catch (error) {
+      console.error('Error guardando usuarios:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar los cambios",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const agregarActividad = (actividad: Omit<ActividadAuditoria, 'id' | 'fecha'>) => {
+    try {
+      const nuevaActividad: ActividadAuditoria = {
+        ...actividad,
+        id: Date.now().toString(),
+        fecha: new Date().toLocaleString('es-ES')
+      };
+      
+      const nuevaAuditoria = [nuevaActividad, ...historialAuditoria].slice(0, 100); // Mantener últimas 100
+      setHistorialAuditoria(nuevaAuditoria);
+      localStorage.setItem(AUDIT_KEY, JSON.stringify(nuevaAuditoria));
+    } catch (error) {
+      console.error('Error guardando actividad:', error);
+    }
+  };
+
+  const validarEmail = (email: string): boolean => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  };
+
+  const validarFormularioInvitacion = (): boolean => {
+    const errores: Record<string, string> = {};
+
+    if (!inviteForm.email.trim()) {
+      errores.email = 'El correo electrónico es obligatorio';
+    } else if (!validarEmail(inviteForm.email)) {
+      errores.email = 'Ingrese un correo electrónico válido';
+    } else if (usuarios.some(u => u.email.toLowerCase() === inviteForm.email.toLowerCase())) {
+      errores.email = 'Ya existe un usuario con este correo electrónico';
+    }
+
+    if (!inviteForm.rol) {
+      errores.rol = 'Debe seleccionar un rol';
+    }
+
+    setErroresValidacion(errores);
+    return Object.keys(errores).length === 0;
+  };
+
+  const handleInviteUser = async () => {
+    if (!validarFormularioInvitacion()) {
+      return;
+    }
+
+    try {
+      const nuevoUsuario: Usuario = {
+        id: Date.now().toString(),
+        nombreCompleto: inviteForm.nombreCompleto.trim() || 'Nombre pendiente',
+        email: inviteForm.email.toLowerCase().trim(),
+        rol: inviteForm.rol,
+        estado: 'Invitación pendiente',
+        ultimoAcceso: 'N/A',
+        fechaInvitacion: new Date().toISOString().split('T')[0]
+      };
+
+      const usuariosActualizados = [...usuarios, nuevoUsuario];
+      guardarUsuarios(usuariosActualizados);
+
+      // Simular envío de invitación por correo
+      await simularEnvioInvitacion(nuevoUsuario.email);
+
+      agregarActividad({
+        usuario: 'admin@empresa.com', // En producción sería el usuario actual
+        accion: `Invitó a nuevo usuario: ${nuevoUsuario.email}`,
+        resultado: 'Éxito',
+        detalles: `Rol asignado: ${getRolLabel(nuevoUsuario.rol)}`
+      });
+
+      setInviteForm({ email: '', rol: '', nombreCompleto: '' });
+      setErroresValidacion({});
+      setIsInviteModalOpen(false);
+
+      toast({
+        title: "Invitación enviada",
+        description: `Se ha enviado una invitación a ${nuevoUsuario.email}`,
+      });
+    } catch (error) {
+      console.error('Error invitando usuario:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo enviar la invitación",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const simularEnvioInvitacion = async (email: string): Promise<void> => {
+    // Simular delay de red
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(`Invitación enviada a: ${email}`);
+  };
+
+  const cambiarEstadoUsuario = (id: string, nuevoEstado: Usuario['estado']) => {
+    const usuariosActualizados = usuarios.map(usuario => {
+      if (usuario.id === id) {
+        const estadoAnterior = usuario.estado;
+        return { 
+          ...usuario, 
+          estado: nuevoEstado,
+          ultimoAcceso: nuevoEstado === 'Activo' ? new Date().toISOString().split('T')[0] : usuario.ultimoAcceso
+        };
+      }
+      return usuario;
+    });
+
+    guardarUsuarios(usuariosActualizados);
+
+    const usuario = usuarios.find(u => u.id === id);
+    if (usuario) {
+      const accion = nuevoEstado === 'Suspendido' ? 'suspendió' : 'activó';
+      agregarActividad({
+        usuario: 'admin@empresa.com',
+        accion: `${accion.charAt(0).toUpperCase() + accion.slice(1)} usuario: ${usuario.email}`,
+        resultado: 'Éxito'
+      });
+    }
+
+    toast({
+      title: "Estado actualizado",
+      description: `El usuario ha sido ${nuevoEstado.toLowerCase()}`,
+    });
+  };
+
+  const eliminarUsuario = (id: string) => {
+    const usuario = usuarios.find(u => u.id === id);
+    if (!usuario) return;
+
+    // No permitir eliminar el último administrador
+    const administradores = usuarios.filter(u => u.rol === 'administrador' && u.id !== id);
+    if (usuario.rol === 'administrador' && administradores.length === 0) {
+      toast({
+        title: "No se puede eliminar",
+        description: "Debe existir al menos un administrador en el sistema",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const usuariosActualizados = usuarios.filter(u => u.id !== id);
+    guardarUsuarios(usuariosActualizados);
+
+    agregarActividad({
+      usuario: 'admin@empresa.com',
+      accion: `Eliminó usuario: ${usuario.email}`,
+      resultado: 'Éxito'
+    });
+
+    toast({
+      title: "Usuario eliminado",
+      description: "El usuario ha sido eliminado del sistema",
+    });
+  };
+
+  const reenviarInvitacion = async (id: string) => {
+    const usuario = usuarios.find(u => u.id === id);
+    if (!usuario || usuario.estado !== 'Invitación pendiente') return;
+
+    try {
+      await simularEnvioInvitacion(usuario.email);
+      
+      agregarActividad({
+        usuario: 'admin@empresa.com',
+        accion: `Reenvió invitación a: ${usuario.email}`,
+        resultado: 'Éxito'
+      });
+
+      toast({
+        title: "Invitación reenviada",
+        description: `Se ha reenviado la invitación a ${usuario.email}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo reenviar la invitación",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const abrirModalEdicion = (usuario: Usuario) => {
+    setUsuarioEditando({
+      id: usuario.id,
+      nombreCompleto: usuario.nombreCompleto,
+      rol: usuario.rol,
+      estado: usuario.estado
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const guardarEdicionUsuario = () => {
+    if (!usuarioEditando) return;
+
+    const usuariosActualizados = usuarios.map(usuario => 
+      usuario.id === usuarioEditando.id 
+        ? { 
+            ...usuario, 
+            nombreCompleto: usuarioEditando.nombreCompleto,
+            rol: usuarioEditando.rol,
+            estado: usuarioEditando.estado
+          }
+        : usuario
+    );
+
+    guardarUsuarios(usuariosActualizados);
+
+    const usuario = usuarios.find(u => u.id === usuarioEditando.id);
+    if (usuario) {
+      agregarActividad({
+        usuario: 'admin@empresa.com',
+        accion: `Modificó usuario: ${usuario.email}`,
+        resultado: 'Éxito',
+        detalles: `Nuevo rol: ${getRolLabel(usuarioEditando.rol)}`
+      });
+    }
+
+    setIsEditModalOpen(false);
+    setUsuarioEditando(null);
+
+    toast({
+      title: "Usuario actualizado",
+      description: "Los cambios han sido guardados correctamente",
+    });
+  };
+
+  // Filtrado de usuarios
   const usuariosFiltrados = usuarios.filter(usuario => {
     const coincideBusqueda = usuario.nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             usuario.email.toLowerCase().includes(searchTerm.toLowerCase());
@@ -135,64 +435,22 @@ export const UsuariosRolesSettings = () => {
     return coincideBusqueda && coincidenRol && coincidenEstado;
   });
 
-  const handleInviteUser = () => {
-    if (!inviteForm.email || !inviteForm.rol) {
-      toast({
-        title: "Error",
-        description: "Email y rol son campos obligatorios",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const nuevoUsuario: Usuario = {
-      id: Date.now().toString(),
-      nombreCompleto: inviteForm.nombreCompleto || 'Nombre pendiente',
-      email: inviteForm.email,
-      rol: inviteForm.rol,
-      estado: 'Invitación pendiente',
-      ultimoAcceso: 'N/A'
-    };
-
-    setUsuarios([...usuarios, nuevoUsuario]);
-    setInviteForm({ email: '', rol: '', nombreCompleto: '' });
-    setIsInviteModalOpen(false);
-
-    toast({
-      title: "Invitación enviada",
-      description: `Se ha enviado una invitación a ${inviteForm.email}`,
-    });
-  };
-
-  const suspenderUsuario = (id: string) => {
-    setUsuarios(usuarios.map(usuario => 
-      usuario.id === id 
-        ? { ...usuario, estado: usuario.estado === 'Suspendido' ? 'Activo' : 'Suspendido' as const }
-        : usuario
-    ));
-
-    toast({
-      title: "Estado actualizado",
-      description: "El estado del usuario ha sido modificado",
-    });
-  };
-
-  const eliminarUsuario = (id: string) => {
-    setUsuarios(usuarios.filter(usuario => usuario.id !== id));
-    toast({
-      title: "Usuario eliminado",
-      description: "El usuario ha sido eliminado del sistema",
-    });
-  };
-
   const getEstadoBadge = (estado: Usuario['estado']) => {
     const variants = {
-      'Activo': 'default',
-      'Invitación pendiente': 'secondary',
-      'Suspendido': 'destructive'
-    } as const;
+      'Activo': { variant: 'default' as const, icon: User },
+      'Invitación pendiente': { variant: 'secondary' as const, icon: Mail },
+      'Suspendido': { variant: 'destructive' as const, icon: UserX }
+    };
 
-    return <Badge variant={variants[estado]}>{estado}</Badge>;
+    const config = variants[estado];
+    const Icon = config.icon;
+
+    return (
+      <Badge variant={config.variant} className="flex items-center gap-1">
+        <Icon className="h-3 w-3" />
+        {estado}
+      </Badge>
+    );
   };
 
   const getRolLabel = (rol: string) => {
@@ -200,12 +458,21 @@ export const UsuariosRolesSettings = () => {
     return rolEncontrado?.label || rol;
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Configuración guardada",
-      description: "La configuración de usuarios ha sido actualizada.",
-    });
+  const getRolDescripcion = (rol: string) => {
+    const rolEncontrado = rolesDisponibles.find(r => r.value === rol);
+    return rolEncontrado?.descripcion || '';
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando usuarios...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -223,7 +490,13 @@ export const UsuariosRolesSettings = () => {
         <TabsContent value="usuarios" className="space-y-6">
           <Card className="p-6">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-medium">Usuarios del Sistema</h3>
+              <div>
+                <h3 className="text-lg font-medium">Usuarios del Sistema</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''} registrado{usuarios.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              
               <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
                 <DialogTrigger asChild>
                   <Button className="bg-blue-600 hover:bg-blue-700">
@@ -231,13 +504,14 @@ export const UsuariosRolesSettings = () => {
                     Invitar nuevo usuario
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
                     <DialogTitle>Invitar nuevo usuario</DialogTitle>
                     <DialogDescription>
                       Envía una invitación para que un nuevo usuario acceda al sistema.
                     </DialogDescription>
                   </DialogHeader>
+                  
                   <div className="grid gap-4 py-4">
                     <div className="space-y-2">
                       <Label htmlFor="email">Correo electrónico *</Label>
@@ -246,13 +520,34 @@ export const UsuariosRolesSettings = () => {
                         type="email"
                         placeholder="usuario@empresa.com"
                         value={inviteForm.email}
-                        onChange={(e) => setInviteForm({...inviteForm, email: e.target.value})}
+                        onChange={(e) => {
+                          setInviteForm({...inviteForm, email: e.target.value});
+                          if (erroresValidacion.email) {
+                            setErroresValidacion({...erroresValidacion, email: ''});
+                          }
+                        }}
+                        className={erroresValidacion.email ? 'border-red-500' : ''}
                       />
+                      {erroresValidacion.email && (
+                        <p className="text-sm text-red-500 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          {erroresValidacion.email}
+                        </p>
+                      )}
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="rol">Rol a asignar *</Label>
-                      <Select value={inviteForm.rol} onValueChange={(value) => setInviteForm({...inviteForm, rol: value})}>
-                        <SelectTrigger>
+                      <Select 
+                        value={inviteForm.rol} 
+                        onValueChange={(value) => {
+                          setInviteForm({...inviteForm, rol: value});
+                          if (erroresValidacion.rol) {
+                            setErroresValidacion({...erroresValidacion, rol: ''});
+                          }
+                        }}
+                      >
+                        <SelectTrigger className={erroresValidacion.rol ? 'border-red-500' : ''}>
                           <SelectValue placeholder="Seleccionar rol" />
                         </SelectTrigger>
                         <SelectContent>
@@ -260,13 +555,20 @@ export const UsuariosRolesSettings = () => {
                             <SelectItem key={rol.value} value={rol.value}>
                               <div>
                                 <div className="font-medium">{rol.label}</div>
-                                <div className="text-sm text-gray-500">{rol.descripcion}</div>
+                                <div className="text-xs text-gray-500">{rol.descripcion}</div>
                               </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {erroresValidacion.rol && (
+                        <p className="text-sm text-red-500 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          {erroresValidacion.rol}
+                        </p>
+                      )}
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="nombre">Nombre completo (opcional)</Label>
                       <Input
@@ -275,10 +577,17 @@ export const UsuariosRolesSettings = () => {
                         value={inviteForm.nombreCompleto}
                         onChange={(e) => setInviteForm({...inviteForm, nombreCompleto: e.target.value})}
                       />
+                      <p className="text-xs text-gray-500">
+                        Si no se especifica, el usuario podrá completarlo al aceptar la invitación
+                      </p>
                     </div>
                   </div>
+
                   <DialogFooter>
-                    <Button type="submit" onClick={handleInviteUser}>
+                    <Button variant="outline" onClick={() => setIsInviteModalOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleInviteUser}>
                       Enviar invitación
                     </Button>
                   </DialogFooter>
@@ -297,6 +606,7 @@ export const UsuariosRolesSettings = () => {
                   className="pl-10"
                 />
               </div>
+              
               <Select value={filtroRol} onValueChange={setFiltroRol}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filtrar por rol" />
@@ -308,6 +618,7 @@ export const UsuariosRolesSettings = () => {
                   ))}
                 </SelectContent>
               </Select>
+              
               <Select value={filtroEstado} onValueChange={setFiltroEstado}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filtrar por estado" />
@@ -335,36 +646,95 @@ export const UsuariosRolesSettings = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {usuariosFiltrados.map((usuario) => (
-                    <TableRow key={usuario.id}>
-                      <TableCell className="font-medium">{usuario.nombreCompleto}</TableCell>
-                      <TableCell>{usuario.email}</TableCell>
-                      <TableCell>{getRolLabel(usuario.rol)}</TableCell>
-                      <TableCell>{getEstadoBadge(usuario.estado)}</TableCell>
-                      <TableCell>{usuario.ultimoAcceso}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => suspenderUsuario(usuario.id)}
-                          >
-                            <User className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => eliminarUsuario(usuario.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                  {usuariosFiltrados.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                        {searchTerm || filtroRol !== 'todos' || filtroEstado !== 'todos' 
+                          ? 'No se encontraron usuarios con los filtros aplicados'
+                          : 'No hay usuarios registrados'
+                        }
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    usuariosFiltrados.map((usuario) => (
+                      <TableRow key={usuario.id}>
+                        <TableCell className="font-medium">{usuario.nombreCompleto}</TableCell>
+                        <TableCell>{usuario.email}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{getRolLabel(usuario.rol)}</div>
+                            <div className="text-xs text-gray-500">{getRolDescripcion(usuario.rol)}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getEstadoBadge(usuario.estado)}</TableCell>
+                        <TableCell>{usuario.ultimoAcceso}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => abrirModalEdicion(usuario)}
+                              title="Editar usuario"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            
+                            {usuario.estado === 'Invitación pendiente' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => reenviarInvitacion(usuario.id)}
+                                title="Reenviar invitación"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            )}
+                            
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => cambiarEstadoUsuario(
+                                usuario.id, 
+                                usuario.estado === 'Suspendido' ? 'Activo' : 'Suspendido'
+                              )}
+                              title={usuario.estado === 'Suspendido' ? 'Activar usuario' : 'Suspender usuario'}
+                            >
+                              {usuario.estado === 'Suspendido' ? <User className="h-4 w-4" /> : <UserX className="h-4 w-4" />}
+                            </Button>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  title="Eliminar usuario"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. El usuario {usuario.email} será eliminado permanentemente del sistema.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => eliminarUsuario(usuario.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -373,7 +743,13 @@ export const UsuariosRolesSettings = () => {
 
         <TabsContent value="auditoria" className="space-y-6">
           <Card className="p-6">
-            <h3 className="text-lg font-medium mb-4">Historial de Actividad</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Historial de Actividad</h3>
+              <p className="text-sm text-gray-500">
+                {historialAuditoria.length} actividad{historialAuditoria.length !== 1 ? 'es' : ''} registrada{historialAuditoria.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            
             <div className="border rounded-lg">
               <Table>
                 <TableHeader>
@@ -385,18 +761,33 @@ export const UsuariosRolesSettings = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {historialAuditoria.map((actividad) => (
-                    <TableRow key={actividad.id}>
-                      <TableCell className="font-medium">{actividad.usuario}</TableCell>
-                      <TableCell>{actividad.accion}</TableCell>
-                      <TableCell>{actividad.fecha}</TableCell>
-                      <TableCell>
-                        <Badge variant={actividad.resultado === 'Éxito' ? 'default' : 'destructive'}>
-                          {actividad.resultado}
-                        </Badge>
+                  {historialAuditoria.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                        No hay actividades registradas
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    historialAuditoria.map((actividad) => (
+                      <TableRow key={actividad.id}>
+                        <TableCell className="font-medium">{actividad.usuario}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div>{actividad.accion}</div>
+                            {actividad.detalles && (
+                              <div className="text-xs text-gray-500 mt-1">{actividad.detalles}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{actividad.fecha}</TableCell>
+                        <TableCell>
+                          <Badge variant={actividad.resultado === 'Éxito' ? 'default' : 'destructive'}>
+                            {actividad.resultado}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -404,12 +795,85 @@ export const UsuariosRolesSettings = () => {
         </TabsContent>
       </Tabs>
 
+      {/* Modal de edición */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar usuario</DialogTitle>
+            <DialogDescription>
+              Modificar la información del usuario seleccionado.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {usuarioEditando && (
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-nombre">Nombre completo</Label>
+                <Input
+                  id="edit-nombre"
+                  value={usuarioEditando.nombreCompleto}
+                  onChange={(e) => setUsuarioEditando({
+                    ...usuarioEditando,
+                    nombreCompleto: e.target.value
+                  })}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-rol">Rol</Label>
+                <Select 
+                  value={usuarioEditando.rol} 
+                  onValueChange={(value) => setUsuarioEditando({
+                    ...usuarioEditando,
+                    rol: value
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rolesDisponibles.map((rol) => (
+                      <SelectItem key={rol.value} value={rol.value}>
+                        <div>
+                          <div className="font-medium">{rol.label}</div>
+                          <div className="text-xs text-gray-500">{rol.descripcion}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarEdicionUsuario}>
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex gap-4">
-        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => toast({
+          title: "Configuración guardada",
+          description: "La configuración de usuarios ha sido actualizada.",
+        })} className="bg-blue-600 hover:bg-blue-700">
           Guardar Configuración
         </Button>
-        <Button variant="outline">
-          Revertir Cambios
+        <Button variant="outline" onClick={() => {
+          setSearchTerm('');
+          setFiltroRol('todos');
+          setFiltroEstado('todos');
+          toast({
+            title: "Filtros restablecidos",
+            description: "Se han limpiado todos los filtros aplicados.",
+          });
+        }}>
+          Limpiar Filtros
         </Button>
       </div>
     </div>
