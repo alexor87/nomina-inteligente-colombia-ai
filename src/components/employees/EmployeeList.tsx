@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Table, 
   TableBody, 
@@ -21,9 +21,13 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { EmployeeFiltersComponent } from './EmployeeFilters';
+import { EmployeeFormModal } from './EmployeeFormModal';
+import { EmployeeDetails } from './EmployeeDetails';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
+import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { CONTRACT_TYPES } from '@/types/employee-config';
+import { Employee } from '@/types';
 import { 
   Eye, 
   Pencil, 
@@ -53,7 +57,13 @@ export const EmployeeList = () => {
     filteredCount
   } = useEmployeeList();
 
-  const [showBulkActions, setShowBulkActions] = useState(false);
+  const { changeEmployeeStatus } = useEmployeeCRUD();
+
+  // Estados para los modales
+  const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+  const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
   const getStatusColor = (status: string) => {
     const estado = ESTADOS_EMPLEADO.find(e => e.value === status);
@@ -109,6 +119,37 @@ export const EmployeeList = () => {
     );
   };
 
+  const handleViewEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setShowEmployeeDetails(true);
+  };
+
+  const handleEditEmployee = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setShowEmployeeForm(true);
+  };
+
+  const handleNewEmployee = () => {
+    setEditingEmployee(null);
+    setShowEmployeeForm(true);
+  };
+
+  const handleEmployeeFormSuccess = () => {
+    // En un escenario real, aquí recargaríamos la lista desde la API
+    console.log('Employee saved successfully');
+  };
+
+  const handleStatusChange = async (employeeId: string, newStatus: string) => {
+    await changeEmployeeStatus(employeeId, newStatus);
+    // En un escenario real, aquí actualizaríamos la lista
+  };
+
+  const handleExportSelected = () => {
+    const selectedData = employees.filter(emp => selectedEmployees.includes(emp.id));
+    console.log('Exporting selected employees:', selectedData);
+    exportEmployees('excel');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -131,7 +172,7 @@ export const EmployeeList = () => {
             Importar
           </Button>
           
-          <Button>
+          <Button onClick={handleNewEmployee}>
             <UserPlus className="h-4 w-4 mr-2" />
             Nuevo Empleado
           </Button>
@@ -173,7 +214,7 @@ export const EmployeeList = () => {
                 <Button 
                   size="sm" 
                   variant="outline"
-                  onClick={() => exportEmployees('excel')}
+                  onClick={handleExportSelected}
                 >
                   Exportar seleccionados
                 </Button>
@@ -328,11 +369,11 @@ export const EmployeeList = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewEmployee(employee)}>
                           <Eye className="h-4 w-4 mr-2" />
                           Ver ficha
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
                           <Pencil className="h-4 w-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
@@ -346,6 +387,7 @@ export const EmployeeList = () => {
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           className={employee.estado === 'activo' ? 'text-red-600' : 'text-green-600'}
+                          onClick={() => handleStatusChange(employee.id, employee.estado === 'activo' ? 'inactivo' : 'activo')}
                         >
                           {employee.estado === 'activo' ? 'Inactivar' : 'Reactivar'}
                         </DropdownMenuItem>
@@ -369,6 +411,33 @@ export const EmployeeList = () => {
           </div>
         )}
       </Card>
+
+      {/* Modal para formulario de empleado */}
+      <EmployeeFormModal
+        isOpen={showEmployeeForm}
+        onClose={() => setShowEmployeeForm(false)}
+        employee={editingEmployee}
+        onSuccess={handleEmployeeFormSuccess}
+      />
+
+      {/* Modal para detalles del empleado */}
+      {selectedEmployee && (
+        <Dialog open={showEmployeeDetails} onOpenChange={setShowEmployeeDetails}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Detalles del Empleado</DialogTitle>
+            </DialogHeader>
+            <EmployeeDetails
+              employee={selectedEmployee}
+              onEdit={() => {
+                setShowEmployeeDetails(false);
+                handleEditEmployee(selectedEmployee);
+              }}
+              onClose={() => setShowEmployeeDetails(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
