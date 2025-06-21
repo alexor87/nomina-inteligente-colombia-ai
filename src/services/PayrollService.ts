@@ -1,3 +1,4 @@
+
 import { PORCENTAJES_NOMINA, SALARIO_MINIMO_2024, AUXILIO_TRANSPORTE_2024 } from '@/constants';
 import { PayrollCalculation, LegalValidation, Payroll } from '@/types';
 
@@ -30,22 +31,22 @@ export class PayrollService {
     const pagoRecargoNocturno = recargoNocturno;
     const pagoRecargoDominical = recargoDominical;
 
-    // Base para prestaciones sociales (salario + auxilio de transporte)
+    // Base para prestaciones sociales (salario proporcional + auxilio de transporte)
     const baseParaPrestaciones = salarioProporcional + auxilioTransporte;
 
     // PROVISIONES DEL EMPLEADOR (NO se pagan al empleado, se apartan)
-    const cesantias = (baseParaPrestaciones * PORCENTAJES_NOMINA.CESANTIAS) * (diasTrabajados / 30);
-    const interesesCesantias = (cesantias * PORCENTAJES_NOMINA.INTERESES_CESANTIAS);
-    const prima = (baseParaPrestaciones * PORCENTAJES_NOMINA.PRIMA) * (diasTrabajados / 30);
-    const vacaciones = (salarioBase * PORCENTAJES_NOMINA.VACACIONES) * (diasTrabajados / 30);
+    const cesantias = (baseParaPrestaciones * PORCENTAJES_NOMINA.CESANTIAS);
+    const interesesCesantias = (cesantias * PORCENTAJES_NOMINA.INTERESES_CESANTIAS) / 12; // Mensual
+    const prima = (baseParaPrestaciones * PORCENTAJES_NOMINA.PRIMA);
+    const vacaciones = (salarioProporcional * PORCENTAJES_NOMINA.VACACIONES);
 
     // TOTAL A PAGAR AL EMPLEADO (sin provisiones)
     const totalDevengado = salarioProporcional + auxilioTransporte + pagoHorasExtra + 
                           pagoRecargoNocturno + pagoRecargoDominical + bonificaciones;
 
-    // Deducciones - se calculan sobre el salario base mensual completo, no proporcional
-    const saludEmpleado = salarioBase * PORCENTAJES_NOMINA.SALUD_EMPLEADO;
-    const pensionEmpleado = salarioBase * PORCENTAJES_NOMINA.PENSION_EMPLEADO;
+    // Deducciones - se calculan sobre el salario proporcional según días trabajados
+    const saludEmpleado = salarioProporcional * PORCENTAJES_NOMINA.SALUD_EMPLEADO;
+    const pensionEmpleado = salarioProporcional * PORCENTAJES_NOMINA.PENSION_EMPLEADO;
     
     // Retención en la fuente (simplificado)
     const retencionFuente = this.calculateRetencionFuente(salarioBase);
