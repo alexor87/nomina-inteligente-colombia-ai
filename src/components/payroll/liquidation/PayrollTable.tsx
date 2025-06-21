@@ -7,22 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AlertCircle, CheckCircle, User, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-interface PayrollEmployee {
-  id: string;
-  name: string;
-  position: string;
-  workedDays: number;
-  extraHours: number;
-  disabilities: number;
-  bonuses: number;
-  absences: number;
-  grossPay: number;
-  deductions: number;
-  netPay: number;
-  status: 'valid' | 'error' | 'incomplete';
-  errors: string[];
-}
+import { PayrollEmployee } from '@/types/payroll';
 
 interface PayrollTableProps {
   employees: PayrollEmployee[];

@@ -2,14 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-
-interface PayrollPeriod {
-  id: string;
-  startDate: string;
-  endDate: string;
-  status: 'draft' | 'in_progress' | 'closed' | 'approved';
-  type: 'quincenal' | 'mensual';
-}
+import { PayrollPeriod } from '@/types/payroll';
 
 interface PayrollPeriodHeaderProps {
   period: PayrollPeriod;

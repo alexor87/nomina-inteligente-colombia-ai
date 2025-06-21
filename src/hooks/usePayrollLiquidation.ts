@@ -1,166 +1,16 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { PayrollCalculationService, PayrollCalculationInput } from '@/services/PayrollCalculationService';
-
-interface PayrollPeriod {
-  id: string;
-  startDate: string;
-  endDate: string;
-  status: 'draft' | 'in_progress' | 'closed' | 'approved';
-  type: 'quincenal' | 'mensual';
-}
-
-interface PayrollEmployee {
-  id: string;
-  name: string;
-  position: string;
-  baseSalary: number;
-  workedDays: number;
-  extraHours: number;
-  disabilities: number;
-  bonuses: number;
-  absences: number;
-  grossPay: number;
-  deductions: number;
-  netPay: number;
-  status: 'valid' | 'error' | 'incomplete';
-  errors: string[];
-  eps?: string;
-  afp?: string;
-  transportAllowance: number;
-  employerContributions: number;
-}
-
-interface PayrollSummary {
-  totalEmployees: number;
-  validEmployees: number;
-  totalGrossPay: number;
-  totalDeductions: number;
-  totalNetPay: number;
-  employerContributions: number;
-  totalPayrollCost: number;
-}
-
-// Base employee data type for calculations
-interface BaseEmployeeData {
-  id: string;
-  name: string;
-  position: string;
-  baseSalary: number;
-  workedDays: number;
-  extraHours: number;
-  disabilities: number;
-  bonuses: number;
-  absences: number;
-  eps?: string;
-  afp?: string;
-}
-
-// Mock data inicial
-const mockPeriod: PayrollPeriod = {
-  id: '1',
-  startDate: '2025-06-01',
-  endDate: '2025-06-15',
-  status: 'in_progress',
-  type: 'quincenal'
-};
-
-const mockEmployeesBase: BaseEmployeeData[] = [
-  {
-    id: '1',
-    name: 'María García',
-    position: 'Desarrolladora Senior',
-    baseSalary: 2600000,
-    workedDays: 15,
-    extraHours: 8,
-    disabilities: 0,
-    bonuses: 200000,
-    absences: 0,
-    eps: 'Compensar',
-    afp: 'Protección'
-  },
-  {
-    id: '2',
-    name: 'Carlos López',
-    position: 'Contador',
-    baseSalary: 1800000,
-    workedDays: 13,
-    extraHours: 0,
-    disabilities: 2,
-    bonuses: 0,
-    absences: 2,
-    eps: 'Sura',
-    afp: 'Porvenir'
-  },
-  {
-    id: '3',
-    name: 'Ana Rodríguez',
-    position: 'Gerente Comercial',
-    baseSalary: 4200000,
-    workedDays: 15,
-    extraHours: 5,
-    disabilities: 0,
-    bonuses: 500000,
-    absences: 0,
-    eps: 'Compensar',
-    afp: 'Colfondos'
-  }
-];
+import { PayrollCalculationService } from '@/services/PayrollCalculationService';
+import { PayrollPeriod, PayrollEmployee, PayrollSummary } from '@/types/payroll';
+import { mockPeriod, mockEmployeesBase } from '@/data/mockPayrollData';
+import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 
 export const usePayrollLiquidation = () => {
   const { toast } = useToast();
   const [currentPeriod, setCurrentPeriod] = useState<PayrollPeriod>(mockPeriod);
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Función para calcular un empleado usando el servicio
-  const calculateEmployee = useCallback((baseEmployee: BaseEmployeeData): PayrollEmployee => {
-    const input: PayrollCalculationInput = {
-      baseSalary: baseEmployee.baseSalary,
-      workedDays: baseEmployee.workedDays,
-      extraHours: baseEmployee.extraHours,
-      disabilities: baseEmployee.disabilities,
-      bonuses: baseEmployee.bonuses,
-      absences: baseEmployee.absences,
-      periodType: currentPeriod.type
-    };
-
-    const calculation = PayrollCalculationService.calculatePayroll(input);
-    const validation = PayrollCalculationService.validateEmployee(input, baseEmployee.eps, baseEmployee.afp);
-
-    return {
-      ...baseEmployee,
-      grossPay: calculation.grossPay,
-      deductions: calculation.totalDeductions,
-      netPay: calculation.netPay,
-      transportAllowance: calculation.transportAllowance,
-      employerContributions: calculation.employerContributions,
-      status: validation.isValid ? 'valid' : 'error',
-      errors: [...validation.errors, ...validation.warnings]
-    };
-  }, [currentPeriod.type]);
-
-  // Calcular resumen
-  const calculateSummary = useCallback((): PayrollSummary => {
-    const totalEmployees = employees.length;
-    const validEmployees = employees.filter(emp => emp.status === 'valid').length;
-    const totalGrossPay = employees.reduce((sum, emp) => sum + emp.grossPay, 0);
-    const totalDeductions = employees.reduce((sum, emp) => sum + emp.deductions, 0);
-    const totalNetPay = employees.reduce((sum, emp) => sum + emp.netPay, 0);
-    const employerContributions = employees.reduce((sum, emp) => sum + emp.employerContributions, 0);
-    const totalPayrollCost = totalNetPay + employerContributions;
-
-    return {
-      totalEmployees,
-      validEmployees,
-      totalGrossPay,
-      totalDeductions,
-      totalNetPay,
-      employerContributions,
-      totalPayrollCost
-    };
-  }, [employees]);
 
   const [summary, setSummary] = useState<PayrollSummary>({
     totalEmployees: 0,
@@ -174,41 +24,31 @@ export const usePayrollLiquidation = () => {
 
   // Inicializar empleados
   useEffect(() => {
-    const calculatedEmployees = mockEmployeesBase.map(emp => calculateEmployee(emp));
+    const calculatedEmployees = mockEmployeesBase.map(emp => 
+      calculateEmployee(emp, currentPeriod.type)
+    );
     setEmployees(calculatedEmployees);
-  }, [calculateEmployee]);
+  }, [currentPeriod.type]);
 
   // Actualizar resumen
   useEffect(() => {
-    setSummary(calculateSummary());
-  }, [employees, calculateSummary]);
+    setSummary(calculatePayrollSummary(employees));
+  }, [employees]);
 
   // Actualizar empleado
   const updateEmployee = useCallback(async (id: string, field: string, value: number) => {
     setEmployees(prev => prev.map(emp => {
       if (emp.id === id) {
-        const updated: BaseEmployeeData = {
-          id: emp.id,
-          name: emp.name,
-          position: emp.position,
-          baseSalary: emp.baseSalary,
-          workedDays: emp.workedDays,
-          extraHours: emp.extraHours,
-          disabilities: emp.disabilities,
-          bonuses: emp.bonuses,
-          absences: emp.absences,
-          eps: emp.eps,
-          afp: emp.afp,
-          [field]: value
-        };
-        return calculateEmployee(updated);
+        const updated = convertToBaseEmployeeData(emp);
+        const updatedWithNewValue = { ...updated, [field]: value };
+        return calculateEmployee(updatedWithNewValue, currentPeriod.type);
       }
       return emp;
     }));
 
     // Simulación de guardado automático
     await new Promise(resolve => setTimeout(resolve, 300));
-  }, [calculateEmployee]);
+  }, [currentPeriod.type]);
 
   // Recalcular todos
   const recalculateAll = useCallback(async () => {
@@ -225,20 +65,8 @@ export const usePayrollLiquidation = () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       setEmployees(prev => prev.map(emp => {
-        const baseData: BaseEmployeeData = {
-          id: emp.id,
-          name: emp.name,
-          position: emp.position,
-          baseSalary: emp.baseSalary,
-          workedDays: emp.workedDays,
-          extraHours: emp.extraHours,
-          disabilities: emp.disabilities,
-          bonuses: emp.bonuses,
-          absences: emp.absences,
-          eps: emp.eps,
-          afp: emp.afp
-        };
-        return calculateEmployee(baseData);
+        const baseData = convertToBaseEmployeeData(emp);
+        return calculateEmployee(baseData, currentPeriod.type);
       }));
 
       toast({
@@ -254,7 +82,7 @@ export const usePayrollLiquidation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, calculateEmployee]);
+  }, [toast, currentPeriod.type]);
 
   // Aprobar período
   const approvePeriod = useCallback(async () => {
