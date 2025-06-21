@@ -102,14 +102,14 @@ export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHisto
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">Estado</label>
           <Select 
-            value={filters.status || ''} 
-            onValueChange={(value) => onFiltersChange({ ...filters, status: value || undefined })}
+            value={filters.status || 'todos'} 
+            onValueChange={(value) => onFiltersChange({ ...filters, status: value === 'todos' ? undefined : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="cerrado">Cerrado</SelectItem>
               <SelectItem value="con_errores">Con errores</SelectItem>
               <SelectItem value="revision_dian">En revisión DIAN</SelectItem>
@@ -122,14 +122,14 @@ export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHisto
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">Tipo período</label>
           <Select 
-            value={filters.periodType || ''} 
-            onValueChange={(value) => onFiltersChange({ ...filters, periodType: value as 'quincenal' | 'mensual' || undefined })}
+            value={filters.periodType || 'todos'} 
+            onValueChange={(value) => onFiltersChange({ ...filters, periodType: value === 'todos' ? undefined : value as 'quincenal' | 'mensual' })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="quincenal">Quincenal</SelectItem>
               <SelectItem value="mensual">Mensual</SelectItem>
             </SelectContent>
