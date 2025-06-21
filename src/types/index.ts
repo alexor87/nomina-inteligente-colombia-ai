@@ -1,4 +1,3 @@
-
 // Tipos principales de la aplicación
 export interface Employee {
   id: string;
@@ -17,6 +16,7 @@ export interface Employee {
   cajaCompensacion?: string;
   cargo?: string;
   empresaId: string;
+  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
   createdAt: string;
   updatedAt: string;
 }

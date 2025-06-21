@@ -26,9 +26,9 @@ interface EmployeeFormData {
   email: string;
   telefono: string;
   salarioBase: number;
-  tipoContrato: string;
+  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  estado: string;
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
   eps: string;
   afp: string;
   arl: string;
@@ -36,6 +36,7 @@ interface EmployeeFormData {
   cargo: string;
   centrosocial: string;
   nivelRiesgoARL: string;
+  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
 }
 
 export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProps) => {
@@ -50,7 +51,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       email: employee?.email || '',
       telefono: employee?.telefono || '',
       salarioBase: employee?.salarioBase || 0,
-      tipoContrato: employee?.tipoContrato || configuration.defaultParameters.defaultContractType,
+      tipoContrato: employee?.tipoContrato || 'indefinido',
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
       estado: employee?.estado || 'activo',
       eps: employee?.eps || '',
@@ -59,7 +60,8 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       cajaCompensacion: employee?.cajaCompensacion || '',
       cargo: employee?.cargo || '',
       centrosocial: '',
-      nivelRiesgoARL: configuration.defaultParameters.defaultARLRiskLevel
+      nivelRiesgoARL: configuration.defaultParameters.defaultARLRiskLevel,
+      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente'
     }
   });
 
@@ -171,7 +173,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
           <div>
             <Label htmlFor="tipoContrato">Tipo de Contrato *</Label>
-            <Select onValueChange={(value) => setValue('tipoContrato', value)}>
+            <Select onValueChange={(value) => setValue('tipoContrato', value as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje')}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar tipo" />
               </SelectTrigger>
@@ -213,7 +215,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
           <div>
             <Label htmlFor="estado">Estado</Label>
-            <Select onValueChange={(value) => setValue('estado', value)}>
+            <Select onValueChange={(value) => setValue('estado', value as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad')}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar estado" />
               </SelectTrigger>
@@ -280,6 +282,20 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
               {...register('cajaCompensacion')}
               placeholder="Compensar"
             />
+          </div>
+
+          <div>
+            <Label htmlFor="estadoAfiliacion">Estado Afiliación</Label>
+            <Select onValueChange={(value) => setValue('estadoAfiliacion', value as 'completa' | 'pendiente' | 'inconsistente')}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="completa">Completa</SelectItem>
+                <SelectItem value="pendiente">Pendiente</SelectItem>
+                <SelectItem value="inconsistente">Inconsistente</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
