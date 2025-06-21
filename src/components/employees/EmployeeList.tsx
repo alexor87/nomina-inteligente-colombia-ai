@@ -354,7 +354,7 @@ export const EmployeeList = () => {
                   </TableCell>
                 </TableRow>
               ))}
-            </tbody>
+            </TableBody>
           </Table>
         </div>
         
