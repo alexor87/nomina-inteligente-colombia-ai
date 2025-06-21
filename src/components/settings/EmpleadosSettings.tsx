@@ -76,7 +76,7 @@ export const EmpleadosSettings = () => {
 
       {/* Campos Personalizados */}
       <CustomFieldsGlobalSection
-        fields={configuration.customFields}
+        customFields={configuration.customFields}
         onAdd={addCustomField}
         onUpdate={updateCustomField}
         onRemove={removeCustomField}
