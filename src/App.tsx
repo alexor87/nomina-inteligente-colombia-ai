@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import PayrollPage from "./pages/PayrollPage";
+import PayrollHistoryPage from "./pages/PayrollHistoryPage";
 import SettingsPage from "./pages/SettingsPage";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -25,7 +26,7 @@ const App = () => (
           <Route path="/empleados" element={<EmployeesPage />} />
           <Route path="/comprobantes" element={<div>Comprobantes - Próximamente</div>} />
           <Route path="/liquidar-nomina" element={<PayrollPage />} />
-          <Route path="/historial-nomina" element={<div>Historial de Nómina - Próximamente</div>} />
+          <Route path="/historial-nomina" element={<PayrollHistoryPage />} />
           <Route path="/pagos" element={<div>Pagos y Dispersión - Próximamente</div>} />
           <Route path="/dian" element={<div>DIAN / Nómina Electrónica - Próximamente</div>} />
           <Route path="/reportes" element={<div>Reportes - Próximamente</div>} />
