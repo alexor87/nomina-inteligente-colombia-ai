@@ -11,10 +11,15 @@ interface SidebarProps {
 const sidebarItems = {
   company: [
     { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { href: '/employees', label: 'Empleados', icon: '👥' },
-    { href: '/payroll', label: 'Nómina', icon: '💰' },
-    { href: '/reports', label: 'Reportes', icon: '📈' },
-    { href: '/settings', label: 'Configuración', icon: '⚙️' },
+    { href: '/empleados', label: 'Empleados', icon: '👥' },
+    { href: '/comprobantes', label: 'Comprobantes', icon: '📋' },
+    { href: '/liquidar-nomina', label: 'Liquidar Nómina', icon: '💵' },
+    { href: '/historial-nomina', label: 'Historial de Nómina', icon: '🕓' },
+    { href: '/pagos', label: 'Pagos y Dispersión', icon: '💳' },
+    { href: '/dian', label: 'DIAN / Nómina Electrónica', icon: '🧾' },
+    { href: '/reportes', label: 'Reportes', icon: '📈' },
+    { href: '/alertas', label: 'Alertas', icon: '🔔' },
+    { href: '/configuracion', label: 'Configuración', icon: '🛠️' },
   ],
   admin: [
     { href: '/admin', label: 'Panel Admin', icon: '🛡️' },
@@ -48,7 +53,10 @@ export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
       )}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-8">
-            <h1 className="text-2xl font-bold text-blue-600">NóminaCol</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-blue-600">NóminaCol</h1>
+              <p className="text-sm text-gray-500 mt-1">Empresa Demo S.A.S.</p>
+            </div>
             <button 
               onClick={onClose}
               className="lg:hidden text-gray-500 hover:text-gray-700"

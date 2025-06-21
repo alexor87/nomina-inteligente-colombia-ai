@@ -22,6 +22,16 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/empleados" element={<EmployeesPage />} />
+          <Route path="/comprobantes" element={<div>Comprobantes - Próximamente</div>} />
+          <Route path="/liquidar-nomina" element={<PayrollPage />} />
+          <Route path="/historial-nomina" element={<div>Historial de Nómina - Próximamente</div>} />
+          <Route path="/pagos" element={<div>Pagos y Dispersión - Próximamente</div>} />
+          <Route path="/dian" element={<div>DIAN / Nómina Electrónica - Próximamente</div>} />
+          <Route path="/reportes" element={<div>Reportes - Próximamente</div>} />
+          <Route path="/alertas" element={<div>Alertas - Próximamente</div>} />
+          <Route path="/configuracion" element={<SettingsPage />} />
+          {/* Legacy routes for compatibility */}
           <Route path="/employees" element={<EmployeesPage />} />
           <Route path="/payroll" element={<PayrollPage />} />
           <Route path="/settings" element={<SettingsPage />} />
