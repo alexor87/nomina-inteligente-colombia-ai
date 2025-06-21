@@ -6,20 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarIcon, InfoIcon, PlusIcon, TrashIcon, HistoryIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-
-interface Sucursal {
-  id: string;
-  nombre: string;
-  direccion: string;
-  ciudad: string;
-}
+import { Calendar, Plus, Trash2, Info } from 'lucide-react';
 
 export const EmpresaSettings = () => {
   const { toast } = useToast();
@@ -29,163 +18,167 @@ export const EmpresaSettings = () => {
     nit: '',
     direccion: '',
     ciudad: '',
+    tipoEmpresa: '',
+    representanteLegal: '',
+    actividadEconomica: '',
+    periodicidadPago: '',
+    centrosCosto: '',
     
     // Información Legal
-    representanteLegal: '',
-    tipoEmpresa: '',
-    actividadEconomica: '',
-    codigoCIIU: '',
-    fechaConstitucion: null as Date | null,
+    fechaConstitucion: '',
     regimenTributario: '',
-    responsableSegSocial: {
+    responsableSeguridad: {
       nombre: '',
       email: ''
     },
     
     // Configuración Operativa
-    periodicidadPago: '',
-    centrosCosto: '',
     cicloContable: {
-      inicio: null as Date | null,
-      fin: null as Date | null
+      inicio: '',
+      fin: ''
     },
-    
-    // Sedes
-    sucursales: [] as Sucursal[]
+    sucursales: [
+      { nombre: '', direccion: '', ciudad: '' }
+    ]
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [lastModified, setLastModified] = useState({
+    user: 'Admin Usuario',
+    date: '2025-01-15 14:30'
+  });
 
-  const validateNIT = (nit: string): boolean => {
-    const nitRegex = /^\d{9}-\d$/;
-    return nitRegex.test(nit);
+  const handleInputChange = (field: string, value: string) => {
+    setConfig(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    // Campos obligatorios
-    if (!config.razonSocial.trim()) {
-      newErrors.razonSocial = 'La razón social es obligatoria';
-    }
-    
-    if (!config.nit.trim()) {
-      newErrors.nit = 'El NIT es obligatorio';
-    } else if (!validateNIT(config.nit)) {
-      newErrors.nit = 'El NIT debe tener el formato XXXXXXXXX-X';
-    }
-    
-    if (!config.tipoEmpresa) {
-      newErrors.tipoEmpresa = 'El tipo de empresa es obligatorio';
-    }
-    
-    if (!config.ciudad.trim()) {
-      newErrors.ciudad = 'La ciudad es obligatoria';
-    }
-    
-    if (!config.periodicidadPago) {
-      newErrors.periodicidadPago = 'La periodicidad de pago es obligatoria';
-    }
-
-    // Validación del email del responsable
-    if (config.responsableSegSocial.email && !validateEmail(config.responsableSegSocial.email)) {
-      newErrors.responsableEmail = 'El correo electrónico no es válido';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSave = () => {
-    if (validateForm()) {
-      toast({
-        title: "Configuración guardada",
-        description: "Los datos de la empresa han sido actualizados correctamente.",
-      });
-    } else {
-      toast({
-        title: "Error de validación",
-        description: "Por favor corrige los errores en el formulario.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setConfig(prev => ({ ...prev, [field]: value }));
-    // Limpiar error cuando el usuario empiece a escribir
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
-
-  const handleNestedInputChange = (parent: string, field: string, value: any) => {
+  const handleNestedInputChange = (parent: string, field: string, value: string) => {
     setConfig(prev => ({
       ...prev,
       [parent]: {
-        ...prev[parent as keyof typeof prev],
+        ...(prev[parent as keyof typeof prev] as object),
         [field]: value
       }
     }));
   };
 
-  const addSucursal = () => {
-    const newSucursal: Sucursal = {
-      id: Date.now().toString(),
-      nombre: '',
-      direccion: '',
-      ciudad: ''
-    };
+  const handleSucursalChange = (index: number, field: string, value: string) => {
     setConfig(prev => ({
       ...prev,
-      sucursales: [...prev.sucursales, newSucursal]
-    }));
-  };
-
-  const removeSucursal = (id: string) => {
-    setConfig(prev => ({
-      ...prev,
-      sucursales: prev.sucursales.filter(s => s.id !== id)
-    }));
-  };
-
-  const updateSucursal = (id: string, field: string, value: string) => {
-    setConfig(prev => ({
-      ...prev,
-      sucursales: prev.sucursales.map(s => 
-        s.id === id ? { ...s, [field]: value } : s
+      sucursales: prev.sucursales.map((sucursal, i) => 
+        i === index ? { ...sucursal, [field]: value } : sucursal
       )
     }));
+  };
+
+  const addSucursal = () => {
+    setConfig(prev => ({
+      ...prev,
+      sucursales: [...prev.sucursales, { nombre: '', direccion: '', ciudad: '' }]
+    }));
+  };
+
+  const removeSucursal = (index: number) => {
+    if (config.sucursales.length > 1) {
+      setConfig(prev => ({
+        ...prev,
+        sucursales: prev.sucursales.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const validateNIT = (nit: string) => {
+    const nitRegex = /^\d{8,10}-\d$/;
+    return nitRegex.test(nit);
+  };
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleSave = () => {
+    // Validaciones
+    const requiredFields = ['razonSocial', 'nit', 'tipoEmpresa', 'ciudad', 'periodicidadPago'];
+    const emptyFields = requiredFields.filter(field => !config[field as keyof typeof config]);
+    
+    if (emptyFields.length > 0) {
+      toast({
+        title: "Campos obligatorios",
+        description: "Por favor completa todos los campos obligatorios.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!validateNIT(config.nit)) {
+      toast({
+        title: "NIT inválido",
+        description: "El NIT debe tener el formato XXXXXXXXX-X con dígito verificador.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (config.responsableSeguridad.email && !validateEmail(config.responsableSeguridad.email)) {
+      toast({
+        title: "Email inválido",
+        description: "Por favor ingresa un correo electrónico válido para el responsable de seguridad social.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    toast({
+      title: "Configuración guardada",
+      description: "Los datos de la empresa han sido actualizados correctamente.",
+    });
+  };
+
+  const handleRevert = () => {
+    // Revertir cambios
+    toast({
+      title: "Cambios revertidos",
+      description: "Se han revertido todos los cambios no guardados.",
+    });
+  };
+
+  const loadRecommended = () => {
+    setConfig(prev => ({
+      ...prev,
+      periodicidadPago: 'mensual',
+      regimenTributario: 'Responsable de IVA'
+    }));
+    toast({
+      title: "Valores recomendados cargados",
+      description: "Se han aplicado los valores recomendados por Aleluya.",
+    });
   };
 
   return (
     <TooltipProvider>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">🧾 Configuración de Empresa</h2>
-          <p className="text-gray-600">Información básica y legal de la empresa</p>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">🧾 Empresa</h2>
+          <p className="text-gray-600">Configuración general de la empresa y datos legales</p>
         </div>
 
         {/* Información Básica */}
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Información Básica</h3>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="razonSocial">Razón Social *</Label>
               <Input
                 id="razonSocial"
                 value={config.razonSocial}
                 onChange={(e) => handleInputChange('razonSocial', e.target.value)}
-                placeholder="Nombre completo de la empresa"
-                className={cn("mt-1", errors.razonSocial && "border-red-500")}
+                placeholder="Ej: Empresa ABC S.A.S."
+                className="mt-1"
               />
-              {errors.razonSocial && <p className="text-sm text-red-500 mt-1">{errors.razonSocial}</p>}
             </div>
 
             <div>
@@ -194,21 +187,22 @@ export const EmpresaSettings = () => {
                 id="nit"
                 value={config.nit}
                 onChange={(e) => handleInputChange('nit', e.target.value)}
-                placeholder="123456789-0"
-                className={cn("mt-1", errors.nit && "border-red-500")}
+                placeholder="Ej: 900123456-7"
+                className="mt-1"
               />
-              {errors.nit && <p className="text-sm text-red-500 mt-1">{errors.nit}</p>}
             </div>
 
             <div>
-              <Label htmlFor="direccion">Dirección</Label>
-              <Input
-                id="direccion"
-                value={config.direccion}
-                onChange={(e) => handleInputChange('direccion', e.target.value)}
-                placeholder="Ej: Calle 123 # 45-67, Barrio Centro"
-                className="mt-1"
-              />
+              <Label htmlFor="tipoEmpresa">Tipo de Empresa *</Label>
+              <Select value={config.tipoEmpresa} onValueChange={(value) => handleInputChange('tipoEmpresa', value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="natural">Persona Natural</SelectItem>
+                  <SelectItem value="juridica">Persona Jurídica</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -217,19 +211,22 @@ export const EmpresaSettings = () => {
                 id="ciudad"
                 value={config.ciudad}
                 onChange={(e) => handleInputChange('ciudad', e.target.value)}
-                placeholder="Ciudad principal"
-                className={cn("mt-1", errors.ciudad && "border-red-500")}
+                placeholder="Ej: Bogotá D.C."
+                className="mt-1"
               />
-              {errors.ciudad && <p className="text-sm text-red-500 mt-1">{errors.ciudad}</p>}
             </div>
-          </div>
-        </Card>
 
-        {/* Información Legal */}
-        <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4">Información Legal</h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <Label htmlFor="direccion">Dirección</Label>
+              <Input
+                id="direccion"
+                value={config.direccion}
+                onChange={(e) => handleInputChange('direccion', e.target.value)}
+                placeholder="Ej: Calle 123 # 45-67, Oficina 890"
+                className="mt-1"
+              />
+            </div>
+
             <div>
               <Label htmlFor="representanteLegal">Representante Legal</Label>
               <Input
@@ -242,36 +239,11 @@ export const EmpresaSettings = () => {
             </div>
 
             <div>
-              <Label htmlFor="tipoEmpresa">Tipo de Empresa *</Label>
-              <Select value={config.tipoEmpresa} onValueChange={(value) => handleInputChange('tipoEmpresa', value)}>
-                <SelectTrigger className={cn("mt-1", errors.tipoEmpresa && "border-red-500")}>
-                  <SelectValue placeholder="Seleccionar tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="natural">Persona Natural</SelectItem>
-                  <SelectItem value="juridica">Persona Jurídica</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.tipoEmpresa && <p className="text-sm text-red-500 mt-1">{errors.tipoEmpresa}</p>}
-            </div>
-
-            <div>
-              <Label htmlFor="actividadEconomica">Actividad Económica</Label>
-              <Input
-                id="actividadEconomica"
-                value={config.actividadEconomica}
-                onChange={(e) => handleInputChange('actividadEconomica', e.target.value)}
-                placeholder="Descripción de la actividad"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="codigoCIIU">Código CIIU</Label>
+                <Label htmlFor="actividadEconomica">Código CIIU</Label>
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <InfoIcon className="h-4 w-4 text-gray-400 cursor-help" />
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-gray-400" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Código de clasificación de actividad económica según DIAN</p>
@@ -279,111 +251,34 @@ export const EmpresaSettings = () => {
                 </Tooltip>
               </div>
               <Input
-                id="codigoCIIU"
-                value={config.codigoCIIU}
-                onChange={(e) => handleInputChange('codigoCIIU', e.target.value)}
-                placeholder="0000"
+                id="actividadEconomica"
+                value={config.actividadEconomica}
+                onChange={(e) => handleInputChange('actividadEconomica', e.target.value)}
+                placeholder="Ej: 6201"
                 className="mt-1"
               />
             </div>
 
             <div>
-              <Label htmlFor="fechaConstitucion">Fecha de Constitución</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full mt-1 justify-start text-left font-normal",
-                      !config.fechaConstitucion && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {config.fechaConstitucion ? format(config.fechaConstitucion, "dd/MM/yyyy") : "Seleccionar fecha"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={config.fechaConstitucion || undefined}
-                    onSelect={(date) => handleInputChange('fechaConstitucion', date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div>
-              <Label htmlFor="regimenTributario">Régimen Tributario</Label>
-              <Select value={config.regimenTributario} onValueChange={(value) => handleInputChange('regimenTributario', value)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Seleccionar régimen" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="no-responsable">No responsable de IVA</SelectItem>
-                  <SelectItem value="responsable">Responsable de IVA</SelectItem>
-                  <SelectItem value="simple">Régimen simple</SelectItem>
-                  <SelectItem value="gran-contribuyente">Gran contribuyente</SelectItem>
-                  <SelectItem value="especial">Régimen especial</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <Label className="text-base font-medium">Responsable de Seguridad Social</Label>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
-              <div>
-                <Label htmlFor="responsableNombre">Nombre Completo</Label>
-                <Input
-                  id="responsableNombre"
-                  value={config.responsableSegSocial.nombre}
-                  onChange={(e) => handleNestedInputChange('responsableSegSocial', 'nombre', e.target.value)}
-                  placeholder="Nombre completo del responsable"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="responsableEmail">Correo Electrónico</Label>
-                <Input
-                  id="responsableEmail"
-                  type="email"
-                  value={config.responsableSegSocial.email}
-                  onChange={(e) => handleNestedInputChange('responsableSegSocial', 'email', e.target.value)}
-                  placeholder="correo@empresa.com"
-                  className={cn("mt-1", errors.responsableEmail && "border-red-500")}
-                />
-                {errors.responsableEmail && <p className="text-sm text-red-500 mt-1">{errors.responsableEmail}</p>}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Configuración Operativa */}
-        <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4">Configuración Operativa</h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
               <Label htmlFor="periodicidadPago">Periodicidad de Pago *</Label>
               <Select value={config.periodicidadPago} onValueChange={(value) => handleInputChange('periodicidadPago', value)}>
-                <SelectTrigger className={cn("mt-1", errors.periodicidadPago && "border-red-500")}>
+                <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Seleccionar periodicidad" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="semanal">Semanal</SelectItem>
                   <SelectItem value="quincenal">Quincenal</SelectItem>
                   <SelectItem value="mensual">Mensual</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.periodicidadPago && <p className="text-sm text-red-500 mt-1">{errors.periodicidadPago}</p>}
             </div>
 
-            <div>
+            <div className="md:col-span-2">
               <div className="flex items-center gap-2">
                 <Label htmlFor="centrosCosto">Centros de Costo</Label>
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <InfoIcon className="h-4 w-4 text-gray-400 cursor-help" />
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-gray-400" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Ej: Administración, Ventas, Producción</p>
@@ -394,65 +289,97 @@ export const EmpresaSettings = () => {
                 id="centrosCosto"
                 value={config.centrosCosto}
                 onChange={(e) => handleInputChange('centrosCosto', e.target.value)}
-                placeholder="Administración, Ventas, Producción (separados por comas)"
+                placeholder="Administración, Ventas, Producción..."
                 className="mt-1"
-                rows={3}
+                rows={2}
               />
             </div>
           </div>
+        </Card>
 
-          <div className="mt-4">
-            <Label className="text-base font-medium">Ciclo Contable (Año Fiscal)</Label>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
-              <div>
-                <Label htmlFor="cicloInicio">Fecha de Inicio</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full mt-1 justify-start text-left font-normal",
-                        !config.cicloContable.inicio && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {config.cicloContable.inicio ? format(config.cicloContable.inicio, "dd/MM/yyyy") : "Fecha de inicio"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={config.cicloContable.inicio || undefined}
-                      onSelect={(date) => handleNestedInputChange('cicloContable', 'inicio', date)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <Label htmlFor="cicloFin">Fecha de Fin</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full mt-1 justify-start text-left font-normal",
-                        !config.cicloContable.fin && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {config.cicloContable.fin ? format(config.cicloContable.fin, "dd/MM/yyyy") : "Fecha de fin"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={config.cicloContable.fin || undefined}
-                      onSelect={(date) => handleNestedInputChange('cicloContable', 'fin', date)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+        {/* Información Legal */}
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">Información Legal</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="fechaConstitucion">Fecha de Constitución</Label>
+              <Input
+                id="fechaConstitucion"
+                type="date"
+                value={config.fechaConstitucion}
+                onChange={(e) => handleInputChange('fechaConstitucion', e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="regimenTributario">Régimen Tributario</Label>
+              <Select value={config.regimenTributario} onValueChange={(value) => handleInputChange('regimenTributario', value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Seleccionar régimen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no-responsable-iva">No responsable de IVA</SelectItem>
+                  <SelectItem value="responsable-iva">Responsable de IVA</SelectItem>
+                  <SelectItem value="regimen-simple">Régimen simple</SelectItem>
+                  <SelectItem value="gran-contribuyente">Gran contribuyente</SelectItem>
+                  <SelectItem value="regimen-especial">Régimen especial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="responsableNombre">Responsable Seguridad Social - Nombre</Label>
+              <Input
+                id="responsableNombre"
+                value={config.responsableSeguridad.nombre}
+                onChange={(e) => handleNestedInputChange('responsableSeguridad', 'nombre', e.target.value)}
+                placeholder="Nombre completo"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="responsableEmail">Responsable Seguridad Social - Email</Label>
+              <Input
+                id="responsableEmail"
+                type="email"
+                value={config.responsableSeguridad.email}
+                onChange={(e) => handleNestedInputChange('responsableSeguridad', 'email', e.target.value)}
+                placeholder="correo@empresa.com"
+                className="mt-1"
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Configuración Operativa */}
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">Configuración Operativa</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <Label>Ciclo Contable</Label>
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <div>
+                  <Label htmlFor="cicloInicio" className="text-sm text-gray-600">Inicio del año fiscal</Label>
+                  <Input
+                    id="cicloInicio"
+                    type="date"
+                    value={config.cicloContable.inicio}
+                    onChange={(e) => handleNestedInputChange('cicloContable', 'inicio', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cicloFin" className="text-sm text-gray-600">Fin del año fiscal</Label>
+                  <Input
+                    id="cicloFin"
+                    type="date"
+                    value={config.cicloContable.fin}
+                    onChange={(e) => handleNestedInputChange('cicloContable', 'fin', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -463,89 +390,78 @@ export const EmpresaSettings = () => {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium">Sucursales o Sedes</h3>
             <Button onClick={addSucursal} variant="outline" size="sm">
-              <PlusIcon className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-2" />
               Agregar Sede
             </Button>
           </div>
           
-          {config.sucursales.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No hay sedes configuradas</p>
-          ) : (
-            <div className="space-y-4">
-              {config.sucursales.map((sucursal, index) => (
-                <div key={sucursal.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-medium">Sede {index + 1}</h4>
-                    <Button
-                      onClick={() => removeSucursal(sucursal.id)}
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <TrashIcon className="h-4 w-4" />
+          <div className="space-y-4">
+            {config.sucursales.map((sucursal, index) => (
+              <div key={index} className="border rounded-lg p-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-medium">Sede {index + 1}</h4>
+                  {config.sucursales.length > 1 && (
+                    <Button onClick={() => removeSucursal(index)} variant="outline" size="sm">
+                      <Trash2 className="h-4 w-4" />
                     </Button>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label>Nombre de la sede</Label>
+                    <Input
+                      value={sucursal.nombre}
+                      onChange={(e) => handleSucursalChange(index, 'nombre', e.target.value)}
+                      placeholder="Ej: Sede Principal"
+                      className="mt-1"
+                    />
                   </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor={`sede-nombre-${sucursal.id}`}>Nombre de la Sede</Label>
-                      <Input
-                        id={`sede-nombre-${sucursal.id}`}
-                        value={sucursal.nombre}
-                        onChange={(e) => updateSucursal(sucursal.id, 'nombre', e.target.value)}
-                        placeholder="Ej: Sede Principal"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`sede-direccion-${sucursal.id}`}>Dirección</Label>
-                      <Input
-                        id={`sede-direccion-${sucursal.id}`}
-                        value={sucursal.direccion}
-                        onChange={(e) => updateSucursal(sucursal.id, 'direccion', e.target.value)}
-                        placeholder="Ej: Calle 123 # 45-67"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`sede-ciudad-${sucursal.id}`}>Ciudad</Label>
-                      <Input
-                        id={`sede-ciudad-${sucursal.id}`}
-                        value={sucursal.ciudad}
-                        onChange={(e) => updateSucursal(sucursal.id, 'ciudad', e.target.value)}
-                        placeholder="Ciudad"
-                        className="mt-1"
-                      />
-                    </div>
+                  <div>
+                    <Label>Dirección</Label>
+                    <Input
+                      value={sucursal.direccion}
+                      onChange={(e) => handleSucursalChange(index, 'direccion', e.target.value)}
+                      placeholder="Dirección completa"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Ciudad</Label>
+                    <Input
+                      value={sucursal.ciudad}
+                      onChange={(e) => handleSucursalChange(index, 'ciudad', e.target.value)}
+                      placeholder="Ciudad"
+                      className="mt-1"
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
         </Card>
 
-        {/* Botones de acción */}
-        <div className="flex gap-4">
-          <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
-            Guardar Configuración
-          </Button>
-          <Button variant="outline">
-            Revertir Cambios
-          </Button>
-          <Button variant="secondary">
-            Cargar Valores Recomendados
-          </Button>
-        </div>
-
-        {/* Control y trazabilidad */}
-        <Card className="p-4 bg-gray-50">
-          <div className="flex justify-between items-center text-sm text-gray-600">
-            <span>Última modificación realizada por <strong>Admin Usuario</strong> el <strong>21/06/2025 - 14:30</strong></span>
-            <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-800">
-              <HistoryIcon className="h-4 w-4 mr-2" />
+        {/* Control y Trazabilidad */}
+        <div className="border-t pt-4">
+          <p className="text-sm text-gray-500 mb-4">
+            Última modificación realizada por {lastModified.user} el {lastModified.date}
+          </p>
+          
+          <div className="flex gap-4">
+            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+              Guardar Configuración
+            </Button>
+            <Button variant="outline" onClick={handleRevert}>
+              Revertir Cambios
+            </Button>
+            <Button variant="outline" onClick={loadRecommended}>
+              Cargar Valores Recomendados
+            </Button>
+            <Button variant="ghost" className="text-blue-600">
               Ver historial de cambios
             </Button>
           </div>
-        </Card>
+        </div>
       </div>
     </TooltipProvider>
   );

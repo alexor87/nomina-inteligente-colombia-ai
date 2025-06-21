@@ -6,69 +6,375 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { Info, AlertTriangle } from 'lucide-react';
 
 export const ContratoNominaSettings = () => {
   const { toast } = useToast();
   const [config, setConfig] = useState({
-    tiposContrato: ['indefinido', 'fijo', 'obra', 'aprendizaje'],
-    diasLaborablesPeriodo: 30,
+    // Tipos de contrato permitidos
+    tiposContratoPermitidos: {
+      fijo: true,
+      indefinido: true,
+      obra: false,
+      servicios: false,
+      aprendiz: false
+    },
+    
+    // Configuración de periodicidad
+    diasPeriodicidad: 30,
+    
+    // Horas y jornada
     jornadaEstandar: 8,
-    politicaRedondeo: 'centavos',
-    decimales: 0,
+    politicaRedondeo: 'decimales',
+    
+    // Prestaciones sociales
     prestacionesActivadas: {
       prima: true,
       cesantias: true,
-      vacaciones: true,
-      interesesCesantias: true
+      interesesCesantias: true,
+      vacaciones: true
     },
-    reglasRetencion: 'oficial',
-    bonificacionesPersonalizadas: ''
+    
+    // Bonificaciones y deducciones
+    bonificacionesActivas: {
+      noSalariales: false,
+      anticipos: false,
+      libranzas: false,
+      descuentosPersonalizados: false
+    },
+    
+    // Reglas de liquidación
+    metodoCalculo: 'calendario-fijo',
+    calculoInteresesCesantias: 'mensual',
+    vacacionesConfig: {
+      acumularAutomaticamente: true,
+      permitirAnticipar: false,
+      liquidarAlFinalizar: true
+    }
   });
 
+  // Cálculos automáticos basados en periodicidad
+  const getFrecuenciaEstimada = (dias: number) => {
+    if (dias <= 7) return 'Semanal';
+    if (dias <= 15) return 'Quincenal';
+    if (dias <= 31) return 'Mensual';
+    return 'Personalizada';
+  };
+
+  const getCiclosAlAno = (dias: number) => {
+    return Math.round(365 / dias);
+  };
+
+  const getDiasBasePrestaciones = (dias: number) => {
+    return dias;
+  };
+
+  const handleTipoContratoChange = (tipo: string, checked: boolean) => {
+    setConfig(prev => ({
+      ...prev,
+      tiposContratoPermitidos: {
+        ...prev.tiposContratoPermitidos,
+        [tipo]: checked
+      }
+    }));
+  };
+
+  const handlePrestacionChange = (prestacion: string, checked: boolean) => {
+    setConfig(prev => ({
+      ...prev,
+      prestacionesActivadas: {
+        ...prev.prestacionesActivadas,
+        [prestacion]: checked
+      }
+    }));
+  };
+
+  const handleBonificacionChange = (bonificacion: string, checked: boolean) => {
+    setConfig(prev => ({
+      ...prev,
+      bonificacionesActivas: {
+        ...prev.bonificacionesActivas,
+        [bonificacion]: checked
+      }
+    }));
+  };
+
+  const handleVacacionesChange = (campo: string, checked: boolean) => {
+    setConfig(prev => ({
+      ...prev,
+      vacacionesConfig: {
+        ...prev.vacacionesConfig,
+        [campo]: checked
+      }
+    }));
+  };
+
+  const validateForm = () => {
+    // Validar que al menos un tipo de contrato esté seleccionado
+    const tiposSeleccionados = Object.values(config.tiposContratoPermitidos).some(tipo => tipo);
+    if (!tiposSeleccionados) {
+      toast({
+        title: "Error de validación",
+        description: "Debe seleccionar al menos un tipo de contrato permitido.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Validar periodicidad
+    if (config.diasPeriodicidad < 1 || config.diasPeriodicidad > 31) {
+      toast({
+        title: "Error de validación",
+        description: "La periodicidad debe estar entre 1 y 31 días.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Validar jornada
+    if (config.jornadaEstandar < 1 || config.jornadaEstandar > 12) {
+      toast({
+        title: "Error de validación",
+        description: "La jornada estándar debe estar entre 1 y 12 horas.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSave = () => {
+    if (!validateForm()) return;
+
+    // Mostrar advertencia si jornada > 8h y no hay recargos configurados
+    if (config.jornadaEstandar > 8) {
+      toast({
+        title: "Advertencia",
+        description: "Jornada superior a 8 horas. Asegúrate de configurar recargos por horas extra.",
+        variant: "destructive"
+      });
+    }
+
+    // Mostrar advertencia si hay días que no dividen el año exactamente
+    const resto = 365 % config.diasPeriodicidad;
+    if (resto !== 0) {
+      toast({
+        title: "Advertencia",
+        description: `La periodicidad de ${config.diasPeriodicidad} días no divide exactamente el año. Quedarán ${resto} días sin ciclo.`,
+        variant: "destructive"
+      });
+    }
+
     toast({
       title: "Configuración guardada",
       description: "Los parámetros de contrato y nómina han sido actualizados.",
     });
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">📄 Contrato y Nómina</h2>
-        <p className="text-gray-600">Configuración de tipos de contrato y parámetros de liquidación</p>
-      </div>
+  const handleRevert = () => {
+    toast({
+      title: "Cambios revertidos",
+      description: "Se han revertido todos los cambios no guardados.",
+    });
+  };
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  const loadRecommended = () => {
+    setConfig({
+      tiposContratoPermitidos: {
+        fijo: true,
+        indefinido: true,
+        obra: false,
+        servicios: false,
+        aprendiz: false
+      },
+      diasPeriodicidad: 30,
+      jornadaEstandar: 8,
+      politicaRedondeo: 'decimales',
+      prestacionesActivadas: {
+        prima: true,
+        cesantias: true,
+        interesesCesantias: true,
+        vacaciones: true
+      },
+      bonificacionesActivas: {
+        noSalariales: false,
+        anticipos: false,
+        libranzas: false,
+        descuentosPersonalizados: false
+      },
+      metodoCalculo: 'calendario-fijo',
+      calculoInteresesCesantias: 'mensual',
+      vacacionesConfig: {
+        acumularAutomaticamente: true,
+        permitirAnticipar: false,
+        liquidarAlFinalizar: true
+      }
+    });
+
+    toast({
+      title: "Valores recomendados cargados",
+      description: "Se han aplicado los valores recomendados (mensual, jornada de 8h, 30 días base).",
+    });
+  };
+
+  const showPrestacionWarning = () => {
+    const prestacionesDesactivadas = Object.entries(config.prestacionesActivadas)
+      .filter(([_, activa]) => !activa)
+      .map(([prestacion]) => prestacion);
+
+    if (prestacionesDesactivadas.length > 0) {
+      return (
+        <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-yellow-800">Advertencia UGPP</p>
+            <p className="text-yellow-700">
+              Has desactivado algunas prestaciones legales. Esto puede generar riesgos en una inspección laboral.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <TooltipProvider>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">📄 Contrato y Nómina</h2>
+          <p className="text-gray-600">Configuración de tipos de contrato y parámetros de liquidación</p>
+        </div>
+
+        {/* Sección 1: Tipos de Contrato Permitidos */}
         <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4">Configuración Básica</h3>
+          <h3 className="text-lg font-medium mb-4">🧱 Tipos de Contrato Permitidos</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Selecciona los tipos de contrato que tu empresa está autorizada a usar:
+          </p>
+          
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="fijo"
+                checked={config.tiposContratoPermitidos.fijo}
+                onCheckedChange={(checked) => handleTipoContratoChange('fijo', checked as boolean)}
+              />
+              <Label htmlFor="fijo">Contrato a término fijo</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="indefinido"
+                checked={config.tiposContratoPermitidos.indefinido}
+                onCheckedChange={(checked) => handleTipoContratoChange('indefinido', checked as boolean)}
+              />
+              <Label htmlFor="indefinido">Contrato a término indefinido</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="obra"
+                checked={config.tiposContratoPermitidos.obra}
+                onCheckedChange={(checked) => handleTipoContratoChange('obra', checked as boolean)}
+              />
+              <Label htmlFor="obra">Obra o labor</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="servicios"
+                checked={config.tiposContratoPermitidos.servicios}
+                onCheckedChange={(checked) => handleTipoContratoChange('servicios', checked as boolean)}
+              />
+              <Label htmlFor="servicios">Prestación de servicios</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="aprendiz"
+                checked={config.tiposContratoPermitidos.aprendiz}
+                onCheckedChange={(checked) => handleTipoContratoChange('aprendiz', checked as boolean)}
+              />
+              <Label htmlFor="aprendiz">Aprendiz SENA</Label>
+            </div>
+          </div>
+        </Card>
+
+        {/* Sección 2: Configuración de Periodicidad de Pago */}
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">🗓️ Configuración de Periodicidad de Pago</h3>
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="diasLaborables">Días Laborables por Período</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="diasPeriodicidad">¿Cada cuántos días paga nómina la empresa?</Label>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-gray-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Ingresa cada cuántos días paga nómina tu empresa. El sistema ajustará automáticamente los cálculos de liquidación y acumulación de prestaciones.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input
-                id="diasLaborables"
+                id="diasPeriodicidad"
                 type="number"
-                value={config.diasLaborablesPeriodo}
-                onChange={(e) => setConfig(prev => ({ ...prev, diasLaborablesPeriodo: parseInt(e.target.value) || 30 }))}
-                className="mt-1"
+                value={config.diasPeriodicidad}
+                onChange={(e) => setConfig(prev => ({ ...prev, diasPeriodicidad: parseInt(e.target.value) || 30 }))}
+                placeholder="Ej: 15"
+                min="1"
+                max="31"
+                className="mt-1 max-w-xs"
               />
             </div>
 
+            {/* Campos calculados automáticamente */}
+            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <h4 className="font-medium text-gray-700">Cálculos Automáticos:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Frecuencia estimada:</span>
+                  <p className="font-medium">{getFrecuenciaEstimada(config.diasPeriodicidad)}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Ciclos de pago al año:</span>
+                  <p className="font-medium">{getCiclosAlAno(config.diasPeriodicidad)}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Días base para prestaciones:</span>
+                  <p className="font-medium">{getDiasBasePrestaciones(config.diasPeriodicidad)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Sección 3: Horas y Jornada */}
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">⏱️ Horas y Jornada</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="jornadaEstandar">Jornada Estándar (horas/día)</Label>
+              <Label htmlFor="jornadaEstandar">Jornada estándar (horas por día)</Label>
               <Input
                 id="jornadaEstandar"
                 type="number"
                 value={config.jornadaEstandar}
                 onChange={(e) => setConfig(prev => ({ ...prev, jornadaEstandar: parseInt(e.target.value) || 8 }))}
+                min="1"
+                max="12"
                 className="mt-1"
               />
             </div>
 
             <div>
-              <Label htmlFor="politicaRedondeo">Política de Redondeo</Label>
+              <Label htmlFor="politicaRedondeo">Política de redondeo</Label>
               <Select 
                 value={config.politicaRedondeo} 
                 onValueChange={(value) => setConfig(prev => ({ ...prev, politicaRedondeo: value }))}
@@ -77,86 +383,225 @@ export const ContratoNominaSettings = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="centavos">Sin redondeo (centavos)</SelectItem>
-                  <SelectItem value="pesos">Redondear a pesos</SelectItem>
-                  <SelectItem value="decenas">Redondear a decenas</SelectItem>
+                  <SelectItem value="decimales">Sin redondeo (usar decimales exactos)</SelectItem>
+                  <SelectItem value="dos-decimales">Redondear a dos decimales</SelectItem>
+                  <SelectItem value="pesos">Redondear a pesos enteros</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </Card>
 
+        {/* Sección 4: Prestaciones Sociales */}
         <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4">Prestaciones Sociales</h3>
+          <h3 className="text-lg font-medium mb-4">💼 Prestaciones Sociales</h3>
           
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="prima"
-                checked={config.prestacionesActivadas.prima}
-                onCheckedChange={(checked) => 
-                  setConfig(prev => ({ 
-                    ...prev, 
-                    prestacionesActivadas: { ...prev.prestacionesActivadas, prima: checked === true }
-                  }))
-                }
-              />
-              <Label htmlFor="prima">Prima de Servicios</Label>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="prima"
+                  checked={config.prestacionesActivadas.prima}
+                  onCheckedChange={(checked) => handlePrestacionChange('prima', checked as boolean)}
+                />
+                <Label htmlFor="prima">Prima de servicios</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="cesantias"
+                  checked={config.prestacionesActivadas.cesantias}
+                  onCheckedChange={(checked) => handlePrestacionChange('cesantias', checked as boolean)}
+                />
+                <Label htmlFor="cesantias">Cesantías</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="interesesCesantias"
+                  checked={config.prestacionesActivadas.interesesCesantias}
+                  onCheckedChange={(checked) => handlePrestacionChange('interesesCesantias', checked as boolean)}
+                />
+                <Label htmlFor="interesesCesantias">Intereses sobre cesantías</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="vacaciones"
+                  checked={config.prestacionesActivadas.vacaciones}
+                  onCheckedChange={(checked) => handlePrestacionChange('vacaciones', checked as boolean)}
+                />
+                <Label htmlFor="vacaciones">Vacaciones</Label>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="cesantias"
-                checked={config.prestacionesActivadas.cesantias}
-                onCheckedChange={(checked) => 
-                  setConfig(prev => ({ 
-                    ...prev, 
-                    prestacionesActivadas: { ...prev.prestacionesActivadas, cesantias: checked === true }
-                  }))
-                }
+            {showPrestacionWarning()}
+          </div>
+        </Card>
+
+        {/* Sección 5: Bonificaciones y Deducciones */}
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">💰 Bonificaciones y Deducciones</h3>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="noSalariales">Permitir bonificaciones no salariales</Label>
+                <p className="text-sm text-gray-600">Bonificaciones que no afectan seguridad social</p>
+              </div>
+              <Switch
+                id="noSalariales"
+                checked={config.bonificacionesActivas.noSalariales}
+                onCheckedChange={(checked) => handleBonificacionChange('noSalariales', checked)}
               />
-              <Label htmlFor="cesantias">Cesantías</Label>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="interesesCesantias"
-                checked={config.prestacionesActivadas.interesesCesantias}
-                onCheckedChange={(checked) => 
-                  setConfig(prev => ({ 
-                    ...prev, 
-                    prestacionesActivadas: { ...prev.prestacionesActivadas, interesesCesantias: checked === true }
-                  }))
-                }
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="anticipos">Permitir anticipos o préstamos internos</Label>
+                <p className="text-sm text-gray-600">Adelantos de sueldo y préstamos a empleados</p>
+              </div>
+              <Switch
+                id="anticipos"
+                checked={config.bonificacionesActivas.anticipos}
+                onCheckedChange={(checked) => handleBonificacionChange('anticipos', checked)}
               />
-              <Label htmlFor="interesesCesantias">Intereses sobre Cesantías</Label>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="vacaciones"
-                checked={config.prestacionesActivadas.vacaciones}
-                onCheckedChange={(checked) => 
-                  setConfig(prev => ({ 
-                    ...prev, 
-                    prestacionesActivadas: { ...prev.prestacionesActivadas, vacaciones: checked === true }
-                  }))
-                }
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="libranzas">Permitir libranzas automáticas</Label>
+                <p className="text-sm text-gray-600">Descuentos automáticos por libranzas bancarias</p>
+              </div>
+              <Switch
+                id="libranzas"
+                checked={config.bonificacionesActivas.libranzas}
+                onCheckedChange={(checked) => handleBonificacionChange('libranzas', checked)}
               />
-              <Label htmlFor="vacaciones">Vacaciones</Label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="descuentosPersonalizados">Permitir descuentos personalizados</Label>
+                <p className="text-sm text-gray-600">Otros descuentos configurables por empleado</p>
+              </div>
+              <Switch
+                id="descuentosPersonalizados"
+                checked={config.bonificacionesActivas.descuentosPersonalizados}
+                onCheckedChange={(checked) => handleBonificacionChange('descuentosPersonalizados', checked)}
+              />
             </div>
           </div>
         </Card>
-      </div>
 
-      <div className="flex gap-4">
-        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
-          Guardar Configuración
-        </Button>
-        <Button variant="outline">
-          Revertir Cambios
-        </Button>
+        {/* Sección 6: Reglas de Liquidación */}
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">⚙️ Reglas de Liquidación</h3>
+          
+          <div className="space-y-6">
+            <div>
+              <Label className="text-base font-medium">Método de cálculo de nómina</Label>
+              <div className="space-y-2 mt-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="calendario-fijo"
+                    name="metodoCalculo"
+                    value="calendario-fijo"
+                    checked={config.metodoCalculo === 'calendario-fijo'}
+                    onChange={(e) => setConfig(prev => ({ ...prev, metodoCalculo: e.target.value }))}
+                  />
+                  <Label htmlFor="calendario-fijo">Calendario fijo de 30 días</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="dias-reales"
+                    name="metodoCalculo"
+                    value="dias-reales"
+                    checked={config.metodoCalculo === 'dias-reales'}
+                    onChange={(e) => setConfig(prev => ({ ...prev, metodoCalculo: e.target.value }))}
+                  />
+                  <Label htmlFor="dias-reales">Días reales trabajados</Label>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-base font-medium">Intereses sobre cesantías</Label>
+              <div className="space-y-2 mt-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="mensual"
+                    name="calculoIntereses"
+                    value="mensual"
+                    checked={config.calculoInteresesCesantias === 'mensual'}
+                    onChange={(e) => setConfig(prev => ({ ...prev, calculoInteresesCesantias: e.target.value }))}
+                  />
+                  <Label htmlFor="mensual">Calcular mensualmente</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="finalizar"
+                    name="calculoIntereses"
+                    value="finalizar"
+                    checked={config.calculoInteresesCesantias === 'finalizar'}
+                    onChange={(e) => setConfig(prev => ({ ...prev, calculoInteresesCesantias: e.target.value }))}
+                  />
+                  <Label htmlFor="finalizar">Calcular solo al finalizar contrato o diciembre</Label>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-base font-medium">Vacaciones</Label>
+              <div className="space-y-3 mt-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="acumular"
+                    checked={config.vacacionesConfig.acumularAutomaticamente}
+                    onCheckedChange={(checked) => handleVacacionesChange('acumularAutomaticamente', checked as boolean)}
+                  />
+                  <Label htmlFor="acumular">Acumular automáticamente</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="anticipar"
+                    checked={config.vacacionesConfig.permitirAnticipar}
+                    onCheckedChange={(checked) => handleVacacionesChange('permitirAnticipar', checked as boolean)}
+                  />
+                  <Label htmlFor="anticipar">Permitir anticipar</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="liquidarFinalizar"
+                    checked={config.vacacionesConfig.liquidarAlFinalizar}
+                    onCheckedChange={(checked) => handleVacacionesChange('liquidarAlFinalizar', checked as boolean)}
+                  />
+                  <Label htmlFor="liquidarFinalizar">Liquidar siempre al finalizar contrato</Label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Controles Inferiores */}
+        <div className="flex gap-4">
+          <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+            Guardar Configuración
+          </Button>
+          <Button variant="outline" onClick={handleRevert}>
+            Revertir Cambios
+          </Button>
+          <Button variant="outline" onClick={loadRecommended}>
+            Cargar Valores Recomendados
+          </Button>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
