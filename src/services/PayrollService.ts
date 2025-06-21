@@ -27,24 +27,25 @@ export class PayrollService {
     const valorHoraExtra = (salarioBase / 240) * 1.25; // 25% recargo
     const pagoHorasExtra = horasExtra * valorHoraExtra;
 
-    // Recargos
+    // Recargos (estos ya vienen calculados como valores en pesos)
     const pagoRecargoNocturno = recargoNocturno;
     const pagoRecargoDominical = recargoDominical;
 
-    // Total devengado base
-    const totalDevengadoBase = salarioProporcional + auxilioTransporte + pagoHorasExtra + 
-                               pagoRecargoNocturno + pagoRecargoDominical + bonificaciones;
+    // Base para prestaciones sociales (salario + auxilio de transporte, sin horas extra ni recargos)
+    const baseParaPrestaciones = salarioProporcional + auxilioTransporte;
 
-    // Prestaciones sociales
-    const cesantias = (totalDevengadoBase * PORCENTAJES_NOMINA.CESANTIAS);
-    const interesesCesantias = (cesantias * PORCENTAJES_NOMINA.INTERESES_CESANTIAS) / 12;
-    const prima = (totalDevengadoBase * PORCENTAJES_NOMINA.PRIMA);
-    const vacaciones = (salarioBase * PORCENTAJES_NOMINA.VACACIONES);
+    // Prestaciones sociales - se calculan sobre el salario base mensual, no proporcional
+    const cesantias = (baseParaPrestaciones * PORCENTAJES_NOMINA.CESANTIAS) * (diasTrabajados / 30);
+    const interesesCesantias = (cesantias * PORCENTAJES_NOMINA.INTERESES_CESANTIAS);
+    const prima = (baseParaPrestaciones * PORCENTAJES_NOMINA.PRIMA) * (diasTrabajados / 30);
+    const vacaciones = (salarioBase * PORCENTAJES_NOMINA.VACACIONES) * (diasTrabajados / 30);
 
     // Total devengado
-    const totalDevengado = totalDevengadoBase + cesantias + interesesCesantias + prima + vacaciones;
+    const totalDevengado = salarioProporcional + auxilioTransporte + pagoHorasExtra + 
+                          pagoRecargoNocturno + pagoRecargoDominical + bonificaciones +
+                          cesantias + interesesCesantias + prima + vacaciones;
 
-    // Deducciones
+    // Deducciones - se calculan sobre el salario base mensual completo, no proporcional
     const saludEmpleado = salarioBase * PORCENTAJES_NOMINA.SALUD_EMPLEADO;
     const pensionEmpleado = salarioBase * PORCENTAJES_NOMINA.PENSION_EMPLEADO;
     
@@ -55,9 +56,9 @@ export class PayrollService {
     const netoPagado = totalDevengado - totalDeducciones;
 
     return {
-      salarioBase,
+      salarioBase: salarioProporcional,
       diasTrabajados,
-      horasExtra,
+      horasExtra: pagoHorasExtra,
       recargoNocturno: pagoRecargoNocturno,
       recargoDominical: pagoRecargoDominical,
       auxilioTransporte,
