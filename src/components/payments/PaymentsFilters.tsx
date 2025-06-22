@@ -26,14 +26,14 @@ export const PaymentsFilters = ({ filters, onFiltersChange, employees }: Payment
             Estado de pago
           </label>
           <Select 
-            value={filters.paymentStatus || ''} 
-            onValueChange={(value) => onFiltersChange({ ...filters, paymentStatus: value as any })}
+            value={filters.paymentStatus || 'all'} 
+            onValueChange={(value) => onFiltersChange({ ...filters, paymentStatus: value === 'all' ? undefined : value as any })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Todos los estados" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos los estados</SelectItem>
+              <SelectItem value="all">Todos los estados</SelectItem>
               <SelectItem value="pendiente">Pendiente</SelectItem>
               <SelectItem value="pagado">Pagado</SelectItem>
               <SelectItem value="fallido">Fallido</SelectItem>
@@ -46,14 +46,14 @@ export const PaymentsFilters = ({ filters, onFiltersChange, employees }: Payment
             Banco
           </label>
           <Select 
-            value={filters.bankName || ''} 
-            onValueChange={(value) => onFiltersChange({ ...filters, bankName: value })}
+            value={filters.bankName || 'all'} 
+            onValueChange={(value) => onFiltersChange({ ...filters, bankName: value === 'all' ? undefined : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Todos los bancos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos los bancos</SelectItem>
+              <SelectItem value="all">Todos los bancos</SelectItem>
               {uniqueBanks.map(bank => (
                 <SelectItem key={bank} value={bank}>{bank}</SelectItem>
               ))}
@@ -66,14 +66,14 @@ export const PaymentsFilters = ({ filters, onFiltersChange, employees }: Payment
             Centro de costo
           </label>
           <Select 
-            value={filters.costCenter || ''} 
-            onValueChange={(value) => onFiltersChange({ ...filters, costCenter: value })}
+            value={filters.costCenter || 'all'} 
+            onValueChange={(value) => onFiltersChange({ ...filters, costCenter: value === 'all' ? undefined : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Todos los centros" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos los centros</SelectItem>
+              <SelectItem value="all">Todos los centros</SelectItem>
               {uniqueCostCenters.map(center => (
                 <SelectItem key={center} value={center}>{center}</SelectItem>
               ))}
