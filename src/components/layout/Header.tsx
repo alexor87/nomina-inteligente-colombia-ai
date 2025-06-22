@@ -20,7 +20,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
       <div className="flex items-center justify-between">
         <button
           onClick={onMenuClick}
-          className="lg:hidden text-gray-500 hover:text-gray-700"
+          className="text-gray-500 hover:text-gray-700"
         >
           <Menu className="h-6 w-6" />
         </button>
