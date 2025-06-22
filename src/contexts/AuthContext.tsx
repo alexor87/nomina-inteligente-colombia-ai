@@ -55,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔄 Loading user data for:', userId);
       
       // Cargar perfil
+      console.log('📋 Loading profile...');
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -63,9 +64,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (profileError) {
         console.error('❌ Error loading profile:', profileError);
+        console.error('❌ Profile error details:', JSON.stringify(profileError, null, 2));
       } else if (profileData) {
         console.log('✅ Profile loaded:', profileData);
         setProfile(profileData);
+      } else {
+        console.log('⚠️ No profile data found');
       }
 
       // Cargar roles usando consulta directa
@@ -75,19 +79,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('role, company_id')
         .eq('user_id', userId);
 
+      console.log('🔍 Roles query result:', { rolesData, rolesError });
+
       if (rolesError) {
         console.error('❌ Error loading roles:', rolesError);
         console.error('❌ Roles error details:', JSON.stringify(rolesError, null, 2));
+        // Establecer roles vacíos pero continuar
+        setRoles([]);
       } else if (rolesData) {
         console.log('✅ Roles loaded:', rolesData);
         console.log('✅ Roles count:', rolesData.length);
         setRoles(rolesData as UserRoleData[]);
       } else {
-        console.log('⚠️ No roles data returned');
+        console.log('⚠️ No roles data returned, setting empty array');
         setRoles([]);
       }
+
+      console.log('✅ User data loading completed');
     } catch (error) {
       console.error('💥 Unexpected error loading user data:', error);
+      // En caso de error, establecer valores por defecto
+      setRoles([]);
+    } finally {
+      // IMPORTANTE: Siempre establecer loading a false aquí
+      console.log('🏁 Setting loading to false');
+      setLoading(false);
     }
   };
 
@@ -107,15 +123,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setProfile(null);
           setRoles([]);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
     // Verificar sesión existente
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('🔍 Initial session check:', session?.user?.email);
+      console.log('🔍 Initial session check:', session?.user?.email || 'No session');
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -181,9 +196,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     roles,
     loading,
-    signIn,
-    signUp,
-    signOut,
+    signIn: async (email: string, password: string) => {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
+    },
+    signUp: async (email: string, password: string, firstName: string, lastName: string) => {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
+        }
+      });
+      return { error };
+    },
+    signOut: async () => {
+      await supabase.auth.signOut();
+    },
     hasRole,
     getCurrentCompanyId,
   };
