@@ -35,7 +35,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/empleados" element={
-              <ProtectedRoute requiredRole="rrhh">
+              <ProtectedRoute>
                 <EmployeesPage />
               </ProtectedRoute>
             } />
@@ -45,7 +45,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/liquidar-nomina" element={
-              <ProtectedRoute requiredRole="contador">
+              <ProtectedRoute>
                 <PayrollPage />
               </ProtectedRoute>
             } />
@@ -55,7 +55,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/pagos" element={
-              <ProtectedRoute requiredRole="contador">
+              <ProtectedRoute>
                 <PaymentsPage />
               </ProtectedRoute>
             } />
@@ -75,23 +75,23 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/configuracion" element={
-              <ProtectedRoute requiredRole="administrador">
+              <ProtectedRoute>
                 <SettingsPage />
               </ProtectedRoute>
             } />
             {/* Legacy routes for compatibility */}
             <Route path="/employees" element={
-              <ProtectedRoute requiredRole="rrhh">
+              <ProtectedRoute>
                 <EmployeesPage />
               </ProtectedRoute>
             } />
             <Route path="/payroll" element={
-              <ProtectedRoute requiredRole="contador">
+              <ProtectedRoute>
                 <PayrollPage />
               </ProtectedRoute>
             } />
             <Route path="/settings" element={
-              <ProtectedRoute requiredRole="administrador">
+              <ProtectedRoute>
                 <SettingsPage />
               </ProtectedRoute>
             } />
