@@ -19,7 +19,7 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const { roles } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Changed from true to false
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar contraído por defecto
 
   // Determinar el rol del usuario para el sidebar
   const getUserRole = () => {
@@ -38,7 +38,7 @@ export const Layout = ({ children }: LayoutProps) => {
       
       <div className="flex-1 flex flex-col min-w-0">
         <Header 
-          onMenuClick={() => setSidebarOpen(true)}
+          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
         />
         
         <main className="flex-1 p-6">
