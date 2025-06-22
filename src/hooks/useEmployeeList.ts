@@ -1,90 +1,15 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { EmployeeWithStatus, EmployeeFilters, ComplianceIndicator } from '@/types/employee-extended';
 import { Employee } from '@/types';
-
-// Datos mock extendidos para el listado
-const mockEmployeesExtended: EmployeeWithStatus[] = [
-  {
-    id: '1',
-    cedula: '12345678',
-    nombre: 'María',
-    apellido: 'García',
-    email: 'maria.garcia@email.com',
-    salarioBase: 2500000,
-    tipoContrato: 'indefinido',
-    fechaIngreso: '2023-06-15',
-    estado: 'activo',
-    eps: 'Sura EPS',
-    afp: 'Porvenir',
-    arl: 'Sura ARL',
-    cajaCompensacion: 'Compensar',
-    cargo: 'Desarrolladora Senior',
-    empresaId: '1',
-    estadoAfiliacion: 'completa',
-    createdAt: '2023-06-15',
-    updatedAt: '2024-01-15',
-    centrosocial: 'Tecnología',
-    nivelRiesgoARL: 'II',
-    ultimaLiquidacion: '2024-01-15',
-    fechaUltimaModificacion: '2024-01-15',
-    usuarioUltimaModificacion: 'Admin Usuario'
-  },
-  {
-    id: '2',
-    cedula: '23456789',
-    nombre: 'Carlos',
-    apellido: 'López',
-    email: 'carlos.lopez@email.com',
-    salarioBase: 1800000,
-    tipoContrato: 'fijo',
-    fechaIngreso: '2024-01-12',
-    estado: 'activo',
-    eps: 'Sanitas EPS',
-    afp: 'Colfondos',
-    arl: 'Colpatria ARL',
-    cajaCompensacion: 'Colsubsidio',
-    cargo: 'Contador',
-    empresaId: '1',
-    estadoAfiliacion: 'pendiente',
-    createdAt: '2024-01-12',
-    updatedAt: '2024-01-15',
-    centrosocial: 'Contabilidad',
-    nivelRiesgoARL: 'I',
-    ultimaLiquidacion: '2024-01-12',
-    contratoVencimiento: '2024-06-12',
-    fechaUltimaModificacion: '2024-01-15',
-    usuarioUltimaModificacion: 'Admin Usuario'
-  },
-  {
-    id: '3',
-    cedula: '34567890',
-    nombre: 'Ana',
-    apellido: 'Rodríguez',
-    email: 'ana.rodriguez@email.com',
-    salarioBase: 3200000,
-    tipoContrato: 'indefinido',
-    fechaIngreso: '2022-03-20',
-    estado: 'vacaciones',
-    eps: '',
-    afp: 'Protección',
-    arl: 'Sura ARL',
-    cajaCompensacion: 'Compensar',
-    cargo: 'Gerente Comercial',
-    empresaId: '1',
-    estadoAfiliacion: 'inconsistente',
-    createdAt: '2022-03-20',
-    updatedAt: '2024-01-10',
-    centrosocial: 'Comercial',
-    nivelRiesgoARL: 'III',
-    ultimaLiquidacion: '2024-01-10',
-    fechaUltimaModificacion: '2024-01-10',
-    usuarioUltimaModificacion: 'HR Manager'
-  }
-];
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export const useEmployeeList = () => {
-  const [employees] = useState<EmployeeWithStatus[]>(mockEmployeesExtended);
+  const [employees, setEmployees] = useState<EmployeeWithStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  
   const [filters, setFilters] = useState<EmployeeFilters>({
     searchTerm: '',
     estado: '',
@@ -96,6 +21,74 @@ export const useEmployeeList = () => {
     afiliacionIncompleta: undefined
   });
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+
+  // Cargar empleados desde Supabase
+  const loadEmployees = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading employees:', error);
+        toast({
+          title: "Error al cargar empleados",
+          description: "No se pudieron cargar los empleados desde la base de datos",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Transformar los datos de Supabase al formato esperado
+      const transformedEmployees: EmployeeWithStatus[] = (data || []).map(emp => ({
+        id: emp.id,
+        cedula: emp.cedula,
+        nombre: emp.nombre,
+        apellido: emp.apellido,
+        email: emp.email || '',
+        telefono: emp.telefono,
+        salarioBase: Number(emp.salario_base),
+        tipoContrato: emp.tipo_contrato as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
+        fechaIngreso: emp.fecha_ingreso,
+        estado: emp.estado as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad',
+        eps: emp.eps,
+        afp: emp.afp,
+        arl: emp.arl,
+        cajaCompensacion: emp.caja_compensacion,
+        cargo: emp.cargo,
+        empresaId: emp.company_id,
+        estadoAfiliacion: emp.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente',
+        createdAt: emp.created_at,
+        updatedAt: emp.updated_at,
+        // Campos adicionales para el tipo extendido
+        centrosocial: 'Sin asignar', // Este campo no existe en la BD actual
+        nivelRiesgoARL: undefined, // Este campo no existe en la BD actual
+        ultimaLiquidacion: undefined,
+        contratoVencimiento: undefined,
+        fechaUltimaModificacion: emp.updated_at,
+        usuarioUltimaModificacion: 'Sistema'
+      }));
+
+      setEmployees(transformedEmployees);
+      console.log('Empleados cargados:', transformedEmployees.length);
+    } catch (error) {
+      console.error('Error loading employees:', error);
+      toast({
+        title: "Error inesperado",
+        description: "Ocurrió un error al cargar los empleados",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Cargar empleados al montar el componente
+  useEffect(() => {
+    loadEmployees();
+  }, []);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter(employee => {
@@ -256,10 +249,16 @@ export const useEmployeeList = () => {
     // Aquí iría la lógica de exportación
   };
 
+  // Función para refrescar la lista (útil después de crear/editar empleados)
+  const refreshEmployees = () => {
+    loadEmployees();
+  };
+
   return {
     employees: filteredEmployees,
     filters,
     selectedEmployees,
+    isLoading,
     updateFilters,
     clearFilters,
     toggleEmployeeSelection,
@@ -268,6 +267,7 @@ export const useEmployeeList = () => {
     exportEmployees,
     getComplianceIndicators,
     totalEmployees: employees.length,
-    filteredCount: filteredEmployees.length
+    filteredCount: filteredEmployees.length,
+    refreshEmployees
   };
 };

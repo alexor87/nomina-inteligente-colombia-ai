@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,8 @@ import {
   Clock, 
   Download,
   Upload,
-  UserPlus
+  UserPlus,
+  Loader2
 } from 'lucide-react';
 
 export const EmployeeList = () => {
@@ -46,6 +48,7 @@ export const EmployeeList = () => {
     employees,
     filters,
     selectedEmployees,
+    isLoading,
     updateFilters,
     clearFilters,
     toggleEmployeeSelection,
@@ -54,7 +57,8 @@ export const EmployeeList = () => {
     exportEmployees,
     getComplianceIndicators,
     totalEmployees,
-    filteredCount
+    filteredCount,
+    refreshEmployees
   } = useEmployeeList();
 
   const { changeEmployeeStatus } = useEmployeeCRUD();
@@ -135,13 +139,15 @@ export const EmployeeList = () => {
   };
 
   const handleEmployeeFormSuccess = () => {
-    // En un escenario real, aquí recargaríamos la lista desde la API
-    console.log('Employee saved successfully');
+    // Refrescar la lista de empleados después de crear/editar
+    refreshEmployees();
+    console.log('Employee saved successfully, refreshing list');
   };
 
   const handleStatusChange = async (employeeId: string, newStatus: string) => {
     await changeEmployeeStatus(employeeId, newStatus);
-    // En un escenario real, aquí actualizaríamos la lista
+    // Refrescar la lista después del cambio de estado
+    refreshEmployees();
   };
 
   const handleExportSelected = () => {
@@ -149,6 +155,15 @@ export const EmployeeList = () => {
     console.log('Exporting selected employees:', selectedData);
     exportEmployees('excel');
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Cargando empleados...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -286,7 +301,7 @@ export const EmployeeList = () => {
                   </TableCell>
                   
                   <TableCell>
-                    <div className="text-sm font-medium text-gray-900">{employee.cargo}</div>
+                    <div className="text-sm font-medium text-gray-900">{employee.cargo || 'Sin asignar'}</div>
                     <div className="text-sm text-gray-500">{employee.email}</div>
                   </TableCell>
                   
@@ -311,7 +326,7 @@ export const EmployeeList = () => {
                   </TableCell>
                   
                   <TableCell>
-                    <div className="text-sm text-gray-900">{employee.centrosocial || '-'}</div>
+                    <div className="text-sm text-gray-900">{employee.centrosocial || 'Sin asignar'}</div>
                   </TableCell>
                   
                   <TableCell>
@@ -400,7 +415,7 @@ export const EmployeeList = () => {
           </Table>
         </div>
         
-        {employees.length === 0 && (
+        {employees.length === 0 && !isLoading && (
           <div className="text-center py-12">
             <div className="text-gray-500 mb-4">
               No se encontraron empleados que coincidan con los filtros aplicados.
