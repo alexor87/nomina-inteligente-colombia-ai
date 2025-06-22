@@ -7,8 +7,10 @@ import {
   RecentEmployee, 
   DashboardActivity 
 } from '@/services/DashboardService';
+import { useToast } from '@/hooks/use-toast';
 
 export const useDashboard = () => {
+  const { toast } = useToast();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
   const [recentEmployees, setRecentEmployees] = useState<RecentEmployee[]>([]);
@@ -43,6 +45,11 @@ export const useDashboard = () => {
       setRecentActivity(activityData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      toast({
+        title: "Error al cargar datos",
+        description: "No se pudieron cargar los datos del dashboard.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -57,8 +64,22 @@ export const useDashboard = () => {
     loadDashboardData(true);
   };
 
-  const dismissAlert = (alertId: string) => {
-    setAlerts(prev => prev.filter(alert => alert.id !== alertId));
+  const dismissAlert = async (alertId: string) => {
+    try {
+      await DashboardService.dismissAlert(alertId);
+      setAlerts(prev => prev.filter(alert => alert.id !== alertId));
+      toast({
+        title: "Alerta descartada",
+        description: "La alerta ha sido marcada como revisada."
+      });
+    } catch (error) {
+      console.error('Error dismissing alert:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo descartar la alerta.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getPayrollSummary = async () => {

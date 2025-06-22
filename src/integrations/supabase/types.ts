@@ -9,7 +9,312 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      companies: {
+        Row: {
+          actividad_economica: string | null
+          ciudad: string | null
+          created_at: string
+          direccion: string | null
+          email: string
+          estado: string | null
+          id: string
+          nit: string
+          plan: string | null
+          razon_social: string
+          representante_legal: string | null
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          actividad_economica?: string | null
+          ciudad?: string | null
+          created_at?: string
+          direccion?: string | null
+          email: string
+          estado?: string | null
+          id?: string
+          nit: string
+          plan?: string | null
+          razon_social: string
+          representante_legal?: string | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actividad_economica?: string | null
+          ciudad?: string | null
+          created_at?: string
+          direccion?: string | null
+          email?: string
+          estado?: string | null
+          id?: string
+          nit?: string
+          plan?: string | null
+          razon_social?: string
+          representante_legal?: string | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dashboard_activity: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string
+          id: string
+          type: string
+          user_email: string
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string
+          id?: string
+          type: string
+          user_email: string
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          type?: string
+          user_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_activity_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dashboard_alerts: {
+        Row: {
+          action_required: boolean | null
+          company_id: string
+          created_at: string
+          description: string
+          dismissed: boolean | null
+          due_date: string | null
+          icon: string | null
+          id: string
+          priority: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          action_required?: boolean | null
+          company_id: string
+          created_at?: string
+          description: string
+          dismissed?: boolean | null
+          due_date?: string | null
+          icon?: string | null
+          id?: string
+          priority?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          action_required?: boolean | null
+          company_id?: string
+          created_at?: string
+          description?: string
+          dismissed?: boolean | null
+          due_date?: string | null
+          icon?: string | null
+          id?: string
+          priority?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_alerts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          afp: string | null
+          apellido: string
+          arl: string | null
+          caja_compensacion: string | null
+          cargo: string | null
+          cedula: string
+          company_id: string
+          created_at: string
+          email: string | null
+          eps: string | null
+          estado: string | null
+          estado_afiliacion: string | null
+          fecha_ingreso: string
+          id: string
+          nombre: string
+          salario_base: number
+          telefono: string | null
+          tipo_contrato: string | null
+          updated_at: string
+        }
+        Insert: {
+          afp?: string | null
+          apellido: string
+          arl?: string | null
+          caja_compensacion?: string | null
+          cargo?: string | null
+          cedula: string
+          company_id: string
+          created_at?: string
+          email?: string | null
+          eps?: string | null
+          estado?: string | null
+          estado_afiliacion?: string | null
+          fecha_ingreso?: string
+          id?: string
+          nombre: string
+          salario_base?: number
+          telefono?: string | null
+          tipo_contrato?: string | null
+          updated_at?: string
+        }
+        Update: {
+          afp?: string | null
+          apellido?: string
+          arl?: string | null
+          caja_compensacion?: string | null
+          cargo?: string | null
+          cedula?: string
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          eps?: string | null
+          estado?: string | null
+          estado_afiliacion?: string | null
+          fecha_ingreso?: string
+          id?: string
+          nombre?: string
+          salario_base?: number
+          telefono?: string | null
+          tipo_contrato?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payrolls: {
+        Row: {
+          auxilio_transporte: number | null
+          bonificaciones: number | null
+          cesantias: number | null
+          company_id: string
+          created_at: string
+          dias_trabajados: number | null
+          employee_id: string
+          estado: string | null
+          horas_extra: number | null
+          id: string
+          intereses_cesantias: number | null
+          neto_pagado: number | null
+          otras_deducciones: number | null
+          pension_empleado: number | null
+          periodo: string
+          prima: number | null
+          recargo_dominical: number | null
+          recargo_nocturno: number | null
+          retencion_fuente: number | null
+          salario_base: number
+          salud_empleado: number | null
+          total_deducciones: number | null
+          total_devengado: number | null
+          updated_at: string
+          vacaciones: number | null
+        }
+        Insert: {
+          auxilio_transporte?: number | null
+          bonificaciones?: number | null
+          cesantias?: number | null
+          company_id: string
+          created_at?: string
+          dias_trabajados?: number | null
+          employee_id: string
+          estado?: string | null
+          horas_extra?: number | null
+          id?: string
+          intereses_cesantias?: number | null
+          neto_pagado?: number | null
+          otras_deducciones?: number | null
+          pension_empleado?: number | null
+          periodo: string
+          prima?: number | null
+          recargo_dominical?: number | null
+          recargo_nocturno?: number | null
+          retencion_fuente?: number | null
+          salario_base?: number
+          salud_empleado?: number | null
+          total_deducciones?: number | null
+          total_devengado?: number | null
+          updated_at?: string
+          vacaciones?: number | null
+        }
+        Update: {
+          auxilio_transporte?: number | null
+          bonificaciones?: number | null
+          cesantias?: number | null
+          company_id?: string
+          created_at?: string
+          dias_trabajados?: number | null
+          employee_id?: string
+          estado?: string | null
+          horas_extra?: number | null
+          id?: string
+          intereses_cesantias?: number | null
+          neto_pagado?: number | null
+          otras_deducciones?: number | null
+          pension_empleado?: number | null
+          periodo?: string
+          prima?: number | null
+          recargo_dominical?: number | null
+          recargo_nocturno?: number | null
+          retencion_fuente?: number | null
+          salario_base?: number
+          salud_empleado?: number | null
+          total_deducciones?: number | null
+          total_devengado?: number | null
+          updated_at?: string
+          vacaciones?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payrolls_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payrolls_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

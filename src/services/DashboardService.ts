@@ -1,4 +1,5 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { DashboardMetrics } from '@/types';
 
 export interface DashboardAlert {
@@ -31,115 +32,125 @@ export interface DashboardActivity {
 
 export class DashboardService {
   static async getDashboardMetrics(): Promise<DashboardMetrics> {
-    // Simular llamada a API
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // En producción, estos datos vendrían de Supabase con queries reales
-    return {
-      totalEmpleados: 24,
-      nominasProcesadas: 18,
-      alertasLegales: 3,
-      gastosNomina: 48500000,
-      tendenciaMensual: 5.2
-    };
+    try {
+      // Obtener total de empleados
+      const { count: totalEmpleados } = await supabase
+        .from('employees')
+        .select('*', { count: 'exact', head: true });
+
+      // Obtener total de nóminas procesadas
+      const { count: nominasProcesadas } = await supabase
+        .from('payrolls')
+        .select('*', { count: 'exact', head: true })
+        .eq('estado', 'procesada');
+
+      // Obtener alertas de alta prioridad
+      const { count: alertasLegales } = await supabase
+        .from('dashboard_alerts')
+        .select('*', { count: 'exact', head: true })
+        .eq('priority', 'high')
+        .eq('dismissed', false);
+
+      // Calcular gastos de nómina (suma de neto pagado)
+      const { data: payrollData } = await supabase
+        .from('payrolls')
+        .select('neto_pagado')
+        .eq('estado', 'pagada');
+
+      const gastosNomina = payrollData?.reduce((sum, payroll) => 
+        sum + (parseFloat(payroll.neto_pagado?.toString() || '0')), 0) || 0;
+
+      return {
+        totalEmpleados: totalEmpleados || 0,
+        nominasProcesadas: nominasProcesadas || 0,
+        alertasLegales: alertasLegales || 0,
+        gastosNomina: gastosNomina,
+        tendenciaMensual: 5.2 // Esto se puede calcular comparando períodos
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard metrics:', error);
+      // Fallback a datos por defecto
+      return {
+        totalEmpleados: 0,
+        nominasProcesadas: 0,
+        alertasLegales: 0,
+        gastosNomina: 0,
+        tendenciaMensual: 0
+      };
+    }
   }
 
   static async getDashboardAlerts(): Promise<DashboardAlert[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return [
-      {
-        id: '1',
-        type: 'warning',
-        title: '3 empleados sin afiliación ARL',
-        description: 'Revisa y actualiza las afiliaciones',
-        priority: 'high',
-        icon: '⚠️',
-        actionRequired: true
-      },
-      {
-        id: '2',
-        type: 'error',
-        title: '2 contratos vencen este mes',
-        description: 'Renueva antes del 25 de enero',
-        priority: 'high',
-        icon: '🚨',
-        actionRequired: true,
-        dueDate: '2025-01-25'
-      },
-      {
-        id: '3',
-        type: 'info',
-        title: 'Actualización legal disponible',
-        description: 'Nuevas tarifas 2024 del salario mínimo',
-        priority: 'medium',
-        icon: 'ℹ️',
-        actionRequired: false
-      }
-    ];
+    try {
+      const { data, error } = await supabase
+        .from('dashboard_alerts')
+        .select('*')
+        .eq('dismissed', false)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return data?.map(alert => ({
+        id: alert.id,
+        type: alert.type as 'warning' | 'error' | 'info',
+        title: alert.title,
+        description: alert.description,
+        priority: alert.priority as 'high' | 'medium' | 'low',
+        icon: alert.icon || '⚠️',
+        actionRequired: alert.action_required || false,
+        dueDate: alert.due_date || undefined
+      })) || [];
+    } catch (error) {
+      console.error('Error fetching dashboard alerts:', error);
+      return [];
+    }
   }
 
   static async getRecentEmployees(): Promise<RecentEmployee[]> {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
-    return [
-      {
-        id: '1',
-        name: 'María García',
-        position: 'Desarrolladora',
-        dateAdded: '2025-01-15',
-        status: 'activo'
-      },
-      {
-        id: '2',
-        name: 'Carlos López',
-        position: 'Contador',
-        dateAdded: '2025-01-12',
-        status: 'activo'
-      },
-      {
-        id: '3',
-        name: 'Ana Rodríguez',
-        position: 'Diseñadora',
-        dateAdded: '2025-01-08',
-        status: 'pendiente'
-      }
-    ];
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido, cargo, created_at, estado')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      return data?.map(employee => ({
+        id: employee.id,
+        name: `${employee.nombre} ${employee.apellido}`,
+        position: employee.cargo || 'Sin cargo',
+        dateAdded: new Date(employee.created_at).toLocaleDateString('es-ES'),
+        status: employee.estado as 'activo' | 'pendiente' | 'inactivo'
+      })) || [];
+    } catch (error) {
+      console.error('Error fetching recent employees:', error);
+      return [];
+    }
   }
 
   static async getDashboardActivity(): Promise<DashboardActivity[]> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    return [
-      {
-        id: '1',
-        action: 'Procesó nómina de enero',
-        user: 'admin@empresa.com',
-        timestamp: '2025-01-25T16:45:00Z',
-        type: 'payroll'
-      },
-      {
-        id: '2',
-        action: 'Agregó nuevo empleado',
-        user: 'rrhh@empresa.com',
-        timestamp: '2025-01-25T15:30:00Z',
-        type: 'employee'
-      },
-      {
-        id: '3',
-        action: 'Exportó reporte de costos laborales',
-        user: 'contador@empresa.com',
-        timestamp: '2025-01-25T14:20:00Z',
-        type: 'report'
-      },
-      {
-        id: '4',
-        action: 'Procesó pagos bancarios',
-        user: 'admin@empresa.com',
-        timestamp: '2025-01-25T13:15:00Z',
-        type: 'payment'
-      }
-    ];
+    try {
+      const { data, error } = await supabase
+        .from('dashboard_activity')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      return data?.map(activity => ({
+        id: activity.id,
+        action: activity.action,
+        user: activity.user_email,
+        timestamp: activity.created_at,
+        type: activity.type as 'payroll' | 'employee' | 'report' | 'payment'
+      })) || [];
+    } catch (error) {
+      console.error('Error fetching dashboard activity:', error);
+      return [];
+    }
   }
 
   static async getPayrollSummary(): Promise<{
@@ -148,14 +159,37 @@ export class DashboardService {
     pendingPayments: number;
     totalDeductions: number;
   }> {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    return {
-      totalPaid: 45200000,
-      employeesPaid: 22,
-      pendingPayments: 2,
-      totalDeductions: 8450000
-    };
+    try {
+      const { data, error } = await supabase
+        .from('payrolls')
+        .select('neto_pagado, total_deducciones, estado');
+
+      if (error) throw error;
+
+      const totalPaid = data?.reduce((sum, payroll) => 
+        sum + (parseFloat(payroll.neto_pagado?.toString() || '0')), 0) || 0;
+      
+      const totalDeductions = data?.reduce((sum, payroll) => 
+        sum + (parseFloat(payroll.total_deducciones?.toString() || '0')), 0) || 0;
+
+      const employeesPaid = data?.filter(p => p.estado === 'pagada').length || 0;
+      const pendingPayments = data?.filter(p => p.estado === 'procesada').length || 0;
+
+      return {
+        totalPaid,
+        employeesPaid,
+        pendingPayments,
+        totalDeductions
+      };
+    } catch (error) {
+      console.error('Error fetching payroll summary:', error);
+      return {
+        totalPaid: 0,
+        employeesPaid: 0,
+        pendingPayments: 0,
+        totalDeductions: 0
+      };
+    }
   }
 
   static async getComplianceStatus(): Promise<{
@@ -165,8 +199,7 @@ export class DashboardService {
     nextDeadline: string;
     nextDeadlineType: string;
   }> {
-    await new Promise(resolve => setTimeout(resolve, 450));
-    
+    // Por ahora devolvemos datos estáticos, pero se puede implementar lógica real
     return {
       socialSecurityUpToDate: true,
       taxDeclarationsUpToDate: false,
@@ -174,5 +207,37 @@ export class DashboardService {
       nextDeadline: '2025-02-15',
       nextDeadlineType: 'Declaración de retenciones'
     };
+  }
+
+  static async dismissAlert(alertId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('dashboard_alerts')
+        .update({ dismissed: true })
+        .eq('id', alertId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error dismissing alert:', error);
+      throw error;
+    }
+  }
+
+  static async logActivity(action: string, type: 'payroll' | 'employee' | 'report' | 'payment'): Promise<void> {
+    try {
+      // Por ahora usamos un email por defecto, cuando implementemos auth usaremos el usuario actual
+      const { error } = await supabase
+        .from('dashboard_activity')
+        .insert({
+          company_id: '00000000-0000-0000-0000-000000000000', // Se actualizará con auth
+          user_email: 'admin@empresademo.com',
+          action,
+          type
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error logging activity:', error);
+    }
   }
 }
