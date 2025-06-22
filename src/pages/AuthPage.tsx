@@ -42,11 +42,20 @@ const AuthPage = () => {
       const { error } = await signIn(loginForm.email, loginForm.password);
       
       if (error) {
+        console.error('Login error:', error);
+        let errorMessage = 'Ocurrió un error inesperado.';
+        
+        if (error.message === 'Invalid login credentials') {
+          errorMessage = 'Credenciales inválidas. Verifica tu email y contraseña.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Por favor confirma tu email antes de iniciar sesión.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
         toast({
           title: "Error de inicio de sesión",
-          description: error.message === 'Invalid login credentials' 
-            ? 'Credenciales inválidas. Verifica tu email y contraseña.'
-            : error.message,
+          description: errorMessage,
           variant: "destructive"
         });
       } else {
@@ -57,6 +66,7 @@ const AuthPage = () => {
         navigate('/dashboard');
       }
     } catch (error) {
+      console.error('Unexpected login error:', error);
       toast({
         title: "Error",
         description: "Ocurrió un error inesperado.",
@@ -72,6 +82,12 @@ const AuthPage = () => {
     setLoading(true);
 
     try {
+      console.log('Attempting signup with:', { 
+        email: signupForm.email, 
+        firstName: signupForm.firstName, 
+        lastName: signupForm.lastName 
+      });
+      
       const { error } = await signUp(
         signupForm.email, 
         signupForm.password, 
@@ -80,11 +96,22 @@ const AuthPage = () => {
       );
       
       if (error) {
+        console.error('Signup error:', error);
+        let errorMessage = 'Ocurrió un error inesperado.';
+        
+        if (error.message === 'User already registered') {
+          errorMessage = 'El usuario ya está registrado. Intenta iniciar sesión.';
+        } else if (error.message.includes('email_address_invalid')) {
+          errorMessage = 'El formato del email no es válido. Usa un email como ejemplo@dominio.com';
+        } else if (error.message.includes('weak_password')) {
+          errorMessage = 'La contraseña debe tener al menos 6 caracteres.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
         toast({
           title: "Error de registro",
-          description: error.message === 'User already registered'
-            ? 'El usuario ya está registrado. Intenta iniciar sesión.'
-            : error.message,
+          description: errorMessage,
           variant: "destructive"
         });
       } else {
@@ -92,8 +119,16 @@ const AuthPage = () => {
           title: "Registro exitoso",
           description: "Se ha enviado un email de confirmación a tu correo."
         });
+        // Limpiar formulario
+        setSignupForm({
+          email: '',
+          password: '',
+          firstName: '',
+          lastName: ''
+        });
       }
     } catch (error) {
+      console.error('Unexpected signup error:', error);
       toast({
         title: "Error",
         description: "Ocurrió un error inesperado.",
@@ -128,6 +163,7 @@ const AuthPage = () => {
                     type="email"
                     value={loginForm.email}
                     onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="admin@demo.com"
                     required
                   />
                 </div>
@@ -138,6 +174,7 @@ const AuthPage = () => {
                     type="password"
                     value={loginForm.password}
                     onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="admin123456"
                     required
                   />
                 </div>
@@ -148,6 +185,12 @@ const AuthPage = () => {
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-4">
+              <div className="bg-blue-50 p-3 rounded-lg mb-4 text-sm">
+                <strong>Credenciales de prueba:</strong><br/>
+                Email: admin@demo.com<br/>
+                Contraseña: admin123456
+              </div>
+              
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -178,6 +221,7 @@ const AuthPage = () => {
                     type="email"
                     value={signupForm.email}
                     onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="ejemplo@dominio.com"
                     required
                   />
                 </div>

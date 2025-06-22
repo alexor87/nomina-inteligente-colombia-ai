@@ -15,7 +15,7 @@ INSERT INTO public.companies (
 SELECT 
   '900123456-1',
   'Empresa Demo',
-  'admin@nominacol.com',
+  'admin@demo.com',
   '3001234567',
   'Calle 123 #45-67',
   'Bogotá',
@@ -24,5 +24,5 @@ SELECT
   'activa',
   'basico'
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.companies WHERE email = 'admin@nominacol.com'
+  SELECT 1 FROM public.companies WHERE email = 'admin@demo.com'
 );
