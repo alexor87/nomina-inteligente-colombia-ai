@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUserData = async (userId: string) => {
     try {
-      console.log('Loading user data for:', userId);
+      console.log('🔄 Loading user data for:', userId);
       
       // Cargar perfil
       const { data: profileData, error: profileError } = await supabase
@@ -62,34 +62,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (profileError) {
-        console.error('Error loading profile:', profileError);
+        console.error('❌ Error loading profile:', profileError);
       } else if (profileData) {
-        console.log('Profile loaded:', profileData);
+        console.log('✅ Profile loaded:', profileData);
         setProfile(profileData);
       }
 
-      // Cargar roles usando consulta directa en lugar de RPC para evitar problemas
+      // Cargar roles usando consulta directa
+      console.log('🔄 Loading roles for user:', userId);
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('role, company_id')
         .eq('user_id', userId);
 
       if (rolesError) {
-        console.error('Error loading roles:', rolesError);
+        console.error('❌ Error loading roles:', rolesError);
+        console.error('❌ Roles error details:', JSON.stringify(rolesError, null, 2));
       } else if (rolesData) {
-        console.log('Roles loaded:', rolesData);
+        console.log('✅ Roles loaded:', rolesData);
+        console.log('✅ Roles count:', rolesData.length);
         setRoles(rolesData as UserRoleData[]);
+      } else {
+        console.log('⚠️ No roles data returned');
+        setRoles([]);
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('💥 Unexpected error loading user data:', error);
     }
   };
 
   useEffect(() => {
+    console.log('🚀 AuthProvider initializing...');
+    
     // Configurar listener de cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -107,7 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Verificar sesión existente
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.email);
+      console.log('🔍 Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -151,15 +159,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasRole = (role: UserRole, companyId?: string): boolean => {
-    console.log('Checking role:', role, 'for user with roles:', roles);
-    return roles.some(r => 
+    console.log('🔍 Checking role:', role, 'for user with roles:', roles);
+    console.log('🔍 Company filter:', companyId);
+    const hasRoleResult = roles.some(r => 
       r.role === role && 
       (companyId ? r.company_id === companyId : true)
     );
+    console.log('✅ Has role result:', hasRoleResult);
+    return hasRoleResult;
   };
 
   const getCurrentCompanyId = (): string | null => {
-    return profile?.company_id || (roles.length > 0 ? roles[0].company_id : null);
+    const companyId = profile?.company_id || (roles.length > 0 ? roles[0].company_id : null);
+    console.log('🏢 Current company ID:', companyId);
+    return companyId;
   };
 
   const value = {
