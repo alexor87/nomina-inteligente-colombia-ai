@@ -62,7 +62,8 @@ export class ReportsFilterService {
           const dateRange = value as { from: string; to: string };
           return dateRange.from !== '' || dateRange.to !== '';
         }
-        return Object.values(value).some(v => v !== undefined && v !== '');
+        // For other objects, check if they have any defined values
+        return Object.values(value).some(v => v !== undefined && v !== '' && v !== null);
       }
       return value !== undefined && value !== '';
     });
