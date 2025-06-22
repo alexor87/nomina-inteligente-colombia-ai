@@ -57,6 +57,11 @@ export class ReportsFilterService {
         return value.length > 0;
       }
       if (typeof value === 'object' && value !== null) {
+        // Handle dateRange object specifically
+        if (key === 'dateRange') {
+          const dateRange = value as { from: string; to: string };
+          return dateRange.from !== '' || dateRange.to !== '';
+        }
         return Object.values(value).some(v => v !== undefined && v !== '');
       }
       return value !== undefined && value !== '';
