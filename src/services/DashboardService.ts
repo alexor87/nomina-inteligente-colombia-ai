@@ -31,30 +31,54 @@ export interface DashboardActivity {
 }
 
 export class DashboardService {
+  static async getCurrentCompanyId(): Promise<string | null> {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+      
+      return profile?.company_id || null;
+    } catch (error) {
+      console.error('Error getting current company ID:', error);
+      return null;
+    }
+  }
+
   static async getDashboardMetrics(): Promise<DashboardMetrics> {
     try {
-      // Obtener total de empleados
+      const companyId = await this.getCurrentCompanyId();
+      if (!companyId) {
+        throw new Error('No company ID found');
+      }
+
+      // Obtener total de empleados para la empresa actual
       const { count: totalEmpleados } = await supabase
         .from('employees')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', companyId);
 
-      // Obtener total de nóminas procesadas
+      // Obtener total de nóminas procesadas para la empresa actual
       const { count: nominasProcesadas } = await supabase
         .from('payrolls')
         .select('*', { count: 'exact', head: true })
+        .eq('company_id', companyId)
         .eq('estado', 'procesada');
 
-      // Obtener alertas de alta prioridad
+      // Obtener alertas de alta prioridad para la empresa actual
       const { count: alertasLegales } = await supabase
         .from('dashboard_alerts')
         .select('*', { count: 'exact', head: true })
+        .eq('company_id', companyId)
         .eq('priority', 'high')
         .eq('dismissed', false);
 
-      // Calcular gastos de nómina (suma de neto pagado)
+      // Calcular gastos de nómina (suma de neto pagado) para la empresa actual
       const { data: payrollData } = await supabase
         .from('payrolls')
         .select('neto_pagado')
+        .eq('company_id', companyId)
         .eq('estado', 'pagada');
 
       const gastosNomina = payrollData?.reduce((sum, payroll) => 
@@ -82,9 +106,13 @@ export class DashboardService {
 
   static async getDashboardAlerts(): Promise<DashboardAlert[]> {
     try {
+      const companyId = await this.getCurrentCompanyId();
+      if (!companyId) return [];
+
       const { data, error } = await supabase
         .from('dashboard_alerts')
         .select('*')
+        .eq('company_id', companyId)
         .eq('dismissed', false)
         .order('priority', { ascending: false })
         .order('created_at', { ascending: false });
@@ -109,9 +137,13 @@ export class DashboardService {
 
   static async getRecentEmployees(): Promise<RecentEmployee[]> {
     try {
+      const companyId = await this.getCurrentCompanyId();
+      if (!companyId) return [];
+
       const { data, error } = await supabase
         .from('employees')
         .select('id, nombre, apellido, cargo, created_at, estado')
+        .eq('company_id', companyId)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -132,9 +164,13 @@ export class DashboardService {
 
   static async getDashboardActivity(): Promise<DashboardActivity[]> {
     try {
+      const companyId = await this.getCurrentCompanyId();
+      if (!companyId) return [];
+
       const { data, error } = await supabase
         .from('dashboard_activity')
         .select('*')
+        .eq('company_id', companyId)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -225,12 +261,16 @@ export class DashboardService {
 
   static async logActivity(action: string, type: 'payroll' | 'employee' | 'report' | 'payment'): Promise<void> {
     try {
-      // Por ahora usamos un email por defecto, cuando implementemos auth usaremos el usuario actual
+      const companyId = await this.getCurrentCompanyId();
+      const user = (await supabase.auth.getUser()).data.user;
+      
+      if (!companyId || !user) return;
+
       const { error } = await supabase
         .from('dashboard_activity')
         .insert({
-          company_id: '00000000-0000-0000-0000-000000000000', // Se actualizará con auth
-          user_email: 'admin@empresademo.com',
+          company_id: companyId,
+          user_email: user.email || 'Unknown',
           action,
           type
         });
