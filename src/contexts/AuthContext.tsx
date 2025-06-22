@@ -51,58 +51,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const loadUserData = async (userId: string) => {
+    console.log('🔄 Starting loadUserData for:', userId);
+    setLoading(true);
+    
     try {
-      console.log('🔄 Loading user data for:', userId);
-      
-      // Cargar perfil
+      // Cargar perfil con timeout
       console.log('📋 Loading profile...');
-      const { data: profileData, error: profileError } = await supabase
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .single();
 
+      const profileResult = await Promise.race([
+        profilePromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile query timeout')), 5000)
+        )
+      ]);
+
+      const { data: profileData, error: profileError } = profileResult as any;
+
       if (profileError) {
-        console.error('❌ Error loading profile:', profileError);
-        console.error('❌ Profile error details:', JSON.stringify(profileError, null, 2));
+        console.error('❌ Profile error:', profileError.message);
+        setProfile(null);
       } else if (profileData) {
-        console.log('✅ Profile loaded:', profileData);
+        console.log('✅ Profile loaded successfully');
         setProfile(profileData);
       } else {
         console.log('⚠️ No profile data found');
+        setProfile(null);
       }
 
-      // Cargar roles usando consulta directa
-      console.log('🔄 Loading roles for user:', userId);
-      const { data: rolesData, error: rolesError } = await supabase
+      // Cargar roles con timeout
+      console.log('🔄 Loading roles...');
+      const rolesPromise = supabase
         .from('user_roles')
         .select('role, company_id')
         .eq('user_id', userId);
 
-      console.log('🔍 Roles query result:', { rolesData, rolesError });
+      const rolesResult = await Promise.race([
+        rolesPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Roles query timeout')), 5000)
+        )
+      ]);
+
+      const { data: rolesData, error: rolesError } = rolesResult as any;
 
       if (rolesError) {
-        console.error('❌ Error loading roles:', rolesError);
-        console.error('❌ Roles error details:', JSON.stringify(rolesError, null, 2));
-        // Establecer roles vacíos pero continuar
+        console.error('❌ Roles error:', rolesError.message);
         setRoles([]);
-      } else if (rolesData) {
-        console.log('✅ Roles loaded:', rolesData);
-        console.log('✅ Roles count:', rolesData.length);
+      } else if (rolesData && Array.isArray(rolesData)) {
+        console.log('✅ Roles loaded:', rolesData.length, 'roles found');
         setRoles(rolesData as UserRoleData[]);
       } else {
-        console.log('⚠️ No roles data returned, setting empty array');
+        console.log('⚠️ No roles data returned');
         setRoles([]);
       }
 
-      console.log('✅ User data loading completed');
     } catch (error) {
-      console.error('💥 Unexpected error loading user data:', error);
-      // En caso de error, establecer valores por defecto
+      console.error('💥 Error in loadUserData:', error);
+      setProfile(null);
       setRoles([]);
     } finally {
-      // IMPORTANTE: Siempre establecer loading a false aquí
-      console.log('🏁 Setting loading to false');
+      console.log('🏁 loadUserData completed, setting loading to false');
       setLoading(false);
     }
   };
@@ -121,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Cargar datos del usuario cuando se autentica
           await loadUserData(session.user.id);
         } else {
+          console.log('👤 No user session, clearing data');
           setProfile(null);
           setRoles([]);
           setLoading(false);
@@ -129,17 +143,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // Verificar sesión existente
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('🔍 Initial session check:', session?.user?.email || 'No session');
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        loadUserData(session.user.id);
-      } else {
+    const checkInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔍 Initial session check:', session?.user?.email || 'No session');
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await loadUserData(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('💥 Error checking initial session:', error);
         setLoading(false);
       }
-    });
+    };
+
+    checkInitialSession();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -175,7 +197,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasRole = (role: UserRole, companyId?: string): boolean => {
     console.log('🔍 Checking role:', role, 'for user with roles:', roles);
-    console.log('🔍 Company filter:', companyId);
     const hasRoleResult = roles.some(r => 
       r.role === role && 
       (companyId ? r.company_id === companyId : true)
@@ -196,32 +217,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     roles,
     loading,
-    signIn: async (email: string, password: string) => {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      return { error };
-    },
-    signUp: async (email: string, password: string, firstName: string, lastName: string) => {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-          }
-        }
-      });
-      return { error };
-    },
-    signOut: async () => {
-      await supabase.auth.signOut();
-    },
+    signIn,
+    signUp,
+    signOut,
     hasRole,
     getCurrentCompanyId,
   };
