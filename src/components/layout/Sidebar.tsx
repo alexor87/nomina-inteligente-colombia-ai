@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpen: () => void;
   userRole: 'admin' | 'company' | 'employee';
 }
 
@@ -33,8 +34,22 @@ const sidebarItems = {
   ]
 };
 
-export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
+export const Sidebar = ({ isOpen, onClose, onOpen, userRole }: SidebarProps) => {
   const items = sidebarItems[userRole] || [];
+
+  const handleMouseEnter = () => {
+    // Solo abrir automáticamente en desktop si no está ya abierto
+    if (window.innerWidth >= 1024 && !isOpen) {
+      onOpen();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    // Solo cerrar automáticamente en desktop
+    if (window.innerWidth >= 1024) {
+      onClose();
+    }
+  };
 
   return (
     <>
@@ -47,10 +62,14 @@ export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
       )}
       
       {/* Sidebar */}
-      <aside className={cn(
-        "fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out",
-        isOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <aside 
+        className={cn(
+          "fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <div className="p-6">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -59,7 +78,7 @@ export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
             </div>
             <button 
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-gray-500 hover:text-gray-700 lg:hidden"
             >
               ✕
             </button>
@@ -76,7 +95,12 @@ export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
                     ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700" 
                     : "text-gray-700 hover:bg-gray-50"
                 )}
-                onClick={onClose}
+                onClick={() => {
+                  // Solo cerrar en mobile
+                  if (window.innerWidth < 1024) {
+                    onClose();
+                  }
+                }}
               >
                 <span className="mr-3 text-lg">{item.icon}</span>
                 {item.label}

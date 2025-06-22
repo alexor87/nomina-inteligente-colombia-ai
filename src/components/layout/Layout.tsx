@@ -33,6 +33,7 @@ export const Layout = ({ children }: LayoutProps) => {
       <Sidebar 
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)}
+        onOpen={() => setSidebarOpen(true)}
         userRole={getUserRole()}
       />
       
