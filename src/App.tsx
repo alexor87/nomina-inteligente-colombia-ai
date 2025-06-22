@@ -9,6 +9,7 @@ import EmployeesPage from "./pages/EmployeesPage";
 import PayrollPage from "./pages/PayrollPage";
 import PayrollHistoryPage from "./pages/PayrollHistoryPage";
 import PaymentsPage from "./pages/PaymentsPage";
+import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -30,7 +31,7 @@ const App = () => (
           <Route path="/historial-nomina" element={<PayrollHistoryPage />} />
           <Route path="/pagos" element={<PaymentsPage />} />
           <Route path="/dian" element={<div>DIAN / Nómina Electrónica - Próximamente</div>} />
-          <Route path="/reportes" element={<div>Reportes - Próximamente</div>} />
+          <Route path="/reportes" element={<ReportsPage />} />
           <Route path="/alertas" element={<div>Alertas - Próximamente</div>} />
           <Route path="/configuracion" element={<SettingsPage />} />
           {/* Legacy routes for compatibility */}
