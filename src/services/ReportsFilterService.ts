@@ -51,14 +51,13 @@ export class ReportsFilterService {
     }
 
     // Validar que haya al menos un filtro aplicado
-    const hasFilters = Object.keys(filters).some(key => {
-      const value = filters[key as keyof ReportFilters];
+    const hasFilters = Object.entries(filters).some(([key, value]) => {
       if (Array.isArray(value)) {
         return value.length > 0;
       }
       if (typeof value === 'object' && value !== null) {
         // Handle dateRange object specifically
-        if (key === 'dateRange') {
+        if (key === 'dateRange' && 'from' in value && 'to' in value) {
           const dateRange = value as { from: string; to: string };
           return dateRange.from !== '' || dateRange.to !== '';
         }
