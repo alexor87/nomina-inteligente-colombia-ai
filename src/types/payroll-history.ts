@@ -72,3 +72,20 @@ export interface EditWizardSteps {
     update: boolean;
   };
 }
+
+export interface ReopenPeriodData {
+  periodId: string;
+  reason: string;
+  userId: string;
+}
+
+export interface AuditLog {
+  id: string;
+  periodId: string;
+  action: 'created' | 'reopened' | 'edited' | 'closed' | 'exported';
+  userId: string;
+  userName: string;
+  timestamp: string;
+  details: string;
+  changes?: Record<string, any>;
+}

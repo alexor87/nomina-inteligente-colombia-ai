@@ -9,9 +9,15 @@ interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
   onViewDetails: (period: PayrollHistoryPeriod) => void;
   onReopenPeriod: (period: PayrollHistoryPeriod) => void;
+  onDownloadFile?: (fileUrl: string, fileName: string) => void;
 }
 
-export const PayrollHistoryTable = ({ periods, onViewDetails, onReopenPeriod }: PayrollHistoryTableProps) => {
+export const PayrollHistoryTable = ({ 
+  periods, 
+  onViewDetails, 
+  onReopenPeriod, 
+  onDownloadFile 
+}: PayrollHistoryTableProps) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -54,6 +60,17 @@ export const PayrollHistoryTable = ({ periods, onViewDetails, onReopenPeriod }: 
     return <Badge className={`${config.color} text-xs`}>{config.text}</Badge>;
   };
 
+  const handleDownloadPila = (period: PayrollHistoryPeriod) => {
+    if (period.pilaFileUrl && onDownloadFile) {
+      onDownloadFile(period.pilaFileUrl, `pila-${period.id}.txt`);
+    }
+  };
+
+  const canReopen = (period: PayrollHistoryPeriod) => {
+    // Lógica para determinar si se puede reabrir
+    return period.status === 'cerrado' || period.status === 'con_errores';
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <Table>
@@ -80,6 +97,11 @@ export const PayrollHistoryTable = ({ periods, onViewDetails, onReopenPeriod }: 
                   {period.version > 1 && (
                     <div className="text-xs text-blue-600">v{period.version}</div>
                   )}
+                  {period.editedBy && (
+                    <div className="text-xs text-gray-400">
+                      Editado por {period.editedBy.split('@')[0]}
+                    </div>
+                  )}
                 </div>
               </TableCell>
               <TableCell>
@@ -98,7 +120,12 @@ export const PayrollHistoryTable = ({ periods, onViewDetails, onReopenPeriod }: 
               </TableCell>
               <TableCell>
                 {period.pilaFileUrl ? (
-                  <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-blue-600 hover:text-blue-800"
+                    onClick={() => handleDownloadPila(period)}
+                  >
                     <FileText className="h-4 w-4 mr-1" />
                     Ver/Descargar
                   </Button>
@@ -119,6 +146,7 @@ export const PayrollHistoryTable = ({ periods, onViewDetails, onReopenPeriod }: 
                     size="sm"
                     onClick={() => onViewDetails(period)}
                     className="text-blue-600 hover:text-blue-800"
+                    title="Ver detalles"
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -127,6 +155,8 @@ export const PayrollHistoryTable = ({ periods, onViewDetails, onReopenPeriod }: 
                     size="sm"
                     onClick={() => onReopenPeriod(period)}
                     className="text-orange-600 hover:text-orange-800"
+                    disabled={!canReopen(period)}
+                    title={canReopen(period) ? "Reabrir período" : "No se puede reabrir"}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -134,6 +164,8 @@ export const PayrollHistoryTable = ({ periods, onViewDetails, onReopenPeriod }: 
                     variant="ghost" 
                     size="sm"
                     className="text-green-600 hover:text-green-800"
+                    onClick={() => handleDownloadPila(period)}
+                    title="Descargar archivos"
                   >
                     <Download className="h-4 w-4" />
                   </Button>
@@ -143,6 +175,12 @@ export const PayrollHistoryTable = ({ periods, onViewDetails, onReopenPeriod }: 
           ))}
         </TableBody>
       </Table>
+      
+      {periods.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No se encontraron períodos que coincidan con los filtros</p>
+        </div>
+      )}
     </div>
   );
 };
