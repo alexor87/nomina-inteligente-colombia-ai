@@ -38,7 +38,7 @@ export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay for mobile */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" 
@@ -48,7 +48,7 @@ export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
       
       {/* Sidebar */}
       <aside className={cn(
-        "fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:z-0",
+        "fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="p-6">
@@ -59,7 +59,7 @@ export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
             </div>
             <button 
               onClick={onClose}
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className="text-gray-500 hover:text-gray-700"
             >
               ✕
             </button>
@@ -76,9 +76,7 @@ export const Sidebar = ({ isOpen, onClose, userRole }: SidebarProps) => {
                     ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700" 
                     : "text-gray-700 hover:bg-gray-50"
                 )}
-                onClick={() => {
-                  if (window.innerWidth < 1024) onClose();
-                }}
+                onClick={onClose}
               >
                 <span className="mr-3 text-lg">{item.icon}</span>
                 {item.label}

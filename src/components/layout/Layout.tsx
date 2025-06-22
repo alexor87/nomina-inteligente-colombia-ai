@@ -19,7 +19,7 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const { roles } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar contraído por defecto
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Determinar el rol del usuario para el sidebar
   const getUserRole = () => {
