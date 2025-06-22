@@ -1,4 +1,5 @@
 
+
 -- Crear solo la empresa de ejemplo para el usuario administrador
 INSERT INTO public.companies (
   nit,
@@ -15,7 +16,7 @@ INSERT INTO public.companies (
 SELECT 
   '900123456-1',
   'Empresa Demo',
-  'admin@demo.com',
+  'alexor87@gmail.com',
   '3001234567',
   'Calle 123 #45-67',
   'Bogotá',
@@ -24,5 +25,6 @@ SELECT
   'activa',
   'basico'
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.companies WHERE email = 'admin@demo.com'
+  SELECT 1 FROM public.companies WHERE email = 'alexor87@gmail.com'
 );
+

@@ -163,7 +163,7 @@ const AuthPage = () => {
                     type="email"
                     value={loginForm.email}
                     onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="admin@demo.com"
+                    placeholder="alexor87@gmail.com"
                     required
                   />
                 </div>
@@ -187,7 +187,7 @@ const AuthPage = () => {
             <TabsContent value="signup" className="space-y-4">
               <div className="bg-blue-50 p-3 rounded-lg mb-4 text-sm">
                 <strong>Credenciales de prueba:</strong><br/>
-                Email: admin@demo.com<br/>
+                Email: alexor87@gmail.com<br/>
                 Contraseña: admin123456
               </div>
               
@@ -221,7 +221,7 @@ const AuthPage = () => {
                     type="email"
                     value={signupForm.email}
                     onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="ejemplo@dominio.com"
+                    placeholder="alexor87@gmail.com"
                     required
                   />
                 </div>
