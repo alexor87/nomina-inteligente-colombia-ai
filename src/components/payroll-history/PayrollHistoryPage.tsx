@@ -121,10 +121,7 @@ export const PayrollHistoryPage = () => {
       <>
         <PayrollHistoryDetails 
           period={selectedPeriod} 
-          onBack={() => setSelectedP
-          onReopenPeriod={() => handleReopenPeriod(selectedPeriod)}
-          onDownloadFile={handleDownloadFile}
-          onOpenEditWizard={() => setEditWizardOpen(true)}
+          onBack={() => setSelectedPeriod(null)}
         />
         
         <EditWizard
