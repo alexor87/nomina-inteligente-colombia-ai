@@ -1,6 +1,7 @@
 
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -70,7 +71,7 @@ export const Sidebar = ({ isOpen, onClose, onOpen, userRole }: SidebarProps) => 
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div className="p-6">
+        <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-2xl font-bold text-blue-600">NóminaCol</h1>
@@ -84,29 +85,31 @@ export const Sidebar = ({ isOpen, onClose, onOpen, userRole }: SidebarProps) => 
             </button>
           </div>
           
-          <nav className="space-y-2">
-            {items.map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                className={({ isActive }) => cn(
-                  "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
-                  isActive 
-                    ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700" 
-                    : "text-gray-700 hover:bg-gray-50"
-                )}
-                onClick={() => {
-                  // Solo cerrar en mobile
-                  if (window.innerWidth < 1024) {
-                    onClose();
-                  }
-                }}
-              >
-                <span className="mr-3 text-lg">{item.icon}</span>
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+          <ScrollArea className="flex-1">
+            <nav className="space-y-2 pr-4">
+              {items.map((item) => (
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  className={({ isActive }) => cn(
+                    "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                    isActive 
+                      ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700" 
+                      : "text-gray-700 hover:bg-gray-50"
+                  )}
+                  onClick={() => {
+                    // Solo cerrar en mobile
+                    if (window.innerWidth < 1024) {
+                      onClose();
+                    }
+                  }}
+                >
+                  <span className="mr-3 text-lg">{item.icon}</span>
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+          </ScrollArea>
         </div>
       </aside>
     </>
