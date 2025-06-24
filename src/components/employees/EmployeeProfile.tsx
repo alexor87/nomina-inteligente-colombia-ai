@@ -7,15 +7,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   User, Calendar, DollarSign, FileText, Shield, Clock, 
   Mail, Download, Eye, Send, CheckCircle, XCircle,
-  TrendingUp, Building, Phone, MapPin
+  TrendingUp, Building, Phone, MapPin, X
 } from 'lucide-react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EmployeeProfileProps {
   employee: EmployeeWithStatus;
@@ -92,6 +93,7 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
   const [contractChanges, setContractChanges] = useState<ContractChange[]>([]);
   const [communications, setCommunications] = useState<Communication[]>([]);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     loadEmployeeData();
@@ -311,483 +313,506 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
   const lastPayroll = getLastPayroll();
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header del perfil */}
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-8">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start space-x-6">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={employee.avatar} alt={`${employee.nombre} ${employee.apellido}`} />
-                  <AvatarFallback className="bg-blue-600 text-white text-2xl">
-                    {employee.nombre[0]}{employee.apellido[0]}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className="space-y-3">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900">
-                      {employee.nombre} {employee.apellido}
-                    </h1>
-                    <p className="text-lg text-gray-600">{employee.cargo}</p>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    {getStatusBadge(employee.estado)}
-                    <Badge variant="outline" className="text-sm">
-                      {employee.cedula}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-              
-              <Button variant="outline" onClick={onClose}>
-                Cerrar
-              </Button>
-            </div>
+    <div className="h-full flex flex-col bg-gray-50">
+      {/* Header fijo */}
+      <div className="flex-shrink-0 bg-white border-b p-4 lg:p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-3 lg:space-x-6 min-w-0 flex-1">
+            <Avatar className="h-12 w-12 lg:h-20 lg:w-20 flex-shrink-0">
+              <AvatarImage src={employee.avatar} alt={`${employee.nombre} ${employee.apellido}`} />
+              <AvatarFallback className="bg-blue-600 text-white text-sm lg:text-2xl">
+                {employee.nombre[0]}{employee.apellido[0]}
+              </AvatarFallback>
+            </Avatar>
             
-            {/* KPIs rápidos */}
-            <div className="mt-8 grid grid-cols-2 md:grid-cols-6 gap-4">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <Calendar className="h-5 w-5 mx-auto mb-2 text-blue-600" />
-                <div className="text-sm text-gray-600">Ingreso</div>
-                <div className="font-semibold">{formatDate(employee.fechaIngreso)}</div>
+            <div className="space-y-2 lg:space-y-3 min-w-0 flex-1">
+              <div>
+                <h1 className="text-xl lg:text-3xl font-bold text-gray-900 truncate">
+                  {employee.nombre} {employee.apellido}
+                </h1>
+                <p className="text-sm lg:text-lg text-gray-600 truncate">{employee.cargo}</p>
               </div>
               
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <Building className="h-5 w-5 mx-auto mb-2 text-green-600" />
-                <div className="text-sm text-gray-600">Contrato</div>
-                <div className="font-semibold capitalize">{employee.tipoContrato}</div>
-              </div>
-              
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <DollarSign className="h-5 w-5 mx-auto mb-2 text-purple-600" />
-                <div className="text-sm text-gray-600">Salario Base</div>
-                <div className="font-semibold">{formatCurrency(employee.salarioBase)}</div>
-              </div>
-              
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <Calendar className="h-5 w-5 mx-auto mb-2 text-orange-600" />
-                <div className="text-sm text-gray-600">Último Período</div>
-                <div className="font-semibold text-sm">{lastPayroll?.periodo || 'N/A'}</div>
-              </div>
-              
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <TrendingUp className="h-5 w-5 mx-auto mb-2 text-green-600" />
-                <div className="text-sm text-gray-600">Último Neto</div>
-                <div className="font-semibold">{lastPayroll ? formatCurrency(lastPayroll.netoPagado) : 'N/A'}</div>
-              </div>
-              
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <FileText className="h-5 w-5 mx-auto mb-2 text-blue-600" />
-                <div className="text-sm text-gray-600">Comprobantes</div>
-                <div className="font-semibold">{vouchers.length}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                {getStatusBadge(employee.estado)}
+                <Badge variant="outline" className="text-xs lg:text-sm">
+                  {employee.cedula}
+                </Badge>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          
+          <Button variant="outline" onClick={onClose} size={isMobile ? "sm" : "default"}>
+            <X className="h-4 w-4 lg:mr-2" />
+            {!isMobile && "Cerrar"}
+          </Button>
+        </div>
+        
+        {/* KPIs responsivos */}
+        <div className="mt-4 lg:mt-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-4">
+          <div className="text-center p-2 lg:p-4 bg-gray-50 rounded-lg">
+            <Calendar className="h-4 w-4 lg:h-5 lg:w-5 mx-auto mb-1 lg:mb-2 text-blue-600" />
+            <div className="text-xs lg:text-sm text-gray-600">Ingreso</div>
+            <div className="font-semibold text-xs lg:text-base">{formatDate(employee.fechaIngreso)}</div>
+          </div>
+          
+          <div className="text-center p-2 lg:p-4 bg-gray-50 rounded-lg">
+            <Building className="h-4 w-4 lg:h-5 lg:w-5 mx-auto mb-1 lg:mb-2 text-green-600" />
+            <div className="text-xs lg:text-sm text-gray-600">Contrato</div>
+            <div className="font-semibold text-xs lg:text-base capitalize">{employee.tipoContrato}</div>
+          </div>
+          
+          <div className="text-center p-2 lg:p-4 bg-gray-50 rounded-lg">
+            <DollarSign className="h-4 w-4 lg:h-5 lg:w-5 mx-auto mb-1 lg:mb-2 text-purple-600" />
+            <div className="text-xs lg:text-sm text-gray-600">Salario Base</div>
+            <div className="font-semibold text-xs lg:text-base">{formatCurrency(employee.salarioBase)}</div>
+          </div>
+          
+          <div className="text-center p-2 lg:p-4 bg-gray-50 rounded-lg">
+            <Calendar className="h-4 w-4 lg:h-5 lg:w-5 mx-auto mb-1 lg:mb-2 text-orange-600" />
+            <div className="text-xs lg:text-sm text-gray-600">Último Período</div>
+            <div className="font-semibold text-xs lg:text-base">{lastPayroll?.periodo || 'N/A'}</div>
+          </div>
+          
+          <div className="text-center p-2 lg:p-4 bg-gray-50 rounded-lg">
+            <TrendingUp className="h-4 w-4 lg:h-5 lg:w-5 mx-auto mb-1 lg:mb-2 text-green-600" />
+            <div className="text-xs lg:text-sm text-gray-600">Último Neto</div>
+            <div className="font-semibold text-xs lg:text-base">{lastPayroll ? formatCurrency(lastPayroll.netoPagado) : 'N/A'}</div>
+          </div>
+          
+          <div className="text-center p-2 lg:p-4 bg-gray-50 rounded-lg">
+            <FileText className="h-4 w-4 lg:h-5 lg:w-5 mx-auto mb-1 lg:mb-2 text-blue-600" />
+            <div className="text-xs lg:text-sm text-gray-600">Comprobantes</div>
+            <div className="font-semibold text-xs lg:text-base">{vouchers.length}</div>
+          </div>
+        </div>
+      </div>
 
-        {/* Tabs principales */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-white border shadow-sm">
-            <TabsTrigger value="nomina" className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4" />
-              <span>Nómina</span>
-            </TabsTrigger>
-            <TabsTrigger value="comprobantes" className="flex items-center space-x-2">
-              <FileText className="h-4 w-4" />
-              <span>Comprobantes</span>
-            </TabsTrigger>
-            <TabsTrigger value="aportes" className="flex items-center space-x-2">
-              <Shield className="h-4 w-4" />
-              <span>Aportes</span>
-            </TabsTrigger>
-            <TabsTrigger value="novedades" className="flex items-center space-x-2">
-              <Clock className="h-4 w-4" />
-              <span>Novedades</span>
-            </TabsTrigger>
-            <TabsTrigger value="cambios" className="flex items-center space-x-2">
-              <FileText className="h-4 w-4" />
-              <span>Cambios</span>
-            </TabsTrigger>
-            <TabsTrigger value="comunicaciones" className="flex items-center space-x-2">
-              <Mail className="h-4 w-4" />
-              <span>Comunicaciones</span>
-            </TabsTrigger>
-          </TabsList>
+      {/* Contenido scrolleable */}
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
+            {/* Tabs principales */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="sticky top-0 bg-gray-50 pb-4 z-10">
+                <TabsList className={`grid w-full ${isMobile ? 'grid-cols-3' : 'grid-cols-6'} bg-white border shadow-sm`}>
+                  <TabsTrigger value="nomina" className="flex items-center space-x-1 lg:space-x-2 text-xs lg:text-sm">
+                    <DollarSign className="h-3 w-3 lg:h-4 lg:w-4" />
+                    <span className={isMobile ? 'hidden' : 'block'}>Nómina</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="comprobantes" className="flex items-center space-x-1 lg:space-x-2 text-xs lg:text-sm">
+                    <FileText className="h-3 w-3 lg:h-4 lg:w-4" />
+                    <span className={isMobile ? 'hidden' : 'block'}>Comprobantes</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="aportes" className="flex items-center space-x-1 lg:space-x-2 text-xs lg:text-sm">
+                    <Shield className="h-3 w-3 lg:h-4 lg:w-4" />
+                    <span className={isMobile ? 'hidden' : 'block'}>Aportes</span>
+                  </TabsTrigger>
+                  {!isMobile && (
+                    <>
+                      <TabsTrigger value="novedades" className="flex items-center space-x-2 text-sm">
+                        <Clock className="h-4 w-4" />
+                        <span>Novedades</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="cambios" className="flex items-center space-x-2 text-sm">
+                        <FileText className="h-4 w-4" />
+                        <span>Cambios</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="comunicaciones" className="flex items-center space-x-2 text-sm">
+                        <Mail className="h-4 w-4" />
+                        <span>Comunicaciones</span>
+                      </TabsTrigger>
+                    </>
+                  )}
+                </TabsList>
+              </div>
 
-          {/* Tab Content: Historial de nómina */}
-          <TabsContent value="nomina">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                  <span>Historial de Nómina</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {payrollHistory.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Período</TableHead>
-                        <TableHead>Devengado</TableHead>
-                        <TableHead>Deducciones</TableHead>
-                        <TableHead>Neto</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead className="text-center">Ver</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {payrollHistory.map((payroll) => (
-                        <TableRow key={payroll.id}>
-                          <TableCell className="font-medium">{payroll.periodo}</TableCell>
-                          <TableCell className="text-green-600 font-semibold">
-                            {formatCurrency(payroll.totalDevengado)}
-                          </TableCell>
-                          <TableCell className="text-red-600 font-semibold">
-                            {formatCurrency(payroll.totalDeducciones)}
-                          </TableCell>
-                          <TableCell className="text-blue-600 font-semibold">
-                            {formatCurrency(payroll.netoPagado)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={
-                              payroll.estado === 'pagada' ? 'bg-green-100 text-green-800' :
-                              payroll.estado === 'procesada' ? 'bg-blue-100 text-blue-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }>
-                              {payroll.estado}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Drawer>
-                              <DrawerTrigger asChild>
+              {/* Tab Content: Historial de nómina */}
+              <TabsContent value="nomina" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg lg:text-xl">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                      <span>Historial de Nómina</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {payrollHistory.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs lg:text-sm">Período</TableHead>
+                              <TableHead className="text-xs lg:text-sm">Devengado</TableHead>
+                              <TableHead className="text-xs lg:text-sm">Deducciones</TableHead>
+                              <TableHead className="text-xs lg:text-sm">Neto</TableHead>
+                              <TableHead className="text-xs lg:text-sm">Estado</TableHead>
+                              <TableHead className="text-center text-xs lg:text-sm">Ver</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {payrollHistory.map((payroll) => (
+                              <TableRow key={payroll.id}>
+                                <TableCell className="font-medium text-xs lg:text-sm">{payroll.periodo}</TableCell>
+                                <TableCell className="text-green-600 font-semibold text-xs lg:text-sm">
+                                  {formatCurrency(payroll.totalDevengado)}
+                                </TableCell>
+                                <TableCell className="text-red-600 font-semibold text-xs lg:text-sm">
+                                  {formatCurrency(payroll.totalDeducciones)}
+                                </TableCell>
+                                <TableCell className="text-blue-600 font-semibold text-xs lg:text-sm">
+                                  {formatCurrency(payroll.netoPagado)}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={
+                                    payroll.estado === 'pagada' ? 'bg-green-100 text-green-800' :
+                                    payroll.estado === 'procesada' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                  }>
+                                    {payroll.estado}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Drawer>
+                                    <DrawerTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                    </DrawerTrigger>
+                                    <DrawerContent className="max-w-4xl mx-auto max-h-[90vh]">
+                                      <DrawerHeader>
+                                        <DrawerTitle>Detalle de Nómina - {payroll.periodo}</DrawerTitle>
+                                      </DrawerHeader>
+                                      <ScrollArea className="h-[60vh] p-6">
+                                        <div className="space-y-4">
+                                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="text-center p-4 bg-green-50 rounded-lg">
+                                              <div className="text-xl lg:text-2xl font-bold text-green-600">
+                                                {formatCurrency(payroll.totalDevengado)}
+                                              </div>
+                                              <div className="text-sm text-gray-600">Total Devengado</div>
+                                            </div>
+                                            <div className="text-center p-4 bg-red-50 rounded-lg">
+                                              <div className="text-xl lg:text-2xl font-bold text-red-600">
+                                                {formatCurrency(payroll.totalDeducciones)}
+                                              </div>
+                                              <div className="text-sm text-gray-600">Deducciones</div>
+                                            </div>
+                                            <div className="text-center p-4 bg-blue-50 rounded-lg">
+                                              <div className="text-xl lg:text-2xl font-bold text-blue-600">
+                                                {formatCurrency(payroll.netoPagado)}
+                                              </div>
+                                              <div className="text-sm text-gray-600">Neto Pagado</div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </ScrollArea>
+                                    </DrawerContent>
+                                  </Drawer>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        No hay historial de nómina disponible
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Tab Content: Comprobantes */}
+              <TabsContent value="comprobantes" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg lg:text-xl">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      <span>Comprobantes</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {vouchers.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs lg:text-sm">Tipo</TableHead>
+                              <TableHead className="text-xs lg:text-sm">Período</TableHead>
+                              <TableHead className="text-xs lg:text-sm">PDF</TableHead>
+                              <TableHead className="text-xs lg:text-sm">XML</TableHead>
+                              <TableHead className="text-xs lg:text-sm">Enviado</TableHead>
+                              <TableHead className="text-center text-xs lg:text-sm">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {vouchers.map((voucher) => (
+                              <TableRow key={voucher.id}>
+                                <TableCell className="font-medium text-xs lg:text-sm">{voucher.tipo}</TableCell>
+                                <TableCell className="text-xs lg:text-sm">{voucher.periodo}</TableCell>
+                                <TableCell>
+                                  {voucher.pdfUrl ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDownloadVoucher(voucher)}
+                                    >
+                                      <Download className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                  ) : (
+                                    <span className="text-gray-400">–</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {voucher.xmlUrl ? (
+                                    <Button variant="ghost" size="sm">
+                                      <Download className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                  ) : (
+                                    <span className="text-gray-400">–</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {voucher.enviado ? (
+                                    <div className="flex items-center space-x-1">
+                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                      <span className="text-sm text-green-600">Sí</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center space-x-1">
+                                      <XCircle className="h-4 w-4 text-red-600" />
+                                      <span className="text-sm text-red-600">No</span>
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleResendVoucher(voucher)}
+                                    >
+                                      <Send className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        No hay comprobantes disponibles
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Tab Content: Aportes */}
+              <TabsContent value="aportes" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg lg:text-xl">
+                      <Shield className="h-5 w-5 text-purple-600" />
+                      <span>Aportes a Seguridad Social</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs lg:text-sm">Mes</TableHead>
+                            <TableHead className="text-xs lg:text-sm">EPS</TableHead>
+                            <TableHead className="text-xs lg:text-sm">ARL</TableHead>
+                            <TableHead className="text-xs lg:text-sm">Pensión</TableHead>
+                            <TableHead className="text-xs lg:text-sm">Caja</TableHead>
+                            <TableHead className="text-xs lg:text-sm">IBC</TableHead>
+                            <TableHead className="text-center text-xs lg:text-sm">Ver</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {contributions.map((contribution, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium text-xs lg:text-sm">{contribution.mes}</TableCell>
+                              <TableCell className="text-xs lg:text-sm">{formatCurrency(contribution.eps)}</TableCell>
+                              <TableCell className="text-xs lg:text-sm">{formatCurrency(contribution.arl)}</TableCell>
+                              <TableCell className="text-xs lg:text-sm">{formatCurrency(contribution.pension)}</TableCell>
+                              <TableCell className="text-xs lg:text-sm">{formatCurrency(contribution.cajaCompensacion)}</TableCell>
+                              <TableCell className="font-semibold text-xs lg:text-sm">{formatCurrency(contribution.ibc)}</TableCell>
+                              <TableCell className="text-center">
                                 <Button variant="ghost" size="sm">
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                              </DrawerTrigger>
-                              <DrawerContent className="max-w-4xl mx-auto">
-                                <DrawerHeader>
-                                  <DrawerTitle>Detalle de Nómina - {payroll.periodo}</DrawerTitle>
-                                </DrawerHeader>
-                                <div className="p-6 space-y-4">
-                                  <div className="grid grid-cols-3 gap-4">
-                                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                                      <div className="text-2xl font-bold text-green-600">
-                                        {formatCurrency(payroll.totalDevengado)}
-                                      </div>
-                                      <div className="text-sm text-gray-600">Total Devengado</div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Tabs adicionales solo en desktop */}
+              {!isMobile && (
+                <>
+                  {/* Tab Content: Novedades */}
+                  <TabsContent value="novedades" className="mt-0">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Clock className="h-5 w-5 text-orange-600" />
+                          <span>Novedades Laborales</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {novelties.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead>Tipo</TableHead>
+                                <TableHead>Días / Valor</TableHead>
+                                <TableHead>Aplicada en</TableHead>
+                                <TableHead>Estado</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {novelties.map((novelty) => (
+                                <TableRow key={novelty.id}>
+                                  <TableCell>{formatDate(novelty.fecha)}</TableCell>
+                                  <TableCell className="font-medium">{novelty.tipo}</TableCell>
+                                  <TableCell>
+                                    {novelty.dias ? `${novelty.dias} días` : formatCurrency(novelty.valor)}
+                                  </TableCell>
+                                  <TableCell>{novelty.aplicadoEn}</TableCell>
+                                  <TableCell>
+                                    <Badge className="bg-green-100 text-green-800">
+                                      {novelty.estado}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            No hay novedades registradas
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* Tab Content: Cambios de contrato */}
+                  <TabsContent value="cambios" className="mt-0">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <FileText className="h-5 w-5 text-indigo-600" />
+                          <span>Cambios Contractuales</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {contractChanges.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Evento</TableHead>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead>Descripción</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {contractChanges.map((change) => (
+                                <TableRow key={change.id}>
+                                  <TableCell className="font-medium">{change.evento}</TableCell>
+                                  <TableCell>{formatDate(change.fecha)}</TableCell>
+                                  <TableCell>
+                                    <div>
+                                      {change.descripcion}
+                                      {change.valorAnterior && change.valorNuevo && (
+                                        <div className="text-sm text-gray-600 mt-1">
+                                          {change.valorAnterior} → {change.valorNuevo}
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="text-center p-4 bg-red-50 rounded-lg">
-                                      <div className="text-2xl font-bold text-red-600">
-                                        {formatCurrency(payroll.totalDeducciones)}
-                                      </div>
-                                      <div className="text-sm text-gray-600">Deducciones</div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            No hay cambios contractuales registrados
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* Tab Content: Comunicaciones */}
+                  <TabsContent value="comunicaciones" className="mt-0">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Mail className="h-5 w-5 text-teal-600" />
+                          <span>Comunicaciones</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {communications.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead>Medio</TableHead>
+                                <TableHead>Documento</TableHead>
+                                <TableHead>Resultado</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {communications.map((comm) => (
+                                <TableRow key={comm.id}>
+                                  <TableCell>{formatDate(comm.fecha)}</TableCell>
+                                  <TableCell>{comm.medio}</TableCell>
+                                  <TableCell>{comm.documento}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center space-x-2">
+                                      {comm.resultado === 'Enviado' ? (
+                                        <CheckCircle className="h-4 w-4 text-green-600" />
+                                      ) : (
+                                        <XCircle className="h-4 w-4 text-red-600" />
+                                      )}
+                                      <span className={
+                                        comm.resultado === 'Enviado' ? 'text-green-600' : 'text-red-600'
+                                      }>
+                                        {comm.resultado}
+                                      </span>
                                     </div>
-                                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                                      <div className="text-2xl font-bold text-blue-600">
-                                        {formatCurrency(payroll.netoPagado)}
-                                      </div>
-                                      <div className="text-sm text-gray-600">Neto Pagado</div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </DrawerContent>
-                            </Drawer>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No hay historial de nómina disponible
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Tab Content: Comprobantes */}
-          <TabsContent value="comprobantes">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5 text-blue-600" />
-                  <span>Comprobantes</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {vouchers.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Período</TableHead>
-                        <TableHead>PDF</TableHead>
-                        <TableHead>XML</TableHead>
-                        <TableHead>Enviado</TableHead>
-                        <TableHead className="text-center">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {vouchers.map((voucher) => (
-                        <TableRow key={voucher.id}>
-                          <TableCell className="font-medium">{voucher.tipo}</TableCell>
-                          <TableCell>{voucher.periodo}</TableCell>
-                          <TableCell>
-                            {voucher.pdfUrl ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDownloadVoucher(voucher)}
-                              >
-                                <Download className="h-4 w-4 text-blue-600" />
-                              </Button>
-                            ) : (
-                              <span className="text-gray-400">–</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {voucher.xmlUrl ? (
-                              <Button variant="ghost" size="sm">
-                                <Download className="h-4 w-4 text-green-600" />
-                              </Button>
-                            ) : (
-                              <span className="text-gray-400">–</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {voucher.enviado ? (
-                              <div className="flex items-center space-x-1">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                <span className="text-sm text-green-600">Sí</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center space-x-1">
-                                <XCircle className="h-4 w-4 text-red-600" />
-                                <span className="text-sm text-red-600">No</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleResendVoucher(voucher)}
-                              >
-                                <Send className="h-4 w-4 text-blue-600" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No hay comprobantes disponibles
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Tab Content: Aportes */}
-          <TabsContent value="aportes">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="h-5 w-5 text-purple-600" />
-                  <span>Aportes a Seguridad Social</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Mes</TableHead>
-                      <TableHead>EPS</TableHead>
-                      <TableHead>ARL</TableHead>
-                      <TableHead>Pensión</TableHead>
-                      <TableHead>Caja</TableHead>
-                      <TableHead>IBC</TableHead>
-                      <TableHead className="text-center">Ver</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {contributions.map((contribution, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{contribution.mes}</TableCell>
-                        <TableCell>{formatCurrency(contribution.eps)}</TableCell>
-                        <TableCell>{formatCurrency(contribution.arl)}</TableCell>
-                        <TableCell>{formatCurrency(contribution.pension)}</TableCell>
-                        <TableCell>{formatCurrency(contribution.cajaCompensacion)}</TableCell>
-                        <TableCell className="font-semibold">{formatCurrency(contribution.ibc)}</TableCell>
-                        <TableCell className="text-center">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Tab Content: Novedades */}
-          <TabsContent value="novedades">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 text-orange-600" />
-                  <span>Novedades Laborales</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {novelties.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Días / Valor</TableHead>
-                        <TableHead>Aplicada en</TableHead>
-                        <TableHead>Estado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {novelties.map((novelty) => (
-                        <TableRow key={novelty.id}>
-                          <TableCell>{formatDate(novelty.fecha)}</TableCell>
-                          <TableCell className="font-medium">{novelty.tipo}</TableCell>
-                          <TableCell>
-                            {novelty.dias ? `${novelty.dias} días` : formatCurrency(novelty.valor)}
-                          </TableCell>
-                          <TableCell>{novelty.aplicadoEn}</TableCell>
-                          <TableCell>
-                            <Badge className="bg-green-100 text-green-800">
-                              {novelty.estado}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No hay novedades registradas
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Tab Content: Cambios de contrato */}
-          <TabsContent value="cambios">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5 text-indigo-600" />
-                  <span>Cambios Contractuales</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {contractChanges.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Evento</TableHead>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Descripción</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {contractChanges.map((change) => (
-                        <TableRow key={change.id}>
-                          <TableCell className="font-medium">{change.evento}</TableCell>
-                          <TableCell>{formatDate(change.fecha)}</TableCell>
-                          <TableCell>
-                            <div>
-                              {change.descripcion}
-                              {change.valorAnterior && change.valorNuevo && (
-                                <div className="text-sm text-gray-600 mt-1">
-                                  {change.valorAnterior} → {change.valorNuevo}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No hay cambios contractuales registrados
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Tab Content: Comunicaciones */}
-          <TabsContent value="comunicaciones">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Mail className="h-5 w-5 text-teal-600" />
-                  <span>Comunicaciones</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {communications.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Medio</TableHead>
-                        <TableHead>Documento</TableHead>
-                        <TableHead>Resultado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {communications.map((comm) => (
-                        <TableRow key={comm.id}>
-                          <TableCell>{formatDate(comm.fecha)}</TableCell>
-                          <TableCell>{comm.medio}</TableCell>
-                          <TableCell>{comm.documento}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              {comm.resultado === 'Enviado' ? (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-red-600" />
-                              )}
-                              <span className={
-                                comm.resultado === 'Enviado' ? 'text-green-600' : 'text-red-600'
-                              }>
-                                {comm.resultado}
-                              </span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No hay comunicaciones registradas
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            No hay comunicaciones registradas
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </>
+              )}
+            </Tabs>
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );
