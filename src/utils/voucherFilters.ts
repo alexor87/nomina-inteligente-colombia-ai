@@ -29,11 +29,6 @@ export const filterVouchers = (vouchers: PayrollVoucher[], filters: VoucherFilte
       return false;
     }
 
-    // Filtro por estado DIAN
-    if (filters.dianStatus && voucher.dianStatus !== filters.dianStatus) {
-      return false;
-    }
-
     // Filtro por rango de fechas
     if (filters.startDate) {
       if (new Date(voucher.startDate) < new Date(filters.startDate)) {
@@ -49,4 +44,9 @@ export const filterVouchers = (vouchers: PayrollVoucher[], filters: VoucherFilte
 
     return true;
   });
+};
+
+export const getUniquePeriodsFromVouchers = (vouchers: PayrollVoucher[]): string[] => {
+  const periods = vouchers.map(voucher => voucher.periodo);
+  return [...new Set(periods)].sort();
 };

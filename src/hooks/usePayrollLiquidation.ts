@@ -1,17 +1,22 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { PayrollCalculationService } from '@/services/PayrollCalculationService';
+import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { PayrollPeriod, PayrollEmployee, PayrollSummary } from '@/types/payroll';
-import { mockPeriod, mockEmployeesBase } from '@/data/mockPayrollData';
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 
 export const usePayrollLiquidation = () => {
   const { toast } = useToast();
-  const [currentPeriod, setCurrentPeriod] = useState<PayrollPeriod>(mockPeriod);
+  const [currentPeriod, setCurrentPeriod] = useState<PayrollPeriod>({
+    id: 'current',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    status: 'draft',
+    type: 'quincenal'
+  });
+  
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
   const [summary, setSummary] = useState<PayrollSummary>({
     totalEmployees: 0,
     validEmployees: 0,
@@ -22,15 +27,39 @@ export const usePayrollLiquidation = () => {
     totalPayrollCost: 0
   });
 
-  // Inicializar empleados
-  useEffect(() => {
-    const calculatedEmployees = mockEmployeesBase.map(emp => 
-      calculateEmployee(emp, currentPeriod.type)
-    );
-    setEmployees(calculatedEmployees);
-  }, [currentPeriod.type]);
+  // Cargar empleados reales desde la base de datos
+  const loadEmployees = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // TODO: Obtener companyId del contexto de autenticación
+      const companyId = 'sample-company-id';
+      const loadedEmployees = await PayrollLiquidationService.loadEmployeesForLiquidation(companyId);
+      setEmployees(loadedEmployees);
+      
+      toast({
+        title: "Empleados cargados",
+        description: `Se cargaron ${loadedEmployees.length} empleados activos`
+      });
+    } catch (error) {
+      console.error('Error loading employees:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los empleados",
+        variant: "destructive"
+      });
+      // Fallback a datos mock si hay error
+      setEmployees([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
-  // Actualizar resumen
+  // Cargar empleados al montar el componente
+  useEffect(() => {
+    loadEmployees();
+  }, [loadEmployees]);
+
+  // Actualizar resumen cuando cambien los empleados
   useEffect(() => {
     setSummary(calculatePayrollSummary(employees));
   }, [employees]);
@@ -45,12 +74,9 @@ export const usePayrollLiquidation = () => {
       }
       return emp;
     }));
-
-    // Simulación de guardado automático
-    await new Promise(resolve => setTimeout(resolve, 300));
   }, [currentPeriod.type]);
 
-  // Recalcular todos
+  // Recalcular todos los empleados
   const recalculateAll = useCallback(async () => {
     setIsLoading(true);
     toast({
@@ -59,10 +85,7 @@ export const usePayrollLiquidation = () => {
     });
 
     try {
-      // Actualizar configuración del servicio
-      PayrollCalculationService.updateConfiguration('2025');
-      
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       setEmployees(prev => prev.map(emp => {
         const baseData = convertToBaseEmployeeData(emp);
@@ -84,7 +107,7 @@ export const usePayrollLiquidation = () => {
     }
   }, [toast, currentPeriod.type]);
 
-  // Aprobar período
+  // Aprobar período y guardar en base de datos
   const approvePeriod = useCallback(async () => {
     const invalidEmployees = employees.filter(emp => emp.status !== 'valid');
     if (invalidEmployees.length > 0) {
@@ -99,28 +122,38 @@ export const usePayrollLiquidation = () => {
     setIsLoading(true);
     toast({
       title: "Aprobando período",
-      description: "Cerrando nómina y preparando reportes..."
+      description: "Guardando nómina y generando comprobantes..."
     });
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // TODO: Obtener companyId del contexto de autenticación
+      const companyId = 'sample-company-id';
+      
+      const liquidationData = {
+        period: currentPeriod,
+        employees,
+        companyId
+      };
+
+      const message = await PayrollLiquidationService.savePayrollLiquidation(liquidationData);
       
       setCurrentPeriod(prev => ({ ...prev, status: 'approved' }));
       
       toast({
         title: "¡Período aprobado!",
-        description: "La nómina está lista para PILA y dispersión bancaria."
+        description: message
       });
     } catch (error) {
+      console.error('Error approving period:', error);
       toast({
         title: "Error al aprobar",
-        description: "No se pudo aprobar el período.",
+        description: error instanceof Error ? error.message : "No se pudo aprobar el período.",
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
-  }, [toast, employees]);
+  }, [toast, employees, currentPeriod]);
 
   const isValid = employees.every(emp => emp.status === 'valid') && employees.length > 0;
 
@@ -132,6 +165,7 @@ export const usePayrollLiquidation = () => {
     isLoading,
     updateEmployee,
     recalculateAll,
-    approvePeriod
+    approvePeriod,
+    refreshEmployees: loadEmployees
   };
 };
