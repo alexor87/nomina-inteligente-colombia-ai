@@ -86,17 +86,20 @@ export const NovedadDrawer = ({
   const totalDeducciones = deducciones.reduce((sum, n) => sum + n.valor, 0);
   const impactoNeto = totalDevengados - totalDeducciones;
 
-  const getCategoryInfo = (tipoNovedad: NovedadType) => {
-    for (const [categoryKey, category] of Object.entries(NOVEDAD_CATEGORIES)) {
-      if (tipoNovedad in category.types) {
-        return {
-          category: categoryKey as 'devengados' | 'deducciones',
-          config: category,
-          type: category.types[tipoNovedad as keyof typeof category.types]
-        };
-      }
+  const getNovedadTypeLabel = (tipoNovedad: NovedadType) => {
+    // Check in devengados first
+    if (tipoNovedad in NOVEDAD_CATEGORIES.devengados.types) {
+      const typeKey = tipoNovedad as keyof typeof NOVEDAD_CATEGORIES.devengados.types;
+      return NOVEDAD_CATEGORIES.devengados.types[typeKey].label;
     }
-    return null;
+    
+    // Check in deducciones
+    if (tipoNovedad in NOVEDAD_CATEGORIES.deducciones.types) {
+      const typeKey = tipoNovedad as keyof typeof NOVEDAD_CATEGORIES.deducciones.types;
+      return NOVEDAD_CATEGORIES.deducciones.types[typeKey].label;
+    }
+    
+    return tipoNovedad;
   };
 
   return (
@@ -161,49 +164,53 @@ export const NovedadDrawer = ({
         </SheetHeader>
 
         {/* Main Content - Diseño horizontal mejorado */}
-        <div className="flex-1 flex min-h-0">
-          {/* Panel izquierdo - Formulario */}
-          <div className="w-[45%] border-r border-gray-100 flex flex-col bg-gray-50">
+        <div className="flex-1 flex min-h-0 bg-gray-50">
+          {/* Panel izquierdo - Formulario - Fixed width */}
+          <div className="w-[500px] border-r border-gray-200 flex flex-col bg-white shrink-0">
             {showForm && (
               <div className="flex-1 flex flex-col h-full">
-                <div className="px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
                   <h3 className="text-base font-semibold text-gray-900">Nueva novedad</h3>
                   <p className="text-xs text-gray-600 mt-1">Completa la información</p>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                  <NovedadForm
-                    onSubmit={handleCreateNovedad}
-                    onCancel={() => setShowForm(false)}
-                    isLoading={isLoading}
-                    employeeSalary={employeeSalary}
-                  />
+                <div className="flex-1 overflow-y-auto">
+                  <div className="p-4">
+                    <NovedadForm
+                      onSubmit={handleCreateNovedad}
+                      onCancel={() => setShowForm(false)}
+                      isLoading={isLoading}
+                      employeeSalary={employeeSalary}
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
             {editingNovedad && (
               <div className="flex-1 flex flex-col h-full">
-                <div className="px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
                   <h3 className="text-base font-semibold text-gray-900">Editar novedad</h3>
                   <p className="text-xs text-gray-600 mt-1">Modifica la información</p>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                  <NovedadForm
-                    initialData={{
-                      tipo_novedad: editingNovedad.tipo_novedad,
-                      subtipo: editingNovedad.subtipo,
-                      fecha_inicio: editingNovedad.fecha_inicio,
-                      fecha_fin: editingNovedad.fecha_fin,
-                      dias: editingNovedad.dias,
-                      horas: editingNovedad.horas,
-                      valor: editingNovedad.valor,
-                      observacion: editingNovedad.observacion
-                    }}
-                    onSubmit={handleUpdateNovedad}
-                    onCancel={() => setEditingNovedad(null)}
-                    isLoading={isLoading}
-                    employeeSalary={employeeSalary}
-                  />
+                <div className="flex-1 overflow-y-auto">
+                  <div className="p-4">
+                    <NovedadForm
+                      initialData={{
+                        tipo_novedad: editingNovedad.tipo_novedad,
+                        subtipo: editingNovedad.subtipo,
+                        fecha_inicio: editingNovedad.fecha_inicio,
+                        fecha_fin: editingNovedad.fecha_fin,
+                        dias: editingNovedad.dias,
+                        horas: editingNovedad.horas,
+                        valor: editingNovedad.valor,
+                        observacion: editingNovedad.observacion
+                      }}
+                      onSubmit={handleUpdateNovedad}
+                      onCancel={() => setEditingNovedad(null)}
+                      isLoading={isLoading}
+                      employeeSalary={employeeSalary}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -211,7 +218,7 @@ export const NovedadDrawer = ({
             {!showForm && !editingNovedad && (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center px-6">
-                  <div className="p-4 bg-white rounded-lg mb-4 inline-block shadow-sm">
+                  <div className="p-4 bg-gray-50 rounded-lg mb-4 inline-block">
                     <FileText className="h-8 w-8 text-gray-400" />
                   </div>
                   <h3 className="text-base font-semibold text-gray-900 mb-2">
@@ -234,9 +241,9 @@ export const NovedadDrawer = ({
             )}
           </div>
 
-          {/* Panel derecho - Lista de novedades */}
-          <div className="w-[55%] flex flex-col bg-white">
-            <div className="px-4 py-3 border-b border-gray-100 shrink-0">
+          {/* Panel derecho - Lista de novedades - Flexible width */}
+          <div className="flex-1 flex flex-col bg-white min-w-0">
+            <div className="px-4 py-3 border-b border-gray-100 shrink-0 bg-gray-50">
               <h3 className="text-base font-semibold text-gray-900">Novedades registradas</h3>
               <p className="text-xs text-gray-600 mt-1">
                 {novedades.length > 0 ? `${novedades.length} novedades activas` : 'No hay novedades'}
@@ -271,79 +278,76 @@ export const NovedadDrawer = ({
                         </Badge>
                       </div>
                       
-                      {devengados.map((novedad) => {
-                        const categoryInfo = getCategoryInfo(novedad.tipo_novedad);
-                        return (
-                          <div key={novedad.id} className="bg-green-50 border border-green-100 rounded-lg p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <Badge className="bg-green-200 text-green-800 border-0 px-2 py-0.5 text-xs font-medium">
-                                    {categoryInfo?.type?.label || novedad.tipo_novedad}
-                                    {novedad.subtipo && ` - ${novedad.subtipo}`}
-                                  </Badge>
-                                  <div className="flex items-center text-green-700 text-sm font-semibold">
-                                    <DollarSign className="h-3 w-3 mr-1" />
-                                    {formatCurrency(novedad.valor)}
-                                  </div>
+                      {devengados.map((novedad) => (
+                        <div key={novedad.id} className="bg-green-50 border border-green-100 rounded-lg p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Badge className="bg-green-200 text-green-800 border-0 px-2 py-0.5 text-xs font-medium">
+                                  {getNovedadTypeLabel(novedad.tipo_novedad)}
+                                  {novedad.subtipo && ` - ${novedad.subtipo}`}
+                                </Badge>
+                                <div className="flex items-center text-green-700 text-sm font-semibold">
+                                  <DollarSign className="h-3 w-3 mr-1" />
+                                  {formatCurrency(novedad.valor)}
                                 </div>
-                                
-                                {(novedad.fecha_inicio || novedad.fecha_fin || novedad.dias || novedad.horas) && (
-                                  <div className="flex items-center text-xs text-green-700 space-x-3">
-                                    {(novedad.fecha_inicio || novedad.fecha_fin) && (
-                                      <div className="flex items-center">
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        <span>
-                                          {novedad.fecha_inicio && formatDate(novedad.fecha_inicio)}
-                                          {novedad.fecha_inicio && novedad.fecha_fin && ' - '}
-                                          {novedad.fecha_fin && formatDate(novedad.fecha_fin)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {novedad.dias && (
-                                      <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs">
-                                        {novedad.dias} días
-                                      </span>
-                                    )}
-                                    {novedad.horas && (
-                                      <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs">
-                                        {novedad.horas} horas
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                
-                                {novedad.observacion && (
-                                  <div className="bg-green-100 border border-green-200 p-2 rounded">
-                                    <p className="text-xs text-green-800">{novedad.observacion}</p>
-                                  </div>
-                                )}
                               </div>
-
-                              {canEdit && (
-                                <div className="flex space-x-1">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleEditNovedad(novedad)}
-                                    className="h-7 w-7 p-0 hover:bg-green-100 text-green-600 hover:text-green-700"
-                                  >
-                                    <Edit2 className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleDeleteNovedad(novedad.id)}
-                                    className="h-7 w-7 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                              
+                              {(novedad.fecha_inicio || novedad.fecha_fin || novedad.dias || novedad.horas) && (
+                                <div className="flex items-center text-xs text-green-700 space-x-3">
+                                  {(novedad.fecha_inicio || novedad.fecha_fin) && (
+                                    <div className="flex items-center">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      <span>
+                                        {novedad.fecha_inicio && formatDate(novedad.fecha_inicio)}
+                                        {novedad.fecha_inicio && novedad.fecha_fin && ' - '}
+                                        {novedad.fecha_fin && formatDate(novedad.fecha_fin)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {novedad.dias && (
+                                    <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs">
+                                      {novedad.dias} días
+                                    </span>
+                                  )}
+                                  {novedad.horas && (
+                                    <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs">
+                                      {novedad.horas} horas
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {novedad.observacion && (
+                                <div className="bg-green-100 border border-green-200 p-2 rounded">
+                                  <p className="text-xs text-green-800">{novedad.observacion}</p>
                                 </div>
                               )}
                             </div>
+
+                            {canEdit && (
+                              <div className="flex space-x-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEditNovedad(novedad)}
+                                  className="h-7 w-7 p-0 hover:bg-green-100 text-green-600 hover:text-green-700"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteNovedad(novedad.id)}
+                                  className="h-7 w-7 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -363,79 +367,76 @@ export const NovedadDrawer = ({
                         </Badge>
                       </div>
                       
-                      {deducciones.map((novedad) => {
-                        const categoryInfo = getCategoryInfo(novedad.tipo_novedad);
-                        return (
-                          <div key={novedad.id} className="bg-red-50 border border-red-100 rounded-lg p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <Badge className="bg-red-200 text-red-800 border-0 px-2 py-0.5 text-xs font-medium">
-                                    {categoryInfo?.type?.label || novedad.tipo_novedad}
-                                    {novedad.subtipo && ` - ${novedad.subtipo}`}
-                                  </Badge>
-                                  <div className="flex items-center text-red-700 text-sm font-semibold">
-                                    <DollarSign className="h-3 w-3 mr-1" />
-                                    {formatCurrency(novedad.valor)}
-                                  </div>
+                      {deducciones.map((novedad) => (
+                        <div key={novedad.id} className="bg-red-50 border border-red-100 rounded-lg p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Badge className="bg-red-200 text-red-800 border-0 px-2 py-0.5 text-xs font-medium">
+                                  {getNovedadTypeLabel(novedad.tipo_novedad)}
+                                  {novedad.subtipo && ` - ${novedad.subtipo}`}
+                                </Badge>
+                                <div className="flex items-center text-red-700 text-sm font-semibold">
+                                  <DollarSign className="h-3 w-3 mr-1" />
+                                  {formatCurrency(novedad.valor)}
                                 </div>
-                                
-                                {(novedad.fecha_inicio || novedad.fecha_fin || novedad.dias || novedad.horas) && (
-                                  <div className="flex items-center text-xs text-red-700 space-x-3">
-                                    {(novedad.fecha_inicio || novedad.fecha_fin) && (
-                                      <div className="flex items-center">
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        <span>
-                                          {novedad.fecha_inicio && formatDate(novedad.fecha_inicio)}
-                                          {novedad.fecha_inicio && novedad.fecha_fin && ' - '}
-                                          {novedad.fecha_fin && formatDate(novedad.fecha_fin)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {novedad.dias && (
-                                      <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">
-                                        {novedad.dias} días
-                                      </span>
-                                    )}
-                                    {novedad.horas && (
-                                      <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">
-                                        {novedad.horas} horas
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                
-                                {novedad.observacion && (
-                                  <div className="bg-red-100 border border-red-200 p-2 rounded">
-                                    <p className="text-xs text-red-800">{novedad.observacion}</p>
-                                  </div>
-                                )}
                               </div>
-
-                              {canEdit && (
-                                <div className="flex space-x-1">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleEditNovedad(novedad)}
-                                    className="h-7 w-7 p-0 hover:bg-red-100 text-red-600 hover:text-red-700"
-                                  >
-                                    <Edit2 className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleDeleteNovedad(novedad.id)}
-                                    className="h-7 w-7 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                              
+                              {(novedad.fecha_inicio || novedad.fecha_fin || novedad.dias || novedad.horas) && (
+                                <div className="flex items-center text-xs text-red-700 space-x-3">
+                                  {(novedad.fecha_inicio || novedad.fecha_fin) && (
+                                    <div className="flex items-center">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      <span>
+                                        {novedad.fecha_inicio && formatDate(novedad.fecha_inicio)}
+                                        {novedad.fecha_inicio && novedad.fecha_fin && ' - '}
+                                        {novedad.fecha_fin && formatDate(novedad.fecha_fin)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {novedad.dias && (
+                                    <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">
+                                      {novedad.dias} días
+                                    </span>
+                                  )}
+                                  {novedad.horas && (
+                                    <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">
+                                      {novedad.horas} horas
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {novedad.observacion && (
+                                <div className="bg-red-100 border border-red-200 p-2 rounded">
+                                  <p className="text-xs text-red-800">{novedad.observacion}</p>
                                 </div>
                               )}
                             </div>
+
+                            {canEdit && (
+                              <div className="flex space-x-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEditNovedad(novedad)}
+                                  className="h-7 w-7 p-0 hover:bg-red-100 text-red-600 hover:text-red-700"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteNovedad(novedad.id)}
+                                  className="h-7 w-7 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
