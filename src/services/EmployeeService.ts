@@ -10,6 +10,7 @@ export class EmployeeService {
       throw new Error('No se encontró la empresa del usuario. Asegúrate de estar autenticado.');
     }
 
+    // Mapear los datos del Employee interface a las columnas de la base de datos
     const supabaseData = {
       company_id: companyId, // Usar la empresa del usuario autenticado
       cedula: employeeData.cedula,
@@ -26,14 +27,11 @@ export class EmployeeService {
       arl: employeeData.arl,
       caja_compensacion: employeeData.cajaCompensacion,
       cargo: employeeData.cargo,
-      estado_afiliacion: employeeData.estadoAfiliacion,
-      centro_costo: null,
-      nivel_riesgo_arl: null,
-      contrato_vencimiento: null,
-      ultima_liquidacion: null
+      estado_afiliacion: employeeData.estadoAfiliacion
     };
 
     console.log('Creando empleado para empresa:', companyId);
+    console.log('Datos a insertar:', supabaseData);
 
     const { data, error } = await supabase
       .from('employees')
@@ -41,7 +39,10 @@ export class EmployeeService {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error en Supabase:', error);
+      throw error;
+    }
     return data;
   }
 
