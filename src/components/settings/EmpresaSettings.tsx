@@ -79,16 +79,42 @@ export const EmpresaSettings = () => {
       
       // Obtener el usuario actual
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        toast({
+          title: "Error de autenticación",
+          description: "No se pudo obtener información del usuario.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('Usuario actual:', user.id, user.email);
 
       // Obtener el perfil del usuario para conseguir company_id
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
 
-      if (!profile?.company_id) return;
+      if (profileError) {
+        console.error('Error obteniendo perfil:', profileError);
+        toast({
+          title: "Error al cargar perfil",
+          description: "No se pudo obtener el perfil del usuario.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('Perfil encontrado:', profile);
+
+      if (!profile?.company_id) {
+        // Si no hay company_id, crear una empresa por defecto para el usuario
+        console.log('No se encontró company_id, creando empresa...');
+        await createDefaultCompany(user);
+        return;
+      }
 
       // Cargar datos de la empresa
       const { data: company, error: companyError } = await supabase
@@ -97,7 +123,17 @@ export const EmpresaSettings = () => {
         .eq('id', profile.company_id)
         .single();
 
-      if (companyError) throw companyError;
+      if (companyError) {
+        console.error('Error cargando empresa:', companyError);
+        if (companyError.code === 'PGRST116') {
+          // No se encontró la empresa, crear una por defecto
+          await createDefaultCompany(user);
+          return;
+        }
+        throw companyError;
+      }
+
+      console.log('Empresa encontrada:', company);
 
       if (company) {
         setCompanyData({
@@ -138,6 +174,73 @@ export const EmpresaSettings = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const createDefaultCompany = async (user: any) => {
+    try {
+      console.log('Creando empresa por defecto para usuario:', user.email);
+      
+      // Crear empresa por defecto
+      const { data: newCompany, error: createError } = await supabase
+        .from('companies')
+        .insert({
+          razon_social: 'Mi Empresa',
+          nit: '000000000-0',
+          email: user.email,
+          ciudad: 'Bogotá',
+          estado: 'activa',
+          plan: 'basico'
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creando empresa:', createError);
+        throw createError;
+      }
+
+      console.log('Empresa creada:', newCompany);
+
+      // Actualizar el perfil del usuario con la nueva empresa
+      const { error: updateProfileError } = await supabase
+        .from('profiles')
+        .update({ company_id: newCompany.id })
+        .eq('user_id', user.id);
+
+      if (updateProfileError) {
+        console.error('Error actualizando perfil:', updateProfileError);
+        throw updateProfileError;
+      }
+
+      // Crear configuración por defecto de la empresa
+      const { error: settingsError } = await supabase
+        .from('company_settings')
+        .insert({
+          company_id: newCompany.id,
+          periodicity: 'mensual'
+        });
+
+      if (settingsError) {
+        console.error('Error creando configuración:', settingsError);
+        // No lanzar error aquí, la configuración se puede crear después
+      }
+
+      // Recargar datos
+      await loadCompanyData();
+
+      toast({
+        title: "Empresa creada",
+        description: "Se ha creado una empresa por defecto. Puedes editarla ahora.",
+      });
+
+    } catch (error) {
+      console.error('Error creating default company:', error);
+      toast({
+        title: "Error al crear empresa",
+        description: "No se pudo crear la empresa por defecto.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -248,13 +351,17 @@ export const EmpresaSettings = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
 
-      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+      if (profileError || !profile?.company_id) {
+        throw new Error('No se encontró la empresa del usuario');
+      }
+
+      console.log('Guardando datos para empresa:', profile.company_id);
 
       // Actualizar datos de la empresa
       const { error: companyError } = await supabase
@@ -273,7 +380,10 @@ export const EmpresaSettings = () => {
         })
         .eq('id', profile.company_id);
 
-      if (companyError) throw companyError;
+      if (companyError) {
+        console.error('Error actualizando empresa:', companyError);
+        throw companyError;
+      }
 
       // Actualizar configuración de periodicidad si se especificó
       if (config.periodicidadPago) {
@@ -284,7 +394,10 @@ export const EmpresaSettings = () => {
             periodicity: config.periodicidadPago
           });
 
-        if (settingsError) throw settingsError;
+        if (settingsError) {
+          console.error('Error actualizando configuración:', settingsError);
+          throw settingsError;
+        }
       }
 
       toast({
@@ -302,7 +415,7 @@ export const EmpresaSettings = () => {
       console.error('Error saving company data:', error);
       toast({
         title: "Error al guardar",
-        description: "No se pudieron guardar los datos de la empresa.",
+        description: error instanceof Error ? error.message : "No se pudieron guardar los datos de la empresa.",
         variant: "destructive"
       });
     } finally {
