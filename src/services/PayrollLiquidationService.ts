@@ -1,7 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollCalculationService } from './PayrollCalculationService';
+import { PayrollPeriodService } from './PayrollPeriodService';
 
 export interface PayrollLiquidationData {
   period: PayrollPeriod;
@@ -130,6 +130,26 @@ export class PayrollLiquidationService {
         return [];
       }
 
+      // Obtener la periodicidad configurada por el usuario
+      const companySettings = await PayrollPeriodService.getCompanySettings();
+      const periodType = companySettings?.periodicity || 'mensual';
+      
+      // Determinar días trabajados por defecto según la periodicidad
+      let defaultWorkedDays: number;
+      switch (periodType) {
+        case 'quincenal':
+          defaultWorkedDays = 15;
+          break;
+        case 'mensual':
+          defaultWorkedDays = 30;
+          break;
+        case 'semanal':
+          defaultWorkedDays = 7;
+          break;
+        default:
+          defaultWorkedDays = 30;
+      }
+
       // Cargar SOLO los empleados ACTIVOS para la liquidación de nómina
       const { data, error } = await supabase
         .from('employees')
@@ -147,7 +167,7 @@ export class PayrollLiquidationService {
         return [];
       }
 
-      console.log(`Loaded ${data.length} active employees for payroll liquidation`);
+      console.log(`Loaded ${data.length} active employees for payroll liquidation with ${periodType} periodicity`);
 
       return data.map(emp => {
         const baseEmployeeData = {
@@ -155,7 +175,7 @@ export class PayrollLiquidationService {
           name: `${emp.nombre} ${emp.apellido}`,
           position: emp.cargo || 'No especificado',
           baseSalary: Number(emp.salario_base),
-          workedDays: 30,
+          workedDays: defaultWorkedDays, // Usar días según periodicidad configurada
           extraHours: 0,
           disabilities: 0,
           bonuses: 0,
@@ -164,7 +184,7 @@ export class PayrollLiquidationService {
           afp: emp.afp
         };
 
-        // Calcular datos de nómina usando el servicio de cálculo
+        // Calcular datos de nómina usando el servicio de cálculo con la periodicidad correcta
         const calculation = PayrollCalculationService.calculatePayroll({
           baseSalary: baseEmployeeData.baseSalary,
           workedDays: baseEmployeeData.workedDays,
@@ -172,7 +192,7 @@ export class PayrollLiquidationService {
           disabilities: baseEmployeeData.disabilities,
           bonuses: baseEmployeeData.bonuses,
           absences: baseEmployeeData.absences,
-          periodType: 'mensual'
+          periodType: periodType === 'semanal' ? 'mensual' : periodType as 'quincenal' | 'mensual' // Fallback para semanal
         });
 
         // Solo empleados activos, todos válidos por defecto

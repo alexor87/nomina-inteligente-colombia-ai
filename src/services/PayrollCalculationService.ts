@@ -1,5 +1,6 @@
 
 import { ConfigurationService, PayrollConfiguration } from './ConfigurationService';
+import { PayrollPeriodService } from './PayrollPeriodService';
 
 export interface PayrollCalculationInput {
   baseSalary: number;
@@ -45,6 +46,17 @@ export class PayrollCalculationService {
     console.log(`Configuration will be loaded dynamically for year: ${year}`);
   }
 
+  // Obtener periodicidad configurada por el usuario
+  static async getUserConfiguredPeriodicity(): Promise<'quincenal' | 'mensual' | 'semanal'> {
+    try {
+      const companySettings = await PayrollPeriodService.getCompanySettings();
+      return companySettings?.periodicity as 'quincenal' | 'mensual' | 'semanal' || 'mensual';
+    } catch (error) {
+      console.warn('Could not load company periodicity, defaulting to mensual:', error);
+      return 'mensual';
+    }
+  }
+
   static validateEmployee(
     input: PayrollCalculationInput,
     eps?: string,
@@ -58,8 +70,20 @@ export class PayrollCalculationService {
     if (!eps) errors.push('Falta afiliación a EPS');
     if (!afp) errors.push('Falta afiliación a AFP');
 
+    // Determinar días máximos según el tipo de período
+    let maxDays: number;
+    switch (input.periodType) {
+      case 'quincenal':
+        maxDays = 15;
+        break;
+      case 'mensual':
+        maxDays = 30;
+        break;
+      default:
+        maxDays = 30;
+    }
+
     // Validaciones de días trabajados
-    const maxDays = input.periodType === 'quincenal' ? 15 : 30;
     if (input.workedDays > maxDays) {
       errors.push(`Días trabajados (${input.workedDays}) exceden el período ${input.periodType} (máximo ${maxDays})`);
     }
@@ -103,29 +127,46 @@ export class PayrollCalculationService {
   static calculatePayroll(input: PayrollCalculationInput): PayrollCalculationResult {
     const config = this.getCurrentConfig();
     
-    // Determinar días del período
-    const periodDays = input.periodType === 'quincenal' ? 15 : 30;
+    // Determinar días del período según la configuración
+    let periodDays: number;
+    let monthlyDivisor: number; // Para calcular salario diario
+    let hourlyDivisor: number; // Para calcular valor hora ordinaria
+    
+    switch (input.periodType) {
+      case 'quincenal':
+        periodDays = 15;
+        monthlyDivisor = 30; // Siempre se calcula sobre base mensual
+        hourlyDivisor = 240; // 8 horas x 30 días
+        break;
+      case 'mensual':
+        periodDays = 30;
+        monthlyDivisor = 30;
+        hourlyDivisor = 240;
+        break;
+      default:
+        periodDays = 30;
+        monthlyDivisor = 30;
+        hourlyDivisor = 240;
+    }
     
     // Cálculo del salario base proporcional
-    const dailySalary = input.baseSalary / 30;
+    const dailySalary = input.baseSalary / monthlyDivisor;
     const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
     const regularPay = effectiveWorkedDays * dailySalary;
 
     // Cálculo de horas extra (25% de recargo sobre valor hora ordinaria)
-    // Valor hora = salario mensual / 240 horas (8 horas x 30 días)
-    const hourlyRate = input.baseSalary / 240;
+    const hourlyRate = input.baseSalary / hourlyDivisor;
     const extraPay = input.extraHours * hourlyRate * 1.25;
 
-    // Auxilio de transporte
-    // Solo si devenga máximo 2 SMMLV y trabaja período completo o proporcional
+    // Auxilio de transporte - Solo si devenga máximo 2 SMMLV
     let transportAllowance = 0;
     if (input.baseSalary <= (config.salarioMinimo * 2)) {
       if (input.periodType === 'quincenal') {
-        // Para quincenal: auxilio completo si trabaja 15 días, proporcional si menos
-        transportAllowance = Math.round((config.auxilioTransporte / 2) * (input.workedDays / 15));
+        // Para quincenal: la mitad del auxilio mensual, proporcional a días trabajados
+        transportAllowance = Math.round((config.auxilioTransporte / 2) * (input.workedDays / periodDays));
       } else {
-        // Para mensual: auxilio completo si trabaja 30 días, proporcional si menos
-        transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / 30));
+        // Para mensual: auxilio completo proporcional a días trabajados
+        transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / periodDays));
       }
     }
 
