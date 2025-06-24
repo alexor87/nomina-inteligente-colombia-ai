@@ -136,6 +136,9 @@ export const EmpresaSettings = () => {
       console.log('Empresa encontrada:', company);
 
       if (company) {
+        // Actualizar automáticamente el email si no coincide con el usuario actual
+        const needsEmailUpdate = company.email !== user.email;
+        
         setCompanyData({
           id: company.id,
           razon_social: company.razon_social || '',
@@ -143,12 +146,21 @@ export const EmpresaSettings = () => {
           direccion: company.direccion || '',
           ciudad: company.ciudad || '',
           telefono: company.telefono || '',
-          email: company.email || '',
+          email: user.email || company.email || '', // Usar el email del usuario actual
           representante_legal: company.representante_legal || '',
           actividad_economica: company.actividad_economica || '',
           estado: company.estado || 'activa',
           plan: company.plan || 'basico'
         });
+
+        // Si el email no coincide, actualizarlo automáticamente
+        if (needsEmailUpdate) {
+          console.log('Actualizando email de la empresa de', company.email, 'a', user.email);
+          await supabase
+            .from('companies')
+            .update({ email: user.email })
+            .eq('id', company.id);
+        }
       }
 
       // Cargar configuración de periodicidad
@@ -187,7 +199,7 @@ export const EmpresaSettings = () => {
         .insert({
           razon_social: 'Mi Empresa',
           nit: '000000000-0',
-          email: user.email,
+          email: user.email, // Usar el email del usuario actual
           ciudad: 'Bogotá',
           estado: 'activa',
           plan: 'basico'
