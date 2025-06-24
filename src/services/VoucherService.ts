@@ -1,44 +1,64 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollVoucher } from '@/types/vouchers';
 
 export class VoucherService {
   static async loadVouchers(): Promise<PayrollVoucher[]> {
-    const { data, error } = await supabase
-      .from('payroll_vouchers')
-      .select(`
-        *,
-        employees (
-          nombre,
-          apellido,
-          cedula,
-          email
-        )
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      // Primero verificar si existen nóminas procesadas
+      const { data: payrollsExist, error: payrollError } = await supabase
+        .from('payrolls')
+        .select('id')
+        .eq('estado', 'procesada')
+        .limit(1);
 
-    if (error) throw error;
+      if (payrollError) throw payrollError;
 
-    return (data || []).map(voucher => ({
-      id: voucher.id,
-      companyId: voucher.company_id,
-      employeeId: voucher.employee_id,
-      payrollId: voucher.payroll_id || undefined,
-      periodo: voucher.periodo,
-      startDate: voucher.start_date,
-      endDate: voucher.end_date,
-      netPay: Number(voucher.net_pay),
-      voucherStatus: voucher.voucher_status as 'generado' | 'pendiente' | 'enviado' | 'error',
-      sentToEmployee: voucher.sent_to_employee,
-      sentDate: voucher.sent_date || undefined,
-      pdfUrl: voucher.pdf_url || undefined,
-      createdAt: voucher.created_at,
-      updatedAt: voucher.updated_at,
-      generatedBy: voucher.generated_by || undefined,
-      employeeName: voucher.employees ? `${voucher.employees.nombre} ${voucher.employees.apellido}` : 'Sin nombre',
-      employeeEmail: voucher.employees?.email || '',
-      employeeCedula: voucher.employees?.cedula || ''
-    }));
+      // Si no hay nóminas procesadas, retornar array vacío
+      if (!payrollsExist || payrollsExist.length === 0) {
+        console.log('No processed payrolls found, returning empty vouchers list');
+        return [];
+      }
+
+      // Solo si hay nóminas procesadas, cargar los comprobantes
+      const { data, error } = await supabase
+        .from('payroll_vouchers')
+        .select(`
+          *,
+          employees (
+            nombre,
+            apellido,
+            cedula,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map(voucher => ({
+        id: voucher.id,
+        companyId: voucher.company_id,
+        employeeId: voucher.employee_id,
+        payrollId: voucher.payroll_id || undefined,
+        periodo: voucher.periodo,
+        startDate: voucher.start_date,
+        endDate: voucher.end_date,
+        netPay: Number(voucher.net_pay),
+        voucherStatus: voucher.voucher_status as 'generado' | 'pendiente' | 'enviado' | 'error',
+        sentToEmployee: voucher.sent_to_employee,
+        sentDate: voucher.sent_date || undefined,
+        pdfUrl: voucher.pdf_url || undefined,
+        createdAt: voucher.created_at,
+        updatedAt: voucher.updated_at,
+        generatedBy: voucher.generated_by || undefined,
+        employeeName: voucher.employees ? `${voucher.employees.nombre} ${voucher.employees.apellido}` : 'Sin nombre',
+        employeeEmail: voucher.employees?.email || '',
+        employeeCedula: voucher.employees?.cedula || ''
+      }));
+    } catch (error) {
+      console.error('Error loading vouchers:', error);
+      return [];
+    }
   }
 
   static async updateVoucher(voucherId: string, updates: Partial<PayrollVoucher>) {

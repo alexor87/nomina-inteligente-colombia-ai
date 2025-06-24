@@ -30,7 +30,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Send
+  Send,
+  AlertCircle
 } from 'lucide-react';
 
 export const VouchersPage = () => {
@@ -79,6 +80,50 @@ export const VouchersPage = () => {
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
         <span className="ml-2">Cargando comprobantes...</span>
+      </div>
+    );
+  }
+
+  // Mostrar mensaje informativo si no hay comprobantes porque no hay nóminas procesadas
+  if (vouchers.length === 0 && summary.totalVouchers === 0) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Comprobantes de Nómina</h1>
+            <p className="text-gray-600 mt-1">
+              Gestiona, descarga y envía comprobantes de nómina de forma eficiente
+            </p>
+          </div>
+        </div>
+
+        {/* Estado vacío */}
+        <Card className="p-12 text-center">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="p-4 bg-blue-50 rounded-full">
+              <AlertCircle className="h-12 w-12 text-blue-500" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-semibold text-gray-900">
+                No hay comprobantes disponibles
+              </h3>
+              <p className="text-gray-500 max-w-md">
+                Los comprobantes se generan automáticamente cuando procesas y apruebas una nómina. 
+                Primero debes liquidar un período de nómina.
+              </p>
+            </div>
+            <div className="pt-4">
+              <Button 
+                onClick={() => window.location.href = '/payroll'}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Ir a Liquidar Nómina
+              </Button>
+            </div>
+          </div>
+        </Card>
       </div>
     );
   }
@@ -302,7 +347,7 @@ export const VouchersPage = () => {
           </Table>
         </div>
         
-        {vouchers.length === 0 && (
+        {vouchers.length === 0 && summary.totalVouchers > 0 && (
           <div className="text-center py-12">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <div className="text-gray-500 mb-4">
