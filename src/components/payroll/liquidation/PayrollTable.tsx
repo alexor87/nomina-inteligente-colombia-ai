@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -233,8 +232,6 @@ export const PayrollTable = ({
                 <TableHead className="font-medium text-gray-700">Cargo</TableHead>
                 <TableHead className="text-right font-medium text-gray-700">Salario Base</TableHead>
                 <TableHead className="text-center font-medium text-gray-700">Días</TableHead>
-                <TableHead className="text-center font-medium text-gray-700">H. Extra</TableHead>
-                <TableHead className="text-right font-medium text-gray-700">Bonos</TableHead>
                 <TableHead className="text-right font-medium text-gray-700 text-green-700">Devengado</TableHead>
                 <TableHead className="text-right font-medium text-gray-700 text-red-700">Deducciones</TableHead>
                 <TableHead className="text-right font-medium text-gray-700 text-green-800">Neto</TableHead>
@@ -277,20 +274,6 @@ export const PayrollTable = ({
                         employeeId={employee.id}
                         field="workedDays"
                         value={employee.workedDays}
-                      />
-                    </TableCell>
-                    <TableCell className="text-center py-4">
-                      <EditableCell
-                        employeeId={employee.id}
-                        field="extraHours"
-                        value={employee.extraHours}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right py-4">
-                      <EditableCell
-                        employeeId={employee.id}
-                        field="bonuses"
-                        value={employee.bonuses}
                       />
                     </TableCell>
                     <TableCell className="text-right py-4">

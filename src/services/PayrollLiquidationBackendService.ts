@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollPeriodService } from './PayrollPeriodService';
@@ -83,8 +82,8 @@ export class PayrollLiquidationBackendService {
           periodo: periodo,
           salario_base: employee.baseSalary,
           dias_trabajados: employee.workedDays,
-          horas_extra: employee.extraHours,
-          bonificaciones: employee.bonuses,
+          horas_extra: 0, // Removed from UI, set to 0
+          bonificaciones: 0, // Removed from UI, set to 0
           auxilio_transporte: employee.transportAllowance,
           total_devengado: employee.grossPay,
           salud_empleado: employee.grossPay * 0.04,
@@ -128,8 +127,8 @@ export class PayrollLiquidationBackendService {
             .update({
               salario_base: employee.baseSalary,
               dias_trabajados: employee.workedDays,
-              horas_extra: employee.extraHours,
-              bonificaciones: employee.bonuses,
+              horas_extra: 0, // Removed from UI, set to 0
+              bonificaciones: 0, // Removed from UI, set to 0
               auxilio_transporte: employee.transportAllowance,
               total_devengado: employee.grossPay,
               salud_empleado: employee.grossPay * 0.04,
@@ -321,6 +320,7 @@ export class PayrollLiquidationBackendService {
         let bonuses = 0;
         let absences = 0;
         let disabilities = 0;
+        let additionalDeductions = 0;
 
         // Load novedades for this employee if we have a current period
         if (currentPeriod) {
@@ -328,17 +328,23 @@ export class PayrollLiquidationBackendService {
             const novedades = await NovedadesService.getNovedadesByEmployee(emp.id, currentPeriod.id);
             console.log(`Loaded ${novedades.length} novedades for employee ${emp.nombre} ${emp.apellido}`);
             
-            // Sum up novedades by type
+            // Sum up novedades by type - now they go directly to devengados or deducciones
             novedades.forEach(novedad => {
               const valor = Number(novedad.valor) || 0;
               const dias = Number(novedad.dias) || 0;
               
               switch (novedad.tipo_novedad) {
                 case 'horas_extra':
-                  extraHours += valor;
-                  break;
                 case 'bonificacion':
+                case 'vacaciones':
+                case 'licencia':
+                  // These add to devengados (included in bonuses for calculation)
                   bonuses += valor;
+                  break;
+                case 'descuento':
+                case 'otro':
+                  // These add to deducciones
+                  additionalDeductions += valor;
                   break;
                 case 'ausencia':
                   absences += dias;
@@ -347,15 +353,17 @@ export class PayrollLiquidationBackendService {
                   disabilities += dias;
                   break;
                 default:
-                  // For other types, add to bonuses if positive value
+                  // For any other types, add to bonuses if positive value, deducciones if negative
                   if (valor > 0) {
                     bonuses += valor;
+                  } else {
+                    additionalDeductions += Math.abs(valor);
                   }
                   break;
               }
             });
             
-            console.log(`Employee ${emp.nombre}: extraHours=${extraHours}, bonuses=${bonuses}, absences=${absences}, disabilities=${disabilities}`);
+            console.log(`Employee ${emp.nombre}: bonuses=${bonuses}, absences=${absences}, disabilities=${disabilities}, additionalDeductions=${additionalDeductions}`);
           } catch (error) {
             console.warn(`Could not load novedades for employee ${emp.id}:`, error);
           }
@@ -367,18 +375,27 @@ export class PayrollLiquidationBackendService {
           position: emp.cargo || 'No especificado',
           baseSalary: Number(emp.salario_base),
           workedDays: Math.max(0, defaultWorkedDays - absences - disabilities),
-          extraHours,
+          extraHours: 0, // No longer used directly, included in bonuses
           disabilities,
           bonuses,
           absences,
           eps: emp.eps,
-          afp: emp.afp
+          afp: emp.afp,
+          additionalDeductions // Pass additional deductions from novedades
         };
 
-        return await calculateEmployeeBackend(
+        const calculatedEmployee = await calculateEmployeeBackend(
           baseEmployeeData, 
           periodType === 'semanal' ? 'mensual' : periodType as 'quincenal' | 'mensual'
         );
+
+        // Add additional deductions from novedades to total deductions
+        if (additionalDeductions > 0) {
+          calculatedEmployee.deductions += additionalDeductions;
+          calculatedEmployee.netPay = calculatedEmployee.grossPay - calculatedEmployee.deductions;
+        }
+
+        return calculatedEmployee;
       });
 
       return await Promise.all(employeePromises);

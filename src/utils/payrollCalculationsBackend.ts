@@ -9,9 +9,9 @@ export const calculateEmployeeBackend = async (
   const input: PayrollCalculationInput = {
     baseSalary: baseEmployee.baseSalary,
     workedDays: baseEmployee.workedDays,
-    extraHours: baseEmployee.extraHours,
+    extraHours: 0, // No longer used directly
     disabilities: baseEmployee.disabilities,
-    bonuses: baseEmployee.bonuses,
+    bonuses: baseEmployee.bonuses, // Now includes all positive novedades
     absences: baseEmployee.absences,
     periodType
   };

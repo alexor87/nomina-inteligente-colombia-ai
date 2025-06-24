@@ -1,4 +1,3 @@
-
 export interface PayrollPeriod {
   id: string;
   startDate: string;
@@ -50,6 +49,7 @@ export interface BaseEmployeeData {
   absences: number;
   eps?: string;
   afp?: string;
+  additionalDeductions?: number; // Add this field for deductions from novedades
 }
 
 // Nuevos tipos para la funcionalidad avanzada
