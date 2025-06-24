@@ -88,7 +88,7 @@ export const EmpresaSettings = () => {
         return;
       }
 
-      console.log('Usuario actual:', user.id, user.email);
+      console.log('Usuario autenticado:', user.id, user.email);
 
       // Obtener el perfil del usuario para conseguir company_id
       const { data: profile, error: profileError } = await supabase
@@ -110,13 +110,13 @@ export const EmpresaSettings = () => {
       console.log('Perfil encontrado:', profile);
 
       if (!profile?.company_id) {
-        // Si no hay company_id, crear una empresa por defecto para el usuario
-        console.log('No se encontró company_id, creando empresa...');
-        await createDefaultCompany(user);
+        // Si no hay company_id, crear una empresa específica para este usuario
+        console.log('No se encontró company_id, creando empresa específica para este usuario...');
+        await createCompanyForUser(user);
         return;
       }
 
-      // Cargar datos de la empresa
+      // Cargar datos de la empresa (las políticas RLS aseguran que solo vea su empresa)
       const { data: company, error: companyError } = await supabase
         .from('companies')
         .select('*')
@@ -126,19 +126,16 @@ export const EmpresaSettings = () => {
       if (companyError) {
         console.error('Error cargando empresa:', companyError);
         if (companyError.code === 'PGRST116') {
-          // No se encontró la empresa, crear una por defecto
-          await createDefaultCompany(user);
+          // No se encontró la empresa, crear una específica para este usuario
+          await createCompanyForUser(user);
           return;
         }
         throw companyError;
       }
 
-      console.log('Empresa encontrada:', company);
+      console.log('Empresa del usuario encontrada:', company);
 
       if (company) {
-        // Actualizar automáticamente el email si no coincide con el usuario actual
-        const needsEmailUpdate = company.email !== user.email;
-        
         setCompanyData({
           id: company.id,
           razon_social: company.razon_social || '',
@@ -146,21 +143,12 @@ export const EmpresaSettings = () => {
           direccion: company.direccion || '',
           ciudad: company.ciudad || '',
           telefono: company.telefono || '',
-          email: user.email || company.email || '', // Usar el email del usuario actual
+          email: company.email || user.email || '', // Usar el email de la empresa o del usuario
           representante_legal: company.representante_legal || '',
           actividad_economica: company.actividad_economica || '',
           estado: company.estado || 'activa',
           plan: company.plan || 'basico'
         });
-
-        // Si el email no coincide, actualizarlo automáticamente
-        if (needsEmailUpdate) {
-          console.log('Actualizando email de la empresa de', company.email, 'a', user.email);
-          await supabase
-            .from('companies')
-            .update({ email: user.email })
-            .eq('id', company.id);
-        }
       }
 
       // Cargar configuración de periodicidad
@@ -181,7 +169,7 @@ export const EmpresaSettings = () => {
       console.error('Error loading company data:', error);
       toast({
         title: "Error al cargar datos",
-        description: "No se pudieron cargar los datos de la empresa.",
+        description: "No se pudieron cargar los datos de tu empresa.",
         variant: "destructive"
       });
     } finally {
@@ -189,17 +177,17 @@ export const EmpresaSettings = () => {
     }
   };
 
-  const createDefaultCompany = async (user: any) => {
+  const createCompanyForUser = async (user: any) => {
     try {
-      console.log('Creando empresa por defecto para usuario:', user.email);
+      console.log('Creando empresa específica para usuario:', user.email);
       
-      // Crear empresa por defecto
+      // Crear empresa específica para este usuario
       const { data: newCompany, error: createError } = await supabase
         .from('companies')
         .insert({
-          razon_social: 'Mi Empresa',
+          razon_social: `Empresa de ${user.email}`,
           nit: '000000000-0',
-          email: user.email, // Usar el email del usuario actual
+          email: user.email,
           ciudad: 'Bogotá',
           estado: 'activa',
           plan: 'basico'
@@ -243,14 +231,14 @@ export const EmpresaSettings = () => {
 
       toast({
         title: "Empresa creada",
-        description: "Se ha creado una empresa por defecto. Puedes editarla ahora.",
+        description: "Se ha creado tu empresa. Puedes personalizar la información ahora.",
       });
 
     } catch (error) {
-      console.error('Error creating default company:', error);
+      console.error('Error creating company for user:', error);
       toast({
         title: "Error al crear empresa",
-        description: "No se pudo crear la empresa por defecto.",
+        description: "No se pudo crear tu empresa.",
         variant: "destructive"
       });
     }
@@ -370,12 +358,12 @@ export const EmpresaSettings = () => {
         .single();
 
       if (profileError || !profile?.company_id) {
-        throw new Error('No se encontró la empresa del usuario');
+        throw new Error('No se encontró tu empresa');
       }
 
-      console.log('Guardando datos para empresa:', profile.company_id);
+      console.log('Guardando datos para tu empresa:', profile.company_id);
 
-      // Actualizar datos de la empresa
+      // Actualizar datos de la empresa (las políticas RLS aseguran que solo actualice su empresa)
       const { error: companyError } = await supabase
         .from('companies')
         .update({
@@ -414,12 +402,12 @@ export const EmpresaSettings = () => {
 
       toast({
         title: "Configuración guardada",
-        description: "Los datos de la empresa han sido actualizados correctamente.",
+        description: "Los datos de tu empresa han sido actualizados correctamente.",
       });
 
       // Actualizar timestamp de última modificación
       setLastModified({
-        user: 'Admin Usuario',
+        user: user.email || 'Usuario',
         date: new Date().toLocaleString('es-CO')
       });
 
@@ -427,7 +415,7 @@ export const EmpresaSettings = () => {
       console.error('Error saving company data:', error);
       toast({
         title: "Error al guardar",
-        description: error instanceof Error ? error.message : "No se pudieron guardar los datos de la empresa.",
+        description: error instanceof Error ? error.message : "No se pudieron guardar los datos de tu empresa.",
         variant: "destructive"
       });
     } finally {
@@ -458,7 +446,7 @@ export const EmpresaSettings = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-center">Cargando configuración...</div>
+        <div className="text-center">Cargando configuración de tu empresa...</div>
       </div>
     );
   }
@@ -467,8 +455,8 @@ export const EmpresaSettings = () => {
     <TooltipProvider>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">🧾 Empresa</h2>
-          <p className="text-gray-600">Configuración general de la empresa y datos legales</p>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">🧾 Mi Empresa</h2>
+          <p className="text-gray-600">Configuración general de tu empresa y datos legales</p>
         </div>
 
         {/* Información Básica */}

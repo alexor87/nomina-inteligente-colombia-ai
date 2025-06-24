@@ -4,12 +4,19 @@ import { EmployeeWithStatus } from '@/types/employee-extended';
 
 export class EmployeeDataService {
   static async loadEmployees(): Promise<EmployeeWithStatus[]> {
+    // Solo cargar empleados de la empresa del usuario autenticado
+    // Las políticas RLS se encargan de filtrar automáticamente
     const { data, error } = await supabase
       .from('employees')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error loading employees:', error);
+      throw error;
+    }
+
+    console.log('Empleados cargados desde la base de datos:', data?.length || 0);
 
     return (data || []).map(emp => ({
       id: emp.id,
@@ -38,5 +45,31 @@ export class EmployeeDataService {
       fechaUltimaModificacion: emp.updated_at,
       usuarioUltimaModificacion: 'Sistema'
     }));
+  }
+
+  static async getCurrentUserCompanyId(): Promise<string | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('No authenticated user found');
+        return null;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !profile?.company_id) {
+        console.error('Error getting user profile or no company assigned:', error);
+        return null;
+      }
+
+      return profile.company_id;
+    } catch (error) {
+      console.error('Error getting user company ID:', error);
+      return null;
+    }
   }
 }

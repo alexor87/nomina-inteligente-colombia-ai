@@ -1,11 +1,17 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types';
+import { EmployeeDataService } from './EmployeeDataService';
 
 export class EmployeeService {
   static async create(employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) {
+    // Obtener la empresa del usuario autenticado
+    const companyId = await EmployeeDataService.getCurrentUserCompanyId();
+    if (!companyId) {
+      throw new Error('No se encontró la empresa del usuario. Asegúrate de estar autenticado.');
+    }
+
     const supabaseData = {
-      company_id: employeeData.empresaId,
+      company_id: companyId, // Usar la empresa del usuario autenticado
       cedula: employeeData.cedula,
       nombre: employeeData.nombre,
       apellido: employeeData.apellido,
@@ -21,11 +27,13 @@ export class EmployeeService {
       caja_compensacion: employeeData.cajaCompensacion,
       cargo: employeeData.cargo,
       estado_afiliacion: employeeData.estadoAfiliacion,
-      centro_costo: null, // Se asignará después si viene en los datos
-      nivel_riesgo_arl: null, // Se asignará después si viene en los datos
+      centro_costo: null,
+      nivel_riesgo_arl: null,
       contrato_vencimiento: null,
       ultima_liquidacion: null
     };
+
+    console.log('Creando empleado para empresa:', companyId);
 
     const { data, error } = await supabase
       .from('employees')
