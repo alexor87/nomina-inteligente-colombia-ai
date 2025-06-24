@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -19,6 +18,7 @@ interface PayrollTableProps {
   isLoading: boolean;
   canEdit?: boolean;
   periodoId?: string;
+  onRefreshEmployees?: () => void;
 }
 
 const formatCurrency = (amount: number) => {
@@ -53,11 +53,19 @@ export const PayrollTable = ({
   onRecalculate, 
   isLoading, 
   canEdit = true,
-  periodoId = ''
+  periodoId = '',
+  onRefreshEmployees
 }: PayrollTableProps) => {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<{ id: string; name: string } | null>(null);
   
+  const handleNovedadChange = () => {
+    console.log('Novedad changed, refreshing employees...');
+    if (onRefreshEmployees) {
+      onRefreshEmployees();
+    }
+  };
+
   const {
     loadNovedadesForEmployee,
     createNovedad,
@@ -65,7 +73,7 @@ export const PayrollTable = ({
     deleteNovedad,
     getEmployeeNovedadesCount,
     getEmployeeNovedades
-  } = useNovedades(periodoId);
+  } = useNovedades(periodoId, handleNovedadChange);
 
   const handleCellEdit = (employeeId: string, field: string, value: string) => {
     const numericValue = parseFloat(value) || 0;

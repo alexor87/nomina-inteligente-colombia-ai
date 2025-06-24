@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { NovedadesService } from '@/services/NovedadesService';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
 
-export const useNovedades = (periodoId: string) => {
+export const useNovedades = (periodoId: string, onNovedadChange?: () => void) => {
   const { toast } = useToast();
   const [novedades, setNovedades] = useState<Record<string, PayrollNovedad[]>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +48,11 @@ export const useNovedades = (periodoId: string) => {
           description: "La novedad se ha registrado correctamente"
         });
 
+        // Trigger recalculation of payroll after novedad creation
+        if (onNovedadChange) {
+          onNovedadChange();
+        }
+
         return newNovedad;
       }
     } catch (error) {
@@ -61,7 +66,7 @@ export const useNovedades = (periodoId: string) => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, onNovedadChange]);
 
   const updateNovedad = useCallback(async (id: string, updates: Partial<CreateNovedadData>, empleadoId: string) => {
     try {
@@ -80,6 +85,11 @@ export const useNovedades = (periodoId: string) => {
           title: "Novedad actualizada",
           description: "La novedad se ha actualizado correctamente"
         });
+
+        // Trigger recalculation of payroll after novedad update
+        if (onNovedadChange) {
+          onNovedadChange();
+        }
       }
     } catch (error) {
       console.error('Error updating novedad:', error);
@@ -92,7 +102,7 @@ export const useNovedades = (periodoId: string) => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, onNovedadChange]);
 
   const deleteNovedad = useCallback(async (id: string, empleadoId: string) => {
     try {
@@ -108,6 +118,11 @@ export const useNovedades = (periodoId: string) => {
         title: "Novedad eliminada",
         description: "La novedad se ha eliminado correctamente"
       });
+
+      // Trigger recalculation of payroll after novedad deletion
+      if (onNovedadChange) {
+        onNovedadChange();
+      }
     } catch (error) {
       console.error('Error deleting novedad:', error);
       toast({
@@ -119,7 +134,7 @@ export const useNovedades = (periodoId: string) => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, onNovedadChange]);
 
   const getEmployeeNovedadesCount = useCallback((empleadoId: string): number => {
     return novedades[empleadoId]?.length || 0;

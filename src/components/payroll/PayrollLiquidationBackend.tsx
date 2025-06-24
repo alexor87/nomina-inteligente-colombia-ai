@@ -46,6 +46,7 @@ export const PayrollLiquidationBackend = () => {
             isLoading={isLoading}
             canEdit={canEdit}
             periodoId={currentPeriod?.id || ''}
+            onRefreshEmployees={refreshEmployees}
           />
         </div>
       </div>
