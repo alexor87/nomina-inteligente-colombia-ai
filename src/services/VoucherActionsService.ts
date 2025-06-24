@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollVoucher } from '@/types/vouchers';
 
@@ -12,30 +11,26 @@ export class VoucherActionsService {
 
       if (error) throw error;
 
-      if (data.pdfBlob) {
-        // Crear un blob con el contenido PDF y descargarlo
-        const blob = new Blob([data.pdfBlob], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
+      if (data.htmlContent) {
+        // Crear un blob HTML y abrirlo en una nueva ventana para imprimir como PDF
+        const htmlBlob = new Blob([data.htmlContent], { type: 'text/html' });
+        const htmlUrl = window.URL.createObjectURL(htmlBlob);
         
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `comprobante_${voucher.employeeCedula}_${voucher.periodo}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } else if (data.htmlContent) {
-        // Fallback: crear un HTML si no hay PDF
-        const blob = new Blob([data.htmlContent], { type: 'text/html' });
-        const url = window.URL.createObjectURL(blob);
+        // Abrir en nueva ventana para que el usuario pueda imprimir o guardar como PDF
+        const printWindow = window.open(htmlUrl, '_blank');
+        if (printWindow) {
+          printWindow.onload = () => {
+            // Opcional: iniciar impresión automáticamente
+            setTimeout(() => {
+              printWindow.print();
+            }, 1000);
+          };
+        }
         
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `comprobante_${voucher.employeeCedula}_${voucher.periodo}.html`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        // Limpiar URL después de un tiempo
+        setTimeout(() => {
+          window.URL.revokeObjectURL(htmlUrl);
+        }, 10000);
       }
     } catch (error: any) {
       console.error('Error downloading voucher:', error);

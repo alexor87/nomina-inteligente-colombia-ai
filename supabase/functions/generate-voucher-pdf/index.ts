@@ -37,162 +37,236 @@ const generatePDFContent = (voucher: VoucherData, companyInfo: any) => {
       <meta charset="UTF-8">
       <title>Comprobante de Pago - ${voucher.employeeName}</title>
       <style>
+        @page {
+          size: A4;
+          margin: 20mm;
+        }
         body { 
           font-family: Arial, sans-serif; 
-          margin: 20px; 
+          margin: 0;
+          padding: 0;
           background-color: white;
           color: #333;
+          font-size: 12px;
+          line-height: 1.4;
         }
         .header { 
           text-align: center; 
-          border-bottom: 2px solid #333; 
+          border-bottom: 3px solid #2563eb; 
           padding-bottom: 20px; 
           margin-bottom: 30px; 
         }
         .company-logo {
-          width: 100px;
-          height: 60px;
-          background-color: #f0f0f0;
-          margin: 0 auto 20px;
+          width: 80px;
+          height: 50px;
+          background-color: #f8fafc;
+          margin: 0 auto 15px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid #ddd;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          font-weight: bold;
+          color: #64748b;
         }
-        .company-info { 
-          margin-bottom: 20px; 
-          background-color: #f9f9f9;
+        .company-info, .employee-info { 
+          margin-bottom: 25px; 
+          background-color: #f8fafc;
           padding: 15px;
-          border-radius: 5px;
-        }
-        .employee-info { 
-          margin-bottom: 30px; 
-          background-color: #f9f9f9;
-          padding: 15px;
-          border-radius: 5px;
-        }
-        .payroll-details { 
-          margin-bottom: 30px; 
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
         }
         .section-title { 
           font-weight: bold; 
-          color: #333; 
-          font-size: 16px; 
-          margin-bottom: 10px;
+          color: #1e293b; 
+          font-size: 14px; 
+          margin-bottom: 12px;
           text-transform: uppercase;
-          border-bottom: 1px solid #ddd;
+          border-bottom: 2px solid #3b82f6;
           padding-bottom: 5px;
-        }
-        .detail-row { 
-          display: flex; 
-          justify-content: space-between; 
-          padding: 8px 0; 
-          border-bottom: 1px solid #eee; 
-        }
-        .detail-row:last-child {
-          border-bottom: none;
-        }
-        .total-row { 
-          font-weight: bold; 
-          background-color: #f5f5f5; 
-          padding: 15px; 
-          margin-top: 10px;
-          border-radius: 5px;
-        }
-        .net-pay-row {
-          background-color: #e3f2fd; 
-          font-size: 18px;
-          color: #1976d2;
-        }
-        .signature-section { 
-          margin-top: 50px; 
-          text-align: center;
-          border-top: 1px solid #ddd;
-          padding-top: 20px;
+          letter-spacing: 0.5px;
         }
         .info-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-bottom: 20px;
+          gap: 25px;
+          margin-bottom: 25px;
+        }
+        .detail-row { 
+          display: flex; 
+          justify-content: space-between; 
+          padding: 10px 0; 
+          border-bottom: 1px solid #e2e8f0; 
+        }
+        .detail-row:last-child {
+          border-bottom: none;
+        }
+        .detail-label {
+          font-weight: 500;
+          color: #475569;
+        }
+        .detail-value {
+          font-weight: 600;
+          color: #1e293b;
+        }
+        .total-row { 
+          font-weight: bold; 
+          background-color: #f1f5f9; 
+          padding: 15px; 
+          margin-top: 15px;
+          border-radius: 8px;
+          border: 1px solid #cbd5e1;
+        }
+        .net-pay-row {
+          background-color: #dbeafe; 
+          font-size: 16px;
+          color: #1d4ed8;
+          border: 2px solid #3b82f6;
+        }
+        .signature-section { 
+          margin-top: 40px; 
+          text-align: center;
+          border-top: 2px solid #e2e8f0;
+          padding-top: 25px;
+        }
+        .payroll-details {
+          margin-bottom: 25px;
+        }
+        .earnings-section, .deductions-section {
+          margin-bottom: 25px;
+          background-color: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .section-header {
+          background-color: #f8fafc;
+          padding: 12px 15px;
+          font-weight: bold;
+          color: #1e293b;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .section-content {
+          padding: 15px;
         }
         @media print {
-          body { margin: 0; }
-          .header { page-break-inside: avoid; }
+          body { 
+            margin: 0;
+            font-size: 11px;
+          }
+          .header { 
+            page-break-inside: avoid; 
+          }
+          .info-grid {
+            page-break-inside: avoid;
+          }
+          .earnings-section, .deductions-section {
+            page-break-inside: avoid;
+          }
         }
       </style>
     </head>
     <body>
       <div class="header">
         <div class="company-logo">LOGO</div>
-        <h1>COMPROBANTE DE PAGO DE NÓMINA</h1>
-        <p><strong>Período:</strong> ${voucher.startDate} al ${voucher.endDate}</p>
+        <h1 style="margin: 0; color: #1e293b; font-size: 18px;">COMPROBANTE DE PAGO DE NÓMINA</h1>
+        <p style="margin: 10px 0 0 0; color: #64748b;"><strong>Período:</strong> ${new Date(voucher.startDate).toLocaleDateString('es-CO')} al ${new Date(voucher.endDate).toLocaleDateString('es-CO')}</p>
       </div>
 
       <div class="info-grid">
         <div class="company-info">
           <div class="section-title">Información de la Empresa</div>
-          <p><strong>Razón Social:</strong> ${companyInfo.razon_social}</p>
-          <p><strong>NIT:</strong> ${companyInfo.nit}</p>
-          <p><strong>Dirección:</strong> ${companyInfo.direccion || 'No especificada'}</p>
-          <p><strong>Teléfono:</strong> ${companyInfo.telefono || 'No especificado'}</p>
+          <div class="detail-row">
+            <span class="detail-label">Razón Social:</span>
+            <span class="detail-value">${companyInfo?.razon_social || 'No especificada'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">NIT:</span>
+            <span class="detail-value">${companyInfo?.nit || 'No especificado'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Dirección:</span>
+            <span class="detail-value">${companyInfo?.direccion || 'No especificada'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Teléfono:</span>
+            <span class="detail-value">${companyInfo?.telefono || 'No especificado'}</span>
+          </div>
         </div>
 
         <div class="employee-info">
           <div class="section-title">Información del Empleado</div>
-          <p><strong>Nombre:</strong> ${voucher.employeeName}</p>
-          <p><strong>Cédula:</strong> ${voucher.employeeCedula}</p>
-          <p><strong>Período:</strong> ${voucher.periodo}</p>
-          <p><strong>Empleado ID:</strong> ${voucher.employeeId}</p>
+          <div class="detail-row">
+            <span class="detail-label">Nombre:</span>
+            <span class="detail-value">${voucher.employeeName}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Cédula:</span>
+            <span class="detail-value">${voucher.employeeCedula}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Período:</span>
+            <span class="detail-value">${voucher.periodo}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">ID Empleado:</span>
+            <span class="detail-value">${voucher.employeeId}</span>
+          </div>
         </div>
       </div>
 
-      <div class="payroll-details">
-        <div class="section-title">Devengados</div>
-        <div class="detail-row">
-          <span>Salario Básico</span>
-          <span>$${voucher.salaryDetails.baseSalary.toLocaleString('es-CO')}</span>
-        </div>
-        <div class="detail-row">
-          <span>Horas Extra</span>
-          <span>$${voucher.salaryDetails.overtime.toLocaleString('es-CO')}</span>
-        </div>
-        <div class="detail-row">
-          <span>Bonificaciones</span>
-          <span>$${voucher.salaryDetails.bonuses.toLocaleString('es-CO')}</span>
-        </div>
-        <div class="total-row">
+      <div class="earnings-section">
+        <div class="section-header">💰 DEVENGADOS</div>
+        <div class="section-content">
           <div class="detail-row">
-            <span>TOTAL DEVENGADO</span>
-            <span>$${voucher.salaryDetails.totalEarnings.toLocaleString('es-CO')}</span>
+            <span class="detail-label">Salario Básico</span>
+            <span class="detail-value">$${voucher.salaryDetails.baseSalary.toLocaleString('es-CO')}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Horas Extra</span>
+            <span class="detail-value">$${voucher.salaryDetails.overtime.toLocaleString('es-CO')}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Bonificaciones</span>
+            <span class="detail-value">$${voucher.salaryDetails.bonuses.toLocaleString('es-CO')}</span>
+          </div>
+          <div class="total-row">
+            <div class="detail-row">
+              <span>TOTAL DEVENGADO</span>
+              <span>$${voucher.salaryDetails.totalEarnings.toLocaleString('es-CO')}</span>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div class="section-title" style="margin-top: 30px;">Deducciones</div>
-        <div class="detail-row">
-          <span>Salud (4%)</span>
-          <span>$${voucher.salaryDetails.healthContribution.toLocaleString('es-CO')}</span>
-        </div>
-        <div class="detail-row">
-          <span>Pensión (4%)</span>
-          <span>$${voucher.salaryDetails.pensionContribution.toLocaleString('es-CO')}</span>
-        </div>
-        <div class="detail-row">
-          <span>Retención en la Fuente</span>
-          <span>$${voucher.salaryDetails.withholdingTax.toLocaleString('es-CO')}</span>
-        </div>
-        <div class="total-row">
+      <div class="deductions-section">
+        <div class="section-header">📉 DEDUCCIONES</div>
+        <div class="section-content">
           <div class="detail-row">
-            <span>TOTAL DEDUCCIONES</span>
-            <span>$${voucher.salaryDetails.totalDeductions.toLocaleString('es-CO')}</span>
+            <span class="detail-label">Salud (4%)</span>
+            <span class="detail-value">$${voucher.salaryDetails.healthContribution.toLocaleString('es-CO')}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Pensión (4%)</span>
+            <span class="detail-value">$${voucher.salaryDetails.pensionContribution.toLocaleString('es-CO')}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Retención en la Fuente</span>
+            <span class="detail-value">$${voucher.salaryDetails.withholdingTax.toLocaleString('es-CO')}</span>
+          </div>
+          <div class="total-row">
+            <div class="detail-row">
+              <span>TOTAL DEDUCCIONES</span>
+              <span>$${voucher.salaryDetails.totalDeductions.toLocaleString('es-CO')}</span>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div class="total-row net-pay-row" style="margin-top: 20px;">
-          <div class="detail-row">
-            <span>NETO A PAGAR</span>
-            <span>$${voucher.netPay.toLocaleString('es-CO')}</span>
-          </div>
+      <div class="total-row net-pay-row">
+        <div class="detail-row">
+          <span style="font-size: 18px;">💵 NETO A PAGAR</span>
+          <span style="font-size: 18px;">$${voucher.netPay.toLocaleString('es-CO')}</span>
         </div>
       </div>
 
@@ -204,22 +278,16 @@ const generatePDFContent = (voucher: VoucherData, companyInfo: any) => {
           hour: '2-digit',
           minute: '2-digit'
         })}</p>
-        <p style="margin-top: 20px;">Este documento fue generado electrónicamente y es válido sin firma.</p>
-        <p style="font-size: 12px; color: #666; margin-top: 30px;">
+        <p style="margin-top: 25px; font-size: 11px; color: #64748b;">
+          Este documento fue generado electrónicamente y es válido sin firma autógrafa.
+        </p>
+        <p style="font-size: 10px; color: #94a3b8; margin-top: 20px;">
           Para consultas sobre este comprobante, contacte al departamento de recursos humanos.
         </p>
       </div>
     </body>
     </html>
   `;
-};
-
-// Función para convertir HTML a PDF usando Puppeteer (simulado)
-const convertHtmlToPdf = async (htmlContent: string): Promise<Uint8Array> => {
-  // En un entorno real, aquí usarías una librería como Puppeteer o jsPDF
-  // Por ahora, retornamos el HTML como bytes para simular un PDF
-  const encoder = new TextEncoder();
-  return encoder.encode(htmlContent);
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -234,20 +302,25 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { voucherId, regenerate = false } = await req.json();
 
+    console.log('Generating voucher PDF for:', voucherId);
+
     // Obtener datos del comprobante
     const { data: voucher, error: voucherError } = await supabase
       .from('payroll_vouchers')
       .select(`
         *,
-        employees (nombre, apellido, cedula),
-        payrolls (salario_base, total_devengado, total_deducciones, salud_empleado, pension_empleado, retencion_fuente)
+        employees (nombre, apellido, cedula, email),
+        payrolls (salario_base, total_devengado, total_deducciones, salud_empleado, pension_empleado, retencion_fuente, bonificaciones)
       `)
       .eq('id', voucherId)
       .single();
 
     if (voucherError || !voucher) {
+      console.error('Voucher not found:', voucherError);
       throw new Error('Comprobante no encontrado');
     }
+
+    console.log('Voucher found:', voucher.id);
 
     // Obtener información de la empresa
     const { data: company } = await supabase
@@ -255,6 +328,8 @@ const handler = async (req: Request): Promise<Response> => {
       .select('*')
       .eq('id', voucher.company_id)
       .single();
+
+    console.log('Company found:', company?.razon_social);
 
     const voucherData: VoucherData = {
       voucherId: voucher.id,
@@ -267,10 +342,10 @@ const handler = async (req: Request): Promise<Response> => {
       endDate: voucher.end_date,
       netPay: voucher.net_pay,
       salaryDetails: {
-        baseSalary: voucher.payrolls?.salario_base || 0,
-        overtime: 0, // Podríamos obtener esto de la tabla payrolls
+        baseSalary: voucher.payrolls?.salario_base || voucher.net_pay,
+        overtime: 0,
         bonuses: voucher.payrolls?.bonificaciones || 0,
-        totalEarnings: voucher.payrolls?.total_devengado || 0,
+        totalEarnings: voucher.payrolls?.total_devengado || voucher.net_pay,
         healthContribution: voucher.payrolls?.salud_empleado || 0,
         pensionContribution: voucher.payrolls?.pension_empleado || 0,
         withholdingTax: voucher.payrolls?.retencion_fuente || 0,
@@ -280,29 +355,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     const htmlContent = generatePDFContent(voucherData, company);
     
-    // Generar PDF (simulado)
-    const pdfBytes = await convertHtmlToPdf(htmlContent);
-    
-    // Crear URL única para el PDF
-    const fileName = `comprobante_${voucherData.employeeCedula}_${voucherData.periodo.replace(/\s+/g, '_')}.pdf`;
-    const pdfUrl = `${supabaseUrl}/storage/v1/object/vouchers/${fileName}`;
-
-    // Actualizar el comprobante con el estado generado y URL del PDF
+    // Actualizar el comprobante con el estado generado
     await supabase
       .from('payroll_vouchers')
       .update({ 
         voucher_status: 'generado',
-        pdf_url: pdfUrl,
         updated_at: new Date().toISOString()
       })
       .eq('id', voucherId);
 
+    console.log('Voucher updated successfully');
+
     return new Response(JSON.stringify({ 
       success: true, 
-      pdfUrl: pdfUrl,
-      fileName: fileName,
       htmlContent: htmlContent,
-      pdfBlob: Array.from(pdfBytes) // Convertir a array para enviar
+      fileName: `comprobante_${voucherData.employeeCedula}_${voucherData.periodo.replace(/\s+/g, '_')}.html`
     }), {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
@@ -310,19 +377,6 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error('Error generating PDF:', error);
     
-    // Marcar el comprobante con error
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    const { voucherId } = await req.json();
-    if (voucherId) {
-      await supabase
-        .from('payroll_vouchers')
-        .update({ voucher_status: 'error' })
-        .eq('id', voucherId);
-    }
-
     return new Response(JSON.stringify({ 
       success: false,
       error: error.message 
