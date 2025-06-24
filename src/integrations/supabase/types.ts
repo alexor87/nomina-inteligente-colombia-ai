@@ -316,6 +316,105 @@ export type Database = {
           },
         ]
       }
+      payroll_novedades: {
+        Row: {
+          adjunto_url: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          dias: number | null
+          empleado_id: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          observacion: string | null
+          periodo_id: string
+          tipo_novedad: string
+          updated_at: string
+          valor: number | null
+        }
+        Insert: {
+          adjunto_url?: string | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          dias?: number | null
+          empleado_id: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          observacion?: string | null
+          periodo_id: string
+          tipo_novedad: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Update: {
+          adjunto_url?: string | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          dias?: number | null
+          empleado_id?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          observacion?: string | null
+          periodo_id?: string
+          tipo_novedad?: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_novedades_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_novedades_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_novedades_audit: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string
+          id: string
+          new_values: Json | null
+          novedad_id: string
+          old_values: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          novedad_id: string
+          old_values?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          novedad_id?: string
+          old_values?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       payroll_periods: {
         Row: {
           company_id: string

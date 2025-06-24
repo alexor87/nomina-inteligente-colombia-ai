@@ -104,8 +104,10 @@ export const PayrollLiquidation = () => {
           <PayrollTable
             employees={employees}
             onUpdateEmployee={updateEmployee}
+            onRecalculate={recalculateAll}
             isLoading={isLoading}
             canEdit={canEdit}
+            periodoId={currentPeriod?.id || ''}
           />
         </div>
       </div>
