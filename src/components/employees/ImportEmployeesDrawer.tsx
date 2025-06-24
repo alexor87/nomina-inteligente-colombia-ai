@@ -21,6 +21,13 @@ export interface ColumnMapping {
   validationMessage?: string;
 }
 
+export interface ImportData {
+  validRows: any[];
+  invalidRows: any[];
+  mapping: Record<string, string>;
+  totalRows: number;
+}
+
 export interface ImportStep {
   step: 'upload' | 'mapping' | 'validation' | 'confirmation';
   data?: {
@@ -31,6 +38,8 @@ export interface ImportStep {
     validRows?: ImportedRow[];
     invalidRows?: ImportedRow[];
     errors?: string[];
+    mapping?: Record<string, string>;
+    totalRows?: number;
   };
 }
 
@@ -125,7 +134,12 @@ export const ImportEmployeesDrawer = ({ isOpen, onClose, onImportComplete }: Imp
 
           {currentStep.step === 'confirmation' && currentStep.data && (
             <ImportConfirmationStep
-              data={currentStep.data}
+              data={{
+                validRows: currentStep.data.validRows || [],
+                invalidRows: currentStep.data.invalidRows || [],
+                mapping: currentStep.data.mapping || {},
+                totalRows: currentStep.data.totalRows || 0
+              }}
               onComplete={() => {
                 onImportComplete();
                 handleClose();

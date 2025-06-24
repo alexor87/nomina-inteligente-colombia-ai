@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 
@@ -20,22 +21,22 @@ export class EmployeeDataService {
     return data?.map(emp => ({
       id: emp.id,
       cedula: emp.cedula,
-      tipoDocumento: emp.tipo_documento || 'CC',
+      tipoDocumento: (emp.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
       nombre: emp.nombre,
       apellido: emp.apellido,
       email: emp.email,
       telefono: emp.telefono,
       salarioBase: emp.salario_base,
-      tipoContrato: emp.tipo_contrato,
+      tipoContrato: (emp.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
       fechaIngreso: emp.fecha_ingreso,
-      estado: emp.estado,
+      estado: (emp.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad',
       eps: emp.eps,
       afp: emp.afp,
       arl: emp.arl,
       cajaCompensacion: emp.caja_compensacion,
       cargo: emp.cargo,
       empresaId: emp.company_id,
-      estadoAfiliacion: emp.estado_afiliacion || 'pendiente',
+      estadoAfiliacion: (emp.estado_afiliacion || 'pendiente') as 'completa' | 'pendiente' | 'inconsistente',
       createdAt: emp.created_at,
       updatedAt: emp.updated_at,
       // Status fields
@@ -46,6 +47,10 @@ export class EmployeeDataService {
       diasDesdeUltimaRevision: 5,
       usuarioUltimaModificacion: 'Sistema'
     })) || [];
+  }
+
+  static async loadEmployees(): Promise<EmployeeWithStatus[]> {
+    return this.getEmployees();
   }
 
   static async getCurrentUserCompanyId(): Promise<string | null> {
@@ -85,22 +90,22 @@ export class EmployeeDataService {
     return data?.map(emp => ({
       id: emp.id,
       cedula: emp.cedula,
-      tipoDocumento: emp.tipo_documento || 'CC',
+      tipoDocumento: (emp.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
       nombre: emp.nombre,
       apellido: emp.apellido,
       email: emp.email,
       telefono: emp.telefono,
       salarioBase: emp.salario_base,
-      tipoContrato: emp.tipo_contrato,
+      tipoContrato: (emp.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
       fechaIngreso: emp.fecha_ingreso,
-      estado: emp.estado,
+      estado: (emp.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad',
       eps: emp.eps,
       afp: emp.afp,
       arl: emp.arl,
       cajaCompensacion: emp.caja_compensacion,
       cargo: emp.cargo,
       empresaId: emp.company_id,
-      estadoAfiliacion: emp.estado_afiliacion || 'pendiente',
+      estadoAfiliacion: (emp.estado_afiliacion || 'pendiente') as 'completa' | 'pendiente' | 'inconsistente',
       createdAt: emp.created_at,
       updatedAt: emp.updated_at,
       // Status fields
@@ -134,22 +139,22 @@ export class EmployeeDataService {
     return {
       id: data.id,
       cedula: data.cedula,
-      tipoDocumento: data.tipo_documento || 'CC',
+      tipoDocumento: (data.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
       nombre: data.nombre,
       apellido: data.apellido,
       email: data.email,
       telefono: data.telefono,
       salarioBase: data.salario_base,
-      tipoContrato: data.tipo_contrato,
+      tipoContrato: (data.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
       fechaIngreso: data.fecha_ingreso,
-      estado: data.estado,
+      estado: (data.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad',
       eps: data.eps,
       afp: data.afp,
       arl: data.arl,
       cajaCompensacion: data.caja_compensacion,
       cargo: data.cargo,
       empresaId: data.company_id,
-      estadoAfiliacion: data.estado_afiliacion || 'pendiente',
+      estadoAfiliacion: (data.estado_afiliacion || 'pendiente') as 'completa' | 'pendiente' | 'inconsistente',
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       // Status fields

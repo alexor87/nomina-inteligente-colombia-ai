@@ -1,5 +1,4 @@
 
-
 export const CONTRACT_TYPES = [
   { value: 'indefinido', label: 'Indefinido' },
   { value: 'fijo', label: 'Término Fijo' },
@@ -41,6 +40,8 @@ export interface CustomField {
   label: string;
   type: 'text' | 'number' | 'date' | 'list' | 'boolean';
   required: boolean;
+  visibleOnlyToHR: boolean;
+  editableByEmployee: boolean;
   options?: string[];
   defaultValue?: string | number | boolean;
 }
@@ -69,4 +70,3 @@ export interface EmployeeGlobalConfiguration {
   validationRules: ValidationRules;
   defaultParameters: DefaultParameters;
 }
-

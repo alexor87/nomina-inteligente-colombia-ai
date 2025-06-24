@@ -23,6 +23,7 @@ export const CustomFieldsGlobalSection = ({
   const handleAddField = () => {
     onAdd({
       name: 'Nuevo Campo',
+      label: 'Nuevo Campo',
       type: 'text',
       required: false,
       visibleOnlyToHR: false,
