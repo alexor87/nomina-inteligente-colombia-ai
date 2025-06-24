@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -42,26 +41,24 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     )}>
       <div className="flex items-center justify-between p-4 border-b border-gray-200 min-h-[64px]">
         {!collapsed && (
-          <div className="flex items-center space-x-2">
-            <Calculator className="h-8 w-8 text-blue-600 flex-shrink-0" />
-            <span className="text-xl font-bold text-gray-900 truncate">NóminaApp</span>
-          </div>
+          <>
+            <div className="flex items-center space-x-2">
+              <Calculator className="h-8 w-8 text-blue-600 flex-shrink-0" />
+              <span className="text-xl font-bold text-gray-900 truncate">NóminaApp</span>
+            </div>
+            <button
+              onClick={onToggle}
+              className="p-1 rounded-md hover:bg-gray-100 flex-shrink-0 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </>
         )}
         {collapsed && (
           <div className="flex items-center justify-center w-full">
             <Calculator className="h-8 w-8 text-blue-600" />
           </div>
         )}
-        <button
-          onClick={onToggle}
-          className="p-1 rounded-md hover:bg-gray-100 flex-shrink-0 transition-colors"
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </button>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">

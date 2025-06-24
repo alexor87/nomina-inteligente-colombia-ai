@@ -32,6 +32,7 @@ export const Layout = ({ children }: LayoutProps) => {
       <div className="flex-1 flex flex-col min-w-0">
         <Header 
           onMenuClick={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
         />
         
         <main className="flex-1 p-6">
