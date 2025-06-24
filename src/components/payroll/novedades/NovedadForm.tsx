@@ -104,7 +104,6 @@ export const NovedadForm = ({
                 onClick={() => setSelectedCategory(key as 'devengados' | 'deducciones')}
                 className={`flex items-center space-x-2 ${selectedCategory === key ? category.color : 'border-gray-200'}`}
               >
-                <span>{category.icon}</span>
                 <span>{category.label}</span>
               </Button>
             ))}
@@ -153,14 +152,17 @@ export const NovedadForm = ({
               name="subtipo"
               control={control}
               render={({ field }) => (
-                <Select value={field.value || ''} onValueChange={field.onChange}>
+                <Select value={field.value || ''} onValueChange={(value) => {
+                  field.onChange(value);
+                  console.log('Subtipo seleccionado:', value, 'Para tipo:', tipoNovedad);
+                }}>
                   <SelectTrigger className="border-gray-200 focus:border-gray-300 focus:ring-0">
                     <SelectValue placeholder="Selecciona el subtipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(currentTypeConfig.subtipos).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label as string}
+                    {currentTypeConfig.subtipos.map((subtipo) => (
+                      <SelectItem key={subtipo} value={subtipo}>
+                        {subtipo}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -229,6 +231,9 @@ export const NovedadForm = ({
                 placeholder="0"
                 min="0"
                 step="0.5"
+                onChange={(e) => {
+                  console.log('Horas cambiadas:', e.target.value, 'Para subtipo:', subtipo);
+                }}
                 className="border-gray-200 focus:border-gray-300 focus:ring-0"
               />
             </div>

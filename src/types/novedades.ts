@@ -1,3 +1,4 @@
+
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -55,8 +56,6 @@ export interface NovedadFormData {
 
 export type NovedadType = 
   // Devengados
-  | 'salario_base'
-  | 'auxilio_transporte'
   | 'horas_extra'
   | 'recargo_nocturno'
   | 'vacaciones'
@@ -162,12 +161,10 @@ export const NOVEDAD_CATEGORIES = {
 } as const;
 
 export const HORAS_EXTRA_FACTORS = {
-  diurna: 1.25,
-  nocturna: 1.75,
-  dominical_diurna: 1.75,
-  dominical_nocturna: 2.10,
-  festiva_diurna: 1.75,
-  festiva_nocturna: 2.10
+  diurnas: 1.25,
+  nocturnas: 1.75,
+  dominicales: 1.75,
+  festivas: 1.75
 } as const;
 
 // Función para calcular automáticamente el valor de una novedad
@@ -178,6 +175,8 @@ export const calcularValorNovedad = (
   dias?: number,
   horas?: number
 ): { valor: number; baseCalculo: BaseCalculoData } => {
+  console.log('🧮 Calculando novedad:', { tipoNovedad, subtipo, salarioBase, dias, horas });
+  
   const category = Object.values(NOVEDAD_CATEGORIES).find(cat => 
     cat.types[tipoNovedad as keyof typeof cat.types]
   );
@@ -194,23 +193,26 @@ export const calcularValorNovedad = (
   switch (tipoNovedad) {
     case 'horas_extra':
       if (horas && subtipo) {
+        console.log('Calculando horas extra - subtipo:', subtipo);
         const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS] || 1.25;
+        console.log('Factor aplicado:', factor);
         const tarifaHora = salarioBase / 240; // 30 días × 8 horas
         valor = Math.round(tarifaHora * factor * horas);
         factorCalculo = factor;
-        detalleCalculo = `(${salarioBase} / 240) × ${factor} × ${horas} horas`;
+        detalleCalculo = `(${salarioBase} / 240) × ${factor} × ${horas} horas = ${valor}`;
+        console.log('Resultado horas extra:', { tarifaHora, factor, horas, valor });
       }
       break;
 
     case 'incapacidad':
-      if (dias && subtipo === 'eps') {
+      if (dias && subtipo === 'general') {
         // EPS paga 66.7% desde el día 4
         const diasPagados = Math.max(0, dias - 3);
         const salarioDiario = salarioBase / 30;
         valor = Math.round(salarioDiario * 0.667 * diasPagados);
         factorCalculo = 0.667;
         detalleCalculo = `(${salarioBase} / 30) × 0.667 × ${diasPagados} días (desde día 4)`;
-      } else if (dias && subtipo === 'arl') {
+      } else if (dias && subtipo === 'laboral') {
         // ARL paga 100% desde el día 1
         const salarioDiario = salarioBase / 30;
         valor = Math.round(salarioDiario * dias);
@@ -263,6 +265,8 @@ export const calcularValorNovedad = (
       detalleCalculo = 'Cálculo manual requerido';
       break;
   }
+
+  console.log('Resultado final cálculo:', { valor, detalleCalculo });
 
   return {
     valor,

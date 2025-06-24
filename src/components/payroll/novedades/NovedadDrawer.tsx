@@ -4,7 +4,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { NovedadForm } from './NovedadForm';
 import { PayrollNovedad, NovedadFormData, NOVEDAD_CATEGORIES, NovedadType } from '@/types/novedades';
 import { Trash2, Edit2, Calendar, DollarSign, Plus, FileText, User, Clock, Calculator, TrendingUp, TrendingDown } from 'lucide-react';
@@ -88,43 +87,34 @@ export const NovedadDrawer = ({
   const impactoNeto = totalDevengados - totalDeducciones;
 
   const getCategoryInfo = (tipoNovedad: NovedadType) => {
-    // Check devengados category
-    if (tipoNovedad in NOVEDAD_CATEGORIES.devengados.types) {
-      return {
-        category: 'devengados' as const,
-        config: NOVEDAD_CATEGORIES.devengados,
-        type: NOVEDAD_CATEGORIES.devengados.types[tipoNovedad as keyof typeof NOVEDAD_CATEGORIES.devengados.types]
-      };
+    for (const [categoryKey, category] of Object.entries(NOVEDAD_CATEGORIES)) {
+      if (tipoNovedad in category.types) {
+        return {
+          category: categoryKey as 'devengados' | 'deducciones',
+          config: category,
+          type: category.types[tipoNovedad as keyof typeof category.types]
+        };
+      }
     }
-    
-    // Check deducciones category
-    if (tipoNovedad in NOVEDAD_CATEGORIES.deducciones.types) {
-      return {
-        category: 'deducciones' as const,
-        config: NOVEDAD_CATEGORIES.deducciones,
-        type: NOVEDAD_CATEGORIES.deducciones.types[tipoNovedad as keyof typeof NOVEDAD_CATEGORIES.deducciones.types]
-      };
-    }
-    
     return null;
   };
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[98vw] max-w-[1400px] min-w-[1000px] h-full p-0 flex flex-col bg-white overflow-hidden">
-        {/* Header fijo */}
-        <SheetHeader className="px-6 py-4 border-b border-gray-100 shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
+      <SheetContent className="w-[98vw] max-w-[1400px] min-w-[1000px] h-full p-0 flex flex-col bg-white">
+        {/* Header fijo - más compacto */}
+        <SheetHeader className="px-6 py-3 border-b border-gray-100 shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-white rounded-lg shadow-sm">
-                <User className="h-5 w-5 text-blue-600" />
+                <User className="h-4 w-4 text-blue-600" />
               </div>
               <div>
                 <SheetTitle className="text-lg font-semibold text-gray-900">
                   {employeeName}
                 </SheetTitle>
                 <SheetDescription className="text-sm text-gray-600">
-                  Gestión de novedades - Salario base: {formatCurrency(employeeSalary)}
+                  Salario base: {formatCurrency(employeeSalary)}
                 </SheetDescription>
               </div>
             </div>
@@ -137,7 +127,6 @@ export const NovedadDrawer = ({
                     <span className="text-xs font-medium">Devengados</span>
                   </div>
                   <p className="text-sm font-bold text-gray-900">{formatCurrency(totalDevengados)}</p>
-                  <p className="text-xs text-gray-500">{devengados.length} conceptos</p>
                 </div>
                 <div className="flex flex-col items-center">
                   <div className="flex items-center space-x-1 text-red-600">
@@ -145,7 +134,6 @@ export const NovedadDrawer = ({
                     <span className="text-xs font-medium">Deducciones</span>
                   </div>
                   <p className="text-sm font-bold text-gray-900">{formatCurrency(totalDeducciones)}</p>
-                  <p className="text-xs text-gray-500">{deducciones.length} conceptos</p>
                 </div>
                 <div className="flex flex-col items-center">
                   <div className="flex items-center space-x-1 text-blue-600">
@@ -155,7 +143,6 @@ export const NovedadDrawer = ({
                   <p className={`text-sm font-bold ${impactoNeto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {impactoNeto >= 0 ? '+' : ''}{formatCurrency(impactoNeto)}
                   </p>
-                  <p className="text-xs text-gray-500">Neto adicional</p>
                 </div>
               </div>
 
@@ -173,34 +160,34 @@ export const NovedadDrawer = ({
           </div>
         </SheetHeader>
 
-        {/* Main Content - Two Column Layout */}
-        <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Left Panel - Form */}
-          <div className="w-1/2 border-r border-gray-100 flex flex-col bg-gray-50 overflow-hidden">
+        {/* Main Content - Diseño horizontal mejorado */}
+        <div className="flex-1 flex min-h-0">
+          {/* Panel izquierdo - Formulario */}
+          <div className="w-[45%] border-r border-gray-100 flex flex-col bg-gray-50">
             {showForm && (
-              <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 flex flex-col h-full">
                 <div className="px-4 py-3 border-b border-gray-200 bg-white shrink-0">
                   <h3 className="text-base font-semibold text-gray-900">Nueva novedad</h3>
-                  <p className="text-xs text-gray-600 mt-1">Selecciona el tipo y completa la información</p>
+                  <p className="text-xs text-gray-600 mt-1">Completa la información</p>
                 </div>
-                <ScrollArea className="flex-1 p-4">
+                <div className="flex-1 overflow-y-auto p-4">
                   <NovedadForm
                     onSubmit={handleCreateNovedad}
                     onCancel={() => setShowForm(false)}
                     isLoading={isLoading}
                     employeeSalary={employeeSalary}
                   />
-                </ScrollArea>
+                </div>
               </div>
             )}
 
             {editingNovedad && (
-              <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 flex flex-col h-full">
                 <div className="px-4 py-3 border-b border-gray-200 bg-white shrink-0">
                   <h3 className="text-base font-semibold text-gray-900">Editar novedad</h3>
-                  <p className="text-xs text-gray-600 mt-1">Modifica la información de la novedad</p>
+                  <p className="text-xs text-gray-600 mt-1">Modifica la información</p>
                 </div>
-                <ScrollArea className="flex-1 p-4">
+                <div className="flex-1 overflow-y-auto p-4">
                   <NovedadForm
                     initialData={{
                       tipo_novedad: editingNovedad.tipo_novedad,
@@ -217,7 +204,7 @@ export const NovedadDrawer = ({
                     isLoading={isLoading}
                     employeeSalary={employeeSalary}
                   />
-                </ScrollArea>
+                </div>
               </div>
             )}
 
@@ -232,7 +219,6 @@ export const NovedadDrawer = ({
                   </h3>
                   <p className="text-gray-500 mb-6 text-sm leading-relaxed">
                     Crea una nueva novedad o selecciona una existente para editarla.
-                    Las novedades afectarán automáticamente el cálculo de nómina.
                   </p>
                   {canEdit && (
                     <Button
@@ -248,18 +234,18 @@ export const NovedadDrawer = ({
             )}
           </div>
 
-          {/* Right Panel - Novedades List */}
-          <div className="w-1/2 flex flex-col bg-white overflow-hidden">
+          {/* Panel derecho - Lista de novedades */}
+          <div className="w-[55%] flex flex-col bg-white">
             <div className="px-4 py-3 border-b border-gray-100 shrink-0">
               <h3 className="text-base font-semibold text-gray-900">Novedades registradas</h3>
               <p className="text-xs text-gray-600 mt-1">
-                {novedades.length > 0 ? `${novedades.length} novedades activas` : 'No hay novedades registradas'}
+                {novedades.length > 0 ? `${novedades.length} novedades activas` : 'No hay novedades'}
               </p>
             </div>
 
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto">
               {novedades.length === 0 ? (
-                <div className="flex items-center justify-center h-full min-h-[400px]">
+                <div className="flex items-center justify-center h-full min-h-[300px]">
                   <div className="text-center px-6">
                     <div className="p-4 bg-gray-50 rounded-lg mb-4 inline-block">
                       <Calendar className="h-8 w-8 text-gray-400" />
@@ -268,7 +254,7 @@ export const NovedadDrawer = ({
                       Sin novedades
                     </h3>
                     <p className="text-gray-500 text-sm">
-                      Este empleado no tiene novedades registradas para este período
+                      Este empleado no tiene novedades registradas
                     </p>
                   </div>
                 </div>
@@ -454,7 +440,7 @@ export const NovedadDrawer = ({
                   )}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </div>
         </div>
       </SheetContent>
