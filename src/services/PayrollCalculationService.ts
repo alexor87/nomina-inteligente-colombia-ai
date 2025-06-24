@@ -37,13 +37,11 @@ export interface ValidationResult {
 }
 
 export class PayrollCalculationService {
-  // Remover la configuración estática y obtenerla dinámicamente
   private static getCurrentConfig(year: string = '2025'): PayrollConfiguration {
     return ConfigurationService.getConfiguration(year);
   }
 
   static updateConfiguration(year: string = '2025'): void {
-    // Método mantenido por compatibilidad, pero ya no es necesario
     console.log(`Configuration will be loaded dynamically for year: ${year}`);
   }
 
@@ -52,7 +50,7 @@ export class PayrollCalculationService {
     eps?: string,
     afp?: string
   ): ValidationResult {
-    const config = this.getCurrentConfig(); // Obtener configuración actual
+    const config = this.getCurrentConfig();
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -103,38 +101,55 @@ export class PayrollCalculationService {
   }
 
   static calculatePayroll(input: PayrollCalculationInput): PayrollCalculationResult {
-    const config = this.getCurrentConfig(); // Obtener configuración actual cada vez
+    const config = this.getCurrentConfig();
+    
+    // Determinar días del período
+    const periodDays = input.periodType === 'quincenal' ? 15 : 30;
     
     // Cálculo del salario base proporcional
     const dailySalary = input.baseSalary / 30;
-    const regularPay = Math.max(0, (input.workedDays - input.disabilities) * dailySalary);
+    const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
+    const regularPay = effectiveWorkedDays * dailySalary;
 
-    // Cálculo de horas extra (25% de recargo)
-    const hourlyRate = input.baseSalary / 240; // 240 horas laborales al mes
+    // Cálculo de horas extra (25% de recargo sobre valor hora ordinaria)
+    // Valor hora = salario mensual / 240 horas (8 horas x 30 días)
+    const hourlyRate = input.baseSalary / 240;
     const extraPay = input.extraHours * hourlyRate * 1.25;
 
-    // Auxilio de transporte (solo si devenga máximo 2 SMMLV)
-    const transportAllowance = input.baseSalary <= (config.salarioMinimo * 2) ? 
-      Math.round((config.auxilioTransporte * input.workedDays) / 30) : 0;
+    // Auxilio de transporte
+    // Solo si devenga máximo 2 SMMLV y trabaja período completo o proporcional
+    let transportAllowance = 0;
+    if (input.baseSalary <= (config.salarioMinimo * 2)) {
+      if (input.periodType === 'quincenal') {
+        // Para quincenal: auxilio completo si trabaja 15 días, proporcional si menos
+        transportAllowance = Math.round((config.auxilioTransporte / 2) * (input.workedDays / 15));
+      } else {
+        // Para mensual: auxilio completo si trabaja 30 días, proporcional si menos
+        transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / 30));
+      }
+    }
 
-    // Total devengado
-    const grossPay = regularPay + extraPay + input.bonuses + transportAllowance;
+    // Base para aportes (salario devengado sin auxilio de transporte)
+    const payrollBase = regularPay + extraPay + input.bonuses;
 
-    // Deducciones del empleado (sobre el devengado)
-    const healthDeduction = grossPay * config.porcentajes.saludEmpleado;
-    const pensionDeduction = grossPay * config.porcentajes.pensionEmpleado;
+    // Deducciones del empleado (sobre base de cotización)
+    const healthDeduction = payrollBase * config.porcentajes.saludEmpleado;
+    const pensionDeduction = payrollBase * config.porcentajes.pensionEmpleado;
     const totalDeductions = healthDeduction + pensionDeduction;
+
+    // Total devengado (incluye auxilio de transporte)
+    const grossPay = payrollBase + transportAllowance;
 
     // Neto a pagar
     const netPay = grossPay - totalDeductions;
 
-    // Aportes del empleador (sobre el devengado)
-    const employerHealth = grossPay * config.porcentajes.saludEmpleador;
-    const employerPension = grossPay * config.porcentajes.pensionEmpleador;
-    const employerArl = grossPay * config.porcentajes.arl;
-    const employerCaja = grossPay * config.porcentajes.cajaCompensacion;
-    const employerIcbf = grossPay * config.porcentajes.icbf;
-    const employerSena = grossPay * config.porcentajes.sena;
+    // Aportes del empleador (sobre base de cotización, no sobre auxilio de transporte)
+    const employerHealth = payrollBase * config.porcentajes.saludEmpleador;
+    const employerPension = payrollBase * config.porcentajes.pensionEmpleador;
+    const employerArl = payrollBase * config.porcentajes.arl;
+    const employerCaja = payrollBase * config.porcentajes.cajaCompensacion;
+    const employerIcbf = payrollBase * config.porcentajes.icbf;
+    const employerSena = payrollBase * config.porcentajes.sena;
 
     const employerContributions = employerHealth + employerPension + employerArl + 
                                   employerCaja + employerIcbf + employerSena;
@@ -145,7 +160,7 @@ export class PayrollCalculationService {
     return {
       regularPay: Math.round(regularPay),
       extraPay: Math.round(extraPay),
-      transportAllowance,
+      transportAllowance: Math.round(transportAllowance),
       grossPay: Math.round(grossPay),
       healthDeduction: Math.round(healthDeduction),
       pensionDeduction: Math.round(pensionDeduction),
@@ -174,7 +189,6 @@ export class PayrollCalculationService {
     }).format(amount);
   }
 
-  // Método para obtener información de configuración actual
   static getConfigurationInfo(): {
     salarioMinimo: number;
     auxilioTransporte: number;
