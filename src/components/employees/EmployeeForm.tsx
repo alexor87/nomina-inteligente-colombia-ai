@@ -6,10 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Employee } from '@/types';
-import { CONTRACT_TYPES, ARL_RISK_LEVELS } from '@/types/employee-config';
-import { CENTROS_COSTO, ESTADOS_EMPLEADO } from '@/types/employee-extended';
+import { CONTRACT_TYPES } from '@/types/employee-config';
+import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,8 +34,6 @@ interface EmployeeFormData {
   arl: string;
   cajaCompensacion: string;
   cargo: string;
-  centrosocial: string;
-  nivelRiesgoARL: string;
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
 }
 
@@ -61,8 +58,6 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       arl: employee?.arl || '',
       cajaCompensacion: employee?.cajaCompensacion || '',
       cargo: employee?.cargo || '',
-      centrosocial: '',
-      nivelRiesgoARL: configuration.defaultParameters.defaultARLRiskLevel,
       estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente'
     }
   });
@@ -97,10 +92,25 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       return;
     }
 
+    console.log('Creando empleado para empresa:', companyId);
+
     const employeeData = {
-      ...data,
-      empresaId: companyId,
-      salarioBase: Number(data.salarioBase)
+      company_id: companyId,
+      cedula: data.cedula,
+      nombre: data.nombre,
+      apellido: data.apellido,
+      email: data.email,
+      telefono: data.telefono,
+      salario_base: Number(data.salarioBase),
+      tipo_contrato: data.tipoContrato,
+      fecha_ingreso: data.fechaIngreso,
+      estado: data.estado,
+      eps: data.eps,
+      afp: data.afp,
+      arl: data.arl,
+      caja_compensacion: data.cajaCompensacion,
+      cargo: data.cargo,
+      estado_afiliacion: data.estadoAfiliacion
     };
 
     let result;
@@ -229,22 +239,6 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
           </div>
 
           <div>
-            <Label htmlFor="centrosocial">Centro de Costo</Label>
-            <Select onValueChange={(value) => setValue('centrosocial', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar centro" />
-              </SelectTrigger>
-              <SelectContent>
-                {CENTROS_COSTO.map((centro) => (
-                  <SelectItem key={centro} value={centro}>
-                    {centro}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
             <Label htmlFor="estado">Estado</Label>
             <Select onValueChange={(value) => setValue('estado', value as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad')}>
               <SelectTrigger>
@@ -254,22 +248,6 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
                 {ESTADOS_EMPLEADO.map((estado) => (
                   <SelectItem key={estado.value} value={estado.value}>
                     {estado.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="nivelRiesgoARL">Nivel Riesgo ARL</Label>
-            <Select onValueChange={(value) => setValue('nivelRiesgoARL', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar nivel" />
-              </SelectTrigger>
-              <SelectContent>
-                {ARL_RISK_LEVELS.map((nivel) => (
-                  <SelectItem key={nivel.value} value={nivel.value}>
-                    {nivel.label}
                   </SelectItem>
                 ))}
               </SelectContent>
