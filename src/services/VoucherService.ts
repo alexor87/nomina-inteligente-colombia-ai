@@ -5,22 +5,9 @@ import { PayrollVoucher } from '@/types/vouchers';
 export class VoucherService {
   static async loadVouchers(): Promise<PayrollVoucher[]> {
     try {
-      // Primero verificar si existen nóminas aprobadas/cerradas
-      const { data: payrollsExist, error: payrollError } = await supabase
-        .from('payrolls')
-        .select('id')
-        .in('estado', ['aprobada', 'cerrada']) // Estados que indican nóminas procesadas
-        .limit(1);
-
-      if (payrollError) throw payrollError;
-
-      // Si no hay nóminas procesadas, retornar array vacío
-      if (!payrollsExist || payrollsExist.length === 0) {
-        console.log('No processed payrolls found, returning empty vouchers list');
-        return [];
-      }
-
-      // Solo si hay nóminas procesadas, cargar los comprobantes
+      console.log('Loading vouchers from database...');
+      
+      // Cargar todos los comprobantes sin verificar nóminas primero
       const { data, error } = await supabase
         .from('payroll_vouchers')
         .select(`
@@ -34,9 +21,19 @@ export class VoucherService {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading vouchers:', error);
+        throw error;
+      }
 
-      return (data || []).map(voucher => ({
+      console.log('Raw vouchers data:', data?.length || 0);
+
+      if (!data || data.length === 0) {
+        console.log('No vouchers found in database');
+        return [];
+      }
+
+      const vouchers = data.map(voucher => ({
         id: voucher.id,
         companyId: voucher.company_id,
         employeeId: voucher.employee_id,
@@ -56,6 +53,9 @@ export class VoucherService {
         employeeEmail: voucher.employees?.email || '',
         employeeCedula: voucher.employees?.cedula || ''
       }));
+
+      console.log('Processed vouchers:', vouchers.length);
+      return vouchers;
     } catch (error) {
       console.error('Error loading vouchers:', error);
       return [];

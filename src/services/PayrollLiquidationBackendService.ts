@@ -48,6 +48,7 @@ export class PayrollLiquidationBackendService {
       }
 
       const periodo = `${data.period.startDate} al ${data.period.endDate}`;
+      console.log('Saving payroll liquidation for period:', periodo);
 
       // Verificar si ya existen registros para este período y empleados
       const { data: existingPayrolls, error: checkError } = await supabase
@@ -70,6 +71,7 @@ export class PayrollLiquidationBackendService {
       const duplicateEmployees = data.employees.filter(emp => existingEmployeeIds.has(emp.id));
 
       let processedCount = 0;
+      let savedPayrollIds: string[] = [];
 
       // Insertar nuevos registros
       if (newEmployees.length > 0) {
@@ -93,19 +95,22 @@ export class PayrollLiquidationBackendService {
         const { data: payrollData, error: payrollError } = await supabase
           .from('payrolls')
           .insert(payrollInserts)
-          .select();
+          .select('id');
 
         if (payrollError) {
           console.error('Error inserting new payrolls:', payrollError);
           throw new Error('Error al insertar nuevos registros de nómina');
         }
 
+        savedPayrollIds = payrollData?.map(p => p.id) || [];
         processedCount += newEmployees.length;
+        console.log('Inserted new payrolls:', savedPayrollIds);
 
+        // Generar comprobantes para nuevos empleados
         try {
           await this.generateVouchers(
             { ...data, employees: newEmployees }, 
-            payrollData, 
+            payrollData || [], 
             companyId
           );
         } catch (voucherError) {
@@ -116,7 +121,7 @@ export class PayrollLiquidationBackendService {
       // Actualizar registros existentes
       if (duplicateEmployees.length > 0) {
         for (const employee of duplicateEmployees) {
-          const { error: updateError } = await supabase
+          const { data: updatedPayroll, error: updateError } = await supabase
             .from('payrolls')
             .update({
               salario_base: employee.baseSalary,
@@ -133,15 +138,31 @@ export class PayrollLiquidationBackendService {
             })
             .eq('company_id', companyId)
             .eq('employee_id', employee.id)
-            .eq('periodo', periodo);
+            .eq('periodo', periodo)
+            .select('id');
 
           if (updateError) {
             console.error('Error updating existing payroll:', updateError);
             throw new Error(`Error al actualizar nómina para empleado ${employee.name}`);
           }
+
+          if (updatedPayroll && updatedPayroll.length > 0) {
+            savedPayrollIds.push(updatedPayroll[0].id);
+          }
         }
         processedCount += duplicateEmployees.length;
+        console.log('Updated existing payrolls for employees:', duplicateEmployees.length);
+
+        // Regenerar comprobantes para empleados actualizados
+        try {
+          await this.regenerateVouchersForUpdatedEmployees(duplicateEmployees, periodo, companyId);
+        } catch (voucherError) {
+          console.warn('Warning: Some vouchers could not be regenerated:', voucherError);
+        }
       }
+
+      console.log('Total processed employees:', processedCount);
+      console.log('All payroll IDs:', savedPayrollIds);
 
       const message = newEmployees.length > 0 && duplicateEmployees.length > 0
         ? `Liquidación procesada: ${newEmployees.length} nuevos registros y ${duplicateEmployees.length} actualizados`
@@ -160,6 +181,8 @@ export class PayrollLiquidationBackendService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      console.log('Generating vouchers for employees:', liquidationData.employees.length);
+      
       const voucherInserts = liquidationData.employees.map((employee, index) => ({
         company_id: companyId,
         employee_id: employee.id,
@@ -174,16 +197,72 @@ export class PayrollLiquidationBackendService {
         pdf_url: null
       }));
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('payroll_vouchers')
-        .insert(voucherInserts);
+        .insert(voucherInserts)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting vouchers:', error);
+        throw error;
+      }
 
       console.log(`${voucherInserts.length} comprobantes generados exitosamente`);
     } catch (error) {
       console.error('Error generating vouchers:', error);
       throw new Error('Error al generar los comprobantes');
+    }
+  }
+
+  static async regenerateVouchersForUpdatedEmployees(employees: PayrollEmployee[], periodo: string, companyId: string): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      console.log('Regenerating vouchers for updated employees:', employees.length);
+      
+      for (const employee of employees) {
+        // Actualizar o crear comprobante para empleado actualizado
+        const { data: existingVoucher } = await supabase
+          .from('payroll_vouchers')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('employee_id', employee.id)
+          .eq('periodo', periodo)
+          .single();
+
+        if (existingVoucher) {
+          // Actualizar comprobante existente
+          await supabase
+            .from('payroll_vouchers')
+            .update({
+              net_pay: employee.netPay,
+              voucher_status: 'generado',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingVoucher.id);
+        } else {
+          // Crear nuevo comprobante si no existe
+          await supabase
+            .from('payroll_vouchers')
+            .insert({
+              company_id: companyId,
+              employee_id: employee.id,
+              periodo: periodo,
+              start_date: employee.startDate || new Date().toISOString().split('T')[0],
+              end_date: employee.endDate || new Date().toISOString().split('T')[0],
+              net_pay: employee.netPay,
+              voucher_status: 'generado',
+              sent_to_employee: false,
+              generated_by: user?.id,
+              pdf_url: null
+            });
+        }
+      }
+      
+      console.log('Vouchers regenerated successfully for updated employees');
+    } catch (error) {
+      console.error('Error regenerating vouchers:', error);
+      throw new Error('Error al regenerar los comprobantes');
     }
   }
 

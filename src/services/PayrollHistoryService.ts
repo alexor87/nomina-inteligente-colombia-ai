@@ -36,24 +36,36 @@ export class PayrollHistoryService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) return [];
 
+      console.log('Loading payroll history for company:', companyId);
+
       const { data, error } = await supabase
         .from('payrolls')
         .select('*')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading payroll history:', error);
+        throw error;
+      }
+
+      console.log('Raw payroll history data:', data?.length || 0);
+
+      if (!data || data.length === 0) {
+        console.log('No payroll records found');
+        return [];
+      }
 
       // Agrupar por período
       const grouped: { [key: string]: any[] } = {};
-      (data || []).forEach(record => {
+      data.forEach(record => {
         if (!grouped[record.periodo]) {
           grouped[record.periodo] = [];
         }
         grouped[record.periodo].push(record);
       });
 
-      return Object.entries(grouped).map(([periodo, records]) => ({
+      const periods = Object.entries(grouped).map(([periodo, records]) => ({
         id: `${periodo}-${records[0].created_at}`,
         periodo,
         fechaCreacion: records[0].created_at,
@@ -62,6 +74,9 @@ export class PayrollHistoryService {
         estado: records[0].estado,
         companyId
       }));
+
+      console.log('Processed payroll periods:', periods.length);
+      return periods;
     } catch (error) {
       console.error('Error loading payroll periods:', error);
       return [];
