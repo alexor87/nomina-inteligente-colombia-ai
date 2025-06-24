@@ -35,7 +35,7 @@ export class NovedadesService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as PayrollNovedad[];
     } catch (error) {
       console.error('Error loading novedades:', error);
       return [];
@@ -56,7 +56,7 @@ export class NovedadesService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as PayrollNovedad[];
     } catch (error) {
       console.error('Error loading employee novedades:', error);
       return [];
@@ -87,7 +87,7 @@ export class NovedadesService {
       // Create audit log
       await this.createAuditLog(data.id, 'created', null, data);
 
-      return data;
+      return data as PayrollNovedad;
     } catch (error) {
       console.error('Error creating novedad:', error);
       throw error;
@@ -119,7 +119,7 @@ export class NovedadesService {
       // Create audit log
       await this.createAuditLog(id, 'updated', oldData, data);
 
-      return data;
+      return data as PayrollNovedad;
     } catch (error) {
       console.error('Error updating novedad:', error);
       throw error;
