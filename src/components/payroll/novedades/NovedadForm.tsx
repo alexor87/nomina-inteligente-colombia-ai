@@ -60,25 +60,64 @@ export const NovedadForm = ({
 
   const currentTypeConfig = getCurrentTypeConfig();
 
+  // Actualizar categoría cuando cambie el tipo de novedad
+  useEffect(() => {
+    const newCategory = Object.entries(NOVEDAD_CATEGORIES).find(([_, cat]) => 
+      Object.keys(cat.types).includes(tipoNovedad)
+    )?.[0] as 'devengados' | 'deducciones';
+    
+    if (newCategory && newCategory !== selectedCategory) {
+      setSelectedCategory(newCategory);
+    }
+  }, [tipoNovedad, selectedCategory]);
+
   // Calcular valor automáticamente
   useEffect(() => {
-    if (currentTypeConfig?.auto_calculo) {
+    console.log('🧮 Calculando automáticamente...', {
+      tipoNovedad,
+      subtipo,
+      dias,
+      horas,
+      employeeSalary,
+      autoCalculo: currentTypeConfig?.auto_calculo
+    });
+
+    if (currentTypeConfig?.auto_calculo && (dias > 0 || horas > 0 || tipoNovedad === 'salud' || tipoNovedad === 'pension')) {
       const result = calcularValorNovedad(tipoNovedad, subtipo, employeeSalary, dias, horas);
+      console.log('Resultado del cálculo:', result);
+      
       setCalculatedValue(result.valor);
       setCalculationDetail(result.baseCalculo.detalle_calculo);
       
       if (result.valor > 0) {
         setValue('valor', result.valor);
+        console.log('Valor actualizado en el formulario:', result.valor);
       }
+    } else if (!currentTypeConfig?.auto_calculo) {
+      // Limpiar cálculo automático si no aplica
+      setCalculatedValue(0);
+      setCalculationDetail('');
     }
   }, [tipoNovedad, subtipo, dias, horas, employeeSalary, currentTypeConfig, setValue]);
 
   const handleFormSubmit = async (data: NovedadFormData) => {
     try {
+      console.log('Enviando novedad:', data);
       await onSubmit(data);
     } catch (error) {
       console.error('Error submitting novedad:', error);
     }
+  };
+
+  const handleCategoryChange = (category: 'devengados' | 'deducciones') => {
+    setSelectedCategory(category);
+    // Resetear tipo de novedad al primer elemento de la nueva categoría
+    const firstType = Object.keys(NOVEDAD_CATEGORIES[category].types)[0] as NovedadType;
+    setValue('tipo_novedad', firstType);
+    setValue('subtipo', undefined);
+    setValue('dias', undefined);
+    setValue('horas', undefined);
+    setValue('valor', 0);
   };
 
   const formatCurrency = (amount: number) => {
@@ -101,8 +140,12 @@ export const NovedadForm = ({
                 key={key}
                 type="button"
                 variant={selectedCategory === key ? "default" : "outline"}
-                onClick={() => setSelectedCategory(key as 'devengados' | 'deducciones')}
-                className={`flex items-center space-x-2 ${selectedCategory === key ? category.color : 'border-gray-200'}`}
+                onClick={() => handleCategoryChange(key as 'devengados' | 'deducciones')}
+                className={`flex items-center space-x-2 ${
+                  selectedCategory === key 
+                    ? (key === 'devengados' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')
+                    : 'border-gray-200'
+                }`}
               >
                 <span>{category.label}</span>
               </Button>
@@ -121,7 +164,10 @@ export const NovedadForm = ({
             name="tipo_novedad"
             control={control}
             render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange}>
+              <Select value={field.value} onValueChange={(value) => {
+                field.onChange(value);
+                console.log('Tipo de novedad cambiado a:', value);
+              }}>
                 <SelectTrigger className="border-gray-200 focus:border-gray-300 focus:ring-0">
                   <SelectValue placeholder="Selecciona el tipo de novedad" />
                 </SelectTrigger>
@@ -208,7 +254,12 @@ export const NovedadForm = ({
                 Días
               </Label>
               <Input
-                {...register('dias', { valueAsNumber: true })}
+                {...register('dias', { 
+                  valueAsNumber: true,
+                  onChange: (e) => {
+                    console.log('Días cambiados:', e.target.value);
+                  }
+                })}
                 type="number"
                 id="dias"
                 placeholder="0"
@@ -225,15 +276,17 @@ export const NovedadForm = ({
                 Horas
               </Label>
               <Input
-                {...register('horas', { valueAsNumber: true })}
+                {...register('horas', { 
+                  valueAsNumber: true,
+                  onChange: (e) => {
+                    console.log('Horas cambiadas:', e.target.value, 'Para subtipo:', subtipo);
+                  }
+                })}
                 type="number"
                 id="horas"
                 placeholder="0"
                 min="0"
                 step="0.5"
-                onChange={(e) => {
-                  console.log('Horas cambiadas:', e.target.value, 'Para subtipo:', subtipo);
-                }}
                 className="border-gray-200 focus:border-gray-300 focus:ring-0"
               />
             </div>
