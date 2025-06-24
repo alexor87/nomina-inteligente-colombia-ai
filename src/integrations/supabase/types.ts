@@ -319,6 +319,7 @@ export type Database = {
       payroll_novedades: {
         Row: {
           adjunto_url: string | null
+          base_calculo: string | null
           company_id: string
           creado_por: string | null
           created_at: string
@@ -329,12 +330,14 @@ export type Database = {
           id: string
           observacion: string | null
           periodo_id: string
+          subtipo: string | null
           tipo_novedad: string
           updated_at: string
           valor: number | null
         }
         Insert: {
           adjunto_url?: string | null
+          base_calculo?: string | null
           company_id: string
           creado_por?: string | null
           created_at?: string
@@ -345,12 +348,14 @@ export type Database = {
           id?: string
           observacion?: string | null
           periodo_id: string
+          subtipo?: string | null
           tipo_novedad: string
           updated_at?: string
           valor?: number | null
         }
         Update: {
           adjunto_url?: string | null
+          base_calculo?: string | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
@@ -361,6 +366,7 @@ export type Database = {
           id?: string
           observacion?: string | null
           periodo_id?: string
+          subtipo?: string | null
           tipo_novedad?: string
           updated_at?: string
           valor?: number | null

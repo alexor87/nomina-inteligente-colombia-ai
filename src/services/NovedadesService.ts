@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
 
@@ -108,7 +109,8 @@ export class NovedadesService {
         dias: safeNumber(novedadData.dias) || null,
         horas: safeNumber(novedadData.horas) || null,
         observacion: novedadData.observacion || null,
-        base_calculo: novedadData.base_calculo || null,
+        // Convertir base_calculo a JSON string si existe
+        base_calculo: novedadData.base_calculo ? JSON.stringify(novedadData.base_calculo) : null,
         adjunto_url: novedadData.adjunto_url || null
       };
 
@@ -122,7 +124,9 @@ export class NovedadesService {
         dias: typeof insertData.dias,
         horas: typeof insertData.horas,
         dias_valor: insertData.dias,
-        horas_valor: insertData.horas
+        horas_valor: insertData.horas,
+        subtipo: typeof insertData.subtipo,
+        base_calculo: typeof insertData.base_calculo
       });
 
       const { data, error } = await supabase
