@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,9 +43,47 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
     loadGeneratedFiles();
   }, [period.id]);
 
+  const getCurrentUserCompanyId = async (): Promise<string | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found');
+        return null;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error) {
+        console.error('Error getting user profile:', error);
+        return null;
+      }
+
+      console.log('User company_id:', profile?.company_id);
+      return profile?.company_id || null;
+    } catch (error) {
+      console.error('Error getting company ID:', error);
+      return null;
+    }
+  };
+
   const loadPeriodEmployees = async () => {
     try {
       setIsLoadingEmployees(true);
+      
+      const companyId = await getCurrentUserCompanyId();
+      if (!companyId) {
+        console.error('No company ID found for user');
+        setEmployees([]);
+        return;
+      }
+
+      // Extraer el período sin la versión
+      const periodWithoutVersion = period.period.split(' (')[0];
+      console.log('Loading employees for period:', periodWithoutVersion, 'company:', companyId);
       
       // Cargar empleados del período desde la tabla payrolls
       const { data: payrollData, error } = await supabase
@@ -60,13 +97,15 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
             cargo
           )
         `)
-        .eq('periodo', period.period.split(' (')[0]) // Quitar la versión del período
-        .eq('company_id', period.id.split('-')[0]); // Usar company_id del período
+        .eq('periodo', periodWithoutVersion)
+        .eq('company_id', companyId);
 
       if (error) {
         console.error('Error loading period employees:', error);
         throw error;
       }
+
+      console.log('Payroll data loaded:', payrollData?.length || 0, 'records');
 
       if (payrollData && payrollData.length > 0) {
         const periodEmployees: PeriodEmployee[] = payrollData.map(payroll => ({
@@ -80,8 +119,10 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
           payslipUrl: undefined // Se cargará desde vouchers si existe
         }));
 
+        console.log('Processed employees:', periodEmployees.length);
         setEmployees(periodEmployees);
       } else {
+        console.log('No payroll data found, showing simulated employees');
         // Si no hay datos reales, mostrar empleados simulados basados en el período
         const simulatedEmployees: PeriodEmployee[] = Array.from({ length: period.employeesCount }, (_, index) => ({
           id: `emp-${period.id}-${index + 1}`,
@@ -112,16 +153,29 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
     try {
       setIsLoadingFiles(true);
       
+      const companyId = await getCurrentUserCompanyId();
+      if (!companyId) {
+        console.error('No company ID found for user');
+        setGeneratedFiles([]);
+        return;
+      }
+
+      // Extraer el período sin la versión
+      const periodWithoutVersion = period.period.split(' (')[0];
+      console.log('Loading files for period:', periodWithoutVersion, 'company:', companyId);
+      
       // Cargar archivos generados (vouchers, reportes, etc.)
       const { data: vouchersData, error: vouchersError } = await supabase
         .from('payroll_vouchers')
         .select('*')
-        .eq('periodo', period.period.split(' (')[0])
-        .eq('company_id', period.id.split('-')[0]);
+        .eq('periodo', periodWithoutVersion)
+        .eq('company_id', companyId);
 
       if (vouchersError) {
         console.error('Error loading vouchers:', vouchersError);
       }
+
+      console.log('Vouchers data loaded:', vouchersData?.length || 0, 'records');
 
       const files: GeneratedFile[] = [];
 
@@ -180,6 +234,7 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
         size: '1.2 MB'
       });
 
+      console.log('Total files generated:', files.length);
       setGeneratedFiles(files);
     } catch (error) {
       console.error('Error loading generated files:', error);
