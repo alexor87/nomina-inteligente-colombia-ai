@@ -1,11 +1,30 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, AlertTriangle, XCircle, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { ImportStep, ColumnMapping } from '../ImportEmployeesDrawer';
+
+const EMPLOYEE_FIELDS = [
+  { value: 'nombre', label: 'Nombre', required: true },
+  { value: 'apellido', label: 'Apellido', required: false },
+  { value: 'cedula', label: 'Cédula/Documento', required: true },
+  { value: 'email', label: 'Correo electrónico', required: false },
+  { value: 'telefono', label: 'Teléfono', required: false },
+  { value: 'cargo', label: 'Cargo', required: true },
+  { value: 'salarioBase', label: 'Salario base', required: true },
+  { value: 'fechaIngreso', label: 'Fecha de ingreso', required: true },
+  { value: 'tipoContrato', label: 'Tipo de contrato', required: true },
+  { value: 'periodicidad', label: 'Periodicidad', required: false },
+  { value: 'eps', label: 'EPS', required: false },
+  { value: 'afp', label: 'AFP/Fondo de pensiones', required: false },
+  { value: 'arl', label: 'ARL', required: false },
+  { value: 'cajaCompensacion', label: 'Caja de compensación', required: false },
+  { value: 'estado', label: 'Estado', required: false },
+  { value: 'centrosocial', label: 'Centro social', required: false },
+];
 
 interface ColumnMappingStepProps {
   data: any;
@@ -13,120 +32,82 @@ interface ColumnMappingStepProps {
   onBack: () => void;
 }
 
-const EMPLOYEE_FIELDS = [
-  { value: 'nombre', label: 'Nombre', required: true },
-  { value: 'apellido', label: 'Apellido', required: true },
-  { value: 'cedula', label: 'Documento de identidad', required: true },
-  { value: 'email', label: 'Correo electrónico', required: false },
-  { value: 'telefono', label: 'Teléfono', required: false },
-  { value: 'cargo', label: 'Cargo', required: false },
-  { value: 'salarioBase', label: 'Salario base', required: true },
-  { value: 'tipoContrato', label: 'Tipo de contrato', required: true },
-  { value: 'fechaIngreso', label: 'Fecha de ingreso', required: true },
-  { value: 'estado', label: 'Estado', required: false },
-  { value: 'eps', label: 'EPS', required: false },
-  { value: 'afp', label: 'Fondo de pensiones', required: false },
-  { value: 'arl', label: 'ARL', required: false },
-  { value: 'cajaCompensacion', label: 'Caja de compensación', required: false },
-  { value: 'banco', label: 'Banco', required: false },
-  { value: 'tipoCuenta', label: 'Tipo de cuenta', required: false },
-  { value: 'numeroCuenta', label: 'Número de cuenta', required: false },
-  { value: 'titularCuenta', label: 'Titular de cuenta', required: false }
-];
-
 export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepProps) => {
-  const [mappings, setMappings] = useState<ColumnMapping[]>([]);
+  const [mappings, setMappings] = useState<ColumnMapping[]>(() => {
+    return data.columns.map((column: string) => ({
+      sourceColumn: column,
+      targetField: suggestMapping(column),
+      isRequired: isRequiredField(suggestMapping(column)),
+      validation: 'valid' as const
+    }));
+  });
 
-  useEffect(() => {
-    // Auto-mapeo inicial basado en similitud semántica
-    const initialMappings: ColumnMapping[] = data.columns.map((column: string) => {
-      const suggestedField = suggestMapping(column);
-      const field = EMPLOYEE_FIELDS.find(f => f.value === suggestedField);
-      
-      return {
-        sourceColumn: column,
-        targetField: suggestedField || '',
-        isRequired: field?.required || false,
-        validation: suggestedField ? 'valid' : 'warning',
-        validationMessage: suggestedField ? undefined : 'Mapeo no sugerido'
-      };
-    });
-
-    setMappings(initialMappings);
-  }, [data.columns]);
-
-  const suggestMapping = (columnName: string): string | null => {
-    const name = columnName.toLowerCase().trim();
+  const suggestMapping = (columnName: string): string => {
+    const normalized = columnName.toLowerCase().trim();
     
-    // Mapeos exactos y por similitud
-    const mappingRules = [
-      { patterns: ['nombre', 'name', 'first_name', 'primer_nombre'], field: 'nombre' },
-      { patterns: ['apellido', 'lastname', 'last_name', 'surname'], field: 'apellido' },
-      { patterns: ['cedula', 'documento', 'dni', 'cc', 'nit', 'identification'], field: 'cedula' },
-      { patterns: ['email', 'correo', 'mail', 'e-mail'], field: 'email' },
-      { patterns: ['telefono', 'phone', 'celular', 'mobile', 'tel'], field: 'telefono' },
-      { patterns: ['cargo', 'position', 'job', 'puesto', 'role'], field: 'cargo' },
-      { patterns: ['salario', 'salary', 'sueldo', 'wage', 'salario_base'], field: 'salarioBase' },
-      { patterns: ['contrato', 'contract', 'tipo_contrato'], field: 'tipoContrato' },
-      { patterns: ['fecha_ingreso', 'ingreso', 'start_date', 'hire_date'], field: 'fechaIngreso' },
-      { patterns: ['estado', 'status', 'state'], field: 'estado' },
-      { patterns: ['eps', 'salud'], field: 'eps' },
-      { patterns: ['afp', 'pension', 'fondo'], field: 'afp' },
-      { patterns: ['arl', 'riesgo'], field: 'arl' },
-      { patterns: ['caja', 'compensacion'], field: 'cajaCompensacion' },
-      { patterns: ['banco', 'bank'], field: 'banco' },
-      { patterns: ['tipo_cuenta', 'account_type'], field: 'tipoCuenta' },
-      { patterns: ['numero_cuenta', 'account_number', 'cuenta'], field: 'numeroCuenta' },
-      { patterns: ['titular', 'account_holder'], field: 'titularCuenta' }
-    ];
+    // Mapeo inteligente basado en palabras clave
+    if (normalized.includes('nombre') && !normalized.includes('apellido')) return 'nombre';
+    if (normalized.includes('apellido')) return 'apellido';
+    if (normalized.includes('cedula') || normalized.includes('documento') || normalized.includes('identificacion')) return 'cedula';
+    if (normalized.includes('email') || normalized.includes('correo')) return 'email';
+    if (normalized.includes('telefono') || normalized.includes('celular') || normalized.includes('movil')) return 'telefono';
+    if (normalized.includes('cargo') || normalized.includes('puesto')) return 'cargo';
+    if (normalized.includes('salario') || normalized.includes('sueldo')) return 'salarioBase';
+    if (normalized.includes('fecha') && (normalized.includes('ingreso') || normalized.includes('entrada'))) return 'fechaIngreso';
+    if (normalized.includes('contrato') || normalized.includes('tipo')) return 'tipoContrato';
+    if (normalized.includes('periodicidad') || normalized.includes('periodo')) return 'periodicidad';
+    if (normalized.includes('eps')) return 'eps';
+    if (normalized.includes('afp') || normalized.includes('pension')) return 'afp';
+    if (normalized.includes('arl')) return 'arl';
+    if (normalized.includes('caja')) return 'cajaCompensacion';
+    if (normalized.includes('estado')) return 'estado';
+    if (normalized.includes('centro') || normalized.includes('sede')) return 'centrosocial';
+    
+    return 'sin_mapear'; // Default value for unmapped columns
+  };
 
-    for (const rule of mappingRules) {
-      if (rule.patterns.some(pattern => name.includes(pattern))) {
-        return rule.field;
-      }
-    }
-
-    return null;
+  const isRequiredField = (fieldValue: string): boolean => {
+    const field = EMPLOYEE_FIELDS.find(f => f.value === fieldValue);
+    return field?.required || false;
   };
 
   const handleMappingChange = (sourceColumn: string, targetField: string) => {
-    setMappings(prev => prev.map(mapping => {
-      if (mapping.sourceColumn === sourceColumn) {
-        const field = EMPLOYEE_FIELDS.find(f => f.value === targetField);
-        return {
-          ...mapping,
-          targetField,
-          isRequired: field?.required || false,
-          validation: targetField ? 'valid' : 'warning',
-          validationMessage: targetField ? undefined : 'Campo no mapeado'
-        };
-      }
-      return mapping;
-    }));
+    setMappings(prev => prev.map(mapping => 
+      mapping.sourceColumn === sourceColumn 
+        ? { 
+            ...mapping, 
+            targetField,
+            isRequired: isRequiredField(targetField),
+            validation: targetField === 'sin_mapear' ? 'warning' as const : 'valid' as const
+          }
+        : mapping
+    ));
   };
 
-  const getValidationIcon = (validation?: string) => {
+  const getValidationIcon = (validation: string) => {
     switch (validation) {
-      case 'valid': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      case 'error': return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'valid': return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'warning': return <AlertCircle className="h-4 w-4 text-yellow-600" />;
+      case 'error': return <XCircle className="h-4 w-4 text-red-600" />;
       default: return null;
     }
   };
 
-  const requiredFieldsMapped = EMPLOYEE_FIELDS
-    .filter(field => field.required)
-    .every(field => mappings.some(m => m.targetField === field.value));
-
-  const handleContinue = () => {
+  const handleNext = () => {
+    // Filtrar solo los mapeos que no son "sin_mapear"
+    const validMappings = mappings.filter(m => m.targetField !== 'sin_mapear');
+    
     onNext({
       step: 'validation',
       data: {
         ...data,
-        mappings
+        mappings: validMappings
       }
     });
   };
+
+  const requiredMappings = mappings.filter(m => m.isRequired && m.targetField !== 'sin_mapear');
+  const hasRequiredFields = requiredMappings.length > 0;
 
   return (
     <div className="space-y-6">
@@ -141,34 +122,33 @@ export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepPro
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Columnas detectadas: {data.columns.length}</CardTitle>
+          <CardTitle className="text-base">
+            Columnas detectadas: {data.columns.length}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {mappings.map((mapping, index) => (
-              <div key={index} className="flex items-center space-x-4 p-3 border rounded-lg">
+            {mappings.map((mapping) => (
+              <div key={mapping.sourceColumn} className="flex items-center space-x-4 p-3 border rounded-lg">
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    {mapping.sourceColumn}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Columna del archivo
-                  </div>
+                  <div className="font-medium text-sm">{mapping.sourceColumn}</div>
+                  <div className="text-xs text-gray-500">Columna del archivo</div>
                 </div>
-
+                
                 <div className="flex-1">
-                  <Select 
-                    value={mapping.targetField} 
+                  <Select
+                    value={mapping.targetField}
                     onValueChange={(value) => handleMappingChange(mapping.sourceColumn, value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar campo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin mapear</SelectItem>
+                      <SelectItem value="sin_mapear">No mapear</SelectItem>
                       {EMPLOYEE_FIELDS.map((field) => (
                         <SelectItem key={field.value} value={field.value}>
-                          {field.label} {field.required && <span className="text-red-500">*</span>}
+                          {field.label}
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -176,12 +156,10 @@ export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepPro
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {getValidationIcon(mapping.validation)}
-                  {mapping.isRequired && (
-                    <Badge variant="secondary" className="text-xs">
-                      Requerido
-                    </Badge>
+                  {mapping.isRequired && mapping.targetField !== 'sin_mapear' && (
+                    <Badge variant="destructive" className="text-xs">Requerido</Badge>
                   )}
+                  {getValidationIcon(mapping.validation)}
                 </div>
               </div>
             ))}
@@ -189,25 +167,28 @@ export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepPro
         </CardContent>
       </Card>
 
-      {!requiredFieldsMapped && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-          <div className="flex">
-            <AlertTriangle className="h-5 w-5 text-yellow-400" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">
-                Campos obligatorios faltantes
-              </h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                Debes mapear los siguientes campos obligatorios: {' '}
-                {EMPLOYEE_FIELDS
-                  .filter(field => field.required && !mappings.some(m => m.targetField === field.value))
-                  .map(field => field.label)
-                  .join(', ')}
-              </div>
-            </div>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="font-medium text-blue-900 mb-2">Vista previa del mapeo</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="font-medium">Campos mapeados:</span>
+            <span className="ml-2 text-blue-600">
+              {mappings.filter(m => m.targetField !== 'sin_mapear').length}
+            </span>
+          </div>
+          <div>
+            <span className="font-medium">Campos requeridos:</span>
+            <span className="ml-2 text-green-600">
+              {requiredMappings.length}
+            </span>
           </div>
         </div>
-      )}
+        {!hasRequiredFields && (
+          <div className="mt-2 text-yellow-600 text-sm">
+            ⚠️ Considera mapear al menos los campos básicos como Nombre y Cédula
+          </div>
+        )}
+      </div>
 
       <div className="flex justify-between">
         <Button variant="outline" onClick={onBack}>
@@ -215,10 +196,10 @@ export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepPro
           Volver
         </Button>
         <Button 
-          onClick={handleContinue}
-          disabled={!requiredFieldsMapped}
+          onClick={handleNext}
+          disabled={mappings.filter(m => m.targetField !== 'sin_mapear').length === 0}
         >
-          Validar datos
+          Continuar a validación
         </Button>
       </div>
     </div>

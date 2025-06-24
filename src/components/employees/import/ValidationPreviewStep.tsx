@@ -2,10 +2,10 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, CheckCircle, XCircle, ArrowLeft, Download } from 'lucide-react';
-import { ImportStep, ImportedRow, ColumnMapping } from '../ImportEmployeesDrawer';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Download } from 'lucide-react';
+import { ImportStep } from '../ImportEmployeesDrawer';
 
 interface ValidationPreviewStepProps {
   data: any;
@@ -13,203 +13,142 @@ interface ValidationPreviewStepProps {
   onBack: () => void;
 }
 
-interface ValidationResult {
-  row: ImportedRow;
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}
-
 export const ValidationPreviewStep = ({ data, onNext, onBack }: ValidationPreviewStepProps) => {
-  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
-  const [validRows, setValidRows] = useState<ImportedRow[]>([]);
-  const [invalidRows, setInvalidRows] = useState<ImportedRow[]>([]);
+  const [validatedRows, setValidatedRows] = useState<any[]>([]);
+  const [validRows, setValidRows] = useState<any[]>([]);
+  const [invalidRows, setInvalidRows] = useState<any[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
-    validateRows();
-  }, [data]);
+    validateData();
+  }, []);
 
-  const validateRows = () => {
-    const results: ValidationResult[] = [];
-    const valid: ImportedRow[] = [];
-    const invalid: ImportedRow[] = [];
+  const validateData = () => {
+    const { rows, mappings } = data;
+    const validated: any[] = [];
+    const valid: any[] = [];
+    const invalid: any[] = [];
+    const errorList: string[] = [];
 
-    data.rows.forEach((row: ImportedRow) => {
-      const validation = validateRow(row, data.mappings);
-      results.push(validation);
+    rows.forEach((row: any, index: number) => {
+      const validatedRow: any = { _rowIndex: index + 2 };
+      let hasErrors = false;
+      const rowErrors: string[] = [];
 
-      if (validation.isValid) {
-        // Transformar la fila para que coincida con el formato esperado
-        const transformedRow = transformRowData(row, data.mappings);
-        valid.push(transformedRow);
+      mappings.forEach((mapping: any) => {
+        const value = row[mapping.sourceColumn];
+        const validation = validateField(mapping.targetField, value, mapping.sourceColumn);
+        
+        validatedRow[mapping.targetField] = value;
+        validatedRow[`${mapping.targetField}_validation`] = validation.status;
+        validatedRow[`${mapping.targetField}_error`] = validation.message;
+
+        if (validation.status === 'error') {
+          hasErrors = true;
+          rowErrors.push(`${mapping.sourceColumn}: ${validation.message}`);
+        }
+      });
+
+      validatedRow._errors = rowErrors;
+      validated.push(validatedRow);
+
+      if (hasErrors) {
+        invalid.push(validatedRow);
+        errorList.push(`Fila ${validatedRow._rowIndex}: ${rowErrors.join(', ')}`);
       } else {
-        invalid.push(row);
+        valid.push(validatedRow);
       }
     });
 
-    setValidationResults(results);
+    setValidatedRows(validated);
     setValidRows(valid);
     setInvalidRows(invalid);
+    setErrors(errorList);
   };
 
-  const validateRow = (row: ImportedRow, mappings: ColumnMapping[]): ValidationResult => {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    // Validar campos obligatorios
-    const requiredMappings = mappings.filter(m => m.isRequired && m.targetField);
-    
-    requiredMappings.forEach(mapping => {
-      const value = row[mapping.sourceColumn];
-      if (!value || value.toString().trim() === '') {
-        errors.push(`${mapping.targetField}: Campo obligatorio vacío`);
+  const validateField = (fieldName: string, value: any, sourceColumn: string) => {
+    if (!value || value.toString().trim() === '') {
+      const requiredFields = ['nombre', 'cedula', 'cargo', 'salarioBase', 'fechaIngreso', 'tipoContrato'];
+      if (requiredFields.includes(fieldName)) {
+        return { status: 'error', message: 'Campo requerido' };
       }
-    });
+      return { status: 'valid', message: '' };
+    }
 
-    // Validaciones específicas por campo
-    mappings.forEach(mapping => {
-      const value = row[mapping.sourceColumn];
-      if (!value || value.toString().trim() === '') return;
-
-      switch (mapping.targetField) {
-        case 'cedula':
-          if (!/^\d{6,12}$/.test(value.toString().replace(/\D/g, ''))) {
-            errors.push('Documento: Debe contener entre 6 y 12 dígitos');
-          }
-          break;
-          
-        case 'email':
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.toString())) {
-            warnings.push('Email: Formato inválido');
-          }
-          break;
-          
-        case 'salarioBase':
-          const salary = parseFloat(value.toString().replace(/[^\d.]/g, ''));
-          if (isNaN(salary) || salary <= 0) {
-            errors.push('Salario: Debe ser un número mayor a 0');
-          }
-          break;
-          
-        case 'fechaIngreso':
-          const date = parseDate(value.toString());
-          if (!date || isNaN(date.getTime())) {
-            errors.push('Fecha de ingreso: Formato inválido');
-          }
-          break;
-          
-        case 'tipoContrato':
-          const validContracts = ['indefinido', 'fijo', 'obra', 'aprendizaje'];
-          if (!validContracts.includes(value.toString().toLowerCase())) {
-            warnings.push('Tipo contrato: Se usará "indefinido" por defecto');
-          }
-          break;
-      }
-    });
-
-    return {
-      row,
-      isValid: errors.length === 0,
-      errors,
-      warnings
-    };
-  };
-
-  const parseDate = (dateStr: string): Date | null => {
-    // Intentar varios formatos de fecha
-    const formats = [
-      /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-      /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
-      /^\d{2}-\d{2}-\d{4}$/, // DD-MM-YYYY
-    ];
-
-    for (const format of formats) {
-      if (format.test(dateStr)) {
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          return date;
+    switch (fieldName) {
+      case 'email':
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value)) {
+          return { status: 'error', message: 'Formato de email inválido' };
         }
-      }
-    }
-
-    return null;
-  };
-
-  const transformRowData = (row: ImportedRow, mappings: ColumnMapping[]): ImportedRow => {
-    const transformed: ImportedRow = {};
-
-    mappings.forEach(mapping => {
-      if (mapping.targetField && row[mapping.sourceColumn]) {
-        let value = row[mapping.sourceColumn];
-
-        // Transformaciones específicas por campo
-        switch (mapping.targetField) {
-          case 'salarioBase':
-            transformed[mapping.targetField] = parseFloat(value.toString().replace(/[^\d.]/g, '')) || 0;
-            break;
-            
-          case 'fechaIngreso':
-            const date = parseDate(value.toString());
-            transformed[mapping.targetField] = date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-            break;
-            
-          case 'tipoContrato':
-            const validContracts = ['indefinido', 'fijo', 'obra', 'aprendizaje'];
-            transformed[mapping.targetField] = validContracts.includes(value.toString().toLowerCase()) 
-              ? value.toString().toLowerCase() 
-              : 'indefinido';
-            break;
-            
-          default:
-            transformed[mapping.targetField] = value.toString().trim();
+        break;
+      
+      case 'cedula':
+        if (!/^\d+$/.test(value.toString().replace(/\D/g, ''))) {
+          return { status: 'error', message: 'Debe contener solo números' };
         }
-      }
-    });
-
-    // Campos por defecto
-    if (!transformed.estado) {
-      transformed.estado = 'activo';
+        break;
+      
+      case 'salarioBase':
+        const salary = parseFloat(value.toString().replace(/[^\d.]/g, ''));
+        if (isNaN(salary) || salary <= 0) {
+          return { status: 'error', message: 'Debe ser un número válido mayor a 0' };
+        }
+        break;
+      
+      case 'fechaIngreso':
+        const date = new Date(value);
+        if (isNaN(date.getTime())) {
+          return { status: 'error', message: 'Formato de fecha inválido' };
+        }
+        break;
+      
+      case 'telefono':
+        if (value && !/^\d{7,10}$/.test(value.toString().replace(/\D/g, ''))) {
+          return { status: 'warning', message: 'Formato de teléfono puede ser incorrecto' };
+        }
+        break;
     }
-    if (!transformed.estadoAfiliacion) {
-      transformed.estadoAfiliacion = 'pendiente';
-    }
 
-    return transformed;
+    return { status: 'valid', message: '' };
   };
 
-  const downloadErrorReport = () => {
-    const errorData = validationResults
-      .filter(result => !result.isValid)
-      .map(result => ({
-        Fila: result.row._rowIndex,
-        Errores: result.errors.join('; '),
-        Advertencias: result.warnings.join('; ')
-      }));
-
-    const csv = [
-      ['Fila', 'Errores', 'Advertencias'],
-      ...errorData.map(row => [row.Fila, row.Errores, row.Advertencias])
-    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'errores_importacion.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'valid':
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Válido</Badge>;
+      case 'warning':
+        return <Badge className="bg-yellow-100 text-yellow-800"><AlertTriangle className="h-3 w-3 mr-1" />Advertencia</Badge>;
+      case 'error':
+        return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" />Error</Badge>;
+      default:
+        return null;
+    }
   };
 
-  const handleContinue = () => {
+  const handleNext = () => {
     onNext({
       step: 'confirmation',
       data: {
         ...data,
         validRows,
         invalidRows,
-        errors: validationResults.filter(r => !r.isValid).flatMap(r => r.errors)
+        errors
       }
     });
+  };
+
+  const downloadErrorReport = () => {
+    const csvContent = [
+      'Fila,Error',
+      ...errors.map(error => `"${error.replace(/"/g, '""')}"`)
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'errores_importacion.csv';
+    link.click();
   };
 
   return (
@@ -219,112 +158,120 @@ export const ValidationPreviewStep = ({ data, onNext, onBack }: ValidationPrevie
           Validación de datos
         </h3>
         <p className="text-gray-600">
-          Revisión de los datos antes de la importación
+          Revisa los datos antes de importar
         </p>
       </div>
 
-      {/* Resumen de validación */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Card>
-          <CardContent className="flex items-center p-4">
-            <CheckCircle className="h-8 w-8 text-green-500 mr-3" />
-            <div>
+          <CardContent className="pt-6">
+            <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{validRows.length}</div>
-              <div className="text-sm text-gray-600">Filas válidas</div>
+              <div className="text-sm text-gray-600">Registros válidos</div>
             </div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="flex items-center p-4">
-            <XCircle className="h-8 w-8 text-red-500 mr-3" />
-            <div>
+          <CardContent className="pt-6">
+            <div className="text-center">
               <div className="text-2xl font-bold text-red-600">{invalidRows.length}</div>
-              <div className="text-sm text-gray-600">Filas con errores</div>
+              <div className="text-sm text-gray-600">Registros con errores</div>
             </div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="flex items-center p-4">
-            <AlertTriangle className="h-8 w-8 text-blue-500 mr-3" />
-            <div>
+          <CardContent className="pt-6">
+            <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{data.rows.length}</div>
-              <div className="text-sm text-gray-600">Total de filas</div>
+              <div className="text-sm text-gray-600">Total registros</div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Vista previa de las primeras filas */}
+      {invalidRows.length > 0 && (
+        <Card className="border-red-200">
+          <CardHeader className="bg-red-50">
+            <CardTitle className="text-red-800 flex items-center">
+              <XCircle className="h-5 w-5 mr-2" />
+              Errores encontrados
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <p className="text-sm text-gray-600 mb-3">
+              Se encontraron {invalidRows.length} registros con errores. 
+              Puedes continuar e importar solo los registros válidos, o corregir el archivo.
+            </p>
+            {errors.length > 5 ? (
+              <div className="space-y-2">
+                <div className="text-sm">
+                  {errors.slice(0, 5).map((error, index) => (
+                    <div key={index} className="text-red-600">• {error}</div>
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" onClick={downloadErrorReport}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Descargar reporte completo ({errors.length} errores)
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {errors.map((error, index) => (
+                  <div key={index} className="text-sm text-red-600">• {error}</div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Vista previa (primeras 5 filas)</CardTitle>
-            {invalidRows.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={downloadErrorReport}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Descargar errores
-              </Button>
-            )}
-          </div>
+          <CardTitle>Vista previa de datos (primeras 5 filas)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Fila</TableHead>
+                  {data.mappings.map((mapping: any) => (
+                    <TableHead key={mapping.sourceColumn}>
+                      {mapping.sourceColumn}
+                    </TableHead>
+                  ))}
                   <TableHead>Estado</TableHead>
-                  {data.mappings
-                    .filter((m: ColumnMapping) => m.targetField)
-                    .slice(0, 4)
-                    .map((mapping: ColumnMapping) => (
-                      <TableHead key={mapping.targetField}>
-                        {mapping.targetField}
-                      </TableHead>
-                    ))}
-                  <TableHead>Errores/Advertencias</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {validationResults.slice(0, 5).map((result, index) => (
+                {validatedRows.slice(0, 5).map((row, index) => (
                   <TableRow key={index}>
+                    <TableCell>{row._rowIndex}</TableCell>
+                    {data.mappings.map((mapping: any) => (
+                      <TableCell key={mapping.sourceColumn}>
+                        <div>
+                          <div className="truncate max-w-32">
+                            {row[mapping.targetField] || '-'}
+                          </div>
+                          {row[`${mapping.targetField}_validation`] !== 'valid' && (
+                            <div className="text-xs text-red-500 mt-1">
+                              {row[`${mapping.targetField}_error`]}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    ))}
                     <TableCell>
-                      {result.isValid ? (
+                      {row._errors.length > 0 ? (
+                        <Badge className="bg-red-100 text-red-800">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Error
+                        </Badge>
+                      ) : (
                         <Badge className="bg-green-100 text-green-800">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Válido
                         </Badge>
-                      ) : (
-                        <Badge variant="destructive">
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Error
-                        </Badge>
-                      )}
-                    </TableCell>
-                    {data.mappings
-                      .filter((m: ColumnMapping) => m.targetField)
-                      .slice(0, 4)
-                      .map((mapping: ColumnMapping) => (
-                        <TableCell key={mapping.targetField} className="max-w-32 truncate">
-                          {result.row[mapping.sourceColumn] || '-'}
-                        </TableCell>
-                      ))}
-                    <TableCell className="max-w-48">
-                      {result.errors.length > 0 && (
-                        <div className="text-red-600 text-xs">
-                          {result.errors.slice(0, 2).join('; ')}
-                          {result.errors.length > 2 && '...'}
-                        </div>
-                      )}
-                      {result.warnings.length > 0 && (
-                        <div className="text-yellow-600 text-xs">
-                          {result.warnings.slice(0, 1).join('; ')}
-                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -338,13 +285,16 @@ export const ValidationPreviewStep = ({ data, onNext, onBack }: ValidationPrevie
       <div className="flex justify-between">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver
+          Volver al mapeo
         </Button>
         <Button 
-          onClick={handleContinue}
+          onClick={handleNext}
           disabled={validRows.length === 0}
         >
-          {validRows.length > 0 ? `Importar ${validRows.length} empleados` : 'No hay datos válidos'}
+          {invalidRows.length > 0 
+            ? `Importar ${validRows.length} registros válidos`
+            : `Importar todos los registros (${validRows.length})`
+          }
         </Button>
       </div>
     </div>
