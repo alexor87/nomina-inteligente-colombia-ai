@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { NovedadForm } from './NovedadForm';
 import { PayrollNovedad, NovedadFormData, NOVEDAD_CATEGORIES, NovedadType } from '@/types/novedades';
 import { Trash2, Edit2, Calendar, DollarSign, Plus, FileText, User, Clock, Calculator, TrendingUp, TrendingDown } from 'lucide-react';
@@ -92,7 +93,7 @@ export const NovedadDrawer = ({
       return {
         category: 'devengados' as const,
         config: NOVEDAD_CATEGORIES.devengados,
-        type: NOVEDAD_CATEGORIES.devengados.types[tipoNovedad]
+        type: NOVEDAD_CATEGORIES.devengados.types[tipoNovedad as keyof typeof NOVEDAD_CATEGORIES.devengados.types]
       };
     }
     
@@ -101,7 +102,7 @@ export const NovedadDrawer = ({
       return {
         category: 'deducciones' as const,
         config: NOVEDAD_CATEGORIES.deducciones,
-        type: NOVEDAD_CATEGORIES.deducciones.types[tipoNovedad]
+        type: NOVEDAD_CATEGORIES.deducciones.types[tipoNovedad as keyof typeof NOVEDAD_CATEGORIES.deducciones.types]
       };
     }
     
@@ -110,48 +111,48 @@ export const NovedadDrawer = ({
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[98vw] max-w-[1600px] min-w-[1200px] h-full p-0 flex flex-col bg-white">
-        {/* Header mejorado */}
-        <SheetHeader className="px-8 py-6 border-b border-gray-100 shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
+      <SheetContent className="w-[98vw] max-w-[1400px] min-w-[1000px] h-full p-0 flex flex-col bg-white overflow-hidden">
+        {/* Header fijo */}
+        <SheetHeader className="px-6 py-4 border-b border-gray-100 shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-white rounded-xl shadow-sm">
-                <User className="h-6 w-6 text-blue-600" />
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <User className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <SheetTitle className="text-2xl font-semibold text-gray-900">
+                <SheetTitle className="text-lg font-semibold text-gray-900">
                   {employeeName}
                 </SheetTitle>
-                <SheetDescription className="text-base text-gray-600 mt-1">
+                <SheetDescription className="text-sm text-gray-600">
                   Gestión de novedades - Salario base: {formatCurrency(employeeSalary)}
                 </SheetDescription>
               </div>
             </div>
             
-            <div className="flex items-center space-x-8">
-              <div className="grid grid-cols-3 gap-6 text-center">
+            <div className="flex items-center space-x-6">
+              <div className="grid grid-cols-3 gap-4 text-center">
                 <div className="flex flex-col items-center">
                   <div className="flex items-center space-x-1 text-green-600">
-                    <TrendingUp className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">Devengados</span>
+                    <TrendingUp className="h-3 w-3" />
+                    <span className="text-xs font-medium">Devengados</span>
                   </div>
-                  <p className="text-lg font-bold text-gray-900">{formatCurrency(totalDevengados)}</p>
+                  <p className="text-sm font-bold text-gray-900">{formatCurrency(totalDevengados)}</p>
                   <p className="text-xs text-gray-500">{devengados.length} conceptos</p>
                 </div>
                 <div className="flex flex-col items-center">
                   <div className="flex items-center space-x-1 text-red-600">
-                    <TrendingDown className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">Deducciones</span>
+                    <TrendingDown className="h-3 w-3" />
+                    <span className="text-xs font-medium">Deducciones</span>
                   </div>
-                  <p className="text-lg font-bold text-gray-900">{formatCurrency(totalDeducciones)}</p>
+                  <p className="text-sm font-bold text-gray-900">{formatCurrency(totalDeducciones)}</p>
                   <p className="text-xs text-gray-500">{deducciones.length} conceptos</p>
                 </div>
                 <div className="flex flex-col items-center">
                   <div className="flex items-center space-x-1 text-blue-600">
-                    <Calculator className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">Impacto</span>
+                    <Calculator className="h-3 w-3" />
+                    <span className="text-xs font-medium">Impacto</span>
                   </div>
-                  <p className={`text-lg font-bold ${impactoNeto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <p className={`text-sm font-bold ${impactoNeto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {impactoNeto >= 0 ? '+' : ''}{formatCurrency(impactoNeto)}
                   </p>
                   <p className="text-xs text-gray-500">Neto adicional</p>
@@ -162,9 +163,9 @@ export const NovedadDrawer = ({
                 <Button
                   onClick={() => {setShowForm(true); setEditingNovedad(null);}}
                   disabled={isLoading || showForm || Boolean(editingNovedad)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 h-12 text-base font-medium shadow-sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2"
                 >
-                  <Plus className="h-5 w-5 mr-2" />
+                  <Plus className="h-4 w-4 mr-2" />
                   Nueva novedad
                 </Button>
               )}
@@ -173,33 +174,33 @@ export const NovedadDrawer = ({
         </SheetHeader>
 
         {/* Main Content - Two Column Layout */}
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex min-h-0 overflow-hidden">
           {/* Left Panel - Form */}
-          <div className="w-1/2 border-r border-gray-100 flex flex-col bg-gray-50">
+          <div className="w-1/2 border-r border-gray-100 flex flex-col bg-gray-50 overflow-hidden">
             {showForm && (
-              <div className="flex-1 flex flex-col">
-                <div className="px-6 py-4 border-b border-gray-200 bg-white">
-                  <h3 className="text-lg font-semibold text-gray-900">Nueva novedad</h3>
-                  <p className="text-sm text-gray-600 mt-1">Selecciona el tipo y completa la información</p>
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+                  <h3 className="text-base font-semibold text-gray-900">Nueva novedad</h3>
+                  <p className="text-xs text-gray-600 mt-1">Selecciona el tipo y completa la información</p>
                 </div>
-                <div className="flex-1 p-6 overflow-y-auto">
+                <ScrollArea className="flex-1 p-4">
                   <NovedadForm
                     onSubmit={handleCreateNovedad}
                     onCancel={() => setShowForm(false)}
                     isLoading={isLoading}
                     employeeSalary={employeeSalary}
                   />
-                </div>
+                </ScrollArea>
               </div>
             )}
 
             {editingNovedad && (
-              <div className="flex-1 flex flex-col">
-                <div className="px-6 py-4 border-b border-gray-200 bg-white">
-                  <h3 className="text-lg font-semibold text-gray-900">Editar novedad</h3>
-                  <p className="text-sm text-gray-600 mt-1">Modifica la información de la novedad</p>
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+                  <h3 className="text-base font-semibold text-gray-900">Editar novedad</h3>
+                  <p className="text-xs text-gray-600 mt-1">Modifica la información de la novedad</p>
                 </div>
-                <div className="flex-1 p-6 overflow-y-auto">
+                <ScrollArea className="flex-1 p-4">
                   <NovedadForm
                     initialData={{
                       tipo_novedad: editingNovedad.tipo_novedad,
@@ -216,29 +217,29 @@ export const NovedadDrawer = ({
                     isLoading={isLoading}
                     employeeSalary={employeeSalary}
                   />
-                </div>
+                </ScrollArea>
               </div>
             )}
 
             {!showForm && !editingNovedad && (
               <div className="flex-1 flex items-center justify-center">
-                <div className="text-center px-8">
-                  <div className="p-6 bg-white rounded-xl mb-6 inline-block shadow-sm">
-                    <FileText className="h-12 w-12 text-gray-400" />
+                <div className="text-center px-6">
+                  <div className="p-4 bg-white rounded-lg mb-4 inline-block shadow-sm">
+                    <FileText className="h-8 w-8 text-gray-400" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">
                     Administrar novedades
                   </h3>
-                  <p className="text-gray-500 mb-8 text-base leading-relaxed">
+                  <p className="text-gray-500 mb-6 text-sm leading-relaxed">
                     Crea una nueva novedad o selecciona una existente para editarla.
                     Las novedades afectarán automáticamente el cálculo de nómina.
                   </p>
                   {canEdit && (
                     <Button
                       onClick={() => setShowForm(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                      <Plus className="h-5 w-5 mr-2" />
+                      <Plus className="h-4 w-4 mr-2" />
                       Crear novedad
                     </Button>
                   )}
@@ -248,38 +249,38 @@ export const NovedadDrawer = ({
           </div>
 
           {/* Right Panel - Novedades List */}
-          <div className="w-1/2 flex flex-col bg-white">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">Novedades registradas</h3>
-              <p className="text-sm text-gray-600 mt-1">
+          <div className="w-1/2 flex flex-col bg-white overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 shrink-0">
+              <h3 className="text-base font-semibold text-gray-900">Novedades registradas</h3>
+              <p className="text-xs text-gray-600 mt-1">
                 {novedades.length > 0 ? `${novedades.length} novedades activas` : 'No hay novedades registradas'}
               </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <ScrollArea className="flex-1">
               {novedades.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center px-8">
-                    <div className="p-6 bg-gray-50 rounded-xl mb-6 inline-block">
-                      <Calendar className="h-12 w-12 text-gray-400" />
+                <div className="flex items-center justify-center h-full min-h-[400px]">
+                  <div className="text-center px-6">
+                    <div className="p-4 bg-gray-50 rounded-lg mb-4 inline-block">
+                      <Calendar className="h-8 w-8 text-gray-400" />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                    <h3 className="text-base font-semibold text-gray-900 mb-2">
                       Sin novedades
                     </h3>
-                    <p className="text-gray-500 text-base">
+                    <p className="text-gray-500 text-sm">
                       Este empleado no tiene novedades registradas para este período
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="p-6 space-y-4">
+                <div className="p-4 space-y-4">
                   {/* Devengados */}
                   {devengados.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center space-x-2">
                         <TrendingUp className="h-4 w-4 text-green-600" />
                         <h4 className="font-semibold text-green-800">Devengados</h4>
-                        <Badge className="bg-green-100 text-green-800 border-0">
+                        <Badge className="bg-green-100 text-green-800 border-0 text-xs">
                           {formatCurrency(totalDevengados)}
                         </Badge>
                       </div>
@@ -287,22 +288,22 @@ export const NovedadDrawer = ({
                       {devengados.map((novedad) => {
                         const categoryInfo = getCategoryInfo(novedad.tipo_novedad);
                         return (
-                          <div key={novedad.id} className="bg-green-50 border border-green-100 rounded-lg p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 space-y-3">
+                          <div key={novedad.id} className="bg-green-50 border border-green-100 rounded-lg p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <Badge className="bg-green-200 text-green-800 border-0 px-3 py-1 text-sm font-medium">
+                                  <Badge className="bg-green-200 text-green-800 border-0 px-2 py-0.5 text-xs font-medium">
                                     {categoryInfo?.type?.label || novedad.tipo_novedad}
                                     {novedad.subtipo && ` - ${novedad.subtipo}`}
                                   </Badge>
-                                  <div className="flex items-center text-green-700 text-base font-semibold">
-                                    <DollarSign className="h-4 w-4 mr-1" />
+                                  <div className="flex items-center text-green-700 text-sm font-semibold">
+                                    <DollarSign className="h-3 w-3 mr-1" />
                                     {formatCurrency(novedad.valor)}
                                   </div>
                                 </div>
                                 
                                 {(novedad.fecha_inicio || novedad.fecha_fin || novedad.dias || novedad.horas) && (
-                                  <div className="flex items-center text-sm text-green-700 space-x-4">
+                                  <div className="flex items-center text-xs text-green-700 space-x-3">
                                     {(novedad.fecha_inicio || novedad.fecha_fin) && (
                                       <div className="flex items-center">
                                         <Clock className="h-3 w-3 mr-1" />
@@ -314,12 +315,12 @@ export const NovedadDrawer = ({
                                       </div>
                                     )}
                                     {novedad.dias && (
-                                      <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
+                                      <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs">
                                         {novedad.dias} días
                                       </span>
                                     )}
                                     {novedad.horas && (
-                                      <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
+                                      <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs">
                                         {novedad.horas} horas
                                       </span>
                                     )}
@@ -327,8 +328,8 @@ export const NovedadDrawer = ({
                                 )}
                                 
                                 {novedad.observacion && (
-                                  <div className="bg-green-100 border border-green-200 p-3 rounded-md">
-                                    <p className="text-xs text-green-800 leading-relaxed">{novedad.observacion}</p>
+                                  <div className="bg-green-100 border border-green-200 p-2 rounded">
+                                    <p className="text-xs text-green-800">{novedad.observacion}</p>
                                   </div>
                                 )}
                               </div>
@@ -339,7 +340,7 @@ export const NovedadDrawer = ({
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleEditNovedad(novedad)}
-                                    className="h-8 w-8 p-0 hover:bg-green-100 text-green-600 hover:text-green-700"
+                                    className="h-7 w-7 p-0 hover:bg-green-100 text-green-600 hover:text-green-700"
                                   >
                                     <Edit2 className="h-3 w-3" />
                                   </Button>
@@ -347,7 +348,7 @@ export const NovedadDrawer = ({
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleDeleteNovedad(novedad.id)}
-                                    className="h-8 w-8 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
+                                    className="h-7 w-7 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -362,7 +363,7 @@ export const NovedadDrawer = ({
 
                   {/* Separador */}
                   {devengados.length > 0 && deducciones.length > 0 && (
-                    <Separator className="my-6" />
+                    <Separator className="my-4" />
                   )}
 
                   {/* Deducciones */}
@@ -371,7 +372,7 @@ export const NovedadDrawer = ({
                       <div className="flex items-center space-x-2">
                         <TrendingDown className="h-4 w-4 text-red-600" />
                         <h4 className="font-semibold text-red-800">Deducciones</h4>
-                        <Badge className="bg-red-100 text-red-800 border-0">
+                        <Badge className="bg-red-100 text-red-800 border-0 text-xs">
                           {formatCurrency(totalDeducciones)}
                         </Badge>
                       </div>
@@ -379,22 +380,22 @@ export const NovedadDrawer = ({
                       {deducciones.map((novedad) => {
                         const categoryInfo = getCategoryInfo(novedad.tipo_novedad);
                         return (
-                          <div key={novedad.id} className="bg-red-50 border border-red-100 rounded-lg p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 space-y-3">
+                          <div key={novedad.id} className="bg-red-50 border border-red-100 rounded-lg p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <Badge className="bg-red-200 text-red-800 border-0 px-3 py-1 text-sm font-medium">
+                                  <Badge className="bg-red-200 text-red-800 border-0 px-2 py-0.5 text-xs font-medium">
                                     {categoryInfo?.type?.label || novedad.tipo_novedad}
                                     {novedad.subtipo && ` - ${novedad.subtipo}`}
                                   </Badge>
-                                  <div className="flex items-center text-red-700 text-base font-semibold">
-                                    <DollarSign className="h-4 w-4 mr-1" />
+                                  <div className="flex items-center text-red-700 text-sm font-semibold">
+                                    <DollarSign className="h-3 w-3 mr-1" />
                                     {formatCurrency(novedad.valor)}
                                   </div>
                                 </div>
                                 
                                 {(novedad.fecha_inicio || novedad.fecha_fin || novedad.dias || novedad.horas) && (
-                                  <div className="flex items-center text-sm text-red-700 space-x-4">
+                                  <div className="flex items-center text-xs text-red-700 space-x-3">
                                     {(novedad.fecha_inicio || novedad.fecha_fin) && (
                                       <div className="flex items-center">
                                         <Clock className="h-3 w-3 mr-1" />
@@ -406,12 +407,12 @@ export const NovedadDrawer = ({
                                       </div>
                                     )}
                                     {novedad.dias && (
-                                      <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">
+                                      <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">
                                         {novedad.dias} días
                                       </span>
                                     )}
                                     {novedad.horas && (
-                                      <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">
+                                      <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">
                                         {novedad.horas} horas
                                       </span>
                                     )}
@@ -419,8 +420,8 @@ export const NovedadDrawer = ({
                                 )}
                                 
                                 {novedad.observacion && (
-                                  <div className="bg-red-100 border border-red-200 p-3 rounded-md">
-                                    <p className="text-xs text-red-800 leading-relaxed">{novedad.observacion}</p>
+                                  <div className="bg-red-100 border border-red-200 p-2 rounded">
+                                    <p className="text-xs text-red-800">{novedad.observacion}</p>
                                   </div>
                                 )}
                               </div>
@@ -431,7 +432,7 @@ export const NovedadDrawer = ({
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleEditNovedad(novedad)}
-                                    className="h-8 w-8 p-0 hover:bg-red-100 text-red-600 hover:text-red-700"
+                                    className="h-7 w-7 p-0 hover:bg-red-100 text-red-600 hover:text-red-700"
                                   >
                                     <Edit2 className="h-3 w-3" />
                                   </Button>
@@ -439,7 +440,7 @@ export const NovedadDrawer = ({
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleDeleteNovedad(novedad.id)}
-                                    className="h-8 w-8 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
+                                    className="h-7 w-7 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -453,7 +454,7 @@ export const NovedadDrawer = ({
                   )}
                 </div>
               )}
-            </div>
+            </ScrollArea>
           </div>
         </div>
       </SheetContent>

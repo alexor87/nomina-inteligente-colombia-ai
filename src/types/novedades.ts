@@ -1,4 +1,3 @@
-
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -80,72 +79,84 @@ export type NovedadType =
 export const NOVEDAD_CATEGORIES = {
   devengados: {
     label: 'Devengados',
-    color: 'text-green-700 bg-green-50 border-green-200',
-    icon: '💰',
+    color: 'green',
     types: {
-      salario_base: { label: 'Salario base', requiere_dias: true, auto_calculo: true },
-      auxilio_transporte: { label: 'Auxilio de transporte', requiere_dias: true, auto_calculo: true },
-      horas_extra: { 
-        label: 'Horas extra', 
-        requiere_horas: true, 
+      horas_extra: {
+        label: 'Horas Extra',
+        requiere_horas: true,
+        requiere_dias: false,
         auto_calculo: true,
-        subtipos: {
-          diurna: 'Diurna (125%)',
-          nocturna: 'Nocturna (175%)',
-          dominical_diurna: 'Dominical diurna (175%)',
-          dominical_nocturna: 'Dominical nocturna (210%)',
-          festiva_diurna: 'Festiva diurna (175%)',
-          festiva_nocturna: 'Festiva nocturna (210%)'
-        }
+        subtipos: ['diurnas', 'nocturnas', 'dominicales', 'festivas']
       },
-      recargo_nocturno: { label: 'Recargo nocturno', requiere_horas: true, auto_calculo: true },
-      vacaciones: { 
-        label: 'Vacaciones', 
-        requiere_dias: true, 
+      bonificacion: {
+        label: 'Bonificación',
+        requiere_horas: false,
+        requiere_dias: false,
+        auto_calculo: false,
+        subtipos: ['productividad', 'ventas', 'puntualidad', 'permanencia']
+      },
+      comision: {
+        label: 'Comisión',
+        requiere_horas: false,
+        requiere_dias: false,
+        auto_calculo: false,
+        subtipos: ['ventas', 'cobranza', 'meta']
+      },
+      prima: {
+        label: 'Prima Extralegal',
+        requiere_horas: false,
+        requiere_dias: false,
+        auto_calculo: false,
+        subtipos: ['servicios', 'navidad', 'vacaciones']
+      },
+      incapacidad: {
+        label: 'Incapacidad',
+        requiere_horas: false,
+        requiere_dias: true,
         auto_calculo: true,
-        subtipos: {
-          disfrutadas: 'Disfrutadas',
-          compensadas: 'Compensadas en dinero'
-        }
+        subtipos: ['general', 'laboral', 'maternidad']
       },
-      licencia_remunerada: { 
-        label: 'Licencias remuneradas', 
-        requiere_dias: true, 
-        auto_calculo: true,
-        subtipos: {
-          maternidad: 'Maternidad',
-          paternidad: 'Paternidad',
-          luto: 'Luto'
-        }
-      },
-      incapacidad: { 
-        label: 'Incapacidades', 
-        requiere_dias: true, 
-        auto_calculo: true,
-        subtipos: {
-          eps: 'EPS (General)',
-          arl: 'ARL (Laboral)'
-        }
-      },
-      bonificacion: { label: 'Bonificaciones', requiere_valor: true },
-      comision: { label: 'Comisiones', requiere_valor: true },
-      prima: { label: 'Primas', requiere_valor: true },
-      otros_ingresos: { label: 'Otros ingresos', requiere_valor: true }
+      otros_ingresos: {
+        label: 'Otros Ingresos',
+        requiere_horas: false,
+        requiere_dias: false,
+        auto_calculo: false,
+        subtipos: ['subsidios', 'reintegros', 'compensaciones']
+      }
     }
   },
   deducciones: {
     label: 'Deducciones',
-    color: 'text-red-700 bg-red-50 border-red-200',
-    icon: '📉',
+    color: 'red',
     types: {
-      salud: { label: 'Salud (4%)', auto_calculo: true, porcentaje: 0.04 },
-      pension: { label: 'Pensión (4%)', auto_calculo: true, porcentaje: 0.04 },
-      fondo_solidaridad: { label: 'Fondo Solidaridad Pensional', auto_calculo: true },
-      retencion_fuente: { label: 'Retención en la fuente', auto_calculo: true },
-      libranza: { label: 'Libranzas/Préstamos', requiere_valor: true },
-      ausencia: { label: 'Ausencias no remuneradas', requiere_dias: true, auto_calculo: true },
-      multa: { label: 'Multas/Sanciones', requiere_valor: true },
-      descuento_voluntario: { label: 'Descuentos voluntarios', requiere_valor: true }
+      libranza: {
+        label: 'Libranza',
+        requiere_horas: false,
+        requiere_dias: false,
+        auto_calculo: false,
+        subtipos: ['banco', 'cooperativa', 'empresa']
+      },
+      multa: {
+        label: 'Multa',
+        requiere_horas: false,
+        requiere_dias: false,
+        auto_calculo: false,
+        subtipos: ['disciplinaria', 'reglamentaria', 'contractual']
+      },
+      ausencia: {
+        label: 'Ausencia',
+        requiere_horas: false,
+        requiere_dias: true,
+        auto_calculo: true,
+        subtipos: ['injustificada', 'permiso_no_remunerado', 'suspension']
+      },
+      descuento_voluntario: {
+        label: 'Descuento Voluntario',
+        requiere_horas: false,
+        requiere_dias: false,
+        auto_calculo: false,
+        subtipos: ['ahorro', 'prestamo', 'seguro', 'otros']
+      }
     }
   }
 } as const;
