@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +11,7 @@ import {
   Mail, Phone, Calendar, Building2, Briefcase
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { EmployeeFilters } from './EmployeeFilters';
+import { EmployeeFiltersComponent } from './EmployeeFilters';
 import { EmployeeFormModal } from './EmployeeFormModal';
 import { EmployeeDetailsModal } from './EmployeeDetailsModal';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
@@ -138,10 +137,12 @@ export const EmployeeList = () => {
       {showFilters && (
         <Card>
           <CardContent className="pt-6">
-            <EmployeeFilters
+            <EmployeeFiltersComponent
               filters={filters}
-              onFiltersChange={updateFilters}
-              onClear={clearFilters}
+              onUpdateFilters={updateFilters}
+              onClearFilters={clearFilters}
+              totalCount={totalEmployees}
+              filteredCount={filteredCount}
             />
           </CardContent>
         </Card>
