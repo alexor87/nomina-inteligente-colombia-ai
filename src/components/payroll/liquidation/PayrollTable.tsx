@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -158,7 +159,7 @@ export const PayrollTable = ({
         <Input
           type="number"
           defaultValue={value}
-          className="h-8 text-sm border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="h-7 text-xs border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           autoFocus
           onBlur={(e) => handleCellEdit(employeeId, field, e.target.value)}
           onKeyDown={(e) => {
@@ -176,14 +177,14 @@ export const PayrollTable = ({
     return (
       <div 
         className={`
-          cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors group
+          cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors group
           ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}
           ${className}
         `}
         onClick={() => handleCellClick(cellId)}
       >
         <div className="flex items-center justify-between">
-          <span className="font-medium text-gray-900">{formatCurrency(value)}</span>
+          <span className="font-medium text-gray-900 text-sm">{formatCurrency(value)}</span>
           {canEdit && <Edit2 className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100" />}
         </div>
       </div>
@@ -228,15 +229,15 @@ export const PayrollTable = ({
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50/50 hover:bg-gray-50/50 border-b border-gray-100">
-                <TableHead className="font-medium text-gray-700 h-12">Empleado</TableHead>
-                <TableHead className="font-medium text-gray-700">Cargo</TableHead>
-                <TableHead className="text-right font-medium text-gray-700">Salario Base</TableHead>
-                <TableHead className="text-center font-medium text-gray-700">Días</TableHead>
-                <TableHead className="text-right font-medium text-gray-700 text-green-700">Devengado</TableHead>
-                <TableHead className="text-right font-medium text-gray-700 text-red-700">Deducciones</TableHead>
-                <TableHead className="text-right font-medium text-gray-700 text-green-800">Neto</TableHead>
-                <TableHead className="text-center font-medium text-gray-700">Novedades</TableHead>
-                <TableHead className="text-center font-medium text-gray-700">Estado</TableHead>
+                <TableHead className="font-medium text-gray-700 h-10 w-[280px]">Empleado</TableHead>
+                <TableHead className="font-medium text-gray-700 w-[140px]">Cargo</TableHead>
+                <TableHead className="text-right font-medium text-gray-700 w-[120px]">Salario Base</TableHead>
+                <TableHead className="text-center font-medium text-gray-700 w-[80px]">Días</TableHead>
+                <TableHead className="text-right font-medium text-gray-700 text-green-700 w-[120px]">Devengado</TableHead>
+                <TableHead className="text-right font-medium text-gray-700 text-red-700 w-[120px]">Deducciones</TableHead>
+                <TableHead className="text-right font-medium text-gray-700 text-green-800 w-[120px]">Neto</TableHead>
+                <TableHead className="text-center font-medium text-gray-700 w-[100px]">Novedades</TableHead>
+                <TableHead className="text-center font-medium text-gray-700 w-[100px]">Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -250,60 +251,62 @@ export const PayrollTable = ({
                     key={employee.id} 
                     className="hover:bg-gray-50/50 transition-colors border-b border-gray-50"
                   >
-                    <TableCell className="py-4">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-1.5 h-8 rounded-full ${employee.status === 'error' ? 'bg-red-400' : 'bg-green-400'}`} />
+                    <TableCell className="py-3">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-1 h-6 rounded-full ${employee.status === 'error' ? 'bg-red-400' : 'bg-green-400'}`} />
                         <div>
-                          <div className="font-medium text-gray-900">{employee.name}</div>
+                          <div className="font-medium text-gray-900 text-sm">{employee.name}</div>
                           <div className="text-xs text-gray-500">{employee.id}</div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-700 py-4">
-                      {employee.position || 'No definido'}
+                    <TableCell className="text-gray-700 py-3 text-sm">
+                      <div className="truncate" title={employee.position || 'No definido'}>
+                        {employee.position || 'No definido'}
+                      </div>
                     </TableCell>
-                    <TableCell className="text-right py-4">
+                    <TableCell className="text-right py-3">
                       <EditableCell
                         employeeId={employee.id}
                         field="baseSalary"
                         value={employee.baseSalary}
                       />
                     </TableCell>
-                    <TableCell className="text-center py-4">
+                    <TableCell className="text-center py-3">
                       <EditableCell
                         employeeId={employee.id}
                         field="workedDays"
                         value={employee.workedDays}
                       />
                     </TableCell>
-                    <TableCell className="text-right py-4">
-                      <div className="font-medium text-green-700 px-3 py-1.5 bg-green-50 rounded-lg text-sm">
+                    <TableCell className="text-right py-3">
+                      <div className="font-medium text-green-700 px-2 py-1 bg-green-50 rounded text-sm">
                         {formatCurrency(employee.grossPay)}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right py-4">
-                      <div className="font-medium text-red-700 px-3 py-1.5 bg-red-50 rounded-lg text-sm">
+                    <TableCell className="text-right py-3">
+                      <div className="font-medium text-red-700 px-2 py-1 bg-red-50 rounded text-sm">
                         {formatCurrency(employee.deductions)}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right py-4">
-                      <div className="font-semibold text-green-800 px-3 py-1.5 bg-green-100 rounded-lg text-sm">
+                    <TableCell className="text-right py-3">
+                      <div className="font-semibold text-green-800 px-2 py-1 bg-green-100 rounded text-sm">
                         {formatCurrency(employee.netPay)}
                       </div>
                     </TableCell>
-                    <TableCell className="text-center py-4">
+                    <TableCell className="text-center py-3">
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => handleOpenNovedades(employee.id, employee.name)}
                         disabled={!canEdit || novedadesLoading}
-                        className="relative hover:bg-blue-50 h-9 px-3 text-sm font-medium text-gray-700"
+                        className="relative hover:bg-blue-50 h-7 px-2 text-xs font-medium text-gray-700"
                       >
-                        <Plus className="h-4 w-4 mr-1" />
+                        <Plus className="h-3 w-3 mr-1" />
                         {novedadesCount > 0 && (
                           <Badge 
                             variant="secondary" 
-                            className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-blue-600 text-white border-0"
+                            className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs bg-blue-600 text-white border-0"
                           >
                             {novedadesCount}
                           </Badge>
@@ -311,8 +314,8 @@ export const PayrollTable = ({
                         Novedad
                       </Button>
                     </TableCell>
-                    <TableCell className="text-center py-4">
-                      <Badge className={`${config.color} flex items-center space-x-1 border-0 px-3 py-1.5 w-fit text-xs font-medium`}>
+                    <TableCell className="text-center py-3">
+                      <Badge className={`${config.color} flex items-center space-x-1 border-0 px-2 py-1 w-fit text-xs font-medium`}>
                         <StatusIcon className="h-3 w-3" />
                         <span>{config.label}</span>
                       </Badge>
