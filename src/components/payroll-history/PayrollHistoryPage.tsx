@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryDetails } from './PayrollHistoryDetails';
@@ -7,19 +7,22 @@ import { ReopenDialog } from './ReopenDialog';
 import { EditWizard } from './EditWizard';
 import { Button } from '@/components/ui/button';
 import { Download, History } from 'lucide-react';
-import { mockPayrollHistoryPeriods } from '@/data/mockPayrollHistory';
 import { PayrollHistoryPeriod, PayrollHistoryFilters as Filters, EditWizardSteps } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
+import { useToast } from '@/hooks/use-toast';
 
 export const PayrollHistoryPage = () => {
   const [filters, setFilters] = useState<Filters>({
     dateRange: {}
   });
   const [selectedPeriod, setSelectedPeriod] = useState<PayrollHistoryPeriod | null>(null);
-  const [periods, setPeriods] = useState(mockPayrollHistoryPeriods);
+  const [periods, setPeriods] = useState<PayrollHistoryPeriod[]>([]);
+  const [isLoadingPeriods, setIsLoadingPeriods] = useState(true);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
   const [editWizardOpen, setEditWizardOpen] = useState(false);
   const [periodToReopen, setPeriodToReopen] = useState<PayrollHistoryPeriod | null>(null);
+  const { toast } = useToast();
 
   const {
     isLoading,
@@ -31,16 +34,65 @@ export const PayrollHistoryPage = () => {
     downloadFile
   } = usePayrollHistory();
 
+  // Cargar períodos reales desde la base de datos
+  useEffect(() => {
+    loadPayrollPeriods();
+  }, []);
+
+  const loadPayrollPeriods = async () => {
+    try {
+      setIsLoadingPeriods(true);
+      const realPeriods = await PayrollHistoryService.getPayrollPeriods();
+      
+      // Convertir los datos del servicio al formato esperado por el componente
+      const convertedPeriods: PayrollHistoryPeriod[] = realPeriods.map(record => ({
+        id: record.id,
+        period: record.periodo,
+        startDate: record.fechaCreacion.split('T')[0],
+        endDate: record.fechaCreacion.split('T')[0],
+        type: 'mensual' as const,
+        employeesCount: record.empleados,
+        status: record.estado === 'cerrada' ? 'cerrado' : 
+                record.estado === 'pagada' ? 'cerrado' : 
+                record.estado === 'procesada' ? 'revision_dian' : 'con_errores',
+        totalGrossPay: record.totalNomina * 1.3, // Estimado incluyendo prestaciones
+        totalNetPay: record.totalNomina,
+        pilaFileUrl: undefined,
+        dianStatus: record.estado === 'cerrada' || record.estado === 'pagada' ? 'enviado' : 'pendiente',
+        paymentStatus: record.estado === 'pagada' ? 'pagado' : 
+                      record.estado === 'procesada' ? 'parcial' : 'pendiente',
+        version: 1,
+        createdAt: record.fechaCreacion,
+        updatedAt: record.fechaCreacion
+      }));
+
+      setPeriods(convertedPeriods);
+    } catch (error) {
+      console.error('Error loading payroll periods:', error);
+      toast({
+        title: "Error al cargar períodos",
+        description: "No se pudieron cargar los períodos de nómina",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingPeriods(false);
+    }
+  };
+
   const handleViewDetails = (period: PayrollHistoryPeriod) => {
     setSelectedPeriod(period);
   };
 
-  const handleReopenPeriod = (period: PayrollHistoryPeriod) => {
+  const handleReopenPeriod = async (period: PayrollHistoryPeriod) => {
     // Verificar permisos (simulado)
     const userRole = 'Administrador'; // En un caso real, esto vendría del contexto de usuario
     
     if (userRole !== 'Administrador' && userRole !== 'Editor histórico') {
-      alert('No tiene permisos para reabrir períodos');
+      toast({
+        title: "Sin permisos",
+        description: "No tiene permisos para reabrir períodos",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -51,8 +103,25 @@ export const PayrollHistoryPage = () => {
       if (!confirmReopen) return;
     }
 
-    setPeriodToReopen(period);
-    setReopenDialogOpen(true);
+    try {
+      // Usar el servicio real para reabrir el período
+      await PayrollHistoryService.reopenPeriod(period.period);
+      
+      toast({
+        title: "Período reabierto",
+        description: "El período ha sido reabierto exitosamente",
+      });
+
+      // Recargar la lista de períodos
+      await loadPayrollPeriods();
+    } catch (error) {
+      console.error('Error reopening period:', error);
+      toast({
+        title: "Error al reabrir período",
+        description: "No se pudo reabrir el período. Intente nuevamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleConfirmReopen = async (reason: string) => {
@@ -134,6 +203,21 @@ export const PayrollHistoryPage = () => {
     );
   }
 
+  if (isLoadingPeriods) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Cargando períodos de nómina...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="min-h-screen bg-gray-50 p-6">
@@ -150,7 +234,7 @@ export const PayrollHistoryPage = () => {
               </div>
               <Button 
                 onClick={handleExportToExcel} 
-                disabled={isExporting}
+                disabled={isExporting || filteredPeriods.length === 0}
                 className="bg-green-600 hover:bg-green-700"
               >
                 <Download className="h-4 w-4 mr-2" />
@@ -192,12 +276,24 @@ export const PayrollHistoryPage = () => {
           </div>
 
           {/* Tabla */}
-          <PayrollHistoryTable 
-            periods={filteredPeriods}
-            onViewDetails={handleViewDetails}
-            onReopenPeriod={handleReopenPeriod}
-            onDownloadFile={handleDownloadFile}
-          />
+          {periods.length === 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 p-12">
+              <div className="text-center">
+                <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay períodos de nómina</h3>
+                <p className="text-gray-600">
+                  Aún no se han procesado períodos de nómina para esta empresa.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <PayrollHistoryTable 
+              periods={filteredPeriods}
+              onViewDetails={handleViewDetails}
+              onReopenPeriod={handleReopenPeriod}
+              onDownloadFile={handleDownloadFile}
+            />
+          )}
         </div>
       </div>
 
