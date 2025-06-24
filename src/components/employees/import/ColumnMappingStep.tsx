@@ -32,44 +32,50 @@ interface ColumnMappingStepProps {
   onBack: () => void;
 }
 
+// Funciones auxiliares movidas fuera del componente
+const suggestMapping = (columnName: string): string => {
+  const normalized = columnName.toLowerCase().trim();
+  
+  // Mapeo inteligente basado en palabras clave
+  if (normalized.includes('nombre') && !normalized.includes('apellido')) return 'nombre';
+  if (normalized.includes('apellido')) return 'apellido';
+  if (normalized.includes('cedula') || normalized.includes('documento') || normalized.includes('identificacion')) return 'cedula';
+  if (normalized.includes('email') || normalized.includes('correo')) return 'email';
+  if (normalized.includes('telefono') || normalized.includes('celular') || normalized.includes('movil')) return 'telefono';
+  if (normalized.includes('cargo') || normalized.includes('puesto')) return 'cargo';
+  if (normalized.includes('salario') || normalized.includes('sueldo')) return 'salarioBase';
+  if (normalized.includes('fecha') && (normalized.includes('ingreso') || normalized.includes('entrada'))) return 'fechaIngreso';
+  if (normalized.includes('contrato') || normalized.includes('tipo')) return 'tipoContrato';
+  if (normalized.includes('periodicidad') || normalized.includes('periodo')) return 'periodicidad';
+  if (normalized.includes('eps')) return 'eps';
+  if (normalized.includes('afp') || normalized.includes('pension')) return 'afp';
+  if (normalized.includes('arl')) return 'arl';
+  if (normalized.includes('caja')) return 'cajaCompensacion';
+  if (normalized.includes('estado')) return 'estado';
+  if (normalized.includes('centro') || normalized.includes('sede')) return 'centrosocial';
+  
+  return 'sin_mapear'; // Default value for unmapped columns
+};
+
+const isRequiredField = (fieldValue: string): boolean => {
+  const field = EMPLOYEE_FIELDS.find(f => f.value === fieldValue);
+  return field?.required || false;
+};
+
 export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepProps) => {
   const [mappings, setMappings] = useState<ColumnMapping[]>(() => {
-    return data.columns.map((column: string) => ({
-      sourceColumn: column,
-      targetField: suggestMapping(column),
-      isRequired: isRequiredField(suggestMapping(column)),
-      validation: 'valid' as const
-    }));
+    if (!data?.columns) return [];
+    
+    return data.columns.map((column: string) => {
+      const targetField = suggestMapping(column);
+      return {
+        sourceColumn: column,
+        targetField,
+        isRequired: isRequiredField(targetField),
+        validation: 'valid' as const
+      };
+    });
   });
-
-  const suggestMapping = (columnName: string): string => {
-    const normalized = columnName.toLowerCase().trim();
-    
-    // Mapeo inteligente basado en palabras clave
-    if (normalized.includes('nombre') && !normalized.includes('apellido')) return 'nombre';
-    if (normalized.includes('apellido')) return 'apellido';
-    if (normalized.includes('cedula') || normalized.includes('documento') || normalized.includes('identificacion')) return 'cedula';
-    if (normalized.includes('email') || normalized.includes('correo')) return 'email';
-    if (normalized.includes('telefono') || normalized.includes('celular') || normalized.includes('movil')) return 'telefono';
-    if (normalized.includes('cargo') || normalized.includes('puesto')) return 'cargo';
-    if (normalized.includes('salario') || normalized.includes('sueldo')) return 'salarioBase';
-    if (normalized.includes('fecha') && (normalized.includes('ingreso') || normalized.includes('entrada'))) return 'fechaIngreso';
-    if (normalized.includes('contrato') || normalized.includes('tipo')) return 'tipoContrato';
-    if (normalized.includes('periodicidad') || normalized.includes('periodo')) return 'periodicidad';
-    if (normalized.includes('eps')) return 'eps';
-    if (normalized.includes('afp') || normalized.includes('pension')) return 'afp';
-    if (normalized.includes('arl')) return 'arl';
-    if (normalized.includes('caja')) return 'cajaCompensacion';
-    if (normalized.includes('estado')) return 'estado';
-    if (normalized.includes('centro') || normalized.includes('sede')) return 'centrosocial';
-    
-    return 'sin_mapear'; // Default value for unmapped columns
-  };
-
-  const isRequiredField = (fieldValue: string): boolean => {
-    const field = EMPLOYEE_FIELDS.find(f => f.value === fieldValue);
-    return field?.required || false;
-  };
 
   const handleMappingChange = (sourceColumn: string, targetField: string) => {
     setMappings(prev => prev.map(mapping => 
@@ -108,6 +114,18 @@ export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepPro
 
   const requiredMappings = mappings.filter(m => m.isRequired && m.targetField !== 'sin_mapear');
   const hasRequiredFields = requiredMappings.length > 0;
+
+  if (!data?.columns) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-600">No se pudieron detectar columnas en el archivo.</p>
+        <Button variant="outline" onClick={onBack} className="mt-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
