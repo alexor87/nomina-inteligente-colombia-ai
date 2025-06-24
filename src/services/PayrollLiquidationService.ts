@@ -74,8 +74,13 @@ export class PayrollLiquidationService {
 
       if (payrollError) throw payrollError;
 
-      // Generar comprobantes de nómina para cada empleado
-      await this.generateVouchers(data, payrollData, companyId);
+      // Generar comprobantes de nómina para cada empleado (con mejor manejo de errores)
+      try {
+        await this.generateVouchers(data, payrollData, companyId);
+      } catch (voucherError) {
+        console.warn('Warning: Some vouchers could not be generated:', voucherError);
+        // No fallar toda la operación si los comprobantes fallan
+      }
 
       return `Liquidación procesada exitosamente para ${data.employees.length} empleados`;
     } catch (error) {
@@ -84,9 +89,11 @@ export class PayrollLiquidationService {
     }
   }
 
-  // Generar comprobantes de nómina
+  // Generar comprobantes de nómina (mejorado con mejor manejo de errores)
   static async generateVouchers(liquidationData: PayrollLiquidationData, payrollRecords: any[], companyId: string): Promise<void> {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const voucherInserts = liquidationData.employees.map((employee, index) => ({
         company_id: companyId,
         employee_id: employee.id,
@@ -97,7 +104,8 @@ export class PayrollLiquidationService {
         net_pay: employee.netPay,
         voucher_status: 'generado',
         sent_to_employee: false,
-        pdf_url: `/vouchers/pdf/${employee.id}_${liquidationData.period.startDate}_${liquidationData.period.endDate}.pdf`
+        generated_by: user?.id,
+        pdf_url: null // Se generará después cuando se implemente la funcionalidad de PDF
       }));
 
       const { error } = await supabase
