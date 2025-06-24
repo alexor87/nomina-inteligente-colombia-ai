@@ -16,7 +16,8 @@ import {
   Eye,
   Download,
   Mail,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 
 interface VoucherTableRowProps {
@@ -54,8 +55,26 @@ export const VoucherTableRow = ({
         return <XCircle className="h-4 w-4 text-red-500" />;
       case 'pendiente':
         return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'generado':
+        return <FileText className="h-4 w-4 text-blue-500" />;
       default:
-        return <CheckCircle2 className="h-4 w-4 text-blue-500" />;
+        return <Clock className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const handleViewPdf = () => {
+    if (voucher.pdfUrl) {
+      // Abrir el PDF en una nueva ventana
+      window.open(voucher.pdfUrl, '_blank');
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    if (voucher.voucherStatus === 'generado' || voucher.pdfUrl) {
+      onDownload(voucher.id);
+    } else {
+      // Si no está generado, regenerar primero
+      onRegenerate(voucher.id);
     }
   };
 
@@ -125,14 +144,14 @@ export const VoucherTableRow = ({
       </TableCell>
       
       <TableCell>
-        {voucher.pdfUrl ? (
+        {voucher.voucherStatus === 'generado' || voucher.pdfUrl ? (
           <div className="flex items-center space-x-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => window.open(voucher.pdfUrl, '_blank')}
+                  onClick={handleViewPdf}
                 >
                   <Eye className="h-4 w-4" />
                 </Button>
@@ -144,7 +163,7 @@ export const VoucherTableRow = ({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => onDownload(voucher.id)}
+                  onClick={handleDownloadPdf}
                 >
                   <Download className="h-4 w-4" />
                 </Button>
@@ -153,7 +172,22 @@ export const VoucherTableRow = ({
             </Tooltip>
           </div>
         ) : (
-          <span className="text-xs text-gray-400">No disponible</span>
+          <div className="flex items-center space-x-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDownloadPdf}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Generar PDF</TooltipContent>
+            </Tooltip>
+            <span className="text-xs text-gray-400">Generar</span>
+          </div>
         )}
       </TableCell>
       
@@ -166,6 +200,7 @@ export const VoucherTableRow = ({
                   size="sm"
                   variant="ghost"
                   onClick={() => onSendEmail(voucher.id)}
+                  disabled={voucher.voucherStatus !== 'generado'}
                 >
                   <Mail className="h-4 w-4" />
                 </Button>

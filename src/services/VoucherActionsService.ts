@@ -12,8 +12,20 @@ export class VoucherActionsService {
 
       if (error) throw error;
 
-      if (data.htmlContent) {
-        // Crear un blob con el contenido HTML y descargarlo
+      if (data.pdfBlob) {
+        // Crear un blob con el contenido PDF y descargarlo
+        const blob = new Blob([data.pdfBlob], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `comprobante_${voucher.employeeCedula}_${voucher.periodo}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else if (data.htmlContent) {
+        // Fallback: crear un HTML si no hay PDF
         const blob = new Blob([data.htmlContent], { type: 'text/html' });
         const url = window.URL.createObjectURL(blob);
         
@@ -55,10 +67,14 @@ export class VoucherActionsService {
   static async regenerateVoucher(voucherId: string): Promise<void> {
     try {
       const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
-        body: { voucherId }
+        body: { voucherId, regenerate: true }
       });
 
       if (error) throw error;
+
+      if (!data.success) {
+        throw new Error('Error al regenerar el comprobante');
+      }
     } catch (error: any) {
       console.error('Error regenerating voucher:', error);
       throw new Error('Error al regenerar el comprobante: ' + error.message);
