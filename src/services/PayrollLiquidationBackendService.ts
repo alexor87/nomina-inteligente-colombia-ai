@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollPeriodService } from './PayrollPeriodService';
@@ -337,7 +338,6 @@ export class PayrollLiquidationBackendService {
                   extraHours += valor;
                   break;
                 case 'bonificacion':
-                case 'comision':
                   bonuses += valor;
                   break;
                 case 'ausencia':
