@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
@@ -20,14 +20,35 @@ interface LayoutProps {
 export const Layout = ({ children }: LayoutProps) => {
   const { roles } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Changed to true to hide by default
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
+  // Handle click outside sidebar
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node) &&
+        !sidebarCollapsed
+      ) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [sidebarCollapsed]);
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      <div ref={sidebarRef}>
+        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      </div>
       
       <div className="flex-1 flex flex-col min-w-0">
         <Header 
