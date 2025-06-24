@@ -1,4 +1,3 @@
-
 import { Employee } from './index';
 
 export interface EmployeeWithStatus extends Employee {
@@ -10,6 +9,12 @@ export interface EmployeeWithStatus extends Employee {
   fechaUltimaModificacion?: string;
   usuarioUltimaModificacion?: string;
   avatar?: string;
+  // Status fields that are calculated/added by the service
+  payrollStatus?: string;
+  alertCount?: number;
+  ultimoProcesamientoNomina?: string;
+  proximoVencimientoContrato?: string | null;
+  diasDesdeUltimaRevision?: number;
 }
 
 export interface EmployeeFilters {
