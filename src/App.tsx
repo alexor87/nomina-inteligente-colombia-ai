@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import PayrollPage from "./pages/PayrollPage";
+import PayrollBackendPage from "./pages/PayrollBackendPage";
 import PayrollHistoryPage from "./pages/PayrollHistoryPage";
 import PaymentsPage from "./pages/PaymentsPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/empleados" element={<EmployeesPage />} />
             <Route path="/payroll" element={<PayrollPage />} />
+            <Route path="/payroll-backend" element={<PayrollBackendPage />} />
             <Route path="/liquidar-nomina" element={<PayrollPage />} />
             <Route path="/payroll-history" element={<PayrollHistoryPage />} />
             <Route path="/historial-nomina" element={<PayrollHistoryPage />} />
