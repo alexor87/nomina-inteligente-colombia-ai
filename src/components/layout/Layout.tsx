@@ -19,7 +19,7 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const { roles } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Changed to true to hide by default
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
