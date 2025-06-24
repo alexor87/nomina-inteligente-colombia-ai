@@ -47,37 +47,109 @@ export class PayrollLiquidationBackendService {
         throw new Error('No se encontró la empresa del usuario');
       }
 
-      const payrollInserts = data.employees.map(employee => ({
-        company_id: companyId,
-        employee_id: employee.id,
-        periodo: `${data.period.startDate} al ${data.period.endDate}`,
-        salario_base: employee.baseSalary,
-        dias_trabajados: employee.workedDays,
-        horas_extra: employee.extraHours,
-        bonificaciones: employee.bonuses,
-        auxilio_transporte: employee.transportAllowance,
-        total_devengado: employee.grossPay,
-        salud_empleado: employee.grossPay * 0.04,
-        pension_empleado: employee.grossPay * 0.04,
-        total_deducciones: employee.deductions,
-        neto_pagado: employee.netPay,
-        estado: 'procesada'
-      }));
+      const periodo = `${data.period.startDate} al ${data.period.endDate}`;
 
-      const { data: payrollData, error: payrollError } = await supabase
+      // Verificar si ya existen registros para este período y empleados
+      const { data: existingPayrolls, error: checkError } = await supabase
         .from('payrolls')
-        .insert(payrollInserts)
-        .select();
+        .select('employee_id')
+        .eq('company_id', companyId)
+        .eq('periodo', periodo);
 
-      if (payrollError) throw payrollError;
-
-      try {
-        await this.generateVouchers(data, payrollData, companyId);
-      } catch (voucherError) {
-        console.warn('Warning: Some vouchers could not be generated:', voucherError);
+      if (checkError) {
+        console.error('Error checking existing payrolls:', checkError);
+        throw new Error('Error al verificar registros existentes');
       }
 
-      return `Liquidación procesada exitosamente para ${data.employees.length} empleados`;
+      const existingEmployeeIds = new Set(existingPayrolls?.map(p => p.employee_id) || []);
+      
+      // Filtrar empleados que no tienen registros existentes
+      const newEmployees = data.employees.filter(emp => !existingEmployeeIds.has(emp.id));
+      
+      // Si hay empleados duplicados, actualizar en lugar de insertar
+      const duplicateEmployees = data.employees.filter(emp => existingEmployeeIds.has(emp.id));
+
+      let processedCount = 0;
+
+      // Insertar nuevos registros
+      if (newEmployees.length > 0) {
+        const payrollInserts = newEmployees.map(employee => ({
+          company_id: companyId,
+          employee_id: employee.id,
+          periodo: periodo,
+          salario_base: employee.baseSalary,
+          dias_trabajados: employee.workedDays,
+          horas_extra: employee.extraHours,
+          bonificaciones: employee.bonuses,
+          auxilio_transporte: employee.transportAllowance,
+          total_devengado: employee.grossPay,
+          salud_empleado: employee.grossPay * 0.04,
+          pension_empleado: employee.grossPay * 0.04,
+          total_deducciones: employee.deductions,
+          neto_pagado: employee.netPay,
+          estado: 'procesada'
+        }));
+
+        const { data: payrollData, error: payrollError } = await supabase
+          .from('payrolls')
+          .insert(payrollInserts)
+          .select();
+
+        if (payrollError) {
+          console.error('Error inserting new payrolls:', payrollError);
+          throw new Error('Error al insertar nuevos registros de nómina');
+        }
+
+        processedCount += newEmployees.length;
+
+        try {
+          await this.generateVouchers(
+            { ...data, employees: newEmployees }, 
+            payrollData, 
+            companyId
+          );
+        } catch (voucherError) {
+          console.warn('Warning: Some vouchers could not be generated:', voucherError);
+        }
+      }
+
+      // Actualizar registros existentes
+      if (duplicateEmployees.length > 0) {
+        for (const employee of duplicateEmployees) {
+          const { error: updateError } = await supabase
+            .from('payrolls')
+            .update({
+              salario_base: employee.baseSalary,
+              dias_trabajados: employee.workedDays,
+              horas_extra: employee.extraHours,
+              bonificaciones: employee.bonuses,
+              auxilio_transporte: employee.transportAllowance,
+              total_devengado: employee.grossPay,
+              salud_empleado: employee.grossPay * 0.04,
+              pension_empleado: employee.grossPay * 0.04,
+              total_deducciones: employee.deductions,
+              neto_pagado: employee.netPay,
+              estado: 'procesada'
+            })
+            .eq('company_id', companyId)
+            .eq('employee_id', employee.id)
+            .eq('periodo', periodo);
+
+          if (updateError) {
+            console.error('Error updating existing payroll:', updateError);
+            throw new Error(`Error al actualizar nómina para empleado ${employee.name}`);
+          }
+        }
+        processedCount += duplicateEmployees.length;
+      }
+
+      const message = newEmployees.length > 0 && duplicateEmployees.length > 0
+        ? `Liquidación procesada: ${newEmployees.length} nuevos registros y ${duplicateEmployees.length} actualizados`
+        : newEmployees.length > 0
+        ? `Liquidación procesada exitosamente para ${newEmployees.length} empleados`
+        : `${duplicateEmployees.length} registros de nómina actualizados`;
+
+      return message;
     } catch (error) {
       console.error('Error saving payroll liquidation:', error);
       throw new Error('Error al guardar la liquidación de nómina');
@@ -159,7 +231,6 @@ export class PayrollLiquidationBackendService {
 
       console.log(`Loaded ${data.length} active employees for payroll liquidation with ${periodType} periodicity`);
 
-      // Calcular empleados usando el backend
       const employeePromises = data.map(async (emp) => {
         const baseEmployeeData = {
           id: emp.id,
