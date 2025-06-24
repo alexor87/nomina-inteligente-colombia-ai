@@ -76,8 +76,8 @@ export const NovedadDrawer = ({
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[700px] sm:w-[800px] max-w-[90vw] flex flex-col h-full p-0">
-        <SheetHeader className="px-8 py-6 border-b bg-white">
+      <SheetContent className="w-[90vw] sm:w-[900px] lg:w-[1000px] xl:w-[1200px] max-w-[95vw] flex flex-col h-full p-0">
+        <SheetHeader className="px-8 py-6 border-b bg-white shrink-0">
           <SheetTitle className="text-2xl font-semibold">
             Novedades - {employeeName}
           </SheetTitle>
