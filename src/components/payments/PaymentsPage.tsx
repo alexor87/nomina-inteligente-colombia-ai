@@ -7,79 +7,17 @@ import { PaymentsTable } from './PaymentsTable';
 import { BankFileGenerator } from './BankFileGenerator';
 import { PaymentConfirmationModal } from './PaymentConfirmationModal';
 import { RetryPaymentModal } from './RetryPaymentModal';
-import { PaymentEmployee, PaymentFilters, PaymentPeriod } from '@/types/payments';
+import { PaymentEmployee, PaymentFilters } from '@/types/payments';
 import { usePayments } from '@/hooks/usePayments';
-
-// Mock data
-const mockPaymentPeriod: PaymentPeriod = {
-  id: '1',
-  periodName: '1 al 15 de junio de 2025',
-  startDate: '2025-06-01',
-  endDate: '2025-06-15',
-  status: 'processing',
-  totalEmployees: 45,
-  totalAmount: 85420000,
-  totalPaid: 65320000,
-  totalFailed: 3250000,
-  createdAt: '2025-06-15T10:00:00Z',
-  updatedAt: '2025-06-16T14:30:00Z'
-};
-
-const mockPaymentEmployees: PaymentEmployee[] = [
-  {
-    id: '1',
-    employeeId: 'emp1',
-    name: 'María González',
-    position: 'Desarrolladora Senior',
-    bankName: 'Bancolombia',
-    accountType: 'ahorros',
-    accountNumber: '12345678901',
-    netPay: 3500000,
-    paymentStatus: 'pagado',
-    paymentMethod: 'transferencia',
-    paymentDate: '2025-06-16',
-    confirmedBy: 'admin@empresa.com',
-    costCenter: 'Tecnología'
-  },
-  {
-    id: '2',
-    employeeId: 'emp2',
-    name: 'Carlos Rodríguez',
-    position: 'Analista Financiero',
-    bankName: 'Banco de Bogotá',
-    accountType: 'corriente',
-    accountNumber: '987654321',
-    netPay: 2800000,
-    paymentStatus: 'fallido',
-    paymentMethod: 'transferencia',
-    errorReason: 'Cuenta inválida',
-    costCenter: 'Finanzas'
-  },
-  {
-    id: '3',
-    employeeId: 'emp3',
-    name: 'Ana Martínez',
-    position: 'Gerente de Ventas',
-    bankName: 'Davivienda',
-    accountType: 'ahorros',
-    accountNumber: '5555666677',
-    netPay: 4200000,
-    paymentStatus: 'pendiente',
-    paymentMethod: 'transferencia',
-    costCenter: 'Ventas'
-  }
-];
+import { LoadingState } from '@/components/ui/LoadingState';
 
 export const PaymentsPage = () => {
-  const [filters, setFilters] = useState<PaymentFilters>({});
-  const [employees, setEmployees] = useState(mockPaymentEmployees);
-  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [showBankFileGenerator, setShowBankFileGenerator] = useState(false);
-  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
-  const [showRetryPayment, setShowRetryPayment] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<PaymentEmployee | null>(null);
-
   const {
+    employees,
+    currentPeriod,
+    isLoading,
+    filters,
+    updateFilters,
     markEmployeeAsPaid,
     markMultipleAsPaid,
     retryPayment,
@@ -87,28 +25,30 @@ export const PaymentsPage = () => {
     downloadPaymentReport
   } = usePayments();
 
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [showBankFileGenerator, setShowBankFileGenerator] = useState(false);
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+  const [showRetryPayment, setShowRetryPayment] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<PaymentEmployee | null>(null);
+
+  if (isLoading) {
+    return <LoadingState message="Cargando datos de pagos..." className="h-64" />;
+  }
+
   // Verificar empleados sin datos bancarios
   const employeesWithoutBankData = employees.filter(emp => 
-    !emp.bankName || !emp.accountNumber
+    emp.bankName === 'Por configurar' || emp.accountNumber === 'Por configurar'
   );
-
-  // Filtrar empleados
-  const filteredEmployees = employees.filter(employee => {
-    if (filters.paymentStatus && employee.paymentStatus !== filters.paymentStatus) return false;
-    if (filters.bankName && employee.bankName !== filters.bankName) return false;
-    if (filters.costCenter && employee.costCenter !== filters.costCenter) return false;
-    return true;
-  });
 
   // Calcular resumen
   const summary = {
-    totalEmployees: filteredEmployees.length,
-    totalAmount: filteredEmployees.reduce((sum, emp) => sum + emp.netPay, 0),
-    totalPaid: filteredEmployees.filter(emp => emp.paymentStatus === 'pagado').reduce((sum, emp) => sum + emp.netPay, 0),
-    totalFailed: filteredEmployees.filter(emp => emp.paymentStatus === 'fallido').reduce((sum, emp) => sum + emp.netPay, 0),
-    paidCount: filteredEmployees.filter(emp => emp.paymentStatus === 'pagado').length,
-    failedCount: filteredEmployees.filter(emp => emp.paymentStatus === 'fallido').length,
-    progressPercentage: filteredEmployees.length > 0 ? Math.round((filteredEmployees.filter(emp => emp.paymentStatus === 'pagado').length / filteredEmployees.length) * 100) : 0
+    totalEmployees: employees.length,
+    totalAmount: employees.reduce((sum, emp) => sum + emp.netPay, 0),
+    totalPaid: employees.filter(emp => emp.paymentStatus === 'pagado').reduce((sum, emp) => sum + emp.netPay, 0),
+    totalFailed: employees.filter(emp => emp.paymentStatus === 'fallido').reduce((sum, emp) => sum + emp.netPay, 0),
+    paidCount: employees.filter(emp => emp.paymentStatus === 'pagado').length,
+    failedCount: employees.filter(emp => emp.paymentStatus === 'fallido').length,
+    progressPercentage: employees.length > 0 ? Math.round((employees.filter(emp => emp.paymentStatus === 'pagado').length / employees.length) * 100) : 0
   };
 
   const handleMarkAsPaid = (employee: PaymentEmployee) => {
@@ -126,11 +66,6 @@ export const PaymentsPage = () => {
     
     const success = await markEmployeeAsPaid(selectedEmployee.id, confirmation);
     if (success) {
-      setEmployees(prev => prev.map(emp => 
-        emp.id === selectedEmployee.id 
-          ? { ...emp, paymentStatus: 'pagado', paymentDate: confirmation.paymentDate, confirmedBy: confirmation.confirmedBy, observations: confirmation.observations }
-          : emp
-      ));
       setShowPaymentConfirmation(false);
       setSelectedEmployee(null);
     }
@@ -138,23 +73,39 @@ export const PaymentsPage = () => {
 
   const handleUpdateBankAccount = async (employeeId: string, accountData: any) => {
     const success = await updateBankAccount(employeeId, accountData);
-    if (success) {
-      setEmployees(prev => prev.map(emp => 
-        emp.id === employeeId 
-          ? { ...emp, ...accountData, paymentStatus: 'pendiente', errorReason: undefined }
-          : emp
-      ));
-    }
     return success;
   };
+
+  // Si no hay período actual, mostrar mensaje
+  if (!currentPeriod) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="text-gray-500 mb-4">
+              <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No hay nóminas procesadas para pagar
+            </h3>
+            <p className="text-gray-600">
+              Primero debes procesar una liquidación de nómina en el módulo de Liquidar Nómina.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <PaymentsHeader 
-          period={mockPaymentPeriod}
-          onDownloadReport={() => downloadPaymentReport(mockPaymentPeriod.id)}
+          period={currentPeriod}
+          onDownloadReport={() => downloadPaymentReport(currentPeriod.id)}
         />
 
         {/* Alerta de empleados sin datos bancarios */}
@@ -177,7 +128,7 @@ export const PaymentsPage = () => {
         {/* Filtros */}
         <PaymentsFilters 
           filters={filters}
-          onFiltersChange={setFilters}
+          onFiltersChange={updateFilters}
           employees={employees}
         />
 
@@ -191,6 +142,7 @@ export const PaymentsPage = () => {
             <button
               onClick={() => setShowBankFileGenerator(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+              disabled={employees.filter(emp => emp.paymentStatus !== 'pagado').length === 0}
             >
               Generar archivo bancario
             </button>
@@ -199,7 +151,7 @@ export const PaymentsPage = () => {
 
         {/* Tabla de empleados */}
         <PaymentsTable 
-          employees={filteredEmployees}
+          employees={employees}
           selectedEmployees={selectedEmployees}
           onSelectionChange={setSelectedEmployees}
           onMarkAsPaid={handleMarkAsPaid}
@@ -211,7 +163,7 @@ export const PaymentsPage = () => {
         <BankFileGenerator
           isOpen={showBankFileGenerator}
           onClose={() => setShowBankFileGenerator(false)}
-          employees={filteredEmployees.filter(emp => emp.paymentStatus !== 'pagado')}
+          employees={employees.filter(emp => emp.paymentStatus !== 'pagado')}
         />
 
         <PaymentConfirmationModal

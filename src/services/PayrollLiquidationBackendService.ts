@@ -241,15 +241,16 @@ export class PayrollLiquidationBackendService {
             })
             .eq('id', existingVoucher.id);
         } else {
-          // Crear nuevo comprobante si no existe
+          // Crear nuevo comprobante si no existe - usar fechas del período actual
+          const currentDate = new Date().toISOString().split('T')[0];
           await supabase
             .from('payroll_vouchers')
             .insert({
               company_id: companyId,
               employee_id: employee.id,
               periodo: periodo,
-              start_date: employee.startDate || new Date().toISOString().split('T')[0],
-              end_date: employee.endDate || new Date().toISOString().split('T')[0],
+              start_date: currentDate,
+              end_date: currentDate,
               net_pay: employee.netPay,
               voucher_status: 'generado',
               sent_to_employee: false,

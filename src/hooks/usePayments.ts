@@ -40,7 +40,7 @@ export const usePayments = () => {
         return;
       }
 
-      // Cargar empleados con datos de nómina procesada
+      // Cargar empleados con datos de nómina procesada más reciente
       const { data: payrollData, error } = await supabase
         .from('payrolls')
         .select(`
@@ -50,7 +50,8 @@ export const usePayments = () => {
             nombre,
             apellido,
             cargo,
-            email
+            email,
+            cedula
           )
         `)
         .eq('company_id', companyId)
@@ -59,35 +60,39 @@ export const usePayments = () => {
 
       if (error) throw error;
 
+      console.log('Loaded payroll data for payments:', payrollData?.length || 0);
+
       // Convertir datos de nómina a formato de pagos
       const paymentEmployees: PaymentEmployee[] = (payrollData || []).map(payroll => ({
         id: payroll.id,
         employeeId: payroll.employee_id,
         name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
         position: payroll.employees.cargo || 'Sin cargo',
-        bankName: 'Bancolombia', // Por defecto
+        bankName: 'Por configurar', // Esto debería venir de una tabla de cuentas bancarias
         accountType: 'ahorros',
-        accountNumber: '****1234', // Por defecto
+        accountNumber: 'Por configurar', // Esto debería venir de una tabla de cuentas bancarias
         netPay: Number(payroll.neto_pagado || 0),
-        paymentStatus: 'pendiente',
+        paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente',
         paymentMethod: 'transferencia',
         costCenter: 'Administración'
       }));
 
       setEmployees(paymentEmployees);
 
-      // Crear período actual basado en los datos
+      // Crear período actual basado en los datos más recientes
       if (payrollData && payrollData.length > 0) {
         const latestPeriod = payrollData[0].periodo;
+        const periodEmployees = payrollData.filter(p => p.periodo === latestPeriod);
+        
         setCurrentPeriod({
           id: 'current',
           periodName: latestPeriod,
           startDate: new Date().toISOString().split('T')[0],
           endDate: new Date().toISOString().split('T')[0],
           status: 'processing',
-          totalEmployees: paymentEmployees.length,
-          totalAmount: paymentEmployees.reduce((sum, emp) => sum + emp.netPay, 0),
-          totalPaid: 0,
+          totalEmployees: periodEmployees.length,
+          totalAmount: periodEmployees.reduce((sum, emp) => sum + Number(emp.neto_pagado || 0), 0),
+          totalPaid: periodEmployees.filter(emp => emp.estado === 'pagada').reduce((sum, emp) => sum + Number(emp.neto_pagado || 0), 0),
           totalFailed: 0,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
