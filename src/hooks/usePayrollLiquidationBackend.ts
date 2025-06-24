@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationBackendService } from '@/services/PayrollLiquidationBackendService';
@@ -87,12 +88,34 @@ export const usePayrollLiquidationBackend = () => {
         grossPay: emp.grossPay
       })));
       
-      setEmployees(loadedEmployees);
+      // Transform loaded employees to match PayrollEmployee interface
+      const transformedEmployees: PayrollEmployee[] = loadedEmployees.map(emp => ({
+        id: emp.id,
+        name: emp.name,
+        position: emp.position,
+        baseSalary: emp.baseSalary,
+        workedDays: emp.workedDays,
+        extraHours: emp.extraHours,
+        disabilities: emp.disabilities,
+        bonuses: emp.bonuses,
+        absences: emp.absences,
+        grossPay: emp.grossPay,
+        deductions: emp.deductions,
+        netPay: emp.netPay,
+        status: emp.status,
+        errors: emp.validationErrors || [],
+        eps: emp.eps,
+        afp: emp.afp,
+        transportAllowance: emp.baseSalary <= 2600000 ? 200000 : 0,
+        employerContributions: emp.employerContributions
+      }));
       
-      if (loadedEmployees.length > 0) {
+      setEmployees(transformedEmployees);
+      
+      if (transformedEmployees.length > 0) {
         toast({
           title: "Empleados cargados (Backend + Novedades)",
-          description: `Se cargaron ${loadedEmployees.length} empleados activos con sus novedades aplicadas`
+          description: `Se cargaron ${transformedEmployees.length} empleados activos con sus novedades aplicadas`
         });
       } else {
         toast({
@@ -252,7 +275,29 @@ export const usePayrollLiquidationBackend = () => {
       // Reload employees to get fresh novedades data
       const recalculatedEmployees = await PayrollLiquidationBackendService.loadEmployeesForLiquidation();
       
-      setEmployees(recalculatedEmployees);
+      // Transform the employees to match PayrollEmployee interface
+      const transformedEmployees: PayrollEmployee[] = recalculatedEmployees.map(emp => ({
+        id: emp.id,
+        name: emp.name,
+        position: emp.position,
+        baseSalary: emp.baseSalary,
+        workedDays: emp.workedDays,
+        extraHours: emp.extraHours,
+        disabilities: emp.disabilities,
+        bonuses: emp.bonuses,
+        absences: emp.absences,
+        grossPay: emp.grossPay,
+        deductions: emp.deductions,
+        netPay: emp.netPay,
+        status: emp.status,
+        errors: emp.validationErrors || [],
+        eps: emp.eps,
+        afp: emp.afp,
+        transportAllowance: emp.baseSalary <= 2600000 ? 200000 : 0,
+        employerContributions: emp.employerContributions
+      }));
+      
+      setEmployees(transformedEmployees);
 
       toast({
         title: "Recálculo completado (Backend + Novedades)",

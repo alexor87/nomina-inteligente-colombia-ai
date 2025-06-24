@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { NovedadForm } from './NovedadForm';
-import { PayrollNovedad, NovedadFormData, NOVEDAD_CATEGORIES } from '@/types/novedades';
+import { PayrollNovedad, NovedadFormData, NOVEDAD_CATEGORIES, NovedadType } from '@/types/novedades';
 import { Trash2, Edit2, Calendar, DollarSign, Plus, FileText, User, Clock, Calculator, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface NovedadDrawerProps {
@@ -86,17 +86,25 @@ export const NovedadDrawer = ({
   const totalDeducciones = deducciones.reduce((sum, n) => sum + n.valor, 0);
   const impactoNeto = totalDevengados - totalDeducciones;
 
-  const getCategoryInfo = (tipoNovedad: string) => {
-    for (const [categoryKey, category] of Object.entries(NOVEDAD_CATEGORIES)) {
-      const typeKey = tipoNovedad as keyof typeof category.types;
-      if (category.types[typeKey]) {
-        return {
-          category: categoryKey as 'devengados' | 'deducciones',
-          config: category,
-          type: category.types[typeKey]
-        };
-      }
+  const getCategoryInfo = (tipoNovedad: NovedadType) => {
+    // Check devengados category
+    if (tipoNovedad in NOVEDAD_CATEGORIES.devengados.types) {
+      return {
+        category: 'devengados' as const,
+        config: NOVEDAD_CATEGORIES.devengados,
+        type: NOVEDAD_CATEGORIES.devengados.types[tipoNovedad]
+      };
     }
+    
+    // Check deducciones category
+    if (tipoNovedad in NOVEDAD_CATEGORIES.deducciones.types) {
+      return {
+        category: 'deducciones' as const,
+        config: NOVEDAD_CATEGORIES.deducciones,
+        type: NOVEDAD_CATEGORIES.deducciones.types[tipoNovedad]
+      };
+    }
+    
     return null;
   };
 
