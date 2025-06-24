@@ -148,7 +148,30 @@ export const PayrollLiquidationBackendService = {
 
       if (!profile?.company_id) throw new Error('Usuario sin empresa asignada');
 
-      // 2. Get active employees
+      // 2. Get company settings to determine default worked days
+      const { data: companySettings } = await supabase
+        .from('company_settings')
+        .select('periodicity')
+        .eq('company_id', profile.company_id)
+        .single();
+
+      // Calculate default worked days based on company periodicity
+      const getDefaultWorkedDays = (periodicity: string) => {
+        switch (periodicity) {
+          case 'quincenal':
+            return 15;
+          case 'semanal':
+            return 7;
+          case 'mensual':
+          default:
+            return 30;
+        }
+      };
+
+      const defaultWorkedDays = getDefaultWorkedDays(companySettings?.periodicity || 'mensual');
+      console.log(`Using default worked days: ${defaultWorkedDays} based on periodicity: ${companySettings?.periodicity || 'mensual'}`);
+
+      // 3. Get active employees
       const { data: employees, error: employeesError } = await supabase
         .from('employees')
         .select('*')
@@ -160,7 +183,7 @@ export const PayrollLiquidationBackendService = {
 
       console.log(`Empleados cargados para la empresa del usuario: ${employees.length}`);
 
-      // 3. Get current active period
+      // 4. Get current active period
       const { data: activePeriod } = await supabase
         .from('payroll_periods')
         .select('*')
@@ -170,7 +193,7 @@ export const PayrollLiquidationBackendService = {
         .limit(1)
         .single();
 
-      // 4. Get novedades for the active period
+      // 5. Get novedades for the active period
       let novedadesByEmployee: Record<string, any[]> = {};
       if (activePeriod) {
         const { data: novedades } = await supabase
@@ -190,7 +213,7 @@ export const PayrollLiquidationBackendService = {
         }
       }
 
-      // 5. Calculate payroll for each employee with novedades
+      // 6. Calculate payroll for each employee with novedades
       const calculatedEmployees = await Promise.all(
         employees.map(async (employee) => {
           const employeeNovedades = novedadesByEmployee[employee.id] || [];
@@ -228,14 +251,17 @@ export const PayrollLiquidationBackendService = {
             }
           });
 
+          // Use default worked days from company configuration minus absences
+          const workedDays = Math.max(0, defaultWorkedDays - absences);
+
           const input: PayrollCalculationInput = {
             baseSalary: Number(employee.salario_base) || 1300000,
-            workedDays: 30 - absences,
+            workedDays,
             extraHours,
             disabilities,
             bonuses,
             absences,
-            periodType: activePeriod?.tipo_periodo as 'quincenal' | 'mensual' || 'mensual'
+            periodType: activePeriod?.tipo_periodo as 'quincenal' | 'mensual' || companySettings?.periodicity as 'quincenal' | 'mensual' || 'mensual'
           };
 
           try {
@@ -271,7 +297,7 @@ export const PayrollLiquidationBackendService = {
               name: `${employee.nombre} ${employee.apellido}`,
               position: employee.cargo || 'No definido',
               baseSalary: Number(employee.salario_base) || 1300000,
-              workedDays: 30,
+              workedDays: defaultWorkedDays,
               extraHours: 0,
               bonuses: 0,
               absences: 0,
