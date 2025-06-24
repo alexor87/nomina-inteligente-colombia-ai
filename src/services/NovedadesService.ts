@@ -71,25 +71,47 @@ export class NovedadesService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
+      console.log('🔍 Datos recibidos para crear novedad:', novedadData);
+
+      // Preparar los datos para inserción, eliminando campos undefined/null
+      const insertData = {
+        company_id: companyId,
+        empleado_id: novedadData.empleado_id,
+        periodo_id: novedadData.periodo_id,
+        tipo_novedad: novedadData.tipo_novedad,
+        valor: novedadData.valor || 0,
+        creado_por: user.id,
+        ...(novedadData.subtipo && { subtipo: novedadData.subtipo }),
+        ...(novedadData.fecha_inicio && { fecha_inicio: novedadData.fecha_inicio }),
+        ...(novedadData.fecha_fin && { fecha_fin: novedadData.fecha_fin }),
+        ...(novedadData.dias && novedadData.dias > 0 && { dias: novedadData.dias }),
+        ...(novedadData.horas && novedadData.horas > 0 && { horas: novedadData.horas }),
+        ...(novedadData.observacion && { observacion: novedadData.observacion }),
+        ...(novedadData.base_calculo && { base_calculo: novedadData.base_calculo }),
+        ...(novedadData.adjunto_url && { adjunto_url: novedadData.adjunto_url })
+      };
+
+      console.log('📤 Datos preparados para inserción:', insertData);
+
       const { data, error } = await supabase
         .from('payroll_novedades')
-        .insert({
-          ...novedadData,
-          company_id: companyId,
-          creado_por: user.id,
-          valor: novedadData.valor || 0
-        })
+        .insert(insertData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error en la inserción:', error);
+        throw error;
+      }
+
+      console.log('✅ Novedad creada exitosamente:', data);
 
       // Create audit log
       await this.createAuditLog(data.id, 'created', null, data);
 
       return data as PayrollNovedad;
     } catch (error) {
-      console.error('Error creating novedad:', error);
+      console.error('❌ Error creating novedad:', error);
       throw error;
     }
   }

@@ -82,18 +82,34 @@ export const NovedadForm = ({
       autoCalculo: currentTypeConfig?.auto_calculo
     });
 
-    if (currentTypeConfig?.auto_calculo && (dias > 0 || horas > 0 || tipoNovedad === 'salud' || tipoNovedad === 'pension')) {
-      const result = calcularValorNovedad(tipoNovedad, subtipo, employeeSalary, dias, horas);
-      console.log('Resultado del cálculo:', result);
+    if (currentTypeConfig?.auto_calculo) {
+      // Validar que tenemos los datos necesarios para el cálculo
+      let canCalculate = false;
       
-      setCalculatedValue(result.valor);
-      setCalculationDetail(result.baseCalculo.detalle_calculo);
-      
-      if (result.valor > 0) {
-        setValue('valor', result.valor);
-        console.log('Valor actualizado en el formulario:', result.valor);
+      if (currentTypeConfig.requiere_horas && horas > 0) {
+        canCalculate = true;
+      } else if (currentTypeConfig.requiere_dias && dias > 0) {
+        canCalculate = true;
+      } else if (!currentTypeConfig.requiere_horas && !currentTypeConfig.requiere_dias) {
+        canCalculate = true;
       }
-    } else if (!currentTypeConfig?.auto_calculo) {
+
+      if (canCalculate) {
+        const result = calcularValorNovedad(tipoNovedad, subtipo, employeeSalary, dias, horas);
+        console.log('Resultado del cálculo:', result);
+        
+        setCalculatedValue(result.valor);
+        setCalculationDetail(result.baseCalculo.detalle_calculo);
+        
+        if (result.valor > 0) {
+          setValue('valor', result.valor);
+          console.log('Valor actualizado en el formulario:', result.valor);
+        }
+      } else {
+        setCalculatedValue(0);
+        setCalculationDetail('Ingrese los datos requeridos para el cálculo');
+      }
+    } else {
       // Limpiar cálculo automático si no aplica
       setCalculatedValue(0);
       setCalculationDetail('');
@@ -102,10 +118,50 @@ export const NovedadForm = ({
 
   const handleFormSubmit = async (data: NovedadFormData) => {
     try {
-      console.log('Enviando novedad:', data);
-      await onSubmit(data);
+      console.log('📋 Datos del formulario antes de envío:', data);
+      
+      // Validar campos requeridos según el tipo de novedad
+      const errors = [];
+      
+      if (currentTypeConfig?.requiere_horas && (!data.horas || data.horas <= 0)) {
+        errors.push('Las horas son requeridas para este tipo de novedad');
+      }
+      
+      if (currentTypeConfig?.requiere_dias && (!data.dias || data.dias <= 0)) {
+        errors.push('Los días son requeridos para este tipo de novedad');
+      }
+      
+      if (currentTypeConfig?.subtipos && currentTypeConfig.subtipos.length > 0 && !data.subtipo) {
+        errors.push('El subtipo es requerido para este tipo de novedad');
+      }
+      
+      if (!data.valor || data.valor <= 0) {
+        errors.push('El valor debe ser mayor a 0');
+      }
+      
+      if (errors.length > 0) {
+        console.error('❌ Errores de validación:', errors);
+        alert('Por favor corrija los siguientes errores:\n' + errors.join('\n'));
+        return;
+      }
+      
+      // Limpiar datos opcionales que no se necesitan
+      const cleanData = {
+        ...data,
+        // Solo enviar campos que tienen valor
+        subtipo: data.subtipo || undefined,
+        fecha_inicio: data.fecha_inicio || undefined,
+        fecha_fin: data.fecha_fin || undefined,
+        dias: data.dias > 0 ? data.dias : undefined,
+        horas: data.horas > 0 ? data.horas : undefined,
+        observacion: data.observacion || undefined
+      };
+      
+      console.log('✅ Datos limpios para envío:', cleanData);
+      await onSubmit(cleanData);
     } catch (error) {
-      console.error('Error submitting novedad:', error);
+      console.error('❌ Error submitting novedad:', error);
+      alert('Error al guardar la novedad. Por favor intente nuevamente.');
     }
   };
 
@@ -189,10 +245,10 @@ export const NovedadForm = ({
         </div>
 
         {/* Subtipo si aplica */}
-        {currentTypeConfig?.subtipos && (
+        {currentTypeConfig?.subtipos && currentTypeConfig.subtipos.length > 0 && (
           <div className="space-y-2">
             <Label htmlFor="subtipo" className="text-sm font-medium text-gray-900">
-              Subtipo
+              Subtipo *
             </Label>
             <Controller
               name="subtipo"
@@ -251,7 +307,7 @@ export const NovedadForm = ({
           {currentTypeConfig?.requiere_dias && (
             <div className="space-y-2">
               <Label htmlFor="dias" className="text-sm font-medium text-gray-900">
-                Días
+                Días *
               </Label>
               <Input
                 {...register('dias', { 
@@ -273,7 +329,7 @@ export const NovedadForm = ({
           {currentTypeConfig?.requiere_horas && (
             <div className="space-y-2">
               <Label htmlFor="horas" className="text-sm font-medium text-gray-900">
-                Horas
+                Horas *
               </Label>
               <Input
                 {...register('horas', { 
@@ -295,7 +351,7 @@ export const NovedadForm = ({
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <Label htmlFor="valor" className="text-sm font-medium text-gray-900">
-                Valor
+                Valor *
               </Label>
               {currentTypeConfig?.auto_calculo && (
                 <Badge variant="outline" className="text-xs">
