@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,18 +8,40 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, Plus, Trash2, Info } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+
+interface CompanyData {
+  id?: string;
+  razon_social: string;
+  nit: string;
+  direccion: string;
+  ciudad: string;
+  telefono: string;
+  email: string;
+  representante_legal: string;
+  actividad_economica: string;
+  estado: string;
+  plan: string;
+}
 
 export const EmpresaSettings = () => {
   const { toast } = useToast();
-  const [config, setConfig] = useState({
-    // Información Básica
-    razonSocial: '',
+  const [isLoading, setIsLoading] = useState(true);
+  const [companyData, setCompanyData] = useState<CompanyData>({
+    razon_social: '',
     nit: '',
     direccion: '',
     ciudad: '',
-    tipoEmpresa: '',
-    representanteLegal: '',
-    actividadEconomica: '',
+    telefono: '',
+    email: '',
+    representante_legal: '',
+    actividad_economica: '',
+    estado: 'activa',
+    plan: 'basico'
+  });
+  
+  const [config, setConfig] = useState({
+    // Información Básica - ahora mapeada a companyData
     periodicidadPago: '',
     centrosCosto: '',
     
@@ -46,6 +67,86 @@ export const EmpresaSettings = () => {
     user: 'Admin Usuario',
     date: '2025-01-15 14:30'
   });
+
+  // Cargar datos de la empresa al montar el componente
+  useEffect(() => {
+    loadCompanyData();
+  }, []);
+
+  const loadCompanyData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Obtener el usuario actual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Obtener el perfil del usuario para conseguir company_id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) return;
+
+      // Cargar datos de la empresa
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', profile.company_id)
+        .single();
+
+      if (companyError) throw companyError;
+
+      if (company) {
+        setCompanyData({
+          id: company.id,
+          razon_social: company.razon_social || '',
+          nit: company.nit || '',
+          direccion: company.direccion || '',
+          ciudad: company.ciudad || '',
+          telefono: company.telefono || '',
+          email: company.email || '',
+          representante_legal: company.representante_legal || '',
+          actividad_economica: company.actividad_economica || '',
+          estado: company.estado || 'activa',
+          plan: company.plan || 'basico'
+        });
+      }
+
+      // Cargar configuración de periodicidad
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .single();
+
+      if (settings) {
+        setConfig(prev => ({
+          ...prev,
+          periodicidadPago: settings.periodicity
+        }));
+      }
+
+    } catch (error) {
+      console.error('Error loading company data:', error);
+      toast({
+        title: "Error al cargar datos",
+        description: "No se pudieron cargar los datos de la empresa.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCompanyDataChange = (field: keyof CompanyData, value: string) => {
+    setCompanyData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setConfig(prev => ({
@@ -99,46 +200,118 @@ export const EmpresaSettings = () => {
     return emailRegex.test(email);
   };
 
-  const handleSave = () => {
-    // Validaciones
-    const requiredFields = ['razonSocial', 'nit', 'tipoEmpresa', 'ciudad', 'periodicidadPago'];
-    const emptyFields = requiredFields.filter(field => !config[field as keyof typeof config]);
-    
-    if (emptyFields.length > 0) {
+  const handleSave = async () => {
+    try {
+      // Validaciones
+      const requiredFields = ['razon_social', 'nit', 'ciudad', 'email'];
+      const emptyFields = requiredFields.filter(field => !companyData[field as keyof CompanyData]);
+      
+      if (emptyFields.length > 0) {
+        toast({
+          title: "Campos obligatorios",
+          description: "Por favor completa todos los campos obligatorios: Razón Social, NIT, Ciudad y Email.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!validateNIT(companyData.nit)) {
+        toast({
+          title: "NIT inválido",
+          description: "El NIT debe tener el formato XXXXXXXXX-X con dígito verificador.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!validateEmail(companyData.email)) {
+        toast({
+          title: "Email inválido",
+          description: "Por favor ingresa un correo electrónico válido.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (config.responsableSeguridad.email && !validateEmail(config.responsableSeguridad.email)) {
+        toast({
+          title: "Email inválido",
+          description: "Por favor ingresa un correo electrónico válido para el responsable de seguridad social.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setIsLoading(true);
+
+      // Obtener company_id del usuario
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+
+      // Actualizar datos de la empresa
+      const { error: companyError } = await supabase
+        .from('companies')
+        .update({
+          razon_social: companyData.razon_social,
+          nit: companyData.nit,
+          direccion: companyData.direccion,
+          ciudad: companyData.ciudad,
+          telefono: companyData.telefono,
+          email: companyData.email,
+          representante_legal: companyData.representante_legal,
+          actividad_economica: companyData.actividad_economica,
+          estado: companyData.estado,
+          plan: companyData.plan
+        })
+        .eq('id', profile.company_id);
+
+      if (companyError) throw companyError;
+
+      // Actualizar configuración de periodicidad si se especificó
+      if (config.periodicidadPago) {
+        const { error: settingsError } = await supabase
+          .from('company_settings')
+          .upsert({
+            company_id: profile.company_id,
+            periodicity: config.periodicidadPago
+          });
+
+        if (settingsError) throw settingsError;
+      }
+
       toast({
-        title: "Campos obligatorios",
-        description: "Por favor completa todos los campos obligatorios.",
+        title: "Configuración guardada",
+        description: "Los datos de la empresa han sido actualizados correctamente.",
+      });
+
+      // Actualizar timestamp de última modificación
+      setLastModified({
+        user: 'Admin Usuario',
+        date: new Date().toLocaleString('es-CO')
+      });
+
+    } catch (error) {
+      console.error('Error saving company data:', error);
+      toast({
+        title: "Error al guardar",
+        description: "No se pudieron guardar los datos de la empresa.",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    if (!validateNIT(config.nit)) {
-      toast({
-        title: "NIT inválido",
-        description: "El NIT debe tener el formato XXXXXXXXX-X con dígito verificador.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (config.responsableSeguridad.email && !validateEmail(config.responsableSeguridad.email)) {
-      toast({
-        title: "Email inválido",
-        description: "Por favor ingresa un correo electrónico válido para el responsable de seguridad social.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    toast({
-      title: "Configuración guardada",
-      description: "Los datos de la empresa han sido actualizados correctamente.",
-    });
   };
 
   const handleRevert = () => {
-    // Revertir cambios
+    loadCompanyData();
     toast({
       title: "Cambios revertidos",
       description: "Se han revertido todos los cambios no guardados.",
@@ -157,6 +330,14 @@ export const EmpresaSettings = () => {
     });
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">Cargando configuración...</div>
+      </div>
+    );
+  }
+
   return (
     <TooltipProvider>
       <div className="space-y-6">
@@ -174,8 +355,8 @@ export const EmpresaSettings = () => {
               <Label htmlFor="razonSocial">Razón Social *</Label>
               <Input
                 id="razonSocial"
-                value={config.razonSocial}
-                onChange={(e) => handleInputChange('razonSocial', e.target.value)}
+                value={companyData.razon_social}
+                onChange={(e) => handleCompanyDataChange('razon_social', e.target.value)}
                 placeholder="Ej: Empresa ABC S.A.S."
                 className="mt-1"
               />
@@ -185,32 +366,31 @@ export const EmpresaSettings = () => {
               <Label htmlFor="nit">NIT *</Label>
               <Input
                 id="nit"
-                value={config.nit}
-                onChange={(e) => handleInputChange('nit', e.target.value)}
+                value={companyData.nit}
+                onChange={(e) => handleCompanyDataChange('nit', e.target.value)}
                 placeholder="Ej: 900123456-7"
                 className="mt-1"
               />
             </div>
 
             <div>
-              <Label htmlFor="tipoEmpresa">Tipo de Empresa *</Label>
-              <Select value={config.tipoEmpresa} onValueChange={(value) => handleInputChange('tipoEmpresa', value)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Seleccionar tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="natural">Persona Natural</SelectItem>
-                  <SelectItem value="juridica">Persona Jurídica</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                value={companyData.email}
+                onChange={(e) => handleCompanyDataChange('email', e.target.value)}
+                placeholder="Ej: contacto@empresa.com"
+                className="mt-1"
+              />
             </div>
 
             <div>
               <Label htmlFor="ciudad">Ciudad *</Label>
               <Input
                 id="ciudad"
-                value={config.ciudad}
-                onChange={(e) => handleInputChange('ciudad', e.target.value)}
+                value={companyData.ciudad}
+                onChange={(e) => handleCompanyDataChange('ciudad', e.target.value)}
                 placeholder="Ej: Bogotá D.C."
                 className="mt-1"
               />
@@ -220,9 +400,20 @@ export const EmpresaSettings = () => {
               <Label htmlFor="direccion">Dirección</Label>
               <Input
                 id="direccion"
-                value={config.direccion}
-                onChange={(e) => handleInputChange('direccion', e.target.value)}
+                value={companyData.direccion}
+                onChange={(e) => handleCompanyDataChange('direccion', e.target.value)}
                 placeholder="Ej: Calle 123 # 45-67, Oficina 890"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="telefono">Teléfono</Label>
+              <Input
+                id="telefono"
+                value={companyData.telefono}
+                onChange={(e) => handleCompanyDataChange('telefono', e.target.value)}
+                placeholder="Ej: +57 1 234 5678"
                 className="mt-1"
               />
             </div>
@@ -231,8 +422,8 @@ export const EmpresaSettings = () => {
               <Label htmlFor="representanteLegal">Representante Legal</Label>
               <Input
                 id="representanteLegal"
-                value={config.representanteLegal}
-                onChange={(e) => handleInputChange('representanteLegal', e.target.value)}
+                value={companyData.representante_legal}
+                onChange={(e) => handleCompanyDataChange('representante_legal', e.target.value)}
                 placeholder="Nombre completo"
                 className="mt-1"
               />
@@ -252,15 +443,15 @@ export const EmpresaSettings = () => {
               </div>
               <Input
                 id="actividadEconomica"
-                value={config.actividadEconomica}
-                onChange={(e) => handleInputChange('actividadEconomica', e.target.value)}
+                value={companyData.actividad_economica}
+                onChange={(e) => handleCompanyDataChange('actividad_economica', e.target.value)}
                 placeholder="Ej: 6201"
                 className="mt-1"
               />
             </div>
 
             <div>
-              <Label htmlFor="periodicidadPago">Periodicidad de Pago *</Label>
+              <Label htmlFor="periodicidadPago">Periodicidad de Pago</Label>
               <Select value={config.periodicidadPago} onValueChange={(value) => handleInputChange('periodicidadPago', value)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Seleccionar periodicidad" />
@@ -269,6 +460,7 @@ export const EmpresaSettings = () => {
                   <SelectItem value="semanal">Semanal</SelectItem>
                   <SelectItem value="quincenal">Quincenal</SelectItem>
                   <SelectItem value="mensual">Mensual</SelectItem>
+                  <SelectItem value="personalizado">Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -448,10 +640,10 @@ export const EmpresaSettings = () => {
           </p>
           
           <div className="flex gap-4">
-            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
-              Guardar Configuración
+            <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
+              {isLoading ? 'Guardando...' : 'Guardar Configuración'}
             </Button>
-            <Button variant="outline" onClick={handleRevert}>
+            <Button variant="outline" onClick={handleRevert} disabled={isLoading}>
               Revertir Cambios
             </Button>
             <Button variant="outline" onClick={loadRecommended}>

@@ -55,7 +55,7 @@ export class PayrollPeriodService {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as CompanySettings;
     } catch (error) {
       console.error('Error getting company settings:', error);
       return null;
@@ -134,7 +134,7 @@ export class PayrollPeriodService {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as PayrollPeriod;
     } catch (error) {
       console.error('Error creating payroll period:', error);
       return null;
@@ -158,7 +158,7 @@ export class PayrollPeriodService {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as PayrollPeriod;
     } catch (error) {
       console.error('Error updating payroll period:', error);
       return null;
@@ -181,7 +181,7 @@ export class PayrollPeriodService {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data as PayrollPeriod | null;
     } catch (error) {
       console.error('Error getting current active period:', error);
       return null;
