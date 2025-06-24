@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Plus, Users, Filter, Download, MoreHorizontal, 
   Eye, Edit, Trash2, UserCheck, UserX, AlertTriangle,
-  Mail, Phone, Calendar, Building2, Briefcase
+  Mail, Phone, Calendar, Building2, Briefcase, Upload
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmployeeFiltersComponent } from './EmployeeFilters';
@@ -19,6 +18,7 @@ import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { EmployeeWithStatus, ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { CONTRACT_TYPES } from '@/types/employee-config';
+import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
 
 export const EmployeeList = () => {
   const {
@@ -47,6 +47,7 @@ export const EmployeeList = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithStatus | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [isImportDrawerOpen, setIsImportDrawerOpen] = useState(false);
 
   const handleCreateEmployee = () => {
     setEditingEmployee(null);
@@ -122,6 +123,10 @@ export const EmployeeList = () => {
           <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
             <Filter className="h-4 w-4 mr-2" />
             Filtros
+          </Button>
+          <Button variant="outline" onClick={() => setIsImportDrawerOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Importar
           </Button>
           <Button variant="outline" onClick={() => exportEmployees('excel')}>
             <Download className="h-4 w-4 mr-2" />
@@ -365,6 +370,16 @@ export const EmployeeList = () => {
         isOpen={isEmployeeProfileOpen}
         onClose={closeEmployeeProfile}
         employee={selectedEmployee}
+      />
+
+      {/* Import Drawer */}
+      <ImportEmployeesDrawer
+        isOpen={isImportDrawerOpen}
+        onClose={() => setIsImportDrawerOpen(false)}
+        onImportComplete={() => {
+          refreshEmployees();
+          setIsImportDrawerOpen(false);
+        }}
       />
     </div>
   );

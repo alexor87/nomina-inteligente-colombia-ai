@@ -174,6 +174,59 @@ export type Database = {
           },
         ]
       }
+      employee_imports: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          error_details: Json | null
+          filename: string
+          id: string
+          invalid_rows: number
+          mapping_config: Json | null
+          status: string
+          total_rows: number
+          user_id: string
+          valid_rows: number
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_details?: Json | null
+          filename: string
+          id?: string
+          invalid_rows?: number
+          mapping_config?: Json | null
+          status?: string
+          total_rows?: number
+          user_id: string
+          valid_rows?: number
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_details?: Json | null
+          filename?: string
+          id?: string
+          invalid_rows?: number
+          mapping_config?: Json | null
+          status?: string
+          total_rows?: number
+          user_id?: string
+          valid_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_imports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           afp: string | null
