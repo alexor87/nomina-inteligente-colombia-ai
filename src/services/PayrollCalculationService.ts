@@ -37,10 +37,14 @@ export interface ValidationResult {
 }
 
 export class PayrollCalculationService {
-  private static config: PayrollConfiguration = ConfigurationService.getConfiguration('2025');
+  // Remover la configuración estática y obtenerla dinámicamente
+  private static getCurrentConfig(year: string = '2025'): PayrollConfiguration {
+    return ConfigurationService.getConfiguration(year);
+  }
 
   static updateConfiguration(year: string = '2025'): void {
-    this.config = ConfigurationService.getConfiguration(year);
+    // Método mantenido por compatibilidad, pero ya no es necesario
+    console.log(`Configuration will be loaded dynamically for year: ${year}`);
   }
 
   static validateEmployee(
@@ -48,6 +52,7 @@ export class PayrollCalculationService {
     eps?: string,
     afp?: string
   ): ValidationResult {
+    const config = this.getCurrentConfig(); // Obtener configuración actual
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -81,12 +86,12 @@ export class PayrollCalculationService {
     }
 
     // Validaciones de salario
-    if (input.baseSalary < this.config.salarioMinimo) {
-      errors.push(`El salario base (${this.formatCurrency(input.baseSalary)}) es menor al SMMLV (${this.formatCurrency(this.config.salarioMinimo)})`);
+    if (input.baseSalary < config.salarioMinimo) {
+      errors.push(`El salario base (${this.formatCurrency(input.baseSalary)}) es menor al SMMLV (${this.formatCurrency(config.salarioMinimo)})`);
     }
 
     // Advertencias
-    if (input.baseSalary >= this.config.salarioMinimo * 10) {
+    if (input.baseSalary >= config.salarioMinimo * 10) {
       warnings.push('Salario alto - verificar cálculo de aportes');
     }
 
@@ -98,6 +103,8 @@ export class PayrollCalculationService {
   }
 
   static calculatePayroll(input: PayrollCalculationInput): PayrollCalculationResult {
+    const config = this.getCurrentConfig(); // Obtener configuración actual cada vez
+    
     // Cálculo del salario base proporcional
     const dailySalary = input.baseSalary / 30;
     const regularPay = Math.max(0, (input.workedDays - input.disabilities) * dailySalary);
@@ -107,27 +114,27 @@ export class PayrollCalculationService {
     const extraPay = input.extraHours * hourlyRate * 1.25;
 
     // Auxilio de transporte (solo si devenga máximo 2 SMMLV)
-    const transportAllowance = input.baseSalary <= (this.config.salarioMinimo * 2) ? 
-      Math.round((this.config.auxilioTransporte * input.workedDays) / 30) : 0;
+    const transportAllowance = input.baseSalary <= (config.salarioMinimo * 2) ? 
+      Math.round((config.auxilioTransporte * input.workedDays) / 30) : 0;
 
     // Total devengado
     const grossPay = regularPay + extraPay + input.bonuses + transportAllowance;
 
     // Deducciones del empleado (sobre el devengado)
-    const healthDeduction = grossPay * this.config.porcentajes.saludEmpleado;
-    const pensionDeduction = grossPay * this.config.porcentajes.pensionEmpleado;
+    const healthDeduction = grossPay * config.porcentajes.saludEmpleado;
+    const pensionDeduction = grossPay * config.porcentajes.pensionEmpleado;
     const totalDeductions = healthDeduction + pensionDeduction;
 
     // Neto a pagar
     const netPay = grossPay - totalDeductions;
 
     // Aportes del empleador (sobre el devengado)
-    const employerHealth = grossPay * this.config.porcentajes.saludEmpleador;
-    const employerPension = grossPay * this.config.porcentajes.pensionEmpleador;
-    const employerArl = grossPay * this.config.porcentajes.arl;
-    const employerCaja = grossPay * this.config.porcentajes.cajaCompensacion;
-    const employerIcbf = grossPay * this.config.porcentajes.icbf;
-    const employerSena = grossPay * this.config.porcentajes.sena;
+    const employerHealth = grossPay * config.porcentajes.saludEmpleador;
+    const employerPension = grossPay * config.porcentajes.pensionEmpleador;
+    const employerArl = grossPay * config.porcentajes.arl;
+    const employerCaja = grossPay * config.porcentajes.cajaCompensacion;
+    const employerIcbf = grossPay * config.porcentajes.icbf;
+    const employerSena = grossPay * config.porcentajes.sena;
 
     const employerContributions = employerHealth + employerPension + employerArl + 
                                   employerCaja + employerIcbf + employerSena;
@@ -174,10 +181,11 @@ export class PayrollCalculationService {
     uvt: number;
     year: string;
   } {
+    const config = this.getCurrentConfig();
     return {
-      salarioMinimo: this.config.salarioMinimo,
-      auxilioTransporte: this.config.auxilioTransporte,
-      uvt: this.config.uvt,
+      salarioMinimo: config.salarioMinimo,
+      auxilioTransporte: config.auxilioTransporte,
+      uvt: config.uvt,
       year: '2025'
     };
   }

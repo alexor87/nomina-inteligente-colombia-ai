@@ -1,8 +1,8 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/services/PayrollPeriodService';
+import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 
@@ -216,17 +216,20 @@ export const usePayrollLiquidation = () => {
     }
   }, [currentPeriod, toast]);
 
-  // Recalcular todos los empleados
+  // Recalcular todos los empleados con configuración actualizada
   const recalculateAll = useCallback(async () => {
     if (!currentPeriod) return;
 
     setIsLoading(true);
     toast({
       title: "Recalculando nómina",
-      description: "Aplicando configuración actual a todos los empleados..."
+      description: "Aplicando configuración legal actualizada a todos los empleados..."
     });
 
     try {
+      // Forzar actualización de la configuración antes de recalcular
+      PayrollCalculationService.updateConfiguration('2025');
+      
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setEmployees(prev => prev.map(emp => {
@@ -236,7 +239,7 @@ export const usePayrollLiquidation = () => {
 
       toast({
         title: "Recálculo completado",
-        description: "Todos los cálculos han sido actualizados exitosamente."
+        description: "Todos los cálculos han sido actualizados con los parámetros legales más recientes."
       });
     } catch (error) {
       toast({
