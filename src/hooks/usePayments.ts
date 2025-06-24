@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { PaymentEmployee, PaymentPeriod, PaymentFilters, BankFileGeneration } from '@/types/payments';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,7 +73,7 @@ export const usePayments = () => {
         name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
         position: payroll.employees.cargo || 'Sin cargo',
         bankName: payroll.employees.banco || 'Por configurar',
-        accountType: payroll.employees.tipo_cuenta || 'ahorros',
+        accountType: (payroll.employees.tipo_cuenta === 'corriente' ? 'corriente' : 'ahorros') as 'ahorros' | 'corriente',
         accountNumber: payroll.employees.numero_cuenta || 'Por configurar',
         netPay: Number(payroll.neto_pagado || 0),
         paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente',
