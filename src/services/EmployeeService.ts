@@ -20,7 +20,11 @@ export class EmployeeService {
       arl: employeeData.arl,
       caja_compensacion: employeeData.cajaCompensacion,
       cargo: employeeData.cargo,
-      estado_afiliacion: employeeData.estadoAfiliacion
+      estado_afiliacion: employeeData.estadoAfiliacion,
+      centro_costo: null, // Se asignará después si viene en los datos
+      nivel_riesgo_arl: null, // Se asignará después si viene en los datos
+      contrato_vencimiento: null,
+      ultima_liquidacion: null
     };
 
     const { data, error } = await supabase
@@ -73,6 +77,24 @@ export class EmployeeService {
     const { error } = await supabase
       .from('employees')
       .update({ estado: newStatus })
+      .eq('id', id);
+
+    if (error) throw error;
+  }
+
+  static async updateCentroCosto(id: string, centroCosto: string) {
+    const { error } = await supabase
+      .from('employees')
+      .update({ centro_costo: centroCosto })
+      .eq('id', id);
+
+    if (error) throw error;
+  }
+
+  static async updateNivelRiesgoARL(id: string, nivelRiesgo: 'I' | 'II' | 'III' | 'IV' | 'V') {
+    const { error } = await supabase
+      .from('employees')
+      .update({ nivel_riesgo_arl: nivelRiesgo })
       .eq('id', id);
 
     if (error) throw error;

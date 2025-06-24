@@ -11,6 +11,7 @@ export const useEmployeeCRUD = () => {
   const createEmployee = async (employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
     setIsLoading(true);
     try {
+      console.log('Creating employee with data:', employeeData);
       const data = await EmployeeService.create(employeeData);
 
       toast({
@@ -35,6 +36,7 @@ export const useEmployeeCRUD = () => {
   const updateEmployee = async (id: string, updates: Partial<Employee>) => {
     setIsLoading(true);
     try {
+      console.log('Updating employee with data:', updates);
       await EmployeeService.update(id, updates);
       
       toast({
@@ -83,6 +85,7 @@ export const useEmployeeCRUD = () => {
   const changeEmployeeStatus = async (id: string, newStatus: string) => {
     setIsLoading(true);
     try {
+      console.log('Changing employee status:', { id, newStatus });
       await EmployeeService.changeStatus(id, newStatus);
       
       toast({
@@ -104,11 +107,61 @@ export const useEmployeeCRUD = () => {
     }
   };
 
+  const updateCentroCosto = async (id: string, centroCosto: string) => {
+    setIsLoading(true);
+    try {
+      await EmployeeService.updateCentroCosto(id, centroCosto);
+      
+      toast({
+        title: "Centro de costo actualizado",
+        description: "Se ha actualizado el centro de costo del empleado.",
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error updating centro costo:', error);
+      toast({
+        title: "Error al actualizar centro de costo",
+        description: error.message || "No se pudo actualizar el centro de costo.",
+        variant: "destructive"
+      });
+      return { success: false, error: error.message };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateNivelRiesgoARL = async (id: string, nivelRiesgo: 'I' | 'II' | 'III' | 'IV' | 'V') => {
+    setIsLoading(true);
+    try {
+      await EmployeeService.updateNivelRiesgoARL(id, nivelRiesgo);
+      
+      toast({
+        title: "Nivel de riesgo ARL actualizado",
+        description: "Se ha actualizado el nivel de riesgo ARL del empleado.",
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error updating ARL risk level:', error);
+      toast({
+        title: "Error al actualizar nivel de riesgo",
+        description: error.message || "No se pudo actualizar el nivel de riesgo ARL.",
+        variant: "destructive"
+      });
+      return { success: false, error: error.message };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     createEmployee,
     updateEmployee,
     deleteEmployee,
     changeEmployeeStatus,
+    updateCentroCosto,
+    updateNivelRiesgoARL,
     isLoading
   };
 };

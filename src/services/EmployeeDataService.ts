@@ -31,10 +31,10 @@ export class EmployeeDataService {
       estadoAfiliacion: emp.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente',
       createdAt: emp.created_at,
       updatedAt: emp.updated_at,
-      centrosocial: 'Sin asignar',
-      nivelRiesgoARL: undefined,
-      ultimaLiquidacion: undefined,
-      contratoVencimiento: undefined,
+      centrosocial: emp.centro_costo || 'Sin asignar',
+      nivelRiesgoARL: emp.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
+      ultimaLiquidacion: emp.ultima_liquidacion,
+      contratoVencimiento: emp.contrato_vencimiento,
       fechaUltimaModificacion: emp.updated_at,
       usuarioUltimaModificacion: 'Sistema'
     }));

@@ -12,6 +12,7 @@ import { CONTRACT_TYPES, ARL_RISK_LEVELS } from '@/types/employee-config';
 import { CENTROS_COSTO, ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EmployeeFormProps {
   employee?: Employee;
@@ -42,6 +43,7 @@ interface EmployeeFormData {
 export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProps) => {
   const { configuration } = useEmployeeGlobalConfiguration();
   const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUD();
+  const [companyId, setCompanyId] = useState<string | null>(null);
   
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<EmployeeFormData>({
     defaultValues: {
@@ -65,10 +67,39 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
     }
   });
 
+  // Obtener company_id del usuario actual
+  useEffect(() => {
+    const loadCompanyId = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile?.company_id) {
+          setCompanyId(profile.company_id);
+        }
+      } catch (error) {
+        console.error('Error loading company ID:', error);
+      }
+    };
+
+    loadCompanyId();
+  }, []);
+
   const onSubmit = async (data: EmployeeFormData) => {
+    if (!companyId) {
+      console.error('No company ID available');
+      return;
+    }
+
     const employeeData = {
       ...data,
-      empresaId: '1', // En un escenario real, esto vendría del contexto de usuario
+      empresaId: companyId,
       salarioBase: Number(data.salarioBase)
     };
 
