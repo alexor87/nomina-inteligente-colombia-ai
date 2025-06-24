@@ -22,8 +22,10 @@ export const PayrollLiquidationBackend = () => {
     isLoading
   } = usePayrollLiquidationBackend();
 
+  const validEmployeeCount = employees.filter(emp => emp.status === 'valid').length;
+
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
       <PayrollPeriodHeader 
         period={currentPeriod}
         isLoading={isLoading}
@@ -33,22 +35,23 @@ export const PayrollLiquidationBackend = () => {
         setIsEditingPeriod={setIsEditingPeriod}
         onApprove={approvePeriod}
         onUpdatePeriod={updatePeriod}
+        employeeCount={employees.length}
+        validEmployeeCount={validEmployeeCount}
+        totalPayroll={summary.totalNetPay}
       />
 
       <PayrollSummaryCards summary={summary} />
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col min-w-0">
-          <PayrollTable
-            employees={employees}
-            onUpdateEmployee={updateEmployee}
-            onRecalculate={recalculateAll}
-            isLoading={isLoading}
-            canEdit={canEdit}
-            periodoId={currentPeriod?.id || ''}
-            onRefreshEmployees={refreshEmployees}
-          />
-        </div>
+      <div className="flex-1 flex flex-col pb-6">
+        <PayrollTable
+          employees={employees}
+          onUpdateEmployee={updateEmployee}
+          onRecalculate={recalculateAll}
+          isLoading={isLoading}
+          canEdit={canEdit}
+          periodoId={currentPeriod?.id || ''}
+          onRefreshEmployees={refreshEmployees}
+        />
       </div>
     </div>
   );
