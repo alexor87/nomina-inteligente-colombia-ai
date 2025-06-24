@@ -66,29 +66,52 @@ export class CompanyConfigurationService {
     try {
       console.log('Guardando datos para empresa:', companyId);
 
-      // Usar UPSERT para evitar conflictos
-      const { data, error } = await supabase
+      // Primero verificar si existe una configuración
+      const { data: existing } = await supabase
         .from('company_settings')
-        .upsert(
-          {
-            company_id: companyId,
-            periodicity: periodicity
-          },
-          {
-            onConflict: 'company_id',
-            ignoreDuplicates: false
-          }
-        )
-        .select()
+        .select('id')
+        .eq('company_id', companyId)
         .single();
 
-      if (error) {
-        console.error('Error actualizando configuración:', error);
-        throw error;
+      let result;
+
+      if (existing) {
+        // Si existe, actualizar
+        const { data, error } = await supabase
+          .from('company_settings')
+          .update({ 
+            periodicity: periodicity,
+            updated_at: new Date().toISOString()
+          })
+          .eq('company_id', companyId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error actualizando configuración:', error);
+          throw error;
+        }
+        result = data;
+      } else {
+        // Si no existe, crear
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert({
+            company_id: companyId,
+            periodicity: periodicity
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creando configuración:', error);
+          throw error;
+        }
+        result = data;
       }
 
-      console.log('Configuración guardada exitosamente:', data);
-      return data;
+      console.log('Configuración guardada exitosamente:', result);
+      return result;
     } catch (error) {
       console.error('Error saving company data:', error);
       throw error;
