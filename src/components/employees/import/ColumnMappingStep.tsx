@@ -10,7 +10,8 @@ import { ImportStep, ColumnMapping } from '../ImportEmployeesDrawer';
 const EMPLOYEE_FIELDS = [
   { value: 'nombre', label: 'Nombre', required: true },
   { value: 'apellido', label: 'Apellido', required: false },
-  { value: 'cedula', label: 'Cédula/Documento', required: true },
+  { value: 'tipoDocumento', label: 'Tipo de documento', required: false },
+  { value: 'cedula', label: 'Número de documento', required: true },
   { value: 'email', label: 'Correo electrónico', required: false },
   { value: 'telefono', label: 'Teléfono', required: false },
   { value: 'cargo', label: 'Cargo', required: true },
@@ -39,14 +40,15 @@ const suggestMapping = (columnName: string): string => {
   // Mapeo inteligente basado en palabras clave
   if (normalized.includes('nombre') && !normalized.includes('apellido')) return 'nombre';
   if (normalized.includes('apellido')) return 'apellido';
-  if (normalized.includes('cedula') || normalized.includes('documento') || normalized.includes('identificacion')) return 'cedula';
+  if (normalized.includes('tipo') && (normalized.includes('documento') || normalized.includes('identificacion'))) return 'tipoDocumento';
+  if (normalized.includes('cedula') || normalized.includes('documento') || normalized.includes('identificacion') || normalized.includes('numero')) return 'cedula';
   if (normalized.includes('email') || normalized.includes('correo')) return 'email';
   if (normalized.includes('telefono') || normalized.includes('celular') || normalized.includes('movil')) return 'telefono';
   if (normalized.includes('cargo') || normalized.includes('puesto')) return 'cargo';
   if (normalized.includes('salario') || normalized.includes('sueldo')) return 'salarioBase';
   if (normalized.includes('fecha') && (normalized.includes('ingreso') || normalized.includes('entrada'))) return 'fechaIngreso';
   if (normalized.includes('contrato') || normalized.includes('tipo')) return 'tipoContrato';
-  if (normalized.includes('periodicidad') || normalized.includes('periodo')) return 'periodicidad';
+  if (normalized.includes('periodicidad') || normalized.includes('periode')) return 'periodicidad';
   if (normalized.includes('eps')) return 'eps';
   if (normalized.includes('afp') || normalized.includes('pension')) return 'afp';
   if (normalized.includes('arl')) return 'arl';
@@ -203,7 +205,7 @@ export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepPro
         </div>
         {!hasRequiredFields && (
           <div className="mt-2 text-yellow-600 text-sm">
-            ⚠️ Considera mapear al menos los campos básicos como Nombre y Cédula
+            ⚠️ Considera mapear al menos los campos básicos como Nombre y Número de documento
           </div>
         )}
       </div>

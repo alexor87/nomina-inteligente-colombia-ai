@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Download } from 'lucide-react';
 import { ImportStep } from '../ImportEmployeesDrawer';
+import { TIPOS_DOCUMENTO } from '@/types/employee-config';
 
 interface ValidationPreviewStepProps {
   data: any;
@@ -83,9 +84,21 @@ export const ValidationPreviewStep = ({ data, onNext, onBack }: ValidationPrevie
         }
         break;
       
+      case 'tipoDocumento':
+        const validDocumentTypes = TIPOS_DOCUMENTO.map(t => t.value);
+        const normalizedValue = value.toString().toUpperCase();
+        if (!validDocumentTypes.includes(normalizedValue)) {
+          return { status: 'warning', message: `Tipo de documento no reconocido. Válidos: ${validDocumentTypes.join(', ')}` };
+        }
+        break;
+      
       case 'cedula':
-        if (!/^\d+$/.test(value.toString().replace(/\D/g, ''))) {
-          return { status: 'error', message: 'Debe contener solo números' };
+        const cleanedDocument = value.toString().replace(/\D/g, '');
+        if (!cleanedDocument || cleanedDocument.length < 6) {
+          return { status: 'error', message: 'Número de documento debe tener al menos 6 dígitos' };
+        }
+        if (cleanedDocument.length > 15) {
+          return { status: 'error', message: 'Número de documento muy largo' };
         }
         break;
       
@@ -101,11 +114,23 @@ export const ValidationPreviewStep = ({ data, onNext, onBack }: ValidationPrevie
         if (isNaN(date.getTime())) {
           return { status: 'error', message: 'Formato de fecha inválido' };
         }
+        const today = new Date();
+        if (date > today) {
+          return { status: 'warning', message: 'Fecha de ingreso es futura' };
+        }
+        break;
+      
+      case 'tipoContrato':
+        const validContractTypes = ['indefinido', 'fijo', 'obra', 'aprendizaje'];
+        const normalizedContract = value.toString().toLowerCase();
+        if (!validContractTypes.includes(normalizedContract)) {
+          return { status: 'warning', message: `Tipo de contrato no reconocido. Válidos: ${validContractTypes.join(', ')}` };
+        }
         break;
       
       case 'telefono':
         if (value && !/^\d{7,10}$/.test(value.toString().replace(/\D/g, ''))) {
-          return { status: 'warning', message: 'Formato de teléfono puede ser incorrecto' };
+          return { status: 'warning', message: 'Formato de teléfono puede ser incorrecto (7-10 dígitos)' };
         }
         break;
     }
@@ -133,7 +158,12 @@ export const ValidationPreviewStep = ({ data, onNext, onBack }: ValidationPrevie
         ...data,
         validRows,
         invalidRows,
-        errors
+        errors,
+        mapping: data.mappings.reduce((acc: any, m: any) => {
+          acc[m.sourceColumn] = m.targetField;
+          return acc;
+        }, {}),
+        totalRows: data.rows.length
       }
     });
   };
