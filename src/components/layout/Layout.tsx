@@ -21,21 +21,9 @@ export const Layout = ({ children }: LayoutProps) => {
   const { roles } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Determinar el rol del usuario para el sidebar
-  const getUserRole = () => {
-    if (roles.some(r => r.role === 'administrador')) return 'company';
-    if (roles.some(r => r.role === 'soporte')) return 'admin';
-    return 'company'; // Por defecto
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={() => setSidebarOpen(false)}
-        onOpen={() => setSidebarOpen(true)}
-        userRole={getUserRole()}
-      />
+      <Sidebar />
       
       <div className="flex-1 flex flex-col min-w-0">
         <Header 

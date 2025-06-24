@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { ReportFilters, SavedFilter, ExportHistory } from '@/types/reports';
 import { ReportsDataService } from '@/services/ReportsDataService';
@@ -66,21 +65,21 @@ export const useReports = () => {
         .from('payrolls')
         .select(`
           *,
-          employees (nombre, apellido, cargo)
+          employees (id, nombre, apellido, cargo)
         `)
         .eq('company_id', companyId);
 
       if (error) throw error;
 
       return data?.map(payroll => ({
+        employeeId: payroll.employee_id,
         employeeName: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
-        position: payroll.employees.cargo || 'Sin cargo',
         period: payroll.periodo,
-        baseSalary: Number(payroll.salario_base || 0),
         totalEarnings: Number(payroll.total_devengado || 0),
         totalDeductions: Number(payroll.total_deducciones || 0),
         netPay: Number(payroll.neto_pagado || 0),
-        status: payroll.estado
+        employerContributions: Number((payroll.total_devengado || 0) * 0.215), // Aproximado 21.5%
+        costCenter: 'Administración'
       })) || [];
     } catch (error) {
       console.error('Error getting payroll summary report:', error);
@@ -105,12 +104,15 @@ export const useReports = () => {
       if (error) throw error;
 
       return data?.map(employee => ({
+        employeeId: employee.id,
         employeeName: `${employee.nombre} ${employee.apellido}`,
-        position: employee.cargo || 'Sin cargo',
         baseSalary: Number(employee.salario_base || 0),
-        benefitLoad: Number(employee.salario_base || 0) * 0.42, // 42% aproximado
-        totalCost: Number(employee.salario_base || 0) * 1.42,
-        costCenter: 'Administración' // Por defecto
+        benefits: Number(employee.salario_base || 0) * 0.15, // 15% beneficios
+        overtime: 0, // No hay datos de horas extra en empleados
+        bonuses: 0, // No hay datos de bonos en empleados
+        employerContributions: Number(employee.salario_base || 0) * 0.215, // 21.5% aportes
+        totalCost: Number(employee.salario_base || 0) * 1.365, // Base + beneficios + aportes
+        costCenter: 'Administración'
       })) || [];
     } catch (error) {
       console.error('Error getting labor cost report:', error);
@@ -130,21 +132,23 @@ export const useReports = () => {
         .from('payrolls')
         .select(`
           *,
-          employees (nombre, apellido, eps, afp, arl)
+          employees (id, nombre, apellido, eps, afp, arl)
         `)
         .eq('company_id', companyId);
 
       if (error) throw error;
 
       return data?.map(payroll => ({
+        employeeId: payroll.employee_id,
         employeeName: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
-        eps: payroll.employees.eps || 'No afiliado',
-        afp: payroll.employees.afp || 'No afiliado',
-        arl: payroll.employees.arl || 'No afiliado',
-        baseSalary: Number(payroll.salario_base || 0),
-        healthContribution: Number(payroll.salud_empleado || 0),
-        pensionContribution: Number(payroll.pension_empleado || 0),
-        period: payroll.periodo
+        healthEmployee: Number(payroll.salud_empleado || 0),
+        healthEmployer: Number(payroll.salud_empleado || 0) * 0.85/0.04, // Empleador paga 8.5% vs 4% empleado
+        pensionEmployee: Number(payroll.pension_empleado || 0),
+        pensionEmployer: Number(payroll.pension_empleado || 0) * 12/4, // Empleador paga 12% vs 4% empleado
+        arl: Number(payroll.salario_base || 0) * 0.00522, // 0.522% promedio ARL
+        compensationBox: Number(payroll.salario_base || 0) * 0.04, // 4% caja compensación
+        total: Number(payroll.salud_empleado || 0) + Number(payroll.pension_empleado || 0) + 
+               (Number(payroll.salario_base || 0) * 0.04522) // ARL + Caja
       })) || [];
     } catch (error) {
       console.error('Error getting social security report:', error);
@@ -164,7 +168,7 @@ export const useReports = () => {
         .from('payrolls')
         .select(`
           *,
-          employees (nombre, apellido, cedula)
+          employees (id, nombre, apellido, cedula)
         `)
         .eq('company_id', companyId)
         .gte('created_at', `${year}-01-01`)
@@ -173,11 +177,14 @@ export const useReports = () => {
       if (error) throw error;
 
       return data?.map(payroll => ({
+        employeeId: payroll.employee_id,
         employeeName: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
-        cedula: payroll.employees.cedula,
-        totalWithholding: Number(payroll.retencion_fuente || 0),
+        year: year,
         totalIncome: Number(payroll.total_devengado || 0),
-        year: year
+        totalRetentions: Number(payroll.retencion_fuente || 0),
+        status: 'generated' as const,
+        generatedAt: new Date().toISOString(),
+        sentAt: undefined
       })) || [];
     } catch (error) {
       console.error('Error getting income retention certificates:', error);
@@ -216,14 +223,21 @@ export const useReports = () => {
 
       if (error) throw error;
 
-      return data?.map(payroll => ({
-        account: '510505', // Cuenta de gastos de personal
+      const accountingEntries = data?.map(payroll => ({
+        account: '510505',
         description: `Nómina ${payroll.employees.nombre} ${payroll.employees.apellido}`,
         debit: Number(payroll.total_devengado || 0),
-        credit: 0,
-        period: payroll.periodo,
-        date: payroll.created_at
+        credit: 0
       })) || [];
+
+      return [{
+        id: 'accounting-export-1',
+        type: 'nomina',
+        period: data?.[0]?.periodo || 'N/A',
+        totalAmount: accountingEntries.reduce((sum, entry) => sum + entry.debit, 0),
+        accountingEntries,
+        generatedAt: new Date().toISOString()
+      }];
     } catch (error) {
       console.error('Error getting accounting exports:', error);
       throw error;

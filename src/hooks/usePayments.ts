@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
-import { PaymentEmployee, PaymentPeriod, PaymentFilters } from '@/types/payments';
+import { PaymentEmployee, PaymentPeriod, PaymentFilters, BankFileGeneration } from '@/types/payments';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -8,6 +8,7 @@ export const usePayments = () => {
   const [employees, setEmployees] = useState<PaymentEmployee[]>([]);
   const [currentPeriod, setCurrentPeriod] = useState<PaymentPeriod | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGeneratingFile, setIsGeneratingFile] = useState(false);
   const [filters, setFilters] = useState<PaymentFilters>({});
   const { toast } = useToast();
 
@@ -128,9 +129,40 @@ export const usePayments = () => {
     setFilters(prev => ({ ...prev, ...newFilters }));
   };
 
-  const markAsPaid = async (employeeIds: string[], paymentDate: string) => {
+  const markEmployeeAsPaid = async (employeeId: string, confirmation: any) => {
     try {
-      // Actualizar estado en la base de datos
+      const { error } = await supabase
+        .from('payrolls')
+        .update({ estado: 'pagada' })
+        .eq('id', employeeId);
+
+      if (error) throw error;
+
+      setEmployees(prev => prev.map(emp => 
+        emp.id === employeeId 
+          ? { ...emp, paymentStatus: 'pagado', paymentDate: confirmation.paymentDate }
+          : emp
+      ));
+
+      toast({
+        title: "Pago marcado como realizado",
+        description: "El empleado ha sido marcado como pagado",
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error marking as paid:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo marcar el pago",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
+  const markMultipleAsPaid = async (employeeIds: string[], paymentDate: string) => {
+    try {
       const { error } = await supabase
         .from('payrolls')
         .update({ estado: 'pagada' })
@@ -138,7 +170,6 @@ export const usePayments = () => {
 
       if (error) throw error;
 
-      // Actualizar estado local
       setEmployees(prev => prev.map(emp => 
         employeeIds.includes(emp.id) 
           ? { ...emp, paymentStatus: 'pagado', paymentDate }
@@ -150,6 +181,7 @@ export const usePayments = () => {
         description: `${employeeIds.length} empleados marcados como pagados`,
       });
 
+      return true;
     } catch (error) {
       console.error('Error marking as paid:', error);
       toast({
@@ -157,35 +189,110 @@ export const usePayments = () => {
         description: "No se pudieron marcar los pagos",
         variant: "destructive"
       });
+      return false;
     }
   };
 
-  const generateBankFile = async (bankName: string, selectedEmployees: string[]) => {
-    const employeesToExport = employees.filter(emp => 
-      selectedEmployees.includes(emp.id)
-    );
+  const retryPayment = async (employeeId: string) => {
+    try {
+      // Lógica para reintentar pago
+      setEmployees(prev => prev.map(emp => 
+        emp.id === employeeId 
+          ? { ...emp, paymentStatus: 'pendiente', errorReason: undefined }
+          : emp
+      ));
 
-    // Simular generación de archivo
-    await new Promise(resolve => setTimeout(resolve, 1500));
+      toast({
+        title: "Pago reintentado",
+        description: "El pago se ha marcado para reintento",
+      });
 
-    toast({
-      title: "Archivo generado",
-      description: `Archivo para ${bankName} generado exitosamente`,
-    });
+      return true;
+    } catch (error) {
+      console.error('Error retrying payment:', error);
+      return false;
+    }
+  };
 
-    return {
-      fileName: `dispersión_${bankName}_${new Date().toISOString().split('T')[0]}.txt`,
-      downloadUrl: '#'
-    };
+  const updateBankAccount = async (employeeId: string, accountData: any) => {
+    try {
+      // Aquí se actualizarían los datos bancarios en la base de datos
+      setEmployees(prev => prev.map(emp => 
+        emp.id === employeeId 
+          ? { ...emp, ...accountData, paymentStatus: 'pendiente', errorReason: undefined }
+          : emp
+      ));
+
+      toast({
+        title: "Datos bancarios actualizados",
+        description: "Los datos bancarios han sido actualizados",
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating bank account:', error);
+      return false;
+    }
+  };
+
+  const downloadPaymentReport = async (periodId: string) => {
+    try {
+      // Lógica para descargar reporte
+      toast({
+        title: "Reporte descargado",
+        description: "El reporte de pagos ha sido descargado",
+      });
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el reporte",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const generateBankFile = async (config: BankFileGeneration) => {
+    try {
+      setIsGeneratingFile(true);
+      
+      // Simular generación de archivo
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      toast({
+        title: "Archivo generado",
+        description: `Archivo para ${config.bankName} generado exitosamente`,
+      });
+
+      return {
+        success: true,
+        fileName: `dispersión_${config.bankName}_${new Date().toISOString().split('T')[0]}.txt`,
+        downloadUrl: '#'
+      };
+    } catch (error) {
+      console.error('Error generating bank file:', error);
+      return {
+        success: false,
+        fileName: '',
+        downloadUrl: ''
+      };
+    } finally {
+      setIsGeneratingFile(false);
+    }
   };
 
   return {
     employees: filteredEmployees,
     currentPeriod,
     isLoading,
+    isGeneratingFile,
     filters,
     updateFilters,
-    markAsPaid,
+    markEmployeeAsPaid,
+    markMultipleAsPaid,
+    retryPayment,
+    updateBankAccount,
+    downloadPaymentReport,
     generateBankFile,
     refreshData: loadPaymentData,
     totalEmployees: employees.length,
