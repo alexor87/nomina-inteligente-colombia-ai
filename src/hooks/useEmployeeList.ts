@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { EmployeeWithStatus, EmployeeFilters, ComplianceIndicator } from '@/types/employee-extended';
 import { useToast } from '@/hooks/use-toast';
@@ -7,6 +8,8 @@ import { filterEmployees } from '@/utils/employeeFilters';
 export const useEmployeeList = () => {
   const [employees, setEmployees] = useState<EmployeeWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithStatus | null>(null);
+  const [isEmployeeProfileOpen, setIsEmployeeProfileOpen] = useState(false);
   const { toast } = useToast();
   
   const [filters, setFilters] = useState<EmployeeFilters>({
@@ -140,11 +143,23 @@ export const useEmployeeList = () => {
     console.log(`Exportando ${filteredEmployees.length} empleados en formato: ${format}`);
   };
 
+  const openEmployeeProfile = (employee: EmployeeWithStatus) => {
+    setSelectedEmployee(employee);
+    setIsEmployeeProfileOpen(true);
+  };
+
+  const closeEmployeeProfile = () => {
+    setIsEmployeeProfileOpen(false);
+    setSelectedEmployee(null);
+  };
+
   return {
     employees: filteredEmployees,
     filters,
     selectedEmployees,
     isLoading,
+    selectedEmployee,
+    isEmployeeProfileOpen,
     updateFilters,
     clearFilters,
     toggleEmployeeSelection,
@@ -152,6 +167,8 @@ export const useEmployeeList = () => {
     bulkUpdateStatus,
     exportEmployees,
     getComplianceIndicators,
+    openEmployeeProfile,
+    closeEmployeeProfile,
     totalEmployees: employees.length,
     filteredCount: filteredEmployees.length,
     refreshEmployees: loadEmployees
