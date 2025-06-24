@@ -28,36 +28,35 @@ export const PayrollHistoryTable = ({
 
   const getStatusBadge = (status: PayrollHistoryPeriod['status']) => {
     const statusConfig = {
-      cerrado: { color: 'bg-green-100 text-green-800', text: 'Cerrado' },
-      con_errores: { color: 'bg-red-100 text-red-800', text: 'Con errores' },
-      revision_dian: { color: 'bg-yellow-100 text-yellow-800', text: 'En revisión DIAN' },
-      editado: { color: 'bg-blue-100 text-blue-800', text: 'Editado' }
+      cerrado: { color: 'bg-green-100 text-green-800', text: 'Cerrado', icon: '✓' },
+      con_errores: { color: 'bg-red-100 text-red-800', text: 'Con errores', icon: '✗' },
+      revision: { color: 'bg-yellow-100 text-yellow-800', text: 'En revisión', icon: '⚠' },
+      editado: { color: 'bg-blue-100 text-blue-800', text: 'Editado', icon: '✏' }
     };
     
     const config = statusConfig[status];
-    return <Badge className={`${config.color} text-xs`}>{config.text}</Badge>;
-  };
-
-  const getDianStatusBadge = (status: PayrollHistoryPeriod['dianStatus']) => {
-    const statusConfig = {
-      enviado: { color: 'bg-green-100 text-green-800', text: 'Enviado' },
-      rechazado: { color: 'bg-red-100 text-red-800', text: 'Rechazado' },
-      pendiente: { color: 'bg-yellow-100 text-yellow-800', text: 'Pendiente' }
-    };
-    
-    const config = statusConfig[status];
-    return <Badge className={`${config.color} text-xs`}>{config.text}</Badge>;
+    return (
+      <Badge className={`${config.color} text-xs`}>
+        <span className="mr-1">{config.icon}</span>
+        {config.text}
+      </Badge>
+    );
   };
 
   const getPaymentStatusBadge = (status: PayrollHistoryPeriod['paymentStatus']) => {
     const statusConfig = {
-      pagado: { color: 'bg-green-100 text-green-800', text: 'Pagado' },
-      parcial: { color: 'bg-yellow-100 text-yellow-800', text: 'Parcial' },
-      pendiente: { color: 'bg-red-100 text-red-800', text: 'Pendiente' }
+      pagado: { color: 'bg-green-100 text-green-800', text: 'Pagado', icon: '✓' },
+      parcial: { color: 'bg-yellow-100 text-yellow-800', text: 'Parcial', icon: '⚠' },
+      pendiente: { color: 'bg-red-100 text-red-800', text: 'Pendiente', icon: '⏳' }
     };
     
     const config = statusConfig[status];
-    return <Badge className={`${config.color} text-xs`}>{config.text}</Badge>;
+    return (
+      <Badge className={`${config.color} text-xs`}>
+        <span className="mr-1">{config.icon}</span>
+        {config.text}
+      </Badge>
+    );
   };
 
   const handleDownloadPila = (period: PayrollHistoryPeriod) => {
@@ -77,12 +76,11 @@ export const PayrollHistoryTable = ({
         <TableHeader>
           <TableRow className="bg-gray-50">
             <TableHead className="font-semibold">Período</TableHead>
-            <TableHead className="font-semibold">Empleados</TableHead>
+            <TableHead className="font-semibold text-center">Empleados</TableHead>
             <TableHead className="font-semibold">Estado</TableHead>
             <TableHead className="font-semibold">Total Devengado</TableHead>
             <TableHead className="font-semibold">Neto Pagado</TableHead>
             <TableHead className="font-semibold">Archivo PILA</TableHead>
-            <TableHead className="font-semibold">Estado DIAN</TableHead>
             <TableHead className="font-semibold">Estado Pagos</TableHead>
             <TableHead className="font-semibold text-center">Acciones</TableHead>
           </TableRow>
@@ -95,7 +93,7 @@ export const PayrollHistoryTable = ({
                   <div className="text-sm font-medium text-gray-900">{period.period}</div>
                   <div className="text-xs text-gray-500 capitalize">{period.type}</div>
                   {period.version > 1 && (
-                    <div className="text-xs text-blue-600">v{period.version}</div>
+                    <div className="text-xs text-blue-600 font-medium">v{period.version}</div>
                   )}
                   {period.editedBy && (
                     <div className="text-xs text-gray-400">
@@ -127,14 +125,11 @@ export const PayrollHistoryTable = ({
                     onClick={() => handleDownloadPila(period)}
                   >
                     <FileText className="h-4 w-4 mr-1" />
-                    Ver/Descargar
+                    Descargar
                   </Button>
                 ) : (
                   <span className="text-gray-400 text-sm">No disponible</span>
                 )}
-              </TableCell>
-              <TableCell>
-                {getDianStatusBadge(period.dianStatus)}
               </TableCell>
               <TableCell>
                 {getPaymentStatusBadge(period.paymentStatus)}

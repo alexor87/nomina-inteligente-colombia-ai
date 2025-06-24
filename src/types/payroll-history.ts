@@ -6,18 +6,21 @@ export interface PayrollHistoryPeriod {
   endDate: string;
   type: 'quincenal' | 'mensual';
   employeesCount: number;
-  status: 'cerrado' | 'con_errores' | 'revision_dian' | 'editado';
+  status: 'cerrado' | 'con_errores' | 'revision' | 'editado';
   totalGrossPay: number;
   totalNetPay: number;
+  totalDeductions: number;
+  totalCost: number;
+  employerContributions: number;
   pilaFileUrl?: string;
-  dianStatus: 'enviado' | 'rechazado' | 'pendiente';
   paymentStatus: 'pagado' | 'parcial' | 'pendiente';
   version: number;
-  originalId?: string; // Para versiones editadas
+  originalId?: string;
   createdAt: string;
   updatedAt: string;
   editedBy?: string;
   editReason?: string;
+  costCenter?: string;
 }
 
 export interface PayrollHistoryEmployee {
@@ -25,8 +28,9 @@ export interface PayrollHistoryEmployee {
   periodId: string;
   name: string;
   position: string;
+  grossPay: number;
+  deductions: number;
   netPay: number;
-  dianStatus: 'enviado' | 'rechazado' | 'pendiente';
   paymentStatus: 'pagado' | 'pendiente';
   payslipUrl?: string;
 }
@@ -55,7 +59,6 @@ export interface PayrollHistoryDetails {
   files: {
     desprendibles: string[];
     pilaFile?: string;
-    dianXmls: string[];
     certificates: string[];
     reports: string[];
   };
@@ -64,9 +67,6 @@ export interface PayrollHistoryDetails {
 export interface EditWizardSteps {
   pilaFile: {
     regenerate: boolean;
-  };
-  dianSubmission: {
-    resend: boolean;
   };
   payslips: {
     update: boolean;

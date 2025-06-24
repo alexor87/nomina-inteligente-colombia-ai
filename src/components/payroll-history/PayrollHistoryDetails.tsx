@@ -26,22 +26,18 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
 
   const getStatusBadge = (status: PayrollHistoryPeriod['status']) => {
     const statusConfig = {
-      cerrado: { color: 'bg-green-100 text-green-800', text: 'Cerrado' },
-      con_errores: { color: 'bg-red-100 text-red-800', text: 'Con errores' },
-      revision_dian: { color: 'bg-yellow-100 text-yellow-800', text: 'En revisión DIAN' },
-      editado: { color: 'bg-blue-100 text-blue-800', text: 'Editado' }
+      cerrado: { color: 'bg-green-100 text-green-800', text: 'Cerrado', icon: '✓' },
+      con_errores: { color: 'bg-red-100 text-red-800', text: 'Con errores', icon: '✗' },
+      revision: { color: 'bg-yellow-100 text-yellow-800', text: 'En revisión', icon: '⚠' },
+      editado: { color: 'bg-blue-100 text-blue-800', text: 'Editado', icon: '✏' }
     };
     const config = statusConfig[status];
-    return <Badge className={`${config.color} text-xs`}>{config.text}</Badge>;
-  };
-
-  // Cálculos simulados para el resumen
-  const summary = {
-    totalDevengado: period.totalGrossPay,
-    totalDeducciones: period.totalGrossPay - period.totalNetPay,
-    totalNeto: period.totalNetPay,
-    costoTotal: period.totalNetPay * 1.15, // Simulando costos adicionales
-    aportesEmpleador: period.totalNetPay * 0.15
+    return (
+      <Badge className={`${config.color} text-xs`}>
+        <span className="mr-1">{config.icon}</span>
+        {config.text}
+      </Badge>
+    );
   };
 
   return (
@@ -100,15 +96,15 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
                 <div className="mt-1">{getStatusBadge(period.status)}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">Estado DIAN</div>
+                <div className="text-sm text-gray-600">Estado de pagos</div>
                 <div className="mt-1">
                   <Badge className={
-                    period.dianStatus === 'enviado' ? 'bg-green-100 text-green-800' :
-                    period.dianStatus === 'rechazado' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
+                    period.paymentStatus === 'pagado' ? 'bg-green-100 text-green-800' :
+                    period.paymentStatus === 'parcial' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
                   }>
-                    {period.dianStatus === 'enviado' ? 'Enviado' :
-                     period.dianStatus === 'rechazado' ? 'Rechazado' : 'Pendiente'}
+                    {period.paymentStatus === 'pagado' ? '✓ Pagado' :
+                     period.paymentStatus === 'parcial' ? '⚠ Parcial' : '⏳ Pendiente'}
                   </Badge>
                 </div>
               </div>
@@ -127,23 +123,23 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalDevengado)}</div>
+                <div className="text-2xl font-bold text-green-600">{formatCurrency(period.totalGrossPay)}</div>
                 <div className="text-sm text-gray-600">Devengado Total</div>
               </div>
               <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">{formatCurrency(summary.totalDeducciones)}</div>
+                <div className="text-2xl font-bold text-red-600">{formatCurrency(period.totalDeductions)}</div>
                 <div className="text-sm text-gray-600">Deducciones Totales</div>
               </div>
               <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{formatCurrency(summary.totalNeto)}</div>
+                <div className="text-2xl font-bold text-blue-600">{formatCurrency(period.totalNetPay)}</div>
                 <div className="text-sm text-gray-600">Neto Pagado</div>
               </div>
               <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">{formatCurrency(summary.aportesEmpleador)}</div>
+                <div className="text-2xl font-bold text-purple-600">{formatCurrency(period.employerContributions)}</div>
                 <div className="text-sm text-gray-600">Aportes Empleador</div>
               </div>
               <div className="text-center p-4 border-2 border-purple-300 rounded-lg bg-purple-50">
-                <div className="text-2xl font-bold text-purple-600">{formatCurrency(summary.costoTotal)}</div>
+                <div className="text-2xl font-bold text-purple-600">{formatCurrency(period.totalCost)}</div>
                 <div className="text-sm text-gray-600">Costo Total Nómina</div>
               </div>
             </div>
@@ -170,8 +166,9 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Cargo</TableHead>
+                  <TableHead>Devengado</TableHead>
+                  <TableHead>Deducciones</TableHead>
                   <TableHead>Neto Pagado</TableHead>
-                  <TableHead>Estado DIAN</TableHead>
                   <TableHead>Estado Pago</TableHead>
                   <TableHead className="text-center">Desprendible</TableHead>
                 </TableRow>
@@ -181,24 +178,20 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
                   <TableRow key={employee.id}>
                     <TableCell className="font-medium">{employee.name}</TableCell>
                     <TableCell>{employee.position}</TableCell>
+                    <TableCell className="font-semibold text-green-600">
+                      {formatCurrency(employee.grossPay || 0)}
+                    </TableCell>
+                    <TableCell className="font-semibold text-red-600">
+                      {formatCurrency(employee.deductions || 0)}
+                    </TableCell>
                     <TableCell className="font-semibold text-blue-600">
                       {formatCurrency(employee.netPay)}
                     </TableCell>
                     <TableCell>
                       <Badge className={
-                        employee.dianStatus === 'enviado' ? 'bg-green-100 text-green-800' :
-                        employee.dianStatus === 'rechazado' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }>
-                        {employee.dianStatus === 'enviado' ? 'Enviado' :
-                         employee.dianStatus === 'rechazado' ? 'Rechazado' : 'Pendiente'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={
                         employee.paymentStatus === 'pagado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                       }>
-                        {employee.paymentStatus === 'pagado' ? 'Pagado' : 'Pendiente'}
+                        {employee.paymentStatus === 'pagado' ? '✓ Pagado' : '⏳ Pendiente'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
@@ -240,8 +233,8 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
                 </Button>
               </div>
               <div className="p-4 border border-gray-200 rounded-lg">
-                <div className="text-sm font-medium text-gray-900 mb-2">XMLs DIAN</div>
-                <div className="text-xs text-gray-600 mb-2">Documentos XML</div>
+                <div className="text-sm font-medium text-gray-900 mb-2">Certificados</div>
+                <div className="text-xs text-gray-600 mb-2">Archivos PDF</div>
                 <Button variant="outline" size="sm" className="w-full">
                   <Download className="h-3 w-3 mr-1" />
                   Descargar

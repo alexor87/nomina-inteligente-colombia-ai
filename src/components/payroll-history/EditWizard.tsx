@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Send, Download, AlertTriangle } from 'lucide-react';
+import { FileText, Download, AlertTriangle } from 'lucide-react';
 import { EditWizardSteps } from '@/types/payroll-history';
 
 interface EditWizardProps {
@@ -19,7 +19,6 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
   const [currentStep, setCurrentStep] = useState(1);
   const [wizardSteps, setWizardSteps] = useState<EditWizardSteps>({
     pilaFile: { regenerate: false },
-    dianSubmission: { resend: false },
     payslips: { update: false }
   });
 
@@ -34,7 +33,7 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
   };
 
   const handleNext = () => {
-    if (currentStep < 4) {
+    if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -51,7 +50,6 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
     setCurrentStep(1);
     setWizardSteps({
       pilaFile: { regenerate: false },
-      dianSubmission: { resend: false },
       payslips: { update: false }
     });
   };
@@ -59,7 +57,6 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
   const getTotalTasks = () => {
     let count = 0;
     if (wizardSteps.pilaFile.regenerate) count++;
-    if (wizardSteps.dianSubmission.resend) count++;
     if (wizardSteps.payslips.update) count++;
     return count;
   };
@@ -77,14 +74,14 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
         <div className="space-y-6">
           {/* Progress indicator */}
           <div className="flex items-center space-x-2">
-            {[1, 2, 3, 4].map((step) => (
+            {[1, 2, 3].map((step) => (
               <div key={step} className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                   step <= currentStep ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
                 }`}>
                   {step}
                 </div>
-                {step < 4 && <div className="w-12 h-0.5 bg-gray-200 mx-2" />}
+                {step < 3 && <div className="w-12 h-0.5 bg-gray-200 mx-2" />}
               </div>
             ))}
           </div>
@@ -123,42 +120,8 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
             </Card>
           )}
 
-          {/* Step 2: DIAN Submission */}
+          {/* Step 2: Payslips */}
           {currentStep === 2 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Send className="h-5 w-5 text-green-600" />
-                  <span>Nómina Electrónica DIAN</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-gray-600">
-                  ¿Desea reenviar los documentos XML a la DIAN con los cambios?
-                </p>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="resend-dian"
-                    checked={wizardSteps.dianSubmission.resend}
-                    onCheckedChange={(checked) => handleStepChange('dianSubmission', 'resend', !!checked)}
-                  />
-                  <label htmlFor="resend-dian" className="text-sm font-medium">
-                    Sí, reenviar a DIAN
-                  </label>
-                </div>
-                {wizardSteps.dianSubmission.resend && (
-                  <div className="bg-red-50 p-3 rounded-lg">
-                    <p className="text-sm text-red-800">
-                      ⚠️ Los documentos anteriores serán invalidados. Esta acción es irreversible.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Step 3: Payslips */}
-          {currentStep === 3 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -191,8 +154,8 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
             </Card>
           )}
 
-          {/* Step 4: Summary */}
-          {currentStep === 4 && (
+          {/* Step 3: Summary */}
+          {currentStep === 3 && (
             <Card>
               <CardHeader>
                 <CardTitle>Resumen de Acciones</CardTitle>
@@ -206,12 +169,6 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
                     <div className="flex items-center space-x-2">
                       <Badge className="bg-blue-100 text-blue-800">PILA</Badge>
                       <span className="text-sm">Regenerar archivo PILA</span>
-                    </div>
-                  )}
-                  {wizardSteps.dianSubmission.resend && (
-                    <div className="flex items-center space-x-2">
-                      <Badge className="bg-green-100 text-green-800">DIAN</Badge>
-                      <span className="text-sm">Reenviar documentos a DIAN</span>
                     </div>
                   )}
                   {wizardSteps.payslips.update && (
@@ -239,10 +196,10 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
             </Button>
             
             <div className="text-sm text-gray-500">
-              Paso {currentStep} de 4
+              Paso {currentStep} de 3
             </div>
 
-            {currentStep < 4 ? (
+            {currentStep < 3 ? (
               <Button onClick={handleNext} disabled={isProcessing}>
                 Siguiente
               </Button>

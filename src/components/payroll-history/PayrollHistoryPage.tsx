@@ -6,7 +6,7 @@ import { PayrollHistoryDetails } from './PayrollHistoryDetails';
 import { ReopenDialog } from './ReopenDialog';
 import { EditWizard } from './EditWizard';
 import { Button } from '@/components/ui/button';
-import { Download, History } from 'lucide-react';
+import { Download, History, FileText } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryFilters as Filters, EditWizardSteps } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
@@ -54,11 +54,13 @@ export const PayrollHistoryPage = () => {
         employeesCount: record.empleados,
         status: record.estado === 'cerrada' ? 'cerrado' : 
                 record.estado === 'pagada' ? 'cerrado' : 
-                record.estado === 'procesada' ? 'revision_dian' : 'con_errores',
+                record.estado === 'procesada' ? 'revision' : 'con_errores',
         totalGrossPay: record.totalNomina * 1.3, // Estimado incluyendo prestaciones
         totalNetPay: record.totalNomina,
+        totalDeductions: record.totalNomina * 0.23, // Estimado de deducciones
+        totalCost: record.totalNomina * 1.15, // Costo total estimado
+        employerContributions: record.totalNomina * 0.15, // Aportes empleador
         pilaFileUrl: undefined,
-        dianStatus: record.estado === 'cerrada' || record.estado === 'pagada' ? 'enviado' : 'pendiente',
         paymentStatus: record.estado === 'pagada' ? 'pagado' : 
                       record.estado === 'procesada' ? 'parcial' : 'pendiente',
         version: 1,
@@ -103,25 +105,8 @@ export const PayrollHistoryPage = () => {
       if (!confirmReopen) return;
     }
 
-    try {
-      // Usar el servicio real para reabrir el período
-      await PayrollHistoryService.reopenPeriod(period.period);
-      
-      toast({
-        title: "Período reabierto",
-        description: "El período ha sido reabierto exitosamente",
-      });
-
-      // Recargar la lista de períodos
-      await loadPayrollPeriods();
-    } catch (error) {
-      console.error('Error reopening period:', error);
-      toast({
-        title: "Error al reabrir período",
-        description: "No se pudo reabrir el período. Intente nuevamente.",
-        variant: "destructive"
-      });
-    }
+    setPeriodToReopen(period);
+    setReopenDialogOpen(true);
   };
 
   const handleConfirmReopen = async (reason: string) => {
@@ -229,7 +214,7 @@ export const PayrollHistoryPage = () => {
                 <History className="h-8 w-8 text-blue-600" />
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">Historial de Nómina</h1>
-                  <p className="text-gray-600">Consulta y gestiona los períodos de nómina cerrados</p>
+                  <p className="text-gray-600">Consulta, audita y edita períodos de nómina cerrados</p>
                 </div>
               </div>
               <Button 
@@ -238,7 +223,7 @@ export const PayrollHistoryPage = () => {
                 className="bg-green-600 hover:bg-green-700"
               >
                 <Download className="h-4 w-4 mr-2" />
-                {isExporting ? 'Exportando...' : 'Exportar a Excel'}
+                {isExporting ? 'Exportando...' : 'Exportar Excel'}
               </Button>
             </div>
           </div>
@@ -279,10 +264,10 @@ export const PayrollHistoryPage = () => {
           {periods.length === 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 p-12">
               <div className="text-center">
-                <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No hay períodos de nómina</h3>
                 <p className="text-gray-600">
-                  Aún no se han procesado períodos de nómina para esta empresa.
+                  Los períodos aparecerán aquí una vez que se cierren en el módulo de liquidación.
                 </p>
               </div>
             </div>

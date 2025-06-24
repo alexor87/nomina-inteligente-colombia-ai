@@ -28,7 +28,7 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
       // Crear nueva versión del período
       const newVersion: PayrollHistoryPeriod = {
         id: `${data.periodId}-v${Date.now()}`,
-        period: "1 al 15 de Mayo 2025 (Editado)",
+        period: "1 al 15 de Mayo 2025 (v2)",
         startDate: '2025-05-01',
         endDate: '2025-05-15',
         type: 'quincenal',
@@ -36,7 +36,9 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
         status: 'editado',
         totalGrossPay: 45000000,
         totalNetPay: 38500000,
-        dianStatus: 'pendiente',
+        totalDeductions: 6500000,
+        totalCost: 51750000,
+        employerContributions: 6750000,
         paymentStatus: 'pendiente',
         version: 2,
         originalId: data.periodId,
@@ -83,10 +85,6 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
       
       if (wizardSteps.pilaFile.regenerate) {
         tasks.push("Regenerando archivo PILA...");
-      }
-      
-      if (wizardSteps.dianSubmission.resend) {
-        tasks.push("Reenviando documentos a DIAN...");
       }
       
       if (wizardSteps.payslips.update) {
