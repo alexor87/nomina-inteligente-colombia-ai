@@ -109,11 +109,11 @@ export class PayrollLiquidationService {
         return this.getSampleEmployees();
       }
 
+      // Cargar TODOS los empleados, no solo los activos, para que coincida con el módulo de empleados
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('company_id', companyId)
-        .eq('estado', 'activo');
+        .eq('company_id', companyId);
 
       if (error) throw error;
 
@@ -121,6 +121,8 @@ export class PayrollLiquidationService {
         console.log('No employees found, returning sample data');
         return this.getSampleEmployees();
       }
+
+      console.log(`Loaded ${data.length} employees for payroll liquidation`);
 
       return data.map(emp => {
         const baseEmployeeData = {
@@ -148,6 +150,11 @@ export class PayrollLiquidationService {
           periodType: 'mensual'
         });
 
+        // Marcar como válido solo si el empleado está activo
+        const isActive = emp.estado === 'activo';
+        const status = isActive ? 'valid' : 'incomplete';
+        const errors = isActive ? [] : ['Empleado no activo'];
+
         return {
           ...baseEmployeeData,
           grossPay: calculation.grossPay,
@@ -155,8 +162,8 @@ export class PayrollLiquidationService {
           netPay: calculation.netPay,
           transportAllowance: calculation.transportAllowance,
           employerContributions: calculation.employerContributions,
-          status: 'valid' as const,
-          errors: []
+          status: status as const,
+          errors
         };
       });
     } catch (error) {
@@ -212,7 +219,6 @@ export class PayrollLiquidationService {
     ];
   }
 
-  // Obtener historial de liquidaciones
   static async getPayrollHistory(): Promise<any[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -240,7 +246,6 @@ export class PayrollLiquidationService {
     }
   }
 
-  // Reabrir un período de nómina
   static async reopenPayrollPeriod(payrollIds: string[]): Promise<void> {
     try {
       const { error } = await supabase
