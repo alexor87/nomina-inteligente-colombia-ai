@@ -127,7 +127,7 @@ export const PayrollTable = ({
       arl: '',
       cajaCompensacion: '',
       estadoAfiliacion: 'completa' as const,
-      nivelRiesgoARL: '1',
+      nivelRiesgoARL: 'I' as const,
       centrosocial: '',
       contratoVencimiento: '',
       ultimaLiquidacion: new Date().toISOString(),

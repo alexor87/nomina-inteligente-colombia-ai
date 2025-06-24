@@ -14,7 +14,7 @@ export const EmployeeDetailsModal = ({ isOpen, onClose, employee }: EmployeeDeta
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden p-0 gap-0">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden p-0 gap-0 [&>button]:hidden">
         <EmployeeProfile employee={employee} onClose={onClose} />
       </DialogContent>
     </Dialog>
