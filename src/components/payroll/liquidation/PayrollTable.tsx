@@ -59,7 +59,7 @@ export const PayrollTable = ({
   onRefreshEmployees
 }: PayrollTableProps) => {
   const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [selectedEmployee, setSelectedEmployee] = useState<{ id: string; name: string } | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<{ id: string; name: string; salary: number } | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   
   const { openEmployeeProfile, closeEmployeeProfile, selectedEmployee: employeeForProfile, isEmployeeProfileOpen } = useEmployeeList();
@@ -100,7 +100,10 @@ export const PayrollTable = ({
 
   const handleOpenNovedades = async (employeeId: string, employeeName: string) => {
     console.log('Opening novedades for employee:', employeeId, employeeName);
-    setSelectedEmployee({ id: employeeId, name: employeeName });
+    const employee = employees.find(emp => emp.id === employeeId);
+    const salary = employee?.baseSalary || 1300000;
+    
+    setSelectedEmployee({ id: employeeId, name: employeeName, salary });
     await loadNovedadesForEmployee(employeeId);
   };
 
@@ -397,6 +400,7 @@ export const PayrollTable = ({
           onClose={() => setSelectedEmployee(null)}
           employeeName={selectedEmployee.name}
           employeeId={selectedEmployee.id}
+          employeeSalary={selectedEmployee.salary}
           novedades={getEmployeeNovedades(selectedEmployee.id)}
           onCreateNovedad={handleCreateNovedad}
           onUpdateNovedad={handleUpdateNovedad}
