@@ -30,7 +30,9 @@ export const NovedadForm = ({
   const { register, handleSubmit, setValue, watch, control, formState: { errors } } = useForm<NovedadFormData>({
     defaultValues: initialData || {
       tipo_novedad: 'bonificacion',
-      valor: 0
+      valor: 0,
+      dias: undefined,
+      horas: undefined
     }
   });
 
@@ -76,8 +78,8 @@ export const NovedadForm = ({
     console.log('🧮 Calculando automáticamente...', {
       tipoNovedad,
       subtipo,
-      dias,
-      horas,
+      dias: typeof dias === 'number' ? dias : 'undefined',
+      horas: typeof horas === 'number' ? horas : 'undefined',
       employeeSalary,
       autoCalculo: currentTypeConfig?.auto_calculo
     });
@@ -86,16 +88,20 @@ export const NovedadForm = ({
       // Validar que tenemos los datos necesarios para el cálculo
       let canCalculate = false;
       
-      if (currentTypeConfig.requiere_horas && horas > 0) {
+      // Convertir valores de forma segura
+      const diasNum = typeof dias === 'number' && !isNaN(dias) ? dias : 0;
+      const horasNum = typeof horas === 'number' && !isNaN(horas) ? horas : 0;
+      
+      if (currentTypeConfig.requiere_horas && horasNum > 0) {
         canCalculate = true;
-      } else if (currentTypeConfig.requiere_dias && dias > 0) {
+      } else if (currentTypeConfig.requiere_dias && diasNum > 0) {
         canCalculate = true;
       } else if (!currentTypeConfig.requiere_horas && !currentTypeConfig.requiere_dias) {
         canCalculate = true;
       }
 
       if (canCalculate) {
-        const result = calcularValorNovedad(tipoNovedad, subtipo, employeeSalary, dias, horas);
+        const result = calcularValorNovedad(tipoNovedad, subtipo, employeeSalary, diasNum, horasNum);
         console.log('Resultado del cálculo:', result);
         
         setCalculatedValue(result.valor);
@@ -120,14 +126,24 @@ export const NovedadForm = ({
     try {
       console.log('📋 Datos del formulario antes de envío:', data);
       
+      // Función auxiliar para convertir a número de forma segura
+      const safeNumber = (value: any): number | undefined => {
+        if (value === null || value === undefined || value === '') return undefined;
+        const num = Number(value);
+        return isNaN(num) || num <= 0 ? undefined : num;
+      };
+
       // Validar campos requeridos según el tipo de novedad
       const errors = [];
       
-      if (currentTypeConfig?.requiere_horas && (!data.horas || data.horas <= 0)) {
+      const diasNum = safeNumber(data.dias);
+      const horasNum = safeNumber(data.horas);
+      
+      if (currentTypeConfig?.requiere_horas && !horasNum) {
         errors.push('Las horas son requeridas para este tipo de novedad');
       }
       
-      if (currentTypeConfig?.requiere_dias && (!data.dias || data.dias <= 0)) {
+      if (currentTypeConfig?.requiere_dias && !diasNum) {
         errors.push('Los días son requeridos para este tipo de novedad');
       }
       
@@ -145,19 +161,27 @@ export const NovedadForm = ({
         return;
       }
       
-      // Limpiar datos opcionales que no se necesitan
-      const cleanData = {
-        ...data,
-        // Solo enviar campos que tienen valor
+      // Limpiar datos y asegurar tipos correctos
+      const cleanData: NovedadFormData = {
+        tipo_novedad: data.tipo_novedad,
+        valor: Number(data.valor),
         subtipo: data.subtipo || undefined,
         fecha_inicio: data.fecha_inicio || undefined,
         fecha_fin: data.fecha_fin || undefined,
-        dias: data.dias > 0 ? data.dias : undefined,
-        horas: data.horas > 0 ? data.horas : undefined,
+        dias: diasNum,
+        horas: horasNum,
         observacion: data.observacion || undefined
       };
       
       console.log('✅ Datos limpios para envío:', cleanData);
+      console.log('🔍 Tipos finales:', {
+        valor: typeof cleanData.valor,
+        dias: typeof cleanData.dias,
+        horas: typeof cleanData.horas,
+        dias_valor: cleanData.dias,
+        horas_valor: cleanData.horas
+      });
+      
       await onSubmit(cleanData);
     } catch (error) {
       console.error('❌ Error submitting novedad:', error);
@@ -311,9 +335,10 @@ export const NovedadForm = ({
               </Label>
               <Input
                 {...register('dias', { 
-                  valueAsNumber: true,
-                  onChange: (e) => {
-                    console.log('Días cambiados:', e.target.value);
+                  setValueAs: (value) => {
+                    if (value === '' || value === null || value === undefined) return undefined;
+                    const num = Number(value);
+                    return isNaN(num) ? undefined : num;
                   }
                 })}
                 type="number"
@@ -333,9 +358,10 @@ export const NovedadForm = ({
               </Label>
               <Input
                 {...register('horas', { 
-                  valueAsNumber: true,
-                  onChange: (e) => {
-                    console.log('Horas cambiadas:', e.target.value, 'Para subtipo:', subtipo);
+                  setValueAs: (value) => {
+                    if (value === '' || value === null || value === undefined) return undefined;
+                    const num = Number(value);
+                    return isNaN(num) ? undefined : num;
                   }
                 })}
                 type="number"
@@ -361,7 +387,12 @@ export const NovedadForm = ({
               )}
             </div>
             <Input
-              {...register('valor', { valueAsNumber: true })}
+              {...register('valor', { 
+                setValueAs: (value) => {
+                  const num = Number(value);
+                  return isNaN(num) ? 0 : num;
+                }
+              })}
               type="number"
               id="valor"
               placeholder="0"

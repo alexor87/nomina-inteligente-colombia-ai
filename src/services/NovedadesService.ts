@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
 
@@ -86,34 +87,43 @@ export class NovedadesService {
         throw new Error('valor debe ser mayor a 0');
       }
 
-      // Preparar los datos para inserción con valores explícitos
+      // Función auxiliar para convertir a número de forma segura
+      const safeNumber = (value: any): number | null => {
+        if (value === null || value === undefined || value === '') return null;
+        const num = Number(value);
+        return isNaN(num) ? null : num;
+      };
+
+      // Preparar los datos para inserción con valores explícitos y conversiones seguras
       const insertData = {
         company_id: companyId,
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
         tipo_novedad: novedadData.tipo_novedad,
-        valor: Number(novedadData.valor), // Asegurar que sea número
+        valor: safeNumber(novedadData.valor) || 0,
         creado_por: user.id,
-        // Campos opcionales con valores por defecto seguros
+        // Campos opcionales con valores por defecto seguros y conversiones
         subtipo: novedadData.subtipo || null,
         fecha_inicio: novedadData.fecha_inicio || null,
         fecha_fin: novedadData.fecha_fin || null,
-        dias: novedadData.dias ? Number(novedadData.dias) : null,
-        horas: novedadData.horas ? Number(novedadData.horas) : null,
+        dias: safeNumber(novedadData.dias),
+        horas: safeNumber(novedadData.horas),
         observacion: novedadData.observacion || null,
         base_calculo: novedadData.base_calculo || null,
         adjunto_url: novedadData.adjunto_url || null
       };
 
       console.log('📤 Datos preparados para inserción:', insertData);
-      console.log('📋 Tipos de datos:', {
+      console.log('📋 Tipos de datos después de conversión:', {
         company_id: typeof insertData.company_id,
         empleado_id: typeof insertData.empleado_id,
         periodo_id: typeof insertData.periodo_id,
         tipo_novedad: typeof insertData.tipo_novedad,
         valor: typeof insertData.valor,
         dias: typeof insertData.dias,
-        horas: typeof insertData.horas
+        horas: typeof insertData.horas,
+        dias_valor: insertData.dias,
+        horas_valor: insertData.horas
       });
 
       const { data, error } = await supabase
