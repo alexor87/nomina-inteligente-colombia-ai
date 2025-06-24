@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
-import { AlertCircle, CheckCircle, Clock, Lock, Users } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Lock, Users, RefreshCw, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PayrollTableProps {
   employees: PayrollEmployee[];
   onUpdateEmployee: (id: string, field: string, value: number) => void;
+  onRecalculate: () => void;
   isLoading: boolean;
   canEdit?: boolean;
 }
@@ -42,7 +43,7 @@ const statusConfig = {
   }
 };
 
-export const PayrollTable = ({ employees, onUpdateEmployee, isLoading, canEdit = true }: PayrollTableProps) => {
+export const PayrollTable = ({ employees, onUpdateEmployee, onRecalculate, isLoading, canEdit = true }: PayrollTableProps) => {
   const [editingCell, setEditingCell] = useState<string | null>(null);
 
   const handleCellEdit = (employeeId: string, field: string, value: string) => {
@@ -132,26 +133,54 @@ export const PayrollTable = ({ employees, onUpdateEmployee, isLoading, canEdit =
     <div className="mx-6 flex-1 overflow-hidden">
       <Card className="h-full flex flex-col">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Empleados para Liquidación</h2>
-          <div className="flex items-center space-x-2">
-            {!canEdit && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Badge variant="secondary" className="bg-gray-100 text-gray-700">
-                      <Lock className="h-3 w-3 mr-1" />
-                      Solo lectura
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>El período no está en estado borrador. Los valores no se pueden editar.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            <Badge variant="secondary">
-              {employees.length} empleados
-            </Badge>
+          <div className="flex items-center space-x-4">
+            <h2 className="text-lg font-semibold text-gray-900">Empleados para Liquidación</h2>
+            <div className="flex items-center space-x-2">
+              {!canEdit && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Badge variant="secondary" className="bg-gray-100 text-gray-700">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Solo lectura
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>El período no está en estado borrador. Los valores no se pueden editar.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <Badge variant="secondary">
+                {employees.length} empleados
+              </Badge>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRecalculate}
+              disabled={!canEdit || isLoading}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Recalcular todos
+            </Button>
+
+            <div className="flex items-center text-sm text-gray-600">
+              {canEdit ? (
+                <>
+                  <Save className="h-4 w-4 mr-1" />
+                  Guardado automático
+                </>
+              ) : (
+                <>
+                  <Lock className="h-4 w-4 mr-1" />
+                  Período bloqueado para edición
+                </>
+              )}
+            </div>
           </div>
         </div>
         

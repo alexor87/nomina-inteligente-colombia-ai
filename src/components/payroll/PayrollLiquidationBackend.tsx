@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
 import { PayrollTable } from './liquidation/PayrollTable';
 import { PayrollSummaryCards } from './liquidation/PayrollSummaryCards';
-import { PayrollActions } from './liquidation/PayrollActions';
 import { usePayrollLiquidationBackend } from '@/hooks/usePayrollLiquidationBackend';
 
 export const PayrollLiquidationBackend = () => {
@@ -43,18 +42,12 @@ export const PayrollLiquidationBackend = () => {
           <PayrollTable
             employees={employees}
             onUpdateEmployee={updateEmployee}
+            onRecalculate={recalculateAll}
             isLoading={isLoading}
             canEdit={canEdit}
           />
         </div>
       </div>
-
-      <PayrollActions
-        onRecalculate={recalculateAll}
-        onToggleSummary={() => {}}
-        showSummary={true}
-        canEdit={canEdit}
-      />
     </div>
   );
 };
