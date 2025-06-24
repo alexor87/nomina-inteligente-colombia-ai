@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
@@ -52,17 +51,22 @@ export const PayrollHistoryPage = () => {
         endDate: record.fechaCreacion.split('T')[0],
         type: 'mensual' as const,
         employeesCount: record.empleados,
+        // Corregir mapeo de estados
         status: record.estado === 'cerrada' ? 'cerrado' : 
                 record.estado === 'pagada' ? 'cerrado' : 
-                record.estado === 'procesada' ? 'revision' : 'con_errores',
+                record.estado === 'procesada' ? 'cerrado' : // Procesada significa lista/cerrada
+                record.estado === 'aprobada' ? 'cerrado' :   // Aprobada también es cerrada
+                'con_errores', // Solo borrador y otros estados no definidos son errores
         totalGrossPay: record.totalNomina * 1.3, // Estimado incluyendo prestaciones
         totalNetPay: record.totalNomina,
         totalDeductions: record.totalNomina * 0.23, // Estimado de deducciones
         totalCost: record.totalNomina * 1.15, // Costo total estimado
         employerContributions: record.totalNomina * 0.15, // Aportes empleador
         pilaFileUrl: undefined,
+        // Corregir mapeo de estado de pagos
         paymentStatus: record.estado === 'pagada' ? 'pagado' : 
-                      record.estado === 'procesada' ? 'parcial' : 'pendiente',
+                      record.estado === 'procesada' || record.estado === 'aprobada' ? 'pendiente' : // Procesada/Aprobada = pendiente de pago
+                      'pendiente',
         version: 1,
         createdAt: record.fechaCreacion,
         updatedAt: record.fechaCreacion
