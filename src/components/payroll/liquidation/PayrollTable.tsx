@@ -4,8 +4,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
-import { AlertCircle, CheckCircle, Clock, Lock } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Lock, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PayrollTableProps {
@@ -104,13 +105,24 @@ export const PayrollTable = ({ employees, onUpdateEmployee, isLoading, canEdit =
     return (
       <Card className="mx-6 p-8 text-center">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-            <AlertCircle className="h-8 w-8 text-gray-400" />
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+            <Users className="h-8 w-8 text-blue-500" />
           </div>
-          <div>
+          <div className="space-y-2">
             <h3 className="text-lg font-medium text-gray-900">Sin empleados para liquidar</h3>
-            <p className="text-gray-500">No hay empleados activos disponibles para la liquidación de nómina.</p>
+            <p className="text-gray-500 max-w-md">
+              No hay empleados activos disponibles para la liquidación de nómina. 
+              Primero debes agregar empleados en el módulo de Empleados.
+            </p>
           </div>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.href = '/empleados'}
+            className="mt-4"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Ir a Empleados
+          </Button>
         </div>
       </Card>
     );
@@ -132,7 +144,7 @@ export const PayrollTable = ({ employees, onUpdateEmployee, isLoading, canEdit =
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>El período no está en estadoborrador. Los valores no se pueden editar.</p>
+                    <p>El período no está en estado borrador. Los valores no se pueden editar.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

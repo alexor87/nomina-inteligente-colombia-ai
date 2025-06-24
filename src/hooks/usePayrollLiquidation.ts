@@ -99,7 +99,7 @@ export const usePayrollLiquidation = () => {
       } else {
         toast({
           title: "Sin empleados activos",
-          description: "No se encontraron empleados activos para liquidar",
+          description: "No se encontraron empleados activos. Agrega empleados en el módulo de Empleados primero.",
           variant: "destructive"
         });
       }

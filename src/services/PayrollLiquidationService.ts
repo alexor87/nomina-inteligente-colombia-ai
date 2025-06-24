@@ -126,8 +126,8 @@ export class PayrollLiquidationService {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
-        console.warn('No company ID found for user, loading sample data');
-        return this.getSampleEmployees();
+        console.warn('No company ID found for user');
+        return [];
       }
 
       // Cargar SOLO los empleados ACTIVOS para la liquidación de nómina
@@ -139,12 +139,12 @@ export class PayrollLiquidationService {
 
       if (error) {
         console.error('Error loading employees:', error);
-        return this.getSampleEmployees();
+        return [];
       }
 
       if (!data || data.length === 0) {
-        console.log('No active employees found, returning sample data');
-        return this.getSampleEmployees();
+        console.log('No active employees found for payroll liquidation');
+        return [];
       }
 
       console.log(`Loaded ${data.length} active employees for payroll liquidation`);
@@ -189,55 +189,8 @@ export class PayrollLiquidationService {
       });
     } catch (error) {
       console.error('Error loading employees:', error);
-      // Return sample data as fallback
-      return this.getSampleEmployees();
+      return [];
     }
-  }
-
-  // Datos de muestra para cuando no hay empleados reales
-  static getSampleEmployees(): PayrollEmployee[] {
-    return [
-      {
-        id: 'sample-1',
-        name: 'Juan Pérez',
-        position: 'Desarrollador',
-        baseSalary: 3000000,
-        workedDays: 30,
-        extraHours: 0,
-        disabilities: 0,
-        bonuses: 0,
-        absences: 0,
-        grossPay: 3000000,
-        deductions: 240000,
-        netPay: 2760000,
-        transportAllowance: 140606,
-        employerContributions: 765000,
-        status: 'valid',
-        errors: [],
-        eps: 'SURA',
-        afp: 'PROTECCIÓN'
-      },
-      {
-        id: 'sample-2',
-        name: 'María González',
-        position: 'Contadora',
-        baseSalary: 2500000,
-        workedDays: 30,
-        extraHours: 0,
-        disabilities: 0,
-        bonuses: 0,
-        absences: 0,
-        grossPay: 2500000,
-        deductions: 200000,
-        netPay: 2300000,
-        transportAllowance: 140606,
-        employerContributions: 637500,
-        status: 'valid',
-        errors: [],
-        eps: 'COMPENSAR',
-        afp: 'COLFONDOS'
-      }
-    ];
   }
 
   static async getPayrollHistory(): Promise<any[]> {
