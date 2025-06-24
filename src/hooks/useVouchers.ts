@@ -1,81 +1,38 @@
 
 import { useState, useEffect, useMemo } from 'react';
-import { PayrollVoucher, VoucherFilters, VoucherSummary } from '@/types/vouchers';
-import { supabase } from '@/integrations/supabase/client';
+import { PayrollVoucher } from '@/types/vouchers';
+import { VoucherService } from '@/services/VoucherService';
 import { useToast } from '@/hooks/use-toast';
+import { useVoucherFilters } from './useVoucherFilters';
+import { useVoucherSelection } from './useVoucherSelection';
+import { useVoucherActions } from './useVoucherActions';
+import { useVoucherSummary } from './useVoucherSummary';
 
 export const useVouchers = () => {
   const [vouchers, setVouchers] = useState<PayrollVoucher[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedVouchers, setSelectedVouchers] = useState<string[]>([]);
   const { toast } = useToast();
-
-  const [filters, setFilters] = useState<VoucherFilters>({
-    searchTerm: '',
-    periodo: '',
-    voucherStatus: '',
-    sentToEmployee: undefined,
-    startDate: '',
-    endDate: ''
-  });
+  
+  const { filters, updateFilters, clearFilters } = useVoucherFilters();
+  const { 
+    selectedVouchers, 
+    toggleVoucherSelection, 
+    toggleAllVouchers, 
+    clearSelection 
+  } = useVoucherSelection();
 
   // Cargar comprobantes desde Supabase
   const loadVouchers = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('payroll_vouchers')
-        .select(`
-          *,
-          employees (
-            nombre,
-            apellido,
-            cedula,
-            email
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading vouchers:', error);
-        toast({
-          title: "Error al cargar comprobantes",
-          description: "No se pudieron cargar los comprobantes",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Transformar datos de Supabase
-      const transformedVouchers: PayrollVoucher[] = (data || []).map(voucher => ({
-        id: voucher.id,
-        companyId: voucher.company_id,
-        employeeId: voucher.employee_id,
-        payrollId: voucher.payroll_id || undefined,
-        periodo: voucher.periodo,
-        startDate: voucher.start_date,
-        endDate: voucher.end_date,
-        netPay: Number(voucher.net_pay),
-        voucherStatus: voucher.voucher_status as 'generado' | 'pendiente' | 'enviado' | 'error',
-        sentToEmployee: voucher.sent_to_employee,
-        sentDate: voucher.sent_date || undefined,
-        pdfUrl: voucher.pdf_url || undefined,
-        createdAt: voucher.created_at,
-        updatedAt: voucher.updated_at,
-        generatedBy: voucher.generated_by || undefined,
-        // Campos del empleado
-        employeeName: voucher.employees ? `${voucher.employees.nombre} ${voucher.employees.apellido}` : 'Sin nombre',
-        employeeEmail: voucher.employees?.email || '',
-        employeeCedula: voucher.employees?.cedula || ''
-      }));
-
-      setVouchers(transformedVouchers);
-      console.log('Comprobantes cargados:', transformedVouchers.length);
+      const data = await VoucherService.loadVouchers();
+      setVouchers(data);
+      console.log('Comprobantes cargados:', data.length);
     } catch (error) {
       console.error('Error loading vouchers:', error);
       toast({
-        title: "Error inesperado",
-        description: "Ocurrió un error al cargar los comprobantes",
+        title: "Error al cargar comprobantes",
+        description: "No se pudieron cargar los comprobantes",
         variant: "destructive"
       });
     } finally {
@@ -133,213 +90,28 @@ export const useVouchers = () => {
     });
   }, [vouchers, filters]);
 
-  // Calcular resumen
-  const summary: VoucherSummary = useMemo(() => {
-    const total = vouchers.length;
-    const sent = vouchers.filter(v => v.sentToEmployee).length;
-    const pending = vouchers.filter(v => v.voucherStatus === 'pendiente').length;
-    const generated = vouchers.filter(v => v.voucherStatus === 'generado').length;
+  const summary = useVoucherSummary(vouchers);
+  
+  const {
+    downloadVoucher,
+    downloadSelectedVouchers,
+    sendVoucherByEmail,
+    sendSelectedVouchersByEmail,
+    regenerateVoucher
+  } = useVoucherActions(vouchers, loadVouchers);
 
-    return {
-      totalVouchers: total,
-      sentPercentage: total > 0 ? Math.round((sent / total) * 100) : 0,
-      pendingVouchers: pending,
-      generatedVouchers: generated
-    };
-  }, [vouchers]);
-
-  const updateFilters = (newFilters: Partial<VoucherFilters>) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+  const handleToggleAllVouchers = () => {
+    toggleAllVouchers(filteredVouchers.map(v => v.id));
   };
 
-  const clearFilters = () => {
-    setFilters({
-      searchTerm: '',
-      periodo: '',
-      voucherStatus: '',
-      sentToEmployee: undefined,
-      startDate: '',
-      endDate: ''
-    });
+  const handleDownloadSelectedVouchers = async () => {
+    await downloadSelectedVouchers(selectedVouchers);
+    clearSelection();
   };
 
-  const toggleVoucherSelection = (voucherId: string) => {
-    setSelectedVouchers(prev => 
-      prev.includes(voucherId)
-        ? prev.filter(id => id !== voucherId)
-        : [...prev, voucherId]
-    );
-  };
-
-  const toggleAllVouchers = () => {
-    if (selectedVouchers.length === filteredVouchers.length) {
-      setSelectedVouchers([]);
-    } else {
-      setSelectedVouchers(filteredVouchers.map(v => v.id));
-    }
-  };
-
-  const downloadVoucher = async (voucherId: string) => {
-    const voucher = vouchers.find(v => v.id === voucherId);
-    if (!voucher) return;
-
-    if (!voucher.pdfUrl) {
-      toast({
-        title: "Archivo no disponible",
-        description: "El PDF no está disponible para este comprobante",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Simular descarga
-    const link = document.createElement('a');
-    link.href = voucher.pdfUrl;
-    link.download = `comprobante_${voucher.employeeCedula}_${voucher.periodo}.pdf`;
-    link.click();
-
-    // Registrar auditoría
-    await logVoucherAction(voucherId, 'downloaded', 'pdf');
-
-    toast({
-      title: "Descarga iniciada",
-      description: "Se está descargando el PDF del comprobante",
-    });
-  };
-
-  const downloadSelectedVouchers = async () => {
-    if (selectedVouchers.length === 0) {
-      toast({
-        title: "Sin selección",
-        description: "Selecciona al menos un comprobante para descargar",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Simular descarga en ZIP
-    toast({
-      title: "Descarga en progreso",
-      description: `Preparando descarga de ${selectedVouchers.length} comprobantes...`,
-    });
-
-    // Registrar auditoría para cada comprobante
-    for (const voucherId of selectedVouchers) {
-      await logVoucherAction(voucherId, 'downloaded', 'bulk');
-    }
-
-    setSelectedVouchers([]);
-  };
-
-  const sendVoucherByEmail = async (voucherId: string) => {
-    const voucher = vouchers.find(v => v.id === voucherId);
-    if (!voucher || !voucher.employeeEmail) {
-      toast({
-        title: "No se puede enviar",
-        description: "El empleado no tiene correo electrónico registrado",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Simular envío de correo
-    await logVoucherAction(voucherId, 'sent_email', 'email', voucher.employeeEmail);
-
-    // Actualizar estado en base de datos
-    await supabase
-      .from('payroll_vouchers')
-      .update({ 
-        sent_to_employee: true, 
-        sent_date: new Date().toISOString(),
-        voucher_status: 'enviado'
-      })
-      .eq('id', voucherId);
-
-    toast({
-      title: "Correo enviado",
-      description: `Comprobante enviado a ${voucher.employeeEmail}`,
-    });
-
-    loadVouchers();
-  };
-
-  const sendSelectedVouchersByEmail = async () => {
-    if (selectedVouchers.length === 0) {
-      toast({
-        title: "Sin selección",
-        description: "Selecciona al menos un comprobante para enviar",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const vouchersToSend = vouchers.filter(v => 
-      selectedVouchers.includes(v.id) && v.employeeEmail
-    );
-
-    if (vouchersToSend.length === 0) {
-      toast({
-        title: "Sin correos válidos",
-        description: "Ninguno de los empleados seleccionados tiene correo registrado",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Simular envío masivo
-    for (const voucher of vouchersToSend) {
-      await logVoucherAction(voucher.id, 'sent_email', 'bulk_email', voucher.employeeEmail);
-      await supabase
-        .from('payroll_vouchers')
-        .update({ 
-          sent_to_employee: true, 
-          sent_date: new Date().toISOString(),
-          voucher_status: 'enviado'
-        })
-        .eq('id', voucher.id);
-    }
-
-    toast({
-      title: "Envío completado",
-      description: `${vouchersToSend.length} comprobantes enviados por correo`,
-    });
-
-    setSelectedVouchers([]);
-    loadVouchers();
-  };
-
-  const regenerateVoucher = async (voucherId: string) => {
-    await logVoucherAction(voucherId, 'regenerated');
-
-    toast({
-      title: "Comprobante regenerado",
-      description: "El comprobante ha sido regenerado exitosamente",
-    });
-
-    loadVouchers();
-  };
-
-  const logVoucherAction = async (
-    voucherId: string, 
-    action: string, 
-    method?: string, 
-    recipient?: string
-  ) => {
-    try {
-      await supabase
-        .from('voucher_audit_log')
-        .insert({
-          company_id: vouchers.find(v => v.id === voucherId)?.companyId || '',
-          voucher_id: voucherId,
-          user_id: 'system', // TODO: obtener usuario actual
-          action,
-          method,
-          recipient_email: recipient,
-          success: true
-        });
-    } catch (error) {
-      console.error('Error logging voucher action:', error);
-    }
+  const handleSendSelectedVouchersByEmail = async () => {
+    await sendSelectedVouchersByEmail(selectedVouchers);
+    clearSelection();
   };
 
   return {
@@ -352,11 +124,11 @@ export const useVouchers = () => {
     updateFilters,
     clearFilters,
     toggleVoucherSelection,
-    toggleAllVouchers,
+    toggleAllVouchers: handleToggleAllVouchers,
     downloadVoucher,
-    downloadSelectedVouchers,
+    downloadSelectedVouchers: handleDownloadSelectedVouchers,
     sendVoucherByEmail,
-    sendSelectedVouchersByEmail,
+    sendSelectedVouchersByEmail: handleSendSelectedVouchersByEmail,
     regenerateVoucher,
     refreshVouchers: loadVouchers
   };
