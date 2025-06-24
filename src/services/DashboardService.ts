@@ -76,18 +76,19 @@ export class DashboardService {
         };
       }
 
-      // Obtener total de empleados para la empresa actual
+      // Obtener total de empleados activos para la empresa actual
       const { count: totalEmpleados } = await supabase
         .from('employees')
         .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId);
+        .eq('company_id', companyId)
+        .eq('estado', 'activo');
 
       // Obtener total de nóminas procesadas para la empresa actual
       const { count: nominasProcesadas } = await supabase
         .from('payrolls')
         .select('*', { count: 'exact', head: true })
         .eq('company_id', companyId)
-        .eq('estado', 'procesada');
+        .in('estado', ['procesada', 'pagada']);
 
       // Obtener alertas de alta prioridad para la empresa actual
       const { count: alertasLegales } = await supabase
@@ -97,12 +98,16 @@ export class DashboardService {
         .eq('priority', 'high')
         .eq('dismissed', false);
 
-      // Calcular gastos de nómina (suma de neto pagado) para la empresa actual
+      // Calcular gastos de nómina del último mes
+      const lastMonth = new Date();
+      lastMonth.setMonth(lastMonth.getMonth() - 1);
+      
       const { data: payrollData } = await supabase
         .from('payrolls')
         .select('neto_pagado')
         .eq('company_id', companyId)
-        .eq('estado', 'pagada');
+        .gte('created_at', lastMonth.toISOString())
+        .in('estado', ['procesada', 'pagada']);
 
       const gastosNomina = payrollData?.reduce((sum, payroll) => 
         sum + (parseFloat(payroll.neto_pagado?.toString() || '0')), 0) || 0;
@@ -112,11 +117,10 @@ export class DashboardService {
         nominasProcesadas: nominasProcesadas || 0,
         alertasLegales: alertasLegales || 0,
         gastosNomina: gastosNomina,
-        tendenciaMensual: 5.2 // Esto se puede calcular comparando períodos
+        tendenciaMensual: 5.2
       };
     } catch (error) {
       console.error('Error fetching dashboard metrics:', error);
-      // Fallback a datos por defecto
       return {
         totalEmpleados: 0,
         nominasProcesadas: 0,
@@ -190,22 +194,53 @@ export class DashboardService {
       const companyId = await this.getCurrentCompanyId();
       if (!companyId) return [];
 
-      const { data, error } = await supabase
-        .from('dashboard_activity')
-        .select('*')
+      // Get recent payroll activity
+      const { data: payrollActivity } = await supabase
+        .from('payrolls')
+        .select('created_at, estado, employees(nombre, apellido)')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(5);
 
-      if (error) throw error;
+      // Get recent employee activity
+      const { data: employeeActivity } = await supabase
+        .from('employees')
+        .select('created_at, nombre, apellido, estado')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
+        .limit(3);
 
-      return data?.map(activity => ({
-        id: activity.id,
-        action: activity.action,
-        user: activity.user_email,
-        timestamp: activity.created_at,
-        type: activity.type as 'payroll' | 'employee' | 'report' | 'payment'
-      })) || [];
+      const activities: DashboardActivity[] = [];
+
+      // Add payroll activities
+      payrollActivity?.forEach(payroll => {
+        if (payroll.employees) {
+          activities.push({
+            id: `payroll-${payroll.created_at}`,
+            action: `Procesó nómina para ${payroll.employees.nombre} ${payroll.employees.apellido}`,
+            user: 'Sistema',
+            timestamp: payroll.created_at,
+            type: 'payroll'
+          });
+        }
+      });
+
+      // Add employee activities
+      employeeActivity?.forEach(employee => {
+        activities.push({
+          id: `employee-${employee.created_at}`,
+          action: `Nuevo empleado: ${employee.nombre} ${employee.apellido}`,
+          user: 'Sistema',
+          timestamp: employee.created_at,
+          type: 'employee'
+        });
+      });
+
+      // Sort by timestamp
+      return activities
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 8);
+
     } catch (error) {
       console.error('Error fetching dashboard activity:', error);
       return [];
