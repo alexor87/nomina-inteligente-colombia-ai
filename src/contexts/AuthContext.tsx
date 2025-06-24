@@ -8,13 +8,25 @@ interface UserRole {
   company_id?: string;
 }
 
+interface UserProfile {
+  id: string;
+  user_id: string;
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string;
+  phone?: string;
+  company_id?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   roles: UserRole[];
+  profile: UserProfile | null;
+  hasRole: (role: string) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -33,6 +45,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  const hasRole = (role: string): boolean => {
+    return roles.some(r => r.role === role);
+  };
 
   useEffect(() => {
     // Set up auth state listener
@@ -43,23 +60,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user roles after successful auth
+          // Fetch user roles and profile after successful auth
           setTimeout(async () => {
             try {
-              const { data: userRoles, error } = await supabase
+              // Fetch user roles
+              const { data: userRoles, error: rolesError } = await supabase
                 .rpc('get_user_roles');
               
-              if (error) {
-                console.error('Error fetching user roles:', error);
+              if (rolesError) {
+                console.error('Error fetching user roles:', rolesError);
               } else {
                 setRoles(userRoles || []);
               }
+
+              // Fetch user profile
+              const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .single();
+              
+              if (profileError) {
+                console.error('Error fetching user profile:', profileError);
+              } else {
+                setProfile(profileData);
+              }
             } catch (error) {
-              console.error('Error in role fetch:', error);
+              console.error('Error in auth data fetch:', error);
             }
           }, 0);
         } else {
           setRoles([]);
+          setProfile(null);
         }
         
         setLoading(false);
@@ -85,14 +117,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl
+        emailRedirectTo: redirectUrl,
+        data: {
+          first_name: firstName,
+          last_name: lastName
+        }
       }
     });
     return { error };
@@ -101,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     await supabase.auth.signOut();
     setRoles([]);
+    setProfile(null);
   };
 
   const value = {
@@ -108,6 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     session,
     loading,
     roles,
+    profile,
+    hasRole,
     signIn,
     signUp,
     signOut,
