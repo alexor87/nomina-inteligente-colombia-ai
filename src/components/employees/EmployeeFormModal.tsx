@@ -1,6 +1,6 @@
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { EmployeeForm } from './EmployeeForm';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { EmployeeFormWizard } from './EmployeeFormWizard';
 import { Employee } from '@/types';
 
 interface EmployeeFormModalProps {
@@ -13,19 +13,8 @@ interface EmployeeFormModalProps {
 export const EmployeeFormModal = ({ isOpen, onClose, employee, onSuccess }: EmployeeFormModalProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {employee ? 'Editar Empleado' : 'Nuevo Empleado'}
-          </DialogTitle>
-          <DialogDescription>
-            {employee 
-              ? 'Modifica la información del empleado seleccionado.'
-              : 'Completa todos los campos para registrar un nuevo empleado en el sistema.'
-            }
-          </DialogDescription>
-        </DialogHeader>
-        <EmployeeForm
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto p-0 gap-0">
+        <EmployeeFormWizard
           employee={employee}
           onSuccess={() => {
             onSuccess?.();
