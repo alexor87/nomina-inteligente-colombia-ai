@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -35,7 +34,29 @@ interface EmployeeFormData {
   cajaCompensacion: string;
   cargo: string;
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
+  banco: string;
+  tipoCuenta: 'ahorros' | 'corriente';
+  numeroCuenta: string;
+  titularCuenta: string;
 }
+
+const BANCOS_COLOMBIA = [
+  'Bancolombia',
+  'Banco de Bogotá',
+  'Davivienda',
+  'BBVA Colombia',
+  'Banco Popular',
+  'Banco de Occidente',
+  'Banco AV Villas',
+  'Bancoomeva',
+  'Banco Falabella',
+  'Banco Pichincha',
+  'Banco Caja Social',
+  'Banco Cooperativo Coopcentral',
+  'Nequi',
+  'Daviplata',
+  'Otro'
+];
 
 export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProps) => {
   const { configuration } = useEmployeeGlobalConfiguration();
@@ -58,7 +79,11 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       arl: employee?.arl || '',
       cajaCompensacion: employee?.cajaCompensacion || '',
       cargo: employee?.cargo || '',
-      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente'
+      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
+      banco: '',
+      tipoCuenta: 'ahorros',
+      numeroCuenta: '',
+      titularCuenta: ''
     }
   });
 
@@ -139,173 +164,238 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Información Personal */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="cedula">Cédula *</Label>
-            <Input
-              id="cedula"
-              {...register('cedula', { required: 'La cédula es requerida' })}
-              placeholder="12345678"
-            />
-            {errors.cedula && <p className="text-red-500 text-sm mt-1">{errors.cedula.message}</p>}
-          </div>
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Información Personal</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="cedula">Cédula *</Label>
+              <Input
+                id="cedula"
+                {...register('cedula', { required: 'La cédula es requerida' })}
+                placeholder="12345678"
+              />
+              {errors.cedula && <p className="text-red-500 text-sm mt-1">{errors.cedula.message}</p>}
+            </div>
 
-          <div>
-            <Label htmlFor="nombre">Nombre *</Label>
-            <Input
-              id="nombre"
-              {...register('nombre', { required: 'El nombre es requerido' })}
-              placeholder="Juan"
-            />
-            {errors.nombre && <p className="text-red-500 text-sm mt-1">{errors.nombre.message}</p>}
-          </div>
+            <div>
+              <Label htmlFor="nombre">Nombre *</Label>
+              <Input
+                id="nombre"
+                {...register('nombre', { required: 'El nombre es requerido' })}
+                placeholder="Juan"
+              />
+              {errors.nombre && <p className="text-red-500 text-sm mt-1">{errors.nombre.message}</p>}
+            </div>
 
-          <div>
-            <Label htmlFor="apellido">Apellido *</Label>
-            <Input
-              id="apellido"
-              {...register('apellido', { required: 'El apellido es requerido' })}
-              placeholder="Pérez"
-            />
-            {errors.apellido && <p className="text-red-500 text-sm mt-1">{errors.apellido.message}</p>}
-          </div>
+            <div>
+              <Label htmlFor="apellido">Apellido *</Label>
+              <Input
+                id="apellido"
+                {...register('apellido', { required: 'El apellido es requerido' })}
+                placeholder="Pérez"
+              />
+              {errors.apellido && <p className="text-red-500 text-sm mt-1">{errors.apellido.message}</p>}
+            </div>
 
-          <div>
-            <Label htmlFor="email">Email *</Label>
-            <Input
-              id="email"
-              type="email"
-              {...register('email', { required: 'El email es requerido' })}
-              placeholder="juan.perez@empresa.com"
-            />
-            {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
-          </div>
+            <div>
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                {...register('email', { required: 'El email es requerido' })}
+                placeholder="juan.perez@empresa.com"
+              />
+              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
+            </div>
 
-          <div>
-            <Label htmlFor="telefono">Teléfono</Label>
-            <Input
-              id="telefono"
-              {...register('telefono')}
-              placeholder="3001234567"
-            />
-          </div>
+            <div>
+              <Label htmlFor="telefono">Teléfono</Label>
+              <Input
+                id="telefono"
+                {...register('telefono')}
+                placeholder="3001234567"
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="cargo">Cargo</Label>
-            <Input
-              id="cargo"
-              {...register('cargo')}
-              placeholder="Desarrollador Senior"
-            />
+            <div>
+              <Label htmlFor="cargo">Cargo</Label>
+              <Input
+                id="cargo"
+                {...register('cargo')}
+                placeholder="Desarrollador Senior"
+              />
+            </div>
           </div>
         </div>
 
         {/* Información Laboral */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="salarioBase">Salario Base *</Label>
-            <Input
-              id="salarioBase"
-              type="number"
-              {...register('salarioBase', { required: 'El salario es requerido', min: 1 })}
-              placeholder="2500000"
-            />
-            {errors.salarioBase && <p className="text-red-500 text-sm mt-1">{errors.salarioBase.message}</p>}
-          </div>
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Información Laboral</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="salarioBase">Salario Base *</Label>
+              <Input
+                id="salarioBase"
+                type="number"
+                {...register('salarioBase', { required: 'El salario es requerido', min: 1 })}
+                placeholder="2500000"
+              />
+              {errors.salarioBase && <p className="text-red-500 text-sm mt-1">{errors.salarioBase.message}</p>}
+            </div>
 
-          <div>
-            <Label htmlFor="tipoContrato">Tipo de Contrato *</Label>
-            <Select onValueChange={(value) => setValue('tipoContrato', value as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje')}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {CONTRACT_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            <div>
+              <Label htmlFor="tipoContrato">Tipo de Contrato *</Label>
+              <Select onValueChange={(value) => setValue('tipoContrato', value as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTRACT_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div>
-            <Label htmlFor="fechaIngreso">Fecha de Ingreso *</Label>
-            <Input
-              id="fechaIngreso"
-              type="date"
-              {...register('fechaIngreso', { required: 'La fecha de ingreso es requerida' })}
-            />
-            {errors.fechaIngreso && <p className="text-red-500 text-sm mt-1">{errors.fechaIngreso.message}</p>}
-          </div>
+            <div>
+              <Label htmlFor="fechaIngreso">Fecha de Ingreso *</Label>
+              <Input
+                id="fechaIngreso"
+                type="date"
+                {...register('fechaIngreso', { required: 'La fecha de ingreso es requerida' })}
+              />
+              {errors.fechaIngreso && <p className="text-red-500 text-sm mt-1">{errors.fechaIngreso.message}</p>}
+            </div>
 
-          <div>
-            <Label htmlFor="estado">Estado</Label>
-            <Select onValueChange={(value) => setValue('estado', value as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad')}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar estado" />
-              </SelectTrigger>
-              <SelectContent>
-                {ESTADOS_EMPLEADO.map((estado) => (
-                  <SelectItem key={estado.value} value={estado.value}>
-                    {estado.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <Label htmlFor="estado">Estado</Label>
+              <Select onValueChange={(value) => setValue('estado', value as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ESTADOS_EMPLEADO.map((estado) => (
+                    <SelectItem key={estado.value} value={estado.value}>
+                      {estado.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* Información Bancaria */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Información Bancaria</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="banco">Banco *</Label>
+              <Select onValueChange={(value) => setValue('banco', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BANCOS_COLOMBIA.map((banco) => (
+                    <SelectItem key={banco} value={banco}>
+                      {banco}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.banco && <p className="text-red-500 text-sm mt-1">{errors.banco.message}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="tipoCuenta">Tipo de Cuenta *</Label>
+              <Select onValueChange={(value) => setValue('tipoCuenta', value as 'ahorros' | 'corriente')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ahorros">Ahorros</SelectItem>
+                  <SelectItem value="corriente">Corriente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="numeroCuenta">Número de Cuenta *</Label>
+              <Input
+                id="numeroCuenta"
+                {...register('numeroCuenta', { required: 'El número de cuenta es requerido' })}
+                placeholder="1234567890"
+              />
+              {errors.numeroCuenta && <p className="text-red-500 text-sm mt-1">{errors.numeroCuenta.message}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="titularCuenta">Titular de la Cuenta *</Label>
+              <Input
+                id="titularCuenta"
+                {...register('titularCuenta', { required: 'El titular de la cuenta es requerido' })}
+                placeholder="Juan Pérez"
+              />
+              {errors.titularCuenta && <p className="text-red-500 text-sm mt-1">{errors.titularCuenta.message}</p>}
+            </div>
           </div>
         </div>
 
         {/* Afiliaciones */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="eps">EPS</Label>
-            <Input
-              id="eps"
-              {...register('eps')}
-              placeholder="Sura EPS"
-            />
-          </div>
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Afiliaciones</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="eps">EPS</Label>
+              <Input
+                id="eps"
+                {...register('eps')}
+                placeholder="Sura EPS"
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="afp">AFP</Label>
-            <Input
-              id="afp"
-              {...register('afp')}
-              placeholder="Porvenir"
-            />
-          </div>
+            <div>
+              <Label htmlFor="afp">AFP</Label>
+              <Input
+                id="afp"
+                {...register('afp')}
+                placeholder="Porvenir"
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="arl">ARL</Label>
-            <Input
-              id="arl"
-              {...register('arl')}
-              placeholder="Sura ARL"
-            />
-          </div>
+            <div>
+              <Label htmlFor="arl">ARL</Label>
+              <Input
+                id="arl"
+                {...register('arl')}
+                placeholder="Sura ARL"
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="cajaCompensacion">Caja de Compensación</Label>
-            <Input
-              id="cajaCompensacion"
-              {...register('cajaCompensacion')}
-              placeholder="Compensar"
-            />
-          </div>
+            <div>
+              <Label htmlFor="cajaCompensacion">Caja de Compensación</Label>
+              <Input
+                id="cajaCompensacion"
+                {...register('cajaCompensacion')}
+                placeholder="Compensar"
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="estadoAfiliacion">Estado Afiliación</Label>
-            <Select onValueChange={(value) => setValue('estadoAfiliacion', value as 'completa' | 'pendiente' | 'inconsistente')}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="completa">Completa</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="inconsistente">Inconsistente</SelectItem>
-              </SelectContent>
-            </Select>
+            <div>
+              <Label htmlFor="estadoAfiliacion">Estado Afiliación</Label>
+              <Select onValueChange={(value) => setValue('estadoAfiliacion', value as 'completa' | 'pendiente' | 'inconsistente')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="completa">Completa</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="inconsistente">Inconsistente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 

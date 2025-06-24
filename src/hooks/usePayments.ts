@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { PaymentEmployee, PaymentPeriod, PaymentFilters, BankFileGeneration } from '@/types/payments';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,7 +50,11 @@ export const usePayments = () => {
             apellido,
             cargo,
             email,
-            cedula
+            cedula,
+            banco,
+            tipo_cuenta,
+            numero_cuenta,
+            titular_cuenta
           )
         `)
         .eq('company_id', companyId)
@@ -68,9 +71,9 @@ export const usePayments = () => {
         employeeId: payroll.employee_id,
         name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
         position: payroll.employees.cargo || 'Sin cargo',
-        bankName: 'Por configurar', // Esto debería venir de una tabla de cuentas bancarias
-        accountType: 'ahorros',
-        accountNumber: 'Por configurar', // Esto debería venir de una tabla de cuentas bancarias
+        bankName: payroll.employees.banco || 'Por configurar',
+        accountType: payroll.employees.tipo_cuenta || 'ahorros',
+        accountNumber: payroll.employees.numero_cuenta || 'Por configurar',
         netPay: Number(payroll.neto_pagado || 0),
         paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente',
         paymentMethod: 'transferencia',
@@ -221,10 +224,29 @@ export const usePayments = () => {
 
   const updateBankAccount = async (employeeId: string, accountData: any) => {
     try {
-      // Aquí se actualizarían los datos bancarios en la base de datos
+      // Actualizar datos bancarios en la tabla employees
+      const { error } = await supabase
+        .from('employees')
+        .update({
+          banco: accountData.bankName,
+          tipo_cuenta: accountData.accountType,
+          numero_cuenta: accountData.accountNumber,
+          titular_cuenta: accountData.titularCuenta
+        })
+        .eq('id', employeeId);
+
+      if (error) throw error;
+
       setEmployees(prev => prev.map(emp => 
-        emp.id === employeeId 
-          ? { ...emp, ...accountData, paymentStatus: 'pendiente', errorReason: undefined }
+        emp.employeeId === employeeId 
+          ? { 
+              ...emp, 
+              bankName: accountData.bankName,
+              accountType: accountData.accountType,
+              accountNumber: accountData.accountNumber,
+              paymentStatus: 'pendiente', 
+              errorReason: undefined 
+            }
           : emp
       ));
 
@@ -236,6 +258,11 @@ export const usePayments = () => {
       return true;
     } catch (error) {
       console.error('Error updating bank account:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los datos bancarios",
+        variant: "destructive"
+      });
       return false;
     }
   };

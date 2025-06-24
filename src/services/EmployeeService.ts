@@ -27,7 +27,12 @@ export class EmployeeService {
       arl: employeeData.arl,
       caja_compensacion: employeeData.cajaCompensacion,
       cargo: employeeData.cargo,
-      estado_afiliacion: employeeData.estadoAfiliacion
+      estado_afiliacion: employeeData.estadoAfiliacion,
+      // Agregar campos bancarios - usando valores por defecto si no están presentes
+      banco: (employeeData as any).banco || null,
+      tipo_cuenta: (employeeData as any).tipoCuenta || 'ahorros',
+      numero_cuenta: (employeeData as any).numeroCuenta || null,
+      titular_cuenta: (employeeData as any).titularCuenta || null
     };
 
     console.log('Creando empleado para empresa:', companyId);
@@ -64,6 +69,12 @@ export class EmployeeService {
     if (updates.cajaCompensacion !== undefined) supabaseData.caja_compensacion = updates.cajaCompensacion;
     if (updates.cargo !== undefined) supabaseData.cargo = updates.cargo;
     if (updates.estadoAfiliacion !== undefined) supabaseData.estado_afiliacion = updates.estadoAfiliacion;
+
+    // Agregar campos bancarios
+    if ((updates as any).banco !== undefined) supabaseData.banco = (updates as any).banco;
+    if ((updates as any).tipoCuenta !== undefined) supabaseData.tipo_cuenta = (updates as any).tipoCuenta;
+    if ((updates as any).numeroCuenta !== undefined) supabaseData.numero_cuenta = (updates as any).numeroCuenta;
+    if ((updates as any).titularCuenta !== undefined) supabaseData.titular_cuenta = (updates as any).titularCuenta;
 
     const { error } = await supabase
       .from('employees')

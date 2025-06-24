@@ -179,6 +179,7 @@ export type Database = {
           afp: string | null
           apellido: string
           arl: string | null
+          banco: string | null
           caja_compensacion: string | null
           cargo: string | null
           cedula: string
@@ -191,15 +192,19 @@ export type Database = {
           fecha_ingreso: string
           id: string
           nombre: string
+          numero_cuenta: string | null
           salario_base: number
           telefono: string | null
           tipo_contrato: string | null
+          tipo_cuenta: string | null
+          titular_cuenta: string | null
           updated_at: string
         }
         Insert: {
           afp?: string | null
           apellido: string
           arl?: string | null
+          banco?: string | null
           caja_compensacion?: string | null
           cargo?: string | null
           cedula: string
@@ -212,15 +217,19 @@ export type Database = {
           fecha_ingreso?: string
           id?: string
           nombre: string
+          numero_cuenta?: string | null
           salario_base?: number
           telefono?: string | null
           tipo_contrato?: string | null
+          tipo_cuenta?: string | null
+          titular_cuenta?: string | null
           updated_at?: string
         }
         Update: {
           afp?: string | null
           apellido?: string
           arl?: string | null
+          banco?: string | null
           caja_compensacion?: string | null
           cargo?: string | null
           cedula?: string
@@ -233,9 +242,12 @@ export type Database = {
           fecha_ingreso?: string
           id?: string
           nombre?: string
+          numero_cuenta?: string | null
           salario_base?: number
           telefono?: string | null
           tipo_contrato?: string | null
+          tipo_cuenta?: string | null
+          titular_cuenta?: string | null
           updated_at?: string
         }
         Relationships: [
