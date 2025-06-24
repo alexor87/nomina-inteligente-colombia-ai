@@ -44,12 +44,21 @@ export const NovedadForm = ({
   const horas = watch('horas');
   const manualValue = watch('valor');
 
-  // Determinar categoría actual
+  // Determinar categoría actual con type assertion segura
   const currentCategory = Object.entries(NOVEDAD_CATEGORIES).find(([_, cat]) => 
-    cat.types[tipoNovedad as keyof typeof cat.types]
+    Object.keys(cat.types).includes(tipoNovedad)
   )?.[0] as 'devengados' | 'deducciones' || 'devengados';
 
-  const currentTypeConfig = NOVEDAD_CATEGORIES[currentCategory]?.types[tipoNovedad as keyof typeof NOVEDAD_CATEGORIES[typeof currentCategory]['types']];
+  // Get current type config with proper typing
+  const getCurrentTypeConfig = () => {
+    const category = NOVEDAD_CATEGORIES[currentCategory];
+    if (!category) return null;
+    
+    const typeKey = tipoNovedad as keyof typeof category.types;
+    return category.types[typeKey] || null;
+  };
+
+  const currentTypeConfig = getCurrentTypeConfig();
 
   // Calcular valor automáticamente
   useEffect(() => {
@@ -151,7 +160,7 @@ export const NovedadForm = ({
                   <SelectContent>
                     {Object.entries(currentTypeConfig.subtipos).map(([key, label]) => (
                       <SelectItem key={key} value={key}>
-                        {label}
+                        {label as string}
                       </SelectItem>
                     ))}
                   </SelectContent>
