@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -12,6 +11,7 @@ import { EmployeeDetailsModal } from '@/components/employees/EmployeeDetailsModa
 import { useNovedades } from '@/hooks/useNovedades';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { NovedadFormData } from '@/types/novedades';
+import { LoadingState } from '@/components/ui/LoadingState';
 
 interface PayrollTableProps {
   employees: PayrollEmployee[];
@@ -105,23 +105,23 @@ export const PayrollTable = ({
   };
 
   const handleEmployeeNameClick = async (employeeId: string) => {
-    // Find the employee data from our employees list
     const payrollEmployee = employees.find(emp => emp.id === employeeId);
     if (!payrollEmployee) return;
 
-    // Create a mock employee object that matches EmployeeWithStatus interface
+    // Create a complete employee object that matches EmployeeWithStatus interface
     const employeeForModal = {
       id: payrollEmployee.id,
       nombre: payrollEmployee.name.split(' ')[0] || '',
       apellido: payrollEmployee.name.split(' ').slice(1).join(' ') || '',
-      cedula: payrollEmployee.id, // Using ID as cedula for now
+      cedula: payrollEmployee.id,
+      tipoDocumento: 'CC' as const,
       email: `${payrollEmployee.name.toLowerCase().replace(/\s+/g, '.')}@empresa.com`,
       telefono: '',
       cargo: payrollEmployee.position,
       salarioBase: payrollEmployee.baseSalary,
-      fechaIngreso: new Date().toISOString().split('T')[0], // Mock date
-      estado: 'activo',
-      tipoContrato: 'indefinido',
+      fechaIngreso: new Date().toISOString().split('T')[0],
+      estado: 'activo' as const,
+      tipoContrato: 'indefinido' as const,
       eps: payrollEmployee.eps || '',
       afp: payrollEmployee.afp || '',
       arl: '',
@@ -131,7 +131,10 @@ export const PayrollTable = ({
       centrosocial: '',
       contratoVencimiento: '',
       ultimaLiquidacion: new Date().toISOString(),
-      avatar: ''
+      avatar: '',
+      empresaId: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     openEmployeeProfile(employeeForModal);
@@ -228,6 +231,20 @@ export const PayrollTable = ({
     );
   };
 
+  // Show loading state while employees are being loaded
+  if (isLoading) {
+    return (
+      <div className="py-16">
+        <LoadingState 
+          message="Cargando empleados..." 
+          size="lg"
+          className="flex-col space-y-4"
+        />
+      </div>
+    );
+  }
+
+  // Show empty state only after loading is complete and no employees found
   if (employees.length === 0) {
     return (
       <div className="py-16 text-center">
@@ -266,15 +283,15 @@ export const PayrollTable = ({
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50/50 hover:bg-gray-50/50 border-b border-gray-100">
-                <TableHead className="font-medium text-gray-700 h-8 w-[240px] text-xs">Empleado</TableHead>
-                <TableHead className="font-medium text-gray-700 w-[120px] text-xs">Cargo</TableHead>
-                <TableHead className="text-right font-medium text-gray-700 w-[100px] text-xs">Salario Base</TableHead>
-                <TableHead className="text-center font-medium text-gray-700 w-[60px] text-xs">Días</TableHead>
-                <TableHead className="text-right font-medium text-gray-700 text-green-700 w-[100px] text-xs">Devengado</TableHead>
-                <TableHead className="text-right font-medium text-gray-700 text-red-700 w-[100px] text-xs">Deducciones</TableHead>
-                <TableHead className="text-right font-medium text-gray-700 text-green-800 w-[100px] text-xs">Neto</TableHead>
-                <TableHead className="text-center font-medium text-gray-700 w-[80px] text-xs">Novedades</TableHead>
-                <TableHead className="text-center font-medium text-gray-700 w-[80px] text-xs">Estado</TableHead>
+                <TableHead className="font-medium text-gray-700 h-8 w-[200px] text-xs px-3">Empleado</TableHead>
+                <TableHead className="font-medium text-gray-700 w-[120px] text-xs px-2">Cargo</TableHead>
+                <TableHead className="text-right font-medium text-gray-700 w-[90px] text-xs px-2">Salario Base</TableHead>
+                <TableHead className="text-center font-medium text-gray-700 w-[50px] text-xs px-2">Días</TableHead>
+                <TableHead className="text-right font-medium text-gray-700 text-green-700 w-[90px] text-xs px-2">Devengado</TableHead>
+                <TableHead className="text-right font-medium text-gray-700 text-red-700 w-[90px] text-xs px-2">Deducciones</TableHead>
+                <TableHead className="text-right font-medium text-gray-700 text-green-800 w-[90px] text-xs px-2">Neto</TableHead>
+                <TableHead className="text-center font-medium text-gray-700 w-[80px] text-xs px-2">Novedades</TableHead>
+                <TableHead className="text-center font-medium text-gray-700 w-[70px] text-xs px-2">Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -288,55 +305,58 @@ export const PayrollTable = ({
                     key={employee.id} 
                     className="hover:bg-gray-50/50 transition-colors border-b border-gray-50"
                   >
-                    <TableCell className="py-2">
+                    <TableCell className="py-1.5 px-3">
                       <div className="flex items-center space-x-2">
-                        <div className={`w-1 h-5 rounded-full ${employee.status === 'error' ? 'bg-red-400' : 'bg-green-400'}`} />
-                        <div>
+                        <div className={`w-1 h-4 rounded-full ${employee.status === 'error' ? 'bg-red-400' : 'bg-green-400'}`} />
+                        <div className="min-w-0 flex-1">
                           <div 
-                            className="font-medium text-gray-900 text-xs cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                            className="font-medium text-gray-900 text-xs cursor-pointer hover:text-blue-600 hover:underline transition-colors truncate"
                             onClick={() => handleEmployeeNameClick(employee.id)}
+                            title={employee.name}
                           >
                             {employee.name}
                           </div>
-                          <div className="text-xs text-gray-500">{employee.id.slice(0, 8)}</div>
+                          <div className="text-xs text-gray-500 truncate" title={employee.id}>
+                            {employee.id.slice(0, 8)}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-700 py-2 text-xs">
+                    <TableCell className="text-gray-700 py-1.5 px-2 text-xs">
                       <div className="truncate" title={employee.position || 'No definido'}>
                         {employee.position || 'No definido'}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right py-2">
+                    <TableCell className="text-right py-1.5 px-2">
                       <EditableCell
                         employeeId={employee.id}
                         field="baseSalary"
                         value={employee.baseSalary}
                       />
                     </TableCell>
-                    <TableCell className="text-center py-2">
+                    <TableCell className="text-center py-1.5 px-2">
                       <EditableCell
                         employeeId={employee.id}
                         field="workedDays"
                         value={employee.workedDays}
                       />
                     </TableCell>
-                    <TableCell className="text-right py-2">
+                    <TableCell className="text-right py-1.5 px-2">
                       <div className="font-medium text-green-700 px-1.5 py-0.5 bg-green-50 rounded text-xs">
                         {formatCurrency(employee.grossPay)}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right py-2">
+                    <TableCell className="text-right py-1.5 px-2">
                       <div className="font-medium text-red-700 px-1.5 py-0.5 bg-red-50 rounded text-xs">
                         {formatCurrency(employee.deductions)}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right py-2">
+                    <TableCell className="text-right py-1.5 px-2">
                       <div className="font-semibold text-green-800 px-1.5 py-0.5 bg-green-100 rounded text-xs">
                         {formatCurrency(employee.netPay)}
                       </div>
                     </TableCell>
-                    <TableCell className="text-center py-2">
+                    <TableCell className="text-center py-1.5 px-2">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -356,7 +376,7 @@ export const PayrollTable = ({
                         Novedad
                       </Button>
                     </TableCell>
-                    <TableCell className="text-center py-2">
+                    <TableCell className="text-center py-1.5 px-2">
                       <Badge className={`${config.color} flex items-center space-x-1 border-0 px-1.5 py-0.5 w-fit text-xs font-medium`}>
                         <StatusIcon className="h-2.5 w-2.5" />
                         <span>{config.label}</span>
