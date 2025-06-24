@@ -31,12 +31,19 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/employees" element={<EmployeesPage />} />
+            <Route path="/empleados" element={<EmployeesPage />} />
             <Route path="/payroll" element={<PayrollPage />} />
+            <Route path="/liquidar-nomina" element={<PayrollPage />} />
             <Route path="/payroll-history" element={<PayrollHistoryPage />} />
+            <Route path="/historial-nomina" element={<PayrollHistoryPage />} />
             <Route path="/payments" element={<PaymentsPage />} />
+            <Route path="/pagos" element={<PaymentsPage />} />
             <Route path="/vouchers" element={<VouchersPage />} />
+            <Route path="/comprobantes" element={<VouchersPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/reportes" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/configuracion" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
