@@ -85,7 +85,7 @@ export class EmployeeService {
   static async updateCentroCosto(id: string, centroCosto: string) {
     const { error } = await supabase
       .from('employees')
-      .update({ centro_costo: centroCosto })
+      .update({ centro_costo: centroCosto } as any)
       .eq('id', id);
 
     if (error) throw error;
@@ -94,7 +94,7 @@ export class EmployeeService {
   static async updateNivelRiesgoARL(id: string, nivelRiesgo: 'I' | 'II' | 'III' | 'IV' | 'V') {
     const { error } = await supabase
       .from('employees')
-      .update({ nivel_riesgo_arl: nivelRiesgo })
+      .update({ nivel_riesgo_arl: nivelRiesgo } as any)
       .eq('id', id);
 
     if (error) throw error;
