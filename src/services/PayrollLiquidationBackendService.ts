@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollPeriodService } from './PayrollPeriodService';
 import { calculateEmployeeBackend, convertToBaseEmployeeData } from '@/utils/payrollCalculationsBackend';
+import { NovedadesService } from './NovedadesService';
 
 export interface PayrollLiquidationData {
   period: PayrollPeriod;
@@ -278,6 +279,9 @@ export class PayrollLiquidationBackendService {
       const companySettings = await PayrollPeriodService.getCompanySettings();
       const periodType = companySettings?.periodicity || 'mensual';
       
+      // Get current active period to load novedades
+      const currentPeriod = await PayrollPeriodService.getCurrentActivePeriod();
+      
       let defaultWorkedDays: number;
       switch (periodType) {
         case 'quincenal':
@@ -312,16 +316,61 @@ export class PayrollLiquidationBackendService {
       console.log(`Loaded ${data.length} active employees for payroll liquidation with ${periodType} periodicity`);
 
       const employeePromises = data.map(async (emp) => {
+        let extraHours = 0;
+        let bonuses = 0;
+        let absences = 0;
+        let disabilities = 0;
+
+        // Load novedades for this employee if we have a current period
+        if (currentPeriod) {
+          try {
+            const novedades = await NovedadesService.getNovedadesByEmployee(emp.id, currentPeriod.id);
+            console.log(`Loaded ${novedades.length} novedades for employee ${emp.nombre} ${emp.apellido}`);
+            
+            // Sum up novedades by type
+            novedades.forEach(novedad => {
+              const valor = Number(novedad.valor) || 0;
+              const dias = Number(novedad.dias) || 0;
+              
+              switch (novedad.tipo_novedad) {
+                case 'horas_extra':
+                  extraHours += valor;
+                  break;
+                case 'bonificacion':
+                case 'comision':
+                  bonuses += valor;
+                  break;
+                case 'ausencia':
+                  absences += dias;
+                  break;
+                case 'incapacidad':
+                  disabilities += dias;
+                  break;
+                default:
+                  // For other types, add to bonuses if positive value
+                  if (valor > 0) {
+                    bonuses += valor;
+                  }
+                  break;
+              }
+            });
+            
+            console.log(`Employee ${emp.nombre}: extraHours=${extraHours}, bonuses=${bonuses}, absences=${absences}, disabilities=${disabilities}`);
+          } catch (error) {
+            console.warn(`Could not load novedades for employee ${emp.id}:`, error);
+          }
+        }
+
         const baseEmployeeData = {
           id: emp.id,
           name: `${emp.nombre} ${emp.apellido}`,
           position: emp.cargo || 'No especificado',
           baseSalary: Number(emp.salario_base),
-          workedDays: defaultWorkedDays,
-          extraHours: 0,
-          disabilities: 0,
-          bonuses: 0,
-          absences: 0,
+          workedDays: Math.max(0, defaultWorkedDays - absences - disabilities),
+          extraHours,
+          disabilities,
+          bonuses,
+          absences,
           eps: emp.eps,
           afp: emp.afp
         };

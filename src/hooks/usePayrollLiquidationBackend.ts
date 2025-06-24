@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationBackendService } from '@/services/PayrollLiquidationBackendService';
@@ -77,20 +76,23 @@ export const usePayrollLiquidationBackend = () => {
     
     setIsLoading(true);
     try {
-      console.log('Loading active employees for payroll liquidation using backend...');
+      console.log('Loading active employees for payroll liquidation using backend with novedades...');
       const loadedEmployees = await PayrollLiquidationBackendService.loadEmployeesForLiquidation();
       console.log(`Loaded ${loadedEmployees.length} active employees for payroll:`, loadedEmployees.map(emp => ({
         id: emp.id,
         name: emp.name,
-        status: emp.status
+        status: emp.status,
+        bonuses: emp.bonuses,
+        extraHours: emp.extraHours,
+        grossPay: emp.grossPay
       })));
       
       setEmployees(loadedEmployees);
       
       if (loadedEmployees.length > 0) {
         toast({
-          title: "Empleados cargados (Backend)",
-          description: `Se cargaron ${loadedEmployees.length} empleados activos usando cálculos del servidor`
+          title: "Empleados cargados (Backend + Novedades)",
+          description: `Se cargaron ${loadedEmployees.length} empleados activos con sus novedades aplicadas`
         });
       } else {
         toast({
@@ -240,25 +242,21 @@ export const usePayrollLiquidationBackend = () => {
 
     setIsLoading(true);
     toast({
-      title: "Recalculando nómina (Backend)",
-      description: "Aplicando configuración legal actualizada usando el servidor..."
+      title: "Recalculando nómina (Backend + Novedades)",
+      description: "Aplicando configuración legal actualizada y novedades usando el servidor..."
     });
 
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const recalculatedEmployees = await Promise.all(
-        employees.map(async (emp) => {
-          const baseData = convertToBaseEmployeeData(emp);
-          return await calculateEmployeeBackend(baseData, currentPeriod.tipo_periodo as 'quincenal' | 'mensual');
-        })
-      );
+      // Reload employees to get fresh novedades data
+      const recalculatedEmployees = await PayrollLiquidationBackendService.loadEmployeesForLiquidation();
       
       setEmployees(recalculatedEmployees);
 
       toast({
-        title: "Recálculo completado (Backend)",
-        description: "Todos los cálculos han sido actualizados usando el servidor con los parámetros legales más recientes."
+        title: "Recálculo completado (Backend + Novedades)",
+        description: "Todos los cálculos han sido actualizados con las novedades más recientes."
       });
     } catch (error) {
       console.error('Error in recalculate:', error);
@@ -270,7 +268,7 @@ export const usePayrollLiquidationBackend = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, currentPeriod, employees]);
+  }, [toast, currentPeriod]);
 
   const approvePeriod = useCallback(async () => {
     if (!currentPeriod) return;
