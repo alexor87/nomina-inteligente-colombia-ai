@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollCalculationService } from './PayrollCalculationService';
@@ -109,20 +108,21 @@ export class PayrollLiquidationService {
         return this.getSampleEmployees();
       }
 
-      // Cargar TODOS los empleados, no solo los activos, para que coincida con el módulo de empleados
+      // Cargar SOLO los empleados ACTIVOS para la liquidación de nómina
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('company_id', companyId);
+        .eq('company_id', companyId)
+        .eq('estado', 'activo');
 
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        console.log('No employees found, returning sample data');
+        console.log('No active employees found, returning sample data');
         return this.getSampleEmployees();
       }
 
-      console.log(`Loaded ${data.length} employees for payroll liquidation`);
+      console.log(`Loaded ${data.length} active employees for payroll liquidation`);
 
       return data.map(emp => {
         const baseEmployeeData = {
@@ -150,11 +150,7 @@ export class PayrollLiquidationService {
           periodType: 'mensual'
         });
 
-        // Marcar como válido solo si el empleado está activo
-        const isActive = emp.estado === 'activo';
-        const status = isActive ? 'valid' : 'incomplete';
-        const errors = isActive ? [] : ['Empleado no activo'];
-
+        // Solo empleados activos, todos válidos por defecto
         return {
           ...baseEmployeeData,
           grossPay: calculation.grossPay,
@@ -162,8 +158,8 @@ export class PayrollLiquidationService {
           netPay: calculation.netPay,
           transportAllowance: calculation.transportAllowance,
           employerContributions: calculation.employerContributions,
-          status: status as const,
-          errors
+          status: 'valid' as PayrollEmployee['status'],
+          errors: []
         };
       });
     } catch (error) {

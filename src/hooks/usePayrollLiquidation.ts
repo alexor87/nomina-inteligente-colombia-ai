@@ -30,9 +30,9 @@ export const usePayrollLiquidation = () => {
   const loadEmployees = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log('Loading employees for payroll liquidation...');
+      console.log('Loading active employees for payroll liquidation...');
       const loadedEmployees = await PayrollLiquidationService.loadEmployeesForLiquidation();
-      console.log(`Loaded ${loadedEmployees.length} employees for payroll:`, loadedEmployees.map(emp => ({
+      console.log(`Loaded ${loadedEmployees.length} active employees for payroll:`, loadedEmployees.map(emp => ({
         id: emp.id,
         name: emp.name,
         status: emp.status
@@ -41,17 +41,14 @@ export const usePayrollLiquidation = () => {
       setEmployees(loadedEmployees);
       
       if (loadedEmployees.length > 0) {
-        const activeEmployees = loadedEmployees.filter(emp => emp.status === 'valid');
-        const inactiveEmployees = loadedEmployees.filter(emp => emp.status !== 'valid');
-        
         toast({
           title: "Empleados cargados",
-          description: `Se cargaron ${loadedEmployees.length} empleados (${activeEmployees.length} activos, ${inactiveEmployees.length} inactivos)`
+          description: `Se cargaron ${loadedEmployees.length} empleados activos para liquidación`
         });
       } else {
         toast({
-          title: "Sin empleados",
-          description: "No se encontraron empleados para liquidar",
+          title: "Sin empleados activos",
+          description: "No se encontraron empleados activos para liquidar",
           variant: "destructive"
         });
       }
