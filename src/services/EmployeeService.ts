@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types';
 import { EmployeeDataService } from './EmployeeDataService';
@@ -13,24 +12,23 @@ export class EmployeeService {
 
     // Mapear los datos del Employee interface a las columnas de la base de datos
     const supabaseData = {
-      company_id: companyId, // Usar la empresa del usuario autenticado
+      company_id: companyId,
       cedula: employeeData.cedula,
       tipo_documento: employeeData.tipoDocumento,
       nombre: employeeData.nombre,
       apellido: employeeData.apellido,
-      email: employeeData.email,
-      telefono: employeeData.telefono,
+      email: employeeData.email || null,
+      telefono: employeeData.telefono || null,
       salario_base: employeeData.salarioBase,
       tipo_contrato: employeeData.tipoContrato,
       fecha_ingreso: employeeData.fechaIngreso,
       estado: employeeData.estado,
-      eps: employeeData.eps,
-      afp: employeeData.afp,
-      arl: employeeData.arl,
-      caja_compensacion: employeeData.cajaCompensacion,
-      cargo: employeeData.cargo,
+      eps: employeeData.eps || null,
+      afp: employeeData.afp || null,
+      arl: employeeData.arl || null,
+      caja_compensacion: employeeData.cajaCompensacion || null,
+      cargo: employeeData.cargo || null,
       estado_afiliacion: employeeData.estadoAfiliacion,
-      // Agregar campos bancarios - usando valores por defecto si no están presentes
       banco: (employeeData as any).banco || null,
       tipo_cuenta: (employeeData as any).tipoCuenta || 'ahorros',
       numero_cuenta: (employeeData as any).numeroCuenta || null,
@@ -42,7 +40,7 @@ export class EmployeeService {
 
     const { data, error } = await supabase
       .from('employees')
-      .insert([supabaseData])
+      .insert(supabaseData)
       .select()
       .single();
 
@@ -73,7 +71,6 @@ export class EmployeeService {
     if (updates.cargo !== undefined) supabaseData.cargo = updates.cargo;
     if (updates.estadoAfiliacion !== undefined) supabaseData.estado_afiliacion = updates.estadoAfiliacion;
 
-    // Agregar campos bancarios
     if ((updates as any).banco !== undefined) supabaseData.banco = (updates as any).banco;
     if ((updates as any).tipoCuenta !== undefined) supabaseData.tipo_cuenta = (updates as any).tipoCuenta;
     if ((updates as any).numeroCuenta !== undefined) supabaseData.numero_cuenta = (updates as any).numeroCuenta;
