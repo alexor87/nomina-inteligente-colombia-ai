@@ -216,6 +216,94 @@ export type Database = {
           },
         ]
       }
+      payroll_vouchers: {
+        Row: {
+          company_id: string
+          created_at: string
+          dian_cufe: string | null
+          dian_status: string | null
+          electronic_signature_date: string | null
+          employee_id: string
+          end_date: string
+          generated_by: string | null
+          id: string
+          net_pay: number
+          payroll_id: string | null
+          pdf_url: string | null
+          periodo: string
+          sent_date: string | null
+          sent_to_employee: boolean | null
+          start_date: string
+          updated_at: string
+          voucher_status: string | null
+          xml_url: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          dian_cufe?: string | null
+          dian_status?: string | null
+          electronic_signature_date?: string | null
+          employee_id: string
+          end_date: string
+          generated_by?: string | null
+          id?: string
+          net_pay?: number
+          payroll_id?: string | null
+          pdf_url?: string | null
+          periodo: string
+          sent_date?: string | null
+          sent_to_employee?: boolean | null
+          start_date: string
+          updated_at?: string
+          voucher_status?: string | null
+          xml_url?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          dian_cufe?: string | null
+          dian_status?: string | null
+          electronic_signature_date?: string | null
+          employee_id?: string
+          end_date?: string
+          generated_by?: string | null
+          id?: string
+          net_pay?: number
+          payroll_id?: string | null
+          pdf_url?: string | null
+          periodo?: string
+          sent_date?: string | null
+          sent_to_employee?: boolean | null
+          start_date?: string
+          updated_at?: string
+          voucher_status?: string | null
+          xml_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_vouchers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_vouchers_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_vouchers_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payrolls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payrolls: {
         Row: {
           auxilio_transporte: number | null
@@ -390,6 +478,69 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voucher_audit_log: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          ip_address: unknown | null
+          method: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          success: boolean | null
+          user_agent: string | null
+          user_id: string
+          voucher_id: string
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown | null
+          method?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id: string
+          voucher_id: string
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown | null
+          method?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voucher_audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voucher_audit_log_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_vouchers"
             referencedColumns: ["id"]
           },
         ]

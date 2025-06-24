@@ -1,0 +1,84 @@
+
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { VoucherSummary } from '@/types/vouchers';
+import { FileText, Shield, Mail, Clock } from 'lucide-react';
+
+interface VoucherSummaryCardsProps {
+  summary: VoucherSummary;
+}
+
+export const VoucherSummaryCards = ({ summary }: VoucherSummaryCardsProps) => {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      {/* Total de comprobantes */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Total Comprobantes</p>
+            <p className="text-3xl font-bold text-gray-900">{summary.totalVouchers}</p>
+          </div>
+          <div className="p-3 bg-blue-100 rounded-full">
+            <FileText className="h-6 w-6 text-blue-600" />
+          </div>
+        </div>
+      </Card>
+
+      {/* Firmados electrónicamente */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Firmados DIAN</p>
+            <p className="text-3xl font-bold text-gray-900">{summary.signedPercentage}%</p>
+          </div>
+          <div className="p-3 bg-green-100 rounded-full">
+            <Shield className="h-6 w-6 text-green-600" />
+          </div>
+        </div>
+        <Progress 
+          value={summary.signedPercentage} 
+          className="h-2"
+        />
+        <p className="text-xs text-gray-500 mt-2">
+          {Math.round((summary.signedPercentage / 100) * summary.totalVouchers)} de {summary.totalVouchers} firmados
+        </p>
+      </Card>
+
+      {/* Enviados a empleados */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Enviados</p>
+            <p className="text-3xl font-bold text-gray-900">{summary.sentPercentage}%</p>
+          </div>
+          <div className="p-3 bg-blue-100 rounded-full">
+            <Mail className="h-6 w-6 text-blue-600" />
+          </div>
+        </div>
+        <Progress 
+          value={summary.sentPercentage} 
+          className="h-2"
+        />
+        <p className="text-xs text-gray-500 mt-2">
+          {Math.round((summary.sentPercentage / 100) * summary.totalVouchers)} de {summary.totalVouchers} enviados
+        </p>
+      </Card>
+
+      {/* Pendientes */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Pendientes</p>
+            <p className="text-3xl font-bold text-orange-600">{summary.pendingVouchers}</p>
+          </div>
+          <div className="p-3 bg-orange-100 rounded-full">
+            <Clock className="h-6 w-6 text-orange-600" />
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Requieren procesamiento
+        </p>
+      </Card>
+    </div>
+  );
+};

@@ -85,7 +85,7 @@ export const useEmployeeCRUD = () => {
       if (updates.eps !== undefined) supabaseData.eps = updates.eps;
       if (updates.afp !== undefined) supabaseData.afp = updates.afp;
       if (updates.arl !== undefined) supabaseData.arl = updates.arl;
-      if (updates.cajaCompensacion !== undefined) supabase.caja_compensacion = updates.cajaCompensacion;
+      if (updates.cajaCompensacion !== undefined) supabaseData.caja_compensacion = updates.cajaCompensacion;
       if (updates.cargo !== undefined) supabaseData.cargo = updates.cargo;
       if (updates.estadoAfiliacion !== undefined) supabaseData.estado_afiliacion = updates.estadoAfiliacion;
 
