@@ -94,23 +94,24 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
     console.log('Creando empleado para empresa:', companyId);
 
-    const employeeData = {
-      company_id: companyId,
+    // Crear el objeto con la estructura que espera el tipo Employee
+    const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
+      empresaId: companyId,
       cedula: data.cedula,
       nombre: data.nombre,
       apellido: data.apellido,
       email: data.email,
       telefono: data.telefono,
-      salario_base: Number(data.salarioBase),
-      tipo_contrato: data.tipoContrato,
-      fecha_ingreso: data.fechaIngreso,
+      salarioBase: Number(data.salarioBase),
+      tipoContrato: data.tipoContrato,
+      fechaIngreso: data.fechaIngreso,
       estado: data.estado,
       eps: data.eps,
       afp: data.afp,
       arl: data.arl,
-      caja_compensacion: data.cajaCompensacion,
+      cajaCompensacion: data.cajaCompensacion,
       cargo: data.cargo,
-      estado_afiliacion: data.estadoAfiliacion
+      estadoAfiliacion: data.estadoAfiliacion
     };
 
     let result;
