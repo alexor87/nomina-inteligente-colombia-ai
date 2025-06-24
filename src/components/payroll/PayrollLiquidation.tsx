@@ -8,7 +8,7 @@ import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Database, Users, FileText } from 'lucide-react';
+import { RefreshCw, Database, Users, FileText, Settings } from 'lucide-react';
 
 export const PayrollLiquidation = () => {
   const {
@@ -16,7 +16,11 @@ export const PayrollLiquidation = () => {
     employees,
     summary,
     isValid,
+    canEdit,
+    isEditingPeriod,
+    setIsEditingPeriod,
     updateEmployee,
+    updatePeriod,
     recalculateAll,
     approvePeriod,
     refreshEmployees,
@@ -25,15 +29,19 @@ export const PayrollLiquidation = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header fijo */}
+      {/* Header fijo con período editable */}
       <PayrollPeriodHeader 
         period={currentPeriod}
         isLoading={isLoading}
         isValid={isValid}
+        canEdit={canEdit}
+        isEditingPeriod={isEditingPeriod}
+        setIsEditingPeriod={setIsEditingPeriod}
         onApprove={approvePeriod}
+        onUpdatePeriod={updatePeriod}
       />
 
-      {/* Estado de conexión */}
+      {/* Estado de conexión y configuración */}
       <Card className="mx-6 mb-4 p-4 bg-blue-50 border-blue-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -41,7 +49,11 @@ export const PayrollLiquidation = () => {
             <div>
               <h3 className="font-medium text-blue-900">Módulo Conectado</h3>
               <p className="text-sm text-blue-700">
-                Datos cargados desde la base de datos • Genera comprobantes automáticamente
+                {currentPeriod ? (
+                  <>Período {currentPeriod.tipo_periodo} • Datos cargados desde Supabase • Genera comprobantes automáticamente</>
+                ) : (
+                  'Configurando período de nómina...'
+                )}
               </p>
             </div>
           </div>
@@ -54,6 +66,21 @@ export const PayrollLiquidation = () => {
               <FileText className="h-3 w-3 mr-1" />
               Auto-comprobantes
             </Badge>
+            {currentPeriod && (
+              <Badge 
+                variant="secondary" 
+                className={
+                  currentPeriod.estado === 'borrador' 
+                    ? "bg-yellow-100 text-yellow-800"
+                    : currentPeriod.estado === 'aprobado'
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-800"
+                }
+              >
+                <Settings className="h-3 w-3 mr-1" />
+                {currentPeriod.estado}
+              </Badge>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -78,6 +105,7 @@ export const PayrollLiquidation = () => {
             employees={employees}
             onUpdateEmployee={updateEmployee}
             isLoading={isLoading}
+            canEdit={canEdit}
           />
         </div>
       </div>
@@ -87,6 +115,7 @@ export const PayrollLiquidation = () => {
         onRecalculate={recalculateAll}
         onToggleSummary={() => {}}
         showSummary={true}
+        canEdit={canEdit}
       />
     </div>
   );

@@ -1,15 +1,17 @@
 
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Save } from 'lucide-react';
+import { RefreshCw, Save, Lock } from 'lucide-react';
 
 interface PayrollActionsProps {
   onRecalculate: () => void;
-  onToggleSummary: () => void; // Keeping for compatibility but not using
-  showSummary: boolean; // Keeping for compatibility but not using
+  onToggleSummary: () => void;
+  showSummary: boolean;
+  canEdit?: boolean;
 }
 
 export const PayrollActions = ({ 
-  onRecalculate
+  onRecalculate,
+  canEdit = true
 }: PayrollActionsProps) => {
   return (
     <div className="bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -18,14 +20,24 @@ export const PayrollActions = ({
           variant="outline"
           size="sm"
           onClick={onRecalculate}
+          disabled={!canEdit}
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Recalcular todos
         </Button>
 
         <div className="flex items-center text-sm text-gray-600">
-          <Save className="h-4 w-4 mr-1" />
-          Guardado automático
+          {canEdit ? (
+            <>
+              <Save className="h-4 w-4 mr-1" />
+              Guardado automático
+            </>
+          ) : (
+            <>
+              <Lock className="h-4 w-4 mr-1" />
+              Período bloqueado para edición
+            </>
+          )}
         </div>
       </div>
     </div>

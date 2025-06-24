@@ -51,3 +51,25 @@ export interface BaseEmployeeData {
   eps?: string;
   afp?: string;
 }
+
+// Nuevos tipos para la funcionalidad avanzada
+export interface CompanySettings {
+  id: string;
+  company_id: string;
+  periodicity: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DBPayrollPeriod {
+  id: string;
+  company_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
+  tipo_periodo: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
+  modificado_por?: string;
+  modificado_en?: string;
+  created_at: string;
+  updated_at: string;
+}

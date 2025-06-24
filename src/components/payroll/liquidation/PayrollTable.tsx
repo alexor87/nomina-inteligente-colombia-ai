@@ -1,227 +1,250 @@
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertCircle, CheckCircle, User, Upload } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card } from '@/components/ui/card';
 import { PayrollEmployee } from '@/types/payroll';
+import { AlertCircle, CheckCircle, Clock, Lock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PayrollTableProps {
   employees: PayrollEmployee[];
   onUpdateEmployee: (id: string, field: string, value: number) => void;
   isLoading: boolean;
+  canEdit?: boolean;
 }
 
-export const PayrollTable = ({ employees, onUpdateEmployee, isLoading }: PayrollTableProps) => {
-  const [searchTerm, setSearchTerm] = useState('');
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+  }).format(amount);
+};
 
-  const filteredEmployees = employees.filter(emp => 
-    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.position.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+const statusConfig = {
+  valid: { 
+    label: 'Válido', 
+    color: 'bg-green-100 text-green-800', 
+    icon: CheckCircle 
+  },
+  error: { 
+    label: 'Error', 
+    color: 'bg-red-100 text-red-800', 
+    icon: AlertCircle 
+  },
+  incomplete: { 
+    label: 'Incompleto', 
+    color: 'bg-yellow-100 text-yellow-800', 
+    icon: Clock 
+  }
+};
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(amount);
+export const PayrollTable = ({ employees, onUpdateEmployee, isLoading, canEdit = true }: PayrollTableProps) => {
+  const [editingCell, setEditingCell] = useState<string | null>(null);
+
+  const handleCellEdit = (employeeId: string, field: string, value: string) => {
+    const numericValue = parseFloat(value) || 0;
+    onUpdateEmployee(employeeId, field, numericValue);
+    setEditingCell(null);
   };
 
-  const getStatusBadge = (employee: PayrollEmployee) => {
-    switch (employee.status) {
-      case 'valid':
-        return (
-          <Badge className="bg-green-100 text-green-800">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Válido
-          </Badge>
-        );
-      case 'error':
-        return (
-          <Tooltip>
-            <TooltipTrigger>
-              <Badge className="bg-red-100 text-red-800">
-                <AlertCircle className="h-3 w-3 mr-1" />
-                Error
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="space-y-1">
-                {employee.errors.map((error, idx) => (
-                  <p key={idx} className="text-xs">{error}</p>
-                ))}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        );
-      case 'incomplete':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Incompleto
-          </Badge>
-        );
+  const handleCellClick = (cellId: string) => {
+    if (canEdit) {
+      setEditingCell(cellId);
     }
   };
 
   const EditableCell = ({ 
+    employeeId, 
+    field, 
     value, 
-    onSave, 
-    type = 'number',
-    className = '' 
+    className = "" 
   }: { 
+    employeeId: string; 
+    field: string; 
     value: number; 
-    onSave: (value: number) => void; 
-    type?: string;
-    className?: string;
+    className?: string; 
   }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [tempValue, setTempValue] = useState(value.toString());
-
-    const handleSave = () => {
-      const numValue = parseFloat(tempValue) || 0;
-      onSave(numValue);
-      setIsEditing(false);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        handleSave();
-      } else if (e.key === 'Escape') {
-        setTempValue(value.toString());
-        setIsEditing(false);
-      }
-    };
+    const cellId = `${employeeId}-${field}`;
+    const isEditing = editingCell === cellId;
 
     if (isEditing) {
       return (
         <Input
-          value={tempValue}
-          onChange={(e) => setTempValue(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
+          type="number"
+          defaultValue={value}
           className="h-8 text-sm"
           autoFocus
+          onBlur={(e) => handleCellEdit(employeeId, field, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleCellEdit(employeeId, field, e.currentTarget.value);
+            }
+            if (e.key === 'Escape') {
+              setEditingCell(null);
+            }
+          }}
         />
       );
     }
 
     return (
       <div 
-        className={`cursor-pointer hover:bg-gray-50 p-2 rounded text-sm ${className}`}
-        onClick={() => {
-          setIsEditing(true);
-          setTempValue(value.toString());
-        }}
+        className={`cursor-pointer hover:bg-gray-50 p-1 rounded ${className} ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}`}
+        onClick={() => handleCellClick(cellId)}
       >
-        {type === 'currency' ? formatCurrency(value) : value}
+        {typeof value === 'number' ? formatCurrency(value) : value}
       </div>
     );
   };
 
-  return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Toolbar */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar empleado..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-64"
-            />
+  if (employees.length === 0) {
+    return (
+      <Card className="mx-6 p-8 text-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+            <AlertCircle className="h-8 w-8 text-gray-400" />
           </div>
-          <div className="text-sm text-gray-600">
-            {filteredEmployees.length} empleados
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Sin empleados para liquidar</h3>
+            <p className="text-gray-500">No hay empleados activos disponibles para la liquidación de nómina.</p>
           </div>
         </div>
+      </Card>
+    );
+  }
 
-        <Button variant="outline" size="sm">
-          <Upload className="h-4 w-4 mr-2" />
-          Importar novedades
-        </Button>
-      </div>
-
-      {/* Tabla */}
-      <ScrollArea className="flex-1">
-        <Table>
-          <TableHeader className="sticky top-0 bg-white z-10">
-            <TableRow>
-              <TableHead className="w-48">Empleado</TableHead>
-              <TableHead className="w-24">Días</TableHead>
-              <TableHead className="w-24">H. Extra</TableHead>
-              <TableHead className="w-24">Incap.</TableHead>
-              <TableHead className="w-32">Bonific.</TableHead>
-              <TableHead className="w-24">Ausenc.</TableHead>
-              <TableHead className="w-32">Devengado</TableHead>
-              <TableHead className="w-32">Deducc.</TableHead>
-              <TableHead className="w-32">Neto</TableHead>
-              <TableHead className="w-24">Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredEmployees.map((employee) => (
-              <TableRow key={employee.id} className="hover:bg-gray-50">
-                <TableCell>
-                  <div>
-                    <div className="font-medium text-sm">{employee.name}</div>
-                    <div className="text-xs text-gray-500">{employee.position}</div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <EditableCell
-                    value={employee.workedDays}
-                    onSave={(value) => onUpdateEmployee(employee.id, 'workedDays', value)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <EditableCell
-                    value={employee.extraHours}
-                    onSave={(value) => onUpdateEmployee(employee.id, 'extraHours', value)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <EditableCell
-                    value={employee.disabilities}
-                    onSave={(value) => onUpdateEmployee(employee.id, 'disabilities', value)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <EditableCell
-                    value={employee.bonuses}
-                    onSave={(value) => onUpdateEmployee(employee.id, 'bonuses', value)}
-                    type="currency"
-                  />
-                </TableCell>
-                <TableCell>
-                  <EditableCell
-                    value={employee.absences}
-                    onSave={(value) => onUpdateEmployee(employee.id, 'absences', value)}
-                  />
-                </TableCell>
-                <TableCell className="font-medium">
-                  {formatCurrency(employee.grossPay)}
-                </TableCell>
-                <TableCell className="font-medium">
-                  {formatCurrency(employee.deductions)}
-                </TableCell>
-                <TableCell className="font-bold">
-                  {formatCurrency(employee.netPay)}
-                </TableCell>
-                <TableCell>
-                  {getStatusBadge(employee)}
-                </TableCell>
+  return (
+    <div className="mx-6 flex-1 overflow-hidden">
+      <Card className="h-full flex flex-col">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Empleados para Liquidación</h2>
+          <div className="flex items-center space-x-2">
+            {!canEdit && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-700">
+                      <Lock className="h-3 w-3 mr-1" />
+                      Solo lectura
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>El período no está en estadoborrador. Los valores no se pueden editar.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <Badge variant="secondary">
+              {employees.length} empleados
+            </Badge>
+          </div>
+        </div>
+        
+        <div className="flex-1 overflow-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-white z-10">
+              <TableRow>
+                <TableHead className="w-48">Empleado</TableHead>
+                <TableHead className="w-32">Cargo</TableHead>
+                <TableHead className="w-32 text-right">Salario Base</TableHead>
+                <TableHead className="w-24 text-center">Días</TableHead>
+                <TableHead className="w-24 text-center">H. Extra</TableHead>
+                <TableHead className="w-32 text-right">Bonos</TableHead>
+                <TableHead className="w-32 text-right">Devengado</TableHead>
+                <TableHead className="w-32 text-right">Deducciones</TableHead>
+                <TableHead className="w-32 text-right">Neto</TableHead>
+                <TableHead className="w-24 text-center">Estado</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </ScrollArea>
+            </TableHeader>
+            <TableBody>
+              {employees.map((employee) => {
+                const config = statusConfig[employee.status];
+                const StatusIcon = config.icon;
+                
+                return (
+                  <TableRow key={employee.id} className={isLoading ? 'opacity-50' : ''}>
+                    <TableCell className="font-medium">
+                      <div>
+                        <div className="font-semibold">{employee.name}</div>
+                        <div className="text-xs text-gray-500">{employee.id}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600">
+                      {employee.position}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        employeeId={employee.id}
+                        field="baseSalary"
+                        value={employee.baseSalary}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <EditableCell
+                        employeeId={employee.id}
+                        field="workedDays"
+                        value={employee.workedDays}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <EditableCell
+                        employeeId={employee.id}
+                        field="extraHours"
+                        value={employee.extraHours}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        employeeId={employee.id}
+                        field="bonuses"
+                        value={employee.bonuses}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(employee.grossPay)}
+                    </TableCell>
+                    <TableCell className="text-right text-red-600">
+                      {formatCurrency(employee.deductions)}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-green-600">
+                      {formatCurrency(employee.netPay)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge className={`${config.color} flex items-center space-x-1`}>
+                              <StatusIcon className="h-3 w-3" />
+                              <span className="text-xs">{config.label}</span>
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {employee.errors.length > 0 ? (
+                              <div>
+                                <p className="font-medium">Errores:</p>
+                                <ul className="list-disc list-inside">
+                                  {employee.errors.map((error, index) => (
+                                    <li key={index} className="text-xs">{error}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : (
+                              <p>Empleado válido para liquidación</p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
     </div>
   );
 };

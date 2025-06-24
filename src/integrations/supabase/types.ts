@@ -57,6 +57,38 @@ export type Database = {
         }
         Relationships: []
       }
+      company_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          periodicity: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          periodicity?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          periodicity?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_activity: {
         Row: {
           action: string
@@ -209,6 +241,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_periods: {
+        Row: {
+          company_id: string
+          created_at: string
+          estado: string
+          fecha_fin: string
+          fecha_inicio: string
+          id: string
+          modificado_en: string | null
+          modificado_por: string | null
+          tipo_periodo: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          estado?: string
+          fecha_fin: string
+          fecha_inicio: string
+          id?: string
+          modificado_en?: string | null
+          modificado_por?: string | null
+          tipo_periodo?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          estado?: string
+          fecha_fin?: string
+          fecha_inicio?: string
+          id?: string
+          modificado_en?: string | null
+          modificado_por?: string | null
+          tipo_periodo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_periods_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
