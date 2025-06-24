@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -27,28 +26,33 @@ export const usePayrollLiquidation = () => {
     totalPayrollCost: 0
   });
 
-  // Cargar empleados reales desde la base de datos
+  // Cargar empleados desde la base de datos
   const loadEmployees = useCallback(async () => {
     setIsLoading(true);
     try {
-      // TODO: Obtener companyId del contexto de autenticación
-      const companyId = 'sample-company-id';
-      const loadedEmployees = await PayrollLiquidationService.loadEmployeesForLiquidation(companyId);
+      const loadedEmployees = await PayrollLiquidationService.loadEmployeesForLiquidation();
       setEmployees(loadedEmployees);
       
-      toast({
-        title: "Empleados cargados",
-        description: `Se cargaron ${loadedEmployees.length} empleados activos`
-      });
+      if (loadedEmployees.length > 0) {
+        toast({
+          title: "Empleados cargados",
+          description: `Se cargaron ${loadedEmployees.length} empleados activos`
+        });
+      } else {
+        toast({
+          title: "Sin empleados",
+          description: "No se encontraron empleados activos para liquidar",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       console.error('Error loading employees:', error);
       toast({
-        title: "Error",
-        description: "No se pudieron cargar los empleados",
+        title: "Error al cargar empleados",
+        description: "No se pudieron cargar los empleados. Verifica la conexión a la base de datos.",
         variant: "destructive"
       });
-      // Fallback a datos mock si hay error
-      setEmployees([]);
+      // No fallback to empty array, just keep current state
     } finally {
       setIsLoading(false);
     }
@@ -126,13 +130,9 @@ export const usePayrollLiquidation = () => {
     });
 
     try {
-      // TODO: Obtener companyId del contexto de autenticación
-      const companyId = 'sample-company-id';
-      
       const liquidationData = {
         period: currentPeriod,
-        employees,
-        companyId
+        employees
       };
 
       const message = await PayrollLiquidationService.savePayrollLiquidation(liquidationData);

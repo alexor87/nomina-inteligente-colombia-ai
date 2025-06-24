@@ -14,8 +14,11 @@ export interface PayrollHistoryRecord {
 
 export class PayrollHistoryService {
   // Obtener resumen de períodos de nómina
-  static async getPayrollPeriods(companyId: string): Promise<PayrollHistoryRecord[]> {
+  static async getPayrollPeriods(): Promise<PayrollHistoryRecord[]> {
     try {
+      const companyId = await PayrollLiquidationService.getCurrentUserCompanyId();
+      if (!companyId) return [];
+
       const { data, error } = await supabase
         .from('payrolls')
         .select('*')
@@ -44,13 +47,16 @@ export class PayrollHistoryService {
       }));
     } catch (error) {
       console.error('Error loading payroll periods:', error);
-      throw new Error('Error al cargar los períodos de nómina');
+      return [];
     }
   }
 
   // Reabrir un período de nómina
-  static async reopenPeriod(periodo: string, companyId: string): Promise<void> {
+  static async reopenPeriod(periodo: string): Promise<void> {
     try {
+      const companyId = await PayrollLiquidationService.getCurrentUserCompanyId();
+      if (!companyId) throw new Error('No se encontró la empresa del usuario');
+
       const { data, error } = await supabase
         .from('payrolls')
         .select('id')
@@ -76,8 +82,11 @@ export class PayrollHistoryService {
   }
 
   // Generar dispersión bancaria para un período
-  static async generateBankDispersion(periodo: string, companyId: string): Promise<void> {
+  static async generateBankDispersion(periodo: string): Promise<void> {
     try {
+      const companyId = await PayrollLiquidationService.getCurrentUserCompanyId();
+      if (!companyId) throw new Error('No se encontró la empresa del usuario');
+
       const { data, error } = await supabase
         .from('payrolls')
         .select(`
