@@ -75,7 +75,7 @@ export const VoucherFiltersComponent = ({
             <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
             <SelectItem value="generado">Generado</SelectItem>
-            <SelectItem value="firmado">Firmado</SelectItem>
+            <SelectItem value="enviado">Enviado</SelectItem>
             <SelectItem value="error">Error</SelectItem>
           </SelectContent>
         </Select>
@@ -93,22 +93,6 @@ export const VoucherFiltersComponent = ({
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="true">Enviados</SelectItem>
             <SelectItem value="false">Sin enviar</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={filters.dianStatus}
-          onValueChange={(value) => onUpdateFilters({ dianStatus: value === 'all' ? '' : value })}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Firma DIAN" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="firmado">Firmado</SelectItem>
-            <SelectItem value="rechazado">Rechazado</SelectItem>
-            <SelectItem value="error">Error</SelectItem>
           </SelectContent>
         </Select>
 

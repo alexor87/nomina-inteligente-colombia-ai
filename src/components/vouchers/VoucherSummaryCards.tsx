@@ -2,7 +2,7 @@
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { VoucherSummary } from '@/types/vouchers';
-import { FileText, Shield, Mail, Clock } from 'lucide-react';
+import { FileText, Mail, Clock, CheckCircle2 } from 'lucide-react';
 
 interface VoucherSummaryCardsProps {
   summary: VoucherSummary;
@@ -24,23 +24,19 @@ export const VoucherSummaryCards = ({ summary }: VoucherSummaryCardsProps) => {
         </div>
       </Card>
 
-      {/* Firmados electrónicamente */}
+      {/* Generados */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Firmados DIAN</p>
-            <p className="text-3xl font-bold text-gray-900">{summary.signedPercentage}%</p>
+            <p className="text-sm font-medium text-gray-600">Generados</p>
+            <p className="text-3xl font-bold text-gray-900">{summary.generatedVouchers}</p>
           </div>
           <div className="p-3 bg-green-100 rounded-full">
-            <Shield className="h-6 w-6 text-green-600" />
+            <CheckCircle2 className="h-6 w-6 text-green-600" />
           </div>
         </div>
-        <Progress 
-          value={summary.signedPercentage} 
-          className="h-2"
-        />
         <p className="text-xs text-gray-500 mt-2">
-          {Math.round((summary.signedPercentage / 100) * summary.totalVouchers)} de {summary.totalVouchers} firmados
+          Comprobantes completados
         </p>
       </Card>
 

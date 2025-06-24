@@ -8,14 +8,10 @@ export interface PayrollVoucher {
   startDate: string;
   endDate: string;
   netPay: number;
-  voucherStatus: 'generado' | 'pendiente' | 'firmado' | 'error';
+  voucherStatus: 'generado' | 'pendiente' | 'enviado' | 'error';
   sentToEmployee: boolean;
   sentDate?: string;
   pdfUrl?: string;
-  xmlUrl?: string;
-  dianStatus: 'pendiente' | 'firmado' | 'rechazado' | 'error';
-  dianCufe?: string;
-  electronicSignatureDate?: string;
   createdAt: string;
   updatedAt: string;
   generatedBy?: string;
@@ -30,10 +26,9 @@ export interface VoucherAuditLog {
   companyId: string;
   voucherId: string;
   userId: string;
-  action: 'generated' | 'downloaded' | 'sent_email' | 'sent_whatsapp' | 'regenerated' | 'viewed';
+  action: 'generated' | 'downloaded' | 'sent_email' | 'regenerated' | 'viewed';
   method?: string;
   recipientEmail?: string;
-  recipientPhone?: string;
   success: boolean;
   errorMessage?: string;
   ipAddress?: string;
@@ -46,14 +41,13 @@ export interface VoucherFilters {
   periodo: string;
   voucherStatus: string;
   sentToEmployee?: boolean;
-  dianStatus: string;
   startDate: string;
   endDate: string;
 }
 
 export interface VoucherSummary {
   totalVouchers: number;
-  signedPercentage: number;
   sentPercentage: number;
   pendingVouchers: number;
+  generatedVouchers: number;
 }

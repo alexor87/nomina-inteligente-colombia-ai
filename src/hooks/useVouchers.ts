@@ -15,7 +15,6 @@ export const useVouchers = () => {
     periodo: '',
     voucherStatus: '',
     sentToEmployee: undefined,
-    dianStatus: '',
     startDate: '',
     endDate: ''
   });
@@ -57,14 +56,10 @@ export const useVouchers = () => {
         startDate: voucher.start_date,
         endDate: voucher.end_date,
         netPay: Number(voucher.net_pay),
-        voucherStatus: voucher.voucher_status as 'generado' | 'pendiente' | 'firmado' | 'error',
+        voucherStatus: voucher.voucher_status as 'generado' | 'pendiente' | 'enviado' | 'error',
         sentToEmployee: voucher.sent_to_employee,
         sentDate: voucher.sent_date || undefined,
         pdfUrl: voucher.pdf_url || undefined,
-        xmlUrl: voucher.xml_url || undefined,
-        dianStatus: voucher.dian_status as 'pendiente' | 'firmado' | 'rechazado' | 'error',
-        dianCufe: voucher.dian_cufe || undefined,
-        electronicSignatureDate: voucher.electronic_signature_date || undefined,
         createdAt: voucher.created_at,
         updatedAt: voucher.updated_at,
         generatedBy: voucher.generated_by || undefined,
@@ -121,11 +116,6 @@ export const useVouchers = () => {
         return false;
       }
 
-      // Filtro por estado DIAN
-      if (filters.dianStatus && voucher.dianStatus !== filters.dianStatus) {
-        return false;
-      }
-
       // Filtro por rango de fechas
       if (filters.startDate) {
         if (new Date(voucher.startDate) < new Date(filters.startDate)) {
@@ -146,15 +136,15 @@ export const useVouchers = () => {
   // Calcular resumen
   const summary: VoucherSummary = useMemo(() => {
     const total = vouchers.length;
-    const signed = vouchers.filter(v => v.dianStatus === 'firmado').length;
     const sent = vouchers.filter(v => v.sentToEmployee).length;
     const pending = vouchers.filter(v => v.voucherStatus === 'pendiente').length;
+    const generated = vouchers.filter(v => v.voucherStatus === 'generado').length;
 
     return {
       totalVouchers: total,
-      signedPercentage: total > 0 ? Math.round((signed / total) * 100) : 0,
       sentPercentage: total > 0 ? Math.round((sent / total) * 100) : 0,
-      pendingVouchers: pending
+      pendingVouchers: pending,
+      generatedVouchers: generated
     };
   }, [vouchers]);
 
@@ -168,7 +158,6 @@ export const useVouchers = () => {
       periodo: '',
       voucherStatus: '',
       sentToEmployee: undefined,
-      dianStatus: '',
       startDate: '',
       endDate: ''
     });
@@ -190,15 +179,14 @@ export const useVouchers = () => {
     }
   };
 
-  const downloadVoucher = async (voucherId: string, type: 'pdf' | 'xml') => {
+  const downloadVoucher = async (voucherId: string) => {
     const voucher = vouchers.find(v => v.id === voucherId);
     if (!voucher) return;
 
-    const url = type === 'pdf' ? voucher.pdfUrl : voucher.xmlUrl;
-    if (!url) {
+    if (!voucher.pdfUrl) {
       toast({
         title: "Archivo no disponible",
-        description: `El ${type.toUpperCase()} no está disponible para este comprobante`,
+        description: "El PDF no está disponible para este comprobante",
         variant: "destructive"
       });
       return;
@@ -206,16 +194,16 @@ export const useVouchers = () => {
 
     // Simular descarga
     const link = document.createElement('a');
-    link.href = url;
-    link.download = `comprobante_${voucher.employeeCedula}_${voucher.periodo}.${type}`;
+    link.href = voucher.pdfUrl;
+    link.download = `comprobante_${voucher.employeeCedula}_${voucher.periodo}.pdf`;
     link.click();
 
     // Registrar auditoría
-    await logVoucherAction(voucherId, 'downloaded', type);
+    await logVoucherAction(voucherId, 'downloaded', 'pdf');
 
     toast({
       title: "Descarga iniciada",
-      description: `Se está descargando el ${type.toUpperCase()} del comprobante`,
+      description: "Se está descargando el PDF del comprobante",
     });
   };
 
@@ -262,7 +250,8 @@ export const useVouchers = () => {
       .from('payroll_vouchers')
       .update({ 
         sent_to_employee: true, 
-        sent_date: new Date().toISOString() 
+        sent_date: new Date().toISOString(),
+        voucher_status: 'enviado'
       })
       .eq('id', voucherId);
 
@@ -304,7 +293,8 @@ export const useVouchers = () => {
         .from('payroll_vouchers')
         .update({ 
           sent_to_employee: true, 
-          sent_date: new Date().toISOString() 
+          sent_date: new Date().toISOString(),
+          voucher_status: 'enviado'
         })
         .eq('id', voucher.id);
     }

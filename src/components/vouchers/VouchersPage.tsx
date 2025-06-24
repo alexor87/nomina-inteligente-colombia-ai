@@ -22,7 +22,6 @@ import { VoucherSummaryCards } from './VoucherSummaryCards';
 import { useVouchers } from '@/hooks/useVouchers';
 import { 
   FileText, 
-  Code, 
   Download, 
   Mail, 
   RefreshCw, 
@@ -56,19 +55,17 @@ export const VouchersPage = () => {
     const colors = {
       'pendiente': 'bg-yellow-100 text-yellow-800',
       'generado': 'bg-blue-100 text-blue-800',
-      'firmado': 'bg-green-100 text-green-800',
-      'error': 'bg-red-100 text-red-800',
-      'rechazado': 'bg-red-100 text-red-800'
+      'enviado': 'bg-green-100 text-green-800',
+      'error': 'bg-red-100 text-red-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'firmado':
+      case 'enviado':
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'error':
-      case 'rechazado':
         return <XCircle className="h-4 w-4 text-red-500" />;
       case 'pendiente':
         return <Clock className="h-4 w-4 text-yellow-500" />;
@@ -166,8 +163,6 @@ export const VouchersPage = () => {
                 <TableHead>Estado</TableHead>
                 <TableHead>Enviado</TableHead>
                 <TableHead>PDF</TableHead>
-                <TableHead>XML DIAN</TableHead>
-                <TableHead>Firma DIAN</TableHead>
                 <TableHead className="w-32">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -208,9 +203,12 @@ export const VouchersPage = () => {
                   </TableCell>
                   
                   <TableCell>
-                    <Badge className={getStatusColor(voucher.voucherStatus)}>
-                      {voucher.voucherStatus}
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      {getStatusIcon(voucher.voucherStatus)}
+                      <Badge className={getStatusColor(voucher.voucherStatus)}>
+                        {voucher.voucherStatus}
+                      </Badge>
+                    </div>
                   </TableCell>
                   
                   <TableCell>
@@ -254,7 +252,7 @@ export const VouchersPage = () => {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => downloadVoucher(voucher.id, 'pdf')}
+                              onClick={() => downloadVoucher(voucher.id)}
                             >
                               <Download className="h-4 w-4" />
                             </Button>
@@ -264,56 +262,6 @@ export const VouchersPage = () => {
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400">No disponible</span>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    {voucher.xmlUrl ? (
-                      <div className="flex items-center space-x-1">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => window.open(voucher.xmlUrl, '_blank')}
-                            >
-                              <Code className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Ver XML</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => downloadVoucher(voucher.id, 'xml')}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Descargar XML</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">No disponible</span>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(voucher.dianStatus)}
-                      <Badge 
-                        variant="outline" 
-                        className={getStatusColor(voucher.dianStatus)}
-                      >
-                        {voucher.dianStatus}
-                      </Badge>
-                    </div>
-                    {voucher.electronicSignatureDate && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        {new Date(voucher.electronicSignatureDate).toLocaleDateString('es-CO')}
-                      </div>
                     )}
                   </TableCell>
                   
