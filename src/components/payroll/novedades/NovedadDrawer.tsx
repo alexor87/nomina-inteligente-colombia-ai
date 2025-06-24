@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -39,8 +38,23 @@ export const NovedadDrawer = ({
   const [editingNovedad, setEditingNovedad] = React.useState<PayrollNovedad | null>(null);
 
   const handleCreateNovedad = async (data: NovedadFormData) => {
-    await onCreateNovedad(data);
-    setShowForm(false);
+    try {
+      console.log('🎯 Creando novedad para empleado:', employeeId);
+      console.log('📋 Datos del formulario:', data);
+      
+      // Agregar empleado_id a los datos antes de enviar
+      const completeData = {
+        ...data,
+        empleado_id: employeeId
+      };
+      
+      console.log('📤 Datos completos para crear novedad:', completeData);
+      await onCreateNovedad(completeData);
+      setShowForm(false);
+    } catch (error) {
+      console.error('❌ Error en handleCreateNovedad:', error);
+      // El error ya se maneja en el hook useNovedades
+    }
   };
 
   const handleUpdateNovedad = async (data: NovedadFormData) => {
@@ -171,7 +185,7 @@ export const NovedadDrawer = ({
               <div className="flex-1 flex flex-col h-full">
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
                   <h3 className="text-base font-semibold text-gray-900">Nueva novedad</h3>
-                  <p className="text-xs text-gray-600 mt-1">Completa la información</p>
+                  <p className="text-xs text-gray-600 mt-1">Completa la información para {employeeName}</p>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                   <div className="p-4">

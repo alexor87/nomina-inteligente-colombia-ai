@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
 
@@ -73,25 +72,49 @@ export class NovedadesService {
 
       console.log('🔍 Datos recibidos para crear novedad:', novedadData);
 
-      // Preparar los datos para inserción, eliminando campos undefined/null
+      // Validar campos requeridos antes de insertar
+      if (!novedadData.empleado_id) {
+        throw new Error('empleado_id es requerido');
+      }
+      if (!novedadData.periodo_id) {
+        throw new Error('periodo_id es requerido');
+      }
+      if (!novedadData.tipo_novedad) {
+        throw new Error('tipo_novedad es requerido');
+      }
+      if (!novedadData.valor || novedadData.valor <= 0) {
+        throw new Error('valor debe ser mayor a 0');
+      }
+
+      // Preparar los datos para inserción con valores explícitos
       const insertData = {
         company_id: companyId,
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
         tipo_novedad: novedadData.tipo_novedad,
-        valor: novedadData.valor || 0,
+        valor: Number(novedadData.valor), // Asegurar que sea número
         creado_por: user.id,
-        ...(novedadData.subtipo && { subtipo: novedadData.subtipo }),
-        ...(novedadData.fecha_inicio && { fecha_inicio: novedadData.fecha_inicio }),
-        ...(novedadData.fecha_fin && { fecha_fin: novedadData.fecha_fin }),
-        ...(novedadData.dias && novedadData.dias > 0 && { dias: novedadData.dias }),
-        ...(novedadData.horas && novedadData.horas > 0 && { horas: novedadData.horas }),
-        ...(novedadData.observacion && { observacion: novedadData.observacion }),
-        ...(novedadData.base_calculo && { base_calculo: novedadData.base_calculo }),
-        ...(novedadData.adjunto_url && { adjunto_url: novedadData.adjunto_url })
+        // Campos opcionales con valores por defecto seguros
+        subtipo: novedadData.subtipo || null,
+        fecha_inicio: novedadData.fecha_inicio || null,
+        fecha_fin: novedadData.fecha_fin || null,
+        dias: novedadData.dias ? Number(novedadData.dias) : null,
+        horas: novedadData.horas ? Number(novedadData.horas) : null,
+        observacion: novedadData.observacion || null,
+        base_calculo: novedadData.base_calculo || null,
+        adjunto_url: novedadData.adjunto_url || null
       };
 
       console.log('📤 Datos preparados para inserción:', insertData);
+      console.log('📋 Tipos de datos:', {
+        company_id: typeof insertData.company_id,
+        empleado_id: typeof insertData.empleado_id,
+        periodo_id: typeof insertData.periodo_id,
+        tipo_novedad: typeof insertData.tipo_novedad,
+        valor: typeof insertData.valor,
+        dias: typeof insertData.dias,
+        horas: typeof insertData.horas
+      });
 
       const { data, error } = await supabase
         .from('payroll_novedades')
@@ -100,7 +123,12 @@ export class NovedadesService {
         .single();
 
       if (error) {
-        console.error('❌ Error en la inserción:', error);
+        console.error('❌ Error detallado en la inserción:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
 
@@ -111,7 +139,7 @@ export class NovedadesService {
 
       return data as PayrollNovedad;
     } catch (error) {
-      console.error('❌ Error creating novedad:', error);
+      console.error('❌ Error completo creating novedad:', error);
       throw error;
     }
   }

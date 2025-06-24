@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesService } from '@/services/NovedadesService';
@@ -35,10 +34,32 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
   const createNovedad = useCallback(async (novedadData: CreateNovedadData) => {
     try {
       setIsLoading(true);
-      console.log('Creating novedad with data:', novedadData);
+      console.log('📝 Iniciando creación de novedad con datos:', novedadData);
       
-      const newNovedad = await NovedadesService.createNovedad(novedadData);
-      console.log('Created novedad:', newNovedad);
+      // Validaciones adicionales antes de enviar
+      if (!novedadData.empleado_id) {
+        throw new Error('ID del empleado es requerido');
+      }
+      if (!periodoId) {
+        throw new Error('ID del período es requerido');
+      }
+      if (!novedadData.tipo_novedad) {
+        throw new Error('Tipo de novedad es requerido');
+      }
+      if (!novedadData.valor || novedadData.valor <= 0) {
+        throw new Error('El valor debe ser mayor a 0');
+      }
+
+      // Agregar periodo_id a los datos
+      const completeData = {
+        ...novedadData,
+        periodo_id: periodoId
+      };
+
+      console.log('📤 Datos completos para envío:', completeData);
+      
+      const newNovedad = await NovedadesService.createNovedad(completeData);
+      console.log('✅ Novedad creada exitosamente:', newNovedad);
       
       if (newNovedad) {
         // Update local state immediately
@@ -57,24 +78,25 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
 
         // Trigger recalculation of payroll after novedad creation
         if (onNovedadChange) {
-          console.log('Triggering payroll recalculation after novedad creation');
+          console.log('🔄 Activando recalculación de nómina');
           onNovedadChange();
         }
 
         return newNovedad;
       }
     } catch (error) {
-      console.error('Error creating novedad:', error);
+      console.error('❌ Error completo creating novedad:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       toast({
         title: "Error al crear novedad",
-        description: "No se pudo registrar la novedad",
+        description: errorMessage,
         variant: "destructive"
       });
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [toast, onNovedadChange]);
+  }, [toast, onNovedadChange, periodoId]);
 
   const updateNovedad = useCallback(async (id: string, updates: Partial<CreateNovedadData>, empleadoId: string) => {
     try {
