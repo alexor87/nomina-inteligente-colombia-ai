@@ -1,13 +1,10 @@
-
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
-import { AlertCircle, CheckCircle, Clock, Users, Plus, Edit3, TrendingUp, Calculator } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertCircle, CheckCircle, Clock, Users, Plus, Edit2 } from 'lucide-react';
 import { NovedadDrawer } from '../novedades/NovedadDrawer';
 import { PayrollTableActions } from './PayrollTableActions';
 import { useNovedades } from '@/hooks/useNovedades';
@@ -34,17 +31,17 @@ const formatCurrency = (amount: number) => {
 const statusConfig = {
   valid: { 
     label: 'Válido', 
-    color: 'bg-green-100 text-green-800 border-green-200', 
+    color: 'bg-green-50 text-green-700 border-green-200', 
     icon: CheckCircle 
   },
   error: { 
     label: 'Error', 
-    color: 'bg-red-100 text-red-800 border-red-200', 
+    color: 'bg-red-50 text-red-700 border-red-200', 
     icon: AlertCircle 
   },
   incomplete: { 
     label: 'Incompleto', 
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
+    color: 'bg-amber-50 text-amber-700 border-amber-200', 
     icon: Clock 
   }
 };
@@ -63,7 +60,6 @@ export const PayrollTable = ({
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   
   const handleNovedadChange = () => {
-    console.log('Novedad changed, refreshing employees...');
     if (onRefreshEmployees) {
       onRefreshEmployees();
     }
@@ -126,14 +122,12 @@ export const PayrollTable = ({
     employeeId, 
     field, 
     value, 
-    className = "",
-    isHighlighted = false
+    className = ""
   }: { 
     employeeId: string; 
     field: string; 
     value: number; 
     className?: string;
-    isHighlighted?: boolean;
   }) => {
     const cellId = `${employeeId}-${field}`;
     const isEditing = editingCell === cellId;
@@ -143,7 +137,7 @@ export const PayrollTable = ({
         <Input
           type="number"
           defaultValue={value}
-          className="h-8 text-sm"
+          className="h-8 text-sm border-blue-300 focus:border-blue-500"
           autoFocus
           onBlur={(e) => handleCellEdit(employeeId, field, e.target.value)}
           onKeyDown={(e) => {
@@ -159,57 +153,36 @@ export const PayrollTable = ({
     }
 
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div 
-              className={`
-                cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors
-                ${isHighlighted ? 'bg-blue-50 border border-blue-200' : ''}
-                ${!canEdit ? 'cursor-not-allowed opacity-60' : 'hover:shadow-sm'}
-                ${className}
-              `}
-              onClick={() => handleCellClick(cellId)}
-            >
-              <div className="flex items-center space-x-1">
-                {canEdit && <Edit3 className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100" />}
-                <span className="font-medium">{formatCurrency(value)}</span>
-              </div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{canEdit ? 'Haz clic para editar' : 'Solo lectura'}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <div 
+        className={`
+          cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors group
+          ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}
+          ${className}
+        `}
+        onClick={() => handleCellClick(cellId)}
+      >
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-gray-900">{formatCurrency(value)}</span>
+          {canEdit && <Edit2 className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100" />}
+        </div>
+      </div>
     );
   };
 
   if (employees.length === 0) {
     return (
-      <div className="mx-6">
-        <Card className="p-12 text-center">
-          <div className="flex flex-col items-center space-y-6">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-              <Users className="h-10 w-10 text-blue-500" />
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-2xl font-semibold text-gray-900">Sin empleados para liquidar</h3>
-              <p className="text-gray-600 max-w-md">
-                No hay empleados activos disponibles para la liquidación de nómina. 
-                Primero debes agregar empleados en el módulo de Empleados.
-              </p>
-            </div>
-            <Button 
-              size="lg"
-              onClick={() => window.location.href = '/empleados'}
-              className="mt-6"
-            >
-              <Users className="h-5 w-5 mr-2" />
-              Ir a Empleados
-            </Button>
-          </div>
-        </Card>
+      <div className="py-12 text-center">
+        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Users className="h-6 w-6 text-gray-400" />
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Sin empleados para liquidar</h3>
+        <p className="text-gray-600 mb-6">
+          No hay empleados activos. Agrega empleados primero.
+        </p>
+        <Button onClick={() => window.location.href = '/empleados'}>
+          <Users className="h-4 w-4 mr-2" />
+          Ir a Empleados
+        </Button>
       </div>
     );
   }
@@ -226,192 +199,122 @@ export const PayrollTable = ({
         onToggleErrorFilter={() => setShowOnlyErrors(!showOnlyErrors)}
       />
 
-      <div className="mx-6 flex-1 overflow-hidden">
-        <Card className="h-full flex flex-col shadow-sm">
-          <div className="flex-1 overflow-auto">
-            <Table>
-              <TableHeader className="sticky top-0 bg-white z-10 border-b-2">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-56 font-semibold">
-                    <div className="flex items-center space-x-2">
-                      <Users className="h-4 w-4" />
-                      <span>Empleado</span>
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-40 font-semibold">Cargo</TableHead>
-                  <TableHead className="w-36 text-right font-semibold">
-                    <div className="flex items-center justify-end space-x-1">
-                      <span>Salario Base</span>
-                      <Edit3 className="h-3 w-3 text-blue-500" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-24 text-center font-semibold">
-                    <div className="flex items-center justify-center space-x-1">
-                      <span>Días</span>
-                      <Edit3 className="h-3 w-3 text-blue-500" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-28 text-center font-semibold">
-                    <div className="flex items-center justify-center space-x-1">
-                      <span>H. Extra</span>
-                      <Edit3 className="h-3 w-3 text-blue-500" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-36 text-right font-semibold">
-                    <div className="flex items-center justify-end space-x-1">
-                      <span>Bonos</span>
-                      <Edit3 className="h-3 w-3 text-blue-500" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-40 text-right font-semibold">
-                    <div className="flex items-center justify-end space-x-1">
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                      <span>Devengado</span>
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-40 text-right font-semibold">
-                    <div className="flex items-center justify-end space-x-1">
-                      <span className="text-red-600">Deducciones</span>
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-40 text-right font-semibold">
-                    <div className="flex items-center justify-end space-x-1">
-                      <Calculator className="h-4 w-4 text-green-700" />
-                      <span className="text-green-700">Neto</span>
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-32 text-center font-semibold">Novedades</TableHead>
-                  <TableHead className="w-28 text-center font-semibold">Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {displayedEmployees.map((employee) => {
-                  const config = statusConfig[employee.status];
-                  const StatusIcon = config.icon;
-                  const novedadesCount = getEmployeeNovedadesCount(employee.id);
-                  const hasErrors = employee.status === 'error';
-                  
-                  return (
-                    <TableRow 
-                      key={employee.id} 
-                      className={`
-                        group hover:bg-gray-50 transition-colors
-                        ${isLoading ? 'opacity-50' : ''}
-                        ${hasErrors ? 'bg-red-50/30' : ''}
-                      `}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-2 h-12 rounded-full ${hasErrors ? 'bg-red-400' : 'bg-green-400'}`} />
-                          <div>
-                            <div className="font-semibold text-gray-900">{employee.name}</div>
-                            <div className="text-xs text-gray-500">{employee.id}</div>
-                          </div>
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                <TableHead className="font-medium text-gray-900">Empleado</TableHead>
+                <TableHead className="font-medium text-gray-900">Cargo</TableHead>
+                <TableHead className="text-right font-medium text-gray-900">Salario Base</TableHead>
+                <TableHead className="text-center font-medium text-gray-900">Días</TableHead>
+                <TableHead className="text-center font-medium text-gray-900">H. Extra</TableHead>
+                <TableHead className="text-right font-medium text-gray-900">Bonos</TableHead>
+                <TableHead className="text-right font-medium text-gray-900 text-green-700">Devengado</TableHead>
+                <TableHead className="text-right font-medium text-gray-900 text-red-700">Deducciones</TableHead>
+                <TableHead className="text-right font-medium text-gray-900 text-green-800">Neto</TableHead>
+                <TableHead className="text-center font-medium text-gray-900">Novedades</TableHead>
+                <TableHead className="text-center font-medium text-gray-900">Estado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {displayedEmployees.map((employee) => {
+                const config = statusConfig[employee.status];
+                const StatusIcon = config.icon;
+                const novedadesCount = getEmployeeNovedadesCount(employee.id);
+                
+                return (
+                  <TableRow 
+                    key={employee.id} 
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <TableCell>
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-2 h-8 rounded-full ${employee.status === 'error' ? 'bg-red-400' : 'bg-green-400'}`} />
+                        <div>
+                          <div className="font-medium text-gray-900">{employee.name}</div>
+                          <div className="text-xs text-gray-500">{employee.id}</div>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-700">
-                        {employee.position || 'No definido'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <EditableCell
-                          employeeId={employee.id}
-                          field="baseSalary"
-                          value={employee.baseSalary}
-                          isHighlighted={true}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <EditableCell
-                          employeeId={employee.id}
-                          field="workedDays"
-                          value={employee.workedDays}
-                          isHighlighted={true}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <EditableCell
-                          employeeId={employee.id}
-                          field="extraHours"
-                          value={employee.extraHours}
-                          isHighlighted={true}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <EditableCell
-                          employeeId={employee.id}
-                          field="bonuses"
-                          value={employee.bonuses}
-                          isHighlighted={true}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="font-semibold text-green-700 bg-green-50 p-2 rounded">
-                          {formatCurrency(employee.grossPay)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="font-semibold text-red-700 bg-red-50 p-2 rounded">
-                          {formatCurrency(employee.deductions)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="font-bold text-green-800 bg-green-100 p-2 rounded border border-green-200">
-                          {formatCurrency(employee.netPay)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleOpenNovedades(employee.id, employee.name)}
-                          disabled={!canEdit}
-                          className="relative hover:bg-blue-50 hover:border-blue-300"
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          {novedadesCount > 0 && (
-                            <Badge 
-                              variant="secondary" 
-                              className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-blue-600 text-white"
-                            >
-                              {novedadesCount}
-                            </Badge>
-                          )}
-                          Novedad
-                        </Button>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Badge className={`${config.color} flex items-center space-x-2 border`}>
-                                <StatusIcon className="h-3 w-3" />
-                                <span className="text-xs font-medium">{config.label}</span>
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {employee.errors.length > 0 ? (
-                                <div className="max-w-xs">
-                                  <p className="font-medium">Errores encontrados:</p>
-                                  <ul className="list-disc list-inside mt-1">
-                                    {employee.errors.map((error, index) => (
-                                      <li key={index} className="text-xs">{error}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              ) : (
-                                <p>Empleado válido para liquidación</p>
-                              )}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {employee.position || 'No definido'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        employeeId={employee.id}
+                        field="baseSalary"
+                        value={employee.baseSalary}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <EditableCell
+                        employeeId={employee.id}
+                        field="workedDays"
+                        value={employee.workedDays}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <EditableCell
+                        employeeId={employee.id}
+                        field="extraHours"
+                        value={employee.extraHours}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        employeeId={employee.id}
+                        field="bonuses"
+                        value={employee.bonuses}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="font-medium text-green-700 px-2 py-1 bg-green-50 rounded">
+                        {formatCurrency(employee.grossPay)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="font-medium text-red-700 px-2 py-1 bg-red-50 rounded">
+                        {formatCurrency(employee.deductions)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="font-semibold text-green-800 px-2 py-1 bg-green-100 rounded">
+                        {formatCurrency(employee.netPay)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleOpenNovedades(employee.id, employee.name)}
+                        disabled={!canEdit}
+                        className="relative hover:bg-blue-50"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        {novedadesCount > 0 && (
+                          <Badge 
+                            variant="secondary" 
+                            className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-blue-600 text-white"
+                          >
+                            {novedadesCount}
+                          </Badge>
+                        )}
+                        Novedad
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge className={`${config.color} flex items-center space-x-1 border w-fit`}>
+                        <StatusIcon className="h-3 w-3" />
+                        <span className="text-xs">{config.label}</span>
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Novedad Drawer */}

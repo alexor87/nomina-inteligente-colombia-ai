@@ -25,24 +25,31 @@ export const PayrollLiquidationBackend = () => {
   const validEmployeeCount = employees.filter(emp => emp.status === 'valid').length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
-      <PayrollPeriodHeader 
-        period={currentPeriod}
-        isLoading={isLoading}
-        isValid={isValid}
-        canEdit={canEdit}
-        isEditingPeriod={isEditingPeriod}
-        setIsEditingPeriod={setIsEditingPeriod}
-        onApprove={approvePeriod}
-        onUpdatePeriod={updatePeriod}
-        employeeCount={employees.length}
-        validEmployeeCount={validEmployeeCount}
-        totalPayroll={summary.totalNetPay}
-      />
+    <div className="min-h-screen bg-white">
+      {/* Clean header with minimal styling */}
+      <div className="border-b border-gray-100">
+        <PayrollPeriodHeader 
+          period={currentPeriod}
+          isLoading={isLoading}
+          isValid={isValid}
+          canEdit={canEdit}
+          isEditingPeriod={isEditingPeriod}
+          setIsEditingPeriod={setIsEditingPeriod}
+          onApprove={approvePeriod}
+          onUpdatePeriod={updatePeriod}
+          employeeCount={employees.length}
+          validEmployeeCount={validEmployeeCount}
+          totalPayroll={summary.totalNetPay}
+        />
+      </div>
 
-      <PayrollSummaryCards summary={summary} />
+      {/* Summary cards with cleaner spacing */}
+      <div className="px-6 py-4">
+        <PayrollSummaryCards summary={summary} />
+      </div>
 
-      <div className="flex-1 flex flex-col pb-6">
+      {/* Main content area */}
+      <div className="px-6 pb-6">
         <PayrollTable
           employees={employees}
           onUpdateEmployee={updateEmployee}
