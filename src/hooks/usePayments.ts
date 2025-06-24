@@ -1,203 +1,194 @@
 
-import { useState } from 'react';
-import { PaymentEmployee, PaymentPeriod, PaymentFilters, BankFileGeneration, PaymentConfirmation } from '@/types/payments';
+import { useState, useEffect, useMemo } from 'react';
+import { PaymentEmployee, PaymentPeriod, PaymentFilters } from '@/types/payments';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export const usePayments = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingFile, setIsGeneratingFile] = useState(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [employees, setEmployees] = useState<PaymentEmployee[]>([]);
+  const [currentPeriod, setCurrentPeriod] = useState<PaymentPeriod | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState<PaymentFilters>({});
   const { toast } = useToast();
 
-  const markEmployeeAsPaid = async (employeeId: string, confirmation: PaymentConfirmation) => {
-    setIsProcessingPayment(true);
+  const getCurrentUserCompanyId = async () => {
     try {
-      // Simular API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
       
-      toast({
-        title: "Pago confirmado",
-        description: "El pago ha sido marcado como exitoso",
-      });
-      
-      return true;
+      return profile?.company_id || null;
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo confirmar el pago",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsProcessingPayment(false);
+      console.error('Error getting company ID:', error);
+      return null;
     }
   };
 
-  const markMultipleAsPaid = async (confirmations: PaymentConfirmation[]) => {
-    setIsProcessingPayment(true);
+  const loadPaymentData = async () => {
     try {
-      // Simular API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast({
-        title: "Pagos confirmados",
-        description: `${confirmations.length} pagos han sido marcados como exitosos`,
-      });
-      
-      return true;
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron confirmar todos los pagos",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  const generateBankFile = async (config: BankFileGeneration) => {
-    setIsGeneratingFile(true);
-    try {
-      // Simular generación de archivo
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      const fileName = `${config.bankName}_${new Date().toISOString().split('T')[0]}.${config.format}`;
-      
-      toast({
-        title: "Archivo generado",
-        description: `Archivo ${fileName} generado exitosamente`,
-      });
-      
-      return {
-        fileName,
-        url: `/downloads/${fileName}`,
-        success: true
-      };
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo generar el archivo bancario",
-        variant: "destructive",
-      });
-      return { success: false };
-    } finally {
-      setIsGeneratingFile(false);
-    }
-  };
-
-  const retryPayment = async (employeeId: string) => {
-    setIsProcessingPayment(true);
-    try {
-      // Simular reintento
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: "Pago reintentado",
-        description: "El pago ha sido marcado para reintento",
-      });
-      
-      return true;
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo reintentar el pago",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  const updateBankAccount = async (employeeId: string, accountData: { bankName: string; accountType: string; accountNumber: string }) => {
-    setIsLoading(true);
-    try {
-      // Validar cuenta bancaria
-      if (!validateBankAccount(accountData.accountNumber, accountData.bankName)) {
-        throw new Error('Número de cuenta inválido');
+      setIsLoading(true);
+      const companyId = await getCurrentUserCompanyId();
+      if (!companyId) {
+        setEmployees([]);
+        setCurrentPeriod(null);
+        return;
       }
 
-      // Simular actualización
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: "Cuenta actualizada",
-        description: "Los datos bancarios han sido actualizados",
-      });
-      
-      return true;
+      // Cargar empleados con datos de nómina procesada
+      const { data: payrollData, error } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees (
+            id,
+            nombre,
+            apellido,
+            cargo,
+            email
+          )
+        `)
+        .eq('company_id', companyId)
+        .eq('estado', 'procesada')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Convertir datos de nómina a formato de pagos
+      const paymentEmployees: PaymentEmployee[] = (payrollData || []).map(payroll => ({
+        id: payroll.id,
+        employeeId: payroll.employee_id,
+        name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
+        position: payroll.employees.cargo || 'Sin cargo',
+        bankName: 'Bancolombia', // Por defecto
+        accountType: 'ahorros',
+        accountNumber: '****1234', // Por defecto
+        netPay: Number(payroll.neto_pagado || 0),
+        paymentStatus: 'pendiente',
+        paymentMethod: 'transferencia',
+        costCenter: 'Administración'
+      }));
+
+      setEmployees(paymentEmployees);
+
+      // Crear período actual basado en los datos
+      if (payrollData && payrollData.length > 0) {
+        const latestPeriod = payrollData[0].periodo;
+        setCurrentPeriod({
+          id: 'current',
+          periodName: latestPeriod,
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: new Date().toISOString().split('T')[0],
+          status: 'processing',
+          totalEmployees: paymentEmployees.length,
+          totalAmount: paymentEmployees.reduce((sum, emp) => sum + emp.netPay, 0),
+          totalPaid: 0,
+          totalFailed: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+
     } catch (error) {
+      console.error('Error loading payment data:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo actualizar la cuenta",
-        variant: "destructive",
+        title: "Error al cargar datos de pago",
+        description: "No se pudieron cargar los datos de pago",
+        variant: "destructive"
       });
-      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const validateBankAccount = (accountNumber: string, bankName: string): boolean => {
-    // Validaciones básicas por banco
-    const validations: Record<string, { minLength: number; maxLength: number; pattern?: RegExp }> = {
-      'bancolombia': { minLength: 10, maxLength: 11, pattern: /^\d+$/ },
-      'bogota': { minLength: 8, maxLength: 10, pattern: /^\d+$/ },
-      'davivienda': { minLength: 9, maxLength: 10, pattern: /^\d+$/ },
-      'nequi': { minLength: 10, maxLength: 10, pattern: /^\d+$/ }
-    };
+  useEffect(() => {
+    loadPaymentData();
+  }, []);
 
-    const bankValidation = validations[bankName.toLowerCase()];
-    if (!bankValidation) return true; // Si no hay validación específica, aceptar
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(employee => {
+      if (filters.paymentStatus && employee.paymentStatus !== filters.paymentStatus) {
+        return false;
+      }
+      if (filters.bankName && employee.bankName !== filters.bankName) {
+        return false;
+      }
+      if (filters.costCenter && employee.costCenter !== filters.costCenter) {
+        return false;
+      }
+      return true;
+    });
+  }, [employees, filters]);
 
-    const length = accountNumber.length;
-    if (length < bankValidation.minLength || length > bankValidation.maxLength) {
-      return false;
-    }
-
-    if (bankValidation.pattern && !bankValidation.pattern.test(accountNumber)) {
-      return false;
-    }
-
-    return true;
+  const updateFilters = (newFilters: Partial<PaymentFilters>) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
   };
 
-  const downloadPaymentReport = async (periodId: string) => {
-    setIsLoading(true);
+  const markAsPaid = async (employeeIds: string[], paymentDate: string) => {
     try {
-      // Simular descarga
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // Actualizar estado en la base de datos
+      const { error } = await supabase
+        .from('payrolls')
+        .update({ estado: 'pagada' })
+        .in('id', employeeIds);
+
+      if (error) throw error;
+
+      // Actualizar estado local
+      setEmployees(prev => prev.map(emp => 
+        employeeIds.includes(emp.id) 
+          ? { ...emp, paymentStatus: 'pagado', paymentDate }
+          : emp
+      ));
+
       toast({
-        title: "Reporte descargado",
-        description: "El reporte de pagos ha sido descargado",
+        title: "Pagos marcados como realizados",
+        description: `${employeeIds.length} empleados marcados como pagados`,
       });
-      
-      return true;
+
     } catch (error) {
+      console.error('Error marking as paid:', error);
       toast({
         title: "Error",
-        description: "No se pudo descargar el reporte",
-        variant: "destructive",
+        description: "No se pudieron marcar los pagos",
+        variant: "destructive"
       });
-      return false;
-    } finally {
-      setIsLoading(false);
     }
+  };
+
+  const generateBankFile = async (bankName: string, selectedEmployees: string[]) => {
+    const employeesToExport = employees.filter(emp => 
+      selectedEmployees.includes(emp.id)
+    );
+
+    // Simular generación de archivo
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    toast({
+      title: "Archivo generado",
+      description: `Archivo para ${bankName} generado exitosamente`,
+    });
+
+    return {
+      fileName: `dispersión_${bankName}_${new Date().toISOString().split('T')[0]}.txt`,
+      downloadUrl: '#'
+    };
   };
 
   return {
+    employees: filteredEmployees,
+    currentPeriod,
     isLoading,
-    isGeneratingFile,
-    isProcessingPayment,
-    markEmployeeAsPaid,
-    markMultipleAsPaid,
+    filters,
+    updateFilters,
+    markAsPaid,
     generateBankFile,
-    retryPayment,
-    updateBankAccount,
-    validateBankAccount,
-    downloadPaymentReport
+    refreshData: loadPaymentData,
+    totalEmployees: employees.length,
+    totalAmount: employees.reduce((sum, emp) => sum + emp.netPay, 0)
   };
 };

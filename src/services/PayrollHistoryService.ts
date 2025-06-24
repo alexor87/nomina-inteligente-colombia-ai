@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollLiquidationService } from './PayrollLiquidationService';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -13,10 +12,28 @@ export interface PayrollHistoryRecord {
 }
 
 export class PayrollHistoryService {
-  // Obtener resumen de períodos de nómina
+  static async getCurrentUserCompanyId(): Promise<string | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      return profile?.company_id || null;
+    } catch (error) {
+      console.error('Error getting company ID:', error);
+      return null;
+    }
+  }
+
+  // Obtener resumen de períodos de nómina reales
   static async getPayrollPeriods(): Promise<PayrollHistoryRecord[]> {
     try {
-      const companyId = await PayrollLiquidationService.getCurrentUserCompanyId();
+      const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) return [];
 
       const { data, error } = await supabase
@@ -54,19 +71,16 @@ export class PayrollHistoryService {
   // Reabrir un período de nómina
   static async reopenPeriod(periodo: string): Promise<void> {
     try {
-      const companyId = await PayrollLiquidationService.getCurrentUserCompanyId();
+      const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('No se encontró la empresa del usuario');
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('payrolls')
-        .select('id')
+        .update({ estado: 'borrador' })
         .eq('company_id', companyId)
         .eq('periodo', periodo);
 
       if (error) throw error;
-
-      const payrollIds = data?.map(p => p.id) || [];
-      await PayrollLiquidationService.reopenPayrollPeriod(payrollIds);
 
       // También actualizar comprobantes asociados
       await supabase
@@ -84,7 +98,7 @@ export class PayrollHistoryService {
   // Generar dispersión bancaria para un período
   static async generateBankDispersion(periodo: string): Promise<void> {
     try {
-      const companyId = await PayrollLiquidationService.getCurrentUserCompanyId();
+      const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('No se encontró la empresa del usuario');
 
       const { data, error } = await supabase

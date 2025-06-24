@@ -1,59 +1,90 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { ReportMetrics, ExportHistory } from '@/types/reports';
 
 export class ReportsMetricsService {
+  static async getCurrentUserCompanyId(): Promise<string | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      return profile?.company_id || null;
+    } catch (error) {
+      console.error('Error getting company ID:', error);
+      return null;
+    }
+  }
+
   static async getReportMetrics(): Promise<ReportMetrics> {
-    // Simular cálculo de métricas desde la base de datos
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return {
-      averageCostPerEmployee: 3455000,
-      averageBenefitLoad: 0.42,
-      totalMonthlyCost: 15120000,
-      employeeCount: 4
-    };
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        return {
+          averageCostPerEmployee: 0,
+          averageBenefitLoad: 0,
+          totalMonthlyCost: 0,
+          employeeCount: 0
+        };
+      }
+
+      // Obtener total de empleados activos
+      const { count: employeeCount } = await supabase
+        .from('employees')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', companyId)
+        .eq('estado', 'activo');
+
+      // Obtener datos de nómina del último mes
+      const lastMonth = new Date();
+      lastMonth.setMonth(lastMonth.getMonth() - 1);
+      
+      const { data: payrollData } = await supabase
+        .from('payrolls')
+        .select('neto_pagado, salario_base')
+        .eq('company_id', companyId)
+        .gte('created_at', lastMonth.toISOString());
+
+      const totalMonthlyCost = payrollData?.reduce((sum, payroll) => 
+        sum + (parseFloat(payroll.neto_pagado?.toString() || '0')), 0) || 0;
+
+      const averageCostPerEmployee = employeeCount ? totalMonthlyCost / employeeCount : 0;
+      const averageBenefitLoad = 0.42; // Este se puede calcular basado en aportes vs salario base
+
+      return {
+        averageCostPerEmployee,
+        averageBenefitLoad,
+        totalMonthlyCost,
+        employeeCount: employeeCount || 0
+      };
+    } catch (error) {
+      console.error('Error calculating report metrics:', error);
+      return {
+        averageCostPerEmployee: 0,
+        averageBenefitLoad: 0,
+        totalMonthlyCost: 0,
+        employeeCount: 0
+      };
+    }
   }
 
   static async loadExportHistory(): Promise<ExportHistory[]> {
-    // Mock data - En producción cargar desde Supabase
-    return [
-      {
-        id: '1',
-        reportType: 'payroll-summary',
-        fileName: 'resumen_nomina_enero_2025.xlsx',
-        format: 'excel',
-        generatedBy: 'admin@empresa.com',
-        generatedAt: '2025-01-15T10:30:00Z',
-        parameters: { 
-          dateRange: { from: '2025-01-01', to: '2025-01-31' }
-        },
-        downloadUrl: '#/download/resumen_nomina_enero_2025.xlsx'
-      },
-      {
-        id: '2',
-        reportType: 'labor-costs',
-        fileName: 'costos_laborales_enero_2025.pdf',
-        format: 'pdf',
-        generatedBy: 'contador@empresa.com',
-        generatedAt: '2025-01-20T14:15:00Z',
-        parameters: { 
-          costCenters: ['Administración', 'Ventas']
-        },
-        downloadUrl: '#/download/costos_laborales_enero_2025.pdf'
-      },
-      {
-        id: '3',
-        reportType: 'social-security',
-        fileName: 'aportes_seguridad_social_enero_2025.xlsx',
-        format: 'excel',
-        generatedBy: 'admin@empresa.com',
-        generatedAt: '2025-01-25T16:45:00Z',
-        parameters: { 
-          dateRange: { from: '2025-01-01', to: '2025-01-31' }
-        },
-        downloadUrl: '#/download/aportes_seguridad_social_enero_2025.xlsx'
-      }
-    ];
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) return [];
+
+      // Aquí se cargarían los exportes reales desde la base de datos
+      // Por ahora retornamos un array vacío ya que no hay tabla de historial
+      return [];
+    } catch (error) {
+      console.error('Error loading export history:', error);
+      return [];
+    }
   }
 
   static async getReportUsageStats(): Promise<{
@@ -61,25 +92,42 @@ export class ReportsMetricsService {
     exportsByFormat: Array<{ format: string; count: number }>;
     recentActivity: Array<{ action: string; timestamp: string; user: string }>;
   }> {
-    return {
-      mostUsedReports: [
-        { reportType: 'payroll-summary', count: 45 },
-        { reportType: 'labor-costs', count: 32 },
-        { reportType: 'social-security', count: 28 },
-        { reportType: 'novelty-history', count: 22 },
-        { reportType: 'income-retention', count: 15 },
-        { reportType: 'accounting-export', count: 12 }
-      ],
-      exportsByFormat: [
-        { format: 'excel', count: 89 },
-        { format: 'pdf', count: 45 },
-        { format: 'csv', count: 20 }
-      ],
-      recentActivity: [
-        { action: 'Exportó reporte de nómina', timestamp: '2025-01-25T16:45:00Z', user: 'admin@empresa.com' },
-        { action: 'Guardó filtro "Empleados Activos"', timestamp: '2025-01-25T15:30:00Z', user: 'contador@empresa.com' },
-        { action: 'Generó certificados CIR', timestamp: '2025-01-25T14:20:00Z', user: 'admin@empresa.com' }
-      ]
-    };
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        return {
+          mostUsedReports: [],
+          exportsByFormat: [],
+          recentActivity: []
+        };
+      }
+
+      // Obtener actividad reciente real
+      const { data: activity } = await supabase
+        .from('dashboard_activity')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const recentActivity = activity?.map(item => ({
+        action: item.action,
+        timestamp: item.created_at,
+        user: item.user_email
+      })) || [];
+
+      return {
+        mostUsedReports: [], // Se puede implementar con una tabla de tracking
+        exportsByFormat: [], // Se puede implementar con una tabla de tracking
+        recentActivity
+      };
+    } catch (error) {
+      console.error('Error getting report usage stats:', error);
+      return {
+        mostUsedReports: [],
+        exportsByFormat: [],
+        recentActivity: []
+      };
+    }
   }
 }

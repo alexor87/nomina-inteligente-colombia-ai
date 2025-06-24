@@ -5,6 +5,7 @@ import { ReportsDataService } from '@/services/ReportsDataService';
 import { ReportsExportService } from '@/services/ReportsExportService';
 import { ReportsFilterService } from '@/services/ReportsFilterService';
 import { ReportsMetricsService } from '@/services/ReportsMetricsService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useReports = () => {
   const [filters, setFilters] = useState<ReportFilters>({});
@@ -12,6 +13,24 @@ export const useReports = () => {
   const [exportHistory, setExportHistory] = useState<ExportHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeReportType, setActiveReportType] = useState<string>('payroll-summary');
+
+  const getCurrentUserCompanyId = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      return profile?.company_id || null;
+    } catch (error) {
+      console.error('Error getting company ID:', error);
+      return null;
+    }
+  };
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -40,7 +59,29 @@ export const useReports = () => {
   const getPayrollSummaryReport = async (filters: ReportFilters) => {
     setLoading(true);
     try {
-      return await ReportsDataService.getPayrollSummaryReport(filters);
+      const companyId = await getCurrentUserCompanyId();
+      if (!companyId) return [];
+
+      const { data, error } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees (nombre, apellido, cargo)
+        `)
+        .eq('company_id', companyId);
+
+      if (error) throw error;
+
+      return data?.map(payroll => ({
+        employeeName: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
+        position: payroll.employees.cargo || 'Sin cargo',
+        period: payroll.periodo,
+        baseSalary: Number(payroll.salario_base || 0),
+        totalEarnings: Number(payroll.total_devengado || 0),
+        totalDeductions: Number(payroll.total_deducciones || 0),
+        netPay: Number(payroll.neto_pagado || 0),
+        status: payroll.estado
+      })) || [];
     } catch (error) {
       console.error('Error getting payroll summary report:', error);
       throw error;
@@ -52,7 +93,25 @@ export const useReports = () => {
   const getLaborCostReport = async (filters: ReportFilters) => {
     setLoading(true);
     try {
-      return await ReportsDataService.getLaborCostReport(filters);
+      const companyId = await getCurrentUserCompanyId();
+      if (!companyId) return [];
+
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('estado', 'activo');
+
+      if (error) throw error;
+
+      return data?.map(employee => ({
+        employeeName: `${employee.nombre} ${employee.apellido}`,
+        position: employee.cargo || 'Sin cargo',
+        baseSalary: Number(employee.salario_base || 0),
+        benefitLoad: Number(employee.salario_base || 0) * 0.42, // 42% aproximado
+        totalCost: Number(employee.salario_base || 0) * 1.42,
+        costCenter: 'Administración' // Por defecto
+      })) || [];
     } catch (error) {
       console.error('Error getting labor cost report:', error);
       throw error;
@@ -64,7 +123,29 @@ export const useReports = () => {
   const getSocialSecurityReport = async (filters: ReportFilters) => {
     setLoading(true);
     try {
-      return await ReportsDataService.getSocialSecurityReport(filters);
+      const companyId = await getCurrentUserCompanyId();
+      if (!companyId) return [];
+
+      const { data, error } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees (nombre, apellido, eps, afp, arl)
+        `)
+        .eq('company_id', companyId);
+
+      if (error) throw error;
+
+      return data?.map(payroll => ({
+        employeeName: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
+        eps: payroll.employees.eps || 'No afiliado',
+        afp: payroll.employees.afp || 'No afiliado',
+        arl: payroll.employees.arl || 'No afiliado',
+        baseSalary: Number(payroll.salario_base || 0),
+        healthContribution: Number(payroll.salud_empleado || 0),
+        pensionContribution: Number(payroll.pension_empleado || 0),
+        period: payroll.periodo
+      })) || [];
     } catch (error) {
       console.error('Error getting social security report:', error);
       throw error;
@@ -76,7 +157,28 @@ export const useReports = () => {
   const getIncomeRetentionCertificates = async (year: number) => {
     setLoading(true);
     try {
-      return await ReportsDataService.getIncomeRetentionCertificates(year);
+      const companyId = await getCurrentUserCompanyId();
+      if (!companyId) return [];
+
+      const { data, error } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees (nombre, apellido, cedula)
+        `)
+        .eq('company_id', companyId)
+        .gte('created_at', `${year}-01-01`)
+        .lt('created_at', `${year + 1}-01-01`);
+
+      if (error) throw error;
+
+      return data?.map(payroll => ({
+        employeeName: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
+        cedula: payroll.employees.cedula,
+        totalWithholding: Number(payroll.retencion_fuente || 0),
+        totalIncome: Number(payroll.total_devengado || 0),
+        year: year
+      })) || [];
     } catch (error) {
       console.error('Error getting income retention certificates:', error);
       throw error;
@@ -88,7 +190,8 @@ export const useReports = () => {
   const getNoveltyHistoryReport = async (filters: ReportFilters) => {
     setLoading(true);
     try {
-      return await ReportsDataService.getNoveltyHistoryReport(filters);
+      // Por ahora retornamos array vacío ya que no hay tabla de novedades
+      return [];
     } catch (error) {
       console.error('Error getting novelty history report:', error);
       throw error;
@@ -100,7 +203,27 @@ export const useReports = () => {
   const getAccountingExports = async (filters: ReportFilters) => {
     setLoading(true);
     try {
-      return await ReportsDataService.getAccountingExports(filters);
+      const companyId = await getCurrentUserCompanyId();
+      if (!companyId) return [];
+
+      const { data, error } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees (nombre, apellido)
+        `)
+        .eq('company_id', companyId);
+
+      if (error) throw error;
+
+      return data?.map(payroll => ({
+        account: '510505', // Cuenta de gastos de personal
+        description: `Nómina ${payroll.employees.nombre} ${payroll.employees.apellido}`,
+        debit: Number(payroll.total_devengado || 0),
+        credit: 0,
+        period: payroll.periodo,
+        date: payroll.created_at
+      })) || [];
     } catch (error) {
       console.error('Error getting accounting exports:', error);
       throw error;
