@@ -1,4 +1,5 @@
 
+
 export const CONTRACT_TYPES = [
   { value: 'indefinido', label: 'Indefinido' },
   { value: 'fijo', label: 'Término Fijo' },
@@ -16,3 +17,56 @@ export const TIPOS_DOCUMENTO = [
   { value: 'PEP', label: 'Permiso Especial de Permanencia' },
   { value: 'PPT', label: 'Permiso por Protección Temporal' }
 ] as const;
+
+export const ARL_RISK_LEVELS = [
+  { value: 'I', label: 'Nivel I - Riesgo Mínimo' },
+  { value: 'II', label: 'Nivel II - Riesgo Bajo' },
+  { value: 'III', label: 'Nivel III - Riesgo Medio' },
+  { value: 'IV', label: 'Nivel IV - Riesgo Alto' },
+  { value: 'V', label: 'Nivel V - Riesgo Máximo' }
+] as const;
+
+export const CUSTOM_FIELD_TYPES = [
+  { value: 'text', label: 'Texto' },
+  { value: 'number', label: 'Número' },
+  { value: 'date', label: 'Fecha' },
+  { value: 'list', label: 'Lista de opciones' },
+  { value: 'boolean', label: 'Sí/No' }
+] as const;
+
+// Tipos para campos personalizados
+export interface CustomField {
+  id: string;
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'list' | 'boolean';
+  required: boolean;
+  options?: string[];
+  defaultValue?: string | number | boolean;
+}
+
+// Tipos para reglas de validación
+export interface ValidationRules {
+  allowWithoutEPS: boolean;
+  allowWithoutCajaCompensacion: boolean;
+  allowPendingAffiliations: boolean;
+  validateARLRiskLevel: boolean;
+  allowEditBaseSalary: boolean;
+}
+
+// Tipos para parámetros por defecto
+export interface DefaultParameters {
+  defaultContractType: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
+  standardWorkingHours: number;
+  suggestedPaymentPeriodicity: 'quincenal' | 'mensual';
+  suggestedCostCenter: string;
+  defaultARLRiskLevel: 'I' | 'II' | 'III' | 'IV' | 'V';
+}
+
+// Configuración global de empleados
+export interface EmployeeGlobalConfiguration {
+  customFields: CustomField[];
+  validationRules: ValidationRules;
+  defaultParameters: DefaultParameters;
+}
+
