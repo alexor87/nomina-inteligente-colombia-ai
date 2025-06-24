@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,9 +9,11 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { Info, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export const ContratoNominaSettings = () => {
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
   const [config, setConfig] = useState({
     // Tipos de contrato permitidos
     tiposContratoPermitidos: {
@@ -23,8 +24,9 @@ export const ContratoNominaSettings = () => {
       aprendiz: false
     },
     
-    // Configuración de periodicidad
+    // Configuración de periodicidad - ahora sincronizada con la DB
     diasPeriodicidad: 30,
+    periodicidadPago: 'mensual', // Ahora viene de la DB
     
     // Horas y jornada
     jornadaEstandar: 8,
@@ -55,6 +57,146 @@ export const ContratoNominaSettings = () => {
       liquidarAlFinalizar: true
     }
   });
+
+  // Cargar configuración al montar el componente
+  useEffect(() => {
+    loadConfiguration();
+  }, []);
+
+  const loadConfiguration = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Obtener el usuario actual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Error de autenticación",
+          description: "No se pudo obtener información del usuario.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Obtener el perfil del usuario para conseguir company_id
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profile?.company_id) {
+        console.error('Error obteniendo perfil:', profileError);
+        toast({
+          title: "Error al cargar perfil",
+          description: "No se pudo obtener el perfil del usuario.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Cargar configuración de periodicidad desde la DB
+      const { data: settings, error: settingsError } = await supabase
+        .from('company_settings')
+        .select('periodicity')
+        .eq('company_id', profile.company_id)
+        .single();
+
+      if (settingsError) {
+        console.log('No se encontró configuración de empresa, usando valores por defecto');
+      } else if (settings) {
+        // Mapear periodicidad y calcular días correspondientes
+        const periodicityToDays = {
+          'semanal': 7,
+          'quincenal': 15,
+          'mensual': 30,
+          'personalizado': 30
+        };
+
+        setConfig(prev => ({
+          ...prev,
+          periodicidadPago: settings.periodicity,
+          diasPeriodicidad: periodicityToDays[settings.periodicity as keyof typeof periodicityToDays] || 30
+        }));
+
+        console.log('Configuración cargada desde DB:', settings.periodicity);
+      }
+
+    } catch (error) {
+      console.error('Error loading configuration:', error);
+      toast({
+        title: "Error al cargar configuración",
+        description: "No se pudo cargar la configuración de contrato.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Actualizar periodicidad en la DB cuando cambie
+  const updatePeriodicityInDB = async (newPeriodicity: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profile?.company_id) {
+        console.error('Error obteniendo company_id para actualizar periodicidad');
+        return;
+      }
+
+      // Verificar si existe configuración
+      const { data: existingSettings, error: checkError } = await supabase
+        .from('company_settings')
+        .select('id')
+        .eq('company_id', profile.company_id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error verificando configuración existente:', checkError);
+        return;
+      }
+
+      if (existingSettings) {
+        // Si existe, actualizar
+        const { error } = await supabase
+          .from('company_settings')
+          .update({ 
+            periodicity: newPeriodicity,
+            updated_at: new Date().toISOString()
+          })
+          .eq('company_id', profile.company_id);
+
+        if (error) {
+          console.error('Error actualizando periodicidad:', error);
+          return;
+        }
+      } else {
+        // Si no existe, crear
+        const { error } = await supabase
+          .from('company_settings')
+          .insert({
+            company_id: profile.company_id,
+            periodicity: newPeriodicity
+          });
+
+        if (error) {
+          console.error('Error creando configuración de periodicidad:', error);
+          return;
+        }
+      }
+
+      console.log('Periodicidad actualizada en DB:', newPeriodicity);
+    } catch (error) {
+      console.error('Error updating periodicity in DB:', error);
+    }
+  };
 
   // Cálculos automáticos basados en periodicidad
   const getFrecuenciaEstimada = (dias: number) => {
@@ -110,6 +252,30 @@ export const ContratoNominaSettings = () => {
         [campo]: checked
       }
     }));
+  };
+
+  // Manejar cambio de periodicidad con sincronización a DB
+  const handlePeriodicityChange = async (value: string) => {
+    const periodicityToDays = {
+      'semanal': 7,
+      'quincenal': 15,
+      'mensual': 30,
+      'personalizado': 30
+    };
+
+    setConfig(prev => ({
+      ...prev,
+      periodicidadPago: value,
+      diasPeriodicidad: periodicityToDays[value as keyof typeof periodicityToDays] || 30
+    }));
+
+    // Actualizar en la base de datos
+    await updatePeriodicityInDB(value);
+
+    toast({
+      title: "Periodicidad actualizada",
+      description: `La periodicidad se ha cambiado a ${value} en todo el sistema.`,
+    });
   };
 
   const validateForm = () => {
@@ -176,6 +342,7 @@ export const ContratoNominaSettings = () => {
   };
 
   const handleRevert = () => {
+    loadConfiguration();
     toast({
       title: "Cambios revertidos",
       description: "Se han revertido todos los cambios no guardados.",
@@ -192,6 +359,7 @@ export const ContratoNominaSettings = () => {
         aprendiz: false
       },
       diasPeriodicidad: 30,
+      periodicidadPago: 'mensual',
       jornadaEstandar: 8,
       politicaRedondeo: 'decimales',
       prestacionesActivadas: {
@@ -241,6 +409,14 @@ export const ContratoNominaSettings = () => {
     }
     return null;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">Cargando configuración de contrato...</div>
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
@@ -305,20 +481,51 @@ export const ContratoNominaSettings = () => {
           </div>
         </Card>
 
-        {/* Sección 2: Configuración de Periodicidad de Pago */}
+        {/* Sección 2: Configuración de Periodicidad de Pago - SINCRONIZADA */}
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">🗓️ Configuración de Periodicidad de Pago</h3>
+          <div className="bg-blue-50 p-3 rounded-lg mb-4">
+            <p className="text-sm text-blue-700">
+              <Info className="h-4 w-4 inline mr-2" />
+              Esta configuración está sincronizada con el módulo de Empresa. Los cambios se reflejan en todo el sistema.
+            </p>
+          </div>
           
           <div className="space-y-4">
             <div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="diasPeriodicidad">¿Cada cuántos días paga nómina la empresa?</Label>
+                <Label htmlFor="periodicidadPago">Periodicidad de Pago</Label>
                 <Tooltip>
                   <TooltipTrigger>
                     <Info className="h-4 w-4 text-gray-400" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Ingresa cada cuántos días paga nómina tu empresa. El sistema ajustará automáticamente los cálculos de liquidación y acumulación de prestaciones.</p>
+                    <p>Selecciona la frecuencia con la que tu empresa paga la nómina. Esta configuración afecta todos los cálculos del sistema.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Select value={config.periodicidadPago} onValueChange={handlePeriodicityChange}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Seleccionar periodicidad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="semanal">Semanal</SelectItem>
+                  <SelectItem value="quincenal">Quincenal</SelectItem>
+                  <SelectItem value="mensual">Mensual</SelectItem>
+                  <SelectItem value="personalizado">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="diasPeriodicidad">Días por período</Label>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-gray-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Número de días que cubre cada período de pago. Se actualiza automáticamente según la periodicidad seleccionada.</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -331,6 +538,7 @@ export const ContratoNominaSettings = () => {
                 min="1"
                 max="31"
                 className="mt-1 max-w-xs"
+                disabled={config.periodicidadPago !== 'personalizado'}
               />
             </div>
 
