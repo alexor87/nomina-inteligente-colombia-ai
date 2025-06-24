@@ -33,13 +33,29 @@ export interface DashboardActivity {
 export class DashboardService {
   static async getCurrentCompanyId(): Promise<string | null> {
     try {
-      const { data: profile } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('No authenticated user found');
+        return null;
+      }
+
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('company_id')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('user_id', user.id)
         .single();
       
-      return profile?.company_id || null;
+      if (error) {
+        console.error('Error getting user profile:', error);
+        return null;
+      }
+
+      if (!profile?.company_id) {
+        console.warn('User profile found but no company_id assigned');
+        return null;
+      }
+
+      return profile.company_id;
     } catch (error) {
       console.error('Error getting current company ID:', error);
       return null;
@@ -50,7 +66,14 @@ export class DashboardService {
     try {
       const companyId = await this.getCurrentCompanyId();
       if (!companyId) {
-        throw new Error('No company ID found');
+        console.log('No company ID found, returning default metrics');
+        return {
+          totalEmpleados: 0,
+          nominasProcesadas: 0,
+          alertasLegales: 0,
+          gastosNomina: 0,
+          tendenciaMensual: 0
+        };
       }
 
       // Obtener total de empleados para la empresa actual

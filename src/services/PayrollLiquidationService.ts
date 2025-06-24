@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollCalculationService } from './PayrollCalculationService';
@@ -12,15 +13,28 @@ export class PayrollLiquidationService {
   static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      if (!user) {
+        console.log('No authenticated user found');
+        return null;
+      }
 
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
 
-      return profile?.company_id || null;
+      if (error) {
+        console.error('Error getting user profile:', error);
+        return null;
+      }
+
+      if (!profile?.company_id) {
+        console.warn('User profile found but no company_id assigned');
+        return null;
+      }
+
+      return profile.company_id;
     } catch (error) {
       console.error('Error getting user company ID:', error);
       return null;
@@ -115,7 +129,10 @@ export class PayrollLiquidationService {
         .eq('company_id', companyId)
         .eq('estado', 'activo');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading employees:', error);
+        return this.getSampleEmployees();
+      }
 
       if (!data || data.length === 0) {
         console.log('No active employees found, returning sample data');

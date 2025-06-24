@@ -27,15 +27,31 @@ export class PayrollPeriodService {
   static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      if (!user) {
+        console.log('No authenticated user found');
+        return null;
+      }
 
-      const { data: profile } = await supabase
+      console.log('Getting company ID for user:', user.id);
+
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
 
-      return profile?.company_id || null;
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+
+      if (!profile?.company_id) {
+        console.warn('User profile found but no company_id assigned');
+        return null;
+      }
+
+      console.log('Company ID found:', profile.company_id);
+      return profile.company_id;
     } catch (error) {
       console.error('Error getting user company ID:', error);
       return null;
@@ -46,7 +62,10 @@ export class PayrollPeriodService {
   static async getCompanySettings(): Promise<CompanySettings | null> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) return null;
+      if (!companyId) {
+        console.log('No company ID available for settings');
+        return null;
+      }
 
       const { data, error } = await supabase
         .from('company_settings')
@@ -54,7 +73,11 @@ export class PayrollPeriodService {
         .eq('company_id', companyId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.log('No company settings found, will use defaults');
+        return null;
+      }
+      
       return data as CompanySettings;
     } catch (error) {
       console.error('Error getting company settings:', error);
@@ -116,7 +139,10 @@ export class PayrollPeriodService {
   static async createPayrollPeriod(startDate: string, endDate: string, periodType: string): Promise<PayrollPeriod | null> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) throw new Error('No company ID found');
+      if (!companyId) {
+        console.error('Cannot create payroll period: No company ID found');
+        return null;
+      }
 
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -133,7 +159,12 @@ export class PayrollPeriodService {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting payroll period:', error);
+        return null;
+      }
+      
+      console.log('Payroll period created successfully:', data);
       return data as PayrollPeriod;
     } catch (error) {
       console.error('Error creating payroll period:', error);

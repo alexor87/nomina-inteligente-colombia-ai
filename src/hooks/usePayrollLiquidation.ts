@@ -43,18 +43,25 @@ export const usePayrollLiquidation = () => {
         if (startDate && endDate) {
           activePeriod = await PayrollPeriodService.createPayrollPeriod(startDate, endDate, periodicity);
           
-          toast({
-            title: "Nuevo período creado",
-            description: `Período ${PayrollPeriodService.formatPeriodText(startDate, endDate)} creado automáticamente`
-          });
+          if (activePeriod) {
+            toast({
+              title: "Nuevo período creado",
+              description: `Período ${PayrollPeriodService.formatPeriodText(startDate, endDate)} creado automáticamente`
+            });
+          } else {
+            console.warn('Could not create payroll period - no company ID available');
+            toast({
+              title: "Configuración requerida",
+              description: "Para usar este módulo, necesitas tener una empresa asignada a tu usuario.",
+              variant: "destructive"
+            });
+          }
         }
       }
       
       if (activePeriod) {
         setCurrentPeriod(activePeriod);
         console.log('Active period loaded:', activePeriod);
-      } else {
-        throw new Error('No se pudo crear o cargar el período de nómina');
       }
     } catch (error) {
       console.error('Error initializing period:', error);
