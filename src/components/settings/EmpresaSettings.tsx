@@ -387,17 +387,58 @@ export const EmpresaSettings = () => {
 
       // Actualizar configuración de periodicidad si se especificó
       if (config.periodicidadPago) {
-        const { error: settingsError } = await supabase
+        console.log('Actualizando periodicidad a:', config.periodicidadPago);
+        
+        // Primero verificar si existe configuración
+        const { data: existingSettings, error: checkError } = await supabase
           .from('company_settings')
-          .upsert({
-            company_id: profile.company_id,
-            periodicity: config.periodicidadPago
-          });
+          .select('id')
+          .eq('company_id', profile.company_id)
+          .maybeSingle();
 
-        if (settingsError) {
-          console.error('Error actualizando configuración:', settingsError);
-          throw settingsError;
+        if (checkError) {
+          console.error('Error verificando configuración existente:', checkError);
+          throw checkError;
         }
+
+        let settingsResult;
+        
+        if (existingSettings) {
+          // Si existe, actualizar
+          const { data, error } = await supabase
+            .from('company_settings')
+            .update({ 
+              periodicity: config.periodicidadPago,
+              updated_at: new Date().toISOString()
+            })
+            .eq('company_id', profile.company_id)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error actualizando configuración:', error);
+            throw error;
+          }
+          settingsResult = data;
+        } else {
+          // Si no existe, crear
+          const { data, error } = await supabase
+            .from('company_settings')
+            .insert({
+              company_id: profile.company_id,
+              periodicity: config.periodicidadPago
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error creando configuración:', error);
+            throw error;
+          }
+          settingsResult = data;
+        }
+
+        console.log('Configuración de periodicidad guardada:', settingsResult);
       }
 
       toast({
