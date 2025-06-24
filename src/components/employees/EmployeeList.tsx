@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -220,9 +221,12 @@ export const EmployeeList = () => {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-semibold text-gray-900">
+                            <button 
+                              onClick={() => openEmployeeProfile(employee)}
+                              className="font-semibold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer text-left"
+                            >
                               {employee.nombre} {employee.apellido}
-                            </p>
+                            </button>
                             <p className="text-sm text-gray-600">{employee.cedula}</p>
                           </div>
                         </div>
