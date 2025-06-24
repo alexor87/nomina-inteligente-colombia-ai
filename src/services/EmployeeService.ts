@@ -10,25 +10,49 @@ export class EmployeeService {
       throw new Error('No se encontró la empresa del usuario. Asegúrate de estar autenticado.');
     }
 
+    // Validar y limpiar el estado específicamente
+    const validStates = ['activo', 'inactivo', 'vacaciones', 'incapacidad'];
+    const estadoLimpio = employeeData.estado && validStates.includes(employeeData.estado) 
+      ? employeeData.estado 
+      : 'activo';
+
+    // Validar y limpiar el tipo de contrato
+    const validContractTypes = ['indefinido', 'fijo', 'obra', 'aprendizaje'];
+    const tipoContratoLimpio = employeeData.tipoContrato && validContractTypes.includes(employeeData.tipoContrato)
+      ? employeeData.tipoContrato
+      : 'indefinido';
+
+    // Validar y limpiar el tipo de documento
+    const validDocumentTypes = ['CC', 'TI', 'CE', 'PA', 'RC', 'NIT', 'PEP', 'PPT'];
+    const tipoDocumentoLimpio = employeeData.tipoDocumento && validDocumentTypes.includes(employeeData.tipoDocumento)
+      ? employeeData.tipoDocumento
+      : 'CC';
+
+    // Validar y limpiar el estado de afiliación
+    const validAffiliationStates = ['completa', 'pendiente', 'inconsistente'];
+    const estadoAfiliacionLimpio = employeeData.estadoAfiliacion && validAffiliationStates.includes(employeeData.estadoAfiliacion)
+      ? employeeData.estadoAfiliacion
+      : 'pendiente';
+
     // Limpiar y validar datos antes de insertar
     const cleanedData = {
       company_id: companyId,
       cedula: String(employeeData.cedula || '').trim(),
-      tipo_documento: employeeData.tipoDocumento || 'CC',
+      tipo_documento: tipoDocumentoLimpio,
       nombre: String(employeeData.nombre || '').trim(),
       apellido: String(employeeData.apellido || '').trim(),
       email: employeeData.email ? String(employeeData.email).trim() : null,
       telefono: employeeData.telefono ? String(employeeData.telefono).trim() : null,
       salario_base: Number(employeeData.salarioBase) || 0,
-      tipo_contrato: employeeData.tipoContrato || 'indefinido',
+      tipo_contrato: tipoContratoLimpio,
       fecha_ingreso: employeeData.fechaIngreso || new Date().toISOString().split('T')[0],
-      estado: employeeData.estado || 'activo',
+      estado: estadoLimpio,
       eps: employeeData.eps ? String(employeeData.eps).trim() : null,
       afp: employeeData.afp ? String(employeeData.afp).trim() : null,
       arl: employeeData.arl ? String(employeeData.arl).trim() : null,
       caja_compensacion: employeeData.cajaCompensacion ? String(employeeData.cajaCompensacion).trim() : null,
       cargo: employeeData.cargo ? String(employeeData.cargo).trim() : null,
-      estado_afiliacion: employeeData.estadoAfiliacion || 'pendiente',
+      estado_afiliacion: estadoAfiliacionLimpio,
       banco: (employeeData as any).banco ? String((employeeData as any).banco).trim() : null,
       tipo_cuenta: (employeeData as any).tipoCuenta || 'ahorros',
       numero_cuenta: (employeeData as any).numeroCuenta ? String((employeeData as any).numeroCuenta).trim() : null,
@@ -48,6 +72,9 @@ export class EmployeeService {
 
     console.log('Creando empleado para empresa:', companyId);
     console.log('Datos limpiados a insertar:', cleanedData);
+    console.log('Estado validado:', estadoLimpio);
+    console.log('Tipo contrato validado:', tipoContratoLimpio);
+    console.log('Tipo documento validado:', tipoDocumentoLimpio);
 
     try {
       const { data, error } = await supabase
@@ -63,6 +90,7 @@ export class EmployeeService {
           hint: error.hint,
           code: error.code
         });
+        console.error('Datos que causaron el error:', cleanedData);
         throw new Error(`Error al crear empleado: ${error.message}`);
       }
 
