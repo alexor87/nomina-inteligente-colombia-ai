@@ -23,7 +23,6 @@ import {
 import { EmployeeFiltersComponent } from './EmployeeFilters';
 import { EmployeeFormModal } from './EmployeeFormModal';
 import { EmployeeDetails } from './EmployeeDetails';
-import { ButtonValidationPanel } from '@/components/debug/ButtonValidationPanel';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
@@ -40,8 +39,7 @@ import {
   Download,
   Upload,
   UserPlus,
-  Loader2,
-  Settings
+  Loader2
 } from 'lucide-react';
 
 export const EmployeeList = () => {
@@ -67,7 +65,6 @@ export const EmployeeList = () => {
   // Estados para los modales
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
-  const [showValidationPanel, setShowValidationPanel] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
@@ -179,15 +176,6 @@ export const EmployeeList = () => {
         </div>
         
         <div className="flex items-center space-x-3">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowValidationPanel(true)}
-            className="flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Validar Funciones
-          </Button>
-          
           <Button variant="outline" onClick={() => exportEmployees('excel')}>
             <Download className="h-4 w-4 mr-2" />
             Exportar
@@ -204,20 +192,6 @@ export const EmployeeList = () => {
           </Button>
         </div>
       </div>
-
-      {/* Panel de validación */}
-      {showValidationPanel && (
-        <div className="mb-6">
-          <ButtonValidationPanel />
-          <Button 
-            variant="ghost" 
-            onClick={() => setShowValidationPanel(false)}
-            className="mt-2"
-          >
-            Ocultar Panel de Validación
-          </Button>
-        </div>
-      )}
 
       {/* Filtros */}
       <EmployeeFiltersComponent
