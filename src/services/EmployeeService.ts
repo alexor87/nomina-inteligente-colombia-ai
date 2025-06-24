@@ -10,45 +10,68 @@ export class EmployeeService {
       throw new Error('No se encontró la empresa del usuario. Asegúrate de estar autenticado.');
     }
 
-    // Mapear los datos del Employee interface a las columnas de la base de datos
-    const supabaseData = {
+    // Limpiar y validar datos antes de insertar
+    const cleanedData = {
       company_id: companyId,
-      cedula: employeeData.cedula,
-      tipo_documento: employeeData.tipoDocumento,
-      nombre: employeeData.nombre,
-      apellido: employeeData.apellido,
-      email: employeeData.email || null,
-      telefono: employeeData.telefono || null,
-      salario_base: employeeData.salarioBase,
-      tipo_contrato: employeeData.tipoContrato,
-      fecha_ingreso: employeeData.fechaIngreso,
-      estado: employeeData.estado,
-      eps: employeeData.eps || null,
-      afp: employeeData.afp || null,
-      arl: employeeData.arl || null,
-      caja_compensacion: employeeData.cajaCompensacion || null,
-      cargo: employeeData.cargo || null,
-      estado_afiliacion: employeeData.estadoAfiliacion,
-      banco: (employeeData as any).banco || null,
+      cedula: String(employeeData.cedula || '').trim(),
+      tipo_documento: employeeData.tipoDocumento || 'CC',
+      nombre: String(employeeData.nombre || '').trim(),
+      apellido: String(employeeData.apellido || '').trim(),
+      email: employeeData.email ? String(employeeData.email).trim() : null,
+      telefono: employeeData.telefono ? String(employeeData.telefono).trim() : null,
+      salario_base: Number(employeeData.salarioBase) || 0,
+      tipo_contrato: employeeData.tipoContrato || 'indefinido',
+      fecha_ingreso: employeeData.fechaIngreso || new Date().toISOString().split('T')[0],
+      estado: employeeData.estado || 'activo',
+      eps: employeeData.eps ? String(employeeData.eps).trim() : null,
+      afp: employeeData.afp ? String(employeeData.afp).trim() : null,
+      arl: employeeData.arl ? String(employeeData.arl).trim() : null,
+      caja_compensacion: employeeData.cajaCompensacion ? String(employeeData.cajaCompensacion).trim() : null,
+      cargo: employeeData.cargo ? String(employeeData.cargo).trim() : null,
+      estado_afiliacion: employeeData.estadoAfiliacion || 'pendiente',
+      banco: (employeeData as any).banco ? String((employeeData as any).banco).trim() : null,
       tipo_cuenta: (employeeData as any).tipoCuenta || 'ahorros',
-      numero_cuenta: (employeeData as any).numeroCuenta || null,
-      titular_cuenta: (employeeData as any).titularCuenta || null
+      numero_cuenta: (employeeData as any).numeroCuenta ? String((employeeData as any).numeroCuenta).trim() : null,
+      titular_cuenta: (employeeData as any).titularCuenta ? String((employeeData as any).titularCuenta).trim() : null
     };
 
-    console.log('Creando empleado para empresa:', companyId);
-    console.log('Datos a insertar:', supabaseData);
-
-    const { data, error } = await supabase
-      .from('employees')
-      .insert(supabaseData)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error en Supabase:', error);
-      throw error;
+    // Validaciones básicas
+    if (!cleanedData.cedula) {
+      throw new Error('El número de documento es requerido');
     }
-    return data;
+    if (!cleanedData.nombre) {
+      throw new Error('El nombre es requerido');
+    }
+    if (cleanedData.salario_base <= 0) {
+      throw new Error('El salario base debe ser mayor a 0');
+    }
+
+    console.log('Creando empleado para empresa:', companyId);
+    console.log('Datos limpiados a insertar:', cleanedData);
+
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .insert(cleanedData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error detallado de Supabase:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw new Error(`Error al crear empleado: ${error.message}`);
+      }
+
+      console.log('Empleado creado exitosamente:', data);
+      return data;
+    } catch (err: any) {
+      console.error('Error durante la inserción:', err);
+      throw err;
+    }
   }
 
   static async update(id: string, updates: Partial<Employee>) {
