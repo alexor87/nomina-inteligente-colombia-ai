@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
 
@@ -106,8 +105,8 @@ export class NovedadesService {
         subtipo: novedadData.subtipo || null,
         fecha_inicio: novedadData.fecha_inicio || null,
         fecha_fin: novedadData.fecha_fin || null,
-        dias: safeNumber(novedadData.dias),
-        horas: safeNumber(novedadData.horas),
+        dias: safeNumber(novedadData.dias) || null,
+        horas: safeNumber(novedadData.horas) || null,
         observacion: novedadData.observacion || null,
         base_calculo: novedadData.base_calculo || null,
         adjunto_url: novedadData.adjunto_url || null
@@ -137,9 +136,14 @@ export class NovedadesService {
           message: error.message,
           details: error.details,
           hint: error.hint,
-          code: error.code
+          code: error.code,
+          fullError: error
         });
-        throw error;
+        
+        // Log the complete error object
+        console.error('❌ Error completo Supabase:', JSON.stringify(error, null, 2));
+        
+        throw new Error(`Database error: ${error.message} ${error.details ? '- ' + error.details : ''} ${error.hint ? '- Hint: ' + error.hint : ''}`);
       }
 
       console.log('✅ Novedad creada exitosamente:', data);
