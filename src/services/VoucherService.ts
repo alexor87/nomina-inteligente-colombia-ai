@@ -1,14 +1,15 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollVoucher } from '@/types/vouchers';
 
 export class VoucherService {
   static async loadVouchers(): Promise<PayrollVoucher[]> {
     try {
-      // Primero verificar si existen nóminas procesadas
+      // Primero verificar si existen nóminas aprobadas/cerradas
       const { data: payrollsExist, error: payrollError } = await supabase
         .from('payrolls')
         .select('id')
-        .eq('estado', 'procesada')
+        .in('estado', ['aprobada', 'cerrada']) // Estados que indican nóminas procesadas
         .limit(1);
 
       if (payrollError) throw payrollError;
