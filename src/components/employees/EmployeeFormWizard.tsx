@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Employee } from '@/types';
-import { CONTRACT_TYPES } from '@/types/employee-config';
+import { CONTRACT_TYPES, TIPOS_DOCUMENTO } from '@/types/employee-config';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
@@ -18,6 +18,7 @@ import { CheckCircle, User, Briefcase, CreditCard, Shield, ChevronLeft, ChevronR
 
 interface EmployeeFormData {
   cedula: string;
+  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
   apellido: string;
   email: string;
@@ -67,6 +68,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
   const { register, handleSubmit, formState: { errors }, setValue, watch, trigger } = useForm<EmployeeFormData>({
     defaultValues: {
       cedula: employee?.cedula || '',
+      tipoDocumento: employee?.tipoDocumento || 'CC',
       nombre: employee?.nombre || '',
       apellido: employee?.apellido || '',
       email: employee?.email || '',
@@ -133,7 +135,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
 
   const getFieldsForStep = (step: number): (keyof EmployeeFormData)[] => {
     switch (step) {
-      case 1: return ['cedula', 'nombre', 'apellido', 'email', 'telefono'];
+      case 1: return ['tipoDocumento', 'cedula', 'nombre', 'apellido', 'email', 'telefono'];
       case 2: return ['salarioBase', 'tipoContrato', 'fechaIngreso', 'cargo'];
       case 3: return ['banco', 'tipoCuenta', 'numeroCuenta', 'titularCuenta'];
       case 4: return ['eps', 'afp', 'arl', 'cajaCompensacion'];
@@ -163,6 +165,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
     const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
       empresaId: companyId,
       cedula: data.cedula,
+      tipoDocumento: data.tipoDocumento,
       nombre: data.nombre,
       apellido: data.apellido,
       email: data.email,
@@ -227,10 +230,27 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <Label htmlFor="cedula" className="text-sm font-medium">Cédula *</Label>
+          <Label htmlFor="tipoDocumento" className="text-sm font-medium">Tipo de Documento *</Label>
+          <Select onValueChange={(value) => setValue('tipoDocumento', value as any)}>
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder="Seleccionar tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              {TIPOS_DOCUMENTO.map((tipo) => (
+                <SelectItem key={tipo.value} value={tipo.value}>
+                  {tipo.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.tipoDocumento && <p className="text-red-500 text-sm">{errors.tipoDocumento.message}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="cedula" className="text-sm font-medium">Número de Documento *</Label>
           <Input
             id="cedula"
-            {...register('cedula', { required: 'La cédula es requerida' })}
+            {...register('cedula', { required: 'El número de documento es requerido' })}
             placeholder="1234567890"
             className="h-12"
           />
@@ -271,7 +291,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
           {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
         </div>
 
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2">
           <Label htmlFor="telefono" className="text-sm font-medium">Teléfono</Label>
           <Input
             id="telefono"

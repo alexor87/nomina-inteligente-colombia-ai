@@ -1,7 +1,9 @@
+
 // Tipos principales de la aplicación
 export interface Employee {
   id: string;
   cedula: string;
+  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
   apellido: string;
   email: string;

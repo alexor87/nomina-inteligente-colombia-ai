@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types';
 import { EmployeeDataService } from './EmployeeDataService';
@@ -14,6 +15,7 @@ export class EmployeeService {
     const supabaseData = {
       company_id: companyId, // Usar la empresa del usuario autenticado
       cedula: employeeData.cedula,
+      tipo_documento: employeeData.tipoDocumento,
       nombre: employeeData.nombre,
       apellido: employeeData.apellido,
       email: employeeData.email,
@@ -55,6 +57,7 @@ export class EmployeeService {
     const supabaseData: any = {};
     
     if (updates.cedula !== undefined) supabaseData.cedula = updates.cedula;
+    if (updates.tipoDocumento !== undefined) supabaseData.tipo_documento = updates.tipoDocumento;
     if (updates.nombre !== undefined) supabaseData.nombre = updates.nombre;
     if (updates.apellido !== undefined) supabaseData.apellido = updates.apellido;
     if (updates.email !== undefined) supabaseData.email = updates.email;

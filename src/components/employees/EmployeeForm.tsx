@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Employee } from '@/types';
-import { CONTRACT_TYPES } from '@/types/employee-config';
+import { CONTRACT_TYPES, TIPOS_DOCUMENTO } from '@/types/employee-config';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
@@ -20,6 +21,7 @@ interface EmployeeFormProps {
 
 interface EmployeeFormData {
   cedula: string;
+  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
   apellido: string;
   email: string;
@@ -66,6 +68,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<EmployeeFormData>({
     defaultValues: {
       cedula: employee?.cedula || '',
+      tipoDocumento: employee?.tipoDocumento || 'CC',
       nombre: employee?.nombre || '',
       apellido: employee?.apellido || '',
       email: employee?.email || '',
@@ -123,6 +126,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
     const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
       empresaId: companyId,
       cedula: data.cedula,
+      tipoDocumento: data.tipoDocumento,
       nombre: data.nombre,
       apellido: data.apellido,
       email: data.email,
@@ -168,10 +172,26 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
           <h3 className="text-lg font-medium text-gray-900 mb-4">Información Personal</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="cedula">Cédula *</Label>
+              <Label htmlFor="tipoDocumento">Tipo de Documento *</Label>
+              <Select onValueChange={(value) => setValue('tipoDocumento', value as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS_DOCUMENTO.map((tipo) => (
+                    <SelectItem key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="cedula">Número de Documento *</Label>
               <Input
                 id="cedula"
-                {...register('cedula', { required: 'La cédula es requerida' })}
+                {...register('cedula', { required: 'El número de documento es requerido' })}
                 placeholder="12345678"
               />
               {errors.cedula && <p className="text-red-500 text-sm mt-1">{errors.cedula.message}</p>}

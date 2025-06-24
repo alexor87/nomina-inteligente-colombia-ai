@@ -250,6 +250,7 @@ export type Database = {
           telefono: string | null
           tipo_contrato: string | null
           tipo_cuenta: string | null
+          tipo_documento: string | null
           titular_cuenta: string | null
           updated_at: string
         }
@@ -275,6 +276,7 @@ export type Database = {
           telefono?: string | null
           tipo_contrato?: string | null
           tipo_cuenta?: string | null
+          tipo_documento?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
@@ -300,6 +302,7 @@ export type Database = {
           telefono?: string | null
           tipo_contrato?: string | null
           tipo_cuenta?: string | null
+          tipo_documento?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
