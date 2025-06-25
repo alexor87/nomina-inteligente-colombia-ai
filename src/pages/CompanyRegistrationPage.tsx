@@ -131,25 +131,27 @@ export const CompanyRegistrationPage = () => {
       
       toast({
         title: "¡Registro exitoso!",
-        description: "Tu empresa ha sido registrada. Revisa tu email para confirmar tu cuenta y luego podrás iniciar sesión.",
+        description: "Tu empresa ha sido registrada exitosamente. Ya puedes acceder al dashboard.",
       });
 
-      // Redirigir a login después de un breve delay
+      // Redirigir al dashboard directamente ya que el usuario está autenticado
       setTimeout(() => {
-        navigate('/auth');
-      }, 3000);
+        navigate('/dashboard');
+      }, 2000);
     } catch (error: any) {
       console.error('Error creating company:', error);
       
       // Manejar errores específicos
       let errorMessage = "Ha ocurrido un error inesperado";
       
-      if (error.message?.includes('User already registered')) {
+      if (error.message?.includes('User already registered') || error.message?.includes('already been registered')) {
         errorMessage = "Ya existe un usuario con este email";
       } else if (error.message?.includes('Invalid email')) {
         errorMessage = "El formato del email no es válido";
       } else if (error.message?.includes('Password should be at least 6 characters')) {
         errorMessage = "La contraseña debe tener al menos 6 caracteres";
+      } else if (error.message?.includes('Signup is disabled')) {
+        errorMessage = "El registro está temporalmente deshabilitado";
       } else if (error.message) {
         errorMessage = error.message;
       }

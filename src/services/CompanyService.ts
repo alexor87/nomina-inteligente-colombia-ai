@@ -60,16 +60,27 @@ export class CompanyService {
 
       console.log('User registered successfully:', authData.user.id);
 
-      // Intentar crear la empresa usando la función simple (sin parámetros de usuario)
+      // Ahora necesitamos iniciar sesión para poder crear la empresa
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: data.user_email,
+        password: data.user_password
+      });
+
+      if (signInError) {
+        console.error('Sign in error:', signInError);
+        throw signInError;
+      }
+
+      console.log('User signed in successfully');
+
+      // Ahora crear la empresa usando la función original (sin parámetros de usuario)
       const { data: result, error } = await supabase.rpc('create_company_with_setup', {
         p_nit: data.nit,
         p_razon_social: data.razon_social,
         p_email: data.email,
         p_telefono: data.telefono,
         p_ciudad: data.ciudad || 'Bogotá',
-        p_plan: data.plan,
-        p_first_name: data.first_name,
-        p_last_name: data.last_name
+        p_plan: data.plan
       });
 
       if (error) {
@@ -78,6 +89,21 @@ export class CompanyService {
       }
 
       console.log('Company created successfully:', result);
+      
+      // Actualizar el perfil del usuario con los nombres
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: data.first_name,
+          last_name: data.last_name
+        })
+        .eq('user_id', signInData.user.id);
+
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+        // No lanzamos error aquí porque la empresa ya se creó
+      }
+
       return result;
     } catch (error) {
       console.error('Error creating company with user:', error);
