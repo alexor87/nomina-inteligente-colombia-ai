@@ -34,41 +34,41 @@ const Sidebar = ({ collapsed = false, onToggle }: SidebarProps) => {
       name: 'Empleados',
       href: '/employees',
       icon: Users,
-      module: 'employees'
+      module: 'empleados'
     },
     {
       name: 'Nómina',
       href: '/payroll-backend',
       icon: Calculator,
-      module: 'payroll'
+      module: 'nomina'
     },
     {
       name: 'Pagos',
       href: '/payments',
       icon: CreditCard,
-      module: 'payments'
+      module: 'pagos'
     },
     {
       name: 'Comprobantes',
       href: '/vouchers',
       icon: FileText,
-      module: 'vouchers'
+      module: 'comprobantes'
     },
     {
       name: 'Reportes',
       href: '/reports',
       icon: BarChart3,
-      module: 'reports'
+      module: 'reportes'
     },
     {
       name: 'Configuración',
       href: '/settings',
       icon: Settings,
-      module: 'settings'
+      module: 'configuracion'
     }
   ];
 
-  // Add super admin item if user is super admin
+  // Add super admin item ONLY if user is actually a super admin
   if (isSaasAdmin) {
     navigationItems.push({
       name: 'Super Admin',
@@ -112,8 +112,11 @@ const Sidebar = ({ collapsed = false, onToggle }: SidebarProps) => {
       <nav className="flex-1 p-2">
         <div className="space-y-1">
           {navigationItems.map((item) => {
-            // Check if user can access this module
-            if (!canAccessModule(item.module)) {
+            // For super admins: allow access to everything
+            // For regular users: check module permissions
+            const hasAccess = isSaasAdmin || canAccessModule(item.module);
+            
+            if (!hasAccess) {
               return null;
             }
 
