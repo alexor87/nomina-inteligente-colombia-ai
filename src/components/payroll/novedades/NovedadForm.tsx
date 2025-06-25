@@ -44,6 +44,8 @@ export const NovedadForm = ({
   const subtipo = watch('subtipo');
   const dias = watch('dias');
   const horas = watch('horas');
+  const fechaInicio = watch('fecha_inicio');
+  const fechaFin = watch('fecha_fin');
   const manualValue = watch('valor');
 
   // Determinar categoría actual con type assertion segura
@@ -62,6 +64,21 @@ export const NovedadForm = ({
 
   const currentTypeConfig = getCurrentTypeConfig();
 
+  // Función para calcular días entre fechas
+  const calculateDaysBetweenDates = (startDate: string, endDate: string): number => {
+    if (!startDate || !endDate) return 0;
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (start > end) return 0;
+    
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
+    
+    return diffDays;
+  };
+
   // Actualizar categoría cuando cambie el tipo de novedad
   useEffect(() => {
     const newCategory = Object.entries(NOVEDAD_CATEGORIES).find(([_, cat]) => 
@@ -72,6 +89,22 @@ export const NovedadForm = ({
       setSelectedCategory(newCategory);
     }
   }, [tipoNovedad, selectedCategory]);
+
+  // Calcular días automáticamente cuando cambien las fechas
+  useEffect(() => {
+    if (currentTypeConfig?.requiere_dias && fechaInicio && fechaFin) {
+      const calculatedDays = calculateDaysBetweenDates(fechaInicio, fechaFin);
+      console.log('📅 Calculando días automáticamente:', {
+        fechaInicio,
+        fechaFin,
+        calculatedDays
+      });
+      
+      if (calculatedDays > 0 && calculatedDays !== dias) {
+        setValue('dias', calculatedDays);
+      }
+    }
+  }, [fechaInicio, fechaFin, tipoNovedad, currentTypeConfig, setValue, dias]);
 
   // Calcular valor automáticamente
   useEffect(() => {
@@ -89,9 +122,17 @@ export const NovedadForm = ({
       let canCalculate = false;
       
       // Convertir valores de forma segura
-      const diasNum = typeof dias === 'number' && !isNaN(dias) ? dias : 0;
-      const horasNum = typeof horas === 'number' && !isNaN(horas) ? horas : 0;
+      const diasNum = typeof dias === 'number' && !isNaN(dias) && dias > 0 ? dias : 0;
+      const horasNum = typeof horas === 'number' && !isNaN(horas) && horas > 0 ? horas : 0;
       
+      console.log('🔍 Verificando condiciones para cálculo:', {
+        requiereHoras: currentTypeConfig.requiere_horas,
+        requiereDias: currentTypeConfig.requiere_dias,
+        horasNum,
+        diasNum,
+        tipoNovedad
+      });
+
       if (currentTypeConfig.requiere_horas && horasNum > 0) {
         canCalculate = true;
       } else if (currentTypeConfig.requiere_dias && diasNum > 0) {
@@ -100,20 +141,36 @@ export const NovedadForm = ({
         canCalculate = true;
       }
 
+      // Para incapacidades, también necesitamos el subtipo
+      if (tipoNovedad === 'incapacidad' && (!subtipo || diasNum === 0)) {
+        canCalculate = false;
+        console.log('❌ Incapacidad requiere subtipo y días:', { subtipo, diasNum });
+      }
+
+      console.log('✅ ¿Puede calcular?', canCalculate);
+
       if (canCalculate) {
         const result = calcularValorNovedad(tipoNovedad, subtipo, employeeSalary, diasNum, horasNum);
-        console.log('Resultado del cálculo:', result);
+        console.log('📊 Resultado del cálculo:', result);
         
         setCalculatedValue(result.valor);
         setCalculationDetail(result.baseCalculo.detalle_calculo);
         
         if (result.valor > 0) {
           setValue('valor', result.valor);
-          console.log('Valor actualizado en el formulario:', result.valor);
+          console.log('💰 Valor actualizado en el formulario:', result.valor);
         }
       } else {
         setCalculatedValue(0);
-        setCalculationDetail('Ingrese los datos requeridos para el cálculo');
+        if (currentTypeConfig.requiere_horas && horasNum === 0) {
+          setCalculationDetail('Ingrese las horas requeridas para el cálculo');
+        } else if (currentTypeConfig.requiere_dias && diasNum === 0) {
+          setCalculationDetail('Ingrese los días requeridos para el cálculo');
+        } else if (tipoNovedad === 'incapacidad' && !subtipo) {
+          setCalculationDetail('Seleccione el tipo de incapacidad para el cálculo');
+        } else {
+          setCalculationDetail('Ingrese los datos requeridos para el cálculo');
+        }
       }
     } else {
       // Limpiar cálculo automático si no aplica
@@ -198,6 +255,8 @@ export const NovedadForm = ({
     setValue('dias', undefined);
     setValue('horas', undefined);
     setValue('valor', 0);
+    setValue('fecha_inicio', undefined);
+    setValue('fecha_fin', undefined);
   };
 
   const formatCurrency = (amount: number) => {
@@ -247,6 +306,11 @@ export const NovedadForm = ({
               <Select value={field.value} onValueChange={(value) => {
                 field.onChange(value);
                 console.log('Tipo de novedad cambiado a:', value);
+                // Limpiar campos dependientes
+                setValue('subtipo', undefined);
+                setValue('dias', undefined);
+                setValue('horas', undefined);
+                setValue('valor', 0);
               }}>
                 <SelectTrigger className="border-gray-200 focus:border-gray-300 focus:ring-0">
                   <SelectValue placeholder="Selecciona el tipo de novedad" />
@@ -303,7 +367,7 @@ export const NovedadForm = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="fecha_inicio" className="text-sm font-medium text-gray-900">
-                Fecha inicio
+                Fecha inicio {currentTypeConfig?.requiere_dias ? '*' : ''}
               </Label>
               <Input
                 {...register('fecha_inicio')}
@@ -314,7 +378,7 @@ export const NovedadForm = ({
             </div>
             <div className="space-y-2">
               <Label htmlFor="fecha_fin" className="text-sm font-medium text-gray-900">
-                Fecha fin
+                Fecha fin {currentTypeConfig?.requiere_dias ? '*' : ''}
               </Label>
               <Input
                 {...register('fecha_fin')}
@@ -332,6 +396,11 @@ export const NovedadForm = ({
             <div className="space-y-2">
               <Label htmlFor="dias" className="text-sm font-medium text-gray-900">
                 Días *
+                {fechaInicio && fechaFin && (
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    Auto-calculado
+                  </Badge>
+                )}
               </Label>
               <Input
                 {...register('dias', { 
@@ -345,8 +414,11 @@ export const NovedadForm = ({
                 id="dias"
                 placeholder="0"
                 min="0"
-                max="30"
-                className="border-gray-200 focus:border-gray-300 focus:ring-0"
+                max="90"
+                readOnly={fechaInicio && fechaFin ? true : false}
+                className={`border-gray-200 focus:border-gray-300 focus:ring-0 ${
+                  fechaInicio && fechaFin ? 'bg-gray-50' : ''
+                }`}
               />
             </div>
           )}
@@ -407,14 +479,16 @@ export const NovedadForm = ({
         </div>
 
         {/* Cálculo automático */}
-        {currentTypeConfig?.auto_calculo && calculationDetail && calculatedValue > 0 && (
+        {currentTypeConfig?.auto_calculo && calculationDetail && (
           <Card className="p-4 bg-blue-50 border-blue-200">
             <div className="flex items-start space-x-3">
               <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-medium text-blue-900">Cálculo automático:</span>
-                  <Badge className="bg-blue-600 text-white">{formatCurrency(calculatedValue)}</Badge>
+                  {calculatedValue > 0 && (
+                    <Badge className="bg-blue-600 text-white">{formatCurrency(calculatedValue)}</Badge>
+                  )}
                 </div>
                 <p className="text-xs text-blue-700 font-mono">{calculationDetail}</p>
               </div>
