@@ -89,6 +89,59 @@ export type Database = {
           },
         ]
       }
+      company_subscriptions: {
+        Row: {
+          company_id: string
+          created_at: string
+          features: Json | null
+          id: string
+          max_employees: number | null
+          max_payrolls_per_month: number | null
+          plan_type: string | null
+          status: string | null
+          subscription_ends_at: string | null
+          subscription_starts_at: string | null
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          features?: Json | null
+          id?: string
+          max_employees?: number | null
+          max_payrolls_per_month?: number | null
+          plan_type?: string | null
+          status?: string | null
+          subscription_ends_at?: string | null
+          subscription_starts_at?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          features?: Json | null
+          id?: string
+          max_employees?: number | null
+          max_payrolls_per_month?: number | null
+          plan_type?: string | null
+          status?: string | null
+          subscription_ends_at?: string | null
+          subscription_starts_at?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_activity: {
         Row: {
           action: string
@@ -702,6 +755,27 @@ export type Database = {
           },
         ]
       }
+      saas_admins: {
+        Row: {
+          created_at: string
+          id: string
+          role: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           assigned_at: string
@@ -805,6 +879,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_company_with_setup: {
+        Args: {
+          p_nit: string
+          p_razon_social: string
+          p_email: string
+          p_telefono?: string
+          p_ciudad?: string
+          p_plan?: string
+        }
+        Returns: string
+      }
       get_user_roles: {
         Args: { _company_id?: string }
         Returns: {
@@ -818,6 +903,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _company_id?: string
         }
+        Returns: boolean
+      }
+      is_saas_admin: {
+        Args: { _user_id?: string }
         Returns: boolean
       }
     }

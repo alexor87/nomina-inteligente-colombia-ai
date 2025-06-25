@@ -24,6 +24,7 @@ interface AuthContextType {
   loading: boolean;
   roles: UserRole[];
   profile: UserProfile | null;
+  isSaasAdmin: boolean;
   hasRole: (role: string) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
@@ -46,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isSaasAdmin, setIsSaasAdmin] = useState(false);
 
   const hasRole = (role: string): boolean => {
     return roles.some(r => r.role === role);
@@ -60,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user roles and profile after successful auth
+          // Fetch user data after successful auth
           setTimeout(async () => {
             try {
               // Fetch user roles
@@ -85,6 +87,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               } else {
                 setProfile(profileData);
               }
+
+              // Check if user is SaaS admin
+              const { data: adminStatus, error: adminError } = await supabase
+                .rpc('is_saas_admin');
+              
+              if (adminError) {
+                console.error('Error checking admin status:', adminError);
+              } else {
+                setIsSaasAdmin(adminStatus || false);
+              }
             } catch (error) {
               console.error('Error in auth data fetch:', error);
             }
@@ -92,6 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setRoles([]);
           setProfile(null);
+          setIsSaasAdmin(false);
         }
         
         setLoading(false);
@@ -138,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
     setRoles([]);
     setProfile(null);
+    setIsSaasAdmin(false);
   };
 
   const value = {
@@ -146,6 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     roles,
     profile,
+    isSaasAdmin,
     hasRole,
     signIn,
     signUp,
