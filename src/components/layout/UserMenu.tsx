@@ -11,16 +11,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogOut, User, Settings } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { LogOut, User, Settings, Crown } from 'lucide-react';
 
 export const UserMenu = () => {
-  const { user, profile, signOut, roles } = useAuth();
+  const { user, profile, signOut, roles, isSuperAdmin } = useAuth();
 
   if (!user || !profile) return null;
 
   const initials = `${profile.first_name?.[0] || ''}${profile.last_name?.[0] || ''}`.toUpperCase();
   const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
-  const primaryRole = roles[0]?.role || 'Sin rol';
+  
+  // Mostrar el rol más alto o SuperAdmin
+  const displayRole = isSuperAdmin ? 'SuperAdmin' : (roles[0]?.role || 'Sin rol');
 
   const handleSignOut = async () => {
     try {
@@ -38,6 +41,9 @@ export const UserMenu = () => {
             <AvatarImage src={profile.avatar_url || ''} alt={fullName} />
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
+          {isSuperAdmin && (
+            <Crown className="absolute -top-1 -right-1 h-3 w-3 text-yellow-500" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -47,9 +53,23 @@ export const UserMenu = () => {
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>
-            <p className="text-xs leading-none text-muted-foreground capitalize">
-              {primaryRole}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              {isSuperAdmin ? (
+                <Badge variant="default" className="bg-yellow-100 text-yellow-800 text-xs">
+                  <Crown className="h-3 w-3 mr-1" />
+                  SuperAdmin
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs capitalize">
+                  {displayRole}
+                </Badge>
+              )}
+            </div>
+            {roles.length > 1 && (
+              <p className="text-xs text-muted-foreground">
+                +{roles.length - 1} rol{roles.length > 2 ? 'es' : ''} más
+              </p>
+            )}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

@@ -37,7 +37,7 @@ function App() {
               <Route path="/register-company" element={<CompanyRegistrationPage />} />
               
               <Route path="/dashboard" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredModule="dashboard">
                   <Layout>
                     <DashboardPage />
                   </Layout>
@@ -53,7 +53,7 @@ function App() {
               } />
               
               <Route path="/employees" element={
-                <ProtectedRoute requiredRole="administrador">
+                <ProtectedRoute requiredModule="employees">
                   <Layout>
                     <EmployeesPage />
                   </Layout>
@@ -61,7 +61,7 @@ function App() {
               } />
               
               <Route path="/payroll" element={
-                <ProtectedRoute requiredRole="administrador">
+                <ProtectedRoute requiredModule="payroll">
                   <Layout>
                     <PayrollPage />
                   </Layout>
@@ -69,7 +69,7 @@ function App() {
               } />
               
               <Route path="/payroll-backend" element={
-                <ProtectedRoute requiredRole="administrador">
+                <ProtectedRoute requiredModule="payroll">
                   <Layout>
                     <PayrollBackendPage />
                   </Layout>
@@ -77,7 +77,7 @@ function App() {
               } />
               
               <Route path="/payroll-history" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredModule="payroll-history">
                   <Layout>
                     <PayrollHistoryPage />
                   </Layout>
@@ -85,7 +85,7 @@ function App() {
               } />
               
               <Route path="/vouchers" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredModule="vouchers">
                   <Layout>
                     <VouchersPage />
                   </Layout>
@@ -93,7 +93,7 @@ function App() {
               } />
               
               <Route path="/payments" element={
-                <ProtectedRoute requiredRole="administrador">
+                <ProtectedRoute requiredModule="payments">
                   <Layout>
                     <PaymentsPage />
                   </Layout>
@@ -101,7 +101,7 @@ function App() {
               } />
               
               <Route path="/reports" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredModule="reports">
                   <Layout>
                     <ReportsPage />
                   </Layout>
@@ -109,7 +109,7 @@ function App() {
               } />
               
               <Route path="/settings" element={
-                <ProtectedRoute requiredRole="administrador">
+                <ProtectedRoute requiredModule="settings">
                   <Layout>
                     <SettingsPage />
                   </Layout>

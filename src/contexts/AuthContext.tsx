@@ -3,8 +3,10 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
+
 interface UserRole {
-  role: string;
+  role: AppRole;
   company_id?: string;
 }
 
@@ -24,8 +26,9 @@ interface AuthContextType {
   loading: boolean;
   roles: UserRole[];
   profile: UserProfile | null;
-  isSaasAdmin: boolean;
-  hasRole: (role: string) => boolean;
+  isSuperAdmin: boolean;
+  hasRole: (role: AppRole, companyId?: string) => boolean;
+  hasModuleAccess: (module: string) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -42,16 +45,39 @@ export const useAuth = () => {
   return context;
 };
 
+// Matriz de permisos por rol
+const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
+  administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings'],
+  rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports'],
+  contador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
+  visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
+  soporte: ['dashboard', 'reports']
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isSaasAdmin, setIsSaasAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  const hasRole = (role: string): boolean => {
-    return roles.some(r => r.role === role);
+  const hasRole = (role: AppRole, companyId?: string): boolean => {
+    if (isSuperAdmin) return true;
+    
+    return roles.some(r => 
+      r.role === role && 
+      (companyId ? r.company_id === companyId : true)
+    );
+  };
+
+  const hasModuleAccess = (module: string): boolean => {
+    if (isSuperAdmin) return true;
+    
+    // Verificar si alguno de los roles del usuario tiene acceso al módulo
+    return roles.some(userRole => 
+      ROLE_PERMISSIONS[userRole.role]?.includes(module)
+    );
   };
 
   const refreshUserData = async () => {
@@ -59,39 +85,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentUser) return;
 
     try {
-      // Fetch user roles
+      // Verificar si es superadmin
+      const { data: superAdminStatus, error: superAdminError } = await supabase
+        .rpc('is_superadmin');
+      
+      if (!superAdminError) {
+        setIsSuperAdmin(superAdminStatus || false);
+        console.log('SuperAdmin status:', superAdminStatus);
+      }
+
+      // Obtener roles del usuario
       const { data: userRoles, error: rolesError } = await supabase
         .rpc('get_user_roles');
       
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-      } else {
+      if (!rolesError && userRoles) {
+        setRoles(userRoles);
         console.log('User roles fetched:', userRoles);
-        setRoles(userRoles || []);
+      } else {
+        console.error('Error fetching user roles:', rolesError);
+        setRoles([]);
       }
 
-      // Fetch user profile
+      // Obtener perfil del usuario
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', currentUser.id)
         .single();
       
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
-      } else {
-        console.log('User profile fetched:', profileData);
+      if (!profileError && profileData) {
         setProfile(profileData);
-      }
-
-      // Check if user is SaaS admin
-      const { data: adminStatus, error: adminError } = await supabase
-        .rpc('is_saas_admin');
-      
-      if (adminError) {
-        console.error('Error checking admin status:', adminError);
+        console.log('User profile fetched:', profileData);
       } else {
-        setIsSaasAdmin(adminStatus || false);
+        console.error('Error fetching user profile:', profileError);
       }
     } catch (error) {
       console.error('Error refreshing user data:', error);
@@ -114,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setRoles([]);
           setProfile(null);
-          setIsSaasAdmin(false);
+          setIsSuperAdmin(false);
         }
         
         setLoading(false);
@@ -161,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
     setRoles([]);
     setProfile(null);
-    setIsSaasAdmin(false);
+    setIsSuperAdmin(false);
   };
 
   const value = {
@@ -170,8 +196,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     roles,
     profile,
-    isSaasAdmin,
+    isSuperAdmin,
     hasRole,
+    hasModuleAccess,
     signIn,
     signUp,
     signOut,
