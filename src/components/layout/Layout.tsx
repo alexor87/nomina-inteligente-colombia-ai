@@ -1,7 +1,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sidebar } from './Sidebar';
+import Sidebar from './Sidebar';
 import { Header } from './Header';
 
 interface LayoutProps {
@@ -47,7 +47,7 @@ export const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <div ref={sidebarRef}>
-        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <Sidebar />
       </div>
       
       <div className="flex-1 flex flex-col min-w-0">
