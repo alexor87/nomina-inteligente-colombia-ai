@@ -909,6 +909,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_support_user: {
+        Args: { _user_id?: string }
+        Returns: boolean
+      }
       user_has_access_to_company: {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
