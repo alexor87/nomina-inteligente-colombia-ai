@@ -1,13 +1,8 @@
 
-import { Layout } from '@/components/layout/Layout';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 
 const DashboardPage = () => {
-  return (
-    <Layout>
-      <Dashboard />
-    </Layout>
-  );
+  return <Dashboard />;
 };
 
 export default DashboardPage;
