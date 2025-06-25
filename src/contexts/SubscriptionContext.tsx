@@ -64,7 +64,24 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return;
       }
 
-      setSubscription(subscriptionData);
+      // Cast the data to our interface type
+      if (subscriptionData) {
+        const typedSubscription: CompanySubscription = {
+          id: subscriptionData.id,
+          company_id: subscriptionData.company_id,
+          plan_type: subscriptionData.plan_type as 'basico' | 'profesional' | 'empresarial',
+          status: subscriptionData.status as 'activa' | 'suspendida' | 'cancelada' | 'trial',
+          trial_ends_at: subscriptionData.trial_ends_at,
+          max_employees: subscriptionData.max_employees,
+          max_payrolls_per_month: subscriptionData.max_payrolls_per_month,
+          features: subscriptionData.features as {
+            email_support: boolean;
+            phone_support: boolean;
+            custom_reports: boolean;
+          }
+        };
+        setSubscription(typedSubscription);
+      }
 
       // Contar empleados activos
       const { count: empCount } = await supabase
