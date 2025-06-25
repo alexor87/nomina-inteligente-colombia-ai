@@ -212,7 +212,7 @@ const AuthPage = () => {
                     id="signupPassword"
                     type="password"
                     value={signupForm.password}
-                    onChange={(e) => setSignupForm(prev => ({ ...rev, password: e.target.value }))}
+                    onChange={(e) => setSignupForm(prev => ({ ...prev, password: e.target.value }))}
                     required
                     minLength={6}
                   />
