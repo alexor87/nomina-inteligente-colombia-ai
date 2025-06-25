@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { EmployeeWithStatus, EmployeeFilters, ComplianceIndicator } from '@/types/employee-extended';
 import { useToast } from '@/hooks/use-toast';
@@ -27,8 +26,11 @@ export const useEmployeeList = () => {
   const loadEmployees = async () => {
     try {
       setIsLoading(true);
-      // Solo cargar empleados de la empresa del usuario autenticado
-      const data = await EmployeeDataService.loadEmployees();
+      const companyId = await EmployeeDataService.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+      const data = await EmployeeDataService.getEmployees(companyId);
       setEmployees(data);
       console.log('Empleados cargados para la empresa del usuario:', data.length);
     } catch (error) {
