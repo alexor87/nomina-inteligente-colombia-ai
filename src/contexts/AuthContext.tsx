@@ -27,7 +27,6 @@ interface AuthContextType {
   isSaasAdmin: boolean;
   hasRole: (role: string) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signInWithGoogle: () => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
@@ -131,18 +130,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
-  const signInWithGoogle = async () => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
-    return { error };
-  };
-
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
@@ -176,7 +163,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isSaasAdmin,
     hasRole,
     signIn,
-    signInWithGoogle,
     signUp,
     signOut,
   };

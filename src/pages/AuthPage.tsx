@@ -8,15 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Chrome } from 'lucide-react';
 
 const AuthPage = () => {
-  const { signIn, signInWithGoogle, signUp, user } = useAuth();
+  const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Redirigir si ya está autenticado
   React.useEffect(() => {
@@ -36,31 +33,6 @@ const AuthPage = () => {
     firstName: '',
     lastName: ''
   });
-
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    try {
-      const { error } = await signInWithGoogle();
-      
-      if (error) {
-        console.error('Google login error:', error);
-        toast({
-          title: "Error con Google",
-          description: "No se pudo iniciar sesión con Google. Intenta nuevamente.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Unexpected Google login error:', error);
-      toast({
-        title: "Error",
-        description: "Ocurrió un error inesperado.",
-        variant: "destructive"
-      });
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,28 +155,6 @@ const AuthPage = () => {
             </TabsList>
 
             <TabsContent value="login" className="space-y-4">
-              {/* Botón de Google */}
-              <Button
-                onClick={handleGoogleSignIn}
-                variant="outline"
-                className="w-full"
-                disabled={googleLoading}
-              >
-                <Chrome className="mr-2 h-4 w-4" />
-                {googleLoading ? 'Conectando...' : 'Continuar con Google'}
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <Separator className="w-full" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">
-                    O continúa con
-                  </span>
-                </div>
-              </div>
-
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -235,28 +185,6 @@ const AuthPage = () => {
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-4">
-              {/* Botón de Google para registro */}
-              <Button
-                onClick={handleGoogleSignIn}
-                variant="outline"
-                className="w-full"
-                disabled={googleLoading}
-              >
-                <Chrome className="mr-2 h-4 w-4" />
-                {googleLoading ? 'Conectando...' : 'Registrarse con Google'}
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <Separator className="w-full" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">
-                    O regístrate con
-                  </span>
-                </div>
-              </div>
-
               <div className="bg-blue-50 p-3 rounded-lg mb-4 text-sm">
                 <strong>Credenciales de prueba:</strong><br/>
                 Email: alexor87@gmail.com<br/>
