@@ -63,26 +63,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const hasRole = (role: AppRole, companyId?: string): boolean => {
-    if (isSuperAdmin) return true;
+    console.log('🔍 Checking role:', { role, companyId, isSuperAdmin, roles });
     
-    return roles.some(r => 
-      r.role === role && 
-      (companyId ? r.company_id === companyId : true)
-    );
+    if (isSuperAdmin) {
+      console.log('✅ SuperAdmin access granted');
+      return true;
+    }
+    
+    const hasRoleAccess = roles.some(r => {
+      const roleMatch = r.role === role;
+      const companyMatch = companyId ? r.company_id === companyId : true;
+      console.log('🔍 Role check:', { userRole: r.role, roleMatch, companyMatch, requiredRole: role });
+      return roleMatch && companyMatch;
+    });
+    
+    console.log('📊 Role access result:', hasRoleAccess);
+    return hasRoleAccess;
   };
 
   const hasModuleAccess = (module: string): boolean => {
-    if (isSuperAdmin) return true;
+    console.log('🔍 Checking module access:', { module, isSuperAdmin, roles });
+    
+    if (isSuperAdmin) {
+      console.log('✅ SuperAdmin module access granted');
+      return true;
+    }
     
     // Verificar si alguno de los roles del usuario tiene acceso al módulo
-    return roles.some(userRole => 
-      ROLE_PERMISSIONS[userRole.role]?.includes(module)
-    );
+    const hasAccess = roles.some(userRole => {
+      const moduleAccess = ROLE_PERMISSIONS[userRole.role]?.includes(module);
+      console.log('🔍 Module check:', { userRole: userRole.role, module, moduleAccess });
+      return moduleAccess;
+    });
+    
+    console.log('📊 Module access result:', hasAccess);
+    return hasAccess;
   };
 
   const refreshUserData = async () => {
     const currentUser = (await supabase.auth.getUser()).data.user;
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.log('❌ No current user found');
+      return;
+    }
+
+    console.log('🔄 Refreshing user data for:', currentUser.email);
 
     try {
       // Verificar si es superadmin
@@ -91,7 +116,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!superAdminError) {
         setIsSuperAdmin(superAdminStatus || false);
-        console.log('SuperAdmin status:', superAdminStatus);
+        console.log('👑 SuperAdmin status:', superAdminStatus);
+      } else {
+        console.error('❌ Error checking superadmin status:', superAdminError);
       }
 
       // Obtener roles del usuario
@@ -100,9 +127,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!rolesError && userRoles) {
         setRoles(userRoles);
-        console.log('User roles fetched:', userRoles);
+        console.log('👥 User roles fetched:', userRoles);
       } else {
-        console.error('Error fetching user roles:', rolesError);
+        console.error('❌ Error fetching user roles:', rolesError);
         setRoles([]);
       }
 
@@ -115,12 +142,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!profileError && profileData) {
         setProfile(profileData);
-        console.log('User profile fetched:', profileData);
+        console.log('👤 User profile fetched:', profileData);
       } else {
-        console.error('Error fetching user profile:', profileError);
+        console.error('❌ Error fetching user profile:', profileError);
+        
+        // Si no existe perfil, intentar crearlo
+        if (profileError?.code === 'PGRST116') {
+          console.log('🔧 Creating missing profile...');
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: currentUser.id,
+              first_name: currentUser.user_metadata?.first_name || '',
+              last_name: currentUser.user_metadata?.last_name || '',
+            })
+            .select()
+            .single();
+          
+          if (!createError && newProfile) {
+            setProfile(newProfile);
+            console.log('✅ Profile created:', newProfile);
+          } else {
+            console.error('❌ Error creating profile:', createError);
+          }
+        }
       }
     } catch (error) {
-      console.error('Error refreshing user data:', error);
+      console.error('❌ Error refreshing user data:', error);
     }
   };
 
@@ -128,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -136,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Fetch user data after successful auth
           setTimeout(async () => {
             await refreshUserData();
-          }, 0);
+          }, 100);
         } else {
           setRoles([]);
           setProfile(null);
@@ -149,9 +197,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.email);
+      console.log('🔍 Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        setTimeout(async () => {
+          await refreshUserData();
+        }, 100);
+      }
+      
       setLoading(false);
     });
 

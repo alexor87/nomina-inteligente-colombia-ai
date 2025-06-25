@@ -1,6 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,14 +18,14 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Empleados', href: '/employees', icon: Users },
-  { name: 'Liquidar Nómina', href: '/payroll-backend', icon: Calculator },
-  { name: 'Historial Nómina', href: '/payroll-history', icon: History },
-  { name: 'Comprobantes', href: '/vouchers', icon: Receipt },
-  { name: 'Pagos y Dispersión', href: '/payments', icon: CreditCard },
-  { name: 'Reportes', href: '/reports', icon: BarChart3 },
-  { name: 'Configuración', href: '/settings', icon: Settings },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
+  { name: 'Empleados', href: '/employees', icon: Users, module: 'employees' },
+  { name: 'Liquidar Nómina', href: '/payroll-backend', icon: Calculator, module: 'payroll' },
+  { name: 'Historial Nómina', href: '/payroll-history', icon: History, module: 'payroll-history' },
+  { name: 'Comprobantes', href: '/vouchers', icon: Receipt, module: 'vouchers' },
+  { name: 'Pagos y Dispersión', href: '/payments', icon: CreditCard, module: 'payments' },
+  { name: 'Reportes', href: '/reports', icon: BarChart3, module: 'reports' },
+  { name: 'Configuración', href: '/settings', icon: Settings, module: 'settings' },
 ];
 
 interface SidebarProps {
@@ -33,6 +35,20 @@ interface SidebarProps {
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
+  const { hasModuleAccess, isSuperAdmin } = useAuth();
+
+  // Filtrar navegación basada en permisos
+  const filteredNavigation = navigation.filter(item => {
+    if (isSuperAdmin) return true;
+    return hasModuleAccess(item.module);
+  });
+
+  console.log('🧭 Sidebar navigation filtered:', {
+    isSuperAdmin,
+    totalItems: navigation.length,
+    filteredItems: filteredNavigation.length,
+    filteredNavigation: filteredNavigation.map(n => n.name)
+  });
 
   return (
     <div className={cn(
@@ -62,7 +78,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
-        {navigation.map((item) => {
+        {filteredNavigation.map((item) => {
           const isActive = location.pathname === item.href;
           return (
             <Link
