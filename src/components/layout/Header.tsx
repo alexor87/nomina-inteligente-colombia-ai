@@ -9,16 +9,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
 export const Header = () => {
-  const { user, profile, isSaasAdmin } = useAuth();
+  const { user, profile, isSuperAdmin } = useAuth();
   const { subscription, isTrialExpired } = useSubscription();
 
   const getCompanyName = () => {
-    if (isSaasAdmin) return 'Super Admin Panel';
+    if (isSuperAdmin) return 'Super Admin Panel';
     return profile?.company_id ? 'Mi Empresa' : 'Sin Empresa';
   };
 
   const getSubscriptionBadge = () => {
-    if (isSaasAdmin) {
+    if (isSuperAdmin) {
       return (
         <Badge variant="default" className="bg-red-100 text-red-800">
           <Crown className="h-3 w-3 mr-1" />
@@ -87,7 +87,7 @@ export const Header = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          {isSaasAdmin && (
+          {isSuperAdmin && (
             <Link to="/super-admin">
               <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
                 <Crown className="h-4 w-4 mr-2" />
@@ -96,7 +96,7 @@ export const Header = () => {
             </Link>
           )}
           
-          {isTrialExpired && !isSaasAdmin && (
+          {isTrialExpired && !isSuperAdmin && (
             <Button variant="default" size="sm" className="bg-blue-600 hover:bg-blue-700">
               Actualizar Plan
             </Button>
