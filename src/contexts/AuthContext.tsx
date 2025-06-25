@@ -1,14 +1,13 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-interface Profile {
-  user_id: string;
-  first_name?: string;
-  last_name?: string;
-  company_id?: string;
-  avatar_url?: string;
+interface Company {
+  id: string;
+  name: string;
+  nit: string;
 }
 
 interface UserCompany {
@@ -18,150 +17,186 @@ interface UserCompany {
 
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null;
+  currentCompany: Company | null;
   loading: boolean;
+  isAuthenticated: boolean;
   isSuperAdmin: boolean;
-  userCompanies: UserCompany[];
-  currentCompany: UserCompany | null;
-  hasRole: (role: string, companyId?: string) => boolean;
-  canAccessModule: (module: string) => boolean;
-  refreshUserData: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  setCurrentCompany: (company: UserCompany) => void;
+  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  hasRole: (role: 'admin' | 'editor' | 'lector') => boolean;
+  canAccessModule: (module: string) => boolean;
+  switchCompany: (companyId: string) => Promise<void>;
+  userCompanies: UserCompany[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Definir permisos por módulo y rol
-const MODULE_PERMISSIONS = {
-  dashboard: ['admin', 'editor', 'lector'],
-  empleados: ['admin', 'editor', 'lector'],
-  nomina: ['admin', 'editor'],
-  pagos: ['admin', 'editor'],
-  comprobantes: ['admin', 'editor', 'lector'],
-  reportes: ['admin', 'editor', 'lector'],
-  configuracion: ['admin'],
-  'super-admin': ['superadmin'], // Solo para superadmin
-  backoffice: ['superadmin'] // Módulo interno para superadmin
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
+  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
-  const [currentCompany, setCurrentCompanyState] = useState<UserCompany | null>(null);
+  const { toast } = useToast();
 
-  const refreshUserData = async () => {
+  const checkSuperAdmin = async (userId: string) => {
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
-      if (!currentUser) {
-        console.log('❌ AuthContext: No user found');
-        setProfile(null);
-        setIsSuperAdmin(false);
-        setUserCompanies([]);
-        setCurrentCompanyState(null);
-        setUser(null);
-        return;
-      }
-
-      console.log('🔍 AuthContext: Current user found:', currentUser.email);
-      setUser(currentUser);
-
-      // Verificar si es superadmin
-      try {
-        const { data: superAdminCheck } = await supabase.rpc('is_superadmin', {
-          _user_id: currentUser.id
-        });
-
-        const isSuper = !!superAdminCheck;
-        console.log('🔐 AuthContext: Is SuperAdmin:', isSuper);
-        setIsSuperAdmin(isSuper);
-      } catch (error) {
-        console.warn('Could not check superadmin status:', error);
-        setIsSuperAdmin(false);
-      }
-
-      // Obtener perfil del usuario
-      try {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
-
-        setProfile(profileData);
-      } catch (error) {
-        console.warn('Could not fetch profile:', error);
-        setProfile(null);
-      }
-
-      // Obtener empresas y roles del usuario
-      try {
-        const { data: companiesData } = await supabase.rpc('get_user_companies', {
-          _user_id: currentUser.id
-        });
-
-        const companies: UserCompany[] = companiesData || [];
-        console.log('🏢 AuthContext: User companies:', companies);
-        setUserCompanies(companies);
-
-        // Establecer empresa actual si no hay una seleccionada
-        if (companies.length > 0 && !currentCompany) {
-          setCurrentCompanyState(companies[0]);
-        }
-      } catch (error) {
-        console.warn('Could not fetch user companies:', error);
-        setUserCompanies([]);
-      }
-
-    } catch (error) {
-      console.error('Error in refreshUserData:', error);
-      setUser(null);
-      setProfile(null);
-      setIsSuperAdmin(false);
-      setUserCompanies([]);
-      setCurrentCompanyState(null);
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      const { data, error } = await supabase.rpc('is_superadmin', {
+        _user_id: userId
       });
       
       if (error) {
-        return { error };
+        console.error('Error checking superadmin status:', error);
+        return false;
       }
       
-      return { error: null };
+      return !!data;
     } catch (error) {
-      return { error };
+      console.error('Error in checkSuperAdmin:', error);
+      return false;
     }
   };
 
-  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
+  const loadUserCompanies = async (userId: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.rpc('get_user_companies', {
+        _user_id: userId
+      });
+
+      if (error) {
+        console.error('Error loading user companies:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in loadUserCompanies:', error);
+      return [];
+    }
+  };
+
+  const loadCurrentCompany = async (companyId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, razon_social, nit')
+        .eq('id', companyId)
+        .single();
+
+      if (error) {
+        console.error('Error loading company:', error);
+        return null;
+      }
+
+      return {
+        id: data.id,
+        name: data.razon_social,
+        nit: data.nit
+      };
+    } catch (error) {
+      console.error('Error in loadCurrentCompany:', error);
+      return null;
+    }
+  };
+
+  const initializeUserData = async (user: User) => {
+    try {
+      setLoading(true);
+      console.log('🔄 Initializing user data for:', user.email);
+
+      // Check if user is superadmin
+      const superAdminStatus = await checkSuperAdmin(user.id);
+      setIsSuperAdmin(superAdminStatus);
+      console.log('👑 SuperAdmin status:', superAdminStatus);
+
+      // Load user companies
+      const companies = await loadUserCompanies(user.id);
+      setUserCompanies(companies);
+      console.log('🏢 User companies:', companies);
+
+      if (companies.length > 0) {
+        // Set the first company as current company
+        const firstCompany = companies[0];
+        const companyData = await loadCurrentCompany(firstCompany.company_id);
+        
+        if (companyData) {
+          setCurrentCompany(companyData);
+          console.log('✅ Current company set:', companyData.name);
+        }
+      } else if (superAdminStatus) {
+        // If superadmin but no companies assigned, load the first available company
+        const { data: firstCompany } = await supabase
+          .from('companies')
+          .select('id, razon_social, nit')
+          .limit(1)
+          .single();
+
+        if (firstCompany) {
+          setCurrentCompany({
+            id: firstCompany.id,
+            name: firstCompany.razon_social,
+            nit: firstCompany.nit
+          });
+          console.log('✅ SuperAdmin using first company:', firstCompany.razon_social);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error initializing user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        initializeUserData(session.user);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔐 Auth state changed:', event, session?.user?.email);
+      
+      if (session?.user) {
+        setUser(session.user);
+        await initializeUserData(session.user);
+      } else {
+        setUser(null);
+        setCurrentCompany(null);
+        setUserCompanies([]);
+        setIsSuperAdmin(false);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName
-          }
-        }
       });
-      
-      return { error };
-    } catch (error) {
-      return { error };
+
+      if (error) {
+        console.error('Sign in error:', error);
+        throw error;
+      }
+
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: "Bienvenido de vuelta",
+      });
+    } catch (error: any) {
+      console.error('SignIn error:', error);
+      throw new Error(error.message || 'Error al iniciar sesión');
     }
   };
 
@@ -169,137 +204,108 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
-      setUser(null);
-      setProfile(null);
-      setIsSuperAdmin(false);
-      setUserCompanies([]);
-      setCurrentCompanyState(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-      throw error;
+
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión exitosamente",
+      });
+    } catch (error: any) {
+      console.error('SignOut error:', error);
+      throw new Error(error.message || 'Error al cerrar sesión');
     }
   };
 
-  const setCurrentCompany = (company: UserCompany) => {
-    setCurrentCompanyState(company);
+  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Registro exitoso",
+        description: "Revisa tu email para confirmar tu cuenta",
+      });
+    } catch (error: any) {
+      console.error('SignUp error:', error);
+      throw new Error(error.message || 'Error al registrarse');
+    }
   };
 
-  const hasRole = (role: string, companyId?: string): boolean => {
-    // Superadmin siempre tiene todos los roles
-    if (isSuperAdmin && role !== 'superadmin') {
-      return true;
-    }
-
-    // Verificar rol específico para superadmin
-    if (role === 'superadmin') {
-      return isSuperAdmin;
-    }
-
-    // Para roles normales, verificar en la empresa especificada o actual
-    const targetCompanyId = companyId || currentCompany?.company_id;
-    if (!targetCompanyId) return false;
-
-    const companyRole = userCompanies.find(uc => 
-      uc.company_id === targetCompanyId
+  const hasRole = (role: 'admin' | 'editor' | 'lector'): boolean => {
+    if (isSuperAdmin) return true;
+    
+    if (!currentCompany || userCompanies.length === 0) return false;
+    
+    const currentCompanyRelation = userCompanies.find(
+      uc => uc.company_id === currentCompany.id
     );
-
-    return companyRole?.rol === role;
+    
+    if (!currentCompanyRelation) return false;
+    
+    const userRole = currentCompanyRelation.rol;
+    
+    switch (role) {
+      case 'admin':
+        return userRole === 'admin';
+      case 'editor':
+        return userRole === 'admin' || userRole === 'editor';
+      case 'lector':
+        return ['admin', 'editor', 'lector'].includes(userRole);
+      default:
+        return false;
+    }
   };
 
   const canAccessModule = (module: string): boolean => {
-    // Superadmin puede acceder a todo
-    if (isSuperAdmin) {
-      console.log('✅ AuthContext: SuperAdmin access granted for module:', module);
-      return true;
-    }
-
-    // Verificar permisos específicos del módulo
-    const requiredRoles = MODULE_PERMISSIONS[module as keyof typeof MODULE_PERMISSIONS];
-    if (!requiredRoles) {
-      console.log('❓ AuthContext: Module not found:', module);
-      return false;
-    }
-
-    // Si no hay empresa actual, no puede acceder
-    if (!currentCompany) {
-      console.log('❌ AuthContext: No current company selected');
-      return false;
-    }
-
-    const hasAccess = requiredRoles.includes(currentCompany.rol);
-    console.log(`🔐 AuthContext: Module ${module} access:`, hasAccess, 'User role:', currentCompany.rol, 'Required roles:', requiredRoles);
+    if (isSuperAdmin) return true;
     
-    return hasAccess;
+    // For now, all authenticated users with a company can access all modules
+    // This can be expanded based on specific module permissions
+    return !!currentCompany && hasRole('lector');
   };
 
-  useEffect(() => {
-    let mounted = true;
-
-    const handleAuthStateChange = async (event: string, session: any) => {
-      if (!mounted) return;
-
-      console.log('🔄 AuthContext: Auth state changed:', event);
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          setUser(session.user);
-          setTimeout(() => {
-            if (mounted) {
-              refreshUserData();
-            }
-          }, 100);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setProfile(null);
-        setIsSuperAdmin(false);
-        setUserCompanies([]);
-        setCurrentCompanyState(null);
+  const switchCompany = async (companyId: string) => {
+    try {
+      const companyData = await loadCurrentCompany(companyId);
+      if (companyData) {
+        setCurrentCompany(companyData);
+        toast({
+          title: "Empresa cambiada",
+          description: `Ahora estás trabajando en ${companyData.name}`,
+        });
       }
-      
-      if (mounted) {
-        setLoading(false);
-      }
-    };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      
-      if (session?.user) {
-        setUser(session.user);
-        setTimeout(() => {
-          if (mounted) {
-            refreshUserData();
-          }
-        }, 100);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+    } catch (error) {
+      console.error('Error switching company:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cambiar de empresa",
+        variant: "destructive"
+      });
+    }
+  };
 
   const value: AuthContextType = {
     user,
-    profile,
-    loading,
-    isSuperAdmin,
-    userCompanies,
     currentCompany,
+    loading,
+    isAuthenticated: !!user,
+    isSuperAdmin,
+    signIn,
+    signOut,
+    signUp,
     hasRole,
     canAccessModule,
-    refreshUserData,
-    signIn,
-    signUp,
-    signOut,
-    setCurrentCompany
+    switchCompany,
+    userCompanies
   };
 
   return (

@@ -1,16 +1,21 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 
 export class EmployeeDataService {
   static async getEmployees(): Promise<EmployeeWithStatus[]> {
     try {
+      console.log('🔄 Loading employees...');
+      
       // Obtener el usuario actual
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
-        console.error('Error getting user:', userError);
+        console.error('❌ Error getting user:', userError);
         return [];
       }
+
+      console.log('👤 Current user:', user.email);
 
       // Verificar si es superadmin
       const { data: isSuperAdminData } = await supabase.rpc('is_superadmin', {
@@ -18,6 +23,7 @@ export class EmployeeDataService {
       });
 
       const isSuperAdmin = !!isSuperAdminData;
+      console.log('👑 Is SuperAdmin:', isSuperAdmin);
 
       let query = supabase.from('employees').select('*');
 
@@ -28,24 +34,26 @@ export class EmployeeDataService {
         });
 
         if (!userCompanies || userCompanies.length === 0) {
-          console.warn('User has no accessible companies');
+          console.warn('⚠️ User has no accessible companies');
           return [];
         }
 
         const companyIds = userCompanies.map((uc: any) => uc.company_id);
+        console.log('🏢 Accessible companies:', companyIds);
         query = query.in('company_id', companyIds);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching employees:', error);
+        console.error('❌ Error fetching employees:', error);
         return [];
       }
 
+      console.log(`✅ Employees loaded successfully: ${data?.length || 0}`);
       return this.transformEmployeeData(data || []);
     } catch (error) {
-      console.error('Error in getEmployees:', error);
+      console.error('❌ Error in getEmployees:', error);
       return [];
     }
   }
@@ -147,21 +155,12 @@ export class EmployeeDataService {
         emp.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.cedula.includes(searchTerm) ||
-        emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
+        emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.cargo?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     } catch (error) {
-      console.error('Error in searchEmployees:', error);
+      console.error('Error searching employees:', error);
       return [];
-    }
-  }
-
-  static async getEmployeeById(id: string): Promise<EmployeeWithStatus | null> {
-    try {
-      const employees = await this.getEmployees();
-      return employees.find(emp => emp.id === id) || null;
-    } catch (error) {
-      console.error('Error in getEmployeeById:', error);
-      return null;
     }
   }
 }
