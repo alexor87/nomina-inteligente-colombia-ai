@@ -24,7 +24,53 @@ export interface CompanyRegistrationData {
   plan: 'basico' | 'profesional' | 'empresarial';
 }
 
+export interface CompanyRegistrationWithUser extends CompanyRegistrationData {
+  user_email: string;
+  user_password: string;
+  first_name: string;
+  last_name: string;
+}
+
 export class CompanyService {
+  // Crear nueva empresa con usuario (para registro completo)
+  static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
+    try {
+      // Primero registrar el usuario
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: data.user_email,
+        password: data.user_password,
+        options: {
+          data: {
+            first_name: data.first_name,
+            last_name: data.last_name
+          }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+      if (!authData.user) throw new Error('Error al crear usuario');
+
+      // Ahora crear la empresa usando la función actualizada
+      const { data: result, error } = await supabase.rpc('create_company_with_setup', {
+        p_nit: data.nit,
+        p_razon_social: data.razon_social,
+        p_email: data.email,
+        p_telefono: data.telefono,
+        p_ciudad: data.ciudad || 'Bogotá',
+        p_plan: data.plan,
+        p_first_name: data.first_name,
+        p_last_name: data.last_name
+      });
+
+      if (error) throw error;
+
+      return result;
+    } catch (error) {
+      console.error('Error creating company with user:', error);
+      throw new Error(error instanceof Error ? error.message : 'Error al crear la empresa');
+    }
+  }
+
   // Crear nueva empresa (para registro)
   static async createCompany(data: CompanyRegistrationData): Promise<string> {
     try {

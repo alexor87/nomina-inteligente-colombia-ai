@@ -880,14 +880,27 @@ export type Database = {
     }
     Functions: {
       create_company_with_setup: {
-        Args: {
-          p_nit: string
-          p_razon_social: string
-          p_email: string
-          p_telefono?: string
-          p_ciudad?: string
-          p_plan?: string
-        }
+        Args:
+          | {
+              p_nit: string
+              p_razon_social: string
+              p_email: string
+              p_telefono?: string
+              p_ciudad?: string
+              p_plan?: string
+            }
+          | {
+              p_nit: string
+              p_razon_social: string
+              p_email: string
+              p_telefono?: string
+              p_ciudad?: string
+              p_plan?: string
+              p_user_email?: string
+              p_user_password?: string
+              p_first_name?: string
+              p_last_name?: string
+            }
         Returns: string
       }
       get_user_roles: {
