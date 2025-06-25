@@ -53,22 +53,57 @@ export const CompanyRegistrationPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with data:', formData);
+    
+    // Validar campos requeridos
+    if (!formData.nit.trim()) {
+      toast({
+        title: "Campo requerido",
+        description: "El NIT es obligatorio",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.razon_social.trim()) {
+      toast({
+        title: "Campo requerido",
+        description: "La razón social es obligatoria",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      toast({
+        title: "Campo requerido",
+        description: "El email es obligatorio",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await CompanyService.createCompany(formData);
+      console.log('Creating company with data:', formData);
+      const companyId = await CompanyService.createCompany(formData);
+      console.log('Company created successfully with id:', companyId);
       
       toast({
         title: "¡Empresa registrada exitosamente!",
         description: "Tu empresa ha sido creada con un trial de 30 días gratuitos",
       });
 
-      // Recargar la página para actualizar el contexto de autenticación
-      window.location.href = '/';
+      // Redirigir al dashboard después de un breve delay
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
     } catch (error: any) {
+      console.error('Error creating company:', error);
       toast({
         title: "Error al registrar empresa",
-        description: error.message,
+        description: error.message || "Ha ocurrido un error inesperado",
         variant: "destructive"
       });
     } finally {
@@ -77,6 +112,7 @@ export const CompanyRegistrationPage = () => {
   };
 
   const handleInputChange = (field: keyof CompanyRegistrationData, value: string) => {
+    console.log(`Updating ${field} to:`, value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
