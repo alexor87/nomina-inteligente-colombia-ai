@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { NovedadFormData, NOVEDAD_CATEGORIES, calcularValorNovedad, NovedadType } from '@/types/novedades';
-import { Save, X, Calculator, Info } from 'lucide-react';
+import { Save, X, Calculator, Info, Calendar } from 'lucide-react';
 
 interface NovedadFormProps {
   initialData?: NovedadFormData;
@@ -332,12 +331,19 @@ export const NovedadForm = ({
           />
         </div>
 
-        {/* Subtipo si aplica */}
+        {/* Subtipo si aplica - Mejorado para incapacidades */}
         {currentTypeConfig?.subtipos && currentTypeConfig.subtipos.length > 0 && (
           <div className="space-y-2">
-            <Label htmlFor="subtipo" className="text-sm font-medium text-gray-900">
-              Subtipo *
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="subtipo" className="text-sm font-medium text-gray-900">
+                {tipoNovedad === 'incapacidad' ? 'Tipo de incapacidad' : 'Subtipo'} *
+              </Label>
+              {tipoNovedad === 'incapacidad' && (
+                <Badge variant="outline" className="text-xs">
+                  Requerido para cálculo
+                </Badge>
+              )}
+            </div>
             <Controller
               name="subtipo"
               control={control}
@@ -347,12 +353,25 @@ export const NovedadForm = ({
                   console.log('Subtipo seleccionado:', value, 'Para tipo:', tipoNovedad);
                 }}>
                   <SelectTrigger className="border-gray-200 focus:border-gray-300 focus:ring-0">
-                    <SelectValue placeholder="Selecciona el subtipo" />
+                    <SelectValue placeholder={
+                      tipoNovedad === 'incapacidad' 
+                        ? "Selecciona el tipo de incapacidad" 
+                        : "Selecciona el subtipo"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     {currentTypeConfig.subtipos.map((subtipo) => (
                       <SelectItem key={subtipo} value={subtipo}>
-                        {subtipo}
+                        <div className="flex flex-col">
+                          <span className="font-medium capitalize">{subtipo}</span>
+                          {tipoNovedad === 'incapacidad' && (
+                            <span className="text-xs text-gray-500">
+                              {subtipo === 'general' && 'EPS paga desde día 4 al 66.7%'}
+                              {subtipo === 'laboral' && 'ARL paga desde día 1 al 100%'}
+                              {subtipo === 'maternidad' && 'EPS paga al 100%'}
+                            </span>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -362,135 +381,183 @@ export const NovedadForm = ({
           </div>
         )}
 
-        {/* Fechas si son requeridas */}
+        {/* Fechas mejoradas para incapacidades */}
         {(currentTypeConfig?.requiere_dias || tipoNovedad === 'vacaciones' || tipoNovedad === 'incapacidad') && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="fecha_inicio" className="text-sm font-medium text-gray-900">
-                Fecha inicio {currentTypeConfig?.requiere_dias ? '*' : ''}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4 text-blue-600" />
+              <Label className="text-sm font-medium text-gray-900">
+                Período {currentTypeConfig?.requiere_dias ? '*' : ''}
               </Label>
-              <Input
-                {...register('fecha_inicio')}
-                type="date"
-                id="fecha_inicio"
-                className="border-gray-200 focus:border-gray-300 focus:ring-0"
-              />
+              {tipoNovedad === 'incapacidad' && (
+                <Badge variant="outline" className="text-xs">
+                  Los días se calculan automáticamente
+                </Badge>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="fecha_fin" className="text-sm font-medium text-gray-900">
-                Fecha fin {currentTypeConfig?.requiere_dias ? '*' : ''}
-              </Label>
-              <Input
-                {...register('fecha_fin')}
-                type="date"
-                id="fecha_fin"
-                className="border-gray-200 focus:border-gray-300 focus:ring-0"
-              />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fecha_inicio" className="text-xs font-medium text-gray-700">
+                  Fecha inicio *
+                </Label>
+                <Input
+                  {...register('fecha_inicio')}
+                  type="date"
+                  id="fecha_inicio"
+                  className="border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fecha_fin" className="text-xs font-medium text-gray-700">
+                  Fecha fin *
+                </Label>
+                <Input
+                  {...register('fecha_fin')}
+                  type="date"
+                  id="fecha_fin"
+                  className="border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                />
+              </div>
             </div>
           </div>
         )}
 
-        {/* Días, Horas y Valor */}
-        <div className="grid grid-cols-3 gap-4">
-          {currentTypeConfig?.requiere_dias && (
+        {/* Días, Horas y Valor - Layout mejorado */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {currentTypeConfig?.requiere_dias && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="dias" className="text-sm font-medium text-gray-900">
+                    Días *
+                  </Label>
+                  {fechaInicio && fechaFin && (
+                    <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700">
+                      Auto-calculado
+                    </Badge>
+                  )}
+                </div>
+                <Input
+                  {...register('dias', { 
+                    setValueAs: (value) => {
+                      if (value === '' || value === null || value === undefined) return undefined;
+                      const num = Number(value);
+                      return isNaN(num) ? undefined : num;
+                    }
+                  })}
+                  type="number"
+                  id="dias"
+                  placeholder="0"
+                  min="0"
+                  max="90"
+                  readOnly={fechaInicio && fechaFin ? true : false}
+                  className={`border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200 ${
+                    fechaInicio && fechaFin ? 'bg-blue-50 text-blue-900' : ''
+                  }`}
+                />
+              </div>
+            )}
+
+            {currentTypeConfig?.requiere_horas && (
+              <div className="space-y-2">
+                <Label htmlFor="horas" className="text-sm font-medium text-gray-900">
+                  Horas *
+                </Label>
+                <Input
+                  {...register('horas', { 
+                    setValueAs: (value) => {
+                      if (value === '' || value === null || value === undefined) return undefined;
+                      const num = Number(value);
+                      return isNaN(num) ? undefined : num;
+                    }
+                  })}
+                  type="number"
+                  id="horas"
+                  placeholder="0"
+                  min="0"
+                  step="0.5"
+                  className="border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="dias" className="text-sm font-medium text-gray-900">
-                Días *
-                {fechaInicio && fechaFin && (
-                  <Badge variant="outline" className="ml-2 text-xs">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="valor" className="text-sm font-medium text-gray-900">
+                  Valor *
+                </Label>
+                {currentTypeConfig?.auto_calculo && (
+                  <Badge variant="secondary" className="text-xs bg-green-50 text-green-700">
+                    <Calculator className="h-3 w-3 mr-1" />
                     Auto-calculado
                   </Badge>
                 )}
-              </Label>
+              </div>
               <Input
-                {...register('dias', { 
+                {...register('valor', { 
                   setValueAs: (value) => {
-                    if (value === '' || value === null || value === undefined) return undefined;
                     const num = Number(value);
-                    return isNaN(num) ? undefined : num;
+                    return isNaN(num) ? 0 : num;
                   }
                 })}
                 type="number"
-                id="dias"
+                id="valor"
                 placeholder="0"
                 min="0"
-                max="90"
-                readOnly={fechaInicio && fechaFin ? true : false}
-                className={`border-gray-200 focus:border-gray-300 focus:ring-0 ${
-                  fechaInicio && fechaFin ? 'bg-gray-50' : ''
+                step="1000"
+                readOnly={currentTypeConfig?.auto_calculo}
+                className={`border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200 ${
+                  currentTypeConfig?.auto_calculo ? 'bg-green-50 text-green-900 font-semibold' : ''
                 }`}
               />
             </div>
-          )}
-
-          {currentTypeConfig?.requiere_horas && (
-            <div className="space-y-2">
-              <Label htmlFor="horas" className="text-sm font-medium text-gray-900">
-                Horas *
-              </Label>
-              <Input
-                {...register('horas', { 
-                  setValueAs: (value) => {
-                    if (value === '' || value === null || value === undefined) return undefined;
-                    const num = Number(value);
-                    return isNaN(num) ? undefined : num;
-                  }
-                })}
-                type="number"
-                id="horas"
-                placeholder="0"
-                min="0"
-                step="0.5"
-                className="border-gray-200 focus:border-gray-300 focus:ring-0"
-              />
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <Label htmlFor="valor" className="text-sm font-medium text-gray-900">
-                Valor *
-              </Label>
-              {currentTypeConfig?.auto_calculo && (
-                <Badge variant="outline" className="text-xs">
-                  <Calculator className="h-3 w-3 mr-1" />
-                  Auto
-                </Badge>
-              )}
-            </div>
-            <Input
-              {...register('valor', { 
-                setValueAs: (value) => {
-                  const num = Number(value);
-                  return isNaN(num) ? 0 : num;
-                }
-              })}
-              type="number"
-              id="valor"
-              placeholder="0"
-              min="0"
-              step="1000"
-              readOnly={currentTypeConfig?.auto_calculo}
-              className={`border-gray-200 focus:border-gray-300 focus:ring-0 ${
-                currentTypeConfig?.auto_calculo ? 'bg-gray-50' : ''
-              }`}
-            />
           </div>
         </div>
 
-        {/* Cálculo automático */}
+        {/* Cálculo automático mejorado para incapacidades */}
         {currentTypeConfig?.auto_calculo && calculationDetail && (
-          <Card className="p-4 bg-blue-50 border-blue-200">
+          <Card className={`p-4 border-l-4 ${
+            tipoNovedad === 'incapacidad' 
+              ? 'bg-amber-50 border-amber-200 border-l-amber-500'
+              : 'bg-blue-50 border-blue-200 border-l-blue-500'
+          }`}>
             <div className="flex items-start space-x-3">
-              <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-blue-900">Cálculo automático:</span>
+              <div className={`p-1 rounded ${
+                tipoNovedad === 'incapacidad' ? 'bg-amber-100' : 'bg-blue-100'
+              }`}>
+                <Calculator className={`h-4 w-4 ${
+                  tipoNovedad === 'incapacidad' ? 'text-amber-600' : 'text-blue-600'
+                }`} />
+              </div>
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className={`text-sm font-semibold ${
+                    tipoNovedad === 'incapacidad' ? 'text-amber-900' : 'text-blue-900'
+                  }`}>
+                    {tipoNovedad === 'incapacidad' ? 'Cálculo de incapacidad:' : 'Cálculo automático:'}
+                  </span>
                   {calculatedValue > 0 && (
-                    <Badge className="bg-blue-600 text-white">{formatCurrency(calculatedValue)}</Badge>
+                    <Badge className={`text-white font-semibold ${
+                      tipoNovedad === 'incapacidad' ? 'bg-amber-600' : 'bg-blue-600'
+                    }`}>
+                      {formatCurrency(calculatedValue)}
+                    </Badge>
                   )}
                 </div>
-                <p className="text-xs text-blue-700 font-mono">{calculationDetail}</p>
+                <div className={`p-3 rounded-md text-xs font-mono ${
+                  tipoNovedad === 'incapacidad' 
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                    : 'bg-blue-100 text-blue-800 border border-blue-200'
+                }`}>
+                  {calculationDetail}
+                </div>
+                {tipoNovedad === 'incapacidad' && subtipo === 'general' && dias && dias <= 3 && (
+                  <div className="flex items-center space-x-2 text-xs text-amber-700">
+                    <Info className="h-3 w-3" />
+                    <span>Los primeros 3 días no son pagados por la EPS</span>
+                  </div>
+                )}
               </div>
             </div>
           </Card>
