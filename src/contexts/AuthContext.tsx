@@ -1,219 +1,147 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-
-interface UserRole {
-  role: string;
-  company_id?: string;
-}
-
-interface UserProfile {
-  id: string;
-  user_id: string;
-  first_name?: string;
-  last_name?: string;
-  avatar_url?: string;
-  phone?: string;
-  company_id?: string;
-}
+import { User } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
-  roles: UserRole[];
-  profile: UserProfile | null;
+  roles: string[];
   isSaasAdmin: boolean;
   hasRole: (role: string) => boolean;
-  isCompanyAdmin: () => boolean;
   canAccessModule: (module: string) => boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
   refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+// Definir permisos por módulo
+const MODULE_PERMISSIONS = {
+  dashboard: ['administrador', 'rrhh', 'contador', 'visualizador'],
+  empleados: ['administrador', 'rrhh'],
+  nomina: ['administrador', 'rrhh', 'contador'],
+  pagos: ['administrador', 'contador'],
+  comprobantes: ['administrador', 'rrhh', 'contador'],
+  reportes: ['administrador', 'rrhh', 'contador', 'visualizador'],
+  configuracion: ['administrador'],
+  'super-admin': ['super_admin']
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [roles, setRoles] = useState<UserRole[]>([]);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [roles, setRoles] = useState<string[]>([]);
   const [isSaasAdmin, setIsSaasAdmin] = useState(false);
 
-  const hasRole = (role: string): boolean => {
-    return roles.some(r => r.role === role);
-  };
-
-  const isCompanyAdmin = (): boolean => {
-    return hasRole('administrador') || isSaasAdmin;
-  };
-
-  const canAccessModule = (module: string): boolean => {
-    // Super admins pueden acceder a todo
-    if (isSaasAdmin) {
-      return true;
-    }
-
-    // Administradores de empresa pueden acceder a todo excepto super admin modules
-    if (hasRole('administrador')) {
-      return module !== 'super-admin';
-    }
-
-    // Otros roles tienen acceso limitado
-    const modulePermissions: { [key: string]: string[] } = {
-      'dashboard': ['administrador', 'rrhh', 'contador', 'visualizador'],
-      'employees': ['administrador', 'rrhh'],
-      'payroll': ['administrador', 'rrhh', 'contador'],
-      'payments': ['administrador', 'contador'],
-      'vouchers': ['administrador', 'rrhh', 'contador'],
-      'reports': ['administrador', 'rrhh', 'contador', 'visualizador'],
-      'settings': ['administrador'],
-      'super-admin': [] // Solo super admins
-    };
-
-    const allowedRoles = modulePermissions[module] || [];
-    return roles.some(r => allowedRoles.includes(r.role));
-  };
-
   const refreshUserData = async () => {
-    const currentUser = (await supabase.auth.getUser()).data.user;
-    if (!currentUser) return;
-
     try {
-      console.log('🔄 Refreshing user data for:', currentUser.email);
-
-      // Fetch user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .rpc('get_user_roles');
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
+      if (currentUser) {
+        console.log('🔍 AuthContext: Current user found:', currentUser.email);
+        
+        // Verificar si es super admin
+        const { data: saasAdminData, error: adminError } = await supabase
+          .from('saas_admins')
+          .select('role')
+          .eq('user_id', currentUser.id)
+          .single();
+
+        if (adminError && adminError.code !== 'PGRST116') {
+          console.error('Error checking saas admin status:', adminError);
+        }
+
+        const isAdmin = !!saasAdminData;
+        console.log('🔐 AuthContext: Is SaaS Admin:', isAdmin);
+        setIsSaasAdmin(isAdmin);
+
+        // Obtener roles del usuario
+        const { data: userRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', currentUser.id);
+
+        if (rolesError) {
+          console.error('Error fetching user roles:', rolesError);
+          setRoles([]);
+        } else {
+          const rolesList = userRoles?.map(r => r.role) || [];
+          console.log('👤 AuthContext: User roles:', rolesList);
+          setRoles(rolesList);
+        }
       } else {
-        console.log('✅ User roles fetched:', userRoles);
-        setRoles(userRoles || []);
-      }
-
-      // Fetch user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .single();
-      
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
-      } else {
-        console.log('✅ User profile fetched:', profileData);
-        setProfile(profileData);
-      }
-
-      // Check if user is SaaS admin
-      const { data: adminStatus, error: adminError } = await supabase
-        .rpc('is_saas_admin');
-      
-      if (adminError) {
-        console.error('Error checking admin status:', adminError);
+        console.log('❌ AuthContext: No user found');
+        setRoles([]);
         setIsSaasAdmin(false);
-      } else {
-        console.log('✅ SaaS admin status:', adminStatus);
-        setIsSaasAdmin(adminStatus || false);
       }
+      
+      setUser(currentUser);
     } catch (error) {
-      console.error('Error refreshing user data:', error);
+      console.error('Error in refreshUserData:', error);
+      setUser(null);
+      setRoles([]);
+      setIsSaasAdmin(false);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔐 Auth state changed:', event, session?.user?.email);
-        setSession(session);
-        setUser(session?.user ?? null);
-        
+    // Cargar datos iniciales
+    refreshUserData();
+
+    // Escuchar cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 AuthContext: Auth state changed:', event);
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
-          // Fetch user data after successful auth
-          setTimeout(async () => {
-            await refreshUserData();
-          }, 0);
-        } else {
-          setRoles([]);
-          setProfile(null);
-          setIsSaasAdmin(false);
+          setUser(session.user);
+          await refreshUserData();
         }
-        
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setRoles([]);
+        setIsSaasAdmin(false);
         setLoading(false);
       }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('🔍 Initial session check:', session?.user?.email);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+  const hasRole = (role: string): boolean => {
+    return roles.includes(role);
   };
 
-  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+  const canAccessModule = (module: string): boolean => {
+    // Super admins pueden acceder a todo
+    if (isSaasAdmin) {
+      console.log('✅ AuthContext: Super admin access granted for module:', module);
+      return true;
+    }
+
+    // Verificar permisos específicos del módulo
+    const requiredRoles = MODULE_PERMISSIONS[module as keyof typeof MODULE_PERMISSIONS];
+    if (!requiredRoles) {
+      console.log('❓ AuthContext: Module not found:', module);
+      return false;
+    }
+
+    const hasAccess = roles.some(role => requiredRoles.includes(role));
+    console.log(`🔐 AuthContext: Module ${module} access:`, hasAccess, 'User roles:', roles, 'Required roles:', requiredRoles);
     
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          first_name: firstName,
-          last_name: lastName
-        }
-      }
-    });
-    return { error };
+    return hasAccess;
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setRoles([]);
-    setProfile(null);
-    setIsSaasAdmin(false);
-  };
-
-  const value = {
+  const value: AuthContextType = {
     user,
-    session,
     loading,
     roles,
-    profile,
     isSaasAdmin,
     hasRole,
-    isCompanyAdmin,
     canAccessModule,
-    signIn,
-    signUp,
-    signOut,
-    refreshUserData,
+    refreshUserData
   };
 
   return (
@@ -221,4 +149,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
