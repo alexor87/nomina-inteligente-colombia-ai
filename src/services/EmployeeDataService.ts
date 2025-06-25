@@ -1,21 +1,42 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 
 export class EmployeeDataService {
   static async getEmployees(): Promise<EmployeeWithStatus[]> {
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        console.warn('No company ID found for current user');
+      // Obtener el usuario actual
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Error getting user:', userError);
         return [];
       }
 
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
+      // Verificar si es superadmin
+      const { data: isSuperAdminData } = await supabase.rpc('is_superadmin', {
+        _user_id: user.id
+      });
+
+      const isSuperAdmin = !!isSuperAdminData;
+
+      let query = supabase.from('employees').select('*');
+
+      // Si no es superadmin, filtrar por empresas accesibles
+      if (!isSuperAdmin) {
+        const { data: userCompanies } = await supabase.rpc('get_user_companies', {
+          _user_id: user.id
+        });
+
+        if (!userCompanies || userCompanies.length === 0) {
+          console.warn('User has no accessible companies');
+          return [];
+        }
+
+        const companyIds = userCompanies.map((uc: any) => uc.company_id);
+        query = query.in('company_id', companyIds);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching employees:', error);
@@ -37,26 +58,44 @@ export class EmployeeDataService {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError) {
+      if (userError || !user) {
         console.error('Error getting user:', userError);
         return null;
       }
 
-      if (!user) {
-        console.warn('No authenticated user found');
-        return null;
+      // Verificar si es superadmin (puede acceder a cualquier empresa)
+      const { data: isSuperAdminData } = await supabase.rpc('is_superadmin', {
+        _user_id: user.id
+      });
+
+      if (isSuperAdminData) {
+        // Para superadmin, obtener la primera empresa disponible o usar el perfil
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profile?.company_id) {
+          return profile.company_id;
+        }
+
+        // Si no tiene empresa en el perfil, obtener la primera empresa disponible
+        const { data: firstCompany } = await supabase
+          .from('companies')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+
+        return firstCompany?.id || null;
       }
 
-      const { data: profile, error: profileError } = await supabase
+      // Para usuarios normales, obtener su empresa actual del perfil
+      const { data: profile } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .maybeSingle();
-
-      if (profileError) {
-        console.error('Error getting user profile:', profileError);
-        return null;
-      }
 
       return profile?.company_id || null;
     } catch (error) {
@@ -85,14 +124,12 @@ export class EmployeeDataService {
       cargo: emp.cargo,
       empresaId: emp.company_id,
       estadoAfiliacion: (emp.estado_afiliacion || 'pendiente') as 'completa' | 'pendiente' | 'inconsistente',
-      // Banking information
       banco: emp.banco,
       tipoCuenta: emp.tipo_cuenta as 'ahorros' | 'corriente',
       numeroCuenta: emp.numero_cuenta,
       titularCuenta: emp.titular_cuenta,
       createdAt: emp.created_at,
       updatedAt: emp.updated_at,
-      // Status fields
       payrollStatus: 'al_dia',
       alertCount: 0,
       ultimoProcesamientoNomina: '2024-12-01',
@@ -104,22 +141,14 @@ export class EmployeeDataService {
 
   static async searchEmployees(searchTerm: string): Promise<EmployeeWithStatus[]> {
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) return [];
-
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('company_id', companyId)
-        .or(`nombre.ilike.%${searchTerm}%,apellido.ilike.%${searchTerm}%,cedula.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error searching employees:', error);
-        return [];
-      }
-
-      return this.transformEmployeeData(data || []);
+      const employees = await this.getEmployees();
+      
+      return employees.filter(emp => 
+        emp.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.cedula.includes(searchTerm) ||
+        emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     } catch (error) {
       console.error('Error in searchEmployees:', error);
       return [];
@@ -128,24 +157,8 @@ export class EmployeeDataService {
 
   static async getEmployeeById(id: string): Promise<EmployeeWithStatus | null> {
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) return null;
-
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('id', id)
-        .eq('company_id', companyId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching employee:', error);
-        return null;
-      }
-
-      if (!data) return null;
-
-      return this.transformEmployeeData([data])[0];
+      const employees = await this.getEmployees();
+      return employees.find(emp => emp.id === id) || null;
     } catch (error) {
       console.error('Error in getEmployeeById:', error);
       return null;

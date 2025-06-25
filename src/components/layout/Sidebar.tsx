@@ -10,7 +10,8 @@ import {
   Settings,
   Building2,
   Menu,
-  X
+  X,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ collapsed = false, onToggle }: SidebarProps) => {
-  const { canAccessModule, isSaasAdmin } = useAuth();
+  const { canAccessModule, isSuperAdmin } = useAuth();
 
   const navigationItems = [
     {
@@ -68,13 +69,20 @@ const Sidebar = ({ collapsed = false, onToggle }: SidebarProps) => {
     }
   ];
 
-  // Add super admin item ONLY if user is actually a super admin
-  if (isSaasAdmin) {
+  // Add super admin item ONLY if user is superadmin
+  if (isSuperAdmin) {
     navigationItems.push({
       name: 'Super Admin',
       href: '/super-admin',
       icon: Building2,
       module: 'super-admin'
+    });
+    
+    navigationItems.push({
+      name: 'Backoffice',
+      href: '/backoffice',
+      icon: Shield,
+      module: 'backoffice'
     });
   }
 
@@ -91,10 +99,15 @@ const Sidebar = ({ collapsed = false, onToggle }: SidebarProps) => {
           <div className="flex items-center space-x-2">
             <Building2 className="h-6 w-6 text-blue-600" />
             <span className="font-semibold text-gray-900 text-sm">Nómina</span>
+            {isSuperAdmin && (
+              <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                SuperAdmin
+              </span>
+            )}
           </div>
         )}
         
-        {/* Toggle button - visible on mobile or when collapsed */}
+        {/* Toggle button */}
         <Button
           variant="ghost"
           size="sm"
@@ -112,9 +125,8 @@ const Sidebar = ({ collapsed = false, onToggle }: SidebarProps) => {
       <nav className="flex-1 p-2">
         <div className="space-y-1">
           {navigationItems.map((item) => {
-            // For super admins: allow access to everything
-            // For regular users: check module permissions
-            const hasAccess = isSaasAdmin || canAccessModule(item.module);
+            // Check if user can access this module
+            const hasAccess = canAccessModule(item.module);
             
             if (!hasAccess) {
               return null;

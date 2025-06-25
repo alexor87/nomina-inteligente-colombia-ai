@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -5,7 +6,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
+  requiredRole?: 'admin' | 'editor' | 'lector';
   requireSuperAdmin?: boolean;
   module?: string;
 }
@@ -16,7 +17,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireSuperAdmin = false,
   module
 }) => {
-  const { user, loading, hasRole, isSaasAdmin, canAccessModule } = useAuth();
+  const { user, loading, hasRole, isSuperAdmin, canAccessModule, currentCompany } = useAuth();
 
   console.log('🛡️ ProtectedRoute check:', {
     user: user?.email,
@@ -24,7 +25,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     requiredRole,
     requireSuperAdmin,
     module,
-    isSaasAdmin,
+    isSuperAdmin,
+    currentCompany,
     hasRequiredRole: requiredRole ? hasRole(requiredRole) : 'no role required',
     canAccessModule: module ? canAccessModule(module) : 'no module check'
   });
@@ -42,18 +44,24 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // If no user, redirect to auth (this is the only redirect we keep)
+  // If no user, redirect to auth
   if (!user) {
     console.log('🚫 ProtectedRoute: No user, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
 
-  // Validate access silently in background
+  // Validate access
   const hasValidAccess = () => {
     // Super admin requirement check
-    if (requireSuperAdmin && !isSaasAdmin) {
+    if (requireSuperAdmin && !isSuperAdmin) {
       console.log('❌ ProtectedRoute: User is not super admin');
       return false;
+    }
+
+    // If requires superadmin and user is superadmin, allow access
+    if (requireSuperAdmin && isSuperAdmin) {
+      console.log('✅ ProtectedRoute: SuperAdmin access granted');
+      return true;
     }
 
     // Module access check
@@ -62,23 +70,38 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return false;
     }
 
-    // Role requirement check (if not super admin)
-    if (requiredRole && !isSaasAdmin && !hasRole(requiredRole)) {
+    // Role requirement check
+    if (requiredRole && !hasRole(requiredRole)) {
       console.log('❌ ProtectedRoute: User lacks required role:', requiredRole);
+      return false;
+    }
+
+    // For non-superadmin users, check if they have a current company
+    if (!isSuperAdmin && !currentCompany) {
+      console.log('❌ ProtectedRoute: Non-superadmin user has no current company');
       return false;
     }
 
     return true;
   };
 
-  // If access validation fails, show loading while we handle it in background
+  // If access validation fails, show access denied
   if (!hasValidAccess()) {
-    console.log('⏳ ProtectedRoute: Access validation in progress...');
+    console.log('❌ ProtectedRoute: Access denied');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <LoadingSpinner size="lg" className="mb-4" />
-          <p className="text-gray-600 text-lg">Validando acceso...</p>
+          <div className="text-6xl mb-4">🚫</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Acceso Denegado</h2>
+          <p className="text-gray-600 mb-4">
+            No tienes permisos para acceder a esta sección.
+          </p>
+          <p className="text-sm text-gray-500">
+            {!currentCompany && !isSuperAdmin ? 
+              'No tienes una empresa asignada. Contacta al administrador.' :
+              'Contacta al administrador para obtener los permisos necesarios.'
+            }
+          </p>
         </div>
       </div>
     );

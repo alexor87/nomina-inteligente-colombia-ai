@@ -11,40 +11,49 @@ interface Profile {
   avatar_url?: string;
 }
 
+interface UserCompany {
+  company_id: string;
+  rol: string;
+}
+
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  roles: string[];
-  isSaasAdmin: boolean;
-  hasRole: (role: string) => boolean;
+  isSuperAdmin: boolean;
+  userCompanies: UserCompany[];
+  currentCompany: UserCompany | null;
+  hasRole: (role: string, companyId?: string) => boolean;
   canAccessModule: (module: string) => boolean;
   refreshUserData: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  setCurrentCompany: (company: UserCompany) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Definir permisos por módulo
+// Definir permisos por módulo y rol
 const MODULE_PERMISSIONS = {
-  dashboard: ['administrador', 'rrhh', 'contador', 'visualizador'],
-  empleados: ['administrador', 'rrhh'],
-  nomina: ['administrador', 'rrhh', 'contador'],
-  pagos: ['administrador', 'contador'],
-  comprobantes: ['administrador', 'rrhh', 'contador'],
-  reportes: ['administrador', 'rrhh', 'contador', 'visualizador'],
-  configuracion: ['administrador'],
-  'super-admin': ['super_admin']
+  dashboard: ['admin', 'editor', 'lector'],
+  empleados: ['admin', 'editor', 'lector'],
+  nomina: ['admin', 'editor'],
+  pagos: ['admin', 'editor'],
+  comprobantes: ['admin', 'editor', 'lector'],
+  reportes: ['admin', 'editor', 'lector'],
+  configuracion: ['admin'],
+  'super-admin': ['superadmin'], // Solo para superadmin
+  backoffice: ['superadmin'] // Módulo interno para superadmin
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [roles, setRoles] = useState<string[]>([]);
-  const [isSaasAdmin, setIsSaasAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
+  const [currentCompany, setCurrentCompanyState] = useState<UserCompany | null>(null);
 
   const refreshUserData = async () => {
     try {
@@ -53,8 +62,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!currentUser) {
         console.log('❌ AuthContext: No user found');
         setProfile(null);
-        setRoles([]);
-        setIsSaasAdmin(false);
+        setIsSuperAdmin(false);
+        setUserCompanies([]);
+        setCurrentCompanyState(null);
         setUser(null);
         return;
       }
@@ -62,23 +72,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔍 AuthContext: Current user found:', currentUser.email);
       setUser(currentUser);
 
-      // Verificar si es super admin de forma segura
+      // Verificar si es superadmin
       try {
-        const { data: saasAdminData } = await supabase
-          .from('saas_admins')
-          .select('role')
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
+        const { data: superAdminCheck } = await supabase.rpc('is_superadmin', {
+          _user_id: currentUser.id
+        });
 
-        const isAdmin = !!saasAdminData;
-        console.log('🔐 AuthContext: Is SaaS Admin:', isAdmin);
-        setIsSaasAdmin(isAdmin);
+        const isSuper = !!superAdminCheck;
+        console.log('🔐 AuthContext: Is SuperAdmin:', isSuper);
+        setIsSuperAdmin(isSuper);
       } catch (error) {
-        console.warn('Could not check saas admin status:', error);
-        setIsSaasAdmin(false);
+        console.warn('Could not check superadmin status:', error);
+        setIsSuperAdmin(false);
       }
 
-      // Obtener perfil del usuario de forma segura
+      // Obtener perfil del usuario
       try {
         const { data: profileData } = await supabase
           .from('profiles')
@@ -92,27 +100,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
 
-      // Obtener roles del usuario de forma segura
+      // Obtener empresas y roles del usuario
       try {
-        const { data: userRoles } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', currentUser.id);
+        const { data: companiesData } = await supabase.rpc('get_user_companies', {
+          _user_id: currentUser.id
+        });
 
-        const rolesList = userRoles?.map(r => r.role) || [];
-        console.log('👤 AuthContext: User roles:', rolesList);
-        setRoles(rolesList);
+        const companies: UserCompany[] = companiesData || [];
+        console.log('🏢 AuthContext: User companies:', companies);
+        setUserCompanies(companies);
+
+        // Establecer empresa actual si no hay una seleccionada
+        if (companies.length > 0 && !currentCompany) {
+          setCurrentCompanyState(companies[0]);
+        }
       } catch (error) {
-        console.warn('Could not fetch user roles:', error);
-        setRoles([]);
+        console.warn('Could not fetch user companies:', error);
+        setUserCompanies([]);
       }
 
     } catch (error) {
       console.error('Error in refreshUserData:', error);
       setUser(null);
       setProfile(null);
-      setRoles([]);
-      setIsSaasAdmin(false);
+      setIsSuperAdmin(false);
+      setUserCompanies([]);
+      setCurrentCompanyState(null);
     }
   };
 
@@ -159,18 +172,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(null);
       setProfile(null);
-      setRoles([]);
-      setIsSaasAdmin(false);
+      setIsSuperAdmin(false);
+      setUserCompanies([]);
+      setCurrentCompanyState(null);
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
     }
   };
 
+  const setCurrentCompany = (company: UserCompany) => {
+    setCurrentCompanyState(company);
+  };
+
+  const hasRole = (role: string, companyId?: string): boolean => {
+    // Superadmin siempre tiene todos los roles
+    if (isSuperAdmin && role !== 'superadmin') {
+      return true;
+    }
+
+    // Verificar rol específico para superadmin
+    if (role === 'superadmin') {
+      return isSuperAdmin;
+    }
+
+    // Para roles normales, verificar en la empresa especificada o actual
+    const targetCompanyId = companyId || currentCompany?.company_id;
+    if (!targetCompanyId) return false;
+
+    const companyRole = userCompanies.find(uc => 
+      uc.company_id === targetCompanyId
+    );
+
+    return companyRole?.rol === role;
+  };
+
+  const canAccessModule = (module: string): boolean => {
+    // Superadmin puede acceder a todo
+    if (isSuperAdmin) {
+      console.log('✅ AuthContext: SuperAdmin access granted for module:', module);
+      return true;
+    }
+
+    // Verificar permisos específicos del módulo
+    const requiredRoles = MODULE_PERMISSIONS[module as keyof typeof MODULE_PERMISSIONS];
+    if (!requiredRoles) {
+      console.log('❓ AuthContext: Module not found:', module);
+      return false;
+    }
+
+    // Si no hay empresa actual, no puede acceder
+    if (!currentCompany) {
+      console.log('❌ AuthContext: No current company selected');
+      return false;
+    }
+
+    const hasAccess = requiredRoles.includes(currentCompany.rol);
+    console.log(`🔐 AuthContext: Module ${module} access:`, hasAccess, 'User role:', currentCompany.rol, 'Required roles:', requiredRoles);
+    
+    return hasAccess;
+  };
+
   useEffect(() => {
     let mounted = true;
 
-    // Función para manejar cambios de estado de autenticación
     const handleAuthStateChange = async (event: string, session: any) => {
       if (!mounted) return;
 
@@ -179,7 +244,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           setUser(session.user);
-          // Usar setTimeout para evitar loops infinitos
           setTimeout(() => {
             if (mounted) {
               refreshUserData();
@@ -189,8 +253,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
-        setRoles([]);
-        setIsSaasAdmin(false);
+        setIsSuperAdmin(false);
+        setUserCompanies([]);
+        setCurrentCompanyState(null);
       }
       
       if (mounted) {
@@ -198,10 +263,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Configurar listener de cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
-    // Cargar sesión inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       
@@ -223,42 +286,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const hasRole = (role: string): boolean => {
-    return roles.includes(role);
-  };
-
-  const canAccessModule = (module: string): boolean => {
-    // Super admins pueden acceder a todo
-    if (isSaasAdmin) {
-      console.log('✅ AuthContext: Super admin access granted for module:', module);
-      return true;
-    }
-
-    // Verificar permisos específicos del módulo
-    const requiredRoles = MODULE_PERMISSIONS[module as keyof typeof MODULE_PERMISSIONS];
-    if (!requiredRoles) {
-      console.log('❓ AuthContext: Module not found:', module);
-      return false;
-    }
-
-    const hasAccess = roles.some(role => requiredRoles.includes(role));
-    console.log(`🔐 AuthContext: Module ${module} access:`, hasAccess, 'User roles:', roles, 'Required roles:', requiredRoles);
-    
-    return hasAccess;
-  };
-
   const value: AuthContextType = {
     user,
     profile,
     loading,
-    roles,
-    isSaasAdmin,
+    isSuperAdmin,
+    userCompanies,
+    currentCompany,
     hasRole,
     canAccessModule,
     refreshUserData,
     signIn,
     signUp,
-    signOut
+    signOut,
+    setCurrentCompany
   };
 
   return (
