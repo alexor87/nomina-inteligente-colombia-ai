@@ -85,26 +85,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return true;
   };
 
-  // If access validation fails, show access denied
+  // If access validation fails, show loading while redirecting
   if (!hasValidAccess()) {
-    console.log('❌ ProtectedRoute: Access denied');
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🚫</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Acceso Denegado</h2>
-          <p className="text-gray-600 mb-4">
-            No tienes permisos para acceder a esta sección.
-          </p>
-          <p className="text-sm text-gray-500">
-            {!currentCompany && !isSuperAdmin ? 
-              'No tienes una empresa asignada. Contacta al administrador.' :
-              'Contacta al administrador para obtener los permisos necesarios.'
-            }
-          </p>
-        </div>
-      </div>
-    );
+    console.log('❌ ProtectedRoute: Access denied, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
   }
 
   console.log('✅ ProtectedRoute: Access granted');
