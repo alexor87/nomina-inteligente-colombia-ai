@@ -2,8 +2,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types';
 import { EmployeeDataService } from './EmployeeDataService';
 
+interface EmployeeDataWithBanking extends Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> {
+  banco?: string;
+  tipoCuenta?: 'ahorros' | 'corriente';
+  numeroCuenta?: string;
+  titularCuenta?: string;
+}
+
 export class EmployeeService {
-  static async create(employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) {
+  static async create(employeeData: EmployeeDataWithBanking) {
+    console.log('🚀 EmployeeService.create called with:', employeeData);
+    
     // Obtener la empresa del usuario autenticado
     const companyId = await EmployeeDataService.getCurrentUserCompanyId();
     if (!companyId) {
@@ -34,7 +43,7 @@ export class EmployeeService {
       ? employeeData.estadoAfiliacion
       : 'pendiente';
 
-    // Limpiar y validar datos antes de insertar
+    // Limpiar y validar datos antes de insertar INCLUYENDO CAMPOS BANCARIOS
     const cleanedData = {
       company_id: companyId,
       cedula: String(employeeData.cedula || '').trim(),
@@ -53,10 +62,11 @@ export class EmployeeService {
       caja_compensacion: employeeData.cajaCompensacion ? String(employeeData.cajaCompensacion).trim() : null,
       cargo: employeeData.cargo ? String(employeeData.cargo).trim() : null,
       estado_afiliacion: estadoAfiliacionLimpio,
-      banco: (employeeData as any).banco ? String((employeeData as any).banco).trim() : null,
-      tipo_cuenta: (employeeData as any).tipoCuenta || 'ahorros',
-      numero_cuenta: (employeeData as any).numeroCuenta ? String((employeeData as any).numeroCuenta).trim() : null,
-      titular_cuenta: (employeeData as any).titularCuenta ? String((employeeData as any).titularCuenta).trim() : null
+      // AGREGAR CAMPOS BANCARIOS
+      banco: employeeData.banco ? String(employeeData.banco).trim() : null,
+      tipo_cuenta: employeeData.tipoCuenta || 'ahorros',
+      numero_cuenta: employeeData.numeroCuenta ? String(employeeData.numeroCuenta).trim() : null,
+      titular_cuenta: employeeData.titularCuenta ? String(employeeData.titularCuenta).trim() : null
     };
 
     // Validaciones básicas
@@ -70,11 +80,8 @@ export class EmployeeService {
       throw new Error('El salario base debe ser mayor a 0');
     }
 
-    console.log('Creando empleado para empresa:', companyId);
-    console.log('Datos limpiados a insertar:', cleanedData);
-    console.log('Estado validado:', estadoLimpio);
-    console.log('Tipo contrato validado:', tipoContratoLimpio);
-    console.log('Tipo documento validado:', tipoDocumentoLimpio);
+    console.log('📊 Creando empleado para empresa:', companyId);
+    console.log('📋 Datos limpiados a insertar:', cleanedData);
 
     try {
       const { data, error } = await supabase
@@ -84,20 +91,20 @@ export class EmployeeService {
         .single();
 
       if (error) {
-        console.error('Error detallado de Supabase:', {
+        console.error('❌ Error detallado de Supabase:', {
           message: error.message,
           details: error.details,
           hint: error.hint,
           code: error.code
         });
-        console.error('Datos que causaron el error:', cleanedData);
+        console.error('📋 Datos que causaron el error:', cleanedData);
         throw new Error(`Error al crear empleado: ${error.message}`);
       }
 
-      console.log('Empleado creado exitosamente:', data);
+      console.log('✅ Empleado creado exitosamente:', data);
       return data;
     } catch (err: any) {
-      console.error('Error durante la inserción:', err);
+      console.error('❌ Error durante la inserción:', err);
       throw err;
     }
   }
@@ -122,6 +129,7 @@ export class EmployeeService {
     if (updates.cargo !== undefined) supabaseData.cargo = updates.cargo;
     if (updates.estadoAfiliacion !== undefined) supabaseData.estado_afiliacion = updates.estadoAfiliacion;
 
+    // Manejar campos bancarios en updates también
     if ((updates as any).banco !== undefined) supabaseData.banco = (updates as any).banco;
     if ((updates as any).tipoCuenta !== undefined) supabaseData.tipo_cuenta = (updates as any).tipoCuenta;
     if ((updates as any).numeroCuenta !== undefined) supabaseData.numero_cuenta = (updates as any).numeroCuenta;

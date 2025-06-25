@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -157,12 +156,15 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
   };
 
   const onSubmit = async (data: EmployeeFormData) => {
+    console.log('Submitting form data:', data);
+    
     if (!companyId) {
       console.error('No company ID available');
       return;
     }
 
-    const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
+    // Crear el objeto de empleado con TODOS los campos incluyendo los bancarios
+    const employeeData = {
       empresaId: companyId,
       cedula: data.cedula,
       tipoDocumento: data.tipoDocumento,
@@ -179,8 +181,15 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
       arl: data.arl,
       cajaCompensacion: data.cajaCompensacion,
       cargo: data.cargo,
-      estadoAfiliacion: data.estadoAfiliacion
+      estadoAfiliacion: data.estadoAfiliacion,
+      // Agregar campos bancarios
+      banco: data.banco,
+      tipoCuenta: data.tipoCuenta,
+      numeroCuenta: data.numeroCuenta,
+      titularCuenta: data.titularCuenta
     };
+
+    console.log('Final employee data to create:', employeeData);
 
     let result;
     if (employee) {
@@ -188,6 +197,8 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
     } else {
       result = await createEmployee(employeeData);
     }
+
+    console.log('Create/Update result:', result);
 
     if (result.success) {
       onSuccess();
@@ -231,7 +242,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="tipoDocumento" className="text-sm font-medium">Tipo de Documento *</Label>
-          <Select onValueChange={(value) => setValue('tipoDocumento', value as any)}>
+          <Select onValueChange={(value) => setValue('tipoDocumento', value as any)} defaultValue={watchedValues.tipoDocumento}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Seleccionar tipo" />
             </SelectTrigger>
@@ -337,7 +348,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
 
         <div className="space-y-2">
           <Label htmlFor="tipoContrato" className="text-sm font-medium">Tipo de Contrato *</Label>
-          <Select onValueChange={(value) => setValue('tipoContrato', value as any)}>
+          <Select onValueChange={(value) => setValue('tipoContrato', value as any)} defaultValue={watchedValues.tipoContrato}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Seleccionar tipo" />
             </SelectTrigger>
@@ -364,7 +375,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
 
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="estado" className="text-sm font-medium">Estado</Label>
-          <Select onValueChange={(value) => setValue('estado', value as any)}>
+          <Select onValueChange={(value) => setValue('estado', value as any)} defaultValue={watchedValues.estado}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Seleccionar estado" />
             </SelectTrigger>
@@ -391,7 +402,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="banco" className="text-sm font-medium">Banco *</Label>
-          <Select onValueChange={(value) => setValue('banco', value)}>
+          <Select onValueChange={(value) => setValue('banco', value)} defaultValue={watchedValues.banco}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Seleccionar banco" />
             </SelectTrigger>
@@ -408,7 +419,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
 
         <div className="space-y-2">
           <Label htmlFor="tipoCuenta" className="text-sm font-medium">Tipo de Cuenta *</Label>
-          <Select onValueChange={(value) => setValue('tipoCuenta', value as any)}>
+          <Select onValueChange={(value) => setValue('tipoCuenta', value as any)} defaultValue={watchedValues.tipoCuenta}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Seleccionar tipo" />
             </SelectTrigger>
@@ -498,7 +509,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
 
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="estadoAfiliacion" className="text-sm font-medium">Estado Afiliación</Label>
-          <Select onValueChange={(value) => setValue('estadoAfiliacion', value as any)}>
+          <Select onValueChange={(value) => setValue('estadoAfiliacion', value as any)} defaultValue={watchedValues.estadoAfiliacion}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Seleccionar estado" />
             </SelectTrigger>

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Employee } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -11,8 +10,10 @@ export const useEmployeeCRUD = () => {
   const createEmployee = async (employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
     setIsLoading(true);
     try {
-      console.log('Creating employee with data:', employeeData);
+      console.log('🚀 useEmployeeCRUD: Creating employee with data:', employeeData);
       const data = await EmployeeService.create(employeeData);
+
+      console.log('✅ Employee created successfully:', data);
 
       toast({
         title: "Empleado creado",
@@ -21,13 +22,18 @@ export const useEmployeeCRUD = () => {
 
       return { success: true, data };
     } catch (error: any) {
-      console.error('Error creating employee:', error);
+      console.error('❌ Error creating employee:', error);
+      
+      // Mostrar error específico al usuario
+      const errorMessage = error.message || "No se pudo crear el empleado. Intenta nuevamente.";
+      
       toast({
         title: "Error al crear empleado",
-        description: error.message || "No se pudo crear el empleado. Intenta nuevamente.",
+        description: errorMessage,
         variant: "destructive"
       });
-      return { success: false, error: error.message };
+      
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
@@ -36,7 +42,7 @@ export const useEmployeeCRUD = () => {
   const updateEmployee = async (id: string, updates: Partial<Employee>) => {
     setIsLoading(true);
     try {
-      console.log('Updating employee with data:', updates);
+      console.log('🔄 Updating employee with data:', updates);
       await EmployeeService.update(id, updates);
       
       toast({
@@ -46,13 +52,17 @@ export const useEmployeeCRUD = () => {
 
       return { success: true };
     } catch (error: any) {
-      console.error('Error updating employee:', error);
+      console.error('❌ Error updating employee:', error);
+      
+      const errorMessage = error.message || "No se pudo actualizar el empleado.";
+      
       toast({
         title: "Error al actualizar",
-        description: error.message || "No se pudo actualizar el empleado.",
+        description: errorMessage,
         variant: "destructive"
       });
-      return { success: false, error: error.message };
+      
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
