@@ -1,4 +1,5 @@
 
+import { useState } from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ import {
   RefreshCw,
   FileText
 } from 'lucide-react';
+import { VoucherPreviewModal } from './VoucherPreviewModal';
 
 interface VoucherTableRowProps {
   voucher: PayrollVoucher;
@@ -37,6 +39,8 @@ export const VoucherTableRow = ({
   onSendEmail,
   onRegenerate
 }: VoucherTableRowProps) => {
+  const [showPreview, setShowPreview] = useState(false);
+
   const getStatusColor = (status: string) => {
     const colors = {
       'pendiente': 'bg-yellow-100 text-yellow-800',
@@ -62,11 +66,8 @@ export const VoucherTableRow = ({
     }
   };
 
-  const handleViewPdf = () => {
-    if (voucher.pdfUrl) {
-      // Abrir el PDF en una nueva ventana
-      window.open(voucher.pdfUrl, '_blank');
-    }
+  const handleViewPreview = () => {
+    setShowPreview(true);
   };
 
   const handleDownloadPdf = () => {
@@ -79,91 +80,94 @@ export const VoucherTableRow = ({
   };
 
   return (
-    <TableRow className="hover:bg-gray-50">
-      <TableCell>
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={() => onToggleSelection(voucher.id)}
-        />
-      </TableCell>
-      
-      <TableCell>
-        <div>
-          <div className="font-medium text-gray-900">
-            {voucher.employeeName}
+    <>
+      <TableRow className="hover:bg-gray-50">
+        <TableCell>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelection(voucher.id)}
+          />
+        </TableCell>
+        
+        <TableCell>
+          <div>
+            <div className="font-medium text-gray-900">
+              {voucher.employeeName}
+            </div>
+            <div className="text-sm text-gray-500">
+              CC: {voucher.employeeCedula}
+            </div>
           </div>
-          <div className="text-sm text-gray-500">
-            CC: {voucher.employeeCedula}
+        </TableCell>
+        
+        <TableCell>
+          <div className="text-sm font-medium text-gray-900">
+            {voucher.periodo}
           </div>
-        </div>
-      </TableCell>
-      
-      <TableCell>
-        <div className="text-sm font-medium text-gray-900">
-          {voucher.periodo}
-        </div>
-        <div className="text-xs text-gray-500">
-          {new Date(voucher.startDate).toLocaleDateString('es-CO')} - {new Date(voucher.endDate).toLocaleDateString('es-CO')}
-        </div>
-      </TableCell>
-      
-      <TableCell>
-        <div className="font-medium text-gray-900">
-          ${voucher.netPay.toLocaleString('es-CO')}
-        </div>
-      </TableCell>
-      
-      <TableCell>
-        <div className="flex items-center space-x-2">
-          {getStatusIcon(voucher.voucherStatus)}
-          <Badge className={getStatusColor(voucher.voucherStatus)}>
-            {voucher.voucherStatus}
-          </Badge>
-        </div>
-      </TableCell>
-      
-      <TableCell>
-        <div className="flex items-center space-x-2">
-          {voucher.sentToEmployee ? (
-            <>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              <span className="text-sm text-green-600">Sí</span>
-            </>
-          ) : (
-            <>
-              <XCircle className="h-4 w-4 text-red-500" />
-              <span className="text-sm text-red-600">No</span>
-            </>
-          )}
-        </div>
-        {voucher.sentDate && (
           <div className="text-xs text-gray-500">
-            {new Date(voucher.sentDate).toLocaleDateString('es-CO')}
+            {new Date(voucher.startDate).toLocaleDateString('es-CO')} - {new Date(voucher.endDate).toLocaleDateString('es-CO')}
           </div>
-        )}
-      </TableCell>
-      
-      <TableCell>
-        {voucher.voucherStatus === 'generado' || voucher.pdfUrl ? (
+        </TableCell>
+        
+        <TableCell>
+          <div className="font-medium text-gray-900">
+            ${voucher.netPay.toLocaleString('es-CO')}
+          </div>
+        </TableCell>
+        
+        <TableCell>
+          <div className="flex items-center space-x-2">
+            {getStatusIcon(voucher.voucherStatus)}
+            <Badge className={getStatusColor(voucher.voucherStatus)}>
+              {voucher.voucherStatus}
+            </Badge>
+          </div>
+        </TableCell>
+        
+        <TableCell>
+          <div className="flex items-center space-x-2">
+            {voucher.sentToEmployee ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="text-sm text-green-600">Sí</span>
+              </>
+            ) : (
+              <>
+                <XCircle className="h-4 w-4 text-red-500" />
+                <span className="text-sm text-red-600">No</span>
+              </>
+            )}
+          </div>
+          {voucher.sentDate && (
+            <div className="text-xs text-gray-500">
+              {new Date(voucher.sentDate).toLocaleDateString('es-CO')}
+            </div>
+          )}
+        </TableCell>
+        
+        <TableCell>
           <div className="flex items-center space-x-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={handleViewPdf}
+                  onClick={handleViewPreview}
+                  className="text-blue-600 hover:text-blue-800"
                 >
                   <Eye className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Ver PDF</TooltipContent>
+              <TooltipContent>Ver comprobante</TooltipContent>
             </Tooltip>
+            
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={handleDownloadPdf}
+                  className="text-green-600 hover:text-green-800"
                 >
                   <Download className="h-4 w-4" />
                 </Button>
@@ -171,58 +175,51 @@ export const VoucherTableRow = ({
               <TooltipContent>Descargar PDF</TooltipContent>
             </Tooltip>
           </div>
-        ) : (
+        </TableCell>
+        
+        <TableCell>
           <div className="flex items-center space-x-1">
+            {!voucher.sentToEmployee && voucher.employeeEmail && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onSendEmail(voucher.id)}
+                    disabled={voucher.voucherStatus !== 'generado'}
+                    className="text-purple-600 hover:text-purple-800"
+                  >
+                    <Mail className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Enviar por correo</TooltipContent>
+              </Tooltip>
+            )}
+            
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={handleDownloadPdf}
-                  className="text-blue-600 hover:text-blue-800"
+                  onClick={() => onRegenerate(voucher.id)}
+                  className="text-orange-600 hover:text-orange-800"
                 >
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Generar PDF</TooltipContent>
+              <TooltipContent>Regenerar</TooltipContent>
             </Tooltip>
-            <span className="text-xs text-gray-400">Generar</span>
           </div>
-        )}
-      </TableCell>
-      
-      <TableCell>
-        <div className="flex items-center space-x-1">
-          {!voucher.sentToEmployee && voucher.employeeEmail && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onSendEmail(voucher.id)}
-                  disabled={voucher.voucherStatus !== 'generado'}
-                >
-                  <Mail className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Enviar por correo</TooltipContent>
-            </Tooltip>
-          )}
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onRegenerate(voucher.id)}
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Regenerar</TooltipContent>
-          </Tooltip>
-        </div>
-      </TableCell>
-    </TableRow>
+        </TableCell>
+      </TableRow>
+
+      <VoucherPreviewModal
+        voucher={voucher}
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        onDownload={onDownload}
+        onSendEmail={onSendEmail}
+      />
+    </>
   );
 };

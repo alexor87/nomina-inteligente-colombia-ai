@@ -38,17 +38,31 @@ export const useVoucherActions = (vouchers: PayrollVoucher[], refreshVouchers: (
       return;
     }
 
+    const vouchersToDownload = vouchers.filter(v => selectedVouchers.includes(v.id));
+
     toast({
-      title: "Descarga en progreso",
-      description: `Preparando descarga de ${selectedVouchers.length} comprobantes...`,
+      title: "Descarga masiva iniciada",
+      description: `Preparando descarga de ${vouchersToDownload.length} comprobantes...`,
     });
 
-    // Registrar auditoría para cada comprobante
-    for (const voucherId of selectedVouchers) {
-      const voucher = vouchers.find(v => v.id === voucherId);
-      if (voucher) {
-        await VoucherAuditService.logAction(voucherId, voucher.companyId, 'downloaded', 'bulk');
+    try {
+      await VoucherActionsService.downloadAllVouchers(vouchersToDownload);
+      
+      // Registrar auditoría para cada comprobante
+      for (const voucher of vouchersToDownload) {
+        await VoucherAuditService.logAction(voucher.id, voucher.companyId, 'downloaded', 'bulk');
       }
+
+      toast({
+        title: "Descarga completada",
+        description: `Se iniciaron ${vouchersToDownload.length} descargas`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error en descarga masiva",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
@@ -98,16 +112,40 @@ export const useVoucherActions = (vouchers: PayrollVoucher[], refreshVouchers: (
       return;
     }
 
-    // Envío masivo
+    toast({
+      title: "Enviando correos...",
+      description: `Enviando ${vouchersToSend.length} comprobantes por correo`,
+    });
+
+    // Envío masivo con manejo de errores individual
+    let successCount = 0;
+    let errorCount = 0;
+
     for (const voucher of vouchersToSend) {
-      await VoucherActionsService.sendVoucherByEmail(voucher.id, voucher.employeeEmail || '');
-      await VoucherAuditService.logAction(voucher.id, voucher.companyId, 'sent_email', 'bulk_email', voucher.employeeEmail);
+      try {
+        await VoucherActionsService.sendVoucherByEmail(voucher.id, voucher.employeeEmail || '');
+        await VoucherAuditService.logAction(voucher.id, voucher.companyId, 'sent_email', 'bulk_email', voucher.employeeEmail);
+        successCount++;
+      } catch (error) {
+        console.error(`Error enviando a ${voucher.employeeName}:`, error);
+        errorCount++;
+      }
     }
 
-    toast({
-      title: "Envío completado",
-      description: `${vouchersToSend.length} comprobantes enviados por correo`,
-    });
+    if (successCount > 0) {
+      toast({
+        title: "Envío completado",
+        description: `${successCount} comprobantes enviados exitosamente${errorCount > 0 ? `, ${errorCount} fallaron` : ''}`,
+      });
+    }
+
+    if (errorCount > 0 && successCount === 0) {
+      toast({
+        title: "Error en envío masivo",
+        description: "No se pudo enviar ningún comprobante",
+        variant: "destructive"
+      });
+    }
 
     await refreshVouchers();
   };
@@ -116,15 +154,23 @@ export const useVoucherActions = (vouchers: PayrollVoucher[], refreshVouchers: (
     const voucher = vouchers.find(v => v.id === voucherId);
     if (!voucher) return;
 
-    await VoucherActionsService.regenerateVoucher(voucherId);
-    await VoucherAuditService.logAction(voucherId, voucher.companyId, 'regenerated');
+    try {
+      await VoucherActionsService.regenerateVoucher(voucherId);
+      await VoucherAuditService.logAction(voucherId, voucher.companyId, 'regenerated');
 
-    toast({
-      title: "Comprobante regenerado",
-      description: "El comprobante ha sido regenerado exitosamente",
-    });
+      toast({
+        title: "Comprobante regenerado",
+        description: "El comprobante ha sido regenerado exitosamente",
+      });
 
-    await refreshVouchers();
+      await refreshVouchers();
+    } catch (error: any) {
+      toast({
+        title: "Error al regenerar",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   return {

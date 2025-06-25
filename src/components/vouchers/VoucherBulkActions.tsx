@@ -1,7 +1,6 @@
 
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Send } from 'lucide-react';
+import { Download, Mail, X } from 'lucide-react';
 
 interface VoucherBulkActionsProps {
   selectedCount: number;
@@ -16,42 +15,50 @@ export const VoucherBulkActions = ({
   onSendSelected,
   onDeselectAll
 }: VoucherBulkActionsProps) => {
-  if (selectedCount === 0) return null;
+  if (selectedCount === 0) {
+    return null;
+  }
 
   return (
-    <Card className="p-4 bg-blue-50 border-blue-200">
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <span className="font-medium text-blue-900">
-            {selectedCount} comprobante{selectedCount !== 1 ? 's' : ''} seleccionado{selectedCount !== 1 ? 's' : ''}
+        <div className="flex items-center space-x-3">
+          <span className="text-sm font-medium text-blue-900">
+            {selectedCount} comprobante{selectedCount > 1 ? 's' : ''} seleccionado{selectedCount > 1 ? 's' : ''}
           </span>
-          <div className="flex items-center space-x-2">
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={onDownloadSelected}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Descargar ZIP
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={onSendSelected}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Enviar por correo
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDeselectAll}
+            className="text-blue-600 hover:text-blue-800 h-8 px-2"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Deseleccionar
+          </Button>
         </div>
-        <Button 
-          size="sm" 
-          variant="ghost"
-          onClick={onDeselectAll}
-        >
-          Deseleccionar todo
-        </Button>
+        
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSendSelected}
+            className="flex items-center space-x-2 text-purple-600 border-purple-200 hover:bg-purple-50"
+          >
+            <Mail className="h-4 w-4" />
+            <span>Enviar por correo</span>
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDownloadSelected}
+            className="flex items-center space-x-2 text-green-600 border-green-200 hover:bg-green-50"
+          >
+            <Download className="h-4 w-4" />
+            <span>📤 Descargar todos</span>
+          </Button>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 };
