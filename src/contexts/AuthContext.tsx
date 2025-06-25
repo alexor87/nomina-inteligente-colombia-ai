@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -145,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔄 Refreshing user data for:', currentUser.email);
 
     try {
-      // Verificar si es superadmin
+      // Verificar si es superadmin PRIMERO
       const { data: superAdminStatus, error: superAdminError } = await supabase
         .rpc('is_superadmin');
       
@@ -156,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('❌ Error checking superadmin status:', superAdminError);
       }
 
-      // Obtener perfil del usuario primero
+      // Obtener perfil del usuario
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -203,22 +204,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user data after successful auth with extended delay
+          // Fetch user data after successful auth with shorter delay
           setTimeout(async () => {
             await refreshUserData();
-          }, 1500); // Aumenté aún más el delay para asegurar que los triggers se procesen
+            setLoading(false); // Mover aquí para asegurar que se completa la carga
+          }, 500); // Reducir delay pero asegurar que los triggers se procesen
         } else {
           setRoles([]);
           setProfile(null);
           setIsSuperAdmin(false);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('🔍 Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
@@ -226,10 +227,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         setTimeout(async () => {
           await refreshUserData();
-        }, 1500);
+          setLoading(false);
+        }, 500);
+      } else {
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();

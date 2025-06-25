@@ -32,6 +32,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     hasModuleAccess: requiredModule ? hasModuleAccess(requiredModule) : 'no module required'
   });
 
+  // SIEMPRE mostrar loading mientras se cargan los datos
   if (loading) {
     console.log('⏳ ProtectedRoute: Still loading...');
     return (
@@ -46,10 +47,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/auth" replace />;
   }
 
-  // SuperAdmin tiene acceso a todo
+  // SuperAdmin tiene acceso a todo - NO necesita verificación adicional
   if (isSuperAdmin) {
     console.log('👑 ProtectedRoute: SuperAdmin access granted');
     return <>{children}</>;
+  }
+
+  // Si hay roles pero no se han cargado completamente, mostrar loading un poco más
+  if (user && roles.length === 0 && !isSuperAdmin) {
+    console.log('⏳ ProtectedRoute: Waiting for roles to load...');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   // Verificar rol específico si se requiere
