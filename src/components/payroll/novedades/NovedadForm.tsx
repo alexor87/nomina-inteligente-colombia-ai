@@ -528,80 +528,113 @@ export const NovedadForm = ({
           </div>
         )}
 
-        {/* Días, Horas y Valor - Layout mejorado */}
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {currentTypeConfig?.requiere_dias && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="dias" className="text-sm font-medium text-gray-900">
-                    Días *
-                  </Label>
-                  {fechaInicio && fechaFin && (
-                    <Badge variant="secondary" className={`text-xs bg-${typeColor}-50 text-${typeColor}-700`}>
-                      Auto-calculado
-                    </Badge>
-                  )}
-                </div>
-                <Input
-                  {...register('dias', { 
-                    setValueAs: (value) => {
-                      if (value === '' || value === null || value === undefined) return undefined;
-                      const num = Number(value);
-                      return isNaN(num) ? undefined : num;
-                    }
-                  })}
-                  type="number"
-                  id="dias"
-                  placeholder="0"
-                  min="0"
-                  max="90"
-                  readOnly={fechaInicio && fechaFin ? true : false}
-                  className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200 ${
-                    fechaInicio && fechaFin ? `bg-${typeColor}-50 text-${typeColor}-900` : ''
-                  }`}
-                />
+        {/* Días, Horas y Valor - Layout mejorado con mejor espaciado */}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            {/* Fila para Días y Horas (si ambos son requeridos) */}
+            {(currentTypeConfig?.requiere_dias || currentTypeConfig?.requiere_horas) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {currentTypeConfig?.requiere_dias && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="dias" className="text-sm font-medium text-gray-900">
+                        Días *
+                      </Label>
+                      {fechaInicio && fechaFin && (
+                        <Badge variant="secondary" className={`text-xs bg-${typeColor}-50 text-${typeColor}-700 border-${typeColor}-200`}>
+                          <Calculator className="h-3 w-3 mr-1" />
+                          Auto-calculado
+                        </Badge>
+                      )}
+                    </div>
+                    <Input
+                      {...register('dias', { 
+                        setValueAs: (value) => {
+                          if (value === '' || value === null || value === undefined) return undefined;
+                          const num = Number(value);
+                          return isNaN(num) ? undefined : num;
+                        }
+                      })}
+                      type="number"
+                      id="dias"
+                      placeholder="0"
+                      min="0"
+                      max="90"
+                      readOnly={fechaInicio && fechaFin ? true : false}
+                      className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200 ${
+                        fechaInicio && fechaFin ? `bg-${typeColor}-50 text-${typeColor}-900 font-medium` : ''
+                      }`}
+                    />
+                    {fechaInicio && fechaFin && (
+                      <div className="flex items-center space-x-2 text-xs text-gray-600">
+                        <Info className="h-3 w-3" />
+                        <span>Calculado entre fechas seleccionadas</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {currentTypeConfig?.requiere_horas && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="horas" className="text-sm font-medium text-gray-900">
+                        Horas *
+                      </Label>
+                      <div className="flex items-center space-x-2">
+                        {tipoNovedad === 'horas_extra' && (
+                          <Badge variant="outline" className="text-xs border-blue-200 text-blue-700">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Tiempo extra
+                          </Badge>
+                        )}
+                        {tipoNovedad === 'recargo_nocturno' && (
+                          <Badge variant="outline" className="text-xs border-blue-200 text-blue-700">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Nocturno
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Input
+                      {...register('horas', { 
+                        setValueAs: (value) => {
+                          if (value === '' || value === null || value === undefined) return undefined;
+                          const num = Number(value);
+                          return isNaN(num) ? undefined : num;
+                        }
+                      })}
+                      type="number"
+                      id="horas"
+                      placeholder="0"
+                      min="0"
+                      step="0.5"
+                      className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200`}
+                    />
+                    <div className="flex items-center space-x-2 text-xs text-gray-600">
+                      <Info className="h-3 w-3" />
+                      <span>
+                        {tipoNovedad === 'horas_extra' && 'Horas trabajadas adicionales'}
+                        {tipoNovedad === 'recargo_nocturno' && 'Horas trabajadas en horario nocturno'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {currentTypeConfig?.requiere_horas && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="horas" className="text-sm font-medium text-gray-900">
-                    Horas *
-                  </Label>
-                  {tipoNovedad === 'horas_extra' && (
-                    <Badge variant="outline" className="text-xs">
-                      <Clock className="h-3 w-3 mr-1" />
-                      Tiempo extra
-                    </Badge>
-                  )}
-                </div>
-                <Input
-                  {...register('horas', { 
-                    setValueAs: (value) => {
-                      if (value === '' || value === null || value === undefined) return undefined;
-                      const num = Number(value);
-                      return isNaN(num) ? undefined : num;
-                    }
-                  })}
-                  type="number"
-                  id="horas"
-                  placeholder="0"
-                  min="0"
-                  step="0.5"
-                  className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200`}
-                />
-              </div>
+            {/* Separador visual */}
+            {(currentTypeConfig?.requiere_dias || currentTypeConfig?.requiere_horas) && (
+              <div className="border-t border-gray-100 pt-2"></div>
             )}
 
-            <div className="space-y-2">
+            {/* Fila para Valor - Siempre en toda la anchura disponible */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label htmlFor="valor" className="text-sm font-medium text-gray-900">
                   Valor *
                 </Label>
                 {currentTypeConfig?.auto_calculo && (
-                  <Badge variant="secondary" className={`text-xs bg-${typeColor}-50 text-${typeColor}-700`}>
+                  <Badge variant="secondary" className={`text-xs bg-${typeColor}-50 text-${typeColor}-700 border-${typeColor}-200`}>
                     <Calculator className="h-3 w-3 mr-1" />
                     Auto-calculado
                   </Badge>
@@ -620,10 +653,18 @@ export const NovedadForm = ({
                 min="0"
                 step="1000"
                 readOnly={currentTypeConfig?.auto_calculo}
-                className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200 ${
-                  currentTypeConfig?.auto_calculo ? `bg-${typeColor}-50 text-${typeColor}-900 font-semibold` : ''
+                className={`text-lg font-semibold border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200 ${
+                  currentTypeConfig?.auto_calculo ? `bg-${typeColor}-50 text-${typeColor}-900 border-${typeColor}-200` : ''
                 }`}
               />
+              {currentTypeConfig?.auto_calculo && calculatedValue > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Valor calculado:</span>
+                  <span className={`font-bold text-${typeColor}-700`}>
+                    {formatCurrency(calculatedValue)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
