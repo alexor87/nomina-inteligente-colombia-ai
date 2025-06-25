@@ -349,7 +349,7 @@ export const PayrollLiquidationBackendService = {
 
       if (!profile?.company_id) throw new Error('Usuario sin empresa asignada');
 
-      // Save individual payroll records
+      // Save individual payroll records with correct estado value
       const payrollRecords = liquidationData.employees.map(emp => ({
         employee_id: emp.id,
         company_id: profile.company_id,
@@ -364,14 +364,17 @@ export const PayrollLiquidationBackendService = {
         pension_empleado: Math.round(emp.baseSalary * 0.04),
         total_deducciones: emp.deductions,
         neto_pagado: emp.netPay,
-        estado: 'aprobado'
+        estado: 'procesada' // Fixed: using valid estado value
       }));
 
       const { error: payrollError } = await supabase
         .from('payrolls')
         .insert(payrollRecords);
 
-      if (payrollError) throw payrollError;
+      if (payrollError) {
+        console.error('Error inserting payroll records:', payrollError);
+        throw payrollError;
+      }
 
       // Generate vouchers
       const voucherRecords = liquidationData.employees.map(emp => ({
@@ -390,7 +393,10 @@ export const PayrollLiquidationBackendService = {
         .from('payroll_vouchers')
         .insert(voucherRecords);
 
-      if (voucherError) throw voucherError;
+      if (voucherError) {
+        console.error('Error inserting voucher records:', voucherError);
+        throw voucherError;
+      }
 
       return `Liquidación guardada exitosamente para ${liquidationData.employees.length} empleados con cálculos backend y novedades aplicadas.`;
     } catch (error) {
