@@ -1,7 +1,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sidebar } from './Sidebar';
+import Sidebar from './Sidebar';
 import { Header } from './Header';
 
 interface LayoutProps {
