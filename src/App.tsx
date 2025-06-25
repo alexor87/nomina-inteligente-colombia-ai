@@ -49,7 +49,7 @@ const App = () => (
               } />
               
               <Route path="/employees" element={
-                <ProtectedRoute module="employees">
+                <ProtectedRoute module="empleados">
                   <Layout>
                     <EmployeesPage />
                   </Layout>
@@ -57,7 +57,7 @@ const App = () => (
               } />
               
               <Route path="/payroll" element={
-                <ProtectedRoute module="payroll">
+                <ProtectedRoute module="nomina">
                   <Layout>
                     <PayrollPage />
                   </Layout>
@@ -65,7 +65,7 @@ const App = () => (
               } />
               
               <Route path="/payroll-backend" element={
-                <ProtectedRoute module="payroll">
+                <ProtectedRoute module="nomina">
                   <Layout>
                     <PayrollBackendPage />
                   </Layout>
@@ -73,7 +73,7 @@ const App = () => (
               } />
               
               <Route path="/payroll-history" element={
-                <ProtectedRoute module="payroll">
+                <ProtectedRoute module="nomina">
                   <Layout>
                     <PayrollHistoryPage />
                   </Layout>
@@ -81,7 +81,7 @@ const App = () => (
               } />
               
               <Route path="/payments" element={
-                <ProtectedRoute module="payments">
+                <ProtectedRoute module="pagos">
                   <Layout>
                     <PaymentsPage />
                   </Layout>
@@ -89,7 +89,7 @@ const App = () => (
               } />
               
               <Route path="/vouchers" element={
-                <ProtectedRoute module="vouchers">
+                <ProtectedRoute module="comprobantes">
                   <Layout>
                     <VouchersPage />
                   </Layout>
@@ -97,7 +97,7 @@ const App = () => (
               } />
               
               <Route path="/reports" element={
-                <ProtectedRoute module="reports">
+                <ProtectedRoute module="reportes">
                   <Layout>
                     <ReportsPage />
                   </Layout>
@@ -105,7 +105,7 @@ const App = () => (
               } />
               
               <Route path="/settings" element={
-                <ProtectedRoute module="settings">
+                <ProtectedRoute module="configuracion">
                   <Layout>
                     <SettingsPage />
                   </Layout>
