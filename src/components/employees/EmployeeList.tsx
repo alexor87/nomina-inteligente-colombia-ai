@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Plus, Users, Filter, Download, MoreHorizontal, 
   Eye, Edit, Trash2, UserCheck, UserX, AlertTriangle,
-  Mail, Phone, Calendar, Building2, Briefcase, Upload, Loader2
+  Mail, Phone, Calendar, Building2, Briefcase, Upload, Loader2, TestTube
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmployeeFiltersComponent } from './EmployeeFilters';
@@ -22,6 +21,7 @@ import { CONTRACT_TYPES } from '@/types/employee-config';
 import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
 import { EmployeeExcelExportService } from '@/services/EmployeeExcelExportService';
 import { useToast } from '@/hooks/use-toast';
+import { EmployeeCreationTest } from '../test/EmployeeCreationTest';
 
 export const EmployeeList = () => {
   const {
@@ -51,6 +51,7 @@ export const EmployeeList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [isImportDrawerOpen, setIsImportDrawerOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [showTest, setShowTest] = useState(false);
 
   const handleCreateEmployee = () => {
     setEditingEmployee(null);
@@ -201,6 +202,14 @@ export const EmployeeList = () => {
           </p>
         </div>
         <div className="flex space-x-3">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowTest(!showTest)}
+            className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+          >
+            <TestTube className="h-4 w-4 mr-2" />
+            {showTest ? 'Ocultar' : 'Mostrar'} Prueba
+          </Button>
           <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
             <Filter className="h-4 w-4 mr-2" />
             Filtros
@@ -227,6 +236,13 @@ export const EmployeeList = () => {
           </Button>
         </div>
       </div>
+
+      {/* Componente de Prueba */}
+      {showTest && (
+        <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4">
+          <EmployeeCreationTest />
+        </div>
+      )}
 
       {/* Filtros */}
       {showFilters && (
