@@ -83,16 +83,41 @@ export const useAuthActions = ({
   };
 
   const canAccessModule = (module: string): boolean => {
+    console.log('🔍 Checking module access:', {
+      module,
+      isSuperAdmin,
+      currentCompany: !!currentCompany,
+      userCompanies: userCompanies.length
+    });
+
     // SuperAdmin can access everything
     if (isSuperAdmin) {
       console.log('✅ SuperAdmin access granted for module:', module);
       return true;
     }
     
-    // For non-superadmin users, check if they have at least lector role in current company
-    const hasAccess = !!currentCompany && hasRole('lector');
-    console.log('🔍 Module access check:', { module, hasAccess, currentCompany: !!currentCompany, hasRole: hasRole('lector') });
-    return hasAccess;
+    // For non-superadmin users, check basic requirements
+    if (!currentCompany) {
+      console.log('❌ No current company assigned');
+      return false;
+    }
+
+    if (userCompanies.length === 0) {
+      console.log('❌ No user companies found');
+      return false;
+    }
+
+    // Check if user has any role in current company
+    const hasRoleInCompany = userCompanies.some(uc => uc.company_id === currentCompany.id);
+    
+    if (!hasRoleInCompany) {
+      console.log('❌ User has no role in current company');
+      return false;
+    }
+
+    // At this point, user has access
+    console.log('✅ Module access granted:', module);
+    return true;
   };
 
   const switchCompany = async (companyId: string) => {

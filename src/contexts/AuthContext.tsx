@@ -50,9 +50,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (session?.user) {
+        console.log('🔄 Setting user and initializing data...');
         setUser(session.user);
         await initializeUserData(session.user);
       } else {
+        console.log('🔄 No session, clearing auth state');
         clearAuthState();
       }
     });
@@ -75,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         initializeUserData(session.user);
       } else {
-        console.log('🔄 No existing session found, setting loading to false');
+        console.log('🔄 No existing session found');
         clearAuthState();
       }
     });

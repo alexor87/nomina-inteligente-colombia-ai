@@ -31,7 +31,7 @@ export const useAuthData = () => {
       setUserCompanies(companies);
       console.log('🏢 User companies:', companies);
 
-      // Set current company
+      // Set current company - CRITICAL FIX
       if (superAdminStatus) {
         // For superadmin, always load the first available company
         console.log('🔄 Loading first available company for superadmin...');
@@ -39,6 +39,15 @@ export const useAuthData = () => {
         if (firstCompany) {
           setCurrentCompany(firstCompany);
           console.log('✅ SuperAdmin using first company:', firstCompany.name);
+        } else {
+          console.warn('⚠️ No companies available for superadmin');
+          // Even without companies, superadmin should have access
+          setCurrentCompany({ 
+            id: 'superadmin', 
+            name: 'SuperAdmin', 
+            nit: '000000000-0',
+            rol: 'superadmin' 
+          });
         }
       } else if (companies.length > 0) {
         // For regular users, use their first assigned company
@@ -51,6 +60,8 @@ export const useAuthData = () => {
             rol: firstCompany.rol
           });
           console.log('✅ Current company set:', companyData.name);
+        } else {
+          console.error('❌ Failed to load company data for:', firstCompany.company_id);
         }
       } else {
         console.warn('⚠️ User has no companies assigned and is not superadmin');
@@ -60,14 +71,14 @@ export const useAuthData = () => {
     } catch (error) {
       console.error('❌ Error initializing user data:', error);
     } finally {
-      // CRITICAL: Always set loading to false, regardless of success or failure
+      // CRITICAL: Always set loading to false
       console.log('🔄 Setting loading to false');
       setLoading(false);
     }
   };
 
   const clearAuthState = () => {
-    console.log('🔄 No session, clearing auth state');
+    console.log('🔄 Clearing auth state');
     setUser(null);
     setProfile(null);
     setCurrentCompany(null);
