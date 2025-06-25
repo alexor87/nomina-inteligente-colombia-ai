@@ -135,17 +135,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const initializeUserData = async (user: User) => {
     try {
-      setLoading(true);
       console.log('🔄 Initializing user data for:', user.email);
+
+      // Check if user is superadmin first
+      const superAdminStatus = await checkSuperAdmin(user.id);
+      setIsSuperAdmin(superAdminStatus);
+      console.log('👑 SuperAdmin status:', superAdminStatus);
 
       // Load user profile
       const profileData = await loadUserProfile(user.id);
       setProfile(profileData);
-
-      // Check if user is superadmin
-      const superAdminStatus = await checkSuperAdmin(user.id);
-      setIsSuperAdmin(superAdminStatus);
-      console.log('👑 SuperAdmin status:', superAdminStatus);
+      console.log('👤 Profile loaded:', profileData);
 
       // Load user companies
       const companies = await loadUserCompanies(user.id);
@@ -166,50 +166,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else if (superAdminStatus) {
         // If superadmin but no companies assigned, load the first available company
-        const { data: firstCompany } = await supabase
-          .from('companies')
-          .select('id, razon_social, nit')
-          .limit(1)
-          .single();
+        try {
+          const { data: firstCompany } = await supabase
+            .from('companies')
+            .select('id, razon_social, nit')
+            .limit(1)
+            .single();
 
-        if (firstCompany) {
-          setCurrentCompany({
-            id: firstCompany.id,
-            name: firstCompany.razon_social,
-            nit: firstCompany.nit,
-            rol: 'superadmin'
-          });
-          console.log('✅ SuperAdmin using first company:', firstCompany.razon_social);
+          if (firstCompany) {
+            setCurrentCompany({
+              id: firstCompany.id,
+              name: firstCompany.razon_social,
+              nit: firstCompany.nit,
+              rol: 'superadmin'
+            });
+            console.log('✅ SuperAdmin using first company:', firstCompany.razon_social);
+          }
+        } catch (error) {
+          console.warn('No companies available for superadmin:', error);
         }
       }
+
+      console.log('✅ User data initialization completed');
     } catch (error) {
       console.error('❌ Error initializing user data:', error);
     } finally {
+      // Always set loading to false, even if there's an error
       setLoading(false);
+      console.log('🔄 Loading state set to false');
     }
   };
 
   const refreshUserData = async () => {
     if (user) {
+      setLoading(true);
       await initializeUserData(user);
     }
   };
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        initializeUserData(session.user);
-      } else {
-        setLoading(false);
-      }
-    });
+    let mounted = true;
 
-    // Listen for auth changes
+    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 Auth state changed:', event, session?.user?.email);
       
+      if (!mounted) return;
+
       if (session?.user) {
         setUser(session.user);
         await initializeUserData(session.user);
@@ -220,10 +223,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserCompanies([]);
         setIsSuperAdmin(false);
         setLoading(false);
+        console.log('🔄 Auth cleared, loading set to false');
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Then check for existing session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!mounted) return;
+      
+      if (error) {
+        console.error('Error getting session:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (session?.user) {
+        console.log('🔄 Found existing session for:', session.user.email);
+        setUser(session.user);
+        initializeUserData(session.user);
+      } else {
+        console.log('🔄 No existing session found');
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string): Promise<void> => {
