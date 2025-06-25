@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +25,8 @@ interface AuthContextType {
   profile: UserProfile | null;
   isSaasAdmin: boolean;
   hasRole: (role: string) => boolean;
+  isCompanyAdmin: () => boolean;
+  canAccessModule: (module: string) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -54,11 +55,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return roles.some(r => r.role === role);
   };
 
+  const isCompanyAdmin = (): boolean => {
+    return hasRole('administrador') || isSaasAdmin;
+  };
+
+  const canAccessModule = (module: string): boolean => {
+    // Super admins pueden acceder a todo
+    if (isSaasAdmin) {
+      return true;
+    }
+
+    // Administradores de empresa pueden acceder a todo excepto super admin modules
+    if (hasRole('administrador')) {
+      return module !== 'super-admin';
+    }
+
+    // Otros roles tienen acceso limitado
+    const modulePermissions: { [key: string]: string[] } = {
+      'dashboard': ['administrador', 'rrhh', 'contador', 'visualizador'],
+      'employees': ['administrador', 'rrhh'],
+      'payroll': ['administrador', 'rrhh', 'contador'],
+      'payments': ['administrador', 'contador'],
+      'vouchers': ['administrador', 'rrhh', 'contador'],
+      'reports': ['administrador', 'rrhh', 'contador', 'visualizador'],
+      'settings': ['administrador'],
+      'super-admin': [] // Solo super admins
+    };
+
+    const allowedRoles = modulePermissions[module] || [];
+    return roles.some(r => allowedRoles.includes(r.role));
+  };
+
   const refreshUserData = async () => {
     const currentUser = (await supabase.auth.getUser()).data.user;
     if (!currentUser) return;
 
     try {
+      console.log('🔄 Refreshing user data for:', currentUser.email);
+
       // Fetch user roles
       const { data: userRoles, error: rolesError } = await supabase
         .rpc('get_user_roles');
@@ -66,7 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (rolesError) {
         console.error('Error fetching user roles:', rolesError);
       } else {
-        console.log('User roles fetched:', userRoles);
+        console.log('✅ User roles fetched:', userRoles);
         setRoles(userRoles || []);
       }
 
@@ -80,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileError) {
         console.error('Error fetching user profile:', profileError);
       } else {
-        console.log('User profile fetched:', profileData);
+        console.log('✅ User profile fetched:', profileData);
         setProfile(profileData);
       }
 
@@ -90,7 +124,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (adminError) {
         console.error('Error checking admin status:', adminError);
+        setIsSaasAdmin(false);
       } else {
+        console.log('✅ SaaS admin status:', adminStatus);
         setIsSaasAdmin(adminStatus || false);
       }
     } catch (error) {
@@ -102,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('🔐 Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -123,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.email);
+      console.log('🔍 Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -172,6 +208,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     isSaasAdmin,
     hasRole,
+    isCompanyAdmin,
+    canAccessModule,
     signIn,
     signUp,
     signOut,
