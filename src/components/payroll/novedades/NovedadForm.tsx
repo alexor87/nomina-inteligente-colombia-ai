@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { NovedadFormData, NOVEDAD_CATEGORIES, calcularValorNovedad, NovedadType } from '@/types/novedades';
-import { Save, X, Calculator, Info, Calendar } from 'lucide-react';
+import { Save, X, Calculator, Info, Calendar, Clock, Users } from 'lucide-react';
 
 interface NovedadFormProps {
   initialData?: NovedadFormData;
@@ -76,6 +76,89 @@ export const NovedadForm = ({
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
     
     return diffDays;
+  };
+
+  // Función para obtener el color de la categoría
+  const getCategoryColor = () => {
+    switch (currentCategory) {
+      case 'devengados':
+        return 'green';
+      case 'deducciones':
+        return 'red';
+      default:
+        return 'gray';
+    }
+  };
+
+  // Función para obtener el color específico del tipo de novedad
+  const getTypeSpecificColor = () => {
+    switch (tipoNovedad) {
+      case 'incapacidad':
+        return 'amber';
+      case 'horas_extra':
+      case 'recargo_nocturno':
+        return 'blue';
+      case 'vacaciones':
+      case 'licencia_remunerada':
+        return 'purple';
+      case 'bonificacion':
+      case 'comision':
+      case 'prima':
+        return 'emerald';
+      case 'ausencia':
+      case 'multa':
+        return 'orange';
+      case 'libranza':
+      case 'descuento_voluntario':
+        return 'indigo';
+      case 'fondo_solidaridad':
+        return 'cyan';
+      default:
+        return getCategoryColor();
+    }
+  };
+
+  // Función para obtener información contextual por tipo
+  const getContextualInfo = () => {
+    switch (tipoNovedad) {
+      case 'incapacidad':
+        return {
+          icon: <Info className="h-3 w-3" />,
+          text: 'Los días se calculan automáticamente entre fechas'
+        };
+      case 'horas_extra':
+        return {
+          icon: <Clock className="h-3 w-3" />,
+          text: 'Cálculo automático según factor de recargo'
+        };
+      case 'recargo_nocturno':
+        return {
+          icon: <Clock className="h-3 w-3" />,
+          text: '35% de recargo sobre valor hora'
+        };
+      case 'vacaciones':
+        return {
+          icon: <Calendar className="h-3 w-3" />,
+          text: 'Valor diario calculado sobre salario base'
+        };
+      case 'licencia_remunerada':
+        return {
+          icon: <Users className="h-3 w-3" />,
+          text: '100% del salario por días de licencia'
+        };
+      case 'ausencia':
+        return {
+          icon: <Info className="h-3 w-3" />,
+          text: 'Descuento por días no laborados'
+        };
+      case 'fondo_solidaridad':
+        return {
+          icon: <Info className="h-3 w-3" />,
+          text: 'Solo aplica para salarios >= 4 SMMLV'
+        };
+      default:
+        return null;
+    }
   };
 
   // Actualizar categoría cuando cambie el tipo de novedad
@@ -266,6 +349,9 @@ export const NovedadForm = ({
     }).format(amount);
   };
 
+  const typeColor = getTypeSpecificColor();
+  const contextualInfo = getContextualInfo();
+
   return (
     <div className="bg-white rounded-lg border border-gray-100">
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 p-6">
@@ -329,16 +415,26 @@ export const NovedadForm = ({
               </Select>
             )}
           />
+          {contextualInfo && (
+            <div className="flex items-center space-x-2 text-xs text-gray-600">
+              {contextualInfo.icon}
+              <span>{contextualInfo.text}</span>
+            </div>
+          )}
         </div>
 
-        {/* Subtipo si aplica - Mejorado para incapacidades */}
+        {/* Subtipo mejorado */}
         {currentTypeConfig?.subtipos && currentTypeConfig.subtipos.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="subtipo" className="text-sm font-medium text-gray-900">
-                {tipoNovedad === 'incapacidad' ? 'Tipo de incapacidad' : 'Subtipo'} *
+                {tipoNovedad === 'incapacidad' ? 'Tipo de incapacidad' : 
+                 tipoNovedad === 'horas_extra' ? 'Tipo de horas extra' :
+                 tipoNovedad === 'bonificacion' ? 'Tipo de bonificación' :
+                 tipoNovedad === 'licencia_remunerada' ? 'Tipo de licencia' :
+                 'Subtipo'} *
               </Label>
-              {tipoNovedad === 'incapacidad' && (
+              {(tipoNovedad === 'incapacidad' || tipoNovedad === 'horas_extra') && (
                 <Badge variant="outline" className="text-xs">
                   Requerido para cálculo
                 </Badge>
@@ -353,11 +449,12 @@ export const NovedadForm = ({
                   console.log('Subtipo seleccionado:', value, 'Para tipo:', tipoNovedad);
                 }}>
                   <SelectTrigger className="border-gray-200 focus:border-gray-300 focus:ring-0">
-                    <SelectValue placeholder={
-                      tipoNovedad === 'incapacidad' 
-                        ? "Selecciona el tipo de incapacidad" 
-                        : "Selecciona el subtipo"
-                    } />
+                    <SelectValue placeholder={`Selecciona el ${
+                      tipoNovedad === 'incapacidad' ? 'tipo de incapacidad' :
+                      tipoNovedad === 'horas_extra' ? 'tipo de horas extra' :
+                      tipoNovedad === 'bonificacion' ? 'tipo de bonificación' :
+                      'subtipo'
+                    }`} />
                   </SelectTrigger>
                   <SelectContent>
                     {currentTypeConfig.subtipos.map((subtipo) => (
@@ -371,6 +468,14 @@ export const NovedadForm = ({
                               {subtipo === 'maternidad' && 'EPS paga al 100%'}
                             </span>
                           )}
+                          {tipoNovedad === 'horas_extra' && (
+                            <span className="text-xs text-gray-500">
+                              {subtipo === 'diurnas' && 'Recargo del 25%'}
+                              {subtipo === 'nocturnas' && 'Recargo del 75%'}
+                              {subtipo === 'dominicales' && 'Recargo del 75%'}
+                              {subtipo === 'festivas' && 'Recargo del 75%'}
+                            </span>
+                          )}
                         </div>
                       </SelectItem>
                     ))}
@@ -381,15 +486,15 @@ export const NovedadForm = ({
           </div>
         )}
 
-        {/* Fechas mejoradas para incapacidades */}
-        {(currentTypeConfig?.requiere_dias || tipoNovedad === 'vacaciones' || tipoNovedad === 'incapacidad') && (
+        {/* Fechas mejoradas */}
+        {(currentTypeConfig?.requiere_dias || tipoNovedad === 'vacaciones' || tipoNovedad === 'incapacidad' || tipoNovedad === 'licencia_remunerada' || tipoNovedad === 'ausencia') && (
           <div className="space-y-3">
             <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-blue-600" />
+              <Calendar className={`h-4 w-4 text-${typeColor}-600`} />
               <Label className="text-sm font-medium text-gray-900">
                 Período {currentTypeConfig?.requiere_dias ? '*' : ''}
               </Label>
-              {tipoNovedad === 'incapacidad' && (
+              {(tipoNovedad === 'incapacidad' || tipoNovedad === 'vacaciones' || tipoNovedad === 'licencia_remunerada' || tipoNovedad === 'ausencia') && (
                 <Badge variant="outline" className="text-xs">
                   Los días se calculan automáticamente
                 </Badge>
@@ -405,7 +510,7 @@ export const NovedadForm = ({
                   {...register('fecha_inicio')}
                   type="date"
                   id="fecha_inicio"
-                  className="border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                  className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200`}
                 />
               </div>
               <div className="space-y-2">
@@ -416,7 +521,7 @@ export const NovedadForm = ({
                   {...register('fecha_fin')}
                   type="date"
                   id="fecha_fin"
-                  className="border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                  className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200`}
                 />
               </div>
             </div>
@@ -433,7 +538,7 @@ export const NovedadForm = ({
                     Días *
                   </Label>
                   {fechaInicio && fechaFin && (
-                    <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700">
+                    <Badge variant="secondary" className={`text-xs bg-${typeColor}-50 text-${typeColor}-700`}>
                       Auto-calculado
                     </Badge>
                   )}
@@ -452,8 +557,8 @@ export const NovedadForm = ({
                   min="0"
                   max="90"
                   readOnly={fechaInicio && fechaFin ? true : false}
-                  className={`border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200 ${
-                    fechaInicio && fechaFin ? 'bg-blue-50 text-blue-900' : ''
+                  className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200 ${
+                    fechaInicio && fechaFin ? `bg-${typeColor}-50 text-${typeColor}-900` : ''
                   }`}
                 />
               </div>
@@ -461,9 +566,17 @@ export const NovedadForm = ({
 
             {currentTypeConfig?.requiere_horas && (
               <div className="space-y-2">
-                <Label htmlFor="horas" className="text-sm font-medium text-gray-900">
-                  Horas *
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="horas" className="text-sm font-medium text-gray-900">
+                    Horas *
+                  </Label>
+                  {tipoNovedad === 'horas_extra' && (
+                    <Badge variant="outline" className="text-xs">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Tiempo extra
+                    </Badge>
+                  )}
+                </div>
                 <Input
                   {...register('horas', { 
                     setValueAs: (value) => {
@@ -477,7 +590,7 @@ export const NovedadForm = ({
                   placeholder="0"
                   min="0"
                   step="0.5"
-                  className="border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                  className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200`}
                 />
               </div>
             )}
@@ -488,7 +601,7 @@ export const NovedadForm = ({
                   Valor *
                 </Label>
                 {currentTypeConfig?.auto_calculo && (
-                  <Badge variant="secondary" className="text-xs bg-green-50 text-green-700">
+                  <Badge variant="secondary" className={`text-xs bg-${typeColor}-50 text-${typeColor}-700`}>
                     <Calculator className="h-3 w-3 mr-1" />
                     Auto-calculado
                   </Badge>
@@ -507,55 +620,52 @@ export const NovedadForm = ({
                 min="0"
                 step="1000"
                 readOnly={currentTypeConfig?.auto_calculo}
-                className={`border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-200 ${
-                  currentTypeConfig?.auto_calculo ? 'bg-green-50 text-green-900 font-semibold' : ''
+                className={`border-gray-200 focus:border-${typeColor}-300 focus:ring-1 focus:ring-${typeColor}-200 ${
+                  currentTypeConfig?.auto_calculo ? `bg-${typeColor}-50 text-${typeColor}-900 font-semibold` : ''
                 }`}
               />
             </div>
           </div>
         </div>
 
-        {/* Cálculo automático mejorado para incapacidades */}
+        {/* Cálculo automático mejorado */}
         {currentTypeConfig?.auto_calculo && calculationDetail && (
-          <Card className={`p-4 border-l-4 ${
-            tipoNovedad === 'incapacidad' 
-              ? 'bg-amber-50 border-amber-200 border-l-amber-500'
-              : 'bg-blue-50 border-blue-200 border-l-blue-500'
-          }`}>
+          <Card className={`p-4 border-l-4 bg-${typeColor}-50 border-${typeColor}-200 border-l-${typeColor}-500`}>
             <div className="flex items-start space-x-3">
-              <div className={`p-1 rounded ${
-                tipoNovedad === 'incapacidad' ? 'bg-amber-100' : 'bg-blue-100'
-              }`}>
-                <Calculator className={`h-4 w-4 ${
-                  tipoNovedad === 'incapacidad' ? 'text-amber-600' : 'text-blue-600'
-                }`} />
+              <div className={`p-1 rounded bg-${typeColor}-100`}>
+                <Calculator className={`h-4 w-4 text-${typeColor}-600`} />
               </div>
               <div className="space-y-2 flex-1">
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm font-semibold ${
-                    tipoNovedad === 'incapacidad' ? 'text-amber-900' : 'text-blue-900'
-                  }`}>
-                    {tipoNovedad === 'incapacidad' ? 'Cálculo de incapacidad:' : 'Cálculo automático:'}
+                  <span className={`text-sm font-semibold text-${typeColor}-900`}>
+                    {tipoNovedad === 'incapacidad' ? 'Cálculo de incapacidad:' :
+                     tipoNovedad === 'horas_extra' ? 'Cálculo de horas extra:' :
+                     tipoNovedad === 'recargo_nocturno' ? 'Cálculo de recargo nocturno:' :
+                     tipoNovedad === 'vacaciones' ? 'Cálculo de vacaciones:' :
+                     tipoNovedad === 'licencia_remunerada' ? 'Cálculo de licencia:' :
+                     tipoNovedad === 'ausencia' ? 'Cálculo de ausencia:' :
+                     tipoNovedad === 'fondo_solidaridad' ? 'Cálculo de fondo solidaridad:' :
+                     'Cálculo automático:'}
                   </span>
                   {calculatedValue > 0 && (
-                    <Badge className={`text-white font-semibold ${
-                      tipoNovedad === 'incapacidad' ? 'bg-amber-600' : 'bg-blue-600'
-                    }`}>
+                    <Badge className={`text-white font-semibold bg-${typeColor}-600`}>
                       {formatCurrency(calculatedValue)}
                     </Badge>
                   )}
                 </div>
-                <div className={`p-3 rounded-md text-xs font-mono ${
-                  tipoNovedad === 'incapacidad' 
-                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                    : 'bg-blue-100 text-blue-800 border border-blue-200'
-                }`}>
+                <div className={`p-3 rounded-md text-xs font-mono bg-${typeColor}-100 text-${typeColor}-800 border border-${typeColor}-200`}>
                   {calculationDetail}
                 </div>
                 {tipoNovedad === 'incapacidad' && subtipo === 'general' && dias && dias <= 3 && (
-                  <div className="flex items-center space-x-2 text-xs text-amber-700">
+                  <div className={`flex items-center space-x-2 text-xs text-${typeColor}-700`}>
                     <Info className="h-3 w-3" />
                     <span>Los primeros 3 días no son pagados por la EPS</span>
+                  </div>
+                )}
+                {tipoNovedad === 'fondo_solidaridad' && employeeSalary < (1300000 * 4) && (
+                  <div className={`flex items-center space-x-2 text-xs text-${typeColor}-700`}>
+                    <Info className="h-3 w-3" />
+                    <span>Solo aplica para salarios de 4 SMMLV o más</span>
                   </div>
                 )}
               </div>
