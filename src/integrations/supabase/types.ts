@@ -332,7 +332,7 @@ export type Database = {
           observacion: string | null
           periodo_id: string
           subtipo: string | null
-          tipo_novedad: string
+          tipo_novedad: Database["public"]["Enums"]["novedad_type"]
           updated_at: string
           valor: number | null
         }
@@ -351,7 +351,7 @@ export type Database = {
           observacion?: string | null
           periodo_id: string
           subtipo?: string | null
-          tipo_novedad: string
+          tipo_novedad: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
           valor?: number | null
         }
@@ -370,7 +370,7 @@ export type Database = {
           observacion?: string | null
           periodo_id?: string
           subtipo?: string | null
-          tipo_novedad?: string
+          tipo_novedad?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
           valor?: number | null
         }
@@ -828,6 +828,24 @@ export type Database = {
         | "contador"
         | "visualizador"
         | "soporte"
+      novedad_type:
+        | "horas_extra"
+        | "recargo_nocturno"
+        | "vacaciones"
+        | "licencia_remunerada"
+        | "incapacidad"
+        | "bonificacion"
+        | "comision"
+        | "prima"
+        | "otros_ingresos"
+        | "salud"
+        | "pension"
+        | "fondo_solidaridad"
+        | "retencion_fuente"
+        | "libranza"
+        | "ausencia"
+        | "multa"
+        | "descuento_voluntario"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -949,6 +967,25 @@ export const Constants = {
         "contador",
         "visualizador",
         "soporte",
+      ],
+      novedad_type: [
+        "horas_extra",
+        "recargo_nocturno",
+        "vacaciones",
+        "licencia_remunerada",
+        "incapacidad",
+        "bonificacion",
+        "comision",
+        "prima",
+        "otros_ingresos",
+        "salud",
+        "pension",
+        "fondo_solidaridad",
+        "retencion_fuente",
+        "libranza",
+        "ausencia",
+        "multa",
+        "descuento_voluntario",
       ],
     },
   },
