@@ -16,6 +16,8 @@ export const useAuthData = () => {
     console.log('🔄 Initializing user data for:', user.email);
 
     try {
+      setLoading(true);
+
       // Check if user is superadmin first
       const superAdminStatus = await AuthService.checkSuperAdmin(user.id);
       setIsSuperAdmin(superAdminStatus);
@@ -26,63 +28,71 @@ export const useAuthData = () => {
       setProfile(profileData);
       console.log('👤 Profile loaded:', profileData);
 
-      // Load user companies with better error handling
-      const companies = await AuthService.loadUserCompanies(user.id);
-      setUserCompanies(companies);
-      console.log('🏢 User companies loaded:', companies);
-
-      // Set current company with improved logic
+      // For superadmin, set up access to all modules immediately
       if (superAdminStatus) {
-        // For superadmin, try to load first available company
-        console.log('🔄 Loading first available company for superadmin...');
-        const firstCompany = await AuthService.loadFirstAvailableCompany();
-        if (firstCompany) {
-          setCurrentCompany(firstCompany);
-          console.log('✅ SuperAdmin using first company:', firstCompany.name);
-        } else {
-          console.warn('⚠️ No companies available, creating default superadmin company');
-          setCurrentCompany({ 
-            id: 'superadmin-default', 
-            name: 'SuperAdmin Panel', 
-            nit: '000000000-0',
-            rol: 'superadmin' 
-          });
-        }
-      } else if (companies.length > 0) {
-        // For regular users, use their first assigned company
-        const firstCompany = companies[0];
-        console.log('🔄 Loading company data for:', firstCompany.company_id);
+        console.log('🔄 Setting up superadmin access...');
         
-        const companyData = await AuthService.loadCurrentCompany(firstCompany.company_id);
+        // Set default superadmin company
+        const superadminCompany: Company = {
+          id: 'superadmin-company',
+          name: 'SuperAdmin Panel',
+          nit: '000000000-0',
+          rol: 'superadmin'
+        };
         
-        if (companyData) {
-          setCurrentCompany({
-            ...companyData,
-            rol: firstCompany.rol
-          });
-          console.log('✅ Current company set:', companyData.name, 'with role:', firstCompany.rol);
-        } else {
-          console.error('❌ Failed to load company data for:', firstCompany.company_id);
-          // Create a fallback company entry
-          setCurrentCompany({
-            id: firstCompany.company_id,
-            name: 'Mi Empresa',
-            nit: 'N/A',
-            rol: firstCompany.rol
-          });
-        }
+        setCurrentCompany(superadminCompany);
+        setUserCompanies([{
+          company_id: 'superadmin-company',
+          rol: 'superadmin'
+        }]);
+        
+        console.log('✅ SuperAdmin setup completed');
       } else {
-        console.warn('⚠️ User has no companies assigned and is not superadmin');
-        // For users without companies, create a minimal company setup
-        if (profileData?.company_id) {
-          const companyData = await AuthService.loadCurrentCompany(profileData.company_id);
+        // For regular users, load their companies
+        console.log('🔄 Loading user companies...');
+        const companies = await AuthService.loadUserCompanies(user.id);
+        console.log('🏢 User companies loaded:', companies);
+        setUserCompanies(companies);
+
+        if (companies.length > 0) {
+          // Use the first company
+          const firstCompany = companies[0];
+          console.log('🔄 Loading company data for:', firstCompany.company_id);
+          
+          const companyData = await AuthService.loadCurrentCompany(firstCompany.company_id);
+          
           if (companyData) {
             setCurrentCompany({
               ...companyData,
-              rol: 'admin'
+              rol: firstCompany.rol
             });
-            console.log('✅ Using company from profile');
+            console.log('✅ Current company set:', companyData.name, 'with role:', firstCompany.rol);
+          } else {
+            // Create a fallback company entry
+            setCurrentCompany({
+              id: firstCompany.company_id,
+              name: 'Mi Empresa',
+              nit: 'N/A',
+              rol: firstCompany.rol
+            });
+            console.log('✅ Fallback company set');
           }
+        } else {
+          console.warn('⚠️ User has no companies assigned');
+          // For users without companies, create a basic setup
+          const fallbackCompany: Company = {
+            id: 'user-company',
+            name: 'Mi Empresa',
+            nit: 'N/A',
+            rol: 'admin'
+          };
+          
+          setCurrentCompany(fallbackCompany);
+          setUserCompanies([{
+            company_id: 'user-company',
+            rol: 'admin'
+          }]);
+          console.log('✅ Fallback setup completed for user without companies');
         }
       }
 
@@ -91,19 +101,20 @@ export const useAuthData = () => {
       console.error('❌ Error initializing user data:', error);
       
       // Even on error, ensure basic access for authenticated users
-      if (user) {
-        console.log('🔄 Setting minimal access due to initialization error');
-        setCurrentCompany({
-          id: 'fallback-company',
-          name: 'Mi Empresa',
-          nit: 'N/A',
-          rol: 'admin'
-        });
-        setUserCompanies([{
-          company_id: 'fallback-company',
-          rol: 'admin'
-        }]);
-      }
+      const fallbackCompany: Company = {
+        id: 'fallback-company',
+        name: 'Mi Empresa',
+        nit: 'N/A',
+        rol: 'admin'
+      };
+      
+      setCurrentCompany(fallbackCompany);
+      setUserCompanies([{
+        company_id: 'fallback-company',
+        rol: 'admin'
+      }]);
+      
+      console.log('✅ Fallback setup applied due to initialization error');
     } finally {
       // CRITICAL: Always set loading to false
       console.log('🔄 Setting loading to false - initialization complete');
@@ -123,7 +134,6 @@ export const useAuthData = () => {
 
   const refreshUserData = async () => {
     if (user) {
-      setLoading(true);
       await initializeUserData(user);
     }
   };

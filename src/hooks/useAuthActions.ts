@@ -72,11 +72,11 @@ export const useAuthActions = ({
     
     switch (role) {
       case 'admin':
-        return userRole === 'admin';
+        return userRole === 'admin' || userRole === 'superadmin';
       case 'editor':
-        return userRole === 'admin' || userRole === 'editor';
+        return userRole === 'admin' || userRole === 'editor' || userRole === 'superadmin';
       case 'lector':
-        return ['admin', 'editor', 'lector'].includes(userRole);
+        return ['admin', 'editor', 'lector', 'superadmin'].includes(userRole);
       default:
         return false;
     }
@@ -87,7 +87,8 @@ export const useAuthActions = ({
       module,
       isSuperAdmin,
       currentCompany: !!currentCompany,
-      userCompanies: userCompanies.length
+      userCompanies: userCompanies.length,
+      loading: false
     });
 
     // SuperAdmin can access everything
@@ -96,14 +97,14 @@ export const useAuthActions = ({
       return true;
     }
     
-    // For non-superadmin users, check basic requirements
+    // For authenticated users, check basic requirements
     if (!currentCompany) {
-      console.log('❌ No current company assigned');
+      console.log('❌ No current company assigned for module:', module);
       return false;
     }
 
     if (userCompanies.length === 0) {
-      console.log('❌ No user companies found');
+      console.log('❌ No user companies found for module:', module);
       return false;
     }
 
@@ -111,7 +112,7 @@ export const useAuthActions = ({
     const hasRoleInCompany = userCompanies.some(uc => uc.company_id === currentCompany.id);
     
     if (!hasRoleInCompany) {
-      console.log('❌ User has no role in current company');
+      console.log('❌ User has no role in current company for module:', module);
       return false;
     }
 
