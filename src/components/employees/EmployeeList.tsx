@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Plus, Users, Filter, Download, MoreHorizontal, 
   Eye, Edit, Trash2, UserCheck, UserX, AlertTriangle,
-  Mail, Phone, Calendar, Building2, Briefcase, Upload
+  Mail, Phone, Calendar, Building2, Briefcase, Upload, Loader2
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmployeeFiltersComponent } from './EmployeeFilters';
@@ -16,9 +17,11 @@ import { EmployeeFormModal } from './EmployeeFormModal';
 import { EmployeeDetailsModal } from './EmployeeDetailsModal';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
-import { EmployeeWithStatus, ESTADOS_EMPLEADO } from '@/types/employee-extended';
+import { EmployeeWithStatus, ESTADOS_EMPLEADO, ComplianceIndicator } from '@/types/employee-extended';
 import { CONTRACT_TYPES } from '@/types/employee-config';
 import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
+import { EmployeeExcelExportService } from '@/services/EmployeeExcelExportService';
+import { useToast } from '@/hooks/use-toast';
 
 export const EmployeeList = () => {
   const {
@@ -33,8 +36,6 @@ export const EmployeeList = () => {
     toggleEmployeeSelection,
     toggleAllEmployees,
     bulkUpdateStatus,
-    exportEmployees,
-    getComplianceIndicators,
     openEmployeeProfile,
     closeEmployeeProfile,
     totalEmployees,
@@ -43,11 +44,13 @@ export const EmployeeList = () => {
   } = useEmployeeList();
 
   const { changeEmployeeStatus, deleteEmployee } = useEmployeeCRUD();
+  const { toast } = useToast();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithStatus | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isImportDrawerOpen, setIsImportDrawerOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleCreateEmployee = () => {
     setEditingEmployee(null);
@@ -73,6 +76,84 @@ export const EmployeeList = () => {
     if (result.success) {
       refreshEmployees();
     }
+  };
+
+  const handleExportToExcel = async () => {
+    try {
+      setIsExporting(true);
+      
+      // Show loading toast
+      toast({
+        title: "Preparando archivo...",
+        description: EmployeeExcelExportService.getExportSummary(totalEmployees, filteredCount),
+      });
+
+      const result = await EmployeeExcelExportService.exportToExcel(employees, 'empleados');
+      
+      toast({
+        title: "Archivo exportado exitosamente",
+        description: `Se exportaron ${result.recordCount} empleados a ${result.fileName}`,
+      });
+    } catch (error) {
+      console.error('Error exporting employees:', error);
+      toast({
+        title: "Error al exportar",
+        description: "No se pudo generar el archivo Excel. Por favor intenta nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const getComplianceIndicators = (employee: EmployeeWithStatus): ComplianceIndicator[] => {
+    const indicators: ComplianceIndicator[] = [];
+
+    if (!employee.eps) {
+      indicators.push({
+        type: 'eps',
+        status: 'pendiente',
+        message: 'Falta afiliación a EPS'
+      });
+    }
+
+    if (!employee.afp) {
+      indicators.push({
+        type: 'pension',
+        status: 'pendiente',
+        message: 'Falta afiliación a fondo de pensiones'
+      });
+    }
+
+    if (!employee.nivelRiesgoARL) {
+      indicators.push({
+        type: 'arl',
+        status: 'pendiente',
+        message: 'Falta asignar nivel de riesgo ARL'
+      });
+    }
+
+    if (employee.contratoVencimiento) {
+      const vencimiento = new Date(employee.contratoVencimiento);
+      const hoy = new Date();
+      const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 3600 * 24));
+      
+      if (diasRestantes <= 0) {
+        indicators.push({
+          type: 'contrato',
+          status: 'vencido',
+          message: 'Contrato vencido'
+        });
+      } else if (diasRestantes <= 30) {
+        indicators.push({
+          type: 'contrato',
+          status: 'pendiente',
+          message: `Contrato vence en ${diasRestantes} días`
+        });
+      }
+    }
+
+    return indicators;
   };
 
   const formatCurrency = (amount: number) => {
@@ -128,9 +209,17 @@ export const EmployeeList = () => {
             <Upload className="h-4 w-4 mr-2" />
             Importar
           </Button>
-          <Button variant="outline" onClick={() => exportEmployees('excel')}>
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
+          <Button 
+            variant="outline" 
+            onClick={handleExportToExcel}
+            disabled={isExporting || employees.length === 0}
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            {isExporting ? 'Exportando...' : 'Exportar'}
           </Button>
           <Button onClick={handleCreateEmployee}>
             <Plus className="h-4 w-4 mr-2" />
@@ -154,7 +243,6 @@ export const EmployeeList = () => {
         </Card>
       )}
 
-      {/* Acciones en lote */}
       {selectedEmployees.length > 0 && (
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="pt-6">
@@ -177,7 +265,6 @@ export const EmployeeList = () => {
         </Card>
       )}
 
-      {/* Lista de empleados */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -351,7 +438,6 @@ export const EmployeeList = () => {
         </CardContent>
       </Card>
 
-      {/* Modales */}
       <EmployeeFormModal
         isOpen={isFormModalOpen}
         onClose={() => {
@@ -372,7 +458,6 @@ export const EmployeeList = () => {
         employee={selectedEmployee}
       />
 
-      {/* Import Drawer */}
       <ImportEmployeesDrawer
         isOpen={isImportDrawerOpen}
         onClose={() => setIsImportDrawerOpen(false)}
