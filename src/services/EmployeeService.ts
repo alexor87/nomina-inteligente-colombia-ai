@@ -19,6 +19,18 @@ export class EmployeeService {
       throw new Error('No se encontró la empresa del usuario. Asegúrate de estar autenticado.');
     }
 
+    // Verificar si ya existe un empleado con la misma cédula en la empresa
+    const { data: existingEmployee } = await supabase
+      .from('employees')
+      .select('id, cedula, nombre, apellido')
+      .eq('company_id', companyId)
+      .eq('cedula', String(employeeData.cedula || '').trim())
+      .single();
+
+    if (existingEmployee) {
+      throw new Error(`Ya existe un empleado con la cédula ${employeeData.cedula} en esta empresa: ${existingEmployee.nombre} ${existingEmployee.apellido}`);
+    }
+
     // Validar y limpiar el estado específicamente
     const validStates = ['activo', 'inactivo', 'vacaciones', 'incapacidad'];
     const estadoLimpio = employeeData.estado && validStates.includes(employeeData.estado) 
@@ -98,6 +110,12 @@ export class EmployeeService {
           code: error.code
         });
         console.error('📋 Datos que causaron el error:', cleanedData);
+        
+        // Manejar errores específicos de duplicación
+        if (error.code === '23505' && error.message.includes('employees_company_id_cedula_key')) {
+          throw new Error(`Ya existe un empleado con la cédula ${cleanedData.cedula} en esta empresa`);
+        }
+        
         throw new Error(`Error al crear empleado: ${error.message}`);
       }
 
