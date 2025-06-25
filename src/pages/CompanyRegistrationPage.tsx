@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -131,19 +130,33 @@ export const CompanyRegistrationPage = () => {
       console.log('Company created successfully with id:', companyId);
       
       toast({
-        title: "¡Empresa registrada exitosamente!",
-        description: "Tu empresa ha sido creada con un trial de 30 días gratuitos. Revisa tu email para confirmar tu cuenta.",
+        title: "¡Registro exitoso!",
+        description: "Tu empresa ha sido registrada. Revisa tu email para confirmar tu cuenta y luego podrás iniciar sesión.",
       });
 
       // Redirigir a login después de un breve delay
       setTimeout(() => {
         navigate('/auth');
-      }, 2000);
+      }, 3000);
     } catch (error: any) {
       console.error('Error creating company:', error);
+      
+      // Manejar errores específicos
+      let errorMessage = "Ha ocurrido un error inesperado";
+      
+      if (error.message?.includes('User already registered')) {
+        errorMessage = "Ya existe un usuario con este email";
+      } else if (error.message?.includes('Invalid email')) {
+        errorMessage = "El formato del email no es válido";
+      } else if (error.message?.includes('Password should be at least 6 characters')) {
+        errorMessage = "La contraseña debe tener al menos 6 caracteres";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error al registrar empresa",
-        description: error.message || "Ha ocurrido un error inesperado",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -318,7 +331,7 @@ export const CompanyRegistrationPage = () => {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creando empresa...
+                      Registrando empresa...
                     </>
                   ) : (
                     'Crear empresa y comenzar trial'

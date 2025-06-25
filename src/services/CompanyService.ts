@@ -35,6 +35,8 @@ export class CompanyService {
   // Crear nueva empresa con usuario (para registro completo)
   static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
     try {
+      console.log('Starting user registration process...');
+      
       // Primero registrar el usuario
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: data.user_email,
@@ -47,10 +49,18 @@ export class CompanyService {
         }
       });
 
-      if (signUpError) throw signUpError;
-      if (!authData.user) throw new Error('Error al crear usuario');
+      if (signUpError) {
+        console.error('Sign up error:', signUpError);
+        throw signUpError;
+      }
+      
+      if (!authData.user) {
+        throw new Error('Error al crear usuario - no se recibió información del usuario');
+      }
 
-      // Ahora crear la empresa usando la función actualizada
+      console.log('User registered successfully:', authData.user.id);
+
+      // Intentar crear la empresa usando la función simple (sin parámetros de usuario)
       const { data: result, error } = await supabase.rpc('create_company_with_setup', {
         p_nit: data.nit,
         p_razon_social: data.razon_social,
@@ -62,8 +72,12 @@ export class CompanyService {
         p_last_name: data.last_name
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Company creation error:', error);
+        throw error;
+      }
 
+      console.log('Company created successfully:', result);
       return result;
     } catch (error) {
       console.error('Error creating company with user:', error);
