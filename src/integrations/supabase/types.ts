@@ -327,6 +327,7 @@ export type Database = {
           empleado_id: string
           fecha_fin: string | null
           fecha_inicio: string | null
+          horas: number | null
           id: string
           observacion: string | null
           periodo_id: string
@@ -345,6 +346,7 @@ export type Database = {
           empleado_id: string
           fecha_fin?: string | null
           fecha_inicio?: string | null
+          horas?: number | null
           id?: string
           observacion?: string | null
           periodo_id: string
@@ -363,6 +365,7 @@ export type Database = {
           empleado_id?: string
           fecha_fin?: string | null
           fecha_inicio?: string | null
+          horas?: number | null
           id?: string
           observacion?: string | null
           periodo_id?: string
