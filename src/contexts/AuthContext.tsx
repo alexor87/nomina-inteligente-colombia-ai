@@ -133,9 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const initializeUserData = async (user: User) => {
-    try {
-      console.log('🔄 Initializing user data for:', user.email);
+    console.log('🔄 Initializing user data for:', user.email);
 
+    try {
       // Check if user is superadmin first
       const superAdminStatus = await checkSuperAdmin(user.id);
       setIsSuperAdmin(superAdminStatus);
@@ -198,9 +198,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('❌ Error initializing user data:', error);
     } finally {
-      // Always set loading to false, even if there's an error
+      // CRITICAL: Always set loading to false, regardless of success or failure
+      console.log('🔄 Setting loading to false');
       setLoading(false);
-      console.log('🔄 Loading state set to false');
     }
   };
 
@@ -212,31 +212,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    console.log('🚀 AuthProvider mounted, setting up auth listener...');
     let mounted = true;
 
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 Auth state changed:', event, session?.user?.email);
       
-      if (!mounted) return;
+      if (!mounted) {
+        console.log('⚠️ Component unmounted, ignoring auth state change');
+        return;
+      }
 
       if (session?.user) {
         setUser(session.user);
         await initializeUserData(session.user);
       } else {
+        console.log('🔄 No session, clearing auth state');
         setUser(null);
         setProfile(null);
         setCurrentCompany(null);
         setUserCompanies([]);
         setIsSuperAdmin(false);
         setLoading(false);
-        console.log('🔄 Auth cleared, loading set to false');
       }
     });
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (!mounted) return;
+      if (!mounted) {
+        console.log('⚠️ Component unmounted, ignoring session check');
+        return;
+      }
       
       if (error) {
         console.error('Error getting session:', error);
@@ -249,12 +256,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         initializeUserData(session.user);
       } else {
-        console.log('🔄 No existing session found');
+        console.log('🔄 No existing session found, setting loading to false');
         setLoading(false);
       }
     });
 
     return () => {
+      console.log('🧹 AuthProvider cleanup');
       mounted = false;
       subscription.unsubscribe();
     };
