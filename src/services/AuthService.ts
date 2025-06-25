@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Company, Profile, UserCompany } from '@/types/auth';
@@ -44,16 +43,69 @@ export class AuthService {
 
   static async loadUserCompanies(userId: string): Promise<UserCompany[]> {
     try {
-      const { data, error } = await supabase.rpc('get_user_companies', {
-        _user_id: userId
-      });
-
-      if (error) {
-        console.error('Error loading user companies:', error);
-        return [];
+      // First check if user is superadmin
+      const isSuperAdmin = await this.checkSuperAdmin(userId);
+      
+      if (isSuperAdmin) {
+        console.log('👑 User is superadmin, loading all companies');
+        // For superadmin, return all companies
+        const { data: companies, error } = await supabase
+          .from('companies')
+          .select('id')
+          .eq('estado', 'activa');
+        
+        if (error) {
+          console.error('Error loading companies for superadmin:', error);
+          return [];
+        }
+        
+        return companies?.map(company => ({
+          company_id: company.id,
+          rol: 'superadmin'
+        })) || [];
       }
 
-      return data || [];
+      // For regular users, check user_roles table first
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('company_id, role')
+        .eq('user_id', userId);
+
+      if (!rolesError && userRoles && userRoles.length > 0) {
+        console.log('✅ Found user roles:', userRoles);
+        return userRoles.map(role => ({
+          company_id: role.company_id,
+          rol: role.role
+        }));
+      }
+
+      // Fallback: check usuarios_empresa table
+      const { data: usuariosEmpresa, error: empresaError } = await supabase
+        .from('usuarios_empresa')
+        .select('empresa_id, rol')
+        .eq('usuario_id', userId)
+        .eq('activo', true);
+
+      if (!empresaError && usuariosEmpresa && usuariosEmpresa.length > 0) {
+        console.log('✅ Found usuarios_empresa:', usuariosEmpresa);
+        return usuariosEmpresa.map(ue => ({
+          company_id: ue.empresa_id,
+          rol: ue.rol
+        }));
+      }
+
+      // If no roles found, check if user has a company_id in their profile
+      const profile = await this.loadUserProfile(userId);
+      if (profile && profile.company_id) {
+        console.log('✅ Using company from profile:', profile.company_id);
+        return [{
+          company_id: profile.company_id,
+          rol: 'admin' // Default role
+        }];
+      }
+
+      console.warn('⚠️ No companies found for user');
+      return [];
     } catch (error) {
       console.error('Error in loadUserCompanies:', error);
       return [];

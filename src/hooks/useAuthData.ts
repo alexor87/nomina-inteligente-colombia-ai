@@ -26,25 +26,24 @@ export const useAuthData = () => {
       setProfile(profileData);
       console.log('👤 Profile loaded:', profileData);
 
-      // Load user companies
+      // Load user companies with better error handling
       const companies = await AuthService.loadUserCompanies(user.id);
       setUserCompanies(companies);
-      console.log('🏢 User companies:', companies);
+      console.log('🏢 User companies loaded:', companies);
 
-      // Set current company - CRITICAL FIX
+      // Set current company with improved logic
       if (superAdminStatus) {
-        // For superadmin, always load the first available company
+        // For superadmin, try to load first available company
         console.log('🔄 Loading first available company for superadmin...');
         const firstCompany = await AuthService.loadFirstAvailableCompany();
         if (firstCompany) {
           setCurrentCompany(firstCompany);
           console.log('✅ SuperAdmin using first company:', firstCompany.name);
         } else {
-          console.warn('⚠️ No companies available for superadmin');
-          // Even without companies, superadmin should have access
+          console.warn('⚠️ No companies available, creating default superadmin company');
           setCurrentCompany({ 
-            id: 'superadmin', 
-            name: 'SuperAdmin', 
+            id: 'superadmin-default', 
+            name: 'SuperAdmin Panel', 
             nit: '000000000-0',
             rol: 'superadmin' 
           });
@@ -52,6 +51,8 @@ export const useAuthData = () => {
       } else if (companies.length > 0) {
         // For regular users, use their first assigned company
         const firstCompany = companies[0];
+        console.log('🔄 Loading company data for:', firstCompany.company_id);
+        
         const companyData = await AuthService.loadCurrentCompany(firstCompany.company_id);
         
         if (companyData) {
@@ -59,20 +60,53 @@ export const useAuthData = () => {
             ...companyData,
             rol: firstCompany.rol
           });
-          console.log('✅ Current company set:', companyData.name);
+          console.log('✅ Current company set:', companyData.name, 'with role:', firstCompany.rol);
         } else {
           console.error('❌ Failed to load company data for:', firstCompany.company_id);
+          // Create a fallback company entry
+          setCurrentCompany({
+            id: firstCompany.company_id,
+            name: 'Mi Empresa',
+            nit: 'N/A',
+            rol: firstCompany.rol
+          });
         }
       } else {
         console.warn('⚠️ User has no companies assigned and is not superadmin');
+        // For users without companies, create a minimal company setup
+        if (profileData?.company_id) {
+          const companyData = await AuthService.loadCurrentCompany(profileData.company_id);
+          if (companyData) {
+            setCurrentCompany({
+              ...companyData,
+              rol: 'admin'
+            });
+            console.log('✅ Using company from profile');
+          }
+        }
       }
 
-      console.log('✅ User data initialization completed');
+      console.log('✅ User data initialization completed successfully');
     } catch (error) {
       console.error('❌ Error initializing user data:', error);
+      
+      // Even on error, ensure basic access for authenticated users
+      if (user) {
+        console.log('🔄 Setting minimal access due to initialization error');
+        setCurrentCompany({
+          id: 'fallback-company',
+          name: 'Mi Empresa',
+          nit: 'N/A',
+          rol: 'admin'
+        });
+        setUserCompanies([{
+          company_id: 'fallback-company',
+          rol: 'admin'
+        }]);
+      }
     } finally {
       // CRITICAL: Always set loading to false
-      console.log('🔄 Setting loading to false');
+      console.log('🔄 Setting loading to false - initialization complete');
       setLoading(false);
     }
   };
