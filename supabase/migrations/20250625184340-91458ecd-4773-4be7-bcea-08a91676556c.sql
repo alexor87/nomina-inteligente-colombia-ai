@@ -1,4 +1,5 @@
 
+
 -- Eliminar las políticas problemáticas que causan recursión infinita
 DROP POLICY IF EXISTS "Superadmin can view all user-company relationships" ON public.usuarios_empresa;
 DROP POLICY IF EXISTS "Admins can view their company relationships" ON public.usuarios_empresa;
@@ -67,3 +68,86 @@ AS $$
   AND ue.activo = true
   AND NOT public.is_superadmin(_user_id)
 $$;
+
+-- Agregar políticas RLS para la tabla employees
+DROP POLICY IF EXISTS "Users can view accessible employees" ON public.employees;
+DROP POLICY IF EXISTS "Editors and admins can manage employees" ON public.employees;
+
+CREATE POLICY "Users can view accessible employees"
+  ON public.employees
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_superadmin(auth.uid()) OR 
+    public.user_has_access_to_company(auth.uid(), company_id)
+  );
+
+CREATE POLICY "Editors and admins can manage employees"
+  ON public.employees
+  FOR ALL
+  TO authenticated
+  USING (
+    public.is_superadmin(auth.uid()) OR
+    company_id IN (
+      SELECT empresa_id 
+      FROM public.usuarios_empresa 
+      WHERE usuario_id = auth.uid() 
+        AND rol IN ('admin', 'editor')
+        AND activo = true
+    )
+  )
+  WITH CHECK (
+    public.is_superadmin(auth.uid()) OR
+    company_id IN (
+      SELECT empresa_id 
+      FROM public.usuarios_empresa 
+      WHERE usuario_id = auth.uid() 
+        AND rol IN ('admin', 'editor')
+        AND activo = true
+    )
+  );
+
+-- Agregar políticas RLS para la tabla companies
+DROP POLICY IF EXISTS "Users can view accessible companies" ON public.companies;
+DROP POLICY IF EXISTS "Superadmin can manage all companies" ON public.companies;
+DROP POLICY IF EXISTS "Admins can update their company" ON public.companies;
+
+CREATE POLICY "Users can view accessible companies"
+  ON public.companies
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_superadmin(auth.uid()) OR 
+    public.user_has_access_to_company(auth.uid(), id)
+  );
+
+CREATE POLICY "Superadmin can manage all companies"
+  ON public.companies
+  FOR ALL
+  TO authenticated
+  USING (public.is_superadmin(auth.uid()))
+  WITH CHECK (public.is_superadmin(auth.uid()));
+
+CREATE POLICY "Admins can update their company"
+  ON public.companies
+  FOR UPDATE
+  TO authenticated
+  USING (
+    id IN (
+      SELECT empresa_id 
+      FROM public.usuarios_empresa 
+      WHERE usuario_id = auth.uid() 
+        AND rol = 'admin' 
+        AND activo = true
+    )
+  )
+  WITH CHECK (
+    id IN (
+      SELECT empresa_id 
+      FROM public.usuarios_empresa 
+      WHERE usuario_id = auth.uid() 
+        AND rol = 'admin' 
+        AND activo = true
+    )
+  );
+
