@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Building2, Check, Loader2 } from 'lucide-react';
 import { CompanyService, CompanyRegistrationWithUser } from '@/services/CompanyService';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
 
 export const CompanyRegistrationPage = () => {
   const [formData, setFormData] = useState<CompanyRegistrationWithUser>({
@@ -27,7 +26,6 @@ export const CompanyRegistrationPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { refreshUserData } = useAuth();
 
   const plans = [
     {
@@ -130,9 +128,6 @@ export const CompanyRegistrationPage = () => {
       console.log('Creating company with user data:', formData);
       const companyId = await CompanyService.createCompanyWithUser(formData);
       console.log('Company created successfully with id:', companyId);
-      
-      // Refresh user data to ensure roles and profile are loaded
-      await refreshUserData();
       
       toast({
         title: "¡Registro exitoso!",

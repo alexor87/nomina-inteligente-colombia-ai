@@ -29,7 +29,6 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,50 +53,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return roles.some(r => r.role === role);
   };
 
-  const refreshUserData = async () => {
-    const currentUser = (await supabase.auth.getUser()).data.user;
-    if (!currentUser) return;
-
-    try {
-      // Fetch user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .rpc('get_user_roles');
-      
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-      } else {
-        console.log('User roles fetched:', userRoles);
-        setRoles(userRoles || []);
-      }
-
-      // Fetch user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .single();
-      
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
-      } else {
-        console.log('User profile fetched:', profileData);
-        setProfile(profileData);
-      }
-
-      // Check if user is SaaS admin
-      const { data: adminStatus, error: adminError } = await supabase
-        .rpc('is_saas_admin');
-      
-      if (adminError) {
-        console.error('Error checking admin status:', adminError);
-      } else {
-        setIsSaasAdmin(adminStatus || false);
-      }
-    } catch (error) {
-      console.error('Error refreshing user data:', error);
-    }
-  };
-
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -109,7 +64,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           // Fetch user data after successful auth
           setTimeout(async () => {
-            await refreshUserData();
+            try {
+              // Fetch user roles
+              const { data: userRoles, error: rolesError } = await supabase
+                .rpc('get_user_roles');
+              
+              if (rolesError) {
+                console.error('Error fetching user roles:', rolesError);
+              } else {
+                setRoles(userRoles || []);
+              }
+
+              // Fetch user profile
+              const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .single();
+              
+              if (profileError) {
+                console.error('Error fetching user profile:', profileError);
+              } else {
+                setProfile(profileData);
+              }
+
+              // Check if user is SaaS admin
+              const { data: adminStatus, error: adminError } = await supabase
+                .rpc('is_saas_admin');
+              
+              if (adminError) {
+                console.error('Error checking admin status:', adminError);
+              } else {
+                setIsSaasAdmin(adminStatus || false);
+              }
+            } catch (error) {
+              console.error('Error in auth data fetch:', error);
+            }
           }, 0);
         } else {
           setRoles([]);
@@ -175,7 +165,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signUp,
     signOut,
-    refreshUserData,
   };
 
   return (

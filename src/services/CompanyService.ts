@@ -73,7 +73,7 @@ export class CompanyService {
 
       console.log('User signed in successfully');
 
-      // Crear la empresa usando la función RPC
+      // Ahora crear la empresa usando la función original (sin parámetros de usuario)
       const { data: result, error } = await supabase.rpc('create_company_with_setup', {
         p_nit: data.nit,
         p_razon_social: data.razon_social,
@@ -90,74 +90,18 @@ export class CompanyService {
 
       console.log('Company created successfully:', result);
       
-      // Esperar un poco para que se procesen los triggers
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Verificar que el perfil se creó correctamente
-      const { data: profileData, error: profileError } = await supabase
+      // Actualizar el perfil del usuario con los nombres
+      const { error: profileError } = await supabase
         .from('profiles')
-        .select('*')
-        .eq('user_id', signInData.user.id)
-        .single();
+        .update({
+          first_name: data.first_name,
+          last_name: data.last_name
+        })
+        .eq('user_id', signInData.user.id);
 
       if (profileError) {
-        console.error('Profile verification error:', profileError);
-        // Intentar crear el perfil manualmente si no existe
-        const { error: createProfileError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: signInData.user.id,
-            first_name: data.first_name,
-            last_name: data.last_name,
-            company_id: result
-          });
-        
-        if (createProfileError) {
-          console.error('Manual profile creation error:', createProfileError);
-        }
-      } else {
-        console.log('Profile verified:', profileData);
-        
-        // Si el perfil existe pero no tiene company_id, actualizarlo
-        if (!profileData.company_id) {
-          const { error: updateProfileError } = await supabase
-            .from('profiles')
-            .update({ company_id: result })
-            .eq('user_id', signInData.user.id);
-          
-          if (updateProfileError) {
-            console.error('Profile update error:', updateProfileError);
-          }
-        }
-      }
-
-      // Verificar que el rol de administrador se asignó correctamente
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', signInData.user.id)
-        .eq('role', 'administrador')
-        .single();
-
-      if (roleError) {
-        console.error('Role verification error:', roleError);
-        // Intentar crear el rol manualmente si no existe
-        const { error: createRoleError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: signInData.user.id,
-            role: 'administrador',
-            company_id: result,
-            assigned_by: signInData.user.id
-          });
-        
-        if (createRoleError) {
-          console.error('Manual role creation error:', createRoleError);
-        } else {
-          console.log('Role created manually');
-        }
-      } else {
-        console.log('Role verified:', roleData);
+        console.error('Profile update error:', profileError);
+        // No lanzamos error aquí porque la empresa ya se creó
       }
 
       return result;
