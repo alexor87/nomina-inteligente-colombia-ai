@@ -8,6 +8,7 @@ interface Company {
   id: string;
   name: string;
   nit: string;
+  rol?: string;
 }
 
 interface UserCompany {
@@ -15,8 +16,18 @@ interface UserCompany {
   rol: string;
 }
 
+interface Profile {
+  user_id: string;
+  first_name?: string;
+  last_name?: string;
+  company_id?: string;
+  avatar_url?: string;
+  phone?: string;
+}
+
 interface AuthContextType {
   user: User | null;
+  profile: Profile | null;
   currentCompany: Company | null;
   loading: boolean;
   isAuthenticated: boolean;
@@ -27,6 +38,7 @@ interface AuthContextType {
   hasRole: (role: 'admin' | 'editor' | 'lector') => boolean;
   canAccessModule: (module: string) => boolean;
   switchCompany: (companyId: string) => Promise<void>;
+  refreshUserData: () => Promise<void>;
   userCompanies: UserCompany[];
 }
 
@@ -34,6 +46,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +68,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error in checkSuperAdmin:', error);
       return false;
+    }
+  };
+
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading profile:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in loadUserProfile:', error);
+      return null;
     }
   };
 
@@ -105,6 +138,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       console.log('🔄 Initializing user data for:', user.email);
 
+      // Load user profile
+      const profileData = await loadUserProfile(user.id);
+      setProfile(profileData);
+
       // Check if user is superadmin
       const superAdminStatus = await checkSuperAdmin(user.id);
       setIsSuperAdmin(superAdminStatus);
@@ -121,7 +158,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const companyData = await loadCurrentCompany(firstCompany.company_id);
         
         if (companyData) {
-          setCurrentCompany(companyData);
+          setCurrentCompany({
+            ...companyData,
+            rol: firstCompany.rol
+          });
           console.log('✅ Current company set:', companyData.name);
         }
       } else if (superAdminStatus) {
@@ -136,7 +176,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentCompany({
             id: firstCompany.id,
             name: firstCompany.razon_social,
-            nit: firstCompany.nit
+            nit: firstCompany.nit,
+            rol: 'superadmin'
           });
           console.log('✅ SuperAdmin using first company:', firstCompany.razon_social);
         }
@@ -145,6 +186,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('❌ Error initializing user data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshUserData = async () => {
+    if (user) {
+      await initializeUserData(user);
     }
   };
 
@@ -168,6 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await initializeUserData(session.user);
       } else {
         setUser(null);
+        setProfile(null);
         setCurrentCompany(null);
         setUserCompanies([]);
         setIsSuperAdmin(false);
@@ -178,7 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<void> => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -200,7 +248,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -215,7 +263,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
+  const signUp = async (email: string, password: string, firstName: string, lastName: string): Promise<void> => {
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -277,7 +325,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const companyData = await loadCurrentCompany(companyId);
       if (companyData) {
-        setCurrentCompany(companyData);
+        const companyRelation = userCompanies.find(uc => uc.company_id === companyId);
+        setCurrentCompany({
+          ...companyData,
+          rol: companyRelation?.rol
+        });
         toast({
           title: "Empresa cambiada",
           description: `Ahora estás trabajando en ${companyData.name}`,
@@ -295,6 +347,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: AuthContextType = {
     user,
+    profile,
     currentCompany,
     loading,
     isAuthenticated: !!user,
@@ -305,6 +358,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasRole,
     canAccessModule,
     switchCompany,
+    refreshUserData,
     userCompanies
   };
 

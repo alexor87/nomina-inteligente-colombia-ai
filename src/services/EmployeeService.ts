@@ -144,16 +144,12 @@ export class EmployeeService {
     }
   }
 
+  // Note: These methods are for future functionality - the database columns don't exist yet
   static async updateCentroCosto(id: string, centroCosto: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('employees')
-        .update({ centro_costo: centroCosto })
-        .eq('id', id);
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      // This would need a migration to add the centro_costo column
+      console.log('Centro costo update requested but column does not exist yet');
+      throw new Error('Funcionalidad no disponible aún - requiere migración de base de datos');
     } catch (error: any) {
       console.error('Error updating centro costo:', error);
       throw error;
@@ -162,14 +158,9 @@ export class EmployeeService {
 
   static async updateNivelRiesgoARL(id: string, nivelRiesgo: 'I' | 'II' | 'III' | 'IV' | 'V'): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('employees')
-        .update({ nivel_riesgo_arl: nivelRiesgo })
-        .eq('id', id);
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      // This would need a migration to add the nivel_riesgo_arl column
+      console.log('ARL risk level update requested but column does not exist yet');
+      throw new Error('Funcionalidad no disponible aún - requiere migración de base de datos');
     } catch (error: any) {
       console.error('Error updating ARL risk level:', error);
       throw error;

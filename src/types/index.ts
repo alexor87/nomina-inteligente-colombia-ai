@@ -1,4 +1,3 @@
-
 // Tipos principales de la aplicación
 export interface Employee {
   id: string;
@@ -7,18 +6,24 @@ export interface Employee {
   nombre: string;
   apellido: string;
   email: string;
-  telefono?: string;
+  telefono: string;
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
   estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
-  eps?: string;
-  afp?: string;
-  arl?: string;
-  cajaCompensacion?: string;
-  cargo?: string;
+  eps: string;
+  afp: string;
+  arl: string;
+  cajaCompensacion: string;
+  cargo: string;
   empresaId: string;
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
+  banco?: string;
+  tipoCuenta?: 'ahorros' | 'corriente';
+  numeroCuenta?: string;
+  titularCuenta?: string;
+  centroCosto?: string;
+  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
   createdAt: string;
   updatedAt: string;
 }
