@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Edit, Calculator, FileText, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { NovedadDrawer } from '../novedades/NovedadDrawer';
 import { useNovedades } from '@/hooks/useNovedades';
-import { NovedadFormData } from '@/types/novedades';
+import { NovedadFormData, CreateNovedadData } from '@/types/novedades';
 
 interface PayrollTableProps {
   employees: PayrollEmployee[];
@@ -17,7 +16,7 @@ interface PayrollTableProps {
   isLoading: boolean;
   canEdit: boolean;
   periodoId: string;
-  onRefreshEmployees: () => void;
+  onRefreshEmployees?: () => void;
 }
 
 export const PayrollTable: React.FC<PayrollTableProps> = ({
@@ -57,7 +56,15 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     if (!selectedEmployee) return;
     
     console.log('Creating novedad without auto-recalculation');
-    await createNovedad(data, true); // skipRecalculation = true
+    
+    // Map NovedadFormData to CreateNovedadData
+    const createData: CreateNovedadData = {
+      ...data,
+      empleado_id: selectedEmployee.id,
+      periodo_id: periodoId
+    };
+    
+    await createNovedad(createData, true); // skipRecalculation = true
   };
 
   const handleUpdateNovedad = async (id: string, data: NovedadFormData) => {
