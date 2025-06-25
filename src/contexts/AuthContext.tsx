@@ -3,14 +3,26 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 
+interface Profile {
+  user_id: string;
+  first_name?: string;
+  last_name?: string;
+  company_id?: string;
+  avatar_url?: string;
+}
+
 interface AuthContextType {
   user: User | null;
+  profile: Profile | null;
   loading: boolean;
   roles: string[];
   isSaasAdmin: boolean;
   hasRole: (role: string) => boolean;
   canAccessModule: (module: string) => boolean;
   refreshUserData: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: any }>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +41,7 @@ const MODULE_PERMISSIONS = {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<string[]>([]);
   const [isSaasAdmin, setIsSaasAdmin] = useState(false);
@@ -55,6 +68,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('🔐 AuthContext: Is SaaS Admin:', isAdmin);
         setIsSaasAdmin(isAdmin);
 
+        // Obtener perfil del usuario
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .single();
+
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error('Error fetching profile:', profileError);
+          setProfile(null);
+        } else {
+          setProfile(profileData);
+        }
+
         // Obtener roles del usuario
         const { data: userRoles, error: rolesError } = await supabase
           .from('user_roles')
@@ -71,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         console.log('❌ AuthContext: No user found');
+        setProfile(null);
         setRoles([]);
         setIsSaasAdmin(false);
       }
@@ -79,10 +107,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error in refreshUserData:', error);
       setUser(null);
+      setProfile(null);
       setRoles([]);
       setIsSaasAdmin(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) {
+        return { error };
+      }
+      
+      // Refresh user data after successful sign in
+      await refreshUserData();
+      
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName
+          }
+        }
+      });
+      
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setIsSaasAdmin(false);
+    } catch (error) {
+      console.error('Error signing out:', error);
+      throw error;
     }
   };
 
@@ -101,6 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        setProfile(null);
         setRoles([]);
         setIsSaasAdmin(false);
         setLoading(false);
@@ -136,12 +220,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: AuthContextType = {
     user,
+    profile,
     loading,
     roles,
     isSaasAdmin,
     hasRole,
     canAccessModule,
-    refreshUserData
+    refreshUserData,
+    signIn,
+    signUp,
+    signOut
   };
 
   return (

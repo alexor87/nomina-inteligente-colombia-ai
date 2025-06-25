@@ -20,7 +20,7 @@ export const UserMenu = () => {
 
   const initials = `${profile.first_name?.[0] || ''}${profile.last_name?.[0] || ''}`.toUpperCase();
   const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
-  const primaryRole = roles[0]?.role || 'Sin rol';
+  const primaryRole = roles[0] || 'Sin rol';
 
   const handleSignOut = async () => {
     try {
