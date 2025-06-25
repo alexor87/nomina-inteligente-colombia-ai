@@ -6,40 +6,22 @@ export class EmployeeDataService {
     console.log('🔍 Getting current user company ID...');
     
     try {
-      // Obtener el usuario autenticado
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        console.error('❌ Error getting user:', userError);
-        throw new Error('Error al obtener usuario autenticado');
+      // Usar la función SECURITY DEFINER para obtener el company_id
+      const { data, error } = await supabase
+        .rpc('get_current_user_company_id');
+
+      if (error) {
+        console.error('❌ Error calling get_current_user_company_id function:', error);
+        throw new Error('Error al obtener empresa del usuario');
       }
 
-      if (!user) {
-        console.error('❌ No authenticated user found');
-        throw new Error('Usuario no autenticado');
-      }
-
-      console.log('👤 Current user ID:', user.id);
-
-      // Obtener el perfil del usuario con su company_id
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError) {
-        console.error('❌ Error getting user profile:', profileError);
-        throw new Error('Error al obtener perfil del usuario');
-      }
-
-      if (!profile?.company_id) {
-        console.error('❌ No company assigned to user profile');
+      if (!data) {
+        console.error('❌ No company found for current user');
         throw new Error('Usuario no tiene empresa asignada');
       }
 
-      console.log('🏢 User company ID:', profile.company_id);
-      return profile.company_id;
+      console.log('🏢 User company ID:', data);
+      return data;
 
     } catch (error) {
       console.error('❌ Error in getCurrentUserCompanyId:', error);
