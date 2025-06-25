@@ -1,41 +1,42 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollVoucher } from '@/types/vouchers';
+import { VoucherPDFService } from './VoucherPDFService';
 
 export class VoucherActionsService {
   static async downloadVoucher(voucher: PayrollVoucher): Promise<void> {
     try {
-      // Llamar a la función para generar el PDF
+      // Obtener datos del comprobante
       const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
         body: { voucherId: voucher.id }
       });
 
       if (error) throw error;
 
-      if (data?.success && data.htmlContent) {
-        // Crear un blob HTML y abrirlo en una nueva ventana para imprimir como PDF
-        const htmlBlob = new Blob([data.htmlContent], { type: 'text/html' });
-        const htmlUrl = window.URL.createObjectURL(htmlBlob);
-        
-        // Generar nombre del archivo dinámicamente
-        const fileName = `comprobante_${voucher.employeeCedula}_${voucher.periodo.replace(/\s+/g, '_').replace(/[\/\\:*?"<>|]/g, '_')}.pdf`;
-        
-        // Abrir en nueva ventana para que el usuario pueda imprimir o guardar como PDF
-        const printWindow = window.open(htmlUrl, '_blank', 'width=800,height=600');
-        if (printWindow) {
-          printWindow.document.title = fileName;
-          printWindow.onload = () => {
-            // Opcional: iniciar diálogo de impresión automáticamente
-            setTimeout(() => {
-              printWindow.print();
-            }, 1000);
-          };
-        }
-        
-        // Limpiar URL después de un tiempo
-        setTimeout(() => {
-          window.URL.revokeObjectURL(htmlUrl);
-        }, 30000);
+      if (data?.success) {
+        // Obtener información de la empresa
+        const { data: company } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', voucher.companyId)
+          .single();
+
+        // Preparar datos para el PDF
+        const voucherData = {
+          salaryDetails: {
+            baseSalary: voucher.netPay,
+            overtime: 0,
+            bonuses: 0,
+            totalEarnings: voucher.netPay,
+            healthContribution: Math.round(voucher.netPay * 0.04),
+            pensionContribution: Math.round(voucher.netPay * 0.04),
+            withholdingTax: 0,
+            totalDeductions: Math.round(voucher.netPay * 0.08)
+          }
+        };
+
+        // Generar y descargar PDF
+        await VoucherPDFService.generateAndDownload(voucher, company, voucherData);
       } else {
         throw new Error('No se pudo generar el contenido del comprobante');
       }
@@ -120,7 +121,7 @@ export class VoucherActionsService {
       try {
         await this.downloadVoucher(voucher);
         // Esperar un poco entre descargas para no sobrecargar el navegador
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
         console.error(`Error descargando comprobante para ${voucher.employeeName}:`, error);
       }
