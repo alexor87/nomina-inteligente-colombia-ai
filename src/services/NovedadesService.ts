@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
+import { PayrollNovedad, CreateNovedadData, BaseCalculoData } from '@/types/novedades';
 
 export class NovedadesService {
   static async getCurrentUserCompanyId(): Promise<string | null> {
@@ -22,6 +21,14 @@ export class NovedadesService {
     }
   }
 
+  // Helper function to convert database row to PayrollNovedad
+  private static convertDatabaseRowToNovedad(row: any): PayrollNovedad {
+    return {
+      ...row,
+      base_calculo: row.base_calculo ? JSON.parse(row.base_calculo) : undefined
+    } as PayrollNovedad;
+  }
+
   static async getNovedadesByPeriod(periodoId: string): Promise<PayrollNovedad[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -35,7 +42,7 @@ export class NovedadesService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as PayrollNovedad[];
+      return (data || []).map(row => this.convertDatabaseRowToNovedad(row));
     } catch (error) {
       console.error('Error loading novedades:', error);
       return [];
@@ -56,7 +63,7 @@ export class NovedadesService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as PayrollNovedad[];
+      return (data || []).map(row => this.convertDatabaseRowToNovedad(row));
     } catch (error) {
       console.error('Error loading employee novedades:', error);
       return [];
@@ -152,10 +159,13 @@ export class NovedadesService {
 
       console.log('✅ Novedad creada exitosamente:', data);
 
-      // Create audit log
-      await this.createAuditLog(data.id, 'created', null, data);
+      // Convert the database row to proper PayrollNovedad format
+      const convertedData = this.convertDatabaseRowToNovedad(data);
 
-      return data as PayrollNovedad;
+      // Create audit log
+      await this.createAuditLog(convertedData.id, 'created', null, convertedData);
+
+      return convertedData;
     } catch (error) {
       console.error('❌ Error completo creating novedad:', error);
       throw error;
@@ -174,9 +184,15 @@ export class NovedadesService {
         .eq('id', id)
         .single();
 
+      // Convert base_calculo to string if it exists in updates
+      const processedUpdates = {
+        ...updates,
+        base_calculo: updates.base_calculo ? JSON.stringify(updates.base_calculo) : undefined
+      };
+
       const { data, error } = await supabase
         .from('payroll_novedades')
-        .update(updates)
+        .update(processedUpdates)
         .eq('id', id)
         .eq('company_id', companyId)
         .select()
@@ -184,10 +200,13 @@ export class NovedadesService {
 
       if (error) throw error;
 
-      // Create audit log
-      await this.createAuditLog(id, 'updated', oldData, data);
+      // Convert the database row to proper PayrollNovedad format
+      const convertedData = this.convertDatabaseRowToNovedad(data);
 
-      return data as PayrollNovedad;
+      // Create audit log
+      await this.createAuditLog(id, 'updated', oldData, convertedData);
+
+      return convertedData;
     } catch (error) {
       console.error('Error updating novedad:', error);
       throw error;
