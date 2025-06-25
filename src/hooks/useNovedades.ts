@@ -31,7 +31,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     }
   }, [periodoId, toast]);
 
-  const createNovedad = useCallback(async (novedadData: CreateNovedadData) => {
+  const createNovedad = useCallback(async (novedadData: CreateNovedadData, skipRecalculation = false) => {
     try {
       setIsLoading(true);
       console.log('📝 Iniciando creación de novedad con datos:', novedadData);
@@ -76,8 +76,8 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
           description: "La novedad se ha registrado correctamente"
         });
 
-        // Trigger recalculation of payroll after novedad creation
-        if (onNovedadChange) {
+        // Only trigger recalculation if not skipped
+        if (!skipRecalculation && onNovedadChange) {
           console.log('🔄 Activando recalculación de nómina');
           onNovedadChange();
         }
@@ -98,7 +98,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     }
   }, [toast, onNovedadChange, periodoId]);
 
-  const updateNovedad = useCallback(async (id: string, updates: Partial<CreateNovedadData>, empleadoId: string) => {
+  const updateNovedad = useCallback(async (id: string, updates: Partial<CreateNovedadData>, empleadoId: string, skipRecalculation = false) => {
     try {
       setIsLoading(true);
       console.log('Updating novedad:', id, 'with updates:', updates);
@@ -120,8 +120,8 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
           description: "La novedad se ha actualizado correctamente"
         });
 
-        // Trigger recalculation of payroll after novedad update
-        if (onNovedadChange) {
+        // Only trigger recalculation if not skipped
+        if (!skipRecalculation && onNovedadChange) {
           console.log('Triggering payroll recalculation after novedad update');
           onNovedadChange();
         }
@@ -139,7 +139,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     }
   }, [toast, onNovedadChange]);
 
-  const deleteNovedad = useCallback(async (id: string, empleadoId: string) => {
+  const deleteNovedad = useCallback(async (id: string, empleadoId: string, skipRecalculation = false) => {
     try {
       setIsLoading(true);
       console.log('Deleting novedad:', id);
@@ -157,8 +157,8 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
         description: "La novedad se ha eliminado correctamente"
       });
 
-      // Trigger recalculation of payroll after novedad deletion
-      if (onNovedadChange) {
+      // Only trigger recalculation if not skipped
+      if (!skipRecalculation && onNovedadChange) {
         console.log('Triggering payroll recalculation after novedad deletion');
         onNovedadChange();
       }
