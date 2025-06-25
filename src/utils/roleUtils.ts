@@ -127,3 +127,37 @@ export async function forceAssignAdminRole(userId: string, companyId: string): P
     return false;
   }
 }
+
+// Función para ejecutar verificación completa de roles
+export async function performCompleteRoleCheck(userId: string): Promise<boolean> {
+  try {
+    console.log('🔄 Starting complete role check for user:', userId);
+    
+    // Esperar un momento para que se procesen los triggers de la base de datos
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Verificar y asignar roles si es necesario
+    const roleCheckResult = await checkAndAssignMissingRoles(userId);
+    
+    if (!roleCheckResult) {
+      console.error('❌ Role check failed, trying direct assignment...');
+      
+      // Obtener el perfil del usuario para forzar asignación
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', userId)
+        .single();
+      
+      if (profile?.company_id) {
+        return await forceAssignAdminRole(userId, profile.company_id);
+      }
+    }
+    
+    console.log('✅ Complete role check finished');
+    return roleCheckResult;
+  } catch (error) {
+    console.error('❌ Error in performCompleteRoleCheck:', error);
+    return false;
+  }
+}

@@ -1,8 +1,7 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { checkAndAssignMissingRoles } from '@/utils/roleUtils';
+import { performCompleteRoleCheck } from '@/utils/roleUtils';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
@@ -168,10 +167,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(profileData);
         console.log('👤 User profile fetched:', profileData);
         
-        // Si el usuario tiene una empresa, verificar y asignar roles si es necesario
+        // Si el usuario tiene una empresa, ejecutar verificación completa de roles
         if (profileData.company_id) {
-          console.log('🔧 Checking and assigning missing roles...');
-          await checkAndAssignMissingRoles(currentUser.id);
+          console.log('🔧 Performing complete role check...');
+          await performCompleteRoleCheck(currentUser.id);
         }
       } else {
         console.error('❌ Error fetching user profile:', profileError);
@@ -204,10 +203,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user data after successful auth with a slight delay
+          // Fetch user data after successful auth with extended delay
           setTimeout(async () => {
             await refreshUserData();
-          }, 500); // Aumenté el delay para dar tiempo a que se procesen los triggers
+          }, 1500); // Aumenté aún más el delay para asegurar que los triggers se procesen
         } else {
           setRoles([]);
           setProfile(null);
@@ -227,7 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         setTimeout(async () => {
           await refreshUserData();
-        }, 500);
+        }, 1500);
       }
       
       setLoading(false);
