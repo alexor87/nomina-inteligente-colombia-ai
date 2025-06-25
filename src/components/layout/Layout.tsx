@@ -18,8 +18,8 @@ interface LayoutProps {
 }
 
 export const Layout = ({ children }: LayoutProps) => {
-  const { roles } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Changed to false to show by default on desktop
+  const { loading } = useAuth();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const toggleSidebar = () => {
@@ -59,6 +59,18 @@ export const Layout = ({ children }: LayoutProps) => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Mostrar loading mientras se inicializa la autenticación
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex w-full">

@@ -50,68 +50,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       
-      if (currentUser) {
-        console.log('🔍 AuthContext: Current user found:', currentUser.email);
-        
-        // Verificar si es super admin
-        const { data: saasAdminData, error: adminError } = await supabase
-          .from('saas_admins')
-          .select('role')
-          .eq('user_id', currentUser.id)
-          .single();
-
-        if (adminError && adminError.code !== 'PGRST116') {
-          console.error('Error checking saas admin status:', adminError);
-        }
-
-        const isAdmin = !!saasAdminData;
-        console.log('🔐 AuthContext: Is SaaS Admin:', isAdmin);
-        setIsSaasAdmin(isAdmin);
-
-        // Obtener perfil del usuario
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .single();
-
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Error fetching profile:', profileError);
-          setProfile(null);
-        } else {
-          setProfile(profileData);
-        }
-
-        // Obtener roles del usuario
-        const { data: userRoles, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', currentUser.id);
-
-        if (rolesError) {
-          console.error('Error fetching user roles:', rolesError);
-          setRoles([]);
-        } else {
-          const rolesList = userRoles?.map(r => r.role) || [];
-          console.log('👤 AuthContext: User roles:', rolesList);
-          setRoles(rolesList);
-        }
-      } else {
+      if (!currentUser) {
         console.log('❌ AuthContext: No user found');
         setProfile(null);
         setRoles([]);
         setIsSaasAdmin(false);
+        setUser(null);
+        return;
       }
-      
+
+      console.log('🔍 AuthContext: Current user found:', currentUser.email);
       setUser(currentUser);
+
+      // Verificar si es super admin de forma segura
+      try {
+        const { data: saasAdminData } = await supabase
+          .from('saas_admins')
+          .select('role')
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+        const isAdmin = !!saasAdminData;
+        console.log('🔐 AuthContext: Is SaaS Admin:', isAdmin);
+        setIsSaasAdmin(isAdmin);
+      } catch (error) {
+        console.warn('Could not check saas admin status:', error);
+        setIsSaasAdmin(false);
+      }
+
+      // Obtener perfil del usuario de forma segura
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+        setProfile(profileData);
+      } catch (error) {
+        console.warn('Could not fetch profile:', error);
+        setProfile(null);
+      }
+
+      // Obtener roles del usuario de forma segura
+      try {
+        const { data: userRoles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', currentUser.id);
+
+        const rolesList = userRoles?.map(r => r.role) || [];
+        console.log('👤 AuthContext: User roles:', rolesList);
+        setRoles(rolesList);
+      } catch (error) {
+        console.warn('Could not fetch user roles:', error);
+        setRoles([]);
+      }
+
     } catch (error) {
       console.error('Error in refreshUserData:', error);
       setUser(null);
       setProfile(null);
       setRoles([]);
       setIsSaasAdmin(false);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -125,9 +126,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         return { error };
       }
-      
-      // Refresh user data after successful sign in
-      await refreshUserData();
       
       return { error: null };
     } catch (error) {
@@ -170,28 +168,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Cargar datos iniciales
-    refreshUserData();
+    let mounted = true;
 
-    // Escuchar cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Función para manejar cambios de estado de autenticación
+    const handleAuthStateChange = async (event: string, session: any) => {
+      if (!mounted) return;
+
       console.log('🔄 AuthContext: Auth state changed:', event);
       
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           setUser(session.user);
-          await refreshUserData();
+          // Usar setTimeout para evitar loops infinitos
+          setTimeout(() => {
+            if (mounted) {
+              refreshUserData();
+            }
+          }, 100);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
         setRoles([]);
         setIsSaasAdmin(false);
+      }
+      
+      if (mounted) {
+        setLoading(false);
+      }
+    };
+
+    // Configurar listener de cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+
+    // Cargar sesión inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
+      if (session?.user) {
+        setUser(session.user);
+        setTimeout(() => {
+          if (mounted) {
+            refreshUserData();
+          }
+        }, 100);
+      } else {
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const hasRole = (role: string): boolean => {
