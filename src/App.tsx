@@ -21,6 +21,7 @@ import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import { CompanyRegistrationPage } from '@/pages/CompanyRegistrationPage';
 import { SuperAdminPage } from '@/pages/SuperAdminPage';
+import { SupportBackofficePage } from '@/pages/SupportBackofficePage';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -48,6 +49,14 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <SuperAdminPage />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/support-backoffice" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <SupportBackofficePage />
                   </Layout>
                 </ProtectedRoute>
               } />

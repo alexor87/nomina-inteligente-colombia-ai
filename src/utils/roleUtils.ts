@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export async function ensureUserHasCompanyRole(userId: string, companyId: string): Promise<boolean> {
@@ -50,7 +49,7 @@ export async function ensureUserHasCompanyRole(userId: string, companyId: string
 }
 
 // Función para verificar si un usuario tiene un rol específico en una empresa (sin usar funciones SQL problemáticas)
-export async function hasRoleInCompany(userId: string, role: string, companyId: string): Promise<boolean> {
+export async function hasRoleInCompany(userId: string, role: 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte', companyId: string): Promise<boolean> {
   try {
     const { data, error } = await supabase
       .from('user_roles')

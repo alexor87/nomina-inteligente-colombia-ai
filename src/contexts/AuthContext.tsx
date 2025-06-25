@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,7 +51,7 @@ const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports'],
   contador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
   visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
-  soporte: ['dashboard', 'reports']
+  soporte: ['dashboard', 'reports', 'employees'] // Agregar acceso a empleados para soporte
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -61,22 +60,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false); // Siempre false ahora
 
   const hasRole = (role: AppRole, companyId?: string): boolean => {
     console.log('🔍 Checking role:', { 
       role, 
       companyId, 
-      isSuperAdmin, 
       roles,
       userEmail: user?.email,
       profileCompanyId: profile?.company_id 
     });
-    
-    if (isSuperAdmin) {
-      console.log('✅ SuperAdmin access granted');
-      return true;
-    }
     
     if (roles.length === 0) {
       console.log('❌ No roles found for user');
@@ -104,16 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hasModuleAccess = (module: string): boolean => {
     console.log('🔍 Checking module access:', { 
       module, 
-      isSuperAdmin, 
       roles,
       userEmail: user?.email,
       rolesDetail: roles.map(r => ({ role: r.role, company_id: r.company_id }))
     });
-    
-    if (isSuperAdmin) {
-      console.log('✅ SuperAdmin module access granted');
-      return true;
-    }
     
     if (roles.length === 0) {
       console.log('❌ No roles found - denying module access');
@@ -146,17 +133,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔄 Refreshing user data for:', currentUser.email);
 
     try {
-      // Verificar si es superadmin PRIMERO
-      const { data: superAdminStatus, error: superAdminError } = await supabase
-        .rpc('is_superadmin');
-      
-      if (!superAdminError) {
-        setIsSuperAdmin(superAdminStatus || false);
-        console.log('👑 SuperAdmin status:', superAdminStatus);
-      } else {
-        console.error('❌ Error checking superadmin status:', superAdminError);
-      }
-
       // Obtener perfil del usuario
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -178,13 +154,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
 
-      // Obtener roles del usuario después de verificar/asignar roles
+      // Obtener roles del usuario usando la nueva función
       const { data: userRoles, error: rolesError } = await supabase
-        .rpc('get_user_roles');
+        .rpc('get_user_companies_simple', { _user_id: currentUser.id });
       
       if (!rolesError && userRoles) {
-        setRoles(userRoles);
-        console.log('👥 User roles fetched:', userRoles);
+        const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
+          role: role.role_name as AppRole,
+          company_id: role.company_id
+        }));
+        setRoles(transformedRoles);
+        console.log('👥 User roles fetched:', transformedRoles);
       } else {
         console.error('❌ Error fetching user roles:', rolesError);
         setRoles([]);
@@ -193,6 +173,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('❌ Error refreshing user data:', error);
     }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return { error };
+  };
+
+  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          first_name: firstName,
+          last_name: lastName
+        }
+      }
+    });
+    return { error };
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setRoles([]);
+    setProfile(null);
+    setIsSuperAdmin(false);
+  };
+
+  const value = {
+    user,
+    session,
+    loading,
+    roles,
+    profile,
+    isSuperAdmin,
+    hasRole,
+    hasModuleAccess,
+    signIn: async (email: string, password: string) => {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
+    },
+    signUp: async (email: string, password: string, firstName?: string, lastName?: string) => {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            first_name: firstName,
+            last_name: lastName
+          }
+        }
+      });
+      return { error };
+    },
+    signOut: async () => {
+      await supabase.auth.signOut();
+      setRoles([]);
+      setProfile(null);
+      setIsSuperAdmin(false);
+    },
+    refreshUserData,
   };
 
   useEffect(() => {
@@ -236,53 +289,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
-  };
-
-  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          first_name: firstName,
-          last_name: lastName
-        }
-      }
-    });
-    return { error };
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setRoles([]);
-    setProfile(null);
-    setIsSuperAdmin(false);
-  };
-
-  const value = {
-    user,
-    session,
-    loading,
-    roles,
-    profile,
-    isSuperAdmin,
-    hasRole,
-    hasModuleAccess,
-    signIn,
-    signUp,
-    signOut,
-    refreshUserData,
-  };
 
   return (
     <AuthContext.Provider value={value}>

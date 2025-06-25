@@ -187,22 +187,32 @@ export class CompanyService {
 
   // Verificar si el usuario es súper admin
   static async isSaasAdmin(): Promise<boolean> {
+    // En el nuevo sistema simplificado, no hay superadmin
+    // Se puede verificar si el usuario tiene rol de soporte en alguna empresa
     try {
-      const { data, error } = await supabase.rpc('is_saas_admin');
-      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('role', 'soporte')
+        .limit(1);
+
       if (error) {
-        console.error('Error checking admin status:', error);
+        console.error('Error checking support role:', error);
         return false;
       }
-      
-      return data || false;
+
+      return data && data.length > 0;
     } catch (error) {
       console.error('Error checking admin status:', error);
       return false;
     }
   }
 
-  // Listar todas las empresas (solo para súper admin)
+  // Listar todas las empresas (solo para usuarios con rol de soporte)
   static async getAllCompanies(): Promise<Company[]> {
     try {
       const { data, error } = await supabase
@@ -286,7 +296,7 @@ export class CompanyService {
     }
   }
 
-  // Suspender empresa (solo súper admin)
+  // Suspender empresa (solo usuarios con rol de soporte)
   static async suspendCompany(companyId: string): Promise<void> {
     try {
       const { error } = await supabase
@@ -301,7 +311,7 @@ export class CompanyService {
     }
   }
 
-  // Activar empresa (solo súper admin)
+  // Activar empresa (solo usuarios con rol de soporte)
   static async activateCompany(companyId: string): Promise<void> {
     try {
       const { error } = await supabase

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,19 +10,19 @@ import {
   Calendar, Mail, Phone, MapPin, Eye 
 } from 'lucide-react';
 
-interface Company {
+interface SupportCompany {
   id: string;
   razon_social: string;
-  nit: string;
-  email: string;
-  estado: string;
+  nit?: string;
+  email?: string;
+  estado?: string;
   employee_count?: number;
   last_activity?: string;
   alerts_count?: number;
 }
 
 export const SupportBackofficePage = () => {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState<SupportCompany[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasSupport, setHasSupport] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -104,10 +103,10 @@ export const SupportBackofficePage = () => {
               employee_count: employeeCount || 0,
               alerts_count: alertsCount || 0,
               last_activity: lastActivity?.[0]?.created_at
-            };
+            } as SupportCompany;
           } catch (error) {
             console.error(`Error enriching company ${company.id}:`, error);
-            return company;
+            return company as SupportCompany;
           }
         })
       );
@@ -268,7 +267,7 @@ export const SupportBackofficePage = () => {
                             {company.razon_social}
                           </h3>
                           <Badge variant={company.estado === 'activa' ? 'default' : 'secondary'}>
-                            {company.estado}
+                            {company.estado || 'activa'}
                           </Badge>
                           {(company.alerts_count || 0) > 0 && (
                             <Badge variant="destructive">
@@ -278,14 +277,18 @@ export const SupportBackofficePage = () => {
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                          <div className="flex items-center space-x-2">
-                            <Building2 className="h-4 w-4" />
-                            <span>NIT: {company.nit}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Mail className="h-4 w-4" />
-                            <span>{company.email}</span>
-                          </div>
+                          {company.nit && (
+                            <div className="flex items-center space-x-2">
+                              <Building2 className="h-4 w-4" />
+                              <span>NIT: {company.nit}</span>
+                            </div>
+                          )}
+                          {company.email && (
+                            <div className="flex items-center space-x-2">
+                              <Mail className="h-4 w-4" />
+                              <span>{company.email}</span>
+                            </div>
+                          )}
                           <div className="flex items-center space-x-2">
                             <Users className="h-4 w-4" />
                             <span>{company.employee_count || 0} empleados</span>
