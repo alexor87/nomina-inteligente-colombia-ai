@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -152,8 +151,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserCompanies(companies);
       console.log('🏢 User companies:', companies);
 
-      if (companies.length > 0) {
-        // Set the first company as current company
+      // Set current company
+      if (superAdminStatus) {
+        // For superadmin, always load the first available company
+        console.log('🔄 Loading first available company for superadmin...');
+        try {
+          const { data: firstCompany, error } = await supabase
+            .from('companies')
+            .select('id, razon_social, nit')
+            .limit(1)
+            .maybeSingle();
+
+          if (error) {
+            console.error('Error loading first company:', error);
+          } else if (firstCompany) {
+            setCurrentCompany({
+              id: firstCompany.id,
+              name: firstCompany.razon_social,
+              nit: firstCompany.nit,
+              rol: 'superadmin'
+            });
+            console.log('✅ SuperAdmin using first company:', firstCompany.razon_social);
+          } else {
+            console.warn('No companies available in the system');
+          }
+        } catch (error) {
+          console.error('Error fetching first company:', error);
+        }
+      } else if (companies.length > 0) {
+        // For regular users, use their first assigned company
         const firstCompany = companies[0];
         const companyData = await loadCurrentCompany(firstCompany.company_id);
         
@@ -164,27 +190,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
           console.log('✅ Current company set:', companyData.name);
         }
-      } else if (superAdminStatus) {
-        // If superadmin but no companies assigned, load the first available company
-        try {
-          const { data: firstCompany } = await supabase
-            .from('companies')
-            .select('id, razon_social, nit')
-            .limit(1)
-            .single();
-
-          if (firstCompany) {
-            setCurrentCompany({
-              id: firstCompany.id,
-              name: firstCompany.razon_social,
-              nit: firstCompany.nit,
-              rol: 'superadmin'
-            });
-            console.log('✅ SuperAdmin using first company:', firstCompany.razon_social);
-          }
-        } catch (error) {
-          console.warn('No companies available for superadmin:', error);
-        }
+      } else {
+        console.warn('⚠️ User has no companies assigned and is not superadmin');
       }
 
       console.log('✅ User data initialization completed');
@@ -341,11 +348,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const canAccessModule = (module: string): boolean => {
-    if (isSuperAdmin) return true;
+    // SuperAdmin can access everything
+    if (isSuperAdmin) {
+      console.log('✅ SuperAdmin access granted for module:', module);
+      return true;
+    }
     
-    // For now, all authenticated users with a company can access all modules
-    // This can be expanded based on specific module permissions
-    return !!currentCompany && hasRole('lector');
+    // For non-superadmin users, check if they have at least lector role in current company
+    const hasAccess = !!currentCompany && hasRole('lector');
+    console.log('🔍 Module access check:', { module, hasAccess, currentCompany: !!currentCompany, hasRole: hasRole('lector') });
+    return hasAccess;
   };
 
   const switchCompany = async (companyId: string) => {
