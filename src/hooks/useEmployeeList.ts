@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { EmployeeWithStatus, EmployeeFilters, ComplianceIndicator } from '@/types/employee-extended';
 import { useToast } from '@/hooks/use-toast';
@@ -26,24 +27,17 @@ export const useEmployeeList = () => {
   const loadEmployees = async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Loading employees...');
-      
+      // Solo cargar empleados de la empresa del usuario autenticado
       const data = await EmployeeDataService.loadEmployees();
       setEmployees(data);
-      
-      console.log(`✅ Empleados cargados: ${data.length}`);
-      
-      if (data.length === 0) {
-        console.warn('No employees found for current user company');
-      }
+      console.log('Empleados cargados para la empresa del usuario:', data.length);
     } catch (error) {
-      console.error('❌ Error loading employees:', error);
+      console.error('Error loading employees:', error);
       toast({
         title: "Error al cargar empleados",
-        description: "No se pudieron cargar los empleados. Verifica tu conexión.",
+        description: "No se pudieron cargar los empleados de tu empresa",
         variant: "destructive"
       });
-      setEmployees([]);
     } finally {
       setIsLoading(false);
     }

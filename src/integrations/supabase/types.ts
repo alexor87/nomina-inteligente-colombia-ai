@@ -755,38 +755,56 @@ export type Database = {
           },
         ]
       }
-      usuarios_empresa: {
+      saas_admins: {
         Row: {
-          activo: boolean
-          asignado_en: string
-          asignado_por: string | null
-          empresa_id: string
+          created_at: string
           id: string
-          rol: string
-          usuario_id: string
+          role: string | null
+          user_id: string
         }
         Insert: {
-          activo?: boolean
-          asignado_en?: string
-          asignado_por?: string | null
-          empresa_id: string
+          created_at?: string
           id?: string
-          rol: string
-          usuario_id: string
+          role?: string | null
+          user_id: string
         }
         Update: {
-          activo?: boolean
-          asignado_en?: string
-          asignado_por?: string | null
-          empresa_id?: string
+          created_at?: string
           id?: string
-          rol?: string
-          usuario_id?: string
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          company_id: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          company_id?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          company_id?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "usuarios_empresa_empresa_id_fkey"
-            columns: ["empresa_id"]
+            foreignKeyName: "user_roles_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
@@ -885,17 +903,6 @@ export type Database = {
             }
         Returns: string
       }
-      get_user_companies: {
-        Args: { _user_id?: string }
-        Returns: {
-          company_id: string
-          rol: string
-        }[]
-      }
-      get_user_role_in_company: {
-        Args: { _user_id: string; _company_id: string }
-        Returns: string
-      }
       get_user_roles: {
         Args: { _company_id?: string }
         Returns: {
@@ -913,14 +920,6 @@ export type Database = {
       }
       is_saas_admin: {
         Args: { _user_id?: string }
-        Returns: boolean
-      }
-      is_superadmin: {
-        Args: { _user_id?: string }
-        Returns: boolean
-      }
-      user_has_access_to_company: {
-        Args: { _user_id: string; _company_id: string }
         Returns: boolean
       }
     }

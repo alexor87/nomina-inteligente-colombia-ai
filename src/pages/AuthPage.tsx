@@ -39,27 +39,37 @@ const AuthPage = () => {
     setLoading(true);
 
     try {
-      await signIn(loginForm.email, loginForm.password);
-      toast({
-        title: "Bienvenido",
-        description: "Has iniciado sesión correctamente."
-      });
-      navigate('/dashboard');
-    } catch (error: any) {
-      console.error('Login error:', error);
-      let errorMessage = 'Ocurrió un error inesperado.';
+      const { error } = await signIn(loginForm.email, loginForm.password);
       
-      if (error.message === 'Invalid login credentials') {
-        errorMessage = 'Credenciales inválidas. Verifica tu email y contraseña.';
-      } else if (error.message?.includes('Email not confirmed')) {
-        errorMessage = 'Por favor confirma tu email antes de iniciar sesión.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (error) {
+        console.error('Login error:', error);
+        let errorMessage = 'Ocurrió un error inesperado.';
+        
+        if (error.message === 'Invalid login credentials') {
+          errorMessage = 'Credenciales inválidas. Verifica tu email y contraseña.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Por favor confirma tu email antes de iniciar sesión.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        toast({
+          title: "Error de inicio de sesión",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Bienvenido",
+          description: "Has iniciado sesión correctamente."
+        });
+        navigate('/dashboard');
       }
-      
+    } catch (error) {
+      console.error('Unexpected login error:', error);
       toast({
-        title: "Error de inicio de sesión",
-        description: errorMessage,
+        title: "Error",
+        description: "Ocurrió un error inesperado.",
         variant: "destructive"
       });
     } finally {
@@ -78,41 +88,50 @@ const AuthPage = () => {
         lastName: signupForm.lastName 
       });
       
-      await signUp(
+      const { error } = await signUp(
         signupForm.email, 
         signupForm.password, 
         signupForm.firstName, 
         signupForm.lastName
       );
       
-      toast({
-        title: "Registro exitoso",
-        description: "Se ha enviado un email de confirmación a tu correo."
-      });
-      // Limpiar formulario
-      setSignupForm({
-        email: '',
-        password: '',
-        firstName: '',
-        lastName: ''
-      });
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      let errorMessage = 'Ocurrió un error inesperado.';
-      
-      if (error.message === 'User already registered') {
-        errorMessage = 'El usuario ya está registrado. Intenta iniciar sesión.';
-      } else if (error.message?.includes('email_address_invalid')) {
-        errorMessage = 'El formato del email no es válido. Usa un email como ejemplo@dominio.com';
-      } else if (error.message?.includes('weak_password')) {
-        errorMessage = 'La contraseña debe tener al menos 6 caracteres.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (error) {
+        console.error('Signup error:', error);
+        let errorMessage = 'Ocurrió un error inesperado.';
+        
+        if (error.message === 'User already registered') {
+          errorMessage = 'El usuario ya está registrado. Intenta iniciar sesión.';
+        } else if (error.message.includes('email_address_invalid')) {
+          errorMessage = 'El formato del email no es válido. Usa un email como ejemplo@dominio.com';
+        } else if (error.message.includes('weak_password')) {
+          errorMessage = 'La contraseña debe tener al menos 6 caracteres.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        toast({
+          title: "Error de registro",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Registro exitoso",
+          description: "Se ha enviado un email de confirmación a tu correo."
+        });
+        // Limpiar formulario
+        setSignupForm({
+          email: '',
+          password: '',
+          firstName: '',
+          lastName: ''
+        });
       }
-      
+    } catch (error) {
+      console.error('Unexpected signup error:', error);
       toast({
-        title: "Error de registro",
-        description: errorMessage,
+        title: "Error",
+        description: "Ocurrió un error inesperado.",
         variant: "destructive"
       });
     } finally {

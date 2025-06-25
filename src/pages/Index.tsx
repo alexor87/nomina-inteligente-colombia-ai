@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Building2, Users, Calculator, FileText, TrendingUp, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-const Index = () => {
+export const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -232,5 +233,3 @@ const Index = () => {
     </div>
   );
 };
-
-export default Index;

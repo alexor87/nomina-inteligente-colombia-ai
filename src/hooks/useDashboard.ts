@@ -26,49 +26,29 @@ export const useDashboard = () => {
         setLoading(true);
       }
 
-      console.log('🔄 Loading dashboard data...');
+      // Cargar datos en paralelo para mejor performance
+      const [
+        metricsData,
+        alertsData,
+        employeesData,
+        activityData
+      ] = await Promise.all([
+        DashboardService.getDashboardMetrics(),
+        DashboardService.getDashboardAlerts(),
+        DashboardService.getRecentEmployees(),
+        DashboardService.getDashboardActivity()
+      ]);
 
-      // Cargar métricas principales primero
-      const metricsData = await DashboardService.getDashboardMetrics();
       setMetrics(metricsData);
-      console.log('✅ Metrics loaded:', metricsData);
-
-      // Cargar datos adicionales en paralelo pero sin bloquear
-      Promise.all([
-        DashboardService.getDashboardAlerts().catch(err => {
-          console.warn('Alerts failed to load:', err);
-          return [];
-        }),
-        DashboardService.getRecentEmployees().catch(err => {
-          console.warn('Recent employees failed to load:', err);
-          return [];
-        }),
-        DashboardService.getDashboardActivity().catch(err => {
-          console.warn('Activity failed to load:', err);
-          return [];
-        })
-      ]).then(([alertsData, employeesData, activityData]) => {
-        setAlerts(alertsData);
-        setRecentEmployees(employeesData);
-        setRecentActivity(activityData);
-        console.log('✅ Additional data loaded');
-      });
-
+      setAlerts(alertsData);
+      setRecentEmployees(employeesData);
+      setRecentActivity(activityData);
     } catch (error) {
-      console.error('❌ Error loading dashboard data:', error);
+      console.error('Error loading dashboard data:', error);
       toast({
         title: "Error al cargar datos",
-        description: "Algunos datos del dashboard no se pudieron cargar.",
+        description: "No se pudieron cargar los datos del dashboard.",
         variant: "destructive"
-      });
-      
-      // Establecer datos por defecto en caso de error
-      setMetrics({
-        totalEmpleados: 0,
-        nominasProcesadas: 0,
-        alertasLegales: 0,
-        gastosNomina: 0,
-        tendenciaMensual: 0
       });
     } finally {
       setLoading(false);
@@ -77,12 +57,10 @@ export const useDashboard = () => {
   };
 
   useEffect(() => {
-    console.log('🚀 Dashboard hook mounted, loading data...');
     loadDashboardData();
   }, []);
 
   const refreshDashboard = () => {
-    console.log('🔄 Manual refresh triggered');
     loadDashboardData(true);
   };
 
@@ -104,6 +82,24 @@ export const useDashboard = () => {
     }
   };
 
+  const getPayrollSummary = async () => {
+    try {
+      return await DashboardService.getPayrollSummary();
+    } catch (error) {
+      console.error('Error getting payroll summary:', error);
+      throw error;
+    }
+  };
+
+  const getComplianceStatus = async () => {
+    try {
+      return await DashboardService.getComplianceStatus();
+    } catch (error) {
+      console.error('Error getting compliance status:', error);
+      throw error;
+    }
+  };
+
   // Computed values
   const highPriorityAlerts = alerts.filter(alert => alert.priority === 'high');
   const actionRequiredAlerts = alerts.filter(alert => alert.actionRequired);
@@ -122,6 +118,8 @@ export const useDashboard = () => {
     // Actions
     refreshDashboard,
     dismissAlert,
+    getPayrollSummary,
+    getComplianceStatus,
     
     // Computed values
     highPriorityAlerts,

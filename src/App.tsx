@@ -1,55 +1,59 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { Layout } from "@/components/layout/Layout";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/sonner';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { Layout } from '@/components/layout/Layout';
 
-import Index from "./pages/Index";
-import AuthPage from "./pages/AuthPage";
-import DashboardPage from "./pages/DashboardPage";
-import EmployeesPage from "./pages/EmployeesPage";
-import PayrollPage from "./pages/PayrollPage";
-import PayrollBackendPage from "./pages/PayrollBackendPage";
-import PayrollHistoryPage from "./pages/PayrollHistoryPage";
-import PaymentsPage from "./pages/PaymentsPage";
-import VouchersPage from "./pages/VouchersPage";
-import ReportsPage from "./pages/ReportsPage";
-import SettingsPage from "./pages/SettingsPage";
-import { CompanyRegistrationPage } from "./pages/CompanyRegistrationPage";
-import { SuperAdminPage } from "./pages/SuperAdminPage";
-import NotFound from "./pages/NotFound";
+// Fix imports to use default exports
+import { Index } from '@/pages/Index';
+import AuthPage from '@/pages/AuthPage';
+import DashboardPage from '@/pages/DashboardPage';
+import EmployeesPage from '@/pages/EmployeesPage';
+import PayrollPage from '@/pages/PayrollPage';
+import PayrollBackendPage from '@/pages/PayrollBackendPage';
+import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
+import VouchersPage from '@/pages/VouchersPage';
+import PaymentsPage from '@/pages/PaymentsPage';
+import ReportsPage from '@/pages/ReportsPage';
+import SettingsPage from '@/pages/SettingsPage';
+import { CompanyRegistrationPage } from '@/pages/CompanyRegistrationPage';
+import { SuperAdminPage } from '@/pages/SuperAdminPage';
+import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <SubscriptionProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <Router>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
-              <Route path="/register" element={<CompanyRegistrationPage />} />
+              <Route path="/register-company" element={<CompanyRegistrationPage />} />
               
-              {/* Protected routes with Layout */}
               <Route path="/dashboard" element={
-                <ProtectedRoute module="dashboard">
+                <ProtectedRoute>
                   <Layout>
                     <DashboardPage />
                   </Layout>
                 </ProtectedRoute>
               } />
               
+              <Route path="/super-admin" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <SuperAdminPage />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
               <Route path="/employees" element={
-                <ProtectedRoute module="empleados">
+                <ProtectedRoute requiredRole="administrador">
                   <Layout>
                     <EmployeesPage />
                   </Layout>
@@ -57,7 +61,7 @@ const App = () => (
               } />
               
               <Route path="/payroll" element={
-                <ProtectedRoute module="nomina">
+                <ProtectedRoute requiredRole="administrador">
                   <Layout>
                     <PayrollPage />
                   </Layout>
@@ -65,7 +69,7 @@ const App = () => (
               } />
               
               <Route path="/payroll-backend" element={
-                <ProtectedRoute module="nomina">
+                <ProtectedRoute requiredRole="administrador">
                   <Layout>
                     <PayrollBackendPage />
                   </Layout>
@@ -73,31 +77,31 @@ const App = () => (
               } />
               
               <Route path="/payroll-history" element={
-                <ProtectedRoute module="nomina">
+                <ProtectedRoute>
                   <Layout>
                     <PayrollHistoryPage />
                   </Layout>
                 </ProtectedRoute>
               } />
               
-              <Route path="/payments" element={
-                <ProtectedRoute module="pagos">
-                  <Layout>
-                    <PaymentsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
               <Route path="/vouchers" element={
-                <ProtectedRoute module="comprobantes">
+                <ProtectedRoute>
                   <Layout>
                     <VouchersPage />
                   </Layout>
                 </ProtectedRoute>
               } />
               
+              <Route path="/payments" element={
+                <ProtectedRoute requiredRole="administrador">
+                  <Layout>
+                    <PaymentsPage />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
               <Route path="/reports" element={
-                <ProtectedRoute module="reportes">
+                <ProtectedRoute>
                   <Layout>
                     <ReportsPage />
                   </Layout>
@@ -105,28 +109,21 @@ const App = () => (
               } />
               
               <Route path="/settings" element={
-                <ProtectedRoute module="configuracion">
+                <ProtectedRoute requiredRole="administrador">
                   <Layout>
                     <SettingsPage />
                   </Layout>
                 </ProtectedRoute>
               } />
               
-              <Route path="/super-admin" element={
-                <ProtectedRoute requireSuperAdmin={true} module="super-admin">
-                  <Layout>
-                    <SuperAdminPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </SubscriptionProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+          </Router>
+        </SubscriptionProvider>
+      </AuthProvider>
+      <Toaster />
+    </QueryClientProvider>
+  );
+}
 
 export default App;
