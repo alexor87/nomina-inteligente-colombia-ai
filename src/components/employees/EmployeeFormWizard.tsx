@@ -535,17 +535,8 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader className="text-center pb-4">
-        <CardTitle className="text-2xl font-bold text-gray-900">
-          {employee ? 'Editar Empleado' : 'Nuevo Empleado'}
-        </CardTitle>
-        <p className="text-gray-600">
-          {employee ? 'Actualiza la información del empleado' : 'Completa los pasos para crear un nuevo empleado'}
-        </p>
-      </CardHeader>
-      
-      <CardContent className="space-y-8">
+    <Card className="w-full max-w-4xl mx-auto border-0 shadow-none">
+      <CardContent className="space-y-8 p-0">
         {renderStepIndicator()}
         
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
