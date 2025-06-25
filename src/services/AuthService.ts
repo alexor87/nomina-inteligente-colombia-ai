@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Company, Profile, UserCompany } from '@/types/auth';
@@ -66,7 +65,7 @@ export class AuthService {
         })) || [];
       }
 
-      // For regular users, check usuarios_empresa table using correct column names
+      // For regular users, check usuarios_empresa table
       const { data: usuariosEmpresa, error: empresaError } = await supabase
         .from('usuarios_empresa')
         .select('empresa_id, rol')
