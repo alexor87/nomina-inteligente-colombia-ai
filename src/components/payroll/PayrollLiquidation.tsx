@@ -27,6 +27,17 @@ export const PayrollLiquidation = () => {
     isLoading
   } = usePayrollLiquidation();
 
+  // Wrapper function to match PayrollTable's expected signature
+  const handleUpdateEmployee = (id: string, updates: Partial<any>) => {
+    // For now, we'll handle the most common update pattern
+    // In the future, this could be expanded to handle multiple field updates
+    const field = Object.keys(updates)[0];
+    const value = updates[field];
+    if (field && typeof value === 'number') {
+      updateEmployee(id, field, value);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header fijo con período editable */}
@@ -103,7 +114,7 @@ export const PayrollLiquidation = () => {
         <div className="flex-1 flex flex-col min-w-0">
           <PayrollTable
             employees={employees}
-            onUpdateEmployee={updateEmployee}
+            onUpdateEmployee={handleUpdateEmployee}
             onRecalculate={recalculateAll}
             isLoading={isLoading}
             canEdit={canEdit}
