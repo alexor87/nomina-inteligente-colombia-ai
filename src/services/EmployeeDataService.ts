@@ -37,6 +37,11 @@ export class EmployeeDataService {
       cargo: emp.cargo,
       empresaId: emp.company_id,
       estadoAfiliacion: (emp.estado_afiliacion || 'pendiente') as 'completa' | 'pendiente' | 'inconsistente',
+      // Banking information
+      banco: emp.banco,
+      tipoCuenta: emp.tipo_cuenta as 'ahorros' | 'corriente',
+      numeroCuenta: emp.numero_cuenta,
+      titularCuenta: emp.titular_cuenta,
       createdAt: emp.created_at,
       updatedAt: emp.updated_at,
       // Status fields
