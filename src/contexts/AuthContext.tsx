@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { ensureUserHasCompanyRole } from '@/utils/roleUtils';
+import { checkAndAssignMissingRoles } from '@/utils/roleUtils';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
@@ -168,17 +168,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(profileData);
         console.log('👤 User profile fetched:', profileData);
         
-        // Si el usuario tiene una empresa, asegurar que tenga rol de administrador
+        // Si el usuario tiene una empresa, verificar y asignar roles si es necesario
         if (profileData.company_id) {
-          console.log('🔧 Ensuring user has admin role for company:', profileData.company_id);
-          await ensureUserHasCompanyRole(currentUser.id, profileData.company_id);
+          console.log('🔧 Checking and assigning missing roles...');
+          await checkAndAssignMissingRoles(currentUser.id);
         }
       } else {
         console.error('❌ Error fetching user profile:', profileError);
         setProfile(null);
       }
 
-      // Obtener roles del usuario después de asegurar que tenga los roles correctos
+      // Obtener roles del usuario después de verificar/asignar roles
       const { data: userRoles, error: rolesError } = await supabase
         .rpc('get_user_roles');
       
@@ -204,10 +204,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user data after successful auth
+          // Fetch user data after successful auth with a slight delay
           setTimeout(async () => {
             await refreshUserData();
-          }, 100);
+          }, 500); // Aumenté el delay para dar tiempo a que se procesen los triggers
         } else {
           setRoles([]);
           setProfile(null);
@@ -227,7 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         setTimeout(async () => {
           await refreshUserData();
-        }, 100);
+        }, 500);
       }
       
       setLoading(false);

@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { forceAssignAdminRole } from '@/utils/roleUtils';
 
 export interface Company {
   id: string;
@@ -80,7 +80,9 @@ export class CompanyService {
         p_email: data.email,
         p_telefono: data.telefono,
         p_ciudad: data.ciudad || 'Bogotá',
-        p_plan: data.plan
+        p_plan: data.plan,
+        p_first_name: data.first_name,
+        p_last_name: data.last_name
       });
 
       if (error) {
@@ -92,6 +94,10 @@ export class CompanyService {
       
       // Esperar un poco para que se procesen los triggers
       await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // FORZAR la asignación del rol de administrador como medida de respaldo
+      console.log('🚀 Force assigning admin role as backup...');
+      await forceAssignAdminRole(signInData.user.id, result);
       
       // Verificar que el perfil se creó correctamente
       const { data: profileData, error: profileError } = await supabase
@@ -142,20 +148,7 @@ export class CompanyService {
       if (roleError) {
         console.error('Role verification error:', roleError);
         // Intentar crear el rol manualmente si no existe
-        const { error: createRoleError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: signInData.user.id,
-            role: 'administrador',
-            company_id: result,
-            assigned_by: signInData.user.id
-          });
-        
-        if (createRoleError) {
-          console.error('Manual role creation error:', createRoleError);
-        } else {
-          console.log('Role created manually');
-        }
+        await forceAssignAdminRole(signInData.user.id, result);
       } else {
         console.log('Role verified:', roleData);
       }
