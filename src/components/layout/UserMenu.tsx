@@ -14,13 +14,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User, Settings } from 'lucide-react';
 
 export const UserMenu = () => {
-  const { user, profile, signOut, roles } = useAuth();
+  const { user, profile, signOut, currentCompany, isSuperAdmin } = useAuth();
 
   if (!user || !profile) return null;
 
   const initials = `${profile.first_name?.[0] || ''}${profile.last_name?.[0] || ''}`.toUpperCase();
   const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
-  const primaryRole = roles[0] || 'Sin rol';
+  const primaryRole = isSuperAdmin ? 'SuperAdmin' : currentCompany?.rol || 'Sin rol';
 
   const handleSignOut = async () => {
     try {

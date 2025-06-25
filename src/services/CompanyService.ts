@@ -97,10 +97,10 @@ export class CompanyService {
       
       // Verificar que el rol se asignó correctamente (solo para debug)
       const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
+        .from('usuarios_empresa')
         .select('*')
-        .eq('user_id', signInData.user.id)
-        .eq('role', 'administrador');
+        .eq('usuario_id', signInData.user.id)
+        .eq('rol', 'admin');
 
       if (roleError) {
         console.error('⚠️ CompanyService: Role verification error:', roleError);
@@ -137,9 +137,9 @@ export class CompanyService {
   }
 
   // Verificar si el usuario es súper admin
-  static async isSaasAdmin(): Promise<boolean> {
+  static async isSuperAdmin(): Promise<boolean> {
     try {
-      const { data, error } = await supabase.rpc('is_saas_admin');
+      const { data, error } = await supabase.rpc('is_superadmin');
       
       if (error) {
         console.error('Error checking admin status:', error);
