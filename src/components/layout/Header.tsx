@@ -3,12 +3,17 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Crown, AlertTriangle } from 'lucide-react';
+import { Building2, Crown, AlertTriangle, Menu } from 'lucide-react';
 import { UserMenu } from './UserMenu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
-export const Header = () => {
+interface HeaderProps {
+  onToggleSidebar?: () => void;
+  sidebarCollapsed?: boolean;
+}
+
+export const Header = ({ onToggleSidebar, sidebarCollapsed }: HeaderProps) => {
   const { user, profile, isSaasAdmin } = useAuth();
   const { subscription, isTrialExpired } = useSubscription();
 
@@ -67,12 +72,22 @@ export const Header = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4">
+    <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleSidebar}
+            className="md:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+
           <div className="flex items-center space-x-2">
-            <Building2 className="h-6 w-6 text-blue-600" />
-            <h1 className="text-xl font-semibold text-gray-900">
+            <Building2 className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+            <h1 className="text-lg md:text-xl font-semibold text-gray-900">
               Nómina Inteligente
             </h1>
           </div>
@@ -86,9 +101,9 @@ export const Header = () => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 md:space-x-4">
           {isSaasAdmin && (
-            <Link to="/super-admin">
+            <Link to="/super-admin" className="hidden md:block">
               <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
                 <Crown className="h-4 w-4 mr-2" />
                 Panel Admin
@@ -97,13 +112,21 @@ export const Header = () => {
           )}
           
           {isTrialExpired && !isSaasAdmin && (
-            <Button variant="default" size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Button variant="default" size="sm" className="bg-blue-600 hover:bg-blue-700 hidden md:block">
               Actualizar Plan
             </Button>
           )}
           
           <UserMenu />
         </div>
+      </div>
+
+      {/* Mobile subscription info */}
+      <div className="md:hidden mt-2 flex items-center space-x-2">
+        <span className="text-sm font-medium text-gray-900">
+          {getCompanyName()}
+        </span>
+        {getSubscriptionBadge()}
       </div>
     </header>
   );
