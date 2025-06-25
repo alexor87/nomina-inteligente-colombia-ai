@@ -755,30 +755,6 @@ export type Database = {
           },
         ]
       }
-      superadmins: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          email: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          email: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          email?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           assigned_at: string
@@ -808,44 +784,6 @@ export type Database = {
           {
             foreignKeyName: "user_roles_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      usuarios_empresa: {
-        Row: {
-          activo: boolean
-          asignado_en: string
-          asignado_por: string | null
-          empresa_id: string
-          id: string
-          rol: string
-          usuario_id: string
-        }
-        Insert: {
-          activo?: boolean
-          asignado_en?: string
-          asignado_por?: string | null
-          empresa_id: string
-          id?: string
-          rol: string
-          usuario_id: string
-        }
-        Update: {
-          activo?: boolean
-          asignado_en?: string
-          asignado_por?: string | null
-          empresa_id?: string
-          id?: string
-          rol?: string
-          usuario_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "usuarios_empresa_empresa_id_fkey"
-            columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
@@ -952,38 +890,23 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      get_user_companies: {
+      get_user_companies_simple: {
         Args: { _user_id?: string }
         Returns: {
           company_id: string
-          rol: string
+          role_name: string
         }[]
-      }
-      get_user_highest_role: {
-        Args: { _company_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
       }
       get_user_role_in_company: {
         Args: { _user_id: string; _company_id: string }
         Returns: string
       }
-      get_user_roles: {
-        Args: { _company_id?: string }
-        Returns: {
-          role: Database["public"]["Enums"]["app_role"]
-          company_id: string
-        }[]
-      }
-      has_role: {
+      has_role_in_company: {
         Args: {
           _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
-          _company_id?: string
+          _company_id: string
         }
-        Returns: boolean
-      }
-      is_superadmin: {
-        Args: { _user_id?: string }
         Returns: boolean
       }
       user_has_access_to_company: {

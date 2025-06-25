@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Plus, Users, Filter, Download, MoreHorizontal, 
   Eye, Edit, Trash2, UserCheck, UserX, AlertTriangle,
-  Mail, Phone, Calendar, Building2, Briefcase, Upload, Loader2, TestTube
+  Mail, Phone, Calendar, Building2, Briefcase, Upload, Loader2, TestTube, Shield
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmployeeFiltersComponent } from './EmployeeFilters';
@@ -52,6 +53,11 @@ export const EmployeeList = () => {
   const [isImportDrawerOpen, setIsImportDrawerOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showTest, setShowTest] = useState(false);
+
+  // Verificar si estamos en modo soporte
+  const urlParams = new URLSearchParams(window.location.search);
+  const supportCompanyId = urlParams.get('support_company');
+  const isSupportMode = !!supportCompanyId;
 
   const handleCreateEmployee = () => {
     setEditingEmployee(null);
@@ -105,6 +111,10 @@ export const EmployeeList = () => {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const goBackToSupport = () => {
+    window.location.href = '/support-backoffice';
   };
 
   const getComplianceIndicators = (employee: EmployeeWithStatus): ComplianceIndicator[] => {
@@ -192,6 +202,23 @@ export const EmployeeList = () => {
 
   return (
     <div className="space-y-6">
+      {/* Alerta de modo soporte */}
+      {isSupportMode && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <Shield className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">
+                Modo Soporte Activo - Estás viendo datos de una empresa cliente
+              </span>
+              <Button variant="outline" size="sm" onClick={goBackToSupport}>
+                Volver al Backoffice
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -199,6 +226,7 @@ export const EmployeeList = () => {
           <p className="text-gray-600">
             {filteredCount} de {totalEmployees} empleados
             {filters.searchTerm && ` - Filtrado por: "${filters.searchTerm}"`}
+            {isSupportMode && " (Vista de Soporte)"}
           </p>
         </div>
         <div className="flex space-x-3">

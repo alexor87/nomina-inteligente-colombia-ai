@@ -49,7 +49,113 @@ export async function ensureUserHasCompanyRole(userId: string, companyId: string
   }
 }
 
-// Función para verificar si un usuario necesita roles y asignarlos automáticamente
+// Función para verificar si un usuario tiene un rol específico en una empresa (sin usar funciones SQL problemáticas)
+export async function hasRoleInCompany(userId: string, role: string, companyId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('role', role)
+      .eq('company_id', companyId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('Error checking role:', error);
+      return false;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error('Error in hasRoleInCompany:', error);
+    return false;
+  }
+}
+
+// Función para obtener todas las empresas donde el usuario tiene algún rol
+export async function getUserCompanies(userId: string): Promise<Array<{company_id: string, role_name: string}>> {
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('company_id, role')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error getting user companies:', error);
+      return [];
+    }
+
+    return data.map(row => ({
+      company_id: row.company_id,
+      role_name: row.role
+    }));
+  } catch (error) {
+    console.error('Error in getUserCompanies:', error);
+    return [];
+  }
+}
+
+// Función para verificar si un usuario es soporte
+export async function isUserSupport(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('role', 'soporte')
+      .limit(1);
+
+    if (error) {
+      console.error('Error checking support role:', error);
+      return false;
+    }
+
+    return data && data.length > 0;
+  } catch (error) {
+    console.error('Error in isUserSupport:', error);
+    return false;
+  }
+}
+
+// Función para obtener todas las empresas donde el usuario tiene rol de soporte
+export async function getSupportCompanies(userId: string): Promise<Array<{id: string, razon_social: string}>> {
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select(`
+        company_id,
+        companies:company_id (
+          id,
+          razon_social,
+          nit,
+          email,
+          estado
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('role', 'soporte');
+
+    if (error) {
+      console.error('Error getting support companies:', error);
+      return [];
+    }
+
+    return data
+      .filter(row => row.companies)
+      .map(row => ({
+        id: row.companies.id,
+        razon_social: row.companies.razon_social,
+        nit: row.companies.nit,
+        email: row.companies.email,
+        estado: row.companies.estado
+      }));
+  } catch (error) {
+    console.error('Error in getSupportCompanies:', error);
+    return [];
+  }
+}
+
+// Función para verificar y asignar roles si es necesario
 export async function checkAndAssignMissingRoles(userId: string): Promise<boolean> {
   try {
     console.log('🔍 Checking for missing roles for user:', userId);

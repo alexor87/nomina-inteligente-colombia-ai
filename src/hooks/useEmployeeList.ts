@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { EmployeeWithStatus, EmployeeFilters, ComplianceIndicator } from '@/types/employee-extended';
 import { useToast } from '@/hooks/use-toast';
@@ -26,10 +27,25 @@ export const useEmployeeList = () => {
   const loadEmployees = async () => {
     try {
       setIsLoading(true);
-      const companyId = await EmployeeDataService.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener la empresa del usuario');
+      
+      // Verificar si hay un parámetro de empresa de soporte en la URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const supportCompanyId = urlParams.get('support_company');
+      
+      let companyId: string;
+      
+      if (supportCompanyId) {
+        // Si hay un parámetro de empresa de soporte, usar ese
+        companyId = supportCompanyId;
+        console.log('🔧 Using support company context:', companyId);
+      } else {
+        // Caso normal: obtener empresa del usuario actual
+        companyId = await EmployeeDataService.getCurrentUserCompanyId();
+        if (!companyId) {
+          throw new Error('No se pudo obtener la empresa del usuario');
+        }
       }
+      
       const rawData = await EmployeeDataService.getEmployees(companyId);
       
       // Transform raw employee data to EmployeeWithStatus format
@@ -62,12 +78,19 @@ export const useEmployeeList = () => {
       }));
       
       setEmployees(transformedData);
-      console.log('Empleados cargados para la empresa del usuario:', transformedData.length);
+      console.log('Empleados cargados:', transformedData.length);
+      
+      if (supportCompanyId) {
+        toast({
+          title: "Modo Soporte Activo",
+          description: `Viendo empleados de empresa en contexto de soporte`,
+        });
+      }
     } catch (error) {
       console.error('Error loading employees:', error);
       toast({
         title: "Error al cargar empleados",
-        description: "No se pudieron cargar los empleados de tu empresa",
+        description: "No se pudieron cargar los empleados",
         variant: "destructive"
       });
     } finally {
