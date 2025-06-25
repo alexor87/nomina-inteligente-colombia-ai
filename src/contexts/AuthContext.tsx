@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,17 +62,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const hasRole = (role: AppRole, companyId?: string): boolean => {
-    console.log('🔍 Checking role:', { role, companyId, isSuperAdmin, roles });
+    console.log('🔍 Checking role:', { 
+      role, 
+      companyId, 
+      isSuperAdmin, 
+      roles,
+      userEmail: user?.email,
+      profileCompanyId: profile?.company_id 
+    });
     
     if (isSuperAdmin) {
       console.log('✅ SuperAdmin access granted');
       return true;
     }
     
+    if (roles.length === 0) {
+      console.log('❌ No roles found for user');
+      return false;
+    }
+    
     const hasRoleAccess = roles.some(r => {
       const roleMatch = r.role === role;
       const companyMatch = companyId ? r.company_id === companyId : true;
-      console.log('🔍 Role check:', { userRole: r.role, roleMatch, companyMatch, requiredRole: role });
+      console.log('🔍 Role check:', { 
+        userRole: r.role, 
+        roleMatch, 
+        companyMatch, 
+        requiredRole: role,
+        userCompanyId: r.company_id,
+        requiredCompanyId: companyId
+      });
       return roleMatch && companyMatch;
     });
     
@@ -82,17 +100,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasModuleAccess = (module: string): boolean => {
-    console.log('🔍 Checking module access:', { module, isSuperAdmin, roles });
+    console.log('🔍 Checking module access:', { 
+      module, 
+      isSuperAdmin, 
+      roles,
+      userEmail: user?.email,
+      rolesDetail: roles.map(r => ({ role: r.role, company_id: r.company_id }))
+    });
     
     if (isSuperAdmin) {
       console.log('✅ SuperAdmin module access granted');
       return true;
     }
     
+    if (roles.length === 0) {
+      console.log('❌ No roles found - denying module access');
+      return false;
+    }
+    
     // Verificar si alguno de los roles del usuario tiene acceso al módulo
     const hasAccess = roles.some(userRole => {
       const moduleAccess = ROLE_PERMISSIONS[userRole.role]?.includes(module);
-      console.log('🔍 Module check:', { userRole: userRole.role, module, moduleAccess });
+      console.log('🔍 Module check:', { 
+        userRole: userRole.role, 
+        module, 
+        moduleAccess,
+        availableModules: ROLE_PERMISSIONS[userRole.role]
+      });
       return moduleAccess;
     });
     
@@ -143,6 +177,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!profileError && profileData) {
         setProfile(profileData);
         console.log('👤 User profile fetched:', profileData);
+        
+        // Si el usuario tiene una empresa asignada pero no tiene roles, intentar crear rol de administrador
+        if (profileData.company_id && (!userRoles || userRoles.length === 0)) {
+          console.log('🔧 User has company but no roles, attempting to assign admin role...');
+          const { error: roleAssignError } = await supabase
+            .from('user_roles')
+            .insert({
+              user_id: currentUser.id,
+              role: 'administrador',
+              company_id: profileData.company_id,
+              assigned_by: currentUser.id
+            });
+          
+          if (!roleAssignError) {
+            console.log('✅ Admin role assigned successfully');
+            // Refresh roles after assignment
+            const { data: newRoles } = await supabase
+              .rpc('get_user_roles');
+            if (newRoles) {
+              setRoles(newRoles);
+              console.log('👥 Updated user roles:', newRoles);
+            }
+          } else {
+            console.error('❌ Error assigning admin role:', roleAssignError);
+          }
+        }
       } else {
         console.error('❌ Error fetching user profile:', profileError);
         
