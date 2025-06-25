@@ -1,4 +1,5 @@
 
+
 -- Investigar y resolver la recursión infinita en las políticas RLS
 
 -- PASO 1: Eliminar TODAS las políticas problemáticas para empezar limpio
@@ -90,3 +91,4 @@ CREATE POLICY "Simple: Company admin manages users"
   TO authenticated 
   USING (public.is_company_admin(auth.uid(), empresa_id))
   WITH CHECK (public.is_company_admin(auth.uid(), empresa_id));
+

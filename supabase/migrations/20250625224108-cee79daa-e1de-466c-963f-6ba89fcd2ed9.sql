@@ -1,4 +1,5 @@
 
+
 -- Solución definitiva: Eliminar por completo las referencias a usuarios_empresa
 -- y simplificar las políticas de employees para que solo usen profiles
 
@@ -49,3 +50,4 @@ DROP POLICY IF EXISTS "Ultra simple: Users manage own company users" ON public.u
 
 -- PASO 4: No crear ninguna política para usuarios_empresa por ahora para evitar recursión
 -- La tabla usuarios_empresa permanecerá sin políticas RLS temporalmente
+

@@ -1,4 +1,5 @@
 
+
 -- Corregir la recursión infinita en usuarios_empresa
 -- El problema está en que la función is_company_admin() hace referencia a user_roles
 -- pero user_roles tiene políticas que pueden referenciar usuarios_empresa
@@ -46,3 +47,4 @@ CREATE POLICY "Ultra simple: Users manage roles in their company"
     user_id = auth.uid() OR 
     company_id = public.get_current_user_company_id()
   );
+

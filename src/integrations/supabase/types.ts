@@ -896,10 +896,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      can_manage_company_users: {
-        Args: { _user_id: string; _company_id: string }
-        Returns: boolean
-      }
       create_company_with_setup: {
         Args:
           | {
@@ -960,10 +956,6 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _company_id?: string
         }
-        Returns: boolean
-      }
-      is_company_admin: {
-        Args: { _user_id: string; _company_id: string }
         Returns: boolean
       }
       is_saas_admin: {
