@@ -924,6 +924,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      get_current_user_company_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_companies: {
         Args: { _user_id?: string }
         Returns: {
@@ -952,6 +956,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _company_id?: string
         }
+        Returns: boolean
+      }
+      is_company_admin: {
+        Args: { _user_id: string; _company_id: string }
         Returns: boolean
       }
       is_saas_admin: {
