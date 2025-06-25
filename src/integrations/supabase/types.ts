@@ -920,6 +920,10 @@ export type Database = {
             }
         Returns: string
       }
+      ensure_admin_role_for_company_users: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_user_companies: {
         Args: { _user_id?: string }
         Returns: {

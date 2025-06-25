@@ -1,6 +1,8 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { ensureUserHasCompanyRole } from '@/utils/roleUtils';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
@@ -155,7 +157,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('❌ Error checking superadmin status:', superAdminError);
       }
 
-      // Obtener roles del usuario
+      // Obtener perfil del usuario primero
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+      
+      if (!profileError && profileData) {
+        setProfile(profileData);
+        console.log('👤 User profile fetched:', profileData);
+        
+        // Si el usuario tiene una empresa, asegurar que tenga rol de administrador
+        if (profileData.company_id) {
+          console.log('🔧 Ensuring user has admin role for company:', profileData.company_id);
+          await ensureUserHasCompanyRole(currentUser.id, profileData.company_id);
+        }
+      } else {
+        console.error('❌ Error fetching user profile:', profileError);
+        setProfile(null);
+      }
+
+      // Obtener roles del usuario después de asegurar que tenga los roles correctos
       const { data: userRoles, error: rolesError } = await supabase
         .rpc('get_user_roles');
       
@@ -167,66 +190,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRoles([]);
       }
 
-      // Obtener perfil del usuario
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .single();
-      
-      if (!profileError && profileData) {
-        setProfile(profileData);
-        console.log('👤 User profile fetched:', profileData);
-        
-        // Si el usuario tiene una empresa asignada pero no tiene roles, intentar crear rol de administrador
-        if (profileData.company_id && (!userRoles || userRoles.length === 0)) {
-          console.log('🔧 User has company but no roles, attempting to assign admin role...');
-          const { error: roleAssignError } = await supabase
-            .from('user_roles')
-            .insert({
-              user_id: currentUser.id,
-              role: 'administrador',
-              company_id: profileData.company_id,
-              assigned_by: currentUser.id
-            });
-          
-          if (!roleAssignError) {
-            console.log('✅ Admin role assigned successfully');
-            // Refresh roles after assignment
-            const { data: newRoles } = await supabase
-              .rpc('get_user_roles');
-            if (newRoles) {
-              setRoles(newRoles);
-              console.log('👥 Updated user roles:', newRoles);
-            }
-          } else {
-            console.error('❌ Error assigning admin role:', roleAssignError);
-          }
-        }
-      } else {
-        console.error('❌ Error fetching user profile:', profileError);
-        
-        // Si no existe perfil, intentar crearlo
-        if (profileError?.code === 'PGRST116') {
-          console.log('🔧 Creating missing profile...');
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: currentUser.id,
-              first_name: currentUser.user_metadata?.first_name || '',
-              last_name: currentUser.user_metadata?.last_name || '',
-            })
-            .select()
-            .single();
-          
-          if (!createError && newProfile) {
-            setProfile(newProfile);
-            console.log('✅ Profile created:', newProfile);
-          } else {
-            console.error('❌ Error creating profile:', createError);
-          }
-        }
-      }
     } catch (error) {
       console.error('❌ Error refreshing user data:', error);
     }
