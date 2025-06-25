@@ -30,9 +30,39 @@ export const useEmployeeList = () => {
       if (!companyId) {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
-      const data = await EmployeeDataService.getEmployees(companyId);
-      setEmployees(data);
-      console.log('Empleados cargados para la empresa del usuario:', data.length);
+      const rawData = await EmployeeDataService.getEmployees(companyId);
+      
+      // Transform raw employee data to EmployeeWithStatus format
+      const transformedData = rawData.map((emp: any): EmployeeWithStatus => ({
+        id: emp.id,
+        cedula: emp.cedula,
+        tipoDocumento: emp.tipo_documento || 'CC',
+        nombre: emp.nombre,
+        apellido: emp.apellido,
+        email: emp.email || '',
+        telefono: emp.telefono,
+        salarioBase: Number(emp.salario_base) || 0,
+        tipoContrato: emp.tipo_contrato || 'indefinido',
+        fechaIngreso: emp.fecha_ingreso,
+        estado: emp.estado || 'activo',
+        eps: emp.eps,
+        afp: emp.afp,
+        arl: emp.arl,
+        cajaCompensacion: emp.caja_compensacion,
+        cargo: emp.cargo,
+        empresaId: emp.company_id,
+        estadoAfiliacion: emp.estado_afiliacion || 'pendiente',
+        createdAt: emp.created_at,
+        updatedAt: emp.updated_at,
+        // Banking information
+        banco: emp.banco,
+        tipoCuenta: emp.tipo_cuenta || 'ahorros',
+        numeroCuenta: emp.numero_cuenta,
+        titularCuenta: emp.titular_cuenta
+      }));
+      
+      setEmployees(transformedData);
+      console.log('Empleados cargados para la empresa del usuario:', transformedData.length);
     } catch (error) {
       console.error('Error loading employees:', error);
       toast({
