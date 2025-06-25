@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Company, Profile, UserCompany } from '@/types/auth';
@@ -65,21 +66,7 @@ export class AuthService {
         })) || [];
       }
 
-      // For regular users, check user_roles table first
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('company_id, role')
-        .eq('user_id', userId);
-
-      if (!rolesError && userRoles && userRoles.length > 0) {
-        console.log('✅ Found user roles:', userRoles);
-        return userRoles.map(role => ({
-          company_id: role.company_id,
-          rol: role.role
-        }));
-      }
-
-      // Fallback: check usuarios_empresa table
+      // For regular users, check usuarios_empresa table using correct column names
       const { data: usuariosEmpresa, error: empresaError } = await supabase
         .from('usuarios_empresa')
         .select('empresa_id, rol')
