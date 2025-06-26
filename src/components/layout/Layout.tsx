@@ -1,25 +1,13 @@
 
 import { useState, useRef, useEffect } from 'react';
+import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 
-interface LayoutProps {
-  children: React.ReactNode;
-  userRole?: 'admin' | 'company' | 'employee';
-  user?: {
-    email: string;
-    profile?: {
-      firstName: string;
-      lastName: string;
-      avatar?: string;
-    };
-  };
-}
-
-export const Layout = ({ children }: LayoutProps) => {
+export const Layout = () => {
   const { roles } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Changed to false for better UX
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const toggleSidebar = () => {
@@ -76,7 +64,7 @@ export const Layout = ({ children }: LayoutProps) => {
         
         <main className="flex-1 p-6 bg-white/50">
           <div className="max-w-7xl mx-auto">
-            {children}
+            <Outlet />
           </div>
         </main>
       </div>
