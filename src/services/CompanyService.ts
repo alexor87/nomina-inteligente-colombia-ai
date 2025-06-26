@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { forceAssignAdminRole, performCompleteRoleCheck } from '@/utils/roleUtils';
 
@@ -33,38 +32,86 @@ export interface CompanyRegistrationWithUser extends CompanyRegistrationData {
 }
 
 export class CompanyService {
-  // Crear nueva empresa con usuario (para registro completo)
+  // Verificar integridad del registro de empresa
+  static async verifyCompanyRegistrationIntegrity(userId: string): Promise<{
+    isComplete: boolean;
+    missing: string[];
+    companyId?: string;
+  }> {
+    try {
+      console.log('🔍 Verifying registration integrity for user:', userId);
+      const missing: string[] = [];
+
+      // Verificar perfil
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (profileError || !profile) {
+        missing.push('profile');
+      }
+
+      // Verificar empresa
+      if (!profile?.company_id) {
+        missing.push('company');
+      }
+
+      // Verificar roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('company_id', profile?.company_id);
+
+      if (rolesError || !roles || roles.length === 0) {
+        missing.push('roles');
+      }
+
+      const isComplete = missing.length === 0;
+      console.log('📊 Registration integrity check:', { isComplete, missing, companyId: profile?.company_id });
+
+      return {
+        isComplete,
+        missing,
+        companyId: profile?.company_id
+      };
+    } catch (error) {
+      console.error('❌ Error verifying registration integrity:', error);
+      return { isComplete: false, missing: ['unknown_error'] };
+    }
+  }
+
+  // Crear nueva empresa con usuario (versión mejorada con verificación de integridad)
   static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
     try {
-      console.log('🚀 Starting complete company registration process...');
+      console.log('🚀 Starting enhanced company registration process...');
       let userId: string;
       let isNewUser = false;
 
-      // Primero intentar iniciar sesión para verificar si el usuario ya existe
-      console.log('🔍 Checking if user already exists...');
+      // Fase 1: Manejo de autenticación mejorado
+      console.log('🔐 Phase 1: Authentication handling...');
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: data.user_email,
         password: data.user_password
       });
 
       if (signInData.user && !signInError) {
-        // Usuario ya existe y las credenciales son correctas
         console.log('✅ Existing user authenticated:', signInData.user.id);
         userId = signInData.user.id;
         
-        // Verificar si el usuario ya tiene una empresa
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('user_id', userId)
-          .single();
-
-        if (existingProfile?.company_id) {
+        // Verificar integridad antes de proceder
+        const integrity = await this.verifyCompanyRegistrationIntegrity(userId);
+        if (integrity.isComplete) {
+          throw new Error('Este usuario ya tiene una empresa completamente registrada. Use su cuenta existente.');
+        }
+        
+        if (integrity.companyId) {
           throw new Error('Este usuario ya tiene una empresa registrada. Use su cuenta existente o contacte soporte.');
         }
       } else if (signInError && signInError.message.includes('Invalid login credentials')) {
-        // Usuario no existe o credenciales incorrectas, intentar registrar
-        console.log('👤 User does not exist, attempting registration...');
+        console.log('👤 Creating new user...');
         
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: data.user_email,
@@ -94,9 +141,9 @@ export class CompanyService {
         isNewUser = true;
         console.log('✅ New user registered successfully:', userId);
 
-        // Si es un nuevo usuario y no tiene sesión, intentar iniciar sesión
+        // Intentar iniciar sesión inmediatamente
         if (!authData.session) {
-          console.log('📧 Email confirmation may be required, attempting sign in...');
+          console.log('🔑 Attempting immediate sign in...');
           const { data: postSignInData, error: postSignInError } = await supabase.auth.signInWithPassword({
             email: data.user_email,
             password: data.user_password
@@ -104,20 +151,14 @@ export class CompanyService {
 
           if (postSignInError && !postSignInError.message.includes('Email not confirmed')) {
             console.error('❌ Post-signup sign in error:', postSignInError);
-            throw new Error(`Error al iniciar sesión después del registro: ${postSignInError.message}`);
-          }
-
-          if (postSignInData.session) {
-            console.log('✅ Session obtained after sign in');
           }
         }
       } else {
-        // Otro tipo de error de autenticación
         throw new Error(`Error de autenticación: ${signInError?.message || 'Error desconocido'}`);
       }
 
-      // Crear la empresa usando la función RPC
-      console.log('🏢 Creating company...');
+      // Fase 2: Creación transaccional de empresa
+      console.log('🏢 Phase 2: Transactional company creation...');
       const { data: companyId, error: companyError } = await supabase.rpc('create_company_with_setup', {
         p_nit: data.nit,
         p_razon_social: data.razon_social,
@@ -136,145 +177,73 @@ export class CompanyService {
 
       console.log('✅ Company created successfully:', companyId);
       
-      // Esperar para que se procesen los triggers
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Verificación múltiple del perfil
-      console.log('👤 Ensuring user profile exists...');
-      let profileExists = false;
-      let attempts = 0;
-      const maxAttempts = 5;
+      // Fase 3: Verificación agresiva de integridad con reintentos
+      console.log('🔍 Phase 3: Integrity verification with retries...');
+      let verificationAttempts = 0;
+      const maxVerificationAttempts = 10;
+      let registrationComplete = false;
 
-      while (!profileExists && attempts < maxAttempts) {
-        const { data: existingProfile, error: profileCheckError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
+      while (!registrationComplete && verificationAttempts < maxVerificationAttempts) {
+        verificationAttempts++;
+        console.log(`🔄 Verification attempt ${verificationAttempts}/${maxVerificationAttempts}...`);
+        
+        // Esperar progresivamente más tiempo
+        await new Promise(resolve => setTimeout(resolve, verificationAttempts * 1000));
+        
+        const integrity = await this.verifyCompanyRegistrationIntegrity(userId);
+        
+        if (integrity.isComplete) {
+          registrationComplete = true;
+          console.log('✅ Registration integrity verified successfully');
+          break;
+        }
 
-        if (existingProfile) {
-          profileExists = true;
-          console.log('✅ Profile found:', existingProfile);
-          
-          // Actualizar perfil con company_id si no lo tiene
-          if (!existingProfile.company_id) {
-            console.log('🔧 Updating profile with company...');
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ 
-                company_id: companyId,
-                first_name: data.first_name,
-                last_name: data.last_name
-              })
-              .eq('user_id', userId);
-            
-            if (updateError) {
-              console.error('❌ Profile update error:', updateError);
-            } else {
-              console.log('✅ Profile updated successfully');
-            }
-          }
-        } else if (profileCheckError && profileCheckError.code === 'PGRST116') {
-          // Perfil no existe, intentar crearlo
-          console.log(`🔧 Creating user profile (attempt ${attempts + 1})...`);
-          const { error: createProfileError } = await supabase
+        console.log(`⚠️ Registration incomplete, missing: ${integrity.missing.join(', ')}`);
+
+        // Intentar corregir los componentes faltantes
+        if (integrity.missing.includes('profile')) {
+          console.log('🔧 Creating missing profile...');
+          const { error: profileError } = await supabase
             .from('profiles')
             .insert({
               user_id: userId,
               first_name: data.first_name,
               last_name: data.last_name,
               company_id: companyId
-            });
+            })
+            .select()
+            .single();
           
-          if (createProfileError && createProfileError.code !== '23505') { // Ignore duplicate key errors
-            console.error('❌ Profile creation error:', createProfileError);
+          if (profileError && profileError.code !== '23505') {
+            console.error('❌ Profile creation error:', profileError);
           }
         }
+
+        if (integrity.missing.includes('roles') || !integrity.companyId) {
+          console.log('🔧 Force assigning admin role...');
+          await forceAssignAdminRole(userId, companyId);
+        }
+      }
+
+      // Fase 4: Verificación final y manejo de fallos
+      if (!registrationComplete) {
+        console.error('❌ Registration could not be completed after all attempts');
         
-        attempts++;
-        if (!profileExists && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-
-      // Verificación múltiple del rol de administrador
-      console.log('👥 Ensuring admin role exists...');
-      let roleExists = false;
-      attempts = 0;
-
-      while (!roleExists && attempts < maxAttempts) {
-        const { data: existingRole, error: roleCheckError } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('company_id', companyId)
-          .eq('role', 'administrador')
-          .single();
-
-        if (existingRole) {
-          roleExists = true;
-          console.log('✅ Admin role found:', existingRole);
-        } else if (roleCheckError && roleCheckError.code === 'PGRST116') {
-          // Rol no existe, crearlo
-          console.log(`🔧 Creating admin role (attempt ${attempts + 1})...`);
-          const { error: createRoleError } = await supabase
-            .from('user_roles')
-            .insert({
-              user_id: userId,
-              role: 'administrador',
-              company_id: companyId,
-              assigned_by: userId
-            });
-          
-          if (createRoleError && createRoleError.code !== '23505') { // Ignore duplicate key errors
-            console.error('❌ Role creation error:', createRoleError);
-          }
-        }
+        // Último intento de recuperación
+        console.log('🆘 Attempting final recovery...');
+        await performCompleteRoleCheck(userId);
         
-        attempts++;
-        if (!roleExists && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        // Verificación final
+        const finalIntegrity = await this.verifyCompanyRegistrationIntegrity(userId);
+        if (!finalIntegrity.isComplete) {
+          throw new Error('Error crítico: No se pudo completar el registro de la empresa. Los datos se guardaron parcialmente. Contacte soporte técnico.');
         }
       }
 
-      // Si después de todos los intentos no se creó el rol, forzar creación
-      if (!roleExists) {
-        console.log('⚠️ Forcing admin role creation as fallback...');
-        await forceAssignAdminRole(userId, companyId);
-      }
-
-      // Verificación final completa
-      console.log('🔍 Performing final verification...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const { data: finalProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      const { data: finalRoles } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('company_id', companyId);
-
-      console.log('📊 Final verification results:', {
-        profile: finalProfile,
-        roles: finalRoles,
-        companyId,
-        isNewUser
-      });
-
-      // Si no hay roles después de todo, lanzar error
-      if (!finalRoles || finalRoles.length === 0) {
-        console.error('❌ Critical: No roles found after complete setup');
-        throw new Error('Error crítico: No se pudieron asignar los roles de usuario. Contacte soporte.');
-      }
-
+      console.log('🎉 Enhanced company registration completed successfully');
       return companyId;
     } catch (error) {
-      console.error('❌ Complete error in company creation process:', error);
+      console.error('❌ Complete error in enhanced company creation process:', error);
       throw new Error(error instanceof Error ? error.message : 'Error al crear la empresa');
     }
   }
