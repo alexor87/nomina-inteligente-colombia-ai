@@ -1,4 +1,3 @@
-
 import { PayrollPeriodService, PayrollPeriod } from '../PayrollPeriodService';
 import { PayrollConfigurationService } from './PayrollConfigurationService';
 import { PayrollHistoryService } from '../PayrollHistoryService';
@@ -74,12 +73,59 @@ export class PayrollPeriodDetectionService {
       if (existingPeriodForCurrentDate && existingPeriodForCurrentDate.estado !== 'borrador') {
         console.log('📋 Período existente encontrado para fecha actual:', existingPeriodForCurrentDate.id);
         
-        // Si el período ya está cerrado/aprobado, mostrar el último período
+        // Si el período ya está cerrado/aprobado, calcular el siguiente período disponible
         if (existingPeriodForCurrentDate.estado === 'aprobado' || existingPeriodForCurrentDate.estado === 'cerrado') {
+          console.log('🔄 Período ya procesado, calculando siguiente período...');
+          
+          // Calcular el siguiente período basado en el período existente
+          const nextPeriodDates = this.calculateNextPeriodDates(config.periodicity, existingPeriodForCurrentDate as PayrollPeriod);
+          
+          // Verificar si el período calculado se superpone con uno existente
+          const hasOverlap = await this.checkPeriodOverlap(nextPeriodDates.startDate, nextPeriodDates.endDate, companyId);
+          
+          if (hasOverlap) {
+            // Intentar encontrar el siguiente período disponible
+            const nextAvailablePeriod = await this.findNextAvailablePeriod(config.periodicity, companyId);
+            
+            if (nextAvailablePeriod) {
+              return {
+                action: 'create',
+                title: 'Crear siguiente período',
+                message: `El período actual ya fue procesado. ¿Deseas abrir el siguiente período de nómina ${PayrollPeriodService.formatPeriodText(nextAvailablePeriod.startDate, nextAvailablePeriod.endDate)}?`,
+                currentPeriod: null,
+                lastLiquidatedPeriod: existingPeriodForCurrentDate as PayrollPeriod,
+                lastLiquidatedPeriodId: existingPeriodForCurrentDate.id,
+                nextPeriod: {
+                  startDate: nextAvailablePeriod.startDate,
+                  endDate: nextAvailablePeriod.endDate,
+                  type: config.periodicity
+                },
+                hasConfiguration: true
+              };
+            }
+          } else {
+            // El período calculado no se superpone, ofrecerlo
+            return {
+              action: 'create',
+              title: 'Crear siguiente período',
+              message: `El período actual ya fue procesado. ¿Deseas abrir el siguiente período de nómina ${PayrollPeriodService.formatPeriodText(nextPeriodDates.startDate, nextPeriodDates.endDate)}?`,
+              currentPeriod: null,
+              lastLiquidatedPeriod: existingPeriodForCurrentDate as PayrollPeriod,
+              lastLiquidatedPeriodId: existingPeriodForCurrentDate.id,
+              nextPeriod: {
+                startDate: nextPeriodDates.startDate,
+                endDate: nextPeriodDates.endDate,
+                type: config.periodicity
+              },
+              hasConfiguration: true
+            };
+          }
+          
+          // Si no se puede calcular el siguiente período, mostrar mensaje de no disponible
           return {
             action: 'view_last',
-            title: 'Período ya procesado',
-            message: `El período ${PayrollPeriodService.formatPeriodText(existingPeriodForCurrentDate.fecha_inicio, existingPeriodForCurrentDate.fecha_fin)} ya fue procesado. Para crear un nuevo período, espera hasta que termine el período actual.`,
+            title: 'No hay períodos disponibles',
+            message: 'No se pudo calcular el siguiente período disponible. Revisa la configuración o contacta soporte.',
             currentPeriod: null,
             lastLiquidatedPeriod: existingPeriodForCurrentDate as PayrollPeriod,
             lastLiquidatedPeriodId: existingPeriodForCurrentDate.id,
