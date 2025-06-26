@@ -114,12 +114,71 @@ const PayrollHistoryDetailsPage = () => {
         break;
     }
 
+    // Determinar el tipo de período dinámicamente basado en las fechas
+    const determinePeriodType = (startDate: string, endDate: string): 'quincenal' | 'mensual' => {
+      if (!startDate || !endDate) return 'mensual';
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Si la diferencia es menor o igual a 16 días, es quincenal
+      // Si es mayor, es mensual
+      return diffDays <= 16 ? 'quincenal' : 'mensual';
+    };
+
+    // Extraer fechas del período si está disponible
+    let periodStartDate = foundRecord.fechaCreacion || new Date().toISOString().split('T')[0];
+    let periodEndDate = foundRecord.fechaCreacion || new Date().toISOString().split('T')[0];
+    let periodType: 'quincenal' | 'mensual' = 'mensual';
+
+    if (foundRecord.periodo) {
+      // Intentar extraer fechas del formato "1 al 15 de Mayo 2025" o similar
+      const periodText = foundRecord.periodo;
+      const monthMatch = periodText.match(/(\d+)\s+al\s+(\d+)\s+de\s+(\w+)\s+(\d+)/i);
+      
+      if (monthMatch) {
+        const [, startDay, endDay, monthName, year] = monthMatch;
+        
+        // Mapear nombres de meses a números
+        const monthMap: { [key: string]: number } = {
+          'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3, 'mayo': 4, 'junio': 5,
+          'julio': 6, 'agosto': 7, 'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11
+        };
+        
+        const monthNum = monthMap[monthName.toLowerCase()];
+        if (monthNum !== undefined) {
+          const startDate = new Date(parseInt(year), monthNum, parseInt(startDay));
+          const endDate = new Date(parseInt(year), monthNum, parseInt(endDay));
+          
+          periodStartDate = startDate.toISOString().split('T')[0];
+          periodEndDate = endDate.toISOString().split('T')[0];
+          periodType = determinePeriodType(periodStartDate, periodEndDate);
+        }
+      } else {
+        // Si no se puede parsear el período, intentar con otros formatos
+        const yearMatch = periodText.match(/(\d{4})/);
+        if (yearMatch) {
+          // Determinar tipo basado en el contenido del texto
+          if (periodText.toLowerCase().includes('quinc') || 
+              periodText.includes('1 al 15') || 
+              periodText.includes('16 al 30') ||
+              periodText.includes('16 al 31')) {
+            periodType = 'quincenal';
+          } else {
+            periodType = 'mensual';
+          }
+        }
+      }
+    }
+
     return {
       id: foundRecord.id || '',
       period: foundRecord.periodo || 'Sin período',
-      startDate: foundRecord.fechaCreacion || new Date().toISOString().split('T')[0],
-      endDate: foundRecord.fechaCreacion || new Date().toISOString().split('T')[0],
-      type: 'mensual' as const,
+      startDate: periodStartDate,
+      endDate: periodEndDate,
+      type: periodType, // Ahora dinámico basado en las fechas reales
       employeesCount: foundRecord.empleados || 0,
       status: mappedStatus,
       totalGrossPay: Number(foundRecord.totalNomina || 0),

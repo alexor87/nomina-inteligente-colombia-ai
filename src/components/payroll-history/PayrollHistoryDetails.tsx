@@ -376,7 +376,10 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <div className="text-sm text-gray-600">Periodicidad</div>
-                <div className="text-lg font-semibold capitalize">{period.type}</div>
+                <div className="text-lg font-semibold capitalize flex items-center">
+                  <Calendar className="h-4 w-4 mr-1 text-blue-600" />
+                  {period.type === 'quincenal' ? 'Quincenal' : 'Mensual'}
+                </div>
               </div>
               <div>
                 <div className="text-sm text-gray-600">Empleados liquidados</div>
