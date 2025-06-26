@@ -395,7 +395,7 @@ export const PayrollLiquidationBackendService = {
       const { error: voucherError } = await supabase
         .from('payroll_vouchers')
         .upsert(voucherRecords, {
-          onConflict: 'employee_id,periodo',
+          onConflict: 'company_id,employee_id,periodo',
           ignoreDuplicates: false
         });
 
