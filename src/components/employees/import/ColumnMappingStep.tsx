@@ -4,222 +4,333 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
-import { ImportStep, ColumnMapping } from '../ImportEmployeesDrawer';
-
-const EMPLOYEE_FIELDS = [
-  { value: 'nombre', label: 'Nombre', required: true },
-  { value: 'apellido', label: 'Apellido', required: false },
-  { value: 'tipoDocumento', label: 'Tipo de documento', required: false },
-  { value: 'cedula', label: 'Número de documento', required: true },
-  { value: 'email', label: 'Correo electrónico', required: false },
-  { value: 'telefono', label: 'Teléfono', required: false },
-  { value: 'cargo', label: 'Cargo', required: true },
-  { value: 'salarioBase', label: 'Salario base', required: true },
-  { value: 'fechaIngreso', label: 'Fecha de ingreso', required: true },
-  { value: 'tipoContrato', label: 'Tipo de contrato', required: true },
-  { value: 'periodicidad', label: 'Periodicidad', required: false },
-  { value: 'eps', label: 'EPS', required: false },
-  { value: 'afp', label: 'AFP/Fondo de pensiones', required: false },
-  { value: 'arl', label: 'ARL', required: false },
-  { value: 'cajaCompensacion', label: 'Caja de compensación', required: false },
-  { value: 'estado', label: 'Estado', required: false },
-  { value: 'centrosocial', label: 'Centro social', required: false },
-];
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ImportStep } from '../ImportEmployeesDrawer';
+import { EMPLOYEE_FIELD_MAPPINGS, getRequiredFields, getOptionalFields } from './EmployeeFieldMapping';
 
 interface ColumnMappingStepProps {
-  data: any;
+  data: {
+    file?: File;
+    columns?: string[];
+    rows?: any[];
+  };
   onNext: (step: ImportStep) => void;
   onBack: () => void;
 }
 
-// Funciones auxiliares movidas fuera del componente
-const suggestMapping = (columnName: string): string => {
-  const normalized = columnName.toLowerCase().trim();
-  
-  // Mapeo inteligente basado en palabras clave
-  if (normalized.includes('nombre') && !normalized.includes('apellido')) return 'nombre';
-  if (normalized.includes('apellido')) return 'apellido';
-  if (normalized.includes('tipo') && (normalized.includes('documento') || normalized.includes('identificacion'))) return 'tipoDocumento';
-  if (normalized.includes('cedula') || normalized.includes('documento') || normalized.includes('identificacion') || normalized.includes('numero')) return 'cedula';
-  if (normalized.includes('email') || normalized.includes('correo')) return 'email';
-  if (normalized.includes('telefono') || normalized.includes('celular') || normalized.includes('movil')) return 'telefono';
-  if (normalized.includes('cargo') || normalized.includes('puesto')) return 'cargo';
-  if (normalized.includes('salario') || normalized.includes('sueldo')) return 'salarioBase';
-  if (normalized.includes('fecha') && (normalized.includes('ingreso') || normalized.includes('entrada'))) return 'fechaIngreso';
-  if (normalized.includes('contrato') || normalized.includes('tipo')) return 'tipoContrato';
-  if (normalized.includes('periodicidad') || normalized.includes('periode')) return 'periodicidad';
-  if (normalized.includes('eps')) return 'eps';
-  if (normalized.includes('afp') || normalized.includes('pension')) return 'afp';
-  if (normalized.includes('arl')) return 'arl';
-  if (normalized.includes('caja')) return 'cajaCompensacion';
-  if (normalized.includes('estado')) return 'estado';
-  if (normalized.includes('centro') || normalized.includes('sede')) return 'centrosocial';
-  
-  return 'sin_mapear'; // Default value for unmapped columns
-};
-
-const isRequiredField = (fieldValue: string): boolean => {
-  const field = EMPLOYEE_FIELDS.find(f => f.value === fieldValue);
-  return field?.required || false;
-};
-
 export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepProps) => {
-  const [mappings, setMappings] = useState<ColumnMapping[]>(() => {
-    if (!data?.columns) return [];
-    
-    return data.columns.map((column: string) => {
-      const targetField = suggestMapping(column);
-      return {
-        sourceColumn: column,
-        targetField,
-        isRequired: isRequiredField(targetField),
-        validation: 'valid' as const
-      };
-    });
-  });
+  const [mappings, setMappings] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
-  const handleMappingChange = (sourceColumn: string, targetField: string) => {
-    setMappings(prev => prev.map(mapping => 
-      mapping.sourceColumn === sourceColumn 
-        ? { 
-            ...mapping, 
-            targetField,
-            isRequired: isRequiredField(targetField),
-            validation: targetField === 'sin_mapear' ? 'warning' as const : 'valid' as const
-          }
-        : mapping
-    ));
+  const { columns = [], rows = [] } = data;
+  const requiredFields = getRequiredFields();
+  const optionalFields = getOptionalFields();
+
+  const handleMappingChange = (targetField: string, sourceColumn: string) => {
+    setMappings(prev => {
+      const newMappings = { ...prev };
+      
+      // Remove any existing mapping to this source column
+      Object.keys(newMappings).forEach(key => {
+        if (newMappings[key] === sourceColumn) {
+          delete newMappings[key];
+        }
+      });
+      
+      // Set new mapping
+      if (sourceColumn && sourceColumn !== 'none') {
+        newMappings[targetField] = sourceColumn;
+      } else {
+        delete newMappings[targetField];
+      }
+      
+      return newMappings;
+    });
+
+    // Clear validation errors when mapping changes
+    setValidationErrors([]);
   };
 
-  const getValidationIcon = (validation: string) => {
-    switch (validation) {
-      case 'valid': return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'warning': return <AlertCircle className="h-4 w-4 text-yellow-600" />;
-      case 'error': return <XCircle className="h-4 w-4 text-red-600" />;
-      default: return null;
+  const validateMappings = () => {
+    const errors: string[] = [];
+    
+    // Check required fields
+    requiredFields.forEach(field => {
+      if (!mappings[field.key]) {
+        errors.push(`El campo requerido "${field.label}" debe estar mapeado`);
+      }
+    });
+
+    // Check for duplicate mappings
+    const usedColumns = Object.values(mappings);
+    const duplicates = usedColumns.filter((column, index) => usedColumns.indexOf(column) !== index);
+    if (duplicates.length > 0) {
+      errors.push('No se pueden mapear múltiples campos a la misma columna');
     }
+
+    setValidationErrors(errors);
+    return errors.length === 0;
   };
 
   const handleNext = () => {
-    // Filtrar solo los mapeos que no son "sin_mapear"
-    const validMappings = mappings.filter(m => m.targetField !== 'sin_mapear');
-    
+    if (!validateMappings()) {
+      return;
+    }
+
+    // Transform data with mappings
+    const transformedRows = rows.map(row => {
+      const transformedRow: any = {};
+      
+      Object.keys(mappings).forEach(targetField => {
+        const sourceColumn = mappings[targetField];
+        if (sourceColumn && row[sourceColumn] !== undefined) {
+          transformedRow[targetField] = row[sourceColumn];
+        }
+      });
+      
+      return transformedRow;
+    });
+
     onNext({
       step: 'validation',
       data: {
         ...data,
-        mappings: validMappings
+        mappings: Object.keys(mappings).map(targetField => ({
+          sourceColumn: mappings[targetField],
+          targetField,
+          isRequired: requiredFields.some(f => f.key === targetField),
+          validation: 'valid' as const,
+        })),
+        validRows: transformedRows,
+        invalidRows: [],
+        mapping: mappings,
+        totalRows: rows.length
       }
     });
   };
 
-  const requiredMappings = mappings.filter(m => m.isRequired && m.targetField !== 'sin_mapear');
-  const hasRequiredFields = requiredMappings.length > 0;
+  const getUsedColumns = () => {
+    return Object.values(mappings);
+  };
 
-  if (!data?.columns) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-600">No se pudieron detectar columnas en el archivo.</p>
-        <Button variant="outline" onClick={onBack} className="mt-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver
-        </Button>
-      </div>
-    );
-  }
+  const getMappedFieldsCount = () => {
+    return Object.keys(mappings).length;
+  };
+
+  const getRequiredMappedCount = () => {
+    return requiredFields.filter(field => mappings[field.key]).length;
+  };
 
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          Mapear columnas del archivo
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Mapear Columnas
         </h3>
         <p className="text-gray-600">
-          Asocia cada columna de tu archivo con los campos del sistema
+          Asocia las columnas de tu archivo con los campos del sistema
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Columnas detectadas: {data.columns.length}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {mappings.map((mapping) => (
-              <div key={mapping.sourceColumn} className="flex items-center space-x-4 p-3 border rounded-lg">
-                <div className="flex-1">
-                  <div className="font-medium text-sm">{mapping.sourceColumn}</div>
-                  <div className="text-xs text-gray-500">Columna del archivo</div>
-                </div>
-                
-                <div className="flex-1">
-                  <Select
-                    value={mapping.targetField}
-                    onValueChange={(value) => handleMappingChange(mapping.sourceColumn, value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar campo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sin_mapear">No mapear</SelectItem>
-                      {EMPLOYEE_FIELDS.map((field) => (
-                        <SelectItem key={field.value} value={field.value}>
-                          {field.label}
-                          {field.required && <span className="text-red-500 ml-1">*</span>}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+      {/* Progress indicators */}
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="p-3 bg-blue-50 rounded-lg">
+          <div className="text-2xl font-bold text-blue-600">{columns.length}</div>
+          <div className="text-sm text-blue-600">Columnas detectadas</div>
+        </div>
+        <div className="p-3 bg-green-50 rounded-lg">
+          <div className="text-2xl font-bold text-green-600">
+            {getRequiredMappedCount()}/{requiredFields.length}
+          </div>
+          <div className="text-sm text-green-600">Campos requeridos</div>
+        </div>
+        <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="text-2xl font-bold text-gray-600">{getMappedFieldsCount()}</div>
+          <div className="text-sm text-gray-600">Total mapeados</div>
+        </div>
+      </div>
 
-                <div className="flex items-center space-x-2">
-                  {mapping.isRequired && mapping.targetField !== 'sin_mapear' && (
-                    <Badge variant="destructive" className="text-xs">Requerido</Badge>
-                  )}
-                  {getValidationIcon(mapping.validation)}
+      {validationErrors.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-1">
+              {validationErrors.map((error, index) => (
+                <div key={index}>• {error}</div>
+              ))}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Required Fields */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CheckCircle className="h-5 w-5 text-red-500" />
+              Campos Requeridos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {requiredFields.map(field => (
+              <div key={field.key} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-900">
+                    {field.label}
+                    <Badge variant="destructive" className="ml-2 text-xs">
+                      Requerido
+                    </Badge>
+                  </label>
                 </div>
+                {field.description && (
+                  <p className="text-xs text-gray-500">{field.description}</p>
+                )}
+                <Select
+                  value={mappings[field.key] || 'none'}
+                  onValueChange={(value) => handleMappingChange(field.key, value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar columna..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No mapear</SelectItem>
+                    {columns.map(column => (
+                      <SelectItem 
+                        key={column} 
+                        value={column}
+                        disabled={getUsedColumns().includes(column) && mappings[field.key] !== column}
+                      >
+                        {column}
+                        {getUsedColumns().includes(column) && mappings[field.key] !== column && (
+                          <span className="text-xs text-gray-400 ml-2">(Ya usado)</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             ))}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">Vista previa del mapeo</h4>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="font-medium">Campos mapeados:</span>
-            <span className="ml-2 text-blue-600">
-              {mappings.filter(m => m.targetField !== 'sin_mapear').length}
-            </span>
-          </div>
-          <div>
-            <span className="font-medium">Campos requeridos:</span>
-            <span className="ml-2 text-green-600">
-              {requiredMappings.length}
-            </span>
-          </div>
-        </div>
-        {!hasRequiredFields && (
-          <div className="mt-2 text-yellow-600 text-sm">
-            ⚠️ Considera mapear al menos los campos básicos como Nombre y Número de documento
-          </div>
-        )}
+        {/* Optional Fields */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Campos Opcionales
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 max-h-96 overflow-y-auto">
+            {optionalFields.map(field => (
+              <div key={field.key} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">
+                    {field.label}
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      Opcional
+                    </Badge>
+                  </label>
+                </div>
+                {field.description && (
+                  <p className="text-xs text-gray-500">{field.description}</p>
+                )}
+                <Select
+                  value={mappings[field.key] || 'none'}
+                  onValueChange={(value) => handleMappingChange(field.key, value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar columna..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No mapear</SelectItem>
+                    {columns.map(column => (
+                      <SelectItem 
+                        key={column} 
+                        value={column}
+                        disabled={getUsedColumns().includes(column) && mappings[field.key] !== column}
+                      >
+                        {column}
+                        {getUsedColumns().includes(column) && mappings[field.key] !== column && (
+                          <span className="text-xs text-gray-400 ml-2">(Ya usado)</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Sample preview */}
+      {rows.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Vista Previa de Datos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-collapse border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    {columns.slice(0, 6).map(column => (
+                      <th key={column} className="border border-gray-200 px-3 py-2 text-left text-sm font-medium">
+                        {column}
+                      </th>
+                    ))}
+                    {columns.length > 6 && (
+                      <th className="border border-gray-200 px-3 py-2 text-center text-sm font-medium">
+                        +{columns.length - 6} más...
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 3).map((row, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      {columns.slice(0, 6).map(column => (
+                        <td key={column} className="border border-gray-200 px-3 py-2 text-sm">
+                          {String(row[column] || '').slice(0, 30)}
+                          {String(row[column] || '').length > 30 && '...'}
+                        </td>
+                      ))}
+                      {columns.length > 6 && (
+                        <td className="border border-gray-200 px-3 py-2 text-center text-sm text-gray-400">
+                          ...
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {rows.length > 3 && (
+              <p className="text-sm text-gray-500 mt-2">
+                Mostrando 3 de {rows.length} filas
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Separator />
 
       <div className="flex justify-between">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver
+          Anterior
         </Button>
         <Button 
           onClick={handleNext}
-          disabled={mappings.filter(m => m.targetField !== 'sin_mapear').length === 0}
+          disabled={getRequiredMappedCount() < requiredFields.length}
         >
-          Continuar a validación
+          Continuar
+          <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </div>
     </div>
