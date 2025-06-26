@@ -17,6 +17,13 @@ export interface PayrollConfiguration {
     prima: number;
     vacaciones: number;
   };
+  arlRiskLevels: {
+    I: number;
+    II: number;
+    III: number;
+    IV: number;
+    V: number;
+  };
 }
 
 export interface YearlyConfiguration {
@@ -40,17 +47,26 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
     interesesCesantias: 0.12,
     prima: 0.0833,
     vacaciones: 0.0417,
+  },
+  arlRiskLevels: {
+    I: 0.348,
+    II: 0.435,
+    III: 0.783,
+    IV: 1.740,
+    V: 3.219,
   }
+};
+
+const DEFAULT_CONFIG_2024: PayrollConfiguration = {
+  ...DEFAULT_CONFIG_2025,
+  salarioMinimo: 1160000,
+  auxilioTransporte: 162000,
+  uvt: 42412,
 };
 
 const DEFAULT_YEARLY_CONFIG: YearlyConfiguration = {
   '2025': DEFAULT_CONFIG_2025,
-  '2024': {
-    ...DEFAULT_CONFIG_2025,
-    salarioMinimo: 1160000,
-    auxilioTransporte: 162000,
-    uvt: 42412,
-  }
+  '2024': DEFAULT_CONFIG_2024
 };
 
 export class ConfigurationService {

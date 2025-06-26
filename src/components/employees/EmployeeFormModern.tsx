@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +14,7 @@ import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { useSecurityEntities } from '@/hooks/useSecurityEntities';
+import { ConfigurationService } from '@/services/ConfigurationService';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   User, 
@@ -120,15 +120,7 @@ const DEPARTAMENTOS_COLOMBIA = [
 ];
 
 // Salario mínimo 2025 Colombia
-const SALARIO_MINIMO_2025 = 1400000;
-
-const ARL_RISK_LEVELS = [
-  { value: 'I', label: 'Nivel I - Riesgo Mínimo (0.348%)', percentage: '0.348%' },
-  { value: 'II', label: 'Nivel II - Riesgo Bajo (0.435%)', percentage: '0.435%' },
-  { value: 'III', label: 'Nivel III - Riesgo Medio (0.783%)', percentage: '0.783%' },
-  { value: 'IV', label: 'Nivel IV - Riesgo Alto (1.740%)', percentage: '1.740%' },
-  { value: 'V', label: 'Nivel V - Riesgo Máximo (3.219%)', percentage: '3.219%' }
-];
+const SALARIO_MINIMO_2025 = 1300000;
 
 export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFormModernProps) => {
   const { configuration } = useEmployeeGlobalConfiguration();
@@ -139,7 +131,21 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
   const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
   const [completionPercentage, setCompletionPercentage] = useState(0);
   const [isDraft, setIsDraft] = useState(false);
+  const [arlRiskLevels, setArlRiskLevels] = useState<{ value: string; label: string; percentage: string }[]>([]);
   
+  // Obtener configuración actual para ARL
+  useEffect(() => {
+    const config = ConfigurationService.getConfiguration();
+    const levels = [
+      { value: 'I', label: 'Nivel I - Riesgo Mínimo', percentage: `${config.arlRiskLevels.I}%` },
+      { value: 'II', label: 'Nivel II - Riesgo Bajo', percentage: `${config.arlRiskLevels.II}%` },
+      { value: 'III', label: 'Nivel III - Riesgo Medio', percentage: `${config.arlRiskLevels.III}%` },
+      { value: 'IV', label: 'Nivel IV - Riesgo Alto', percentage: `${config.arlRiskLevels.IV}%` },
+      { value: 'V', label: 'Nivel V - Riesgo Máximo', percentage: `${config.arlRiskLevels.V}%` }
+    ];
+    setArlRiskLevels(levels);
+  }, []);
+
   const { register, handleSubmit, formState: { errors }, setValue, watch, trigger } = useForm<EmployeeFormData>({
     defaultValues: {
       // Información Personal
@@ -163,7 +169,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       periodicidadPago: 'mensual',
       cargo: employee?.cargo || '',
       codigoCIIU: '',
-      nivelRiesgoARL: 'I',
+      nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
       estado: employee?.estado || 'activo',
       centroCostos: '',
       
@@ -530,9 +536,30 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                 {renderInlineField('cargo', 'Cargo', 'text', undefined, false, <Building className="w-4 h-4 text-gray-500" />)}
                 {renderInlineField('codigoCIIU', 'Código CIIU', 'text', undefined, true)}
                 
-                {renderInlineField('nivelRiesgoARL', 'Nivel de Riesgo ARL', 'select', 
-                  ARL_RISK_LEVELS.map(level => ({ value: level.value, label: level.label })), 
-                  true)}
+                <div className="group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label className="text-sm font-medium text-gray-700">
+                      Nivel de Riesgo ARL <span className="text-red-500">*</span>
+                    </Label>
+                  </div>
+                  <Select onValueChange={(value) => setValue('nivelRiesgoARL', value as any)} defaultValue={watchedValues.nivelRiesgoARL}>
+                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                      <SelectValue placeholder="Seleccionar nivel de riesgo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {arlRiskLevels.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{level.label}</span>
+                            <Badge variant="outline" className="ml-2">
+                              {level.percentage}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 
                 {renderInlineField('estado', 'Estado', 'select', 
                   ESTADOS_EMPLEADO.map(estado => ({ value: estado.value, label: estado.label })))}

@@ -130,6 +130,17 @@ export const ParametrosLegalesSettings = () => {
     }));
   };
 
+  const handleARLRiskLevelChange = (level: string, value: string) => {
+    const numericValue = parseFloat(value) || 0;
+    setConfig(prev => ({
+      ...prev,
+      arlRiskLevels: {
+        ...prev.arlRiskLevels,
+        [level]: numericValue
+      }
+    }));
+  };
+
   const loadRecommendedValues = () => {
     const recommendedConfig = {
       ...config,
@@ -433,6 +444,90 @@ export const ParametrosLegalesSettings = () => {
               onChange={(e) => handlePercentageChange('icbf', e.target.value)}
               className="mt-1"
             />
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h3 className="text-lg font-medium mb-4">Porcentajes de Riesgo ARL</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Estos porcentajes se aplican según el nivel de riesgo del cargo del empleado
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div>
+            <Label htmlFor="arlNivelI">Nivel I (%)</Label>
+            <Input
+              id="arlNivelI"
+              type="number"
+              step="0.001"
+              min="0"
+              max="100"
+              value={config.arlRiskLevels.I.toFixed(3)}
+              onChange={(e) => handleARLRiskLevelChange('I', e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-500 mt-1">Riesgo Mínimo</p>
+          </div>
+
+          <div>
+            <Label htmlFor="arlNivelII">Nivel II (%)</Label>
+            <Input
+              id="arlNivelII"
+              type="number"
+              step="0.001"
+              min="0"
+              max="100"
+              value={config.arlRiskLevels.II.toFixed(3)}
+              onChange={(e) => handleARLRiskLevelChange('II', e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-500 mt-1">Riesgo Bajo</p>
+          </div>
+
+          <div>
+            <Label htmlFor="arlNivelIII">Nivel III (%)</Label>
+            <Input
+              id="arlNivelIII"
+              type="number"
+              step="0.001"
+              min="0"
+              max="100"
+              value={config.arlRiskLevels.III.toFixed(3)}
+              onChange={(e) => handleARLRiskLevelChange('III', e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-500 mt-1">Riesgo Medio</p>
+          </div>
+
+          <div>
+            <Label htmlFor="arlNivelIV">Nivel IV (%)</Label>
+            <Input
+              id="arlNivelIV"
+              type="number"
+              step="0.001"
+              min="0"
+              max="100"
+              value={config.arlRiskLevels.IV.toFixed(3)}
+              onChange={(e) => handleARLRiskLevelChange('IV', e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-500 mt-1">Riesgo Alto</p>
+          </div>
+
+          <div>
+            <Label htmlFor="arlNivelV">Nivel V (%)</Label>
+            <Input
+              id="arlNivelV"
+              type="number"
+              step="0.001"
+              min="0"
+              max="100"
+              value={config.arlRiskLevels.V.toFixed(3)}
+              onChange={(e) => handleARLRiskLevelChange('V', e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-500 mt-1">Riesgo Máximo</p>
           </div>
         </div>
       </Card>

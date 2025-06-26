@@ -10,9 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ConfigurationService } from '@/services/ConfigurationService';
 
 export const AportesSettings = () => {
   const { toast } = useToast();
+  const config = ConfigurationService.getConfiguration();
   
   // Estado para configuraciones
   const [operadorPila, setOperadorPila] = useState('');
@@ -35,13 +37,13 @@ export const AportesSettings = () => {
     { aporte: 'ICBF', empleador: 3, empleado: 0, total: 3, editable: false }
   ]);
 
-  // Tabla referencial ARL
+  // Tabla referencial ARL desde configuración
   const nivelesARL = [
-    { nivel: 'I', descripcion: 'Riesgo mínimo (administrativo)', porcentaje: 0.522 },
-    { nivel: 'II', descripcion: 'Riesgo bajo (técnico)', porcentaje: 1.044 },
-    { nivel: 'III', descripcion: 'Riesgo medio (manufactura)', porcentaje: 2.436 },
-    { nivel: 'IV', descripcion: 'Riesgo alto (transporte, construcción)', porcentaje: 4.350 },
-    { nivel: 'V', descripcion: 'Riesgo máximo (minería, explosivos)', porcentaje: 6.960 }
+    { nivel: 'I', descripcion: 'Riesgo mínimo (administrativo)', porcentaje: config.arlRiskLevels.I },
+    { nivel: 'II', descripcion: 'Riesgo bajo (técnico)', porcentaje: config.arlRiskLevels.II },
+    { nivel: 'III', descripcion: 'Riesgo medio (manufactura)', porcentaje: config.arlRiskLevels.III },
+    { nivel: 'IV', descripcion: 'Riesgo alto (transporte, construcción)', porcentaje: config.arlRiskLevels.IV },
+    { nivel: 'V', descripcion: 'Riesgo máximo (minería, explosivos)', porcentaje: config.arlRiskLevels.V }
   ];
 
   // Afiliación por tipo de contrato
@@ -257,6 +259,14 @@ export const AportesSettings = () => {
                 </AlertDescription>
               </Alert>
               
+              <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                <h4 className="font-semibold text-blue-900 mb-2">💡 Información</h4>
+                <p className="text-blue-800 text-sm">
+                  Los porcentajes mostrados se obtienen de la configuración de Parámetros Legales y se actualizan automáticamente.
+                  Para modificar estos valores, ve a la sección de Parámetros Legales.
+                </p>
+              </div>
+              
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -270,7 +280,7 @@ export const AportesSettings = () => {
                     <TableRow key={nivel.nivel}>
                       <TableCell className="font-medium">{nivel.nivel}</TableCell>
                       <TableCell>{nivel.descripcion}</TableCell>
-                      <TableCell>{nivel.porcentaje}%</TableCell>
+                      <TableCell className="font-semibold">{nivel.porcentaje}%</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
