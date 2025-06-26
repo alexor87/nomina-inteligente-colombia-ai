@@ -34,7 +34,6 @@ export const EmployeeList = () => {
     clearFilters,
     toggleEmployeeSelection,
     toggleAllEmployees,
-    bulkUpdateStatus,
     openEmployeeProfile,
     closeEmployeeProfile,
     totalEmployees,
