@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, X } from 'lucide-react';
 
 interface EmployeeSearchBarProps {
   searchTerm: string;
@@ -20,6 +20,10 @@ export const EmployeeSearchBar = ({
   onToggleFilters, 
   activeFiltersCount 
 }: EmployeeSearchBarProps) => {
+  const handleClearSearch = () => {
+    onSearchChange('');
+  };
+
   return (
     <Card className="shadow-sm">
       <CardContent className="pt-6">
@@ -30,8 +34,18 @@ export const EmployeeSearchBar = ({
               placeholder="Buscar por nombre, apellido, cédula, email o cargo..."
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-10 h-12 text-base"
+              className="pl-10 pr-10 h-12 text-base"
             />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClearSearch}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 hover:bg-gray-100"
+              >
+                <X className="h-4 w-4 text-gray-400" />
+              </Button>
+            )}
           </div>
           
           <Button 
