@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { forceAssignAdminRole, performCompleteRoleCheck } from '@/utils/roleUtils';
 
@@ -193,7 +194,7 @@ export class CompanyService {
       console.log('🔄 Testing create_company_with_setup function existence...');
       
       // Intentar una llamada con parámetros de prueba (esto debería fallar por parámetros inválidos, pero no por 404)
-      const testCall = await supabase.rpc('create_company_with_setup', {
+      const { data: testData, error: testError } = await supabase.rpc('create_company_with_setup', {
         p_nit: 'TEST',
         p_razon_social: 'TEST',
         p_email: 'test@test.com',
@@ -206,9 +207,33 @@ export class CompanyService {
         p_last_name: null
       });
       
-      console.log('🧪 create_company_with_setup test result:', testCall);
+      console.log('🧪 create_company_with_setup test result:', { data: testData, error: testError });
       
-      // Si llegamos aquí sin un error 404, la función existe
+      // Verificar específicamente si es un error 404
+      if (testError) {
+        console.log('🔍 Test error details:', {
+          message: testError.message,
+          details: testError.details,
+          hint: testError.hint,
+          code: testError.code
+        });
+        
+        // Verificar si es un error 404 específicamente
+        if (testError.message?.includes('404') || 
+            testError.message?.includes('not found') ||
+            testError.details?.includes('not found') ||
+            testError.code === 'PGRST202') {
+          console.error('🚨 Function not found - 404 error detected');
+          return false;
+        }
+        
+        // Si es cualquier otro error (permisos, parámetros inválidos, etc.), la función existe
+        console.log('ℹ️ Function exists but returned error (expected with test parameters)');
+        return true;
+      }
+      
+      // Si no hay error con parámetros de prueba, la función definitivamente existe
+      console.log('✅ Function exists and responded successfully');
       return true;
       
     } catch (error) {
