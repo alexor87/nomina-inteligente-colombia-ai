@@ -5,6 +5,7 @@ import { PayrollHistoryDetails } from '@/components/payroll-history/PayrollHisto
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PayrollPeriodService } from '@/services/PayrollPeriodService';
+import { PeriodParsingService } from '@/services/payroll-intelligent/PeriodParsingService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 const PayrollHistoryDetailsPage = () => {
@@ -35,13 +36,25 @@ const PayrollHistoryDetailsPage = () => {
       if (payrollPeriod) {
         console.log('📋 Período encontrado en payroll_periods:', payrollPeriod);
         
+        // Obtener company_id para el parsing inteligente
+        const companyId = payrollPeriod.company_id;
+        
+        // Usar el servicio de parsing inteligente para determinar el tipo
+        const periodTypeResult = await PeriodParsingService.determinePeriodType(
+          companyId,
+          payrollPeriod.fecha_inicio,
+          payrollPeriod.fecha_fin
+        );
+        
+        console.log('🎯 Tipo de período detectado:', periodTypeResult);
+        
         // Convertir PayrollPeriod a PayrollHistoryPeriod
         const convertedPeriod: PayrollHistoryPeriod = {
           id: payrollPeriod.id,
           period: PayrollPeriodService.formatPeriodText(payrollPeriod.fecha_inicio, payrollPeriod.fecha_fin),
           startDate: payrollPeriod.fecha_inicio,
           endDate: payrollPeriod.fecha_fin,
-          type: payrollPeriod.tipo_periodo as 'quincenal' | 'mensual',
+          type: periodTypeResult.type,
           employeesCount: 0, // Se calculará con los datos reales
           status: payrollPeriod.estado === 'cerrada' ? 'cerrado' : 
                  payrollPeriod.estado === 'procesada' ? 'cerrado' : 'revision',
@@ -79,13 +92,13 @@ const PayrollHistoryDetailsPage = () => {
         
         console.log('📋 Período encontrado por coincidencia:', possibleMatch.periodo);
         // Usar el registro encontrado por coincidencia
-        const convertedPeriod = convertHistoryRecordToPeriod(possibleMatch);
+        const convertedPeriod = await convertHistoryRecordToPeriod(possibleMatch);
         setPeriod(convertedPeriod);
         return;
       }
 
       console.log('📋 Período encontrado en historial:', foundRecord.periodo);
-      const convertedPeriod = convertHistoryRecordToPeriod(foundRecord);
+      const convertedPeriod = await convertHistoryRecordToPeriod(foundRecord);
       setPeriod(convertedPeriod);
       
     } catch (error) {
@@ -96,8 +109,8 @@ const PayrollHistoryDetailsPage = () => {
     }
   };
 
-  // Helper method to convert history record to period
-  const convertHistoryRecordToPeriod = (foundRecord: any): PayrollHistoryPeriod => {
+  // Helper method to convert history record to period con parsing inteligente
+  const convertHistoryRecordToPeriod = async (foundRecord: any): Promise<PayrollHistoryPeriod> => {
     let mappedStatus: 'cerrado' | 'con_errores' | 'revision' = 'revision';
     
     switch (foundRecord.estado) {
@@ -114,63 +127,36 @@ const PayrollHistoryDetailsPage = () => {
         break;
     }
 
-    // Determinar el tipo de período dinámicamente basado en las fechas
-    const determinePeriodType = (startDate: string, endDate: string): 'quincenal' | 'mensual' => {
-      if (!startDate || !endDate) return 'mensual';
-      
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      // Si la diferencia es menor o igual a 16 días, es quincenal
-      // Si es mayor, es mensual
-      return diffDays <= 16 ? 'quincenal' : 'mensual';
-    };
-
+    // Obtener company_id del usuario actual para el parsing
+    const companyId = await PayrollPeriodService.getCurrentUserCompanyId();
+    
     // Extraer fechas del período si está disponible
     let periodStartDate = foundRecord.fechaCreacion || new Date().toISOString().split('T')[0];
     let periodEndDate = foundRecord.fechaCreacion || new Date().toISOString().split('T')[0];
-    let periodType: 'quincenal' | 'mensual' = 'mensual';
+    let periodType: PayrollHistoryPeriod['type'] = 'mensual';
 
-    if (foundRecord.periodo) {
-      // Intentar extraer fechas del formato "1 al 15 de Mayo 2025" o similar
-      const periodText = foundRecord.periodo;
-      const monthMatch = periodText.match(/(\d+)\s+al\s+(\d+)\s+de\s+(\w+)\s+(\d+)/i);
+    if (foundRecord.periodo && companyId) {
+      // Usar el servicio de parsing inteligente
+      const periodTypeResult = await PeriodParsingService.determinePeriodType(
+        companyId,
+        undefined, // No tenemos fechas directas del historial
+        undefined,
+        foundRecord.periodo // Usar el texto del período
+      );
       
-      if (monthMatch) {
-        const [, startDay, endDay, monthName, year] = monthMatch;
-        
-        // Mapear nombres de meses a números
-        const monthMap: { [key: string]: number } = {
-          'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3, 'mayo': 4, 'junio': 5,
-          'julio': 6, 'agosto': 7, 'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11
-        };
-        
-        const monthNum = monthMap[monthName.toLowerCase()];
-        if (monthNum !== undefined) {
-          const startDate = new Date(parseInt(year), monthNum, parseInt(startDay));
-          const endDate = new Date(parseInt(year), monthNum, parseInt(endDay));
-          
-          periodStartDate = startDate.toISOString().split('T')[0];
-          periodEndDate = endDate.toISOString().split('T')[0];
-          periodType = determinePeriodType(periodStartDate, periodEndDate);
-        }
-      } else {
-        // Si no se puede parsear el período, intentar con otros formatos
-        const yearMatch = periodText.match(/(\d{4})/);
-        if (yearMatch) {
-          // Determinar tipo basado en el contenido del texto
-          if (periodText.toLowerCase().includes('quinc') || 
-              periodText.includes('1 al 15') || 
-              periodText.includes('16 al 30') ||
-              periodText.includes('16 al 31')) {
-            periodType = 'quincenal';
-          } else {
-            periodType = 'mensual';
-          }
-        }
+      console.log('🎯 Tipo detectado para historial:', periodTypeResult);
+      periodType = periodTypeResult.type;
+      
+      // Intentar extraer fechas del texto si es posible
+      const textParsing = PeriodParsingService.parsePeriodText(foundRecord.periodo);
+      if (textParsing.startDate && textParsing.endDate) {
+        periodStartDate = textParsing.startDate;
+        periodEndDate = textParsing.endDate;
       }
+    } else if (companyId) {
+      // Si no hay texto de período, usar configuración de empresa como fallback
+      const periodTypeResult = await PeriodParsingService.determinePeriodType(companyId);
+      periodType = periodTypeResult.type;
     }
 
     return {
@@ -178,7 +164,7 @@ const PayrollHistoryDetailsPage = () => {
       period: foundRecord.periodo || 'Sin período',
       startDate: periodStartDate,
       endDate: periodEndDate,
-      type: periodType, // Ahora dinámico basado en las fechas reales
+      type: periodType, // Ahora usando parsing inteligente
       employeesCount: foundRecord.empleados || 0,
       status: mappedStatus,
       totalGrossPay: Number(foundRecord.totalNomina || 0),

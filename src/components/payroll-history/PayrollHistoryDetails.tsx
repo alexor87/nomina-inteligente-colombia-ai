@@ -326,6 +326,47 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
     }
   };
 
+  // Función mejorada para mostrar el tipo de período
+  const getPeriodTypeDisplay = () => {
+    switch (period.type) {
+      case 'semanal':
+        return (
+          <div className="text-lg font-semibold flex items-center text-green-600">
+            <Calendar className="h-4 w-4 mr-1" />
+            Semanal
+          </div>
+        );
+      case 'quincenal':
+        return (
+          <div className="text-lg font-semibold flex items-center text-blue-600">
+            <Calendar className="h-4 w-4 mr-1" />
+            Quincenal
+          </div>
+        );
+      case 'mensual':
+        return (
+          <div className="text-lg font-semibold flex items-center text-purple-600">
+            <Calendar className="h-4 w-4 mr-1" />
+            Mensual
+          </div>
+        );
+      case 'personalizado':
+        return (
+          <div className="text-lg font-semibold flex items-center text-orange-600">
+            <Calendar className="h-4 w-4 mr-1" />
+            Personalizado
+          </div>
+        );
+      default:
+        return (
+          <div className="text-lg font-semibold flex items-center text-gray-600">
+            <Calendar className="h-4 w-4 mr-1" />
+            {period.type}
+          </div>
+        );
+    }
+  };
+
   const groupedFiles = generatedFiles.reduce((acc, file) => {
     if (!acc[file.type]) {
       acc[file.type] = [];
@@ -376,10 +417,7 @@ export const PayrollHistoryDetails = ({ period, onBack }: PayrollHistoryDetailsP
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <div className="text-sm text-gray-600">Periodicidad</div>
-                <div className="text-lg font-semibold capitalize flex items-center">
-                  <Calendar className="h-4 w-4 mr-1 text-blue-600" />
-                  {period.type === 'quincenal' ? 'Quincenal' : 'Mensual'}
-                </div>
+                {getPeriodTypeDisplay()}
               </div>
               <div>
                 <div className="text-sm text-gray-600">Empleados liquidados</div>

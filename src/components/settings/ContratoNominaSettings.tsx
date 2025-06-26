@@ -27,6 +27,7 @@ export const ContratoNominaSettings = () => {
     // Configuración de periodicidad - ahora sincronizada con la DB
     diasPeriodicidad: 30,
     periodicidadPago: 'mensual', // Ahora viene de la DB
+    diasPersonalizados: 30, // Nuevo campo para períodos personalizados
     
     // Horas y jornada
     jornadaEstandar: 8,
@@ -98,7 +99,7 @@ export const ContratoNominaSettings = () => {
       // Cargar configuración de periodicidad desde la DB
       const { data: settings, error: settingsError } = await supabase
         .from('company_settings')
-        .select('periodicity')
+        .select('periodicity, custom_period_days')
         .eq('company_id', profile.company_id)
         .single();
 
@@ -110,16 +111,17 @@ export const ContratoNominaSettings = () => {
           'semanal': 7,
           'quincenal': 15,
           'mensual': 30,
-          'personalizado': 30
+          'personalizado': settings.custom_period_days || 30
         };
 
         setConfig(prev => ({
           ...prev,
           periodicidadPago: settings.periodicity,
-          diasPeriodicidad: periodicityToDays[settings.periodicity as keyof typeof periodicityToDays] || 30
+          diasPeriodicidad: periodicityToDays[settings.periodicity as keyof typeof periodicityToDays] || 30,
+          diasPersonalizados: settings.custom_period_days || 30
         }));
 
-        console.log('Configuración cargada desde DB:', settings.periodicity);
+        console.log('Configuración cargada desde DB:', settings);
       }
 
     } catch (error) {
@@ -135,7 +137,7 @@ export const ContratoNominaSettings = () => {
   };
 
   // Actualizar periodicidad en la DB cuando cambie
-  const updatePeriodicityInDB = async (newPeriodicity: string) => {
+  const updatePeriodicityInDB = async (newPeriodicity: string, customDays?: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -163,14 +165,21 @@ export const ContratoNominaSettings = () => {
         return;
       }
 
+      const updateData: any = {
+        periodicity: newPeriodicity,
+        updated_at: new Date().toISOString()
+      };
+
+      // Si es personalizado, incluir los días personalizados
+      if (newPeriodicity === 'personalizado' && customDays) {
+        updateData.custom_period_days = customDays;
+      }
+
       if (existingSettings) {
         // Si existe, actualizar
         const { error } = await supabase
           .from('company_settings')
-          .update({ 
-            periodicity: newPeriodicity,
-            updated_at: new Date().toISOString()
-          })
+          .update(updateData)
           .eq('company_id', profile.company_id);
 
         if (error) {
@@ -183,7 +192,7 @@ export const ContratoNominaSettings = () => {
           .from('company_settings')
           .insert({
             company_id: profile.company_id,
-            periodicity: newPeriodicity
+            ...updateData
           });
 
         if (error) {
@@ -192,7 +201,7 @@ export const ContratoNominaSettings = () => {
         }
       }
 
-      console.log('Periodicidad actualizada en DB:', newPeriodicity);
+      console.log('Periodicidad actualizada en DB:', newPeriodicity, customDays ? `(${customDays} días)` : '');
     } catch (error) {
       console.error('Error updating periodicity in DB:', error);
     }
@@ -260,17 +269,19 @@ export const ContratoNominaSettings = () => {
       'semanal': 7,
       'quincenal': 15,
       'mensual': 30,
-      'personalizado': 30
+      'personalizado': config.diasPersonalizados
     };
+
+    const newDays = periodicityToDays[value as keyof typeof periodicityToDays] || 30;
 
     setConfig(prev => ({
       ...prev,
       periodicidadPago: value,
-      diasPeriodicidad: periodicityToDays[value as keyof typeof periodicityToDays] || 30
+      diasPeriodicidad: newDays
     }));
 
     // Actualizar en la base de datos
-    await updatePeriodicityInDB(value);
+    await updatePeriodicityInDB(value, value === 'personalizado' ? config.diasPersonalizados : undefined);
 
     toast({
       title: "Periodicidad actualizada",
@@ -278,6 +289,26 @@ export const ContratoNominaSettings = () => {
     });
   };
 
+  // Manejar cambio de días personalizados
+  const handleCustomDaysChange = async (days: number) => {
+    setConfig(prev => ({
+      ...prev,
+      diasPersonalizados: days,
+      diasPeriodicidad: prev.periodicidadPago === 'personalizado' ? days : prev.diasPeriodicidad
+    }));
+
+    // Si la periodicidad actual es personalizada, actualizar en DB
+    if (config.periodicidadPago === 'personalizado') {
+      await updatePeriodicityInDB('personalizado', days);
+      
+      toast({
+        title: "Días personalizados actualizado",
+        description: `El período personalizado ahora es de ${days} días.`,
+      });
+    }
+  };
+
+  // Validar formulario
   const validateForm = () => {
     // Validar que al menos un tipo de contrato esté seleccionado
     const tiposSeleccionados = Object.values(config.tiposContratoPermitidos).some(tipo => tipo);
@@ -481,7 +512,7 @@ export const ContratoNominaSettings = () => {
           </div>
         </Card>
 
-        {/* Sección 2: Configuración de Periodicidad de Pago - SINCRONIZADA */}
+        {/* Sección 2: Configuración de Periodicidad de Pago - MEJORADA */}
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">🗓️ Configuración de Periodicidad de Pago</h3>
           <div className="bg-blue-50 p-3 rounded-lg mb-4">
@@ -509,17 +540,47 @@ export const ContratoNominaSettings = () => {
                   <SelectValue placeholder="Seleccionar periodicidad" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="semanal">Semanal</SelectItem>
-                  <SelectItem value="quincenal">Quincenal</SelectItem>
-                  <SelectItem value="mensual">Mensual</SelectItem>
+                  <SelectItem value="semanal">Semanal (7 días)</SelectItem>
+                  <SelectItem value="quincenal">Quincenal (15 días)</SelectItem>
+                  <SelectItem value="mensual">Mensual (30 días)</SelectItem>
                   <SelectItem value="personalizado">Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Campo para días personalizados */}
+            {config.periodicidadPago === 'personalizado' && (
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="diasPersonalizados">Días del período personalizado</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-orange-600" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Define cuántos días abarca cada período de pago en tu empresa. Puede ser cualquier número entre 1 y 365 días.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  id="diasPersonalizados"
+                  type="number"
+                  value={config.diasPersonalizados}
+                  onChange={(e) => handleCustomDaysChange(parseInt(e.target.value) || 30)}
+                  placeholder="Ej: 45"
+                  min="1"
+                  max="365"
+                  className="max-w-xs"
+                />
+                <p className="text-sm text-orange-700 mt-2">
+                  📅 Tu período personalizado será de <strong>{config.diasPersonalizados} días</strong>
+                </p>
+              </div>
+            )}
+
             <div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="diasPeriodicidad">Días por período</Label>
+                <Label htmlFor="diasPeriodicidad">Días por período (calculado automáticamente)</Label>
                 <Tooltip>
                   <TooltipTrigger>
                     <Info className="h-4 w-4 text-gray-400" />
@@ -533,12 +594,9 @@ export const ContratoNominaSettings = () => {
                 id="diasPeriodicidad"
                 type="number"
                 value={config.diasPeriodicidad}
-                onChange={(e) => setConfig(prev => ({ ...prev, diasPeriodicidad: parseInt(e.target.value) || 30 }))}
-                placeholder="Ej: 15"
-                min="1"
-                max="31"
-                className="mt-1 max-w-xs"
-                disabled={config.periodicidadPago !== 'personalizado'}
+                placeholder="Días calculados automáticamente"
+                className="mt-1 max-w-xs bg-gray-50"
+                disabled
               />
             </div>
 

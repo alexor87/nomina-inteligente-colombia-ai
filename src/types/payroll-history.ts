@@ -4,7 +4,7 @@ export interface PayrollHistoryPeriod {
   period: string;
   startDate: string;
   endDate: string;
-  type: 'quincenal' | 'mensual';
+  type: 'semanal' | 'quincenal' | 'mensual' | 'personalizado'; // Actualizado para incluir todos los tipos
   employeesCount: number;
   status: 'cerrado' | 'con_errores' | 'revision' | 'editado';
   totalGrossPay: number;
@@ -42,7 +42,7 @@ export interface PayrollHistoryFilters {
   };
   status?: string;
   costCenter?: string;
-  periodType?: 'quincenal' | 'mensual';
+  periodType?: 'semanal' | 'quincenal' | 'mensual' | 'personalizado'; // Actualizado
   employeeSearch?: string;
 }
 
