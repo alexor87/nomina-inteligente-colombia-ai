@@ -26,8 +26,8 @@ import CompanySettingsPage from '@/pages/CompanySettingsPage';
 import SubscriptionPage from '@/pages/SubscriptionPage';
 import BillingHistoryPage from '@/pages/BillingHistoryPage';
 import EmployeeDetailsPage from '@/pages/EmployeeDetailsPage';
-import CreateEmployeePage from '@/pages/CreateEmployeePage';
-import EditEmployeePage from '@/pages/EditEmployeePage';
+import CreateEmployeeModernPage from '@/pages/CreateEmployeeModernPage';
+import EditEmployeeModernPage from '@/pages/EditEmployeeModernPage';
 import PayrollPage from '@/pages/PayrollPage';
 
 const queryClient = new QueryClient();
@@ -55,9 +55,9 @@ function App() {
                 <Route path="payroll" element={<PayrollIntelligentSilentPage />} />
                 
                 <Route path="employees" element={<EmployeesPage />} />
-                <Route path="employees/create" element={<CreateEmployeePage />} />
+                <Route path="employees/create" element={<CreateEmployeeModernPage />} />
                 <Route path="employees/:employeeId" element={<EmployeeDetailsPage />} />
-                <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
+                <Route path="employees/:employeeId/edit" element={<EditEmployeeModernPage />} />
                 
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="company-settings" element={<CompanySettingsPage />} />
