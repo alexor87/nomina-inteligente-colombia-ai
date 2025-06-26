@@ -136,105 +136,141 @@ export class CompanyService {
 
       console.log('✅ Company created successfully:', companyId);
       
-      // Esperar un momento para que se procesen los triggers
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Esperar para que se procesen los triggers
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Verificación y creación manual de perfil si es necesario
+      // Verificación múltiple del perfil
       console.log('👤 Ensuring user profile exists...');
-      const { data: existingProfile, error: profileCheckError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+      let profileExists = false;
+      let attempts = 0;
+      const maxAttempts = 5;
 
-      if (profileCheckError && profileCheckError.code === 'PGRST116') {
-        // Perfil no existe, crearlo
-        console.log('🔧 Creating user profile manually...');
-        const { error: createProfileError } = await supabase
+      while (!profileExists && attempts < maxAttempts) {
+        const { data: existingProfile, error: profileCheckError } = await supabase
           .from('profiles')
-          .insert({
-            user_id: userId,
-            first_name: data.first_name,
-            last_name: data.last_name,
-            company_id: companyId
-          });
-        
-        if (createProfileError) {
-          console.error('❌ Profile creation error:', createProfileError);
-        } else {
-          console.log('✅ Profile created successfully');
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (existingProfile) {
+          profileExists = true;
+          console.log('✅ Profile found:', existingProfile);
+          
+          // Actualizar perfil con company_id si no lo tiene
+          if (!existingProfile.company_id) {
+            console.log('🔧 Updating profile with company...');
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ 
+                company_id: companyId,
+                first_name: data.first_name,
+                last_name: data.last_name
+              })
+              .eq('user_id', userId);
+            
+            if (updateError) {
+              console.error('❌ Profile update error:', updateError);
+            } else {
+              console.log('✅ Profile updated successfully');
+            }
+          }
+        } else if (profileCheckError && profileCheckError.code === 'PGRST116') {
+          // Perfil no existe, intentar crearlo
+          console.log(`🔧 Creating user profile (attempt ${attempts + 1})...`);
+          const { error: createProfileError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: userId,
+              first_name: data.first_name,
+              last_name: data.last_name,
+              company_id: companyId
+            });
+          
+          if (createProfileError && createProfileError.code !== '23505') { // Ignore duplicate key errors
+            console.error('❌ Profile creation error:', createProfileError);
+          }
         }
-      } else if (existingProfile && !existingProfile.company_id) {
-        // Perfil existe pero sin empresa, actualizarlo
-        console.log('🔧 Updating existing profile with company...');
-        const { error: updateProfileError } = await supabase
-          .from('profiles')
-          .update({ 
-            company_id: companyId,
-            first_name: data.first_name,
-            last_name: data.last_name
-          })
-          .eq('user_id', userId);
         
-        if (updateProfileError) {
-          console.error('❌ Profile update error:', updateProfileError);
-        } else {
-          console.log('✅ Profile updated successfully');
+        attempts++;
+        if (!profileExists && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
-      // Verificación y creación manual de rol de administrador
+      // Verificación múltiple del rol de administrador
       console.log('👥 Ensuring admin role exists...');
-      const { data: existingRole, error: roleCheckError } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('company_id', companyId)
-        .eq('role', 'administrador')
-        .single();
+      let roleExists = false;
+      attempts = 0;
 
-      if (roleCheckError && roleCheckError.code === 'PGRST116') {
-        // Rol no existe, crearlo
-        console.log('🔧 Creating admin role manually...');
-        const { error: createRoleError } = await supabase
+      while (!roleExists && attempts < maxAttempts) {
+        const { data: existingRole, error: roleCheckError } = await supabase
           .from('user_roles')
-          .insert({
-            user_id: userId,
-            role: 'administrador',
-            company_id: companyId,
-            assigned_by: userId
-          });
+          .select('*')
+          .eq('user_id', userId)
+          .eq('company_id', companyId)
+          .eq('role', 'administrador')
+          .single();
+
+        if (existingRole) {
+          roleExists = true;
+          console.log('✅ Admin role found:', existingRole);
+        } else if (roleCheckError && roleCheckError.code === 'PGRST116') {
+          // Rol no existe, crearlo
+          console.log(`🔧 Creating admin role (attempt ${attempts + 1})...`);
+          const { error: createRoleError } = await supabase
+            .from('user_roles')
+            .insert({
+              user_id: userId,
+              role: 'administrador',
+              company_id: companyId,
+              assigned_by: userId
+            });
+          
+          if (createRoleError && createRoleError.code !== '23505') { // Ignore duplicate key errors
+            console.error('❌ Role creation error:', createRoleError);
+          }
+        }
         
-        if (createRoleError) {
-          console.error('❌ Role creation error:', createRoleError);
-          // Intentar con función de utilidad como respaldo
-          await forceAssignAdminRole(userId, companyId);
-        } else {
-          console.log('✅ Admin role created successfully');
+        attempts++;
+        if (!roleExists && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
-      // Verificación final
+      // Si después de todos los intentos no se creó el rol, forzar creación
+      if (!roleExists) {
+        console.log('⚠️ Forcing admin role creation as fallback...');
+        await forceAssignAdminRole(userId, companyId);
+      }
+
+      // Verificación final completa
       console.log('🔍 Performing final verification...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const { data: finalProfile } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .single();
 
-      const { data: finalRole } = await supabase
+      const { data: finalRoles } = await supabase
         .from('user_roles')
         .select('*')
         .eq('user_id', userId)
-        .eq('company_id', companyId)
-        .single();
+        .eq('company_id', companyId);
 
       console.log('📊 Final verification results:', {
         profile: finalProfile,
-        role: finalRole,
+        roles: finalRoles,
         companyId,
         isNewUser
       });
+
+      // Si no hay roles después de todo, lanzar error
+      if (!finalRoles || finalRoles.length === 0) {
+        console.error('❌ Critical: No roles found after complete setup');
+        throw new Error('Error crítico: No se pudieron asignar los roles de usuario. Contacte soporte.');
+      }
 
       return companyId;
     } catch (error) {
@@ -264,10 +300,7 @@ export class CompanyService {
     }
   }
 
-  // Verificar si el usuario es súper admin
   static async isSaasAdmin(): Promise<boolean> {
-    // En el nuevo sistema simplificado, no hay superadmin
-    // Se puede verificar si el usuario tiene rol de soporte en alguna empresa
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
@@ -291,7 +324,6 @@ export class CompanyService {
     }
   }
 
-  // Listar todas las empresas (solo para usuarios con rol de soporte)
   static async getAllCompanies(): Promise<Company[]> {
     try {
       const { data, error } = await supabase
@@ -301,7 +333,6 @@ export class CompanyService {
 
       if (error) throw error;
 
-      // Cast the data to our Company interface
       return (data || []).map(company => ({
         id: company.id,
         nit: company.nit,
@@ -321,7 +352,6 @@ export class CompanyService {
     }
   }
 
-  // Obtener empresa actual del usuario
   static async getCurrentCompany(): Promise<Company | null> {
     try {
       const { data: profile, error: profileError } = await supabase
@@ -340,7 +370,6 @@ export class CompanyService {
 
       if (error) throw error;
 
-      // Cast the data to our Company interface
       return {
         id: data.id,
         nit: data.nit,
@@ -360,7 +389,6 @@ export class CompanyService {
     }
   }
 
-  // Actualizar empresa
   static async updateCompany(companyId: string, updates: Partial<Company>): Promise<void> {
     try {
       const { error } = await supabase
@@ -375,7 +403,6 @@ export class CompanyService {
     }
   }
 
-  // Suspender empresa (solo usuarios con rol de soporte)
   static async suspendCompany(companyId: string): Promise<void> {
     try {
       const { error } = await supabase
@@ -390,7 +417,6 @@ export class CompanyService {
     }
   }
 
-  // Activar empresa (solo usuarios con rol de soporte)
   static async activateCompany(companyId: string): Promise<void> {
     try {
       const { error } = await supabase

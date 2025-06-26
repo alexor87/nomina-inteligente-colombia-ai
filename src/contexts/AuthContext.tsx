@@ -133,12 +133,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('🔄 Refreshing user data for:', currentUser.email);
 
-      // Obtener perfil del usuario con retry logic
+      // Obtener perfil del usuario con retry logic agresivo
       let profileData = null;
       let attempts = 0;
-      const maxAttempts = 3;
+      const maxAttemptsProfile = 8; // Aumentado a 8 intentos
 
-      while (attempts < maxAttempts) {
+      while (attempts < maxAttemptsProfile) {
         try {
           const { data, error } = await supabase
             .from('profiles')
@@ -148,10 +148,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (!error && data) {
             profileData = data;
+            console.log('✅ User profile loaded:', profileData);
             break;
           } else if (error && error.code === 'PGRST116') {
-            console.log(`⏳ Profile not found, attempt ${attempts + 1}/${maxAttempts}`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log(`⏳ Profile not found, attempt ${attempts + 1}/${maxAttemptsProfile}`);
+            // Aumentar tiempo de espera progresivamente
+            await new Promise(resolve => setTimeout(resolve, Math.min(1000 * (attempts + 1), 5000)));
           } else {
             console.error('❌ Error fetching profile:', error);
             break;
@@ -165,11 +167,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (profileData) {
         setProfile(profileData);
-        console.log('✅ User profile loaded:', profileData);
         
         // Si el usuario tiene una empresa, ejecutar verificación completa de roles
         if (profileData.company_id) {
-          console.log('🔧 Performing complete role check...');
+          console.log('🔧 Performing complete role check for company:', profileData.company_id);
           await performCompleteRoleCheck(currentUser.id);
         }
       } else {
@@ -177,21 +178,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
 
-      // Obtener roles del usuario con retry logic
+      // Obtener roles del usuario con retry logic agresivo
       let rolesData = [];
       attempts = 0;
+      const maxAttemptsRoles = 8; // Aumentado a 8 intentos
 
-      while (attempts < maxAttempts) {
+      while (attempts < maxAttemptsRoles) {
         try {
           const { data, error } = await supabase
             .rpc('get_user_companies_simple', { _user_id: currentUser.id });
           
-          if (!error && data) {
+          if (!error && data && data.length > 0) {
             rolesData = data;
+            console.log('✅ User roles loaded:', rolesData);
             break;
+          } else if (!error && data && data.length === 0) {
+            console.log(`⏳ No roles found yet, attempt ${attempts + 1}/${maxAttemptsRoles}`);
+            // Si tenemos perfil con empresa pero no roles, esperar más tiempo
+            if (profileData?.company_id) {
+              await new Promise(resolve => setTimeout(resolve, Math.min(2000 * (attempts + 1), 8000)));
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
           } else {
-            console.log(`⏳ Roles not found, attempt ${attempts + 1}/${maxAttempts}`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.error('❌ Error fetching roles:', error);
+            // En caso de error, intentar una vez más con delay
+            if (attempts < maxAttemptsRoles - 1) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
           }
         } catch (err) {
           console.error('❌ Exception fetching roles:', err);
@@ -206,10 +220,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           company_id: role.company_id
         }));
         setRoles(transformedRoles);
-        console.log('✅ User roles loaded:', transformedRoles);
+        console.log('✅ Final roles set:', transformedRoles);
       } else {
         console.log('⚠️ No roles found after all attempts');
         setRoles([]);
+        
+        // Si tenemos perfil con empresa pero no roles, esto es un problema crítico
+        if (profileData?.company_id) {
+          console.error('🚨 CRITICAL: User has company but no roles assigned!');
+          // Intentar forzar la asignación de rol una vez más
+          setTimeout(async () => {
+            console.log('🔧 Attempting emergency role assignment...');
+            await performCompleteRoleCheck(currentUser.id);
+            
+            // Intentar cargar roles una vez más después del emergency check
+            const { data: emergencyRoles } = await supabase
+              .rpc('get_user_companies_simple', { _user_id: currentUser.id });
+            
+            if (emergencyRoles && emergencyRoles.length > 0) {
+              const transformedEmergencyRoles: UserRole[] = emergencyRoles.map((role: any) => ({
+                role: role.role_name as AppRole,
+                company_id: role.company_id
+              }));
+              setRoles(transformedEmergencyRoles);
+              console.log('🆘 Emergency roles loaded:', transformedEmergencyRoles);
+            }
+          }, 3000);
+        }
       }
 
     } catch (error) {
@@ -278,11 +315,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (session?.user) {
           console.log('👤 User authenticated, refreshing data...');
-          // Usar setTimeout para evitar bloquear el callback
+          // Usar setTimeout más largo para evitar bloquear el callback y dar tiempo a la DB
           setTimeout(async () => {
             await refreshUserData();
             setLoading(false);
-          }, 500);
+          }, 1000); // Aumentado a 1 segundo
         } else {
           console.log('👤 User not authenticated, clearing data...');
           setRoles([]);
@@ -304,7 +341,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTimeout(async () => {
           await refreshUserData();
           setLoading(false);
-        }, 500);
+        }, 1000); // Aumentado a 1 segundo
       } else {
         console.log('👤 No existing session found');
         setLoading(false);
