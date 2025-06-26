@@ -1,8 +1,9 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollPeriodService, PayrollPeriod } from '../PayrollPeriodService';
 import { PayrollConfigurationService } from './PayrollConfigurationService';
 import { PayrollPeriodCalculationService } from './PayrollPeriodCalculationService';
+import { PayrollAuditEnhancedService } from './PayrollAuditEnhancedService';
+import { PayrollPerformanceService } from './PayrollPerformanceService';
 
 export interface PeriodStatus {
   action: 'resume' | 'create_new' | 'configure' | 'error';
@@ -14,17 +15,25 @@ export interface PeriodStatus {
   };
   message: string;
   title: string;
+  systemMetrics?: Record<string, any>;
 }
 
 export class PayrollPeriodDetectionService {
-  // Detectar estado inteligente del módulo de nómina
+  // Detectar estado inteligente del módulo de nómina con métricas mejoradas
   static async detectPeriodStatus(): Promise<PeriodStatus> {
+    const startTime = performance.now();
+    
     try {
       console.log('🔍 Detectando estado inteligente del módulo de nómina...');
       
       const companyId = await PayrollPeriodService.getCurrentUserCompanyId();
       if (!companyId) {
-        console.log('❌ No se encontró company_id');
+        await PayrollAuditEnhancedService.logEnhancedAction({
+          action: 'detection_failed',
+          entity_type: 'system',
+          details: { reason: 'company_id_not_found' }
+        });
+        
         return {
           action: 'configure',
           message: 'Para poder liquidar la nómina, primero debes configurar la periodicidad desde el módulo de Configuración.',
@@ -32,32 +41,41 @@ export class PayrollPeriodDetectionService {
         };
       }
 
-      // Verificar configuración de empresa - forzar refresh completo
-      console.log('🔍 Obteniendo configuración de empresa con refresh forzado...');
-      const companySettings = await PayrollConfigurationService.getCompanySettingsForceRefresh(companyId);
-      
+      // Cargar métricas del sistema de forma paralela
+      const [companySettings, activePeriod, systemMetrics] = await Promise.all([
+        PayrollConfigurationService.getCompanySettingsForceRefresh(companyId),
+        this.getActivePeriod(companyId),
+        PayrollPerformanceService.calculateSystemMetrics(companyId)
+      ]);
+
+      // Verificar configuración de empresa
       if (!companySettings || !companySettings.periodicity) {
-        console.log('❌ No se encontró configuración de empresa o periodicidad');
+        await PayrollAuditEnhancedService.logEnhancedAction({
+          action: 'configuration_missing',
+          entity_type: 'system',
+          details: { company_id: companyId }
+        });
+
         return {
           action: 'configure',
           message: 'Para poder liquidar la nómina, primero debes configurar la periodicidad desde el módulo de Configuración.',
-          title: 'Configuración requerida'
+          title: 'Configuración requerida',
+          systemMetrics
         };
       }
 
-      console.log('✅ Configuración encontrada:', companySettings);
-      console.log('📊 Periodicidad configurada:', companySettings.periodicity);
+      await PayrollAuditEnhancedService.logEnhancedAction({
+        action: 'configuration_validated',
+        entity_type: 'system',
+        details: { 
+          periodicity: companySettings.periodicity,
+          system_metrics: systemMetrics
+        }
+      });
 
-      // Buscar periodo activo (borrador o en proceso)
-      const activePeriod = await this.getActivePeriod(companyId);
-      
+      // Si hay período activo, validar consistencia
       if (activePeriod) {
-        // Verificar que el período activo coincida con la periodicidad configurada
         if (activePeriod.tipo_periodo !== companySettings.periodicity) {
-          console.log('⚠️ El período activo no coincide con la periodicidad configurada');
-          console.log('Período activo:', activePeriod.tipo_periodo, 'vs Configuración:', companySettings.periodicity);
-          
-          // Si hay un conflicto, sugerir crear un nuevo período con la configuración correcta
           const lastClosedPeriod = await this.getLastClosedPeriod(companyId);
           const nextPeriodDates = PayrollPeriodCalculationService.calculateNextPeriod(
             companySettings.periodicity,
@@ -78,35 +96,42 @@ export class PayrollPeriodDetectionService {
               type: companySettings.periodicity
             },
             message: `Hay un cambio en la configuración de periodicidad. ¿Deseas crear un nuevo período ${companySettings.periodicity} ${nextPeriodText}?`,
-            title: 'Actualizar periodicidad'
+            title: 'Actualizar periodicidad',
+            systemMetrics
           };
         }
 
-        // Existe un periodo abierto con la periodicidad correcta - reanudar
+        // Período activo válido - reanudar
         const periodText = PayrollPeriodService.formatPeriodText(
           activePeriod.fecha_inicio, 
           activePeriod.fecha_fin
         );
-        
-        console.log('🔄 Periodo activo encontrado con periodicidad correcta:', activePeriod.id);
+
+        await PayrollAuditEnhancedService.logEnhancedAction({
+          action: 'resume_period',
+          entity_type: 'period',
+          entity_id: activePeriod.id,
+          details: { 
+            period_type: activePeriod.tipo_periodo,
+            period_dates: periodText
+          }
+        });
         
         return {
           action: 'resume',
           currentPeriod: activePeriod,
           message: `Retomando la nómina ${activePeriod.tipo_periodo} en curso ${periodText}`,
-          title: 'Nómina en curso'
+          title: 'Nómina en curso',
+          systemMetrics
         };
       }
 
-      // No hay periodo activo - verificar si hay periodo cerrado reciente
+      // No hay período activo - calcular siguiente
       const lastClosedPeriod = await this.getLastClosedPeriod(companyId);
       const nextPeriodDates = PayrollPeriodCalculationService.calculateNextPeriod(
         companySettings.periodicity,
         lastClosedPeriod
       );
-
-      console.log('📅 Calculando siguiente periodo con periodicidad:', companySettings.periodicity);
-      console.log('📅 Fechas calculadas:', nextPeriodDates);
 
       if (lastClosedPeriod) {
         const lastPeriodText = PayrollPeriodService.formatPeriodText(
@@ -118,8 +143,6 @@ export class PayrollPeriodDetectionService {
           nextPeriodDates.endDate
         );
 
-        console.log('✅ Último periodo cerrado encontrado, sugeriendo siguiente');
-
         return {
           action: 'create_new',
           currentPeriod: lastClosedPeriod,
@@ -129,13 +152,12 @@ export class PayrollPeriodDetectionService {
             type: companySettings.periodicity
           },
           message: `Ya cerraste la nómina ${lastPeriodText}. ¿Deseas iniciar la siguiente nómina ${companySettings.periodicity} ${nextPeriodText}?`,
-          title: 'Iniciar nuevo periodo'
+          title: 'Iniciar nuevo periodo',
+          systemMetrics
         };
       }
 
-      // Primer periodo - crear automáticamente con la periodicidad configurada
-      console.log('🆕 Primera nómina - creando periodo inicial con periodicidad:', companySettings.periodicity);
-      
+      // Primera nómina
       const nextPeriodText = PayrollPeriodService.formatPeriodText(
         nextPeriodDates.startDate,
         nextPeriodDates.endDate
@@ -149,10 +171,22 @@ export class PayrollPeriodDetectionService {
           type: companySettings.periodicity
         },
         message: `¿Deseas iniciar tu primera nómina ${companySettings.periodicity} ${nextPeriodText}?`,
-        title: 'Primera nómina'
+        title: 'Primera nómina',
+        systemMetrics
       };
 
     } catch (error) {
+      const duration = performance.now() - startTime;
+      
+      await PayrollAuditEnhancedService.logEnhancedAction({
+        action: 'detection_error',
+        entity_type: 'system',
+        details: { 
+          error: error instanceof Error ? error.message : 'Unknown error',
+          duration_ms: duration
+        }
+      });
+
       console.error('❌ Error detectando estado del periodo:', error);
       return {
         action: 'error',
