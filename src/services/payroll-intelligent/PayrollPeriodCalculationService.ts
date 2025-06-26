@@ -12,7 +12,7 @@ export class PayrollPeriodCalculationService {
     if (!lastPeriod) {
       // Si no hay periodo anterior, usar la periodicidad configurada correctamente
       console.log('📅 No hay periodo anterior, generando periodo inicial con periodicidad:', periodicity);
-      const result = PayrollPeriodService.generatePeriodDates(periodicity);
+      const result = this.generateInitialPeriod(periodicity);
       console.log('📅 Periodo inicial generado:', result);
       return result;
     }
@@ -59,5 +59,64 @@ export class PayrollPeriodCalculationService {
 
     console.log('📅 Periodo calculado:', result);
     return result;
+  }
+
+  // Generar periodo inicial basado en periodicidad
+  private static generateInitialPeriod(periodicity: string): { startDate: string; endDate: string } {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const day = today.getDate();
+
+    console.log('📅 Generando periodo inicial para periodicidad:', periodicity);
+    console.log('📅 Fecha actual:', { year, month, day });
+
+    switch (periodicity) {
+      case 'mensual':
+        console.log('📅 Generando periodo mensual inicial');
+        return {
+          startDate: new Date(year, month, 1).toISOString().split('T')[0],
+          endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+        };
+
+      case 'quincenal':
+        console.log('📅 Generando periodo quincenal inicial');
+        if (day <= 15) {
+          // Primera quincena del mes
+          return {
+            startDate: new Date(year, month, 1).toISOString().split('T')[0],
+            endDate: new Date(year, month, 15).toISOString().split('T')[0]
+          };
+        } else {
+          // Segunda quincena del mes
+          return {
+            startDate: new Date(year, month, 16).toISOString().split('T')[0],
+            endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+          };
+        }
+
+      case 'semanal':
+        console.log('📅 Generando periodo semanal inicial');
+        const dayOfWeek = today.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Lunes = 1
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + mondayOffset);
+        
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+
+        return {
+          startDate: monday.toISOString().split('T')[0],
+          endDate: sunday.toISOString().split('T')[0]
+        };
+
+      case 'personalizado':
+      default:
+        console.log('📅 Periodicidad personalizada o no reconocida, usando mensual');
+        return {
+          startDate: new Date(year, month, 1).toISOString().split('T')[0],
+          endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+        };
+    }
   }
 }

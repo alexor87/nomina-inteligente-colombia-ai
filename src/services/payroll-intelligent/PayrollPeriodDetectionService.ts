@@ -33,9 +33,11 @@ export class PayrollPeriodDetectionService {
       }
 
       // Verificar configuración de empresa - forzar refresh completo
-      const companySettings = await PayrollConfigurationService.forceRefreshConfiguration(companyId);
-      if (!companySettings) {
-        console.log('❌ No se encontró configuración de empresa');
+      console.log('🔍 Obteniendo configuración de empresa con refresh forzado...');
+      const companySettings = await PayrollConfigurationService.getCompanySettingsForceRefresh(companyId);
+      
+      if (!companySettings || !companySettings.periodicity) {
+        console.log('❌ No se encontró configuración de empresa o periodicidad');
         return {
           action: 'configure',
           message: 'Para poder liquidar la nómina, primero debes configurar la periodicidad desde el módulo de Configuración.',
@@ -50,18 +52,48 @@ export class PayrollPeriodDetectionService {
       const activePeriod = await this.getActivePeriod(companyId);
       
       if (activePeriod) {
-        // Existe un periodo abierto - reanudar
+        // Verificar que el período activo coincida con la periodicidad configurada
+        if (activePeriod.tipo_periodo !== companySettings.periodicity) {
+          console.log('⚠️ El período activo no coincide con la periodicidad configurada');
+          console.log('Período activo:', activePeriod.tipo_periodo, 'vs Configuración:', companySettings.periodicity);
+          
+          // Si hay un conflicto, sugerir crear un nuevo período con la configuración correcta
+          const lastClosedPeriod = await this.getLastClosedPeriod(companyId);
+          const nextPeriodDates = PayrollPeriodCalculationService.calculateNextPeriod(
+            companySettings.periodicity,
+            lastClosedPeriod
+          );
+
+          const nextPeriodText = PayrollPeriodService.formatPeriodText(
+            nextPeriodDates.startDate,
+            nextPeriodDates.endDate
+          );
+
+          return {
+            action: 'create_new',
+            currentPeriod: activePeriod,
+            nextPeriod: {
+              startDate: nextPeriodDates.startDate,
+              endDate: nextPeriodDates.endDate,
+              type: companySettings.periodicity
+            },
+            message: `Hay un cambio en la configuración de periodicidad. ¿Deseas crear un nuevo período ${companySettings.periodicity} ${nextPeriodText}?`,
+            title: 'Actualizar periodicidad'
+          };
+        }
+
+        // Existe un periodo abierto con la periodicidad correcta - reanudar
         const periodText = PayrollPeriodService.formatPeriodText(
           activePeriod.fecha_inicio, 
           activePeriod.fecha_fin
         );
         
-        console.log('🔄 Periodo activo encontrado:', activePeriod.id);
+        console.log('🔄 Periodo activo encontrado con periodicidad correcta:', activePeriod.id);
         
         return {
           action: 'resume',
           currentPeriod: activePeriod,
-          message: `Retomando la nómina en curso ${periodText}`,
+          message: `Retomando la nómina ${activePeriod.tipo_periodo} en curso ${periodText}`,
           title: 'Nómina en curso'
         };
       }
@@ -73,7 +105,8 @@ export class PayrollPeriodDetectionService {
         lastClosedPeriod
       );
 
-      console.log('📅 Calculando siguiente periodo:', nextPeriodDates);
+      console.log('📅 Calculando siguiente periodo con periodicidad:', companySettings.periodicity);
+      console.log('📅 Fechas calculadas:', nextPeriodDates);
 
       if (lastClosedPeriod) {
         const lastPeriodText = PayrollPeriodService.formatPeriodText(
@@ -95,13 +128,18 @@ export class PayrollPeriodDetectionService {
             endDate: nextPeriodDates.endDate,
             type: companySettings.periodicity
           },
-          message: `Ya cerraste la nómina ${lastPeriodText}. ¿Deseas iniciar la siguiente nómina ${nextPeriodText}?`,
+          message: `Ya cerraste la nómina ${lastPeriodText}. ¿Deseas iniciar la siguiente nómina ${companySettings.periodicity} ${nextPeriodText}?`,
           title: 'Iniciar nuevo periodo'
         };
       }
 
-      // Primer periodo - crear automáticamente
-      console.log('🆕 Primera nómina - creando periodo inicial');
+      // Primer periodo - crear automáticamente con la periodicidad configurada
+      console.log('🆕 Primera nómina - creando periodo inicial con periodicidad:', companySettings.periodicity);
+      
+      const nextPeriodText = PayrollPeriodService.formatPeriodText(
+        nextPeriodDates.startDate,
+        nextPeriodDates.endDate
+      );
       
       return {
         action: 'create_new',
@@ -110,7 +148,7 @@ export class PayrollPeriodDetectionService {
           endDate: nextPeriodDates.endDate,
           type: companySettings.periodicity
         },
-        message: `¿Deseas iniciar tu primera nómina ${PayrollPeriodService.formatPeriodText(nextPeriodDates.startDate, nextPeriodDates.endDate)}?`,
+        message: `¿Deseas iniciar tu primera nómina ${companySettings.periodicity} ${nextPeriodText}?`,
         title: 'Primera nómina'
       };
 

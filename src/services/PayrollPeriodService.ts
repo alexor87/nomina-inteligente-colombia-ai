@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CompanySettings {
@@ -87,6 +86,7 @@ export class PayrollPeriodService {
 
   // Generar rango de fechas según periodicidad
   static generatePeriodDates(periodicity: string, referenceDate: Date = new Date()): { startDate: string; endDate: string } {
+    console.log('📅 Generando fechas para periodicidad:', periodicity);
     const today = new Date(referenceDate);
     const year = today.getFullYear();
     const month = today.getMonth();
@@ -94,18 +94,22 @@ export class PayrollPeriodService {
 
     switch (periodicity) {
       case 'mensual':
+        console.log('📅 Generando periodo mensual');
         return {
           startDate: new Date(year, month, 1).toISOString().split('T')[0],
           endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
         };
 
       case 'quincenal':
+        console.log('📅 Generando periodo quincenal');
         if (day <= 15) {
+          // Primera quincena del mes
           return {
             startDate: new Date(year, month, 1).toISOString().split('T')[0],
             endDate: new Date(year, month, 15).toISOString().split('T')[0]
           };
         } else {
+          // Segunda quincena del mes
           return {
             startDate: new Date(year, month, 16).toISOString().split('T')[0],
             endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
@@ -113,6 +117,7 @@ export class PayrollPeriodService {
         }
 
       case 'semanal':
+        console.log('📅 Generando periodo semanal');
         const dayOfWeek = today.getDay();
         const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Lunes = 1
         const monday = new Date(today);
@@ -128,9 +133,10 @@ export class PayrollPeriodService {
 
       case 'personalizado':
       default:
+        console.log('📅 Periodicidad personalizada o no reconocida, usando mensual como fallback');
         return {
-          startDate: '',
-          endDate: ''
+          startDate: new Date(year, month, 1).toISOString().split('T')[0],
+          endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
         };
     }
   }
