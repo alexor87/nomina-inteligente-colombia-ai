@@ -8,7 +8,7 @@ import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Database, Users, FileText, Settings } from 'lucide-react';
+import { RefreshCw, Database, Users, FileText, Settings, CheckCircle2 } from 'lucide-react';
 
 export const PayrollLiquidation = () => {
   const {
@@ -29,14 +29,33 @@ export const PayrollLiquidation = () => {
 
   // Wrapper function to match PayrollTable's expected signature
   const handleUpdateEmployee = (id: string, updates: Partial<any>) => {
-    // For now, we'll handle the most common update pattern
-    // In the future, this could be expanded to handle multiple field updates
     const field = Object.keys(updates)[0];
     const value = updates[field];
     if (field && typeof value === 'number') {
       updateEmployee(id, field, value);
     }
   };
+
+  // Si no hay periodo, mostrar estado de carga
+  if (!currentPeriod) {
+    return (
+      <div className="h-screen flex flex-col bg-gray-50">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-medium text-gray-900">
+                Configurando período de nómina
+              </h3>
+              <p className="text-gray-600">
+                El sistema está detectando el mejor período para ti...
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -52,18 +71,27 @@ export const PayrollLiquidation = () => {
         onUpdatePeriod={updatePeriod}
       />
 
-      {/* Estado de conexión y configuración */}
-      <Card className="mx-6 mb-4 p-4 bg-blue-50 border-blue-200">
+      {/* Estado de conexión mejorado con información inteligente */}
+      <Card className="mx-6 mb-4 p-4 bg-gradient-to-r from-blue-50 to-green-50 border-blue-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Database className="h-5 w-5 text-blue-600" />
+            <div className="p-2 rounded-full bg-white shadow-sm">
+              <Database className="h-5 w-5 text-blue-600" />
+            </div>
             <div>
-              <h3 className="font-medium text-blue-900">Módulo Conectado</h3>
+              <h3 className="font-semibold text-blue-900 flex items-center gap-2">
+                Sistema Inteligente Activo
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              </h3>
               <p className="text-sm text-blue-700">
                 {currentPeriod ? (
-                  <>Período {currentPeriod.tipo_periodo} • Datos cargados desde Supabase • Genera comprobantes automáticamente</>
+                  <>
+                    Período {currentPeriod.tipo_periodo} detectado automáticamente • 
+                    {employees.length} empleados cargados • 
+                    Comprobantes automáticos habilitados
+                  </>
                 ) : (
-                  'Configurando período de nómina...'
+                  'Configurando período de nómina inteligente...'
                 )}
               </p>
             </div>
@@ -97,8 +125,9 @@ export const PayrollLiquidation = () => {
               variant="outline"
               onClick={refreshEmployees}
               disabled={isLoading}
+              className="border-blue-200 hover:bg-blue-50"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Actualizar
             </Button>
           </div>
@@ -123,7 +152,7 @@ export const PayrollLiquidation = () => {
         </div>
       </div>
 
-      {/* Acciones flotantes */}
+      {/* Acciones flotantes mejoradas */}
       <PayrollActions
         onRecalculate={recalculateAll}
         onToggleSummary={() => {}}
