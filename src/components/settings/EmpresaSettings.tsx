@@ -43,6 +43,7 @@ export const EmpresaSettings = () => {
   const [config, setConfig] = useState({
     // Información Básica - ahora mapeada a companyData
     periodicidadPago: '',
+    diasPersonalizados: 30, // Nuevo campo para días personalizados
     centrosCosto: '',
     
     // Información Legal
@@ -70,10 +71,10 @@ export const EmpresaSettings = () => {
 
   // Cargar datos de la empresa al montar el componente
   useEffect(() => {
-    loadCompanyData();
+    loadConfiguration();
   }, []);
 
-  const loadCompanyData = async () => {
+  const loadConfiguration = async () => {
     try {
       setIsLoading(true);
       
@@ -151,17 +152,18 @@ export const EmpresaSettings = () => {
         });
       }
 
-      // Cargar configuración de periodicidad
+      // Cargar configuración de periodicidad y días personalizados
       const { data: settings } = await supabase
         .from('company_settings')
-        .select('*')
+        .select('periodicity, custom_period_days')
         .eq('company_id', profile.company_id)
         .single();
 
       if (settings) {
         setConfig(prev => ({
           ...prev,
-          periodicidadPago: settings.periodicity
+          periodicidadPago: settings.periodicity,
+          diasPersonalizados: settings.custom_period_days || 30
         }));
       }
 
@@ -218,7 +220,8 @@ export const EmpresaSettings = () => {
         .from('company_settings')
         .insert({
           company_id: newCompany.id,
-          periodicity: 'mensual'
+          periodicity: 'mensual',
+          custom_period_days: 30
         });
 
       if (settingsError) {
@@ -227,7 +230,7 @@ export const EmpresaSettings = () => {
       }
 
       // Recargar datos
-      await loadCompanyData();
+      await loadConfiguration();
 
       toast({
         title: "Empresa creada",
@@ -255,6 +258,13 @@ export const EmpresaSettings = () => {
     setConfig(prev => ({
       ...prev,
       [field]: value
+    }));
+  };
+
+  const handleCustomDaysChange = (days: number) => {
+    setConfig(prev => ({
+      ...prev,
+      diasPersonalizados: days
     }));
   };
 
@@ -305,7 +315,7 @@ export const EmpresaSettings = () => {
 
   const handleSave = async () => {
     try {
-      // Validaciones
+      // Validaciones existentes
       const requiredFields = ['razon_social', 'nit', 'ciudad', 'email'];
       const emptyFields = requiredFields.filter(field => !companyData[field as keyof CompanyData]);
       
@@ -343,6 +353,18 @@ export const EmpresaSettings = () => {
           variant: "destructive"
         });
         return;
+      }
+
+      // Validación específica para días personalizados
+      if (config.periodicidadPago === 'personalizado') {
+        if (config.diasPersonalizados < 1 || config.diasPersonalizados > 365) {
+          toast({
+            title: "Días inválidos",
+            description: "Los días del período personalizado deben estar entre 1 y 365.",
+            variant: "destructive"
+          });
+          return;
+        }
       }
 
       setIsLoading(true);
@@ -403,14 +425,21 @@ export const EmpresaSettings = () => {
 
         let settingsResult;
         
+        const updateData: any = {
+          periodicity: config.periodicidadPago,
+          updated_at: new Date().toISOString()
+        };
+
+        // Si es personalizado, incluir los días personalizados
+        if (config.periodicidadPago === 'personalizado') {
+          updateData.custom_period_days = config.diasPersonalizados;
+        }
+        
         if (existingSettings) {
           // Si existe, actualizar
           const { data, error } = await supabase
             .from('company_settings')
-            .update({ 
-              periodicity: config.periodicidadPago,
-              updated_at: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('company_id', profile.company_id)
             .select()
             .single();
@@ -426,7 +455,7 @@ export const EmpresaSettings = () => {
             .from('company_settings')
             .insert({
               company_id: profile.company_id,
-              periodicity: config.periodicidadPago
+              ...updateData
             })
             .select()
             .single();
@@ -465,7 +494,7 @@ export const EmpresaSettings = () => {
   };
 
   const handleRevert = () => {
-    loadCompanyData();
+    loadConfiguration();
     toast({
       title: "Cambios revertidos",
       description: "Se han revertido todos los cambios no guardados.",
@@ -476,6 +505,7 @@ export const EmpresaSettings = () => {
     setConfig(prev => ({
       ...prev,
       periodicidadPago: 'mensual',
+      diasPersonalizados: 30,
       regimenTributario: 'Responsable de IVA'
     }));
     toast({
@@ -605,19 +635,66 @@ export const EmpresaSettings = () => {
             </div>
 
             <div>
-              <Label htmlFor="periodicidadPago">Periodicidad de Pago</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="periodicidadPago">Periodicidad de Pago</Label>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-gray-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Selecciona la frecuencia con la que tu empresa paga la nómina. Esta configuración afecta todos los cálculos del sistema.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Select value={config.periodicidadPago} onValueChange={(value) => handleInputChange('periodicidadPago', value)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Seleccionar periodicidad" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="semanal">Semanal</SelectItem>
-                  <SelectItem value="quincenal">Quincenal</SelectItem>
-                  <SelectItem value="mensual">Mensual</SelectItem>
+                  <SelectItem value="semanal">Semanal (7 días)</SelectItem>
+                  <SelectItem value="quincenal">Quincenal (15 días)</SelectItem>
+                  <SelectItem value="mensual">Mensual (30 días)</SelectItem>
                   <SelectItem value="personalizado">Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Campo para días personalizados - NUEVO */}
+            {config.periodicidadPago === 'personalizado' && (
+              <div className="md:col-span-2">
+                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label htmlFor="diasPersonalizados">Días del período personalizado</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-orange-600" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Define cuántos días abarca cada período de pago en tu empresa. Puede ser cualquier número entre 1 y 365 días.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input
+                    id="diasPersonalizados"
+                    type="number"
+                    value={config.diasPersonalizados}
+                    onChange={(e) => handleCustomDaysChange(parseInt(e.target.value) || 30)}
+                    placeholder="Ej: 45"
+                    min="1"
+                    max="365"
+                    className="max-w-xs"
+                  />
+                  <p className="text-sm text-orange-700 mt-2">
+                    📅 Tu período personalizado será de <strong>{config.diasPersonalizados} días</strong>
+                  </p>
+                  {config.diasPersonalizados > 0 && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      ℹ️ Esto equivale a aproximadamente {Math.round(365 / config.diasPersonalizados)} períodos de pago al año
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="md:col-span-2">
               <div className="flex items-center gap-2">
