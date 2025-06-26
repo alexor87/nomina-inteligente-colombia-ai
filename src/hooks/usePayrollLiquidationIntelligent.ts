@@ -176,7 +176,10 @@ export const usePayrollLiquidationIntelligent = () => {
 
   // Ver último periodo (modo solo lectura)
   const handleViewLastPeriod = useCallback(() => {
-    if (!periodStatus?.currentPeriod) {
+    // Usar el ID correcto del último período liquidado
+    const lastPeriodId = periodStatus?.lastLiquidatedPeriodId || periodStatus?.currentPeriod?.id;
+    
+    if (!lastPeriodId) {
       toast({
         title: "No hay período anterior",
         description: "No se encontró un período anterior para consultar",
@@ -187,22 +190,26 @@ export const usePayrollLiquidationIntelligent = () => {
     
     setShowDialog(false);
     
+    console.log('👁️ Navegando a período anterior:', {
+      periodId: lastPeriodId,
+      esDelHistorial: !!periodStatus?.lastLiquidatedPeriodId
+    });
+    
     // Navegar a la página de detalles del historial de nómina
-    navigate(`/payroll-history/${periodStatus.currentPeriod.id}`);
+    navigate(`/payroll-history/${lastPeriodId}`);
+    
+    // Mensaje específico según el origen del período
+    const periodInfo = periodStatus?.lastLiquidatedPeriod 
+      ? PayrollPeriodService.formatPeriodText(
+          periodStatus.lastLiquidatedPeriod.fecha_inicio, 
+          periodStatus.lastLiquidatedPeriod.fecha_fin
+        )
+      : "período anterior";
     
     toast({
       title: "Consultando período anterior",
-      description: `Mostrando detalles del período ${PayrollPeriodService.formatPeriodText(periodStatus.currentPeriod.fecha_inicio, periodStatus.currentPeriod.fecha_fin)}`,
+      description: `Mostrando detalles del ${periodInfo}`,
       className: "border-blue-200 bg-blue-50"
-    });
-    
-    console.log('👁️ Navegando a período anterior:', {
-      periodId: periodStatus.currentPeriod.id,
-      fechas: {
-        inicio: periodStatus.currentPeriod.fecha_inicio,
-        fin: periodStatus.currentPeriod.fecha_fin
-      },
-      estado: periodStatus.currentPeriod.estado
     });
   }, [periodStatus, toast, navigate]);
 

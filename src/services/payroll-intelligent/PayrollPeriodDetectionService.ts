@@ -1,228 +1,180 @@
-import { supabase } from '@/integrations/supabase/client';
+
 import { PayrollPeriodService, PayrollPeriod } from '../PayrollPeriodService';
 import { PayrollConfigurationService } from './PayrollConfigurationService';
-import { PayrollPeriodCalculationService } from './PayrollPeriodCalculationService';
-import { PayrollAuditEnhancedService } from './PayrollAuditEnhancedService';
-import { PayrollPerformanceService } from './PayrollPerformanceService';
+import { PayrollHistoryService } from '../PayrollHistoryService';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface PeriodStatus {
-  action: 'resume' | 'create_new' | 'configure' | 'error';
-  currentPeriod?: PayrollPeriod;
+  action: 'create' | 'resume' | 'configure' | 'view_last';
+  message: string;
+  currentPeriod?: PayrollPeriod | null;
+  lastLiquidatedPeriod?: PayrollPeriod | null; // Add this for the actual last period
+  lastLiquidatedPeriodId?: string; // ID from payrolls table if different
   nextPeriod?: {
     startDate: string;
     endDate: string;
     type: string;
-  };
-  message: string;
-  title: string;
-  systemMetrics?: Record<string, any>;
+  } | null;
+  hasConfiguration?: boolean;
 }
 
 export class PayrollPeriodDetectionService {
-  // Detectar estado inteligente del módulo de nómina con métricas mejoradas
   static async detectPeriodStatus(): Promise<PeriodStatus> {
-    const startTime = performance.now();
-    
     try {
-      console.log('🔍 Detectando estado inteligente del módulo de nómina...');
-      
+      console.log('🔍 Iniciando detección inteligente de período...');
+
       const companyId = await PayrollPeriodService.getCurrentUserCompanyId();
       if (!companyId) {
-        await PayrollAuditEnhancedService.logEnhancedAction({
-          action: 'detection_failed',
-          entity_type: 'system',
-          details: { reason: 'company_id_not_found' }
-        });
-        
         return {
           action: 'configure',
-          message: 'Para poder liquidar la nómina, primero debes configurar la periodicidad desde el módulo de Configuración.',
-          title: 'Configuración requerida'
+          message: 'No se encontró información de la empresa',
+          hasConfiguration: false
         };
       }
 
-      // Cargar métricas del sistema de forma paralela
-      const [companySettings, activePeriod, systemMetrics] = await Promise.all([
-        PayrollConfigurationService.getCompanySettingsForceRefresh(companyId),
-        this.getActivePeriod(companyId),
-        PayrollPerformanceService.calculateSystemMetrics(companyId)
-      ]);
-
-      // Verificar configuración de empresa
-      if (!companySettings || !companySettings.periodicity) {
-        await PayrollAuditEnhancedService.logEnhancedAction({
-          action: 'configuration_missing',
-          entity_type: 'system',
-          details: { company_id: companyId }
-        });
-
+      // 1. Verificar configuración de periodicidad
+      const config = await PayrollConfigurationService.getOrCreateConfiguration(companyId);
+      if (!config || !config.periodicity) {
+        console.log('❌ No hay configuración de periodicidad');
         return {
           action: 'configure',
-          message: 'Para poder liquidar la nómina, primero debes configurar la periodicidad desde el módulo de Configuración.',
-          title: 'Configuración requerida',
-          systemMetrics
+          message: 'Configura la periodicidad de nómina en Configuración para continuar',
+          hasConfiguration: false
         };
       }
 
-      await PayrollAuditEnhancedService.logEnhancedAction({
-        action: 'configuration_validated',
-        entity_type: 'system',
-        details: { 
-          periodicity: companySettings.periodicity,
-          system_metrics: systemMetrics
-        }
-      });
+      console.log('✅ Configuración encontrada:', config.periodicity);
 
-      // Si hay período activo, validar consistencia
+      // 2. Buscar período activo en payroll_periods
+      const activePeriod = await PayrollPeriodService.getCurrentActivePeriod();
+      
+      // 3. Buscar el último período liquidado (desde payrolls para coincidir con historial)
+      const { lastLiquidatedPeriod, lastLiquidatedPeriodId } = await this.findLastLiquidatedPeriod();
+
       if (activePeriod) {
-        if (activePeriod.tipo_periodo !== companySettings.periodicity) {
-          const lastClosedPeriod = await this.getLastClosedPeriod(companyId);
-          const nextPeriodDates = PayrollPeriodCalculationService.calculateNextPeriod(
-            companySettings.periodicity,
-            lastClosedPeriod
-          );
-
-          const nextPeriodText = PayrollPeriodService.formatPeriodText(
-            nextPeriodDates.startDate,
-            nextPeriodDates.endDate
-          );
-
-          return {
-            action: 'create_new',
-            currentPeriod: activePeriod,
-            nextPeriod: {
-              startDate: nextPeriodDates.startDate,
-              endDate: nextPeriodDates.endDate,
-              type: companySettings.periodicity
-            },
-            message: `Hay un cambio en la configuración de periodicidad. ¿Deseas crear un nuevo período ${companySettings.periodicity} ${nextPeriodText}?`,
-            title: 'Actualizar periodicidad',
-            systemMetrics
-          };
-        }
-
-        // Período activo válido - reanudar
-        const periodText = PayrollPeriodService.formatPeriodText(
-          activePeriod.fecha_inicio, 
-          activePeriod.fecha_fin
-        );
-
-        await PayrollAuditEnhancedService.logEnhancedAction({
-          action: 'resume_period',
-          entity_type: 'period',
-          entity_id: activePeriod.id,
-          details: { 
-            period_type: activePeriod.tipo_periodo,
-            period_dates: periodText
-          }
-        });
-        
+        console.log('📋 Período activo encontrado:', activePeriod.id);
         return {
           action: 'resume',
+          message: `Continúa con el período ${PayrollPeriodService.formatPeriodText(activePeriod.fecha_inicio, activePeriod.fecha_fin)}`,
           currentPeriod: activePeriod,
-          message: `Retomando la nómina ${activePeriod.tipo_periodo} en curso ${periodText}`,
-          title: 'Nómina en curso',
-          systemMetrics
+          lastLiquidatedPeriod,
+          lastLiquidatedPeriodId,
+          hasConfiguration: true
         };
       }
 
-      // No hay período activo - calcular siguiente
-      const lastClosedPeriod = await this.getLastClosedPeriod(companyId);
-      const nextPeriodDates = PayrollPeriodCalculationService.calculateNextPeriod(
-        companySettings.periodicity,
-        lastClosedPeriod
-      );
-
-      if (lastClosedPeriod) {
-        const lastPeriodText = PayrollPeriodService.formatPeriodText(
-          lastClosedPeriod.fecha_inicio,
-          lastClosedPeriod.fecha_fin
-        );
-        const nextPeriodText = PayrollPeriodService.formatPeriodText(
-          nextPeriodDates.startDate,
-          nextPeriodDates.endDate
-        );
-
-        return {
-          action: 'create_new',
-          currentPeriod: lastClosedPeriod,
-          nextPeriod: {
-            startDate: nextPeriodDates.startDate,
-            endDate: nextPeriodDates.endDate,
-            type: companySettings.periodicity
-          },
-          message: `Ya cerraste la nómina ${lastPeriodText}. ¿Deseas iniciar la siguiente nómina ${companySettings.periodicity} ${nextPeriodText}?`,
-          title: 'Iniciar nuevo periodo',
-          systemMetrics
-        };
-      }
-
-      // Primera nómina
-      const nextPeriodText = PayrollPeriodService.formatPeriodText(
-        nextPeriodDates.startDate,
-        nextPeriodDates.endDate
-      );
+      // 4. Si no hay período activo, generar siguiente período
+      const nextPeriodDates = PayrollPeriodService.generatePeriodDates(config.periodicity);
       
+      console.log('📅 Siguiente período calculado:', nextPeriodDates);
+
       return {
-        action: 'create_new',
+        action: 'create',
+        message: lastLiquidatedPeriod 
+          ? `Crear nuevo período de nómina ${PayrollPeriodService.formatPeriodText(nextPeriodDates.startDate, nextPeriodDates.endDate)}`
+          : 'Crear tu primer período de nómina',
+        currentPeriod: null,
+        lastLiquidatedPeriod,
+        lastLiquidatedPeriodId,
         nextPeriod: {
           startDate: nextPeriodDates.startDate,
           endDate: nextPeriodDates.endDate,
-          type: companySettings.periodicity
+          type: config.periodicity
         },
-        message: `¿Deseas iniciar tu primera nómina ${companySettings.periodicity} ${nextPeriodText}?`,
-        title: 'Primera nómina',
-        systemMetrics
+        hasConfiguration: true
       };
 
     } catch (error) {
-      const duration = performance.now() - startTime;
-      
-      await PayrollAuditEnhancedService.logEnhancedAction({
-        action: 'detection_error',
-        entity_type: 'system',
-        details: { 
-          error: error instanceof Error ? error.message : 'Unknown error',
-          duration_ms: duration
-        }
-      });
-
-      console.error('❌ Error detectando estado del periodo:', error);
+      console.error('❌ Error en detección de período:', error);
       return {
-        action: 'error',
-        message: 'Ocurrió un error al verificar el estado de la nómina. Intenta nuevamente.',
-        title: 'Error'
+        action: 'configure',
+        message: 'Error al detectar el estado de la nómina. Verifica la configuración.',
+        hasConfiguration: false
       };
     }
   }
 
-  // Obtener periodo activo (borrador o en proceso)
-  private static async getActivePeriod(companyId: string): Promise<PayrollPeriod | null> {
-    const { data, error } = await supabase
-      .from('payroll_periods')
-      .select('*')
-      .eq('company_id', companyId)
-      .in('estado', ['borrador', 'en_proceso'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  private static async findLastLiquidatedPeriod(): Promise<{
+    lastLiquidatedPeriod: PayrollPeriod | null;
+    lastLiquidatedPeriodId: string | null;
+  }> {
+    try {
+      const companyId = await PayrollPeriodService.getCurrentUserCompanyId();
+      if (!companyId) return { lastLiquidatedPeriod: null, lastLiquidatedPeriodId: null };
 
-    if (error) throw error;
-    return data as PayrollPeriod | null;
-  }
+      console.log('🔍 Buscando último período liquidado...');
 
-  // Obtener último periodo cerrado
-  private static async getLastClosedPeriod(companyId: string): Promise<PayrollPeriod | null> {
-    const { data, error } = await supabase
-      .from('payroll_periods')
-      .select('*')
-      .eq('company_id', companyId)
-      .eq('estado', 'aprobado')
-      .order('fecha_fin', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      // Primero buscar en payrolls (datos reales del historial)
+      const payrollHistory = await PayrollHistoryService.getPayrollPeriods();
+      
+      if (payrollHistory && payrollHistory.length > 0) {
+        console.log('📋 Períodos encontrados en historial:', payrollHistory.length);
+        
+        // Ordenar por fecha de creación (más reciente primero)
+        const sortedHistory = payrollHistory.sort((a, b) => 
+          new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime()
+        );
+        
+        const lastHistoryRecord = sortedHistory[0];
+        console.log('📊 Último período del historial:', lastHistoryRecord.periodo);
 
-    if (error) throw error;
-    return data as PayrollPeriod | null;
+        // Intentar encontrar este período en payroll_periods
+        const { data: payrollPeriods, error } = await supabase
+          .from('payroll_periods')
+          .select('*')
+          .eq('company_id', companyId)
+          .neq('estado', 'borrador')
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (!error && payrollPeriods && payrollPeriods.length > 0) {
+          // Buscar coincidencia por fechas o período
+          const matchingPeriod = payrollPeriods.find(p => {
+            const formattedPeriod = PayrollPeriodService.formatPeriodText(p.fecha_inicio, p.fecha_fin);
+            return formattedPeriod === lastHistoryRecord.periodo;
+          });
+
+          if (matchingPeriod) {
+            console.log('✅ Período encontrado en payroll_periods:', matchingPeriod.id);
+            return {
+              lastLiquidatedPeriod: matchingPeriod as PayrollPeriod,
+              lastLiquidatedPeriodId: matchingPeriod.id
+            };
+          }
+        }
+
+        // Si no se encuentra en payroll_periods, usar el ID del historial
+        console.log('📝 Usando ID del historial:', lastHistoryRecord.id);
+        return {
+          lastLiquidatedPeriod: null,
+          lastLiquidatedPeriodId: lastHistoryRecord.id
+        };
+      }
+
+      // Si no hay historial en payrolls, buscar en payroll_periods cerrados
+      const { data: closedPeriods, error } = await supabase
+        .from('payroll_periods')
+        .select('*')
+        .eq('company_id', companyId)
+        .in('estado', ['cerrada', 'procesada', 'pagada'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && closedPeriods) {
+        console.log('📋 Último período cerrado encontrado:', closedPeriods.id);
+        return {
+          lastLiquidatedPeriod: closedPeriods as PayrollPeriod,
+          lastLiquidatedPeriodId: closedPeriods.id
+        };
+      }
+
+      console.log('ℹ️ No se encontraron períodos liquidados');
+      return { lastLiquidatedPeriod: null, lastLiquidatedPeriodId: null };
+
+    } catch (error) {
+      console.error('❌ Error buscando último período liquidado:', error);
+      return { lastLiquidatedPeriod: null, lastLiquidatedPeriodId: null };
+    }
   }
 }

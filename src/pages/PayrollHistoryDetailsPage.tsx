@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { PayrollHistoryDetails } from '@/components/payroll-history/PayrollHistoryDetails';
@@ -61,59 +60,77 @@ const PayrollHistoryDetailsPage = () => {
       }
       
       // Si no se encuentra en payroll_periods, buscar en el historial de payrolls
+      console.log('📝 Buscando en historial de payrolls...');
       const data = await PayrollHistoryService.getPayrollPeriods();
       const foundRecord = data.find(record => record.id === periodId);
       
       if (!foundRecord) {
-        setError('Período no encontrado');
+        // Intentar buscar por coincidencia parcial del ID (en caso de IDs generados)
+        const possibleMatch = data.find(record => 
+          record.id.includes(periodId) || periodId.includes(record.id)
+        );
+        
+        if (!possibleMatch) {
+          console.log('❌ Período no encontrado en ninguna fuente');
+          setError('Período no encontrado');
+          return;
+        }
+        
+        console.log('📋 Período encontrado por coincidencia:', possibleMatch.periodo);
+        // Usar el registro encontrado por coincidencia
+        const convertedPeriod = this.convertHistoryRecordToPeriod(possibleMatch);
+        setPeriod(convertedPeriod);
         return;
       }
 
-      console.log('📋 Período encontrado en historial:', foundRecord);
-
-      // Convertir el record a PayrollHistoryPeriod format
-      let mappedStatus: 'cerrado' | 'con_errores' | 'revision' = 'revision';
-      
-      switch (foundRecord.estado) {
-        case 'cerrada':
-        case 'procesada':
-        case 'pagada':
-          mappedStatus = 'cerrado';
-          break;
-        case 'borrador':
-          mappedStatus = 'revision';
-          break;
-        default:
-          mappedStatus = 'con_errores';
-          break;
-      }
-
-      const convertedPeriod: PayrollHistoryPeriod = {
-        id: foundRecord.id,
-        period: foundRecord.periodo || 'Sin período',
-        startDate: foundRecord.fechaCreacion || new Date().toISOString().split('T')[0],
-        endDate: foundRecord.fechaCreacion || new Date().toISOString().split('T')[0],
-        type: 'mensual' as const,
-        employeesCount: foundRecord.empleados || 0,
-        status: mappedStatus,
-        totalGrossPay: Number(foundRecord.totalNomina || 0),
-        totalNetPay: Number(foundRecord.totalNomina || 0),
-        totalDeductions: 0,
-        totalCost: Number(foundRecord.totalNomina || 0),
-        employerContributions: 0,
-        paymentStatus: foundRecord.estado === 'pagada' ? 'pagado' as const : 'pendiente' as const,
-        version: 1,
-        createdAt: foundRecord.fechaCreacion || new Date().toISOString(),
-        updatedAt: foundRecord.fechaCreacion || new Date().toISOString(),
-      };
-
+      console.log('📋 Período encontrado en historial:', foundRecord.periodo);
+      const convertedPeriod = this.convertHistoryRecordToPeriod(foundRecord);
       setPeriod(convertedPeriod);
+      
     } catch (error) {
       console.error('❌ Error loading period details:', error);
       setError('Error al cargar los detalles del período');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper method to convert history record to period
+  const convertHistoryRecordToPeriod = (foundRecord: any): PayrollHistoryPeriod => {
+    let mappedStatus: 'cerrado' | 'con_errores' | 'revision' = 'revision';
+    
+    switch (foundRecord.estado) {
+      case 'cerrada':
+      case 'procesada':
+      case 'pagada':
+        mappedStatus = 'cerrado';
+        break;
+      case 'borrador':
+        mappedStatus = 'revision';
+        break;
+      default:
+        mappedStatus = 'con_errores';
+        break;
+    }
+
+    return {
+      id: foundRecord.id,
+      period: foundRecord.periodo || 'Sin período',
+      startDate: foundRecord.fechaCreacion || new Date().toISOString().split('T')[0],
+      endDate: foundRecord.fechaCreacion || new Date().toISOString().split('T')[0],
+      type: 'mensual' as const,
+      employeesCount: foundRecord.empleados || 0,
+      status: mappedStatus,
+      totalGrossPay: Number(foundRecord.totalNomina || 0),
+      totalNetPay: Number(foundRecord.totalNomina || 0),
+      totalDeductions: 0,
+      totalCost: Number(foundRecord.totalNomina || 0),
+      employerContributions: 0,
+      paymentStatus: foundRecord.estado === 'pagada' ? 'pagado' as const : 'pendiente' as const,
+      version: 1,
+      createdAt: foundRecord.fechaCreacion || new Date().toISOString(),
+      updatedAt: foundRecord.fechaCreacion || new Date().toISOString(),
+    };
   };
 
   const handleBack = () => {
