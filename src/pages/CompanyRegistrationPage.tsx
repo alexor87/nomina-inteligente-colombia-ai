@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Check, Loader2 } from 'lucide-react';
+import { Building2, Check, Loader2, AlertCircle } from 'lucide-react';
 import { CompanyService, CompanyRegistrationWithUser } from '@/services/CompanyService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const CompanyRegistrationPage = () => {
   const [formData, setFormData] = useState<CompanyRegistrationWithUser>({
@@ -25,6 +27,7 @@ export const CompanyRegistrationPage = () => {
     last_name: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { refreshUserData } = useAuth();
@@ -88,7 +91,7 @@ export const CompanyRegistrationPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🚀 Form submitted with data:', formData);
+    console.log('🚀 Starting user registration process...');
     
     // Validar formulario
     const validationErrors = validateForm();
@@ -102,13 +105,14 @@ export const CompanyRegistrationPage = () => {
     }
 
     setIsLoading(true);
+    setShowAlert(false);
 
     try {
       console.log('🔧 Starting company registration process...');
       
       // Mostrar progreso al usuario
       toast({
-        title: "Creando cuenta...",
+        title: "Procesando registro...",
         description: "Por favor espera mientras configuramos tu empresa.",
       });
 
@@ -133,11 +137,19 @@ export const CompanyRegistrationPage = () => {
       
       // Manejar errores específicos con mensajes más claros
       let errorMessage = "Ha ocurrido un error inesperado al crear la empresa";
+      let showEmailAlert = false;
       
-      if (error.message?.includes('User already registered') || 
+      if (error.message?.includes('ya tiene una empresa registrada')) {
+        errorMessage = error.message;
+        showEmailAlert = true;
+      } else if (error.message?.includes('Ya existe una cuenta con este email')) {
+        errorMessage = "Ya existe una cuenta con este email. Si ya tienes una cuenta, inicia sesión. Si olvidaste tu contraseña, puedes restablecerla.";
+        showEmailAlert = true;
+      } else if (error.message?.includes('User already registered') || 
           error.message?.includes('already been registered') ||
           error.message?.includes('User already exists')) {
-        errorMessage = "Ya existe un usuario registrado con este email. Intenta iniciar sesión.";
+        errorMessage = "Ya existe un usuario registrado con este email. Intenta iniciar sesión o usa un email diferente.";
+        showEmailAlert = true;
       } else if (error.message?.includes('Invalid email')) {
         errorMessage = "El formato del email no es válido";
       } else if (error.message?.includes('Password should be at least 6 characters')) {
@@ -150,6 +162,10 @@ export const CompanyRegistrationPage = () => {
         errorMessage = "Por favor confirma tu email antes de continuar";
       } else if (error.message) {
         errorMessage = error.message;
+      }
+      
+      if (showEmailAlert) {
+        setShowAlert(true);
       }
       
       toast({
@@ -165,6 +181,9 @@ export const CompanyRegistrationPage = () => {
   const handleInputChange = (field: keyof CompanyRegistrationWithUser, value: string) => {
     console.log(`Updating ${field} to:`, value);
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'user_email') {
+      setShowAlert(false);
+    }
   };
 
   return (
@@ -188,6 +207,20 @@ export const CompanyRegistrationPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {showAlert && (
+                <Alert className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Si ya tienes una cuenta, puedes <button 
+                      onClick={() => navigate('/auth')}
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      iniciar sesión aquí
+                    </button>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Datos del Usuario Administrador */}
                 <div className="border-b pb-4 mb-4">

@@ -37,49 +37,83 @@ export class CompanyService {
   static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
     try {
       console.log('🚀 Starting complete company registration process...');
-      
-      // Primero registrar el usuario
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      let userId: string;
+      let isNewUser = false;
+
+      // Primero intentar iniciar sesión para verificar si el usuario ya existe
+      console.log('🔍 Checking if user already exists...');
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: data.user_email,
-        password: data.user_password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            first_name: data.first_name,
-            last_name: data.last_name
-          }
-        }
+        password: data.user_password
       });
 
-      if (signUpError) {
-        console.error('❌ Sign up error:', signUpError);
-        throw new Error(`Error al registrar usuario: ${signUpError.message}`);
-      }
-      
-      if (!authData.user) {
-        throw new Error('Error al crear usuario - no se recibió información del usuario');
-      }
-
-      console.log('✅ User registered successfully:', authData.user.id);
-
-      // Verificar si necesitamos confirmar email
-      if (!authData.session) {
-        console.log('📧 Email confirmation required, proceeding with user creation...');
+      if (signInData.user && !signInError) {
+        // Usuario ya existe y las credenciales son correctas
+        console.log('✅ Existing user authenticated:', signInData.user.id);
+        userId = signInData.user.id;
         
-        // Intentar iniciar sesión para obtener sesión
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        // Verificar si el usuario ya tiene una empresa
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', userId)
+          .single();
+
+        if (existingProfile?.company_id) {
+          throw new Error('Este usuario ya tiene una empresa registrada. Use su cuenta existente o contacte soporte.');
+        }
+      } else if (signInError && signInError.message.includes('Invalid login credentials')) {
+        // Usuario no existe o credenciales incorrectas, intentar registrar
+        console.log('👤 User does not exist, attempting registration...');
+        
+        const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: data.user_email,
-          password: data.user_password
+          password: data.user_password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              first_name: data.first_name,
+              last_name: data.last_name
+            }
+          }
         });
 
-        if (signInError && !signInError.message.includes('Email not confirmed')) {
-          console.error('❌ Sign in error:', signInError);
-          throw new Error(`Error al iniciar sesión: ${signInError.message}`);
+        if (signUpError) {
+          console.error('❌ Sign up error:', signUpError);
+          if (signUpError.message.includes('User already registered')) {
+            throw new Error('Ya existe una cuenta con este email. Intente iniciar sesión o use un email diferente.');
+          }
+          throw new Error(`Error al registrar usuario: ${signUpError.message}`);
+        }
+        
+        if (!authData.user) {
+          throw new Error('Error al crear usuario - no se recibió información del usuario');
         }
 
-        if (signInData.session) {
-          console.log('✅ Session obtained after sign in');
+        userId = authData.user.id;
+        isNewUser = true;
+        console.log('✅ New user registered successfully:', userId);
+
+        // Si es un nuevo usuario y no tiene sesión, intentar iniciar sesión
+        if (!authData.session) {
+          console.log('📧 Email confirmation may be required, attempting sign in...');
+          const { data: postSignInData, error: postSignInError } = await supabase.auth.signInWithPassword({
+            email: data.user_email,
+            password: data.user_password
+          });
+
+          if (postSignInError && !postSignInError.message.includes('Email not confirmed')) {
+            console.error('❌ Post-signup sign in error:', postSignInError);
+            throw new Error(`Error al iniciar sesión después del registro: ${postSignInError.message}`);
+          }
+
+          if (postSignInData.session) {
+            console.log('✅ Session obtained after sign in');
+          }
         }
+      } else {
+        // Otro tipo de error de autenticación
+        throw new Error(`Error de autenticación: ${signInError?.message || 'Error desconocido'}`);
       }
 
       // Crear la empresa usando la función RPC
@@ -103,14 +137,14 @@ export class CompanyService {
       console.log('✅ Company created successfully:', companyId);
       
       // Esperar un momento para que se procesen los triggers
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Verificar y crear perfil manualmente si es necesario
+      // Verificación y creación manual de perfil si es necesario
       console.log('👤 Ensuring user profile exists...');
       const { data: existingProfile, error: profileCheckError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', authData.user.id)
+        .eq('user_id', userId)
         .single();
 
       if (profileCheckError && profileCheckError.code === 'PGRST116') {
@@ -119,7 +153,7 @@ export class CompanyService {
         const { error: createProfileError } = await supabase
           .from('profiles')
           .insert({
-            user_id: authData.user.id,
+            user_id: userId,
             first_name: data.first_name,
             last_name: data.last_name,
             company_id: companyId
@@ -127,7 +161,6 @@ export class CompanyService {
         
         if (createProfileError) {
           console.error('❌ Profile creation error:', createProfileError);
-          // No fallar aquí, intentar continuar
         } else {
           console.log('✅ Profile created successfully');
         }
@@ -136,8 +169,12 @@ export class CompanyService {
         console.log('🔧 Updating existing profile with company...');
         const { error: updateProfileError } = await supabase
           .from('profiles')
-          .update({ company_id: companyId })
-          .eq('user_id', authData.user.id);
+          .update({ 
+            company_id: companyId,
+            first_name: data.first_name,
+            last_name: data.last_name
+          })
+          .eq('user_id', userId);
         
         if (updateProfileError) {
           console.error('❌ Profile update error:', updateProfileError);
@@ -146,12 +183,12 @@ export class CompanyService {
         }
       }
 
-      // Verificar y crear rol de administrador manualmente
+      // Verificación y creación manual de rol de administrador
       console.log('👥 Ensuring admin role exists...');
       const { data: existingRole, error: roleCheckError } = await supabase
         .from('user_roles')
         .select('*')
-        .eq('user_id', authData.user.id)
+        .eq('user_id', userId)
         .eq('company_id', companyId)
         .eq('role', 'administrador')
         .single();
@@ -162,16 +199,16 @@ export class CompanyService {
         const { error: createRoleError } = await supabase
           .from('user_roles')
           .insert({
-            user_id: authData.user.id,
+            user_id: userId,
             role: 'administrador',
             company_id: companyId,
-            assigned_by: authData.user.id
+            assigned_by: userId
           });
         
         if (createRoleError) {
           console.error('❌ Role creation error:', createRoleError);
-          // Intentar una vez más con función de utilidad
-          await forceAssignAdminRole(authData.user.id, companyId);
+          // Intentar con función de utilidad como respaldo
+          await forceAssignAdminRole(userId, companyId);
         } else {
           console.log('✅ Admin role created successfully');
         }
@@ -182,20 +219,21 @@ export class CompanyService {
       const { data: finalProfile } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', authData.user.id)
+        .eq('user_id', userId)
         .single();
 
       const { data: finalRole } = await supabase
         .from('user_roles')
         .select('*')
-        .eq('user_id', authData.user.id)
+        .eq('user_id', userId)
         .eq('company_id', companyId)
         .single();
 
       console.log('📊 Final verification results:', {
         profile: finalProfile,
         role: finalRole,
-        companyId
+        companyId,
+        isNewUser
       });
 
       return companyId;
