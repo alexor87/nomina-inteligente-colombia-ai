@@ -15,6 +15,7 @@ import EmployeesPage from '@/pages/EmployeesPage';
 import PayrollPage from '@/pages/PayrollPage';
 import PayrollBackendPage from '@/pages/PayrollBackendPage';
 import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
+import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
 import VouchersPage from '@/pages/VouchersPage';
 import PaymentsPage from '@/pages/PaymentsPage';
 import ReportsPage from '@/pages/ReportsPage';
@@ -89,6 +90,14 @@ function App() {
                 <ProtectedRoute requiredModule="payroll-history">
                   <Layout>
                     <PayrollHistoryPage />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/payroll-history/:periodId" element={
+                <ProtectedRoute requiredModule="payroll-history">
+                  <Layout>
+                    <PayrollHistoryDetailsPage />
                   </Layout>
                 </ProtectedRoute>
               } />

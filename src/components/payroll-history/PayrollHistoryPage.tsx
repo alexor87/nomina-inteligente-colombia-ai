@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
-import { PayrollHistoryDetails } from './PayrollHistoryDetails';
 import { ReopenDialog } from './ReopenDialog';
 import { EditWizard } from './EditWizard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,11 +16,11 @@ import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useEffect } from 'react';
 
 export const PayrollHistoryPage = () => {
+  const navigate = useNavigate();
   const [periods, setPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<PayrollHistoryPeriod | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
   const [showReopenDialog, setShowReopenDialog] = useState(false);
   const [showEditWizard, setShowEditWizard] = useState(false);
   const [filters, setFilters] = useState<FiltersType>({
@@ -137,8 +137,7 @@ export const PayrollHistoryPage = () => {
   };
 
   const handleViewDetails = (period: PayrollHistoryPeriod) => {
-    setSelectedPeriod(period);
-    setShowDetails(true);
+    navigate(`/payroll-history/${period.id}`);
   };
 
   const handleReopenPeriod = (period: PayrollHistoryPeriod) => {
@@ -309,16 +308,6 @@ export const PayrollHistoryPage = () => {
       </div>
 
       {/* Modals */}
-      {showDetails && selectedPeriod && (
-        <PayrollHistoryDetails
-          period={selectedPeriod}
-          onBack={() => {
-            setShowDetails(false);
-            setSelectedPeriod(null);
-          }}
-        />
-      )}
-
       {showReopenDialog && selectedPeriod && (
         <ReopenDialog
           isOpen={showReopenDialog}
