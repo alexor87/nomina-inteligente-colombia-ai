@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
@@ -312,7 +311,7 @@ export const PayrollHistoryPage = () => {
         />
       )}
 
-      {showEditWizard && selectedPeriod && (
+      {showEditWizard && (
         <EditWizard
           isOpen={showEditWizard}
           onClose={() => {
@@ -320,7 +319,6 @@ export const PayrollHistoryPage = () => {
             setSelectedPeriod(null);
           }}
           onConfirm={handleEditWizardComplete}
-          period={selectedPeriod}
           isProcessing={isProcessing}
         />
       )}
