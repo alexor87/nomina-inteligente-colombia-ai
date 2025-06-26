@@ -319,8 +319,9 @@ export const PayrollHistoryPage = () => {
             setShowEditWizard(false);
             setSelectedPeriod(null);
           }}
-          onComplete={handleEditWizardComplete}
+          onConfirm={handleEditWizardComplete}
           period={selectedPeriod}
+          isProcessing={isProcessing}
         />
       )}
     </div>
