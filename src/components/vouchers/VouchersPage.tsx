@@ -1,7 +1,7 @@
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { VoucherHeader } from './VoucherHeader';
-import { VoucherFilters } from './VoucherFilters';
+import { VoucherFiltersComponent } from './VoucherFilters';
 import { VoucherTable } from './VoucherTable';
 import { VoucherBulkActions } from './VoucherBulkActions';
 import { VoucherSummaryCards } from './VoucherSummaryCards';
@@ -57,26 +57,25 @@ export const VouchersPage = () => {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gray-50">
-        <VoucherHeader 
-          totalVouchers={allVouchers.length}
-          filteredVouchers={vouchers.length}
-        />
+        <VoucherHeader />
         
         <div className="p-6 space-y-6">
           <VoucherSummaryCards summary={summary} />
           
-          <VoucherFilters
+          <VoucherFiltersComponent
             filters={filters}
-            onFiltersChange={updateFilters}
+            onUpdateFilters={updateFilters}
             onClearFilters={clearFilters}
-            vouchers={allVouchers}
+            totalCount={allVouchers.length}
+            filteredCount={vouchers.length}
           />
 
           {selectedVouchers.length > 0 && (
             <VoucherBulkActions
               selectedCount={selectedVouchers.length}
-              onDownload={downloadSelectedVouchers}
-              onSendEmail={sendSelectedVouchersByEmail}
+              onDownloadSelected={downloadSelectedVouchers}
+              onSendSelected={sendSelectedVouchersByEmail}
+              onDeselectAll={() => {}}
             />
           )}
 
