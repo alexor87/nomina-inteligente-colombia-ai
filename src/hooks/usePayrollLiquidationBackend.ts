@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationBackendService } from '@/services/PayrollLiquidationBackendService';
@@ -88,7 +87,6 @@ export const usePayrollLiquidationBackend = () => {
         grossPay: emp.grossPay
       })));
       
-      // Transform loaded employees to match PayrollEmployee interface
       const transformedEmployees: PayrollEmployee[] = loadedEmployees.map(emp => ({
         id: emp.id,
         name: emp.name,
@@ -136,6 +134,60 @@ export const usePayrollLiquidationBackend = () => {
     }
   }, [toast, currentPeriod]);
 
+  const deleteEmployee = useCallback(async (employeeId: string) => {
+    if (!currentPeriod || currentPeriod.estado !== 'borrador') {
+      toast({
+        title: "Período no editable",
+        description: "Solo se pueden eliminar empleados en períodos en estado borrador",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
+      
+      toast({
+        title: "Empleado eliminado",
+        description: "El empleado ha sido eliminado de la nómina"
+      });
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      toast({
+        title: "Error al eliminar empleado",
+        description: "No se pudo eliminar el empleado",
+        variant: "destructive"
+      });
+    }
+  }, [currentPeriod, toast]);
+
+  const deleteMultipleEmployees = useCallback(async (employeeIds: string[]) => {
+    if (!currentPeriod || currentPeriod.estado !== 'borrador') {
+      toast({
+        title: "Período no editable",
+        description: "Solo se pueden eliminar empleados en períodos en estado borrador",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setEmployees(prev => prev.filter(emp => !employeeIds.includes(emp.id)));
+      
+      toast({
+        title: "Empleados eliminados",
+        description: `Se eliminaron ${employeeIds.length} empleados de la nómina`
+      });
+    } catch (error) {
+      console.error('Error deleting multiple employees:', error);
+      toast({
+        title: "Error al eliminar empleados",
+        description: "No se pudieron eliminar los empleados",
+        variant: "destructive"
+      });
+    }
+  }, [currentPeriod, toast]);
+
   useEffect(() => {
     initializePeriod();
   }, [initializePeriod]);
@@ -169,7 +221,6 @@ export const usePayrollLiquidationBackend = () => {
         return emp;
       }));
 
-      // Recalcular empleado específico usando backend
       const employeeToUpdate = employees.find(emp => emp.id === id);
       if (employeeToUpdate) {
         const updated = convertToBaseEmployeeData(employeeToUpdate);
@@ -239,7 +290,6 @@ export const usePayrollLiquidationBackend = () => {
           });
         }
 
-        // Recalcular empleados con el nuevo período usando backend
         const recalculatedEmployees = await Promise.all(
           employees.map(async (emp) => {
             const baseData = convertToBaseEmployeeData(emp);
@@ -272,10 +322,8 @@ export const usePayrollLiquidationBackend = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Reload employees to get fresh novedades data
       const recalculatedEmployees = await PayrollLiquidationBackendService.loadEmployeesForLiquidation();
       
-      // Transform the employees to match PayrollEmployee interface
       const transformedEmployees: PayrollEmployee[] = recalculatedEmployees.map(emp => ({
         id: emp.id,
         name: emp.name,
@@ -388,6 +436,8 @@ export const usePayrollLiquidationBackend = () => {
     updatePeriod,
     recalculateAll,
     approvePeriod,
-    refreshEmployees: loadEmployees
+    refreshEmployees: loadEmployees,
+    deleteEmployee,
+    deleteMultipleEmployees
   };
 };

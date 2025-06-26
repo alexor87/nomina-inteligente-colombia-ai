@@ -19,15 +19,14 @@ export const PayrollLiquidationBackend = () => {
     recalculateAll,
     approvePeriod,
     refreshEmployees,
-    isLoading
+    isLoading,
+    deleteEmployee,
+    deleteMultipleEmployees
   } = usePayrollLiquidationBackend();
 
   const validEmployeeCount = employees.filter(emp => emp.status === 'valid').length;
 
-  // Wrapper function to match PayrollTable's expected signature
   const handleUpdateEmployee = (id: string, updates: Partial<any>) => {
-    // For now, we'll handle the most common update pattern
-    // In the future, this could be expanded to handle multiple field updates
     const field = Object.keys(updates)[0];
     const value = updates[field];
     if (field && typeof value === 'number') {
@@ -69,6 +68,8 @@ export const PayrollLiquidationBackend = () => {
           canEdit={canEdit}
           periodoId={currentPeriod?.id || ''}
           onRefreshEmployees={refreshEmployees}
+          onDeleteEmployee={deleteEmployee}
+          onDeleteMultipleEmployees={deleteMultipleEmployees}
         />
       </div>
     </div>
