@@ -30,6 +30,9 @@ export class PayrollValidationService {
         return validations;
       }
 
+      console.log('🔍 Validando período para empresa:', companyId);
+      console.log('📅 Fechas del nuevo período:', { startDate, endDate, periodType });
+
       // 1. Validar empleados activos
       const { data: employees, error: empError } = await supabase
         .from('employees')
@@ -77,23 +80,60 @@ export class PayrollValidationService {
         });
       }
 
-      // 4. Validar superposición de períodos
-      const { data: overlappingPeriods } = await supabase
+      // 4. VALIDACIÓN MEJORADA DE SUPERPOSICIÓN DE PERÍODOS
+      console.log('🔍 Buscando períodos existentes para detectar superposición...');
+      
+      // Primero verificar si hay períodos existentes
+      const { data: allPeriods, error: allPeriodsError } = await supabase
         .from('payroll_periods')
-        .select('id, fecha_inicio, fecha_fin, estado')
-        .eq('company_id', companyId)
-        .or(`fecha_inicio.lte.${endDate},fecha_fin.gte.${startDate}`);
+        .select('id, fecha_inicio, fecha_fin, estado, tipo_periodo')
+        .eq('company_id', companyId);
 
-      if (overlappingPeriods && overlappingPeriods.length > 0) {
-        const activePeriods = overlappingPeriods.filter(p => p.estado !== 'cancelado');
-        if (activePeriods.length > 0) {
+      if (allPeriodsError) {
+        console.error('❌ Error consultando períodos:', allPeriodsError);
+        throw allPeriodsError;
+      }
+
+      console.log('📊 Períodos encontrados en la empresa:', allPeriods?.length || 0);
+      if (allPeriods && allPeriods.length > 0) {
+        console.log('📋 Períodos existentes:', allPeriods);
+      }
+
+      // Solo validar superposición si hay períodos existentes
+      if (allPeriods && allPeriods.length > 0) {
+        // Buscar períodos que se superponen usando lógica mejorada
+        const overlappingPeriods = allPeriods.filter(period => {
+          const periodStart = new Date(period.fecha_inicio).getTime();
+          const periodEnd = new Date(period.fecha_fin).getTime();
+          const newStart = new Date(startDate).getTime();
+          const newEnd = new Date(endDate).getTime();
+          
+          // Un período se superpone si:
+          // 1. El nuevo período empieza antes de que termine el existente Y
+          // 2. El nuevo período termina después de que empiece el existente
+          const overlaps = newStart <= periodEnd && newEnd >= periodStart;
+          
+          if (overlaps) {
+            console.log('⚠️ Superposición detectada con período:', {
+              existente: { inicio: period.fecha_inicio, fin: period.fecha_fin, estado: period.estado },
+              nuevo: { inicio: startDate, fin: endDate }
+            });
+          }
+          
+          return overlaps && period.estado !== 'cancelado';
+        });
+
+        if (overlappingPeriods.length > 0) {
+          const conflictPeriod = overlappingPeriods[0];
           validations.push({
             type: 'error',
             message: 'Período se superpone con otros existentes',
-            details: `Hay ${activePeriods.length} período(s) que se superponen con las fechas seleccionadas`,
-            count: activePeriods.length
+            details: `El período del ${startDate} al ${endDate} se superpone con el período existente del ${conflictPeriod.fecha_inicio} al ${conflictPeriod.fecha_fin} (estado: ${conflictPeriod.estado})`,
+            count: overlappingPeriods.length
           });
         }
+      } else {
+        console.log('✅ No hay períodos existentes, no es necesario validar superposición');
       }
 
       // 5. Validar novedades pendientes del período anterior
@@ -138,18 +178,25 @@ export class PayrollValidationService {
       if (!hasErrors) {
         validations.push({
           type: 'success',
-          message: 'Validaciones completadas',
+          message: 'Validaciones completadas exitosamente',
           details: `${employees.length} empleados listos para liquidación`,
           count: employees.length
         });
       }
 
+      console.log('📊 Resultado de validaciones:', {
+        total: validations.length,
+        errores: validations.filter(v => v.type === 'error').length,
+        advertencias: validations.filter(v => v.type === 'warning').length,
+        éxitos: validations.filter(v => v.type === 'success').length
+      });
+
     } catch (error) {
-      console.error('❌ Error en validaciones:', error);
+      console.error('❌ Error en validaciones del sistema:', error);
       validations.push({
         type: 'error',
         message: 'Error en validaciones del sistema',
-        details: 'Contacta al administrador si el problema persiste'
+        details: `Error técnico: ${error instanceof Error ? error.message : 'Error desconocido'}. Contacta al administrador si el problema persiste.`
       });
     }
 
