@@ -19,20 +19,21 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const { roles } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Changed to true to hide by default
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  // Handle click outside sidebar
+  // Handle click outside sidebar on mobile
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         sidebarRef.current &&
         !sidebarRef.current.contains(event.target as Node) &&
-        !sidebarCollapsed
+        !sidebarCollapsed &&
+        window.innerWidth < 768 // Only on mobile
       ) {
         setSidebarCollapsed(true);
       }
@@ -50,7 +51,11 @@ export const Layout = ({ children }: LayoutProps) => {
         <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       </div>
       
-      <div className="flex-1 flex flex-col min-w-0">
+      <div 
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+          sidebarCollapsed ? 'ml-16' : 'ml-64'
+        }`}
+      >
         <Header />
         
         <main className="flex-1 p-6">

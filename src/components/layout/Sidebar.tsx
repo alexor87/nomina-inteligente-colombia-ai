@@ -52,10 +52,10 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
   return (
     <div className={cn(
-      "bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out",
+      "bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out fixed top-0 left-0 h-screen z-50",
       collapsed ? "w-16" : "w-64"
     )}>
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 min-h-[64px]">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 min-h-[64px] flex-shrink-0">
         {!collapsed && (
           <>
             <div className="flex items-center space-x-2">
@@ -77,7 +77,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         )}
       </div>
 
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {filteredNavigation.map((item) => {
           const isActive = location.pathname === item.href;
           return (
