@@ -1,5 +1,5 @@
 
-import { SettingsPage } from './SettingsPage';
+import SettingsPage from './SettingsPage';
 
 const CompanySettingsPage = () => {
   return <SettingsPage />;
