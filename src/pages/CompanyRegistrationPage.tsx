@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Check, Loader2 } from 'lucide-react';
+import { Building2, Check, Loader2, TestTube } from 'lucide-react';
 import { CompanyService, CompanyRegistrationWithUser } from '@/services/CompanyService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +26,7 @@ export const CompanyRegistrationPage = () => {
     last_name: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { refreshUserData } = useAuth();
@@ -55,6 +57,36 @@ export const CompanyRegistrationPage = () => {
       features: ['Soporte prioritario', 'Reportes personalizados', 'API completa', 'Consultoría incluida']
     }
   ];
+
+  const testRpcConnection = async () => {
+    setIsTesting(true);
+    try {
+      console.log('🧪 Starting RPC connection test...');
+      const isConnected = await CompanyService.testRpcConnection();
+      
+      if (isConnected) {
+        toast({
+          title: "✅ Conexión RPC exitosa",
+          description: "La conexión con la base de datos funciona correctamente",
+        });
+      } else {
+        toast({
+          title: "❌ Error de conexión RPC",
+          description: "Hay un problema con la conexión a la base de datos",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('💥 RPC test error:', error);
+      toast({
+        title: "❌ Error al probar conexión",
+        description: "No se pudo verificar la conexión RPC",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,6 +217,28 @@ export const CompanyRegistrationPage = () => {
             <h1 className="text-3xl font-bold text-gray-900">Registra tu Empresa</h1>
           </div>
           <p className="text-gray-600">Únete a miles de empresas que confían en nuestra plataforma de nómina</p>
+          
+          {/* Botón de prueba RPC */}
+          <div className="mt-4">
+            <Button 
+              onClick={testRpcConnection}
+              disabled={isTesting}
+              variant="outline"
+              size="sm"
+            >
+              {isTesting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Probando conexión...
+                </>
+              ) : (
+                <>
+                  <TestTube className="mr-2 h-4 w-4" />
+                  Probar conexión RPC
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -248,7 +302,6 @@ export const CompanyRegistrationPage = () => {
                   </div>
                 </div>
 
-                {/* Datos de la Empresa */}
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3">Datos de la Empresa</h4>
                   <div>

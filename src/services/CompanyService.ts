@@ -35,7 +35,15 @@ export class CompanyService {
   // Crear nueva empresa con usuario (para registro completo)
   static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
     try {
-      console.log('Starting user registration process...');
+      console.log('🚀 Starting user registration process...');
+      console.log('📝 Registration data:', {
+        nit: data.nit,
+        razon_social: data.razon_social,
+        email: data.email,
+        user_email: data.user_email,
+        plan: data.plan,
+        ciudad: data.ciudad
+      });
       
       // Primero registrar el usuario
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -50,7 +58,7 @@ export class CompanyService {
       });
 
       if (signUpError) {
-        console.error('Sign up error:', signUpError);
+        console.error('❌ Sign up error:', signUpError);
         throw signUpError;
       }
       
@@ -58,7 +66,7 @@ export class CompanyService {
         throw new Error('Error al crear usuario - no se recibió información del usuario');
       }
 
-      console.log('User registered successfully:', authData.user.id);
+      console.log('✅ User registered successfully:', authData.user.id);
 
       // Ahora necesitamos iniciar sesión para poder crear la empresa
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -67,14 +75,18 @@ export class CompanyService {
       });
 
       if (signInError) {
-        console.error('Sign in error:', signInError);
+        console.error('❌ Sign in error:', signInError);
         throw signInError;
       }
 
-      console.log('User signed in successfully');
+      console.log('✅ User signed in successfully');
 
-      // Crear la empresa usando la función RPC con TODOS los parámetros requeridos
-      const { data: result, error } = await supabase.rpc('create_company_with_setup', {
+      // Verificar que el usuario esté autenticado
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      console.log('🔍 Current user verification:', currentUser?.id);
+
+      // Preparar parámetros para la función RPC
+      const rpcParams = {
         p_nit: data.nit,
         p_razon_social: data.razon_social,
         p_email: data.email,
@@ -85,14 +97,32 @@ export class CompanyService {
         p_user_password: data.user_password,
         p_first_name: data.first_name,
         p_last_name: data.last_name
-      });
+      };
+
+      console.log('📤 Calling RPC with params:', rpcParams);
+
+      // Crear la empresa usando la función RPC con TODOS los parámetros requeridos
+      const { data: result, error } = await supabase.rpc('create_company_with_setup', rpcParams);
+
+      console.log('📥 RPC Response:', { result, error });
 
       if (error) {
-        console.error('Company creation error:', error);
+        console.error('❌ Company creation error:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
 
-      console.log('Company created successfully:', result);
+      if (!result) {
+        console.error('❌ No result returned from RPC function');
+        throw new Error('No se recibió respuesta de la función de creación de empresa');
+      }
+
+      console.log('✅ Company created successfully with id:', result);
       
       // Esperar para que se procesen los triggers
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -107,8 +137,49 @@ export class CompanyService {
 
       return result;
     } catch (error) {
-      console.error('Error creating company with user:', error);
+      console.error('💥 Error creating company with user:', error);
+      
+      // Log más detalles del error
+      if (error instanceof Error) {
+        console.error('💥 Error message:', error.message);
+        console.error('💥 Error stack:', error.stack);
+      }
+      
+      // Si es un error de Supabase, logar detalles adicionales
+      if (error && typeof error === 'object' && 'code' in error) {
+        console.error('💥 Supabase error code:', (error as any).code);
+        console.error('💥 Supabase error details:', (error as any).details);
+        console.error('💥 Supabase error hint:', (error as any).hint);
+      }
+      
       throw new Error(error instanceof Error ? error.message : 'Error al crear la empresa');
+    }
+  }
+
+  // Función para probar la conexión RPC directamente
+  static async testRpcConnection(): Promise<boolean> {
+    try {
+      console.log('🧪 Testing RPC connection...');
+      
+      // Verificar que el usuario esté autenticado
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('🔍 Current user for RPC test:', user?.id);
+      
+      // Intentar llamar a una función RPC simple para verificar conectividad
+      const { data, error } = await supabase.rpc('get_current_user_company_id');
+      
+      console.log('🧪 RPC test result:', { data, error });
+      
+      if (error) {
+        console.error('❌ RPC test failed:', error);
+        return false;
+      }
+      
+      console.log('✅ RPC connection test successful');
+      return true;
+    } catch (error) {
+      console.error('💥 RPC test error:', error);
+      return false;
     }
   }
 
