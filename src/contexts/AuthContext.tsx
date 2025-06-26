@@ -1,8 +1,8 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { performCompleteRoleCheck } from '@/utils/roleUtils';
+import { useNavigate } from 'react-router-dom';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
@@ -257,17 +257,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    
+    // Si el login es exitoso, redirigir automáticamente al dashboard
+    if (!error && data.user) {
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1000);
+    }
+    
     return { error };
   };
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = `${window.location.origin}/dashboard`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -278,6 +286,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     });
+    
+    // Si el registro es exitoso, intentar asignar rol de admin automáticamente
+    if (!error && data.user) {
+      console.log('🔧 New user registered, attempting to assign admin role...');
+      setTimeout(async () => {
+        try {
+          await performCompleteRoleCheck(data.user.id);
+          console.log('✅ Admin role assigned to new user');
+          // Redirigir al dashboard después del registro
+          window.location.href = '/dashboard';
+        } catch (roleError) {
+          console.error('❌ Error assigning role to new user:', roleError);
+        }
+      }, 2000);
+    }
+    
     return { error };
   };
 
