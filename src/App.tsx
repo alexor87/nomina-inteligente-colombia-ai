@@ -1,28 +1,33 @@
-
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Layout } from '@/components/layout/Layout';
 
-// Fix imports to use default exports
-import { Index } from '@/pages/Index';
-import AuthPage from '@/pages/AuthPage';
+// Auth components
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import VerifyEmailPage from '@/pages/VerifyEmailPage';
+import LogoutPage from '@/pages/LogoutPage';
+
+// Pages
 import DashboardPage from '@/pages/DashboardPage';
+import PayrollIntelligentSilentPage from '@/pages/PayrollIntelligentSilentPage';
 import EmployeesPage from '@/pages/EmployeesPage';
-import PayrollIntelligentPage from '@/pages/PayrollIntelligentPage';
+import SettingsPage from '@/pages/SettingsPage';
 import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
 import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
-import VouchersPage from '@/pages/VouchersPage';
-import PaymentsPage from '@/pages/PaymentsPage';
-import ReportsPage from '@/pages/ReportsPage';
-import SettingsPage from '@/pages/SettingsPage';
-import { CompanyRegistrationPage } from '@/pages/CompanyRegistrationPage';
-import { SuperAdminPage } from '@/pages/SuperAdminPage';
-import { SupportBackofficePage } from '@/pages/SupportBackofficePage';
-import NotFound from '@/pages/NotFound';
+import CompanySettingsPage from '@/pages/CompanySettingsPage';
+import SubscriptionPage from '@/pages/SubscriptionPage';
+import BillingHistoryPage from '@/pages/BillingHistoryPage';
+import EmployeeDetailsPage from '@/pages/EmployeeDetailsPage';
+import CreateEmployeePage from '@/pages/CreateEmployeePage';
+import EditEmployeePage from '@/pages/EditEmployeePage';
+import PayrollPage from '@/pages/PayrollPage';
 
 const queryClient = new QueryClient();
 
@@ -33,105 +38,40 @@ function App() {
         <SubscriptionProvider>
           <Router>
             <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route path="/register-company" element={<CompanyRegistrationPage />} />
+              {/* Auth routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+              <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+              <Route path="/logout" element={<LogoutPage />} />
               
-              <Route path="/dashboard" element={
-                <ProtectedRoute requiredModule="dashboard">
-                  <Layout>
-                    <DashboardPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/super-admin" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <SuperAdminPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/support-backoffice" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <SupportBackofficePage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/employees" element={
-                <ProtectedRoute requiredModule="employees">
-                  <Layout>
-                    <EmployeesPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              {/* Ruta única consolidada de nómina inteligente */}
-              <Route path="/payroll" element={
-                <ProtectedRoute requiredModule="payroll">
-                  <Layout>
-                    <PayrollIntelligentPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payroll-history" element={
-                <ProtectedRoute requiredModule="payroll-history">
-                  <Layout>
-                    <PayrollHistoryPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payroll-history/:periodId" element={
-                <ProtectedRoute requiredModule="payroll-history">
-                  <Layout>
-                    <PayrollHistoryDetailsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/vouchers" element={
-                <ProtectedRoute requiredModule="vouchers">
-                  <Layout>
-                    <VouchersPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payments" element={
-                <ProtectedRoute requiredModule="payments">
-                  <Layout>
-                    <PaymentsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/reports" element={
-                <ProtectedRoute requiredModule="reports">
-                  <Layout>
-                    <ReportsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/settings" element={
-                <ProtectedRoute requiredModule="settings">
-                  <Layout>
-                    <SettingsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="*" element={<NotFound />} />
+              <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                
+                {/* Ruta actualizada para liquidación inteligente silenciosa */}
+                <Route path="payroll" element={<PayrollIntelligentSilentPage />} />
+                
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="employees/create" element={<CreateEmployeePage />} />
+                <Route path="employees/:employeeId" element={<EmployeeDetailsPage />} />
+                <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
+                
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="company-settings" element={<CompanySettingsPage />} />
+                
+                <Route path="payroll-history" element={<PayrollHistoryPage />} />
+                <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
+
+                <Route path="subscription" element={<SubscriptionPage />} />
+                <Route path="billing-history" element={<BillingHistoryPage />} />
+              </Route>
             </Routes>
+            <Toaster />
           </Router>
         </SubscriptionProvider>
       </AuthProvider>
-      <Toaster />
     </QueryClientProvider>
   );
 }
