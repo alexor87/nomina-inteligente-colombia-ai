@@ -21,15 +21,15 @@ export const IntelligentDialogHeader: React.FC<DialogHeaderProps> = ({
   const getIcon = () => {
     switch (periodStatus.action) {
       case 'resume':
-        return <Clock className="h-6 w-6 text-blue-600" />;
+        return <Clock className="h-5 w-5 text-blue-600" />;
       case 'create_new':
-        return <Play className="h-6 w-6 text-green-600" />;
+        return <Play className="h-5 w-5 text-green-600" />;
       case 'configure':
-        return <Settings className="h-6 w-6 text-orange-600" />;
+        return <Settings className="h-5 w-5 text-orange-600" />;
       case 'error':
-        return <AlertCircle className="h-6 w-6 text-red-600" />;
+        return <AlertCircle className="h-5 w-5 text-red-600" />;
       default:
-        return <Calendar className="h-6 w-6 text-gray-600" />;
+        return <Calendar className="h-5 w-5 text-gray-600" />;
     }
   };
 
@@ -37,25 +37,25 @@ export const IntelligentDialogHeader: React.FC<DialogHeaderProps> = ({
     switch (periodStatus.action) {
       case 'resume':
         return (
-          <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50 text-xs font-medium px-2 py-1">
+          <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50 text-xs font-medium px-2 py-0.5">
             En curso
           </Badge>
         );
       case 'create_new':
         return (
-          <Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-50 text-xs font-medium px-2 py-1">
+          <Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-50 text-xs font-medium px-2 py-0.5">
             Nuevo período
           </Badge>
         );
       case 'configure':
         return (
-          <Badge className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-50 text-xs font-medium px-2 py-1">
+          <Badge className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-50 text-xs font-medium px-2 py-0.5">
             Configuración
           </Badge>
         );
       case 'error':
         return (
-          <Badge variant="destructive" className="text-xs font-medium px-2 py-1">
+          <Badge variant="destructive" className="text-xs font-medium px-2 py-0.5">
             Error
           </Badge>
         );
@@ -65,17 +65,17 @@ export const IntelligentDialogHeader: React.FC<DialogHeaderProps> = ({
   };
 
   return (
-    <DialogHeader className="text-center space-y-4">
-      {/* Icon */}
+    <DialogHeader className="text-center space-y-3">
+      {/* Icon - Smaller */}
       <div className="flex justify-center">
-        <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+        <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100">
           {getIcon()}
         </div>
       </div>
       
-      {/* Title and Badge */}
-      <div className="space-y-3">
-        <DialogTitle className="text-xl font-semibold text-gray-900 leading-tight">
+      {/* Title and Badge - Reduced spacing */}
+      <div className="space-y-2">
+        <DialogTitle className="text-lg font-semibold text-gray-900 leading-tight">
           {periodStatus.title}
         </DialogTitle>
         

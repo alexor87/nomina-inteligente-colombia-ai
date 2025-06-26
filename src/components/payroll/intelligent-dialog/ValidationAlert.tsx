@@ -25,13 +25,13 @@ export const ValidationAlert: React.FC<ValidationAlertProps> = ({
   const getIcon = (type: string) => {
     switch (type) {
       case 'error':
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-3.5 w-3.5 text-red-500" />;
       case 'warning':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+        return <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />;
       case 'success':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
       default:
-        return <Clock className="h-4 w-4 text-blue-500" />;
+        return <Clock className="h-3.5 w-3.5 text-blue-500" />;
     }
   };
 
@@ -49,18 +49,18 @@ export const ValidationAlert: React.FC<ValidationAlertProps> = ({
   };
 
   return (
-    <div className="space-y-2 max-h-32 overflow-y-auto">
+    <div className="space-y-1.5 max-h-28 overflow-y-auto">
       {validations.map((validation, index) => (
-        <Alert key={index} className="py-2 px-3">
+        <Alert key={index} className="py-1.5 px-2.5">
           <div className="flex items-start gap-2">
             {getIcon(validation.type)}
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-0.5">
               <div className="flex items-center gap-2">
-                <AlertDescription className="text-sm font-medium">
+                <AlertDescription className="text-xs font-medium">
                   {validation.message}
                 </AlertDescription>
                 {validation.count && (
-                  <Badge variant={getBadgeVariant(validation.type)} className="text-xs">
+                  <Badge variant={getBadgeVariant(validation.type)} className="text-xs px-1.5 py-0">
                     {validation.count}
                   </Badge>
                 )}
