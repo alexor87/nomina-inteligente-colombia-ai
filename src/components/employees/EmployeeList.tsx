@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmployeeFiltersComponent } from './EmployeeFilters';
-import { EmployeeFormModal } from './EmployeeFormModal';
 import { EmployeeDetailsModal } from './EmployeeDetailsModal';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
@@ -24,8 +23,10 @@ import { EmployeeExcelExportService } from '@/services/EmployeeExcelExportServic
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeCreationTest } from '../test/EmployeeCreationTest';
 import { PaginationControls } from '@/components/ui/PaginationControls';
+import { useNavigate } from 'react-router-dom';
 
 export const EmployeeList = () => {
+  const navigate = useNavigate();
   const {
     employees, // Now paginated employees
     allEmployees, // All filtered employees
@@ -50,8 +51,6 @@ export const EmployeeList = () => {
   const { changeEmployeeStatus, deleteEmployee } = useEmployeeCRUD();
   const { toast } = useToast();
 
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<EmployeeWithStatus | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isImportDrawerOpen, setIsImportDrawerOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -63,13 +62,11 @@ export const EmployeeList = () => {
   const isSupportMode = !!supportCompanyId;
 
   const handleCreateEmployee = () => {
-    setEditingEmployee(null);
-    setIsFormModalOpen(true);
+    navigate('/employees/create');
   };
 
   const handleEditEmployee = (employee: EmployeeWithStatus) => {
-    setEditingEmployee(employee);
-    setIsFormModalOpen(true);
+    navigate(`/employees/${employee.id}/edit`);
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
@@ -495,20 +492,6 @@ export const EmployeeList = () => {
           )}
         </CardContent>
       </Card>
-
-      <EmployeeFormModal
-        isOpen={isFormModalOpen}
-        onClose={() => {
-          setIsFormModalOpen(false);
-          setEditingEmployee(null);
-        }}
-        employee={editingEmployee}
-        onSuccess={() => {
-          refreshEmployees();
-          setIsFormModalOpen(false);
-          setEditingEmployee(null);
-        }}
-      />
 
       <EmployeeDetailsModal
         isOpen={isEmployeeProfileOpen}
