@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollPeriodService, PayrollPeriod } from './PayrollPeriodService';
 
@@ -121,7 +120,7 @@ export class PayrollPeriodIntelligentService {
       .maybeSingle();
 
     if (error) throw error;
-    return data;
+    return data as PayrollPeriod | null;
   }
 
   // Obtener último periodo cerrado
@@ -136,7 +135,7 @@ export class PayrollPeriodIntelligentService {
       .maybeSingle();
 
     if (error) throw error;
-    return data;
+    return data as PayrollPeriod | null;
   }
 
   // Calcular siguiente periodo basado en el último cerrado
