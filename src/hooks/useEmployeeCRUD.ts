@@ -1,7 +1,9 @@
+
 import { useState } from 'react';
 import { Employee } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeService } from '@/services/EmployeeService';
+import { EmployeeStatusService } from '@/services/EmployeeStatusService';
 
 export const useEmployeeCRUD = () => {
   const { toast } = useToast();
@@ -120,7 +122,7 @@ export const useEmployeeCRUD = () => {
   const updateCentroCosto = async (id: string, centroCosto: string) => {
     setIsLoading(true);
     try {
-      await EmployeeService.updateCentroCosto(id, centroCosto);
+      await EmployeeStatusService.updateCentroCosto(id, centroCosto);
       
       toast({
         title: "Centro de costo actualizado",
@@ -144,7 +146,7 @@ export const useEmployeeCRUD = () => {
   const updateNivelRiesgoARL = async (id: string, nivelRiesgo: 'I' | 'II' | 'III' | 'IV' | 'V') => {
     setIsLoading(true);
     try {
-      await EmployeeService.updateNivelRiesgoARL(id, nivelRiesgo);
+      await EmployeeStatusService.updateNivelRiesgoARL(id, nivelRiesgo);
       
       toast({
         title: "Nivel de riesgo ARL actualizado",
