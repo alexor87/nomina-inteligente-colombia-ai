@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface PayrollCalculationInput {
@@ -349,7 +348,7 @@ export const PayrollLiquidationBackendService = {
 
       if (!profile?.company_id) throw new Error('Usuario sin empresa asignada');
 
-      // Save individual payroll records with correct estado value
+      // Use UPSERT to handle duplicate key constraints
       const payrollRecords = liquidationData.employees.map(emp => ({
         employee_id: emp.id,
         company_id: profile.company_id,
@@ -364,19 +363,23 @@ export const PayrollLiquidationBackendService = {
         pension_empleado: Math.round(emp.baseSalary * 0.04),
         total_deducciones: emp.deductions,
         neto_pagado: emp.netPay,
-        estado: 'procesada' // Fixed: using valid estado value
+        estado: 'procesada'
       }));
 
+      // Use upsert to handle conflicts
       const { error: payrollError } = await supabase
         .from('payrolls')
-        .insert(payrollRecords);
+        .upsert(payrollRecords, {
+          onConflict: 'employee_id,periodo',
+          ignoreDuplicates: false
+        });
 
       if (payrollError) {
-        console.error('Error inserting payroll records:', payrollError);
+        console.error('Error upserting payroll records:', payrollError);
         throw payrollError;
       }
 
-      // Generate vouchers
+      // Generate vouchers with upsert as well
       const voucherRecords = liquidationData.employees.map(emp => ({
         employee_id: emp.id,
         company_id: profile.company_id,
@@ -391,10 +394,13 @@ export const PayrollLiquidationBackendService = {
 
       const { error: voucherError } = await supabase
         .from('payroll_vouchers')
-        .insert(voucherRecords);
+        .upsert(voucherRecords, {
+          onConflict: 'employee_id,periodo',
+          ignoreDuplicates: false
+        });
 
       if (voucherError) {
-        console.error('Error inserting voucher records:', voucherError);
+        console.error('Error upserting voucher records:', voucherError);
         throw voucherError;
       }
 
