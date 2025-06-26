@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { PayrollHistoryDetails } from '@/components/payroll-history/PayrollHistoryDetails';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
+import { PayrollPeriodService } from '@/services/PayrollPeriodService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 const PayrollHistoryDetailsPage = () => {
@@ -26,7 +27,40 @@ const PayrollHistoryDetailsPage = () => {
       setIsLoading(true);
       setError(null);
       
-      // Load all periods and find the specific one
+      console.log('🔍 Cargando detalles del período:', periodId);
+      
+      // Primero intentar buscar en payroll_periods (períodos del sistema inteligente)
+      const payrollPeriod = await PayrollPeriodService.getPayrollPeriodById(periodId);
+      
+      if (payrollPeriod) {
+        console.log('📋 Período encontrado en payroll_periods:', payrollPeriod);
+        
+        // Convertir PayrollPeriod a PayrollHistoryPeriod
+        const convertedPeriod: PayrollHistoryPeriod = {
+          id: payrollPeriod.id,
+          period: PayrollPeriodService.formatPeriodText(payrollPeriod.fecha_inicio, payrollPeriod.fecha_fin),
+          startDate: payrollPeriod.fecha_inicio,
+          endDate: payrollPeriod.fecha_fin,
+          type: payrollPeriod.tipo_periodo as 'quincenal' | 'mensual',
+          employeesCount: 0, // Se calculará con los datos reales
+          status: payrollPeriod.estado === 'cerrada' ? 'cerrado' : 
+                 payrollPeriod.estado === 'procesada' ? 'cerrado' : 'revision',
+          totalGrossPay: 0,
+          totalNetPay: 0,
+          totalDeductions: 0,
+          totalCost: 0,
+          employerContributions: 0,
+          paymentStatus: payrollPeriod.estado === 'pagada' ? 'pagado' : 'pendiente',
+          version: 1,
+          createdAt: payrollPeriod.created_at,
+          updatedAt: payrollPeriod.updated_at || payrollPeriod.created_at,
+        };
+        
+        setPeriod(convertedPeriod);
+        return;
+      }
+      
+      // Si no se encuentra en payroll_periods, buscar en el historial de payrolls
       const data = await PayrollHistoryService.getPayrollPeriods();
       const foundRecord = data.find(record => record.id === periodId);
       
@@ -35,7 +69,9 @@ const PayrollHistoryDetailsPage = () => {
         return;
       }
 
-      // Convert the record to PayrollHistoryPeriod format
+      console.log('📋 Período encontrado en historial:', foundRecord);
+
+      // Convertir el record a PayrollHistoryPeriod format
       let mappedStatus: 'cerrado' | 'con_errores' | 'revision' = 'revision';
       
       switch (foundRecord.estado) {
@@ -73,7 +109,7 @@ const PayrollHistoryDetailsPage = () => {
 
       setPeriod(convertedPeriod);
     } catch (error) {
-      console.error('Error loading period details:', error);
+      console.error('❌ Error loading period details:', error);
       setError('Error al cargar los detalles del período');
     } finally {
       setIsLoading(false);
@@ -87,7 +123,17 @@ const PayrollHistoryDetailsPage = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner />
+        <div className="text-center space-y-4">
+          <LoadingSpinner size="lg" />
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium text-gray-900">
+              📋 Cargando detalles del período
+            </h3>
+            <p className="text-gray-600">
+              Obteniendo información del período seleccionado...
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

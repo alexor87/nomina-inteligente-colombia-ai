@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -177,17 +176,35 @@ export const usePayrollLiquidationIntelligent = () => {
 
   // Ver último periodo (modo solo lectura)
   const handleViewLastPeriod = useCallback(() => {
-    if (!periodStatus?.currentPeriod) return;
+    if (!periodStatus?.currentPeriod) {
+      toast({
+        title: "No hay período anterior",
+        description: "No se encontró un período anterior para consultar",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setShowDialog(false);
+    
+    // Navegar a la página de detalles del historial de nómina
+    navigate(`/payroll-history/${periodStatus.currentPeriod.id}`);
+    
     toast({
-      title: "Consultando periodo anterior",
-      description: "Cargando datos del último periodo cerrado...",
-      className: "border-yellow-200 bg-yellow-50"
+      title: "Consultando período anterior",
+      description: `Mostrando detalles del período ${PayrollPeriodService.formatPeriodText(periodStatus.currentPeriod.fecha_inicio, periodStatus.currentPeriod.fecha_fin)}`,
+      className: "border-blue-200 bg-blue-50"
     });
     
-    console.log('👁️ Viendo periodo anterior:', periodStatus.currentPeriod.id);
-  }, [periodStatus, toast]);
+    console.log('👁️ Navegando a período anterior:', {
+      periodId: periodStatus.currentPeriod.id,
+      fechas: {
+        inicio: periodStatus.currentPeriod.fecha_inicio,
+        fin: periodStatus.currentPeriod.fecha_fin
+      },
+      estado: periodStatus.currentPeriod.estado
+    });
+  }, [periodStatus, toast, navigate]);
 
   // Ir a configuración
   const handleGoToSettings = useCallback(() => {

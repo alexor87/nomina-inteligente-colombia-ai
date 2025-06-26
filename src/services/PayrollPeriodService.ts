@@ -13,12 +13,12 @@ export interface PayrollPeriod {
   company_id: string;
   fecha_inicio: string;
   fecha_fin: string;
-  estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
-  tipo_periodo: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
+  tipo_periodo: string;
+  estado: string;
+  created_at: string;
+  updated_at?: string;
   modificado_por?: string;
   modificado_en?: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export class PayrollPeriodService {
@@ -264,5 +264,34 @@ export class PayrollPeriodService {
       isValid: warnings.length === 0,
       warnings
     };
+  }
+
+  // Obtener un período específico por ID
+  static async getPayrollPeriodById(periodId: string): Promise<PayrollPeriod | null> {
+    try {
+      console.log('🔍 Buscando período por ID:', periodId);
+      
+      const { data, error } = await supabase
+        .from('payroll_periods')
+        .select('*')
+        .eq('id', periodId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ Error obteniendo período por ID:', error);
+        throw error;
+      }
+
+      if (!data) {
+        console.log('ℹ️ Período no encontrado con ID:', periodId);
+        return null;
+      }
+
+      console.log('✅ Período encontrado:', data);
+      return data as PayrollPeriod;
+    } catch (error) {
+      console.error('❌ Error en getPayrollPeriodById:', error);
+      return null;
+    }
   }
 }
