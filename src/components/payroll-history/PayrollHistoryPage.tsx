@@ -1,31 +1,39 @@
 
-import { useState, useEffect } from 'react';
-import { PayrollHistoryFilters } from './PayrollHistoryFilters';
+import { useState } from 'react';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
+import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { PayrollHistoryDetails } from './PayrollHistoryDetails';
 import { ReopenDialog } from './ReopenDialog';
 import { EditWizard } from './EditWizard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, History, FileText } from 'lucide-react';
-import { PayrollHistoryPeriod, PayrollHistoryFilters as Filters, EditWizardSteps } from '@/types/payroll-history';
+import { Badge } from '@/components/ui/badge';
+import { FileText, Download, Clock, AlertCircle } from 'lucide-react';
+import { PayrollHistoryPeriod, PayrollHistoryFilters as FiltersType } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
-import { useToast } from '@/hooks/use-toast';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/ui/PaginationControls';
+import { useEffect } from 'react';
 
 export const PayrollHistoryPage = () => {
-  const [filters, setFilters] = useState<Filters>({
-    dateRange: {}
-  });
-  const [selectedPeriod, setSelectedPeriod] = useState<PayrollHistoryPeriod | null>(null);
   const [periods, setPeriods] = useState<PayrollHistoryPeriod[]>([]);
-  const [isLoadingPeriods, setIsLoadingPeriods] = useState(true);
-  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
-  const [editWizardOpen, setEditWizardOpen] = useState(false);
-  const [periodToReopen, setPeriodToReopen] = useState<PayrollHistoryPeriod | null>(null);
-  const { toast } = useToast();
+  const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedPeriod, setSelectedPeriod] = useState<PayrollHistoryPeriod | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showReopenDialog, setShowReopenDialog] = useState(false);
+  const [showEditWizard, setShowEditWizard] = useState(false);
+  const [filters, setFilters] = useState<FiltersType>({
+    dateRange: {},
+    status: '',
+    costCenter: '',
+    periodType: undefined,
+    employeeSearch: ''
+  });
 
   const {
-    isLoading,
+    isLoading: isProcessing,
     isReopening,
     isExporting,
     reopenPeriod,
@@ -34,173 +42,127 @@ export const PayrollHistoryPage = () => {
     downloadFile
   } = usePayrollHistory();
 
-  // Cargar períodos reales desde la base de datos
+  // Add pagination for payroll history periods
+  const pagination = usePagination(filteredPeriods, {
+    defaultPageSize: 25,
+    pageSizeOptions: [25, 50, 75, 100],
+    storageKey: 'payroll-history'
+  });
+
   useEffect(() => {
-    loadPayrollPeriods();
+    loadPayrollHistory();
   }, []);
 
-  const loadPayrollPeriods = async () => {
-    try {
-      setIsLoadingPeriods(true);
-      const realPeriods = await PayrollHistoryService.getPayrollPeriods();
-      
-      // Convertir los datos del servicio al formato esperado por el componente
-      const convertedPeriods: PayrollHistoryPeriod[] = realPeriods.map(record => ({
-        id: record.id,
-        period: record.periodo,
-        startDate: record.fechaCreacion.split('T')[0],
-        endDate: record.fechaCreacion.split('T')[0],
-        type: 'mensual' as const,
-        employeesCount: record.empleados,
-        // Corregir mapeo de estados - solo usar estados válidos
-        status: record.estado === 'cerrada' ? 'cerrado' : 
-                record.estado === 'pagada' ? 'cerrado' : 
-                record.estado === 'procesada' ? 'cerrado' : // Procesada significa lista/cerrada
-                'con_errores', // Solo borrador y otros estados no definidos son errores
-        totalGrossPay: record.totalNomina * 1.3, // Estimado incluyendo prestaciones
-        totalNetPay: record.totalNomina,
-        totalDeductions: record.totalNomina * 0.23, // Estimado de deducciones
-        totalCost: record.totalNomina * 1.15, // Costo total estimado
-        employerContributions: record.totalNomina * 0.15, // Aportes empleador
-        pilaFileUrl: undefined,
-        // Corregir mapeo de estado de pagos - solo usar estados válidos
-        paymentStatus: record.estado === 'pagada' ? 'pagado' : 
-                      record.estado === 'procesada' ? 'pendiente' : // Procesada = pendiente de pago
-                      'pendiente',
-        version: 1,
-        createdAt: record.fechaCreacion,
-        updatedAt: record.fechaCreacion
-      }));
+  useEffect(() => {
+    applyFilters();
+  }, [periods, filters]);
 
-      setPeriods(convertedPeriods);
+  const loadPayrollHistory = async () => {
+    try {
+      setIsLoading(true);
+      const data = await PayrollHistoryService.getPayrollPeriods();
+      setPeriods(data);
     } catch (error) {
-      console.error('Error loading payroll periods:', error);
-      toast({
-        title: "Error al cargar períodos",
-        description: "No se pudieron cargar los períodos de nómina",
-        variant: "destructive"
-      });
+      console.error('Error loading payroll history:', error);
     } finally {
-      setIsLoadingPeriods(false);
+      setIsLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...periods];
+
+    if (filters.status) {
+      filtered = filtered.filter(p => p.status === filters.status);
+    }
+
+    if (filters.periodType) {
+      filtered = filtered.filter(p => p.type === filters.periodType);
+    }
+
+    if (filters.dateRange.from) {
+      filtered = filtered.filter(p => new Date(p.startDate) >= new Date(filters.dateRange.from!));
+    }
+
+    if (filters.dateRange.to) {
+      filtered = filtered.filter(p => new Date(p.endDate) <= new Date(filters.dateRange.to!));
+    }
+
+    if (filters.employeeSearch) {
+      filtered = filtered.filter(p => 
+        p.period.toLowerCase().includes(filters.employeeSearch!.toLowerCase())
+      );
+    }
+
+    setFilteredPeriods(filtered);
   };
 
   const handleViewDetails = (period: PayrollHistoryPeriod) => {
     setSelectedPeriod(period);
+    setShowDetails(true);
   };
 
-  const handleReopenPeriod = async (period: PayrollHistoryPeriod) => {
-    // Verificar permisos (simulado)
-    const userRole = 'Administrador'; // En un caso real, esto vendría del contexto de usuario
-    
-    if (userRole !== 'Administrador' && userRole !== 'Editor histórico') {
-      toast({
-        title: "Sin permisos",
-        description: "No tiene permisos para reabrir períodos",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (period.paymentStatus === 'pagado' && period.status === 'cerrado') {
-      const confirmReopen = confirm(
-        'Este período ya fue pagado completamente. ¿Está seguro de que desea reabrirlo? Esto puede requerir una nota de ajuste.'
-      );
-      if (!confirmReopen) return;
-    }
-
-    setPeriodToReopen(period);
-    setReopenDialogOpen(true);
-  };
-
-  const handleConfirmReopen = async (reason: string) => {
-    if (!periodToReopen) return;
-
-    try {
-      const newVersion = await reopenPeriod({
-        periodId: periodToReopen.id,
-        reason,
-        userId: 'admin@empresa.com' // En un caso real, esto vendría del contexto
-      });
-
-      // Actualizar la lista de períodos
-      setPeriods(prev => [newVersion, ...prev]);
-      setReopenDialogOpen(false);
-      setPeriodToReopen(null);
-    } catch (error) {
-      console.error('Error reopening period:', error);
-    }
+  const handleReopenPeriod = (period: PayrollHistoryPeriod) => {
+    setSelectedPeriod(period);
+    setShowReopenDialog(true);
   };
 
   const handleExportToExcel = async () => {
     await exportToExcel(filteredPeriods);
   };
 
-  const handleDownloadFile = async (fileUrl: string, fileName: string) => {
-    await downloadFile(fileUrl, fileName);
-  };
-
-  const handleCloseEditWizard = async (wizardSteps: EditWizardSteps) => {
+  const handleReopenConfirm = async (reason: string) => {
     if (!selectedPeriod) return;
     
     try {
-      await closePeriodWithWizard(selectedPeriod.id, wizardSteps);
-      setEditWizardOpen(false);
+      const newPeriod = await reopenPeriod({
+        periodId: selectedPeriod.id,
+        reason,
+        userId: 'admin@empresa.com'
+      });
       
-      // Actualizar el estado del período
-      setPeriods(prev => prev.map(p => 
-        p.id === selectedPeriod.id 
-          ? { ...p, status: 'cerrado', updatedAt: new Date().toISOString() }
-          : p
-      ));
+      setPeriods(prev => [newPeriod, ...prev]);
+      setShowReopenDialog(false);
+      setSelectedPeriod(null);
+    } catch (error) {
+      console.error('Error reopening period:', error);
+    }
+  };
+
+  const handleEditWizardComplete = async (steps: any) => {
+    if (!selectedPeriod) return;
+    
+    try {
+      await closePeriodWithWizard(selectedPeriod.id, steps);
+      setShowEditWizard(false);
+      setSelectedPeriod(null);
+      await loadPayrollHistory();
     } catch (error) {
       console.error('Error processing period:', error);
     }
   };
 
-  // Filtrar períodos basado en los filtros aplicados
-  const filteredPeriods = periods.filter(period => {
-    if (filters.status && period.status !== filters.status) return false;
-    if (filters.periodType && period.type !== filters.periodType) return false;
-    if (filters.employeeSearch) {
-      // TODO: Implementar búsqueda por empleado cuando tengamos los datos
-      return true;
-    }
-    if (filters.dateRange.from || filters.dateRange.to) {
-      const periodDate = new Date(period.startDate);
-      if (filters.dateRange.from && periodDate < new Date(filters.dateRange.from)) return false;
-      if (filters.dateRange.to && periodDate > new Date(filters.dateRange.to)) return false;
-    }
-    return true;
-  });
+  const getStatusSummary = () => {
+    const summary = {
+      total: filteredPeriods.length,
+      cerrados: filteredPeriods.filter(p => p.status === 'cerrado').length,
+      conErrores: filteredPeriods.filter(p => p.status === 'con_errores').length,
+      enRevision: filteredPeriods.filter(p => p.status === 'revision').length
+    };
+    return summary;
+  };
 
-  if (selectedPeriod) {
-    return (
-      <>
-        <PayrollHistoryDetails 
-          period={selectedPeriod} 
-          onBack={() => setSelectedPeriod(null)}
-        />
-        
-        <EditWizard
-          isOpen={editWizardOpen}
-          onClose={() => setEditWizardOpen(false)}
-          onConfirm={handleCloseEditWizard}
-          isProcessing={isLoading}
-        />
-      </>
-    );
-  }
+  const statusSummary = getStatusSummary();
 
-  if (isLoadingPeriods) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Cargando períodos de nómina...</p>
-            </div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="animate-pulse p-6">
+          <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 bg-gray-200 rounded"></div>
+            ))}
           </div>
         </div>
       </div>
@@ -208,95 +170,147 @@ export const PayrollHistoryPage = () => {
   }
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <History className="h-8 w-8 text-blue-600" />
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Historial de Nómina</h1>
-                  <p className="text-gray-600">Consulta, audita y edita períodos de nómina cerrados</p>
-                </div>
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Historial de Nómina</h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Gestiona y consulta el historial de períodos de nómina procesados
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
               <Button 
-                onClick={handleExportToExcel} 
-                disabled={isExporting || filteredPeriods.length === 0}
-                className="bg-green-600 hover:bg-green-700"
+                onClick={handleExportToExcel}
+                disabled={isExporting}
+                variant="outline"
               >
                 <Download className="h-4 w-4 mr-2" />
                 {isExporting ? 'Exportando...' : 'Exportar Excel'}
               </Button>
             </div>
           </div>
-
-          {/* Filtros */}
-          <PayrollHistoryFilters 
-            filters={filters}
-            onFiltersChange={setFilters}
-          />
-
-          {/* Estadísticas rápidas */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <div className="text-2xl font-bold text-gray-900">{filteredPeriods.length}</div>
-              <div className="text-sm text-gray-600">Períodos encontrados</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <div className="text-2xl font-bold text-green-600">
-                {filteredPeriods.filter(p => p.status === 'cerrado').length}
-              </div>
-              <div className="text-sm text-gray-600">Períodos cerrados</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <div className="text-2xl font-bold text-red-600">
-                {filteredPeriods.filter(p => p.status === 'con_errores').length}
-              </div>
-              <div className="text-sm text-gray-600">Con errores</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <div className="text-2xl font-bold text-blue-600">
-                {filteredPeriods.filter(p => p.version > 1).length}
-              </div>
-              <div className="text-sm text-gray-600">Períodos editados</div>
-            </div>
-          </div>
-
-          {/* Tabla */}
-          {periods.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-12">
-              <div className="text-center">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay períodos de nómina</h3>
-                <p className="text-gray-600">
-                  Los períodos aparecerán aquí una vez que se cierren en el módulo de liquidación.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <PayrollHistoryTable 
-              periods={filteredPeriods}
-              onViewDetails={handleViewDetails}
-              onReopenPeriod={handleReopenPeriod}
-              onDownloadFile={handleDownloadFile}
-            />
-          )}
         </div>
       </div>
 
-      {/* Dialogs */}
-      <ReopenDialog
-        isOpen={reopenDialogOpen}
-        onClose={() => {
-          setReopenDialogOpen(false);
-          setPeriodToReopen(null);
-        }}
-        onConfirm={handleConfirmReopen}
-        period={periodToReopen}
-        isProcessing={isReopening}
-      />
-    </>
+      <div className="p-6 space-y-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Períodos</p>
+                  <p className="text-2xl font-bold text-gray-900">{statusSummary.total}</p>
+                </div>
+                <FileText className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Cerrados</p>
+                  <p className="text-2xl font-bold text-green-600">{statusSummary.cerrados}</p>
+                </div>
+                <Badge className="bg-green-100 text-green-800">✓</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Con Errores</p>
+                  <p className="text-2xl font-bold text-red-600">{statusSummary.conErrores}</p>
+                </div>
+                <AlertCircle className="h-8 w-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">En Revisión</p>
+                  <p className="text-2xl font-bold text-yellow-600">{statusSummary.enRevision}</p>
+                </div>
+                <Clock className="h-8 w-8 text-yellow-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <PayrollHistoryFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          totalCount={periods.length}
+          filteredCount={filteredPeriods.length}
+        />
+
+        {/* Table with Pagination */}
+        <div className="bg-white rounded-lg shadow">
+          <PayrollHistoryTable
+            periods={pagination.paginatedItems}
+            onViewDetails={handleViewDetails}
+            onReopenPeriod={handleReopenPeriod}
+            onDownloadFile={downloadFile}
+          />
+          
+          <PaginationControls 
+            pagination={pagination} 
+            itemName="períodos"
+          />
+        </div>
+      </div>
+
+      {/* Modals */}
+      {showDetails && selectedPeriod && (
+        <PayrollHistoryDetails
+          period={selectedPeriod}
+          onClose={() => {
+            setShowDetails(false);
+            setSelectedPeriod(null);
+          }}
+          onEdit={() => {
+            setShowDetails(false);
+            setShowEditWizard(true);
+          }}
+        />
+      )}
+
+      {showReopenDialog && selectedPeriod && (
+        <ReopenDialog
+          isOpen={showReopenDialog}
+          onClose={() => {
+            setShowReopenDialog(false);
+            setSelectedPeriod(null);
+          }}
+          onConfirm={handleReopenConfirm}
+          period={selectedPeriod}
+          isLoading={isReopening}
+        />
+      )}
+
+      {showEditWizard && selectedPeriod && (
+        <EditWizard
+          isOpen={showEditWizard}
+          onClose={() => {
+            setShowEditWizard(false);
+            setSelectedPeriod(null);
+          }}
+          onComplete={handleEditWizardComplete}
+          period={selectedPeriod}
+          isLoading={isProcessing}
+        />
+      )}
+    </div>
   );
 };

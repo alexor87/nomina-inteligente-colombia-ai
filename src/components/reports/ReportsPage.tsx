@@ -1,183 +1,240 @@
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, FileText, Shield, Receipt, History, Download, TrendingUp, Users, DollarSign, Calendar } from 'lucide-react';
-import { ReportsFilters } from './ReportsFilters';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PayrollSummaryReport } from './PayrollSummaryReport';
 import { LaborCostReport } from './LaborCostReport';
 import { SocialSecurityReport } from './SocialSecurityReport';
 import { IncomeRetentionReport } from './IncomeRetentionReport';
-import { NoveltyHistoryReport } from './NoveltyHistoryReport';
 import { AccountingExportReport } from './AccountingExportReport';
+import { NoveltyHistoryReport } from './NoveltyHistoryReport';
 import { ExportHistory } from './ExportHistory';
+import { ReportsFilters } from './ReportsFilters';
 import { useReports } from '@/hooks/useReports';
-
-const reportSections = [
-  {
-    id: 'payroll-summary',
-    title: 'Resumen de Nómina',
-    description: 'Devengado, deducciones, neto y aportes por período',
-    icon: FileText,
-    color: 'bg-blue-500',
-    badge: 'frecuente'
-  },
-  {
-    id: 'labor-costs',
-    title: 'Costos Laborales',
-    description: 'Carga prestacional y costos por empleado/centro',
-    icon: DollarSign,
-    color: 'bg-green-500',
-    badge: 'recomendado'
-  },
-  {
-    id: 'social-security',
-    title: 'Aportes Seguridad Social',
-    description: 'Salud, pensión, ARL y caja de compensación',
-    icon: Shield,
-    color: 'bg-purple-500'
-  },
-  {
-    id: 'income-retention',
-    title: 'Certificados CIR',
-    description: 'Certificados de ingresos y retenciones anuales',
-    icon: Receipt,
-    color: 'bg-orange-500'
-  },
-  {
-    id: 'novelty-history',
-    title: 'Histórico de Novedades',
-    description: 'Horas extra, incapacidades, licencias y bonificaciones',
-    icon: History,
-    color: 'bg-indigo-500'
-  },
-  {
-    id: 'accounting-export',
-    title: 'Exportaciones Contables',
-    description: 'Reportes para software contable',
-    icon: BarChart3,
-    color: 'bg-red-500',
-    badge: 'nuevo'
-  }
-];
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/ui/PaginationControls';
+import { 
+  FileText, 
+  TrendingUp, 
+  Shield, 
+  Calculator, 
+  Download,
+  Clock,
+  AlertCircle
+} from 'lucide-react';
 
 export const ReportsPage = () => {
-  const { activeReportType, setActiveReportType, exportHistory } = useReports();
-  const [showExportHistory, setShowExportHistory] = useState(false);
+  const {
+    reportData,
+    filters,
+    exportHistory,
+    isLoading,
+    updateFilters,
+    generateReport,
+    exportReport,
+    scheduleReport,
+    refreshData
+  } = useReports();
 
-  const getBadgeVariant = (badge?: string) => {
-    switch (badge) {
-      case 'nuevo': return 'default';
-      case 'frecuente': return 'secondary';
-      case 'recomendado': return 'destructive';
-      default: return 'outline';
+  // Add pagination for export history
+  const pagination = usePagination(exportHistory, {
+    defaultPageSize: 25,
+    pageSizeOptions: [25, 50, 75, 100],
+    storageKey: 'reports-history'
+  });
+
+  const [activeTab, setActiveTab] = useState('payroll-summary');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const reportTypes = [
+    {
+      id: 'payroll-summary',
+      title: 'Resumen de Nómina',
+      description: 'Consolidado general de nómina por período',
+      icon: FileText,
+      component: PayrollSummaryReport
+    },
+    {
+      id: 'labor-cost',
+      title: 'Costo Laboral',
+      description: 'Análisis detallado de costos laborales',
+      icon: TrendingUp,
+      component: LaborCostReport
+    },
+    {
+      id: 'social-security',
+      title: 'Seguridad Social',
+      description: 'Aportes y contribuciones patronales',
+      icon: Shield,
+      component: SocialSecurityReport
+    },
+    {
+      id: 'income-retention',
+      title: 'Retención en la Fuente',
+      description: 'Cálculos de retención por empleado',
+      icon: Calculator,
+      component: IncomeRetentionReport
+    },
+    {
+      id: 'accounting-export',
+      title: 'Exportación Contable',
+      description: 'Datos para sistemas contables',
+      icon: Download,
+      component: AccountingExportReport
+    },
+    {
+      id: 'novelty-history',
+      title: 'Historial de Novedades',
+      description: 'Registro de novedades aplicadas',
+      icon: Clock,
+      component: NoveltyHistoryReport
+    }
+  ];
+
+  const activeReportType = reportTypes.find(r => r.id === activeTab);
+  const ActiveReportComponent = activeReportType?.component;
+
+  const handleGenerateReport = async () => {
+    setIsGenerating(true);
+    try {
+      await generateReport(activeTab, filters);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  if (showExportHistory) {
+  const handleExportReport = async (format: 'excel' | 'pdf' | 'csv') => {
+    await exportReport(activeTab, format, filters);
+  };
+
+  if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Historial de Exportaciones</h1>
-            <p className="text-gray-600 mt-1">Revisa y descarga reportes anteriores</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="animate-pulse p-6">
+          <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 bg-gray-200 rounded"></div>
+            ))}
           </div>
-          <Button variant="outline" onClick={() => setShowExportHistory(false)}>
-            Volver a Reportes
-          </Button>
         </div>
-        <ExportHistory />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reportes</h1>
-          <p className="text-gray-600 mt-1">Genera y exporta reportes detallados de nómina</p>
-        </div>
-        <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => setShowExportHistory(true)}>
-            <Download className="h-4 w-4 mr-2" />
-            Historial ({exportHistory.length})
-          </Button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Reportes</h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Genera y gestiona reportes de nómina y recursos humanos
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Button 
+                onClick={handleGenerateReport}
+                disabled={isGenerating}
+              >
+                {isGenerating ? 'Generando...' : 'Generar Reporte'}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <Tabs value={activeReportType} onValueChange={setActiveReportType} className="space-y-6">
-        {/* Cards de secciones principales */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          {reportSections.map((section) => {
-            const Icon = section.icon;
-            return (
-              <Card 
-                key={section.id} 
-                className={`cursor-pointer transition-all hover:shadow-md ${
-                  activeReportType === section.id ? 'ring-2 ring-blue-500' : ''
-                }`}
-                onClick={() => setActiveReportType(section.id)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className={`p-2 rounded-lg ${section.color} text-white`}>
-                      <Icon className="h-5 w-5" />
+      <div className="p-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          {/* Report Type Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {reportTypes.map((report) => {
+              const Icon = report.icon;
+              return (
+                <Card 
+                  key={report.id}
+                  className={`cursor-pointer transition-all hover:shadow-md ${
+                    activeTab === report.id ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+                  }`}
+                  onClick={() => setActiveTab(report.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <Icon className={`h-6 w-6 ${
+                        activeTab === report.id ? 'text-blue-600' : 'text-gray-600'
+                      }`} />
+                      <div className="flex-1">
+                        <h3 className={`font-medium ${
+                          activeTab === report.id ? 'text-blue-900' : 'text-gray-900'
+                        }`}>
+                          {report.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {report.description}
+                        </p>
+                        {activeTab === report.id && (
+                          <Badge className="mt-2 bg-blue-100 text-blue-800">
+                            Seleccionado
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    {section.badge && (
-                      <Badge variant={getBadgeVariant(section.badge)} className="text-xs">
-                        {section.badge}
-                      </Badge>
-                    )}
-                  </div>
-                  <CardTitle className="text-lg">{section.title}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {section.description}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            );
-          })}
-        </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
 
-        {/* Filtros globales */}
-        <ReportsFilters />
+          {/* Filters */}
+          <ReportsFilters
+            filters={filters}
+            onFiltersChange={updateFilters}
+            reportType={activeTab}
+          />
 
-        {/* Contenido de cada reporte */}
-        <TabsList className="hidden">
-          {reportSections.map((section) => (
-            <TabsTrigger key={section.id} value={section.id}>
-              {section.title}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+          {/* Report Content */}
+          <div className="bg-white rounded-lg shadow">
+            {ActiveReportComponent && (
+              <ActiveReportComponent
+                data={reportData}
+                filters={filters}
+                onExport={handleExportReport}
+                isLoading={isGenerating}
+              />
+            )}
+          </div>
 
-        <TabsContent value="payroll-summary">
-          <PayrollSummaryReport />
-        </TabsContent>
-
-        <TabsContent value="labor-costs">
-          <LaborCostReport />
-        </TabsContent>
-
-        <TabsContent value="social-security">
-          <SocialSecurityReport />
-        </TabsContent>
-
-        <TabsContent value="income-retention">
-          <IncomeRetentionReport />
-        </TabsContent>
-
-        <TabsContent value="novelty-history">
-          <NoveltyHistoryReport />
-        </TabsContent>
-
-        <TabsContent value="accounting-export">
-          <AccountingExportReport />
-        </TabsContent>
-      </Tabs>
+          {/* Export History */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="h-5 w-5 mr-2" />
+                Historial de Exportaciones
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ExportHistory 
+                history={pagination.paginatedItems}
+                onDownload={(url, filename) => {
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = filename;
+                  link.click();
+                }}
+              />
+              
+              <PaginationControls 
+                pagination={pagination} 
+                itemName="exportaciones"
+              />
+            </CardContent>
+          </Card>
+        </Tabs>
+      </div>
     </div>
   );
 };
