@@ -1,43 +1,36 @@
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Input } from '@/components/ui/input';
-import { 
-  Plus, Users, Filter, Download, MoreHorizontal, 
-  Eye, Edit, Trash2, UserCheck, UserX, AlertTriangle,
-  Mail, Phone, Calendar, Building2, Briefcase, Upload, Loader2, Shield, Search
-} from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { EmployeeFiltersComponent } from './EmployeeFilters';
-import { EmployeeDetailsModal } from './EmployeeDetailsModal';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Users } from 'lucide-react';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
-import { EmployeeWithStatus, ESTADOS_EMPLEADO, ComplianceIndicator } from '@/types/employee-extended';
-import { CONTRACT_TYPES } from '@/types/employee-config';
+import { EmployeeWithStatus } from '@/types/employee-extended';
 import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
+import { EmployeeDetailsModal } from './EmployeeDetailsModal';
 import { EmployeeExcelExportService } from '@/services/EmployeeExcelExportService';
 import { useToast } from '@/hooks/use-toast';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useNavigate } from 'react-router-dom';
+import { EmployeeListHeader } from './EmployeeListHeader';
+import { EmployeeSearchBar } from './EmployeeSearchBar';
+import { EmployeeFiltersPanel } from './EmployeeFiltersPanel';
+import { EmployeeBulkActions } from './EmployeeBulkActions';
+import { EmployeeTable } from './EmployeeTable';
+import { EmployeeEmptyState } from './EmployeeEmptyState';
+import { SupportModeAlert } from './SupportModeAlert';
 
 export const EmployeeList = () => {
   const navigate = useNavigate();
   const {
-    employees, // Now paginated employees
-    allEmployees, // All filtered employees
+    employees,
+    allEmployees,
     filters,
     selectedEmployees,
     isLoading,
     selectedEmployee,
     isEmployeeProfileOpen,
-    pagination, // Pagination object
+    pagination,
     updateFilters,
     clearFilters,
     toggleEmployeeSelection,
@@ -91,7 +84,6 @@ export const EmployeeList = () => {
     try {
       setIsExporting(true);
       
-      // Show loading toast
       toast({
         title: "Preparando archivo...",
         description: EmployeeExcelExportService.getExportSummary(totalEmployees, filteredCount),
@@ -119,30 +111,10 @@ export const EmployeeList = () => {
     window.location.href = '/support-backoffice';
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO');
-  };
-
-  const getStatusColor = (status: string) => {
-    const estado = ESTADOS_EMPLEADO.find(e => e.value === status);
-    return estado?.color || 'bg-gray-100 text-gray-800';
-  };
-
-  const getContractTypeLabel = (type: string) => {
-    const contractType = CONTRACT_TYPES.find(c => c.value === type);
-    return contractType?.label || type;
-  };
-
   const currentPageEmployeeIds = employees.map(emp => emp.id);
   const allCurrentPageSelected = currentPageEmployeeIds.every(id => selectedEmployees.includes(id));
+
+  const hasFilters = filters.searchTerm || filters.estado || filters.tipoContrato;
 
   if (isLoading) {
     return (
@@ -160,126 +132,46 @@ export const EmployeeList = () => {
       <div className="space-y-6">
         {/* Alerta de modo soporte */}
         {isSupportMode && (
-          <Alert className="border-blue-200 bg-blue-50">
-            <Shield className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">
-                  Modo Soporte Activo - Estás viendo datos de una empresa cliente
-                </span>
-                <Button variant="outline" size="sm" onClick={goBackToSupport}>
-                  Volver al Backoffice
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
+          <SupportModeAlert onGoBackToSupport={goBackToSupport} />
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Empleados</h1>
-            <p className="text-gray-600">
-              {filteredCount} de {totalEmployees} empleados
-              {filters.searchTerm && ` - Filtrado por: "${filters.searchTerm}"`}
-              {isSupportMode && " (Vista de Soporte)"}
-            </p>
-          </div>
-          <div className="flex space-x-3">
-            <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
-            </Button>
-            <Button variant="outline" onClick={() => setIsImportDrawerOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Importar
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleExportToExcel}
-              disabled={isExporting || employees.length === 0}
-            >
-              {isExporting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              {isExporting ? 'Exportando...' : 'Exportar'}
-            </Button>
-            <Button onClick={handleCreateEmployee}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Empleado
-            </Button>
-          </div>
-        </div>
+        <EmployeeListHeader
+          filteredCount={filteredCount}
+          totalEmployees={totalEmployees}
+          searchTerm={filters.searchTerm}
+          isSupportMode={isSupportMode}
+          showFilters={showFilters}
+          isExporting={isExporting}
+          employeeCount={employees.length}
+          onToggleFilters={() => setShowFilters(!showFilters)}
+          onOpenImport={() => setIsImportDrawerOpen(true)}
+          onExportToExcel={handleExportToExcel}
+          onCreateEmployee={handleCreateEmployee}
+        />
 
-        {/* Barra de búsqueda mejorada */}
-        <Card className="shadow-sm">
-          <CardContent className="pt-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar por nombre, apellido, cédula, email o cargo..."
-                value={filters.searchTerm}
-                onChange={(e) => updateFilters({ searchTerm: e.target.value })}
-                className="pl-10 h-12 text-base"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Barra de búsqueda */}
+        <EmployeeSearchBar
+          searchTerm={filters.searchTerm}
+          onSearchChange={(value) => updateFilters({ searchTerm: value })}
+        />
 
-        {/* Filtros mejorados */}
-        {showFilters && (
-          <Card className="shadow-sm border-t-4 border-t-blue-500">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold text-gray-900">
-                  Filtros Avanzados
-                </CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setShowFilters(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Ocultar
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <EmployeeFiltersComponent
-                filters={filters}
-                onUpdateFilters={updateFilters}
-                onClearFilters={clearFilters}
-                totalCount={totalEmployees}
-                filteredCount={filteredCount}
-              />
-            </CardContent>
-          </Card>
-        )}
+        {/* Filtros */}
+        <EmployeeFiltersPanel
+          showFilters={showFilters}
+          filters={filters}
+          totalEmployees={totalEmployees}
+          filteredCount={filteredCount}
+          onToggleFilters={() => setShowFilters(!showFilters)}
+          onUpdateFilters={updateFilters}
+          onClearFilters={clearFilters}
+        />
 
-        {selectedEmployees.length > 0 && (
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <p className="text-blue-800">
-                  {selectedEmployees.length} empleado{selectedEmployees.length !== 1 ? 's' : ''} seleccionado{selectedEmployees.length !== 1 ? 's' : ''}
-                </p>
-                <div className="flex space-x-2">
-                  <Button size="sm" variant="outline" onClick={() => bulkUpdateStatus('activo')}>
-                    <UserCheck className="h-4 w-4 mr-1" />
-                    Activar
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => bulkUpdateStatus('inactivo')}>
-                    <UserX className="h-4 w-4 mr-1" />
-                    Desactivar
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Acciones en lote */}
+        <EmployeeBulkActions
+          selectedCount={selectedEmployees.length}
+          onBulkUpdateStatus={bulkUpdateStatus}
+        />
 
         <Card>
           <CardHeader>
@@ -291,186 +183,29 @@ export const EmployeeList = () => {
           <CardContent className="p-0">
             {employees.length > 0 ? (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={allCurrentPageSelected && employees.length > 0}
-                          onCheckedChange={toggleAllEmployees}
-                        />
-                      </TableHead>
-                      <TableHead>Empleado</TableHead>
-                      <TableHead>Contacto</TableHead>
-                      <TableHead>Cargo</TableHead>
-                      <TableHead>Contrato</TableHead>
-                      <TableHead>Salario</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Alertas</TableHead>
-                      <TableHead className="text-center">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {employees.map((employee) => {
-                      const indicators = getComplianceIndicators(employee);
-                      return (
-                        <TableRow key={employee.id} className="hover:bg-gray-50">
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedEmployees.includes(employee.id)}
-                              onCheckedChange={() => toggleEmployeeSelection(employee.id)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-3">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={employee.avatar} />
-                                <AvatarFallback className="bg-blue-600 text-white">
-                                  {employee.nombre[0]}{employee.apellido[0]}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <button 
-                                  onClick={() => openEmployeeProfile(employee)}
-                                  className="font-medium text-gray-900 hover:text-blue-600 transition-colors cursor-pointer text-left text-sm"
-                                >
-                                  {employee.nombre} {employee.apellido}
-                                </button>
-                                <p className="text-sm text-gray-600">{employee.cedula}</p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <div className="flex items-center text-sm text-gray-600">
-                                <Mail className="h-3 w-3 mr-1" />
-                                {employee.email || 'No registrado'}
-                              </div>
-                              <div className="flex items-center text-sm text-gray-600">
-                                <Phone className="h-3 w-3 mr-1" />
-                                {employee.telefono || 'No registrado'}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <p className="font-medium">{employee.cargo}</p>
-                              <div className="flex items-center text-sm text-gray-600">
-                                <Building2 className="h-3 w-3 mr-1" />
-                                {employee.centrosocial || 'Sin asignar'}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <p className="text-sm font-medium">
-                                {getContractTypeLabel(employee.tipoContrato)}
-                              </p>
-                              <div className="flex items-center text-sm text-gray-600">
-                                <Calendar className="h-3 w-3 mr-1" />
-                                {formatDate(employee.fechaIngreso)}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <p className="font-semibold text-green-600">
-                              {formatCurrency(employee.salarioBase)}
-                            </p>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(employee.estado)}>
-                              {ESTADOS_EMPLEADO.find(e => e.value === employee.estado)?.label || employee.estado}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {indicators.length > 0 && (
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <div className="flex items-center">
-                                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                                    <span className="text-sm text-yellow-600 ml-1">
-                                      {indicators.length}
-                                    </span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div className="space-y-1">
-                                    {indicators.map((indicator, index) => (
-                                      <p key={index} className="text-xs">
-                                        • {indicator.message}
-                                      </p>
-                                    ))}
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEmployeeProfile(employee)}
-                                className="mr-2"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'activo')}>
-                                    <UserCheck className="h-4 w-4 mr-2" />
-                                    Activar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'inactivo')}>
-                                    <UserX className="h-4 w-4 mr-2" />
-                                    Desactivar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => handleDeleteEmployee(employee.id)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Eliminar
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <EmployeeTable
+                  employees={employees}
+                  selectedEmployees={selectedEmployees}
+                  allCurrentPageSelected={allCurrentPageSelected}
+                  onToggleEmployeeSelection={toggleEmployeeSelection}
+                  onToggleAllEmployees={toggleAllEmployees}
+                  onOpenEmployeeProfile={openEmployeeProfile}
+                  onEditEmployee={handleEditEmployee}
+                  onDeleteEmployee={handleDeleteEmployee}
+                  onStatusChange={handleStatusChange}
+                  getComplianceIndicators={getComplianceIndicators}
+                />
                 
-                {/* Add pagination controls */}
                 <PaginationControls 
                   pagination={pagination} 
                   itemName="empleados"
                 />
               </>
             ) : (
-              <div className="text-center py-12">
-                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay empleados</h3>
-                <p className="text-gray-600 mb-4">
-                  {filters.searchTerm || filters.estado || filters.tipoContrato
-                    ? 'No se encontraron empleados con los filtros aplicados'
-                    : 'Comienza agregando tu primer empleado'}
-                </p>
-                <Button onClick={handleCreateEmployee}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Empleado
-                </Button>
-              </div>
+              <EmployeeEmptyState
+                hasFilters={!!hasFilters}
+                onCreateEmployee={handleCreateEmployee}
+              />
             )}
           </CardContent>
         </Card>
