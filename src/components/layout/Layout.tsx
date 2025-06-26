@@ -19,7 +19,7 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const { roles } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Changed to false for better UX
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const toggleSidebar = () => {
@@ -45,8 +45,24 @@ export const Layout = ({ children }: LayoutProps) => {
     };
   }, [sidebarCollapsed]);
 
+  // Handle responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Check on mount
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50/30 flex">
       <div ref={sidebarRef}>
         <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       </div>
@@ -58,10 +74,20 @@ export const Layout = ({ children }: LayoutProps) => {
       >
         <Header />
         
-        <main className="flex-1 p-6">
-          {children}
+        <main className="flex-1 p-6 bg-white/50">
+          <div className="max-w-7xl mx-auto">
+            {children}
+          </div>
         </main>
       </div>
+      
+      {/* Overlay para móvil cuando sidebar está abierto */}
+      {!sidebarCollapsed && window.innerWidth < 768 && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-40 md:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
     </div>
   );
 };
