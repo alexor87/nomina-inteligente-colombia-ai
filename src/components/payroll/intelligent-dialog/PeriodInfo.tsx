@@ -12,24 +12,41 @@ export const PeriodInfo: React.FC<PeriodInfoProps> = ({
   periodStatus
 }) => {
   return (
-    <div className="py-4">
-      <DialogDescription className="text-center text-base leading-relaxed">
+    <div className="space-y-6">
+      <DialogDescription className="text-center text-lg leading-relaxed text-gray-600 px-2">
         {periodStatus.message}
       </DialogDescription>
 
       {periodStatus.nextPeriod && (
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="h-4 w-4 text-gray-600" />
-            <span className="font-medium text-gray-900">Próximo periodo</span>
+        <div className="p-6 bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-2xl border border-gray-200/50">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-white rounded-lg shadow-sm">
+              <Calendar className="h-5 w-5 text-gray-700" />
+            </div>
+            <span className="text-lg font-semibold text-gray-900">Próximo período</span>
           </div>
-          <div className="text-sm text-gray-600">
-            <span className="font-medium">Tipo:</span> {periodStatus.nextPeriod.type}
-          </div>
-          <div className="text-sm text-gray-600">
-            <span className="font-medium">Fechas:</span>{' '}
-            {new Date(periodStatus.nextPeriod.startDate).toLocaleDateString('es-CO')} -{' '}
-            {new Date(periodStatus.nextPeriod.endDate).toLocaleDateString('es-CO')}
+          
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">Tipo</span>
+              <span className="text-base font-semibold text-gray-900 capitalize">
+                {periodStatus.nextPeriod.type}
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">Fechas</span>
+              <span className="text-base font-semibold text-gray-900">
+                {new Date(periodStatus.nextPeriod.startDate).toLocaleDateString('es-CO', {
+                  day: 'numeric',
+                  month: 'short'
+                })} - {new Date(periodStatus.nextPeriod.endDate).toLocaleDateString('es-CO', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                })}
+              </span>
+            </div>
           </div>
         </div>
       )}
