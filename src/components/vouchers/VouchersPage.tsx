@@ -7,6 +7,8 @@ import { VoucherBulkActions } from './VoucherBulkActions';
 import { VoucherSummaryCards } from './VoucherSummaryCards';
 import { VoucherEmptyState } from './VoucherEmptyState';
 import { useVouchers } from '@/hooks/useVouchers';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 
 export const VouchersPage = () => {
   const {
@@ -27,6 +29,13 @@ export const VouchersPage = () => {
     regenerateVoucher,
     refreshVouchers
   } = useVouchers();
+
+  // Add pagination for vouchers
+  const pagination = usePagination(vouchers, {
+    defaultPageSize: 25,
+    pageSizeOptions: [25, 50, 75, 100],
+    storageKey: 'vouchers'
+  });
 
   if (isLoading) {
     return (
@@ -79,17 +88,25 @@ export const VouchersPage = () => {
             />
           )}
 
-          <VoucherTable
-            vouchers={vouchers}
-            selectedVouchers={selectedVouchers}
-            onToggleSelection={toggleVoucherSelection}
-            onToggleAll={toggleAllVouchers}
-            onDownload={downloadVoucher}
-            onSendEmail={sendVoucherByEmail}
-            onRegenerate={regenerateVoucher}
-            onClearFilters={clearFilters}
-            totalVouchers={allVouchers.length}
-          />
+          <div className="bg-white rounded-lg shadow">
+            <VoucherTable
+              vouchers={pagination.paginatedItems} // Use paginated vouchers
+              selectedVouchers={selectedVouchers}
+              onToggleSelection={toggleVoucherSelection}
+              onToggleAll={toggleAllVouchers}
+              onDownload={downloadVoucher}
+              onSendEmail={sendVoucherByEmail}
+              onRegenerate={regenerateVoucher}
+              onClearFilters={clearFilters}
+              totalVouchers={allVouchers.length}
+            />
+            
+            {/* Add pagination controls */}
+            <PaginationControls 
+              pagination={pagination} 
+              itemName="comprobantes"
+            />
+          </div>
         </div>
       </div>
     </TooltipProvider>

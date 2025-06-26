@@ -1,9 +1,9 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { EmployeeWithStatus, EmployeeFilters, ComplianceIndicator } from '@/types/employee-extended';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeDataService } from '@/services/EmployeeDataService';
 import { filterEmployees } from '@/utils/employeeFilters';
+import { usePagination } from '@/hooks/usePagination';
 
 export const useEmployeeList = () => {
   const [employees, setEmployees] = useState<EmployeeWithStatus[]>([]);
@@ -106,6 +106,12 @@ export const useEmployeeList = () => {
     return filterEmployees(employees, filters);
   }, [employees, filters]);
 
+  const pagination = usePagination(filteredEmployees, {
+    defaultPageSize: 25,
+    pageSizeOptions: [25, 50, 75, 100],
+    storageKey: 'employees'
+  });
+
   const getComplianceIndicators = (employee: EmployeeWithStatus): ComplianceIndicator[] => {
     const indicators: ComplianceIndicator[] = [];
 
@@ -182,10 +188,22 @@ export const useEmployeeList = () => {
   };
 
   const toggleAllEmployees = () => {
-    if (selectedEmployees.length === filteredEmployees.length) {
-      setSelectedEmployees([]);
+    // Toggle all employees on current page
+    const currentPageEmployeeIds = pagination.paginatedItems.map(emp => emp.id);
+    const allCurrentPageSelected = currentPageEmployeeIds.every(id => selectedEmployees.includes(id));
+    
+    if (allCurrentPageSelected) {
+      setSelectedEmployees(prev => prev.filter(id => !currentPageEmployeeIds.includes(id)));
     } else {
-      setSelectedEmployees(filteredEmployees.map(emp => emp.id));
+      setSelectedEmployees(prev => {
+        const newSelected = [...prev];
+        currentPageEmployeeIds.forEach(id => {
+          if (!newSelected.includes(id)) {
+            newSelected.push(id);
+          }
+        });
+        return newSelected;
+      });
     }
   };
 
@@ -209,12 +227,14 @@ export const useEmployeeList = () => {
   };
 
   return {
-    employees: filteredEmployees,
+    employees: pagination.paginatedItems, // Return paginated employees
+    allEmployees: filteredEmployees, // Keep reference to all filtered employees
     filters,
     selectedEmployees,
     isLoading,
     selectedEmployee,
     isEmployeeProfileOpen,
+    pagination, // Export pagination object
     updateFilters,
     clearFilters,
     toggleEmployeeSelection,

@@ -23,15 +23,18 @@ import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
 import { EmployeeExcelExportService } from '@/services/EmployeeExcelExportService';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeCreationTest } from '../test/EmployeeCreationTest';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 
 export const EmployeeList = () => {
   const {
-    employees,
+    employees, // Now paginated employees
+    allEmployees, // All filtered employees
     filters,
     selectedEmployees,
     isLoading,
     selectedEmployee,
     isEmployeeProfileOpen,
+    pagination, // Pagination object
     updateFilters,
     clearFilters,
     toggleEmployeeSelection,
@@ -189,6 +192,9 @@ export const EmployeeList = () => {
     return contractType?.label || type;
   };
 
+  const currentPageEmployeeIds = employees.map(emp => emp.id);
+  const allCurrentPageSelected = currentPageEmployeeIds.every(id => selectedEmployees.includes(id));
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -318,152 +324,160 @@ export const EmployeeList = () => {
         </CardHeader>
         <CardContent className="p-0">
           {employees.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectedEmployees.length === employees.length}
-                      onCheckedChange={toggleAllEmployees}
-                    />
-                  </TableHead>
-                  <TableHead>Empleado</TableHead>
-                  <TableHead>Contacto</TableHead>
-                  <TableHead>Cargo</TableHead>
-                  <TableHead>Contrato</TableHead>
-                  <TableHead>Salario</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Alertas</TableHead>
-                  <TableHead className="text-center">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {employees.map((employee) => {
-                  const indicators = getComplianceIndicators(employee);
-                  return (
-                    <TableRow key={employee.id} className="hover:bg-gray-50">
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedEmployees.includes(employee.id)}
-                          onCheckedChange={() => toggleEmployeeSelection(employee.id)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={employee.avatar} />
-                            <AvatarFallback className="bg-blue-600 text-white">
-                              {employee.nombre[0]}{employee.apellido[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <button 
-                              onClick={() => openEmployeeProfile(employee)}
-                              className="font-semibold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer text-left"
-                            >
-                              {employee.nombre} {employee.apellido}
-                            </button>
-                            <p className="text-sm text-gray-600">{employee.cedula}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Mail className="h-3 w-3 mr-1" />
-                            {employee.email || 'No registrado'}
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Phone className="h-3 w-3 mr-1" />
-                            {employee.telefono || 'No registrado'}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <p className="font-medium">{employee.cargo}</p>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Building2 className="h-3 w-3 mr-1" />
-                            {employee.centrosocial || 'Sin asignar'}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">
-                            {getContractTypeLabel(employee.tipoContrato)}
-                          </p>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {formatDate(employee.fechaIngreso)}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <p className="font-semibold text-green-600">
-                          {formatCurrency(employee.salarioBase)}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(employee.estado)}>
-                          {ESTADOS_EMPLEADO.find(e => e.value === employee.estado)?.label || employee.estado}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {indicators.length > 0 && (
-                          <div className="flex items-center">
-                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                            <span className="text-sm text-yellow-600 ml-1">
-                              {indicators.length}
-                            </span>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEmployeeProfile(employee)}
-                            className="mr-2"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'activo')}>
-                                <UserCheck className="h-4 w-4 mr-2" />
-                                Activar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'inactivo')}>
-                                <UserX className="h-4 w-4 mr-2" />
-                                Desactivar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleDeleteEmployee(employee.id)}
-                                className="text-red-600"
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={allCurrentPageSelected && employees.length > 0}
+                        onCheckedChange={toggleAllEmployees}
+                      />
+                    </TableHead>
+                    <TableHead>Empleado</TableHead>
+                    <TableHead>Contacto</TableHead>
+                    <TableHead>Cargo</TableHead>
+                    <TableHead>Contrato</TableHead>
+                    <TableHead>Salario</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Alertas</TableHead>
+                    <TableHead className="text-center">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {employees.map((employee) => {
+                    const indicators = getComplianceIndicators(employee);
+                    return (
+                      <TableRow key={employee.id} className="hover:bg-gray-50">
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedEmployees.includes(employee.id)}
+                            onCheckedChange={() => toggleEmployeeSelection(employee.id)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={employee.avatar} />
+                              <AvatarFallback className="bg-blue-600 text-white">
+                                {employee.nombre[0]}{employee.apellido[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <button 
+                                onClick={() => openEmployeeProfile(employee)}
+                                className="font-semibold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer text-left"
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                                {employee.nombre} {employee.apellido}
+                              </button>
+                              <p className="text-sm text-gray-600">{employee.cedula}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Mail className="h-3 w-3 mr-1" />
+                              {employee.email || 'No registrado'}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Phone className="h-3 w-3 mr-1" />
+                              {employee.telefono || 'No registrado'}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <p className="font-medium">{employee.cargo}</p>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Building2 className="h-3 w-3 mr-1" />
+                              {employee.centrosocial || 'Sin asignar'}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">
+                              {getContractTypeLabel(employee.tipoContrato)}
+                            </p>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {formatDate(employee.fechaIngreso)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-semibold text-green-600">
+                            {formatCurrency(employee.salarioBase)}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(employee.estado)}>
+                            {ESTADOS_EMPLEADO.find(e => e.value === employee.estado)?.label || employee.estado}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {indicators.length > 0 && (
+                            <div className="flex items-center">
+                              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                              <span className="text-sm text-yellow-600 ml-1">
+                                {indicators.length}
+                              </span>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEmployeeProfile(employee)}
+                              className="mr-2"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'activo')}>
+                                  <UserCheck className="h-4 w-4 mr-2" />
+                                  Activar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'inactivo')}>
+                                  <UserX className="h-4 w-4 mr-2" />
+                                  Desactivar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteEmployee(employee.id)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              
+              {/* Add pagination controls */}
+              <PaginationControls 
+                pagination={pagination} 
+                itemName="empleados"
+              />
+            </>
           ) : (
             <div className="text-center py-12">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
