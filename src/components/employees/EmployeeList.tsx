@@ -40,7 +40,8 @@ export const EmployeeList = () => {
     totalEmployees,
     filteredCount,
     refreshEmployees,
-    getComplianceIndicators
+    getComplianceIndicators,
+    clearSelection
   } = useEmployeeList();
 
   const { changeEmployeeStatus, deleteEmployee } = useEmployeeCRUD();
@@ -49,6 +50,7 @@ export const EmployeeList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [isImportDrawerOpen, setIsImportDrawerOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   // Verificar si estamos en modo soporte
   const urlParams = new URLSearchParams(window.location.search);
@@ -81,6 +83,49 @@ export const EmployeeList = () => {
     const result = await changeEmployeeStatus(employeeId, newStatus);
     if (result.success) {
       refreshEmployees();
+    }
+  };
+
+  const handleBulkUpdateStatus = async (newStatus: string) => {
+    if (selectedEmployees.length === 0) return;
+    
+    setIsBulkUpdating(true);
+    
+    try {
+      // Update each selected employee's status
+      const updatePromises = selectedEmployees.map(employeeId => 
+        changeEmployeeStatus(employeeId, newStatus)
+      );
+      
+      const results = await Promise.all(updatePromises);
+      const successCount = results.filter(result => result.success).length;
+      const failureCount = results.length - successCount;
+      
+      if (successCount > 0) {
+        toast({
+          title: "Estados actualizados",
+          description: `Se actualizaron ${successCount} empleado${successCount !== 1 ? 's' : ''} a ${newStatus}${failureCount > 0 ? `. ${failureCount} falló${failureCount !== 1 ? 'n' : ''}` : ''}.`,
+        });
+        
+        // Refresh the employee list and clear selection
+        refreshEmployees();
+        clearSelection();
+      } else {
+        toast({
+          title: "Error en actualización masiva",
+          description: "No se pudo actualizar el estado de ningún empleado.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error in bulk status update:', error);
+      toast({
+        title: "Error en actualización masiva",
+        description: "Ocurrió un error al actualizar los estados.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsBulkUpdating(false);
     }
   };
 
@@ -177,7 +222,8 @@ export const EmployeeList = () => {
         {/* Acciones en lote */}
         <EmployeeBulkActions
           selectedCount={selectedEmployees.length}
-          onBulkUpdateStatus={bulkUpdateStatus}
+          onBulkUpdateStatus={handleBulkUpdateStatus}
+          isUpdating={isBulkUpdating}
         />
 
         <Card>

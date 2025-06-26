@@ -9,7 +9,7 @@ import { useEmployeeCompliance } from './useEmployeeCompliance';
 export const useEmployeeList = () => {
   const { employees, isLoading, refreshEmployees } = useEmployeeData();
   const { filters, filteredEmployees, updateFilters, clearFilters } = useEmployeeFiltering(employees);
-  const { selectedEmployees, toggleEmployeeSelection, toggleAllEmployees, bulkUpdateStatus, exportEmployees } = useEmployeeSelection();
+  const { selectedEmployees, toggleEmployeeSelection, toggleAllEmployees, clearSelection, exportEmployees } = useEmployeeSelection();
   const { selectedEmployee, isEmployeeProfileOpen, openEmployeeProfile, closeEmployeeProfile } = useEmployeeModal();
   const { getComplianceIndicators } = useEmployeeCompliance();
 
@@ -32,7 +32,7 @@ export const useEmployeeList = () => {
     clearFilters,
     toggleEmployeeSelection,
     toggleAllEmployees: () => toggleAllEmployees(pagination.paginatedItems.map(emp => emp.id)),
-    bulkUpdateStatus,
+    clearSelection,
     exportEmployees,
     getComplianceIndicators,
     openEmployeeProfile,

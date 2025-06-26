@@ -1,14 +1,19 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCheck, UserX } from 'lucide-react';
+import { UserCheck, UserX, Loader2 } from 'lucide-react';
 
 interface EmployeeBulkActionsProps {
   selectedCount: number;
   onBulkUpdateStatus: (status: string) => void;
+  isUpdating?: boolean;
 }
 
-export const EmployeeBulkActions = ({ selectedCount, onBulkUpdateStatus }: EmployeeBulkActionsProps) => {
+export const EmployeeBulkActions = ({ 
+  selectedCount, 
+  onBulkUpdateStatus, 
+  isUpdating = false 
+}: EmployeeBulkActionsProps) => {
   if (selectedCount === 0) return null;
 
   return (
@@ -19,12 +24,30 @@ export const EmployeeBulkActions = ({ selectedCount, onBulkUpdateStatus }: Emplo
             {selectedCount} empleado{selectedCount !== 1 ? 's' : ''} seleccionado{selectedCount !== 1 ? 's' : ''}
           </p>
           <div className="flex space-x-2">
-            <Button size="sm" variant="outline" onClick={() => onBulkUpdateStatus('activo')}>
-              <UserCheck className="h-4 w-4 mr-1" />
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => onBulkUpdateStatus('activo')}
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <UserCheck className="h-4 w-4 mr-1" />
+              )}
               Activar
             </Button>
-            <Button size="sm" variant="outline" onClick={() => onBulkUpdateStatus('inactivo')}>
-              <UserX className="h-4 w-4 mr-1" />
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => onBulkUpdateStatus('inactivo')}
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <UserX className="h-4 w-4 mr-1" />
+              )}
               Desactivar
             </Button>
           </div>

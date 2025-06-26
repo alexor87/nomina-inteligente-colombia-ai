@@ -30,8 +30,7 @@ export const useEmployeeSelection = () => {
     }
   };
 
-  const bulkUpdateStatus = (newStatus: string) => {
-    console.log(`Actualizando estado de ${selectedEmployees.length} empleados a: ${newStatus}`);
+  const clearSelection = () => {
     setSelectedEmployees([]);
   };
 
@@ -43,7 +42,7 @@ export const useEmployeeSelection = () => {
     selectedEmployees,
     toggleEmployeeSelection,
     toggleAllEmployees,
-    bulkUpdateStatus,
+    clearSelection,
     exportEmployees
   };
 };
