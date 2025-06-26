@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { forceAssignAdminRole, performCompleteRoleCheck } from '@/utils/roleUtils';
 
@@ -35,13 +36,14 @@ export class CompanyService {
   // Crear nueva empresa con usuario (para registro completo)
   static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
     try {
-      console.log('Starting user registration process...');
+      console.log('🚀 Starting complete company registration process...');
       
       // Primero registrar el usuario
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: data.user_email,
         password: data.user_password,
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             first_name: data.first_name,
             last_name: data.last_name
@@ -50,31 +52,39 @@ export class CompanyService {
       });
 
       if (signUpError) {
-        console.error('Sign up error:', signUpError);
-        throw signUpError;
+        console.error('❌ Sign up error:', signUpError);
+        throw new Error(`Error al registrar usuario: ${signUpError.message}`);
       }
       
       if (!authData.user) {
         throw new Error('Error al crear usuario - no se recibió información del usuario');
       }
 
-      console.log('User registered successfully:', authData.user.id);
+      console.log('✅ User registered successfully:', authData.user.id);
 
-      // Ahora necesitamos iniciar sesión para poder crear la empresa
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: data.user_email,
-        password: data.user_password
-      });
+      // Verificar si necesitamos confirmar email
+      if (!authData.session) {
+        console.log('📧 Email confirmation required, proceeding with user creation...');
+        
+        // Intentar iniciar sesión para obtener sesión
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: data.user_email,
+          password: data.user_password
+        });
 
-      if (signInError) {
-        console.error('Sign in error:', signInError);
-        throw signInError;
+        if (signInError && !signInError.message.includes('Email not confirmed')) {
+          console.error('❌ Sign in error:', signInError);
+          throw new Error(`Error al iniciar sesión: ${signInError.message}`);
+        }
+
+        if (signInData.session) {
+          console.log('✅ Session obtained after sign in');
+        }
       }
 
-      console.log('User signed in successfully');
-
       // Crear la empresa usando la función RPC
-      const { data: result, error } = await supabase.rpc('create_company_with_setup', {
+      console.log('🏢 Creating company...');
+      const { data: companyId, error: companyError } = await supabase.rpc('create_company_with_setup', {
         p_nit: data.nit,
         p_razon_social: data.razon_social,
         p_email: data.email,
@@ -85,81 +95,112 @@ export class CompanyService {
         p_last_name: data.last_name
       });
 
-      if (error) {
-        console.error('Company creation error:', error);
-        throw error;
+      if (companyError) {
+        console.error('❌ Company creation error:', companyError);
+        throw new Error(`Error al crear la empresa: ${companyError.message}`);
       }
 
-      console.log('Company created successfully:', result);
+      console.log('✅ Company created successfully:', companyId);
       
-      // Esperar más tiempo para que se procesen los triggers
+      // Esperar un momento para que se procesen los triggers
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // EJECUTAR VERIFICACIÓN COMPLETA DE ROLES
-      console.log('🚀 Starting complete role verification process...');
-      await performCompleteRoleCheck(signInData.user.id);
-      
-      // Verificación adicional - forzar asignación como respaldo
-      console.log('🔒 Force assigning admin role as additional backup...');
-      await forceAssignAdminRole(signInData.user.id, result);
-      
-      // Verificar que el perfil se creó correctamente
-      const { data: profileData, error: profileError } = await supabase
+      // Verificar y crear perfil manualmente si es necesario
+      console.log('👤 Ensuring user profile exists...');
+      const { data: existingProfile, error: profileCheckError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', signInData.user.id)
+        .eq('user_id', authData.user.id)
         .single();
 
-      if (profileError) {
-        console.error('Profile verification error:', profileError);
-        // Intentar crear el perfil manualmente si no existe
+      if (profileCheckError && profileCheckError.code === 'PGRST116') {
+        // Perfil no existe, crearlo
+        console.log('🔧 Creating user profile manually...');
         const { error: createProfileError } = await supabase
           .from('profiles')
           .insert({
-            user_id: signInData.user.id,
+            user_id: authData.user.id,
             first_name: data.first_name,
             last_name: data.last_name,
-            company_id: result
+            company_id: companyId
           });
         
         if (createProfileError) {
-          console.error('Manual profile creation error:', createProfileError);
+          console.error('❌ Profile creation error:', createProfileError);
+          // No fallar aquí, intentar continuar
+        } else {
+          console.log('✅ Profile created successfully');
         }
-      } else {
-        console.log('Profile verified:', profileData);
+      } else if (existingProfile && !existingProfile.company_id) {
+        // Perfil existe pero sin empresa, actualizarlo
+        console.log('🔧 Updating existing profile with company...');
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({ company_id: companyId })
+          .eq('user_id', authData.user.id);
         
-        // Si el perfil existe pero no tiene company_id, actualizarlo
-        if (!profileData.company_id) {
-          const { error: updateProfileError } = await supabase
-            .from('profiles')
-            .update({ company_id: result })
-            .eq('user_id', signInData.user.id);
-          
-          if (updateProfileError) {
-            console.error('Profile update error:', updateProfileError);
-          }
+        if (updateProfileError) {
+          console.error('❌ Profile update error:', updateProfileError);
+        } else {
+          console.log('✅ Profile updated successfully');
         }
       }
 
-      // Verificación final de roles
-      const { data: roleData, error: roleError } = await supabase
+      // Verificar y crear rol de administrador manualmente
+      console.log('👥 Ensuring admin role exists...');
+      const { data: existingRole, error: roleCheckError } = await supabase
         .from('user_roles')
         .select('*')
-        .eq('user_id', signInData.user.id)
+        .eq('user_id', authData.user.id)
+        .eq('company_id', companyId)
         .eq('role', 'administrador')
         .single();
 
-      if (roleError) {
-        console.error('Role verification error:', roleError);
-        // Última oportunidad - forzar creación del rol
-        await forceAssignAdminRole(signInData.user.id, result);
-      } else {
-        console.log('Role verified:', roleData);
+      if (roleCheckError && roleCheckError.code === 'PGRST116') {
+        // Rol no existe, crearlo
+        console.log('🔧 Creating admin role manually...');
+        const { error: createRoleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: authData.user.id,
+            role: 'administrador',
+            company_id: companyId,
+            assigned_by: authData.user.id
+          });
+        
+        if (createRoleError) {
+          console.error('❌ Role creation error:', createRoleError);
+          // Intentar una vez más con función de utilidad
+          await forceAssignAdminRole(authData.user.id, companyId);
+        } else {
+          console.log('✅ Admin role created successfully');
+        }
       }
 
-      return result;
+      // Verificación final
+      console.log('🔍 Performing final verification...');
+      const { data: finalProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', authData.user.id)
+        .single();
+
+      const { data: finalRole } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', authData.user.id)
+        .eq('company_id', companyId)
+        .single();
+
+      console.log('📊 Final verification results:', {
+        profile: finalProfile,
+        role: finalRole,
+        companyId
+      });
+
+      return companyId;
     } catch (error) {
-      console.error('Error creating company with user:', error);
+      console.error('❌ Complete error in company creation process:', error);
       throw new Error(error instanceof Error ? error.message : 'Error al crear la empresa');
     }
   }
