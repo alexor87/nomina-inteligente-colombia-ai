@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { PayrollHistoryDetails } from '@/components/payroll-history/PayrollHistoryDetails';
@@ -29,7 +30,7 @@ const PayrollHistoryDetailsPage = () => {
       console.log('🔍 Cargando detalles del período:', periodId);
       
       // Primero intentar buscar en payroll_periods (períodos del sistema inteligente)
-      const payrollPeriod = await PayrollPeriodService.getPayrollPeriodById(periodId);
+      const payrollPeriod = await PayrollPeriodService.getPayrollPeriodById(periodId!);
       
       if (payrollPeriod) {
         console.log('📋 Período encontrado en payroll_periods:', payrollPeriod);
@@ -67,7 +68,7 @@ const PayrollHistoryDetailsPage = () => {
       if (!foundRecord) {
         // Intentar buscar por coincidencia parcial del ID (en caso de IDs generados)
         const possibleMatch = data.find(record => 
-          record.id.includes(periodId) || periodId.includes(record.id)
+          record.id?.includes(periodId!) || periodId!.includes(record.id || '')
         );
         
         if (!possibleMatch) {
@@ -78,13 +79,13 @@ const PayrollHistoryDetailsPage = () => {
         
         console.log('📋 Período encontrado por coincidencia:', possibleMatch.periodo);
         // Usar el registro encontrado por coincidencia
-        const convertedPeriod = this.convertHistoryRecordToPeriod(possibleMatch);
+        const convertedPeriod = convertHistoryRecordToPeriod(possibleMatch);
         setPeriod(convertedPeriod);
         return;
       }
 
       console.log('📋 Período encontrado en historial:', foundRecord.periodo);
-      const convertedPeriod = this.convertHistoryRecordToPeriod(foundRecord);
+      const convertedPeriod = convertHistoryRecordToPeriod(foundRecord);
       setPeriod(convertedPeriod);
       
     } catch (error) {
@@ -114,7 +115,7 @@ const PayrollHistoryDetailsPage = () => {
     }
 
     return {
-      id: foundRecord.id,
+      id: foundRecord.id || '',
       period: foundRecord.periodo || 'Sin período',
       startDate: foundRecord.fechaCreacion || new Date().toISOString().split('T')[0],
       endDate: foundRecord.fechaCreacion || new Date().toISOString().split('T')[0],

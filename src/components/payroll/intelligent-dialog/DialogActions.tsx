@@ -9,7 +9,7 @@ import {
   CheckCircle,
   Loader2
 } from "lucide-react";
-import { PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
+import { PeriodStatus } from '@/services/payroll-intelligent/PayrollPeriodDetectionService';
 
 interface DialogActionsProps {
   periodStatus: PeriodStatus;
@@ -57,11 +57,11 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
         </DialogFooter>
       );
 
-    case 'create_new':
+    case 'create':
       return (
         <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
           <div className="flex gap-2">
-            {periodStatus.currentPeriod && (
+            {periodStatus.lastLiquidatedPeriodId && (
               <Button 
                 variant="outline" 
                 onClick={onViewLastPeriod}
@@ -122,7 +122,7 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
         </DialogFooter>
       );
 
-    case 'error':
+    case 'view_last':
       return (
         <DialogFooter className="pt-4">
           <Button 

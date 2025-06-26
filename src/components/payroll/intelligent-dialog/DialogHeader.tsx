@@ -9,7 +9,7 @@ import {
   AlertCircle,
   Clock
 } from "lucide-react";
-import { PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
+import { PeriodStatus } from '@/services/payroll-intelligent/PayrollPeriodDetectionService';
 
 interface DialogHeaderProps {
   periodStatus: PeriodStatus;
@@ -22,11 +22,11 @@ export const IntelligentDialogHeader: React.FC<DialogHeaderProps> = ({
     switch (periodStatus.action) {
       case 'resume':
         return <Clock className="h-5 w-5 text-blue-600" />;
-      case 'create_new':
+      case 'create':
         return <Play className="h-5 w-5 text-green-600" />;
       case 'configure':
         return <Settings className="h-5 w-5 text-orange-600" />;
-      case 'error':
+      case 'view_last':
         return <AlertCircle className="h-5 w-5 text-red-600" />;
       default:
         return <Calendar className="h-5 w-5 text-gray-600" />;
@@ -41,7 +41,7 @@ export const IntelligentDialogHeader: React.FC<DialogHeaderProps> = ({
             En curso
           </Badge>
         );
-      case 'create_new':
+      case 'create':
         return (
           <Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-50 text-xs font-medium px-2 py-0.5">
             Nuevo período
@@ -53,7 +53,7 @@ export const IntelligentDialogHeader: React.FC<DialogHeaderProps> = ({
             Configuración
           </Badge>
         );
-      case 'error':
+      case 'view_last':
         return (
           <Badge variant="destructive" className="text-xs font-medium px-2 py-0.5">
             Error

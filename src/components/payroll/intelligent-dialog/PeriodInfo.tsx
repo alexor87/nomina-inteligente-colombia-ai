@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, TrendingUp, Users, AlertCircle, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
+import { PeriodStatus } from '@/services/payroll-intelligent/PayrollPeriodDetectionService';
 import { ValidationAlert } from './ValidationAlert';
 import { PayrollValidationService, ValidationResult } from '@/services/payroll-intelligent/PayrollValidationService';
 import { PayrollPerformanceService } from '@/services/payroll-intelligent/PayrollPerformanceService';
@@ -22,7 +22,7 @@ export const PeriodInfo: React.FC<PeriodInfoProps> = ({
 
   useEffect(() => {
     // Auto-validar cuando se propone crear un nuevo período
-    if (periodStatus.action === 'create_new' && periodStatus.nextPeriod) {
+    if (periodStatus.action === 'create' && periodStatus.nextPeriod) {
       runValidations();
       loadSystemMetrics();
     }
@@ -152,7 +152,7 @@ export const PeriodInfo: React.FC<PeriodInfoProps> = ({
           </div>
 
           {/* Botón de validaciones */}
-          {periodStatus.action === 'create_new' && (
+          {periodStatus.action === 'create' && (
             <div className="mt-3 pt-2 border-t border-gray-200">
               <Button
                 variant="outline"
