@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -14,7 +13,7 @@ import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useNavigate } from 'react-router-dom';
 import { EmployeeListHeader } from './EmployeeListHeader';
 import { EmployeeSearchBar } from './EmployeeSearchBar';
-import { EmployeeFiltersPanel } from './EmployeeFiltersPanel';
+import { EmployeeFiltersCollapsible } from './EmployeeFiltersCollapsible';
 import { EmployeeBulkActions } from './EmployeeBulkActions';
 import { EmployeeTable } from './EmployeeTable';
 import { EmployeeEmptyState } from './EmployeeEmptyState';
@@ -55,6 +54,11 @@ export const EmployeeList = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const supportCompanyId = urlParams.get('support_company');
   const isSupportMode = !!supportCompanyId;
+
+  // Calcular filtros activos
+  const activeFiltersCount = Object.values(filters).filter(value => 
+    value !== '' && value !== undefined && value !== filters.searchTerm
+  ).length;
 
   const handleCreateEmployee = () => {
     navigate('/employees/create');
@@ -150,22 +154,25 @@ export const EmployeeList = () => {
           onCreateEmployee={handleCreateEmployee}
         />
 
-        {/* Barra de búsqueda */}
+        {/* Barra de búsqueda con botón de filtros */}
         <EmployeeSearchBar
           searchTerm={filters.searchTerm}
           onSearchChange={(value) => updateFilters({ searchTerm: value })}
+          showFilters={showFilters}
+          onToggleFilters={() => setShowFilters(!showFilters)}
+          activeFiltersCount={activeFiltersCount}
         />
 
-        {/* Filtros */}
-        <EmployeeFiltersPanel
-          showFilters={showFilters}
-          filters={filters}
-          totalEmployees={totalEmployees}
-          filteredCount={filteredCount}
-          onToggleFilters={() => setShowFilters(!showFilters)}
-          onUpdateFilters={updateFilters}
-          onClearFilters={clearFilters}
-        />
+        {/* Panel de filtros colapsible */}
+        {showFilters && (
+          <EmployeeFiltersCollapsible
+            filters={filters}
+            onUpdateFilters={updateFilters}
+            onClearFilters={clearFilters}
+            totalCount={totalEmployees}
+            filteredCount={filteredCount}
+          />
+        )}
 
         {/* Acciones en lote */}
         <EmployeeBulkActions
