@@ -124,6 +124,15 @@ const DEPARTAMENTOS_COLOMBIA = [
 // Salario mínimo 2025 Colombia
 const SALARIO_MINIMO_2025 = 1300000;
 
+// Default ARL risk levels in case configuration is not available
+const DEFAULT_ARL_RISK_LEVELS = [
+  { value: 'I', label: 'Nivel I - Riesgo Mínimo', percentage: '0.522%' },
+  { value: 'II', label: 'Nivel II - Riesgo Bajo', percentage: '1.044%' },
+  { value: 'III', label: 'Nivel III - Riesgo Medio', percentage: '2.436%' },
+  { value: 'IV', label: 'Nivel IV - Riesgo Alto', percentage: '4.350%' },
+  { value: 'V', label: 'Nivel V - Riesgo Máximo', percentage: '6.960%' }
+];
+
 export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFormModernProps) => {
   const { configuration } = useEmployeeGlobalConfiguration();
   const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUD();
@@ -143,19 +152,31 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
   const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
   const [completionPercentage, setCompletionPercentage] = useState(0);
   const [isDraft, setIsDraft] = useState(false);
-  const [arlRiskLevels, setArlRiskLevels] = useState<{ value: string; label: string; percentage: string }[]>([]);
+  const [arlRiskLevels, setArlRiskLevels] = useState<{ value: string; label: string; percentage: string }[]>(DEFAULT_ARL_RISK_LEVELS);
   
-  // Obtener configuración actual para ARL
+  // Obtener configuración actual para ARL con fallback
   useEffect(() => {
-    const config = ConfigurationService.getConfiguration();
-    const levels = [
-      { value: 'I', label: 'Nivel I - Riesgo Mínimo', percentage: `${config.arlRiskLevels.I}%` },
-      { value: 'II', label: 'Nivel II - Riesgo Bajo', percentage: `${config.arlRiskLevels.II}%` },
-      { value: 'III', label: 'Nivel III - Riesgo Medio', percentage: `${config.arlRiskLevels.III}%` },
-      { value: 'IV', label: 'Nivel IV - Riesgo Alto', percentage: `${config.arlRiskLevels.IV}%` },
-      { value: 'V', label: 'Nivel V - Riesgo Máximo', percentage: `${config.arlRiskLevels.V}%` }
-    ];
-    setArlRiskLevels(levels);
+    try {
+      const config = ConfigurationService.getConfiguration();
+      
+      // Verificar que config y arlRiskLevels existen antes de usarlos
+      if (config && config.arlRiskLevels) {
+        const levels = [
+          { value: 'I', label: 'Nivel I - Riesgo Mínimo', percentage: `${config.arlRiskLevels.I || 0.522}%` },
+          { value: 'II', label: 'Nivel II - Riesgo Bajo', percentage: `${config.arlRiskLevels.II || 1.044}%` },
+          { value: 'III', label: 'Nivel III - Riesgo Medio', percentage: `${config.arlRiskLevels.III || 2.436}%` },
+          { value: 'IV', label: 'Nivel IV - Riesgo Alto', percentage: `${config.arlRiskLevels.IV || 4.350}%` },
+          { value: 'V', label: 'Nivel V - Riesgo Máximo', percentage: `${config.arlRiskLevels.V || 6.960}%` }
+        ];
+        setArlRiskLevels(levels);
+      } else {
+        console.warn('Configuration or arlRiskLevels not available, using defaults');
+        setArlRiskLevels(DEFAULT_ARL_RISK_LEVELS);
+      }
+    } catch (error) {
+      console.error('Error loading ARL risk levels configuration:', error);
+      setArlRiskLevels(DEFAULT_ARL_RISK_LEVELS);
+    }
   }, []);
 
   const { register, handleSubmit, formState: { errors }, setValue, watch, trigger } = useForm<EmployeeFormData>({
