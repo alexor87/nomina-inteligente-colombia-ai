@@ -13,26 +13,23 @@ import { PaginationControls } from '@/components/ui/PaginationControls';
 
 export const PaymentsPage = () => {
   const {
-    payments,
-    allPayments,
+    employees,
+    currentPeriod,
     filters,
-    summary,
-    selectedPayments,
     isLoading,
     updateFilters,
-    clearFilters,
-    togglePaymentSelection,
-    toggleAllPayments,
-    processPayment,
-    processSelectedPayments,
+    markEmployeeAsPaid,
+    markMultipleAsPaid,
     retryPayment,
     generateBankFile,
-    markAsPaid,
-    refreshPayments
+    downloadPaymentReport,
+    refreshData,
+    totalEmployees,
+    totalAmount
   } = usePayments();
 
   // Add pagination for payments
-  const pagination = usePagination(payments, {
+  const pagination = usePagination(employees, {
     defaultPageSize: 25,
     pageSizeOptions: [25, 50, 75, 100],
     storageKey: 'payments'
@@ -42,17 +39,18 @@ export const PaymentsPage = () => {
   const [showRetryModal, setShowRetryModal] = useState(false);
   const [showBankFileGenerator, setShowBankFileGenerator] = useState(false);
   const [selectedPaymentForRetry, setSelectedPaymentForRetry] = useState(null);
+  const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
 
   const handlePaymentAction = (paymentId: string, action: string) => {
     switch (action) {
       case 'process':
-        processPayment(paymentId);
+        markEmployeeAsPaid(paymentId, { paymentDate: new Date().toISOString() });
         break;
       case 'markPaid':
-        markAsPaid(paymentId);
+        markEmployeeAsPaid(paymentId, { paymentDate: new Date().toISOString() });
         break;
       case 'retry':
-        const payment = allPayments.find(p => p.id === paymentId);
+        const payment = employees.find(p => p.id === paymentId);
         setSelectedPaymentForRetry(payment);
         setShowRetryModal(true);
         break;
@@ -68,6 +66,38 @@ export const PaymentsPage = () => {
         setShowBankFileGenerator(true);
         break;
     }
+  };
+
+  const togglePaymentSelection = (paymentId: string) => {
+    setSelectedPayments(prev => 
+      prev.includes(paymentId) 
+        ? prev.filter(id => id !== paymentId)
+        : [...prev, paymentId]
+    );
+  };
+
+  const toggleAllPayments = () => {
+    setSelectedPayments(prev => 
+      prev.length === employees.length ? [] : employees.map(emp => emp.id)
+    );
+  };
+
+  const processSelectedPayments = () => {
+    markMultipleAsPaid(selectedPayments, new Date().toISOString());
+    setSelectedPayments([]);
+  };
+
+  const clearFilters = () => {
+    updateFilters({});
+  };
+
+  // Create summary from employees data
+  const summary = {
+    totalEmployees,
+    totalAmount,
+    pendingPayments: employees.filter(emp => emp.paymentStatus === 'pendiente').length,
+    completedPayments: employees.filter(emp => emp.paymentStatus === 'pagado').length,
+    failedPayments: employees.filter(emp => emp.paymentStatus === 'fallido').length
   };
 
   if (isLoading) {
@@ -87,32 +117,34 @@ export const PaymentsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PaymentsHeader />
+      <PaymentsHeader 
+        period={currentPeriod} 
+        onDownloadReport={() => downloadPaymentReport(currentPeriod?.id || 'current')}
+      />
       
       <div className="p-6 space-y-6">
         <PaymentsSummaryCards summary={summary} />
         
         <PaymentsFilters
           filters={filters}
-          onUpdateFilters={updateFilters}
+          onFiltersChange={updateFilters}
           onClearFilters={clearFilters}
-          totalCount={allPayments.length}
-          filteredCount={payments.length}
+          totalCount={totalEmployees}
+          filteredCount={employees.length}
         />
 
         <div className="bg-white rounded-lg shadow">
           <PaymentsTable
-            payments={pagination.paginatedItems} // Use paginated payments
+            employees={pagination.paginatedItems}
             selectedPayments={selectedPayments}
             onToggleSelection={togglePaymentSelection}
             onToggleAll={toggleAllPayments}
             onPaymentAction={handlePaymentAction}
             onBulkAction={handleBulkAction}
             onClearFilters={clearFilters}
-            totalPayments={allPayments.length}
+            totalPayments={totalEmployees}
           />
           
-          {/* Add pagination controls */}
           <PaginationControls 
             pagination={pagination} 
             itemName="pagos"
@@ -128,7 +160,7 @@ export const PaymentsPage = () => {
           processSelectedPayments();
           setShowConfirmationModal(false);
         }}
-        selectedCount={selectedPayments.length}
+        paymentCount={selectedPayments.length}
       />
 
       <RetryPaymentModal
@@ -137,8 +169,8 @@ export const PaymentsPage = () => {
           setShowRetryModal(false);
           setSelectedPaymentForRetry(null);
         }}
-        onRetry={(paymentId, config) => {
-          retryPayment(paymentId, config);
+        onRetry={(paymentId) => {
+          retryPayment(paymentId);
           setShowRetryModal(false);
           setSelectedPaymentForRetry(null);
         }}
@@ -148,11 +180,11 @@ export const PaymentsPage = () => {
       <BankFileGenerator
         isOpen={showBankFileGenerator}
         onClose={() => setShowBankFileGenerator(false)}
-        selectedPayments={selectedPayments.map(id => 
-          allPayments.find(p => p.id === id)!
+        employees={selectedPayments.map(id => 
+          employees.find(p => p.id === id)!
         )}
         onGenerate={(config) => {
-          generateBankFile(selectedPayments, config);
+          generateBankFile(config);
           setShowBankFileGenerator(false);
         }}
       />

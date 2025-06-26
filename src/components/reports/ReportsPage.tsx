@@ -27,15 +27,19 @@ import {
 
 export const ReportsPage = () => {
   const {
-    reportData,
     filters,
+    setFilters,
     exportHistory,
-    isLoading,
-    updateFilters,
-    generateReport,
-    exportReport,
-    scheduleReport,
-    refreshData
+    loading,
+    getPayrollSummaryReport,
+    getLaborCostReport,
+    getSocialSecurityReport,
+    getIncomeRetentionCertificates,
+    getNoveltyHistoryReport,
+    getAccountingExports,
+    exportToExcel,
+    exportToPDF,
+    exportToCSV
   } = useReports();
 
   // Add pagination for export history
@@ -47,6 +51,7 @@ export const ReportsPage = () => {
 
   const [activeTab, setActiveTab] = useState('payroll-summary');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [reportData, setReportData] = useState<any[]>([]);
 
   const reportTypes = [
     {
@@ -99,17 +104,56 @@ export const ReportsPage = () => {
   const handleGenerateReport = async () => {
     setIsGenerating(true);
     try {
-      await generateReport(activeTab, filters);
+      let data = [];
+      switch (activeTab) {
+        case 'payroll-summary':
+          data = await getPayrollSummaryReport(filters);
+          break;
+        case 'labor-cost':
+          data = await getLaborCostReport(filters);
+          break;
+        case 'social-security':
+          data = await getSocialSecurityReport(filters);
+          break;
+        case 'income-retention':
+          data = await getIncomeRetentionCertificates(new Date().getFullYear());
+          break;
+        case 'novelty-history':
+          data = await getNoveltyHistoryReport(filters);
+          break;
+        case 'accounting-export':
+          data = await getAccountingExports(filters);
+          break;
+        default:
+          data = [];
+      }
+      setReportData(data);
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleExportReport = async (format: 'excel' | 'pdf' | 'csv') => {
-    await exportReport(activeTab, format, filters);
+    const fileName = `${activeTab}_${new Date().toISOString().split('T')[0]}`;
+    
+    switch (format) {
+      case 'excel':
+        await exportToExcel(activeTab, reportData, fileName);
+        break;
+      case 'pdf':
+        await exportToPDF(activeTab, reportData, fileName);
+        break;
+      case 'csv':
+        await exportToCSV(activeTab, reportData, fileName);
+        break;
+    }
   };
 
-  if (isLoading) {
+  const updateFilters = (newFilters: any) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="animate-pulse p-6">

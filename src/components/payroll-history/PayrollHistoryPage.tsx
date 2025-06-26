@@ -61,7 +61,32 @@ export const PayrollHistoryPage = () => {
     try {
       setIsLoading(true);
       const data = await PayrollHistoryService.getPayrollPeriods();
-      setPeriods(data);
+      // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
+      const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => ({
+        id: record.id,
+        period: record.periodo || 'Sin período',
+        startDate: record.fecha_inicio || new Date().toISOString().split('T')[0],
+        endDate: record.fecha_fin || new Date().toISOString().split('T')[0],
+        type: 'mensual' as const,
+        status: record.estado as 'cerrado' | 'con_errores' | 'revision',
+        totalEmployees: record.total_empleados || 0,
+        totalAmount: Number(record.total_nomina || 0),
+        totalPaid: Number(record.total_pagado || 0),
+        totalFailed: 0,
+        createdAt: record.created_at || new Date().toISOString(),
+        updatedAt: record.updated_at || new Date().toISOString(),
+        createdBy: record.created_by || 'Sistema',
+        processedAt: record.processed_at,
+        closedAt: record.closed_at,
+        errors: record.errores ? [record.errores] : [],
+        summary: {
+          totalGross: Number(record.total_devengado || 0),
+          totalDeductions: Number(record.total_deducciones || 0),
+          totalNet: Number(record.total_nomina || 0),
+          employerContributions: Number(record.aportes_patronales || 0)
+        }
+      }));
+      setPeriods(convertedPeriods);
     } catch (error) {
       console.error('Error loading payroll history:', error);
     } finally {
@@ -251,8 +276,6 @@ export const PayrollHistoryPage = () => {
         <PayrollHistoryFilters
           filters={filters}
           onFiltersChange={setFilters}
-          totalCount={periods.length}
-          filteredCount={filteredPeriods.length}
         />
 
         {/* Table with Pagination */}
@@ -275,6 +298,7 @@ export const PayrollHistoryPage = () => {
       {showDetails && selectedPeriod && (
         <PayrollHistoryDetails
           period={selectedPeriod}
+          isOpen={showDetails}
           onClose={() => {
             setShowDetails(false);
             setSelectedPeriod(null);
@@ -295,7 +319,6 @@ export const PayrollHistoryPage = () => {
           }}
           onConfirm={handleReopenConfirm}
           period={selectedPeriod}
-          isLoading={isReopening}
         />
       )}
 
@@ -306,9 +329,8 @@ export const PayrollHistoryPage = () => {
             setShowEditWizard(false);
             setSelectedPeriod(null);
           }}
-          onComplete={handleEditWizardComplete}
+          onSave={handleEditWizardComplete}
           period={selectedPeriod}
-          isLoading={isProcessing}
         />
       )}
     </div>
