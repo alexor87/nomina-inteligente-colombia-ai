@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -391,6 +392,7 @@ export const ContratoNominaSettings = () => {
       },
       diasPeriodicidad: 30,
       periodicidadPago: 'mensual',
+      diasPersonalizados: 30, // Agregar la propiedad faltante
       jornadaEstandar: 8,
       politicaRedondeo: 'decimales',
       prestacionesActivadas: {
