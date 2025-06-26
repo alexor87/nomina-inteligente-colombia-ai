@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -21,7 +20,7 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
   { name: 'Empleados', href: '/employees', icon: Users, module: 'employees' },
-  { name: 'Liquidar Nómina', href: '/payroll-backend', icon: Calculator, module: 'payroll' },
+  { name: 'Liquidar Nómina', href: '/payroll', icon: Calculator, module: 'payroll' },
   { name: 'Historial Nómina', href: '/payroll-history', icon: History, module: 'payroll-history' },
   { name: 'Comprobantes', href: '/vouchers', icon: Receipt, module: 'vouchers' },
   { name: 'Pagos y Dispersión', href: '/payments', icon: CreditCard, module: 'payments' },
