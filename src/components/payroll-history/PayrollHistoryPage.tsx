@@ -61,24 +61,45 @@ export const PayrollHistoryPage = () => {
       setIsLoading(true);
       const data = await PayrollHistoryService.getPayrollPeriods();
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
-      const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => ({
-        id: record.id,
-        period: record.periodo || 'Sin período',
-        startDate: record.fechaCreacion || new Date().toISOString().split('T')[0],
-        endDate: record.fechaCreacion || new Date().toISOString().split('T')[0],
-        type: 'mensual' as const,
-        employeesCount: record.empleados || 0,
-        status: (record.estado === 'cerrada' ? 'cerrado' : record.estado === 'borrador' ? 'revision' : 'con_errores') as 'cerrado' | 'con_errores' | 'revision',
-        totalGrossPay: Number(record.totalNomina || 0),
-        totalNetPay: Number(record.totalNomina || 0),
-        totalDeductions: 0,
-        totalCost: Number(record.totalNomina || 0),
-        employerContributions: 0,
-        paymentStatus: 'pendiente' as const,
-        version: 1,
-        createdAt: record.fechaCreacion || new Date().toISOString(),
-        updatedAt: record.fechaCreacion || new Date().toISOString(),
-      }));
+      const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
+        // Fix the status mapping logic
+        let mappedStatus: 'cerrado' | 'con_errores' | 'revision' = 'revision';
+        
+        switch (record.estado) {
+          case 'cerrada':
+          case 'procesada':
+          case 'pagada':
+            mappedStatus = 'cerrado';
+            break;
+          case 'borrador':
+            mappedStatus = 'revision';
+            break;
+          default:
+            // Only mark as 'con_errores' if there's an actual error status
+            // or if we detect data inconsistencies
+            mappedStatus = 'con_errores';
+            break;
+        }
+
+        return {
+          id: record.id,
+          period: record.periodo || 'Sin período',
+          startDate: record.fechaCreacion || new Date().toISOString().split('T')[0],
+          endDate: record.fechaCreacion || new Date().toISOString().split('T')[0],
+          type: 'mensual' as const,
+          employeesCount: record.empleados || 0,
+          status: mappedStatus,
+          totalGrossPay: Number(record.totalNomina || 0),
+          totalNetPay: Number(record.totalNomina || 0),
+          totalDeductions: 0,
+          totalCost: Number(record.totalNomina || 0),
+          employerContributions: 0,
+          paymentStatus: record.estado === 'pagada' ? 'pagado' as const : 'pendiente' as const,
+          version: 1,
+          createdAt: record.fechaCreacion || new Date().toISOString(),
+          updatedAt: record.fechaCreacion || new Date().toISOString(),
+        };
+      });
       setPeriods(convertedPeriods);
     } catch (error) {
       console.error('Error loading payroll history:', error);
