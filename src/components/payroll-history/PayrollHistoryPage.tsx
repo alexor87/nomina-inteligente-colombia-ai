@@ -65,26 +65,21 @@ export const PayrollHistoryPage = () => {
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => ({
         id: record.id,
         period: record.periodo || 'Sin período',
-        startDate: record.fecha_inicio || new Date().toISOString().split('T')[0],
-        endDate: record.fecha_fin || new Date().toISOString().split('T')[0],
+        startDate: record.fechaInicio || new Date().toISOString().split('T')[0],
+        endDate: record.fechaFin || new Date().toISOString().split('T')[0],
         type: 'mensual' as const,
+        employeesCount: record.totalEmpleados || 0,
         status: record.estado as 'cerrado' | 'con_errores' | 'revision',
-        totalEmployees: record.total_empleados || 0,
-        totalAmount: Number(record.total_nomina || 0),
-        totalPaid: Number(record.total_pagado || 0),
-        totalFailed: 0,
-        createdAt: record.created_at || new Date().toISOString(),
-        updatedAt: record.updated_at || new Date().toISOString(),
-        createdBy: record.created_by || 'Sistema',
-        processedAt: record.processed_at,
-        closedAt: record.closed_at,
-        errors: record.errores ? [record.errores] : [],
-        summary: {
-          totalGross: Number(record.total_devengado || 0),
-          totalDeductions: Number(record.total_deducciones || 0),
-          totalNet: Number(record.total_nomina || 0),
-          employerContributions: Number(record.aportes_patronales || 0)
-        }
+        totalGrossPay: Number(record.totalDevengado || 0),
+        totalNetPay: Number(record.totalNomina || 0),
+        totalDeductions: Number(record.totalDeducciones || 0),
+        totalCost: Number(record.totalNomina || 0) + Number(record.aportesPatronales || 0),
+        employerContributions: Number(record.aportesPatronales || 0),
+        paymentStatus: 'pendiente' as const,
+        version: 1,
+        createdAt: record.createdAt || new Date().toISOString(),
+        updatedAt: record.updatedAt || new Date().toISOString(),
+        pilaFileUrl: record.pilaFileUrl
       }));
       setPeriods(convertedPeriods);
     } catch (error) {
@@ -319,6 +314,7 @@ export const PayrollHistoryPage = () => {
           }}
           onConfirm={handleReopenConfirm}
           period={selectedPeriod}
+          isProcessing={isReopening}
         />
       )}
 

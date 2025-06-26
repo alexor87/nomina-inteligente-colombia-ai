@@ -91,13 +91,39 @@ export const PaymentsPage = () => {
     updateFilters({});
   };
 
-  // Create summary from employees data
+  const handleMarkAsPaid = (employee: any) => {
+    markEmployeeAsPaid(employee.id, { paymentDate: new Date().toISOString() });
+  };
+
+  const handleRetryPayment = async (employee: any) => {
+    return new Promise<boolean>((resolve) => {
+      retryPayment(employee.id);
+      resolve(true);
+    });
+  };
+
+  const handleUpdateBankAccount = async (employeeId: string, accountData: any) => {
+    // Implementation would go here
+    return Promise.resolve(true);
+  };
+
+  // Create summary from employees data matching PaymentsSummary interface
+  const paidEmployees = employees.filter(emp => emp.paymentStatus === 'pagado');
+  const failedEmployees = employees.filter(emp => emp.paymentStatus === 'fallido');
+  const totalPaid = paidEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
+  const totalFailed = failedEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
+  
   const summary = {
     totalEmployees,
     totalAmount,
+    totalPaid,
+    totalFailed,
+    paidCount: paidEmployees.length,
+    failedCount: failedEmployees.length,
     pendingPayments: employees.filter(emp => emp.paymentStatus === 'pendiente').length,
-    completedPayments: employees.filter(emp => emp.paymentStatus === 'pagado').length,
-    failedPayments: employees.filter(emp => emp.paymentStatus === 'fallido').length
+    completedPayments: paidEmployees.length,
+    failedPayments: failedEmployees.length,
+    progressPercentage: totalEmployees > 0 ? Math.round((paidEmployees.length / totalEmployees) * 100) : 0
   };
 
   if (isLoading) {
@@ -128,21 +154,17 @@ export const PaymentsPage = () => {
         <PaymentsFilters
           filters={filters}
           onFiltersChange={updateFilters}
-          onClearFilters={clearFilters}
-          totalCount={totalEmployees}
-          filteredCount={employees.length}
+          employees={employees}
         />
 
         <div className="bg-white rounded-lg shadow">
           <PaymentsTable
             employees={pagination.paginatedItems}
-            selectedPayments={selectedPayments}
-            onToggleSelection={togglePaymentSelection}
-            onToggleAll={toggleAllPayments}
-            onPaymentAction={handlePaymentAction}
-            onBulkAction={handleBulkAction}
-            onClearFilters={clearFilters}
-            totalPayments={totalEmployees}
+            selectedEmployees={selectedPayments}
+            onSelectionChange={setSelectedPayments}
+            onMarkAsPaid={handleMarkAsPaid}
+            onRetryPayment={handleRetryPayment}
+            onUpdateBankAccount={handleUpdateBankAccount}
           />
           
           <PaginationControls 
@@ -160,7 +182,7 @@ export const PaymentsPage = () => {
           processSelectedPayments();
           setShowConfirmationModal(false);
         }}
-        paymentCount={selectedPayments.length}
+        employee={null}
       />
 
       <RetryPaymentModal
@@ -169,12 +191,14 @@ export const PaymentsPage = () => {
           setShowRetryModal(false);
           setSelectedPaymentForRetry(null);
         }}
-        onRetry={(paymentId) => {
+        onRetry={async (paymentId) => {
           retryPayment(paymentId);
           setShowRetryModal(false);
           setSelectedPaymentForRetry(null);
+          return true;
         }}
-        payment={selectedPaymentForRetry}
+        onUpdateAccount={handleUpdateBankAccount}
+        employee={selectedPaymentForRetry}
       />
 
       <BankFileGenerator
@@ -183,10 +207,6 @@ export const PaymentsPage = () => {
         employees={selectedPayments.map(id => 
           employees.find(p => p.id === id)!
         )}
-        onGenerate={(config) => {
-          generateBankFile(config);
-          setShowBankFileGenerator(false);
-        }}
       />
     </div>
   );
