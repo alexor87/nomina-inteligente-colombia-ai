@@ -65,21 +65,20 @@ export const PayrollHistoryPage = () => {
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => ({
         id: record.id,
         period: record.periodo || 'Sin período',
-        startDate: record.fechaInicio || new Date().toISOString().split('T')[0],
-        endDate: record.fechaFin || new Date().toISOString().split('T')[0],
+        startDate: record.fechaCreacion || new Date().toISOString().split('T')[0],
+        endDate: record.fechaCreacion || new Date().toISOString().split('T')[0],
         type: 'mensual' as const,
-        employeesCount: record.totalEmpleados || 0,
-        status: record.estado as 'cerrado' | 'con_errores' | 'revision',
-        totalGrossPay: Number(record.totalDevengado || 0),
+        employeesCount: record.empleados || 0,
+        status: (record.estado === 'cerrada' ? 'cerrado' : record.estado === 'borrador' ? 'revision' : 'con_errores') as 'cerrado' | 'con_errores' | 'revision',
+        totalGrossPay: Number(record.totalNomina || 0),
         totalNetPay: Number(record.totalNomina || 0),
-        totalDeductions: Number(record.totalDeducciones || 0),
-        totalCost: Number(record.totalNomina || 0) + Number(record.aportesPatronales || 0),
-        employerContributions: Number(record.aportesPatronales || 0),
+        totalDeductions: 0,
+        totalCost: Number(record.totalNomina || 0),
+        employerContributions: 0,
         paymentStatus: 'pendiente' as const,
         version: 1,
-        createdAt: record.createdAt || new Date().toISOString(),
-        updatedAt: record.updatedAt || new Date().toISOString(),
-        pilaFileUrl: record.pilaFileUrl
+        createdAt: record.fechaCreacion || new Date().toISOString(),
+        updatedAt: record.fechaCreacion || new Date().toISOString(),
       }));
       setPeriods(convertedPeriods);
     } catch (error) {
@@ -293,14 +292,9 @@ export const PayrollHistoryPage = () => {
       {showDetails && selectedPeriod && (
         <PayrollHistoryDetails
           period={selectedPeriod}
-          isOpen={showDetails}
-          onClose={() => {
+          onBack={() => {
             setShowDetails(false);
             setSelectedPeriod(null);
-          }}
-          onEdit={() => {
-            setShowDetails(false);
-            setShowEditWizard(true);
           }}
         />
       )}
@@ -325,7 +319,7 @@ export const PayrollHistoryPage = () => {
             setShowEditWizard(false);
             setSelectedPeriod(null);
           }}
-          onSave={handleEditWizardComplete}
+          onComplete={handleEditWizardComplete}
           period={selectedPeriod}
         />
       )}
