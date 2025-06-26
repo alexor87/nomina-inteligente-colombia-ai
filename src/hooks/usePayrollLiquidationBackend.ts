@@ -403,10 +403,19 @@ export const usePayrollLiquidationBackend = () => {
       if (updatedPeriod) {
         setCurrentPeriod(updatedPeriod);
       }
+
+      const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('es-CO', {
+          style: 'currency',
+          currency: 'COP',
+          minimumFractionDigits: 0,
+        }).format(amount);
+      };
       
       toast({
-        title: "¡Período aprobado! (Backend)",
-        description: message + " - Calculado en el servidor"
+        title: "Período aprobado y cerrado",
+        description: `${employees.length} empleados procesados • ${formatCurrency(summary.totalNetPay)} • Comprobantes generados`,
+        className: "border-green-200 bg-green-50"
       });
     } catch (error) {
       console.error('Error approving period:', error);
@@ -418,7 +427,7 @@ export const usePayrollLiquidationBackend = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, employees, currentPeriod]);
+  }, [toast, employees, currentPeriod, summary.totalNetPay]);
 
   const isValid = employees.every(emp => emp.status === 'valid') && employees.length > 0;
   const canEdit = currentPeriod?.estado === 'borrador';

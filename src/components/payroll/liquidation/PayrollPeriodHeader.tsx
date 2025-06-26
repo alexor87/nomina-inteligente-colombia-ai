@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, AlertCircle, Edit, Save, X, Users, DollarSign } from 'lucide-react';
+import { Calendar, CheckCircle, AlertCircle, Edit, Save, X, Users, DollarSign, Lock } from 'lucide-react';
 import { PayrollPeriod } from '@/services/PayrollPeriodService';
 import { PayrollPeriodService } from '@/services/PayrollPeriodService';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,7 @@ const statusConfig = {
   cerrado: { 
     label: 'Cerrado', 
     color: 'bg-gray-50 text-gray-700 border-gray-200', 
-    icon: AlertCircle
+    icon: Lock
   },
   aprobado: { 
     label: 'Aprobado', 
@@ -73,6 +73,7 @@ export const PayrollPeriodHeader = ({
 
   const config = statusConfig[period.estado];
   const StatusIcon = config.icon;
+  const isApproved = period.estado === 'aprobado';
 
   const formatPeriod = () => {
     if (!period.fecha_inicio || !period.fecha_fin) return 'Período no definido';
@@ -116,10 +117,15 @@ export const PayrollPeriodHeader = ({
             <StatusIcon className="h-3 w-3" />
             <span className="text-sm font-medium">{config.label}</span>
           </Badge>
+          {isApproved && (
+            <div className="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-md border">
+              Período cerrado para edición
+            </div>
+          )}
         </div>
 
-        {/* Action button */}
-        {isValid && canEdit && (
+        {/* Action button - only show if can edit and is valid */}
+        {isValid && canEdit && !isApproved && (
           <Button
             onClick={onApprove}
             className="bg-green-600 hover:bg-green-700 text-white font-medium"
@@ -136,7 +142,7 @@ export const PayrollPeriodHeader = ({
         {/* Period section */}
         <div className="flex items-center space-x-4">
           <Calendar className="h-5 w-5 text-gray-400" />
-          {isEditingPeriod ? (
+          {isEditingPeriod && canEdit ? (
             <div className="flex items-center space-x-2">
               <Input
                 type="date"
@@ -161,7 +167,7 @@ export const PayrollPeriodHeader = ({
           ) : (
             <div className="flex items-center space-x-2">
               <span className="text-lg font-medium text-gray-900">{formatPeriod()}</span>
-              {canEdit && (
+              {canEdit && !isApproved && (
                 <Button 
                   size="sm" 
                   variant="ghost" 
@@ -170,6 +176,9 @@ export const PayrollPeriodHeader = ({
                 >
                   <Edit className="h-3 w-3" />
                 </Button>
+              )}
+              {isApproved && (
+                <Lock className="h-4 w-4 text-gray-400" />
               )}
             </div>
           )}
@@ -185,6 +194,11 @@ export const PayrollPeriodHeader = ({
             <DollarSign className="h-4 w-4" />
             <span className="font-medium">{formatCurrency(totalPayroll)}</span>
           </div>
+          {isApproved && (
+            <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+              Comprobantes generados
+            </div>
+          )}
         </div>
       </div>
     </div>
