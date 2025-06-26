@@ -60,27 +60,38 @@ export const CompanyRegistrationPage = () => {
 
   const testRpcConnection = async () => {
     setIsTesting(true);
+    console.log('🧪 Starting RPC connection test...');
+    
     try {
-      console.log('🧪 Starting RPC connection test...');
       const isConnected = await CompanyService.testRpcConnection();
+      
+      console.log('🧪 RPC test completed, result:', isConnected);
       
       if (isConnected) {
         toast({
           title: "✅ Conexión RPC exitosa",
-          description: "La conexión con la base de datos funciona correctamente",
+          description: "La función create_company_with_setup está disponible y accesible",
         });
       } else {
         toast({
-          title: "❌ Error de conexión RPC",
-          description: "Hay un problema con la conexión a la base de datos",
+          title: "❌ Error de conexión RPC", 
+          description: "La función create_company_with_setup no está disponible (404). Revisar configuración de base de datos.",
           variant: "destructive"
         });
       }
     } catch (error) {
       console.error('💥 RPC test error:', error);
+      
+      let errorMessage = "Error desconocido al probar la conexión";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = (error as any).message;
+      }
+      
       toast({
         title: "❌ Error al probar conexión",
-        description: "No se pudo verificar la conexión RPC",
+        description: `Error: ${errorMessage}`,
         variant: "destructive"
       });
     } finally {

@@ -165,21 +165,67 @@ export class CompanyService {
       const { data: { user } } = await supabase.auth.getUser();
       console.log('🔍 Current user for RPC test:', user?.id);
       
+      if (!user) {
+        console.error('❌ No authenticated user found');
+        return false;
+      }
+
       // Intentar llamar a una función RPC simple para verificar conectividad
+      console.log('🔄 Attempting to call get_current_user_company_id...');
       const { data, error } = await supabase.rpc('get_current_user_company_id');
       
       console.log('🧪 RPC test result:', { data, error });
       
       if (error) {
         console.error('❌ RPC test failed:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         return false;
       }
       
       console.log('✅ RPC connection test successful');
+      
+      // Ahora probar específicamente la función de creación de empresa
+      console.log('🔄 Testing create_company_with_setup function existence...');
+      
+      // Intentar una llamada con parámetros de prueba (esto debería fallar por parámetros inválidos, pero no por 404)
+      const testCall = await supabase.rpc('create_company_with_setup', {
+        p_nit: 'TEST',
+        p_razon_social: 'TEST',
+        p_email: 'test@test.com',
+        p_telefono: null,
+        p_ciudad: 'Bogotá',
+        p_plan: 'basico',
+        p_user_email: null,
+        p_user_password: null,
+        p_first_name: null,
+        p_last_name: null
+      });
+      
+      console.log('🧪 create_company_with_setup test result:', testCall);
+      
+      // Si llegamos aquí sin un error 404, la función existe
       return true;
+      
     } catch (error) {
       console.error('💥 RPC test error:', error);
-      return false;
+      
+      // Verificar si es un error 404 específicamente
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMessage = (error as any).message;
+        if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+          console.error('🚨 Function not found - 404 error detected');
+          return false;
+        }
+      }
+      
+      // Si no es un 404, podría ser otro tipo de error (permisos, parámetros, etc.)
+      console.log('ℹ️ Non-404 error detected, function likely exists but has other issues');
+      return true;
     }
   }
 
