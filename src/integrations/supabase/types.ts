@@ -382,8 +382,10 @@ export type Database = {
           numero_cuenta: string | null
           salario_base: number
           segundo_nombre: string | null
+          subtipo_cotizante_id: string | null
           telefono: string | null
           tipo_contrato: string | null
+          tipo_cotizante_id: string | null
           tipo_cuenta: string | null
           tipo_documento: string | null
           titular_cuenta: string | null
@@ -409,8 +411,10 @@ export type Database = {
           numero_cuenta?: string | null
           salario_base?: number
           segundo_nombre?: string | null
+          subtipo_cotizante_id?: string | null
           telefono?: string | null
           tipo_contrato?: string | null
+          tipo_cotizante_id?: string | null
           tipo_cuenta?: string | null
           tipo_documento?: string | null
           titular_cuenta?: string | null
@@ -436,8 +440,10 @@ export type Database = {
           numero_cuenta?: string | null
           salario_base?: number
           segundo_nombre?: string | null
+          subtipo_cotizante_id?: string | null
           telefono?: string | null
           tipo_contrato?: string | null
+          tipo_cotizante_id?: string | null
           tipo_cuenta?: string | null
           tipo_documento?: string | null
           titular_cuenta?: string | null
@@ -449,6 +455,20 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_subtipo_cotizante_id_fkey"
+            columns: ["subtipo_cotizante_id"]
+            isOneToOne: false
+            referencedRelation: "subtipos_cotizante"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_tipo_cotizante_id_fkey"
+            columns: ["tipo_cotizante_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_cotizante"
             referencedColumns: ["id"]
           },
         ]
@@ -865,6 +885,77 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subtipos_cotizante: {
+        Row: {
+          activo: boolean
+          codigo: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          tipo_cotizante_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          tipo_cotizante_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          tipo_cotizante_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subtipos_cotizante_tipo_cotizante_id_fkey"
+            columns: ["tipo_cotizante_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_cotizante"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tipos_cotizante: {
+        Row: {
+          activo: boolean
+          codigo: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

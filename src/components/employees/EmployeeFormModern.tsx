@@ -14,6 +14,7 @@ import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { useSecurityEntities } from '@/hooks/useSecurityEntities';
+import { useTiposCotizante } from '@/hooks/useTiposCotizante';
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -34,7 +35,8 @@ import {
   ChevronRight,
   Save,
   Copy,
-  CheckCircle2
+  CheckCircle2,
+  Info
 } from 'lucide-react';
 
 interface EmployeeFormModernProps {
@@ -90,8 +92,8 @@ interface EmployeeFormData {
   afp: string;
   arl: string;
   cajaCompensacion: string;
-  tipoCotizante: string;
-  subtipoCotizante: string;
+  tipoCotizanteId: string;
+  subtipoCotizanteId: string;
   regimenSalud: 'contributivo' | 'subsidiado';
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
 }
@@ -126,6 +128,16 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
   const { configuration } = useEmployeeGlobalConfiguration();
   const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUD();
   const { epsEntities, afpEntities, arlEntities, compensationFunds, isLoading: entitiesLoading } = useSecurityEntities();
+  const { 
+    tiposCotizante, 
+    subtiposCotizante, 
+    isLoadingTipos, 
+    isLoadingSubtipos, 
+    error: tiposError,
+    fetchSubtipos,
+    clearSubtipos 
+  } = useTiposCotizante();
+  
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
@@ -194,8 +206,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       afp: employee?.afp || '',
       arl: employee?.arl || '',
       cajaCompensacion: employee?.cajaCompensacion || '',
-      tipoCotizante: '',
-      subtipoCotizante: '',
+      tipoCotizanteId: employee?.tipoCotizanteId || '',
+      subtipoCotizanteId: employee?.subtipoCotizanteId || '',
       regimenSalud: 'contributivo',
       estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente'
     }
@@ -241,7 +253,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
   useEffect(() => {
     const requiredFields = [
       'cedula', 'nombre', 'apellido', 'email', 'salarioBase', 'tipoContrato', 
-      'fechaIngreso', 'banco', 'numeroCuenta', 'titularCuenta'
+      'fechaIngreso', 'banco', 'numeroCuenta', 'titularCuenta', 'tipoCotizanteId'
     ];
     
     const completedFields = requiredFields.filter(field => {
@@ -251,6 +263,18 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     
     setCompletionPercentage(Math.round((completedFields.length / requiredFields.length) * 100));
   }, [watchedValues]);
+
+  // Manejar cambio de tipo de cotizante
+  const handleTipoCotizanteChange = async (tipoCotizanteId: string) => {
+    setValue('tipoCotizanteId', tipoCotizanteId);
+    setValue('subtipoCotizanteId', ''); // Limpiar subtipo al cambiar tipo
+    
+    if (tipoCotizanteId) {
+      await fetchSubtipos(tipoCotizanteId);
+    } else {
+      clearSubtipos();
+    }
+  };
 
   const toggleSection = (sectionId: string) => {
     setCollapsedSections(prev => 
@@ -274,7 +298,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       return;
     }
 
-    // Crear el objeto de empleado con segundo nombre
+    // Crear el objeto de empleado con segundo nombre y tipos de cotizante
     const employeeData = {
       empresaId: companyId,
       cedula: data.cedula,
@@ -298,7 +322,10 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       banco: data.banco,
       tipoCuenta: data.tipoCuenta,
       numeroCuenta: data.numeroCuenta,
-      titularCuenta: data.titularCuenta
+      titularCuenta: data.titularCuenta,
+      // Tipos de cotizante
+      tipoCotizanteId: data.tipoCotizanteId,
+      subtipoCotizanteId: data.subtipoCotizanteId
     };
 
     let result;
@@ -366,7 +393,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     type: 'text' | 'number' | 'email' | 'date' | 'select' = 'text',
     options?: { value: string; label: string }[],
     required = false,
-    icon?: React.ReactNode
+    icon?: React.ReactNode,
+    helpText?: string
   ) => (
     <div className="group">
       <div className="flex items-center gap-2 mb-1">
@@ -374,6 +402,14 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
         <Label className="text-sm font-medium text-gray-700">
           {label} {required && <span className="text-red-500">*</span>}
         </Label>
+        {helpText && (
+          <div className="relative group/tooltip">
+            <Info className="w-3 h-3 text-gray-400 cursor-help" />
+            <div className="absolute left-0 bottom-full mb-1 hidden group-hover/tooltip:block bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+              {helpText}
+            </div>
+          </div>
+        )}
       </div>
       
       {type === 'select' && options ? (
@@ -649,92 +685,186 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
 
             {/* Afiliaciones */}
             {renderSection('afiliaciones', 'Afiliaciones', <Shield className="w-5 h-5 text-red-600" />, (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="group">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Label className="text-sm font-medium text-gray-700">EPS</Label>
+              <div className="space-y-6">
+                {tiposError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-red-600 text-sm">{tiposError}</p>
                   </div>
-                  <Select onValueChange={(value) => setValue('eps', value)} defaultValue={watchedValues.eps}>
-                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                      <SelectValue placeholder="Seleccionar EPS" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {epsEntities.map((eps) => (
-                        <SelectItem key={eps.id} value={eps.name}>
-                          {eps.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="group">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Label className="text-sm font-medium text-gray-700">AFP</Label>
-                  </div>
-                  <Select onValueChange={(value) => setValue('afp', value)} defaultValue={watchedValues.afp}>
-                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                      <SelectValue placeholder="Seleccionar AFP" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {afpEntities.map((afp) => (
-                        <SelectItem key={afp.id} value={afp.name}>
-                          {afp.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="group">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Label className="text-sm font-medium text-gray-700">ARL</Label>
-                  </div>
-                  <Select onValueChange={(value) => setValue('arl', value)} defaultValue={watchedValues.arl}>
-                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                      <SelectValue placeholder="Seleccionar ARL" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {arlEntities.map((arl) => (
-                        <SelectItem key={arl.id} value={arl.name}>
-                          {arl.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="group">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Label className="text-sm font-medium text-gray-700">Caja de Compensación</Label>
-                  </div>
-                  <Select onValueChange={(value) => setValue('cajaCompensacion', value)} defaultValue={watchedValues.cajaCompensacion}>
-                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                      <SelectValue placeholder="Seleccionar Caja de Compensación" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {compensationFunds.map((fund) => (
-                        <SelectItem key={fund.id} value={fund.name}>
-                          {fund.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {renderInlineField('tipoCotizante', 'Tipo de Cotizante', 'text', undefined, true)}
-                {renderInlineField('subtipoCotizante', 'Subtipo de Cotizante', 'text')}
+                )}
                 
-                {renderInlineField('regimenSalud', 'Régimen de Salud', 'select', [
-                  { value: 'contributivo', label: 'Contributivo' },
-                  { value: 'subsidiado', label: 'Subsidiado' }
-                ])}
-                
-                {renderInlineField('estadoAfiliacion', 'Estado de Afiliación', 'select', [
-                  { value: 'completa', label: 'Completa' },
-                  { value: 'pendiente', label: 'Pendiente' },
-                  { value: 'inconsistente', label: 'Inconsistente' }
-                ])}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="group">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Label className="text-sm font-medium text-gray-700">EPS</Label>
+                    </div>
+                    <Select onValueChange={(value) => setValue('eps', value)} defaultValue={watchedValues.eps}>
+                      <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <SelectValue placeholder="Seleccionar EPS" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {epsEntities.map((eps) => (
+                          <SelectItem key={eps.id} value={eps.name}>
+                            {eps.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="group">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Label className="text-sm font-medium text-gray-700">AFP</Label>
+                    </div>
+                    <Select onValueChange={(value) => setValue('afp', value)} defaultValue={watchedValues.afp}>
+                      <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <SelectValue placeholder="Seleccionar AFP" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {afpEntities.map((afp) => (
+                          <SelectItem key={afp.id} value={afp.name}>
+                            {afp.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="group">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Label className="text-sm font-medium text-gray-700">ARL</Label>
+                    </div>
+                    <Select onValueChange={(value) => setValue('arl', value)} defaultValue={watchedValues.arl}>
+                      <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <SelectValue placeholder="Seleccionar ARL" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {arlEntities.map((arl) => (
+                          <SelectItem key={arl.id} value={arl.name}>
+                            {arl.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="group">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Label className="text-sm font-medium text-gray-700">Caja de Compensación</Label>
+                    </div>
+                    <Select onValueChange={(value) => setValue('cajaCompensacion', value)} defaultValue={watchedValues.cajaCompensacion}>
+                      <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <SelectValue placeholder="Seleccionar Caja de Compensación" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {compensationFunds.map((fund) => (
+                          <SelectItem key={fund.id} value={fund.name}>
+                            {fund.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Tipo de Cotizante */}
+                  <div className="group">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Label className="text-sm font-medium text-gray-700">
+                        Tipo de Cotizante <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="relative group/tooltip">
+                        <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-1 hidden group-hover/tooltip:block bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                          Clasificación del empleado según normativa PILA
+                        </div>
+                      </div>
+                    </div>
+                    <Select 
+                      onValueChange={handleTipoCotizanteChange} 
+                      defaultValue={watchedValues.tipoCotizanteId}
+                      disabled={isLoadingTipos}
+                    >
+                      <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <SelectValue placeholder={isLoadingTipos ? "Cargando..." : "Seleccionar tipo de cotizante"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tiposCotizante.map((tipo) => (
+                          <SelectItem key={tipo.id} value={tipo.id}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {tipo.codigo}
+                              </Badge>
+                              <span>{tipo.nombre}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.tipoCotizanteId && (
+                      <p className="text-red-500 text-xs mt-1">Tipo de cotizante es requerido</p>
+                    )}
+                  </div>
+
+                  {/* Subtipo de Cotizante */}
+                  <div className="group">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Label className="text-sm font-medium text-gray-700">
+                        Subtipo de Cotizante <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="relative group/tooltip">
+                        <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-1 hidden group-hover/tooltip:block bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                          Subcategoría específica del tipo de cotizante
+                        </div>
+                      </div>
+                    </div>
+                    <Select 
+                      onValueChange={(value) => setValue('subtipoCotizanteId', value)} 
+                      defaultValue={watchedValues.subtipoCotizanteId}
+                      disabled={!watchedValues.tipoCotizanteId || isLoadingSubtipos || subtiposCotizante.length === 0}
+                    >
+                      <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <SelectValue placeholder={
+                          !watchedValues.tipoCotizanteId 
+                            ? "Primero selecciona un tipo de cotizante"
+                            : isLoadingSubtipos 
+                              ? "Cargando subtipos..."
+                              : subtiposCotizante.length === 0
+                                ? "Este tipo de cotizante no requiere subtipo"
+                                : "Seleccionar subtipo de cotizante"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subtiposCotizante.map((subtipo) => (
+                          <SelectItem key={subtipo.id} value={subtipo.id}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {subtipo.codigo}
+                              </Badge>
+                              <span>{subtipo.nombre}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {subtiposCotizante.length === 0 && watchedValues.tipoCotizanteId && !isLoadingSubtipos && (
+                      <p className="text-xs text-gray-500 mt-1">Este tipo de cotizante no requiere subtipo</p>
+                    )}
+                    {errors.subtipoCotizanteId && (
+                      <p className="text-red-500 text-xs mt-1">Subtipo de cotizante es requerido</p>
+                    )}
+                  </div>
+                  
+                  {renderInlineField('regimenSalud', 'Régimen de Salud', 'select', [
+                    { value: 'contributivo', label: 'Contributivo' },
+                    { value: 'subsidiado', label: 'Subsidiado' }
+                  ])}
+                  
+                  {renderInlineField('estadoAfiliacion', 'Estado de Afiliación', 'select', [
+                    { value: 'completa', label: 'Completa' },
+                    { value: 'pendiente', label: 'Pendiente' },
+                    { value: 'inconsistente', label: 'Inconsistente' }
+                  ])}
+                </div>
               </div>
             ))}
 

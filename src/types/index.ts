@@ -19,6 +19,8 @@ export interface Employee {
   empresaId: string;
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
+  tipoCotizanteId?: string;
+  subtipoCotizanteId?: string;
   createdAt: string;
   updatedAt: string;
 }

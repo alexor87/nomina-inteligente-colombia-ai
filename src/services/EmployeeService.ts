@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types';
 import { EmployeeDataService } from './EmployeeDataService';
@@ -9,6 +8,8 @@ interface EmployeeDataWithBanking extends Omit<Employee, 'id' | 'createdAt' | 'u
   tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
+  tipoCotizanteId?: string;
+  subtipoCotizanteId?: string;
 }
 
 export class EmployeeService {
@@ -57,7 +58,7 @@ export class EmployeeService {
       ? employeeData.estadoAfiliacion
       : 'pendiente';
 
-    // Limpiar y validar datos antes de insertar INCLUYENDO SEGUNDO NOMBRE Y CAMPOS BANCARIOS
+    // Limpiar y validar datos antes de insertar INCLUYENDO SEGUNDO NOMBRE, CAMPOS BANCARIOS Y TIPOS DE COTIZANTE
     const cleanedData = {
       company_id: companyId,
       cedula: String(employeeData.cedula || '').trim(),
@@ -81,7 +82,10 @@ export class EmployeeService {
       banco: employeeData.banco ? String(employeeData.banco).trim() : null,
       tipo_cuenta: employeeData.tipoCuenta || 'ahorros',
       numero_cuenta: employeeData.numeroCuenta ? String(employeeData.numeroCuenta).trim() : null,
-      titular_cuenta: employeeData.titularCuenta ? String(employeeData.titularCuenta).trim() : null
+      titular_cuenta: employeeData.titularCuenta ? String(employeeData.titularCuenta).trim() : null,
+      // AGREGAR CAMPOS DE TIPOS DE COTIZANTE
+      tipo_cotizante_id: employeeData.tipoCotizanteId || null,
+      subtipo_cotizante_id: employeeData.subtipoCotizanteId || null
     };
 
     // Validaciones básicas
@@ -130,7 +134,7 @@ export class EmployeeService {
     }
   }
 
-  static async update(id: string, updates: Partial<Employee & { segundoNombre?: string }>) {
+  static async update(id: string, updates: Partial<Employee & { segundoNombre?: string; tipoCotizanteId?: string; subtipoCotizanteId?: string }>) {
     const supabaseData: any = {};
     
     if (updates.cedula !== undefined) supabaseData.cedula = updates.cedula;
@@ -156,6 +160,10 @@ export class EmployeeService {
     if ((updates as any).tipoCuenta !== undefined) supabaseData.tipo_cuenta = (updates as any).tipoCuenta;
     if ((updates as any).numeroCuenta !== undefined) supabaseData.numero_cuenta = (updates as any).numeroCuenta;
     if ((updates as any).titularCuenta !== undefined) supabaseData.titular_cuenta = (updates as any).titularCuenta;
+
+    // Manejar campos de tipos de cotizante
+    if ((updates as any).tipoCotizanteId !== undefined) supabaseData.tipo_cotizante_id = (updates as any).tipoCotizanteId;
+    if ((updates as any).subtipoCotizanteId !== undefined) supabaseData.subtipo_cotizante_id = (updates as any).subtipoCotizanteId;
 
     const { error } = await supabase
       .from('employees')
