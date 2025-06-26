@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +22,15 @@ export const usePayrollLiquidationIntelligent = () => {
       
       console.log('📊 Estado detectado:', status);
       
+      // Mostrar información de debugging sobre la periodicidad
+      if (status.nextPeriod) {
+        console.log('📊 Periodicidad detectada:', status.nextPeriod.type);
+        console.log('📅 Fechas calculadas:', {
+          inicio: status.nextPeriod.startDate,
+          fin: status.nextPeriod.endDate
+        });
+      }
+      
       // Si es reanudar, ir directo sin mostrar diálogo
       if (status.action === 'resume') {
         console.log('🔄 Reanudando periodo existente');
@@ -31,7 +39,6 @@ export const usePayrollLiquidationIntelligent = () => {
           description: status.message,
           className: "border-blue-200 bg-blue-50"
         });
-        // No mostrar diálogo, ir directo a la liquidación
         setShowDialog(false);
       } else {
         // Para otros casos, mostrar diálogo
@@ -69,13 +76,14 @@ export const usePayrollLiquidationIntelligent = () => {
     console.log('📋 Reanudando periodo:', periodStatus.currentPeriod.id);
   }, [periodStatus, toast]);
 
-  // Crear nuevo periodo
+  // Crear nuevo periodo con validación mejorada
   const handleCreateNewPeriod = useCallback(async () => {
     if (!periodStatus?.nextPeriod) return;
     
     setIsProcessing(true);
     try {
       console.log('🚀 Iniciando creación de nuevo periodo:', periodStatus.nextPeriod);
+      console.log('📊 Tipo de periodicidad a crear:', periodStatus.nextPeriod.type);
       
       // Validar que no haya superposición
       const validation = await PayrollPeriodIntelligentService.validateNonOverlappingPeriod(
@@ -97,6 +105,12 @@ export const usePayrollLiquidationIntelligent = () => {
       
       if (newPeriod) {
         console.log('✅ Nuevo periodo creado exitosamente:', newPeriod.id);
+        console.log('📅 Periodo creado con fechas:', {
+          inicio: newPeriod.fecha_inicio,
+          fin: newPeriod.fecha_fin,
+          tipo: newPeriod.tipo_periodo
+        });
+        
         setShowDialog(false);
         toast({
           title: "¡Nuevo periodo creado!",

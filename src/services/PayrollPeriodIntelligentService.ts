@@ -181,8 +181,8 @@ export class PayrollPeriodIntelligentService {
     console.log('📊 Calculando periodo con periodicidad:', periodicity);
     
     if (!lastPeriod) {
-      // Si no hay periodo anterior, usar la fecha actual
-      console.log('📅 No hay periodo anterior, usando fecha actual');
+      // Si no hay periodo anterior, usar la periodicidad configurada correctamente
+      console.log('📅 No hay periodo anterior, generando periodo inicial con periodicidad:', periodicity);
       return PayrollPeriodService.generatePeriodDates(periodicity);
     }
 
@@ -190,20 +190,20 @@ export class PayrollPeriodIntelligentService {
     const nextStartDate = new Date(lastEndDate);
     nextStartDate.setDate(lastEndDate.getDate() + 1); // Día siguiente al último periodo
 
-    // Calcular el fin del siguiente periodo
+    // Calcular el fin del siguiente periodo basado en la periodicidad configurada
     let nextEndDate: Date;
     
     switch (periodicity) {
       case 'semanal':
         console.log('📅 Calculando periodo semanal');
         nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextStartDate.getDate() + 6);
+        nextEndDate.setDate(nextStartDate.getDate() + 6); // 7 días total
         break;
         
       case 'quincenal':
         console.log('📅 Calculando periodo quincenal');
         nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextStartDate.getDate() + 14);
+        nextEndDate.setDate(nextStartDate.getDate() + 14); // 15 días total
         break;
         
       case 'mensual':
@@ -221,15 +221,13 @@ export class PayrollPeriodIntelligentService {
         nextEndDate.setDate(0);
     }
 
-    console.log('📅 Periodo calculado:', {
-      startDate: nextStartDate.toISOString().split('T')[0],
-      endDate: nextEndDate.toISOString().split('T')[0]
-    });
-
-    return {
+    const result = {
       startDate: nextStartDate.toISOString().split('T')[0],
       endDate: nextEndDate.toISOString().split('T')[0]
     };
+
+    console.log('📅 Periodo calculado:', result);
+    return result;
   }
 
   // Crear nuevo periodo inteligentemente
