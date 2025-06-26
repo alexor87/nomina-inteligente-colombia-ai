@@ -1,147 +1,110 @@
 
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/sonner';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { Layout } from '@/components/layout/Layout';
-
-// Fix imports to use default exports
-import { Index } from '@/pages/Index';
-import AuthPage from '@/pages/AuthPage';
-import DashboardPage from '@/pages/DashboardPage';
-import EmployeesPage from '@/pages/EmployeesPage';
-import PayrollPage from '@/pages/PayrollPage';
-import PayrollBackendPage from '@/pages/PayrollBackendPage';
-import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
-import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
-import VouchersPage from '@/pages/VouchersPage';
-import PaymentsPage from '@/pages/PaymentsPage';
-import ReportsPage from '@/pages/ReportsPage';
-import SettingsPage from '@/pages/SettingsPage';
-import { CompanyRegistrationPage } from '@/pages/CompanyRegistrationPage';
-import { SuperAdminPage } from '@/pages/SuperAdminPage';
-import { SupportBackofficePage } from '@/pages/SupportBackofficePage';
-import NotFound from '@/pages/NotFound';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import Index from "./pages/Index";
+import AuthPage from "./pages/AuthPage";
+import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
+import DashboardPage from "./pages/DashboardPage";
+import EmployeesPage from "./pages/EmployeesPage";
+import PayrollPage from "./pages/PayrollPage";
+import PayrollBackendPage from "./pages/PayrollBackendPage";
+import PayrollHistoryPage from "./pages/PayrollHistoryPage";
+import PayrollHistoryDetailsPage from "./pages/PayrollHistoryDetailsPage";
+import VouchersPage from "./pages/VouchersPage";
+import PaymentsPage from "./pages/PaymentsPage";
+import ReportsPage from "./pages/ReportsPage";
+import SettingsPage from "./pages/SettingsPage";
+import SupportBackofficePage from "./pages/SupportBackofficePage";
+import { SuperAdminPage } from "./pages/SuperAdminPage";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <SubscriptionProvider>
-          <Router>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AuthProvider>
+          <SubscriptionProvider>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
-              <Route path="/register-company" element={<CompanyRegistrationPage />} />
-              
+              <Route path="/registro-empresa" element={<CompanyRegistrationPage />} />
               <Route path="/dashboard" element={
-                <ProtectedRoute requiredModule="dashboard">
-                  <Layout>
-                    <DashboardPage />
-                  </Layout>
+                <ProtectedRoute>
+                  <DashboardPage />
                 </ProtectedRoute>
               } />
-              
+              <Route path="/empleados" element={
+                <ProtectedRoute>
+                  <EmployeesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/nomina" element={
+                <ProtectedRoute>
+                  <PayrollPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/nomina-backend" element={
+                <ProtectedRoute>
+                  <PayrollBackendPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/historial-nomina" element={
+                <ProtectedRoute>
+                  <PayrollHistoryPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/historial-nomina/:periodId" element={
+                <ProtectedRoute>
+                  <PayrollHistoryDetailsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/comprobantes" element={
+                <ProtectedRoute>
+                  <VouchersPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/pagos" element={
+                <ProtectedRoute>
+                  <PaymentsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/reportes" element={
+                <ProtectedRoute>
+                  <ReportsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/configuracion" element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/soporte-backoffice" element={
+                <ProtectedRoute>
+                  <SupportBackofficePage />
+                </ProtectedRoute>
+              } />
               <Route path="/super-admin" element={
                 <ProtectedRoute>
-                  <Layout>
-                    <SuperAdminPage />
-                  </Layout>
+                  <SuperAdminPage />
                 </ProtectedRoute>
               } />
-              
-              <Route path="/support-backoffice" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <SupportBackofficePage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/employees" element={
-                <ProtectedRoute requiredModule="employees">
-                  <Layout>
-                    <EmployeesPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payroll" element={
-                <ProtectedRoute requiredModule="payroll">
-                  <Layout>
-                    <PayrollPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payroll-backend" element={
-                <ProtectedRoute requiredModule="payroll">
-                  <Layout>
-                    <PayrollBackendPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payroll-history" element={
-                <ProtectedRoute requiredModule="payroll-history">
-                  <Layout>
-                    <PayrollHistoryPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payroll-history/:periodId" element={
-                <ProtectedRoute requiredModule="payroll-history">
-                  <Layout>
-                    <PayrollHistoryDetailsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/vouchers" element={
-                <ProtectedRoute requiredModule="vouchers">
-                  <Layout>
-                    <VouchersPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payments" element={
-                <ProtectedRoute requiredModule="payments">
-                  <Layout>
-                    <PaymentsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/reports" element={
-                <ProtectedRoute requiredModule="reports">
-                  <Layout>
-                    <ReportsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/settings" element={
-                <ProtectedRoute requiredModule="settings">
-                  <Layout>
-                    <SettingsPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </Router>
-        </SubscriptionProvider>
-      </AuthProvider>
-      <Toaster />
-    </QueryClientProvider>
-  );
-}
+          </SubscriptionProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;
