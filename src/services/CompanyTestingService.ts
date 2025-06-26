@@ -67,8 +67,10 @@ export class CompanyTestingService {
         if (testError.message?.includes('404') || 
             testError.message?.includes('not found') ||
             testError.details?.includes('not found') ||
-            testError.code === 'PGRST202') {
-          console.error('🚨 Function not found - 404 error detected');
+            testError.code === 'PGRST202' ||
+            testError.code === 'PGRST301') {
+          console.error('🚨 Function create_company_with_setup NOT FOUND - 404 error detected');
+          console.error('🔧 Please check if the function exists in your Supabase database');
           return false;
         }
         
@@ -88,14 +90,22 @@ export class CompanyTestingService {
       if (error && typeof error === 'object' && 'message' in error) {
         const errorMessage = (error as any).message;
         if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-          console.error('🚨 Function not found - 404 error detected');
+          console.error('🚨 Function create_company_with_setup NOT FOUND - 404 error detected');
+          console.error('🔧 Please check if the function exists in your Supabase database');
           return false;
         }
       }
       
+      // Verificar si es un error de respuesta HTTP 404
+      if (error && typeof error === 'object' && 'status' in error && (error as any).status === 404) {
+        console.error('🚨 Function create_company_with_setup NOT FOUND - HTTP 404 error');
+        console.error('🔧 Please check if the function exists in your Supabase database');
+        return false;
+      }
+      
       // Si no es un 404, podría ser otro tipo de error (permisos, parámetros, etc.)
       console.log('ℹ️ Non-404 error detected, function likely exists but has other issues');
-      return true;
+      return false; // Cambiar a false para ser más conservador
     }
   }
 }

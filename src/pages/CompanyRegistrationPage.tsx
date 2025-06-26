@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Check, Loader2, TestTube } from 'lucide-react';
+import { Building2, Check, Loader2, TestTube, AlertTriangle } from 'lucide-react';
 import { CompanyService, CompanyRegistrationWithUser } from '@/services/CompanyService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -74,8 +74,8 @@ export const CompanyRegistrationPage = () => {
         });
       } else {
         toast({
-          title: "❌ Error de conexión RPC", 
-          description: "La función create_company_with_setup no está disponible (404). Revisar configuración de base de datos.",
+          title: "❌ Error: Función RPC no encontrada", 
+          description: "La función create_company_with_setup no existe en la base de datos. Necesitas crear esta función en Supabase para poder registrar empresas.",
           variant: "destructive"
         });
       }
@@ -229,13 +229,21 @@ export const CompanyRegistrationPage = () => {
           </div>
           <p className="text-gray-600">Únete a miles de empresas que confían en nuestra plataforma de nómina</p>
           
-          {/* Botón de prueba RPC */}
-          <div className="mt-4">
+          {/* Botón de prueba RPC mejorado */}
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-center mb-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
+              <span className="text-sm font-medium text-yellow-800">Diagnóstico del Sistema</span>
+            </div>
+            <p className="text-xs text-yellow-700 mb-3">
+              Verifica que la función RPC create_company_with_setup esté disponible en tu base de datos
+            </p>
             <Button 
               onClick={testRpcConnection}
               disabled={isTesting}
               variant="outline"
               size="sm"
+              className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
             >
               {isTesting ? (
                 <>
