@@ -892,6 +892,14 @@ export type Database = {
         Args: { _user_id: string; _company_id: string }
         Returns: string
       }
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _company_id?: string
+        }
+        Returns: boolean
+      }
       has_role_in_company: {
         Args: {
           _user_id: string

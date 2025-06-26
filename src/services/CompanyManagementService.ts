@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Company {
@@ -16,10 +15,8 @@ export interface Company {
 }
 
 export class CompanyManagementService {
-  // Verificar si el usuario es súper admin
+  // Verificar si el usuario tiene rol de soporte (no hay más superadmin)
   static async isSaasAdmin(): Promise<boolean> {
-    // En el nuevo sistema simplificado, no hay superadmin
-    // Se puede verificar si el usuario tiene rol de soporte en alguna empresa
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
@@ -53,7 +50,6 @@ export class CompanyManagementService {
 
       if (error) throw error;
 
-      // Cast the data to our Company interface
       return (data || []).map(company => ({
         id: company.id,
         nit: company.nit,

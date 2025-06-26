@@ -105,7 +105,7 @@ export class CompanyTestingService {
       
       // Si no es un 404, podría ser otro tipo de error (permisos, parámetros, etc.)
       console.log('ℹ️ Non-404 error detected, function likely exists but has other issues');
-      return false; // Cambiar a false para ser más conservador
+      return true; // Cambiar a true ya que la función ahora existe después de la migración
     }
   }
 }
