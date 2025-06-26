@@ -32,16 +32,19 @@ export const IntelligentPeriodDialog: React.FC<IntelligentPeriodDialogProps> = (
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[580px] p-0 gap-0 bg-white border-0 shadow-2xl">
-        <div className="p-8 pb-6">
+      <DialogContent className="sm:max-w-[520px] p-0 gap-0 bg-white border border-gray-200 shadow-xl rounded-xl overflow-hidden">
+        {/* Header Section */}
+        <div className="px-6 pt-6 pb-4">
           <IntelligentDialogHeader periodStatus={periodStatus} />
         </div>
         
-        <div className="px-8 pb-2">
+        {/* Content Section */}
+        <div className="px-6 pb-4">
           <PeriodInfo periodStatus={periodStatus} />
         </div>
         
-        <div className="px-8 pb-8">
+        {/* Actions Section */}
+        <div className="px-6 pb-6 pt-2">
           <DialogActions
             periodStatus={periodStatus}
             onResumePeriod={onResumePeriod}

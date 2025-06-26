@@ -33,19 +33,19 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
   switch (periodStatus.action) {
     case 'resume':
       return (
-        <DialogFooter className="flex-col sm:flex-row gap-3 pt-6">
+        <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
           <Button 
             variant="outline" 
             onClick={onClose}
             disabled={isLoading}
-            className="order-2 sm:order-1 h-11 px-6 font-medium"
+            className="h-10 px-4 font-medium border-gray-200 hover:bg-gray-50"
           >
             Cancelar
           </Button>
           <Button 
             onClick={onResumePeriod}
             disabled={isLoading}
-            className="order-1 sm:order-2 h-11 px-6 bg-blue-600 hover:bg-blue-700 font-medium shadow-sm"
+            className="h-10 px-4 bg-blue-600 hover:bg-blue-700 font-medium"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -59,24 +59,24 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
 
     case 'create_new':
       return (
-        <DialogFooter className="flex-col sm:flex-row gap-3 pt-6">
-          <div className="flex gap-3 order-2 sm:order-1">
+        <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
+          <div className="flex gap-2">
             {periodStatus.currentPeriod && (
               <Button 
                 variant="outline" 
                 onClick={onViewLastPeriod}
                 disabled={isLoading}
-                className="h-11 px-4 font-medium"
+                className="h-10 px-3 font-medium border-gray-200 hover:bg-gray-50"
               >
                 <Eye className="h-4 w-4 mr-2" />
-                Ver último período
+                Ver último
               </Button>
             )}
             <Button 
               variant="outline" 
               onClick={onClose}
               disabled={isLoading}
-              className="h-11 px-6 font-medium"
+              className="h-10 px-4 font-medium border-gray-200 hover:bg-gray-50"
             >
               Cancelar
             </Button>
@@ -84,33 +84,33 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
           <Button 
             onClick={onCreateNewPeriod}
             disabled={isLoading}
-            className="order-1 sm:order-2 h-11 px-6 bg-green-600 hover:bg-green-700 font-medium shadow-sm"
+            className="h-10 px-4 bg-green-600 hover:bg-green-700 font-medium"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <CheckCircle className="h-4 w-4 mr-2" />
             )}
-            Iniciar siguiente período
+            Iniciar período
           </Button>
         </DialogFooter>
       );
 
     case 'configure':
       return (
-        <DialogFooter className="flex-col sm:flex-row gap-3 pt-6">
+        <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
           <Button 
             variant="outline" 
             onClick={onClose}
             disabled={isLoading}
-            className="order-2 sm:order-1 h-11 px-6 font-medium"
+            className="h-10 px-4 font-medium border-gray-200 hover:bg-gray-50"
           >
             Cancelar
           </Button>
           <Button 
             onClick={onGoToSettings}
             disabled={isLoading}
-            className="order-1 sm:order-2 h-11 px-6 bg-orange-600 hover:bg-orange-700 font-medium shadow-sm"
+            className="h-10 px-4 bg-orange-600 hover:bg-orange-700 font-medium"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -124,11 +124,11 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
 
     case 'error':
       return (
-        <DialogFooter className="pt-6">
+        <DialogFooter className="pt-4">
           <Button 
             onClick={onClose}
             disabled={isLoading}
-            className="h-11 px-6 font-medium"
+            className="h-10 px-4 font-medium w-full sm:w-auto"
           >
             Cerrar
           </Button>
