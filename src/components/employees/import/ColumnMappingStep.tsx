@@ -1,14 +1,14 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AlertTriangle } from 'lucide-react';
 import { ImportStep } from '../ImportEmployeesDrawer';
 import { EMPLOYEE_FIELD_MAPPINGS, getRequiredFields, getOptionalFields } from './EmployeeFieldMapping';
+import { ColumnMappingProgressIndicators } from './ColumnMappingProgressIndicators';
+import { FieldMappingForm } from './FieldMappingForm';
+import { DataPreviewTable } from './DataPreviewTable';
 
 interface ColumnMappingStepProps {
   data: {
@@ -134,23 +134,12 @@ export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepPro
         </p>
       </div>
 
-      {/* Progress indicators */}
-      <div className="grid grid-cols-3 gap-4 text-center">
-        <div className="p-3 bg-blue-50 rounded-lg">
-          <div className="text-2xl font-bold text-blue-600">{columns.length}</div>
-          <div className="text-sm text-blue-600">Columnas detectadas</div>
-        </div>
-        <div className="p-3 bg-green-50 rounded-lg">
-          <div className="text-2xl font-bold text-green-600">
-            {getRequiredMappedCount()}/{requiredFields.length}
-          </div>
-          <div className="text-sm text-green-600">Campos requeridos</div>
-        </div>
-        <div className="p-3 bg-gray-50 rounded-lg">
-          <div className="text-2xl font-bold text-gray-600">{getMappedFieldsCount()}</div>
-          <div className="text-sm text-gray-600">Total mapeados</div>
-        </div>
-      </div>
+      <ColumnMappingProgressIndicators
+        totalColumns={columns.length}
+        requiredMappedCount={getRequiredMappedCount()}
+        totalRequiredFields={requiredFields.length}
+        totalMappedFields={getMappedFieldsCount()}
+      />
 
       {validationErrors.length > 0 && (
         <Alert variant="destructive">
@@ -165,158 +154,16 @@ export const ColumnMappingStep = ({ data, onNext, onBack }: ColumnMappingStepPro
         </Alert>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Required Fields */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CheckCircle className="h-5 w-5 text-red-500" />
-              Campos Requeridos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {requiredFields.map(field => (
-              <div key={field.key} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-900">
-                    {field.label}
-                    <Badge variant="destructive" className="ml-2 text-xs">
-                      Requerido
-                    </Badge>
-                  </label>
-                </div>
-                {field.description && (
-                  <p className="text-xs text-gray-500">{field.description}</p>
-                )}
-                <Select
-                  value={mappings[field.key] || 'none'}
-                  onValueChange={(value) => handleMappingChange(field.key, value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar columna..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No mapear</SelectItem>
-                    {columns.map(column => (
-                      <SelectItem 
-                        key={column} 
-                        value={column}
-                        disabled={getUsedColumns().includes(column) && mappings[field.key] !== column}
-                      >
-                        {column}
-                        {getUsedColumns().includes(column) && mappings[field.key] !== column && (
-                          <span className="text-xs text-gray-400 ml-2">(Ya usado)</span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      <FieldMappingForm
+        requiredFields={requiredFields}
+        optionalFields={optionalFields}
+        columns={columns}
+        mappings={mappings}
+        usedColumns={getUsedColumns()}
+        onMappingChange={handleMappingChange}
+      />
 
-        {/* Optional Fields */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              Campos Opcionales
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 max-h-96 overflow-y-auto">
-            {optionalFields.map(field => (
-              <div key={field.key} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">
-                    {field.label}
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      Opcional
-                    </Badge>
-                  </label>
-                </div>
-                {field.description && (
-                  <p className="text-xs text-gray-500">{field.description}</p>
-                )}
-                <Select
-                  value={mappings[field.key] || 'none'}
-                  onValueChange={(value) => handleMappingChange(field.key, value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar columna..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No mapear</SelectItem>
-                    {columns.map(column => (
-                      <SelectItem 
-                        key={column} 
-                        value={column}
-                        disabled={getUsedColumns().includes(column) && mappings[field.key] !== column}
-                      >
-                        {column}
-                        {getUsedColumns().includes(column) && mappings[field.key] !== column && (
-                          <span className="text-xs text-gray-400 ml-2">(Ya usado)</span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sample preview */}
-      {rows.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Vista Previa de Datos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse border border-gray-200">
-                <thead>
-                  <tr className="bg-gray-50">
-                    {columns.slice(0, 6).map(column => (
-                      <th key={column} className="border border-gray-200 px-3 py-2 text-left text-sm font-medium">
-                        {column}
-                      </th>
-                    ))}
-                    {columns.length > 6 && (
-                      <th className="border border-gray-200 px-3 py-2 text-center text-sm font-medium">
-                        +{columns.length - 6} más...
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.slice(0, 3).map((row, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      {columns.slice(0, 6).map(column => (
-                        <td key={column} className="border border-gray-200 px-3 py-2 text-sm">
-                          {String(row[column] || '').slice(0, 30)}
-                          {String(row[column] || '').length > 30 && '...'}
-                        </td>
-                      ))}
-                      {columns.length > 6 && (
-                        <td className="border border-gray-200 px-3 py-2 text-center text-sm text-gray-400">
-                          ...
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {rows.length > 3 && (
-              <p className="text-sm text-gray-500 mt-2">
-                Mostrando 3 de {rows.length} filas
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <DataPreviewTable columns={columns} rows={rows} />
 
       <Separator />
 
