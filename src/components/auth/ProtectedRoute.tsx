@@ -19,7 +19,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredModule,
   companyId
 }) => {
-  const { user, loading, hasRole, hasModuleAccess, isSuperAdmin, roles, profile } = useAuth();
+  const { user, loading, hasRole, hasModuleAccess, isSuperAdmin, roles } = useAuth();
 
   console.log('🛡️ ProtectedRoute check:', {
     user: user?.email,
@@ -27,7 +27,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     requiredRole,
     requiredModule,
     userRoles: roles,
-    profile: profile?.company_id,
     isSuperAdmin,
     hasRequiredRole: requiredRole ? hasRole(requiredRole, companyId) : 'no role required',
     hasModuleAccess: requiredModule ? hasModuleAccess(requiredModule) : 'no module required'
@@ -54,56 +53,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <>{children}</>;
   }
 
-  // Si hay usuario y perfil pero no hay roles, esperar más tiempo antes de denegar acceso
-  if (user && profile?.company_id && roles.length === 0) {
-    console.log('⏳ ProtectedRoute: User has company but roles still loading, waiting...');
+  // Si hay roles pero no se han cargado completamente, mostrar loading un poco más
+  if (user && roles.length === 0 && !isSuperAdmin) {
+    console.log('⏳ ProtectedRoute: Waiting for roles to load...');
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner />
-          <p className="mt-4 text-sm text-gray-600">Configurando permisos...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Si hay usuario pero no perfil ni roles, mostrar mensaje de configuración
-  if (user && !profile && roles.length === 0) {
-    console.log('⚠️ ProtectedRoute: User without profile or roles');
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner />
-          <p className="mt-4 text-sm text-gray-600">Configurando cuenta...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Si hay perfil sin empresa, mostrar mensaje específico
-  if (user && profile && !profile.company_id) {
-    console.log('⚠️ ProtectedRoute: User profile without company');
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Configuración Pendiente</h1>
-          <p className="text-gray-600">Su cuenta necesita ser asociada a una empresa.</p>
-          <p className="text-sm text-gray-400 mt-2">Contacte soporte si necesita ayuda.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Solo después de todas las verificaciones, check roles específicos
-  if (roles.length === 0 && !isSuperAdmin) {
-    console.log('❌ ProtectedRoute: No roles found after complete loading');
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sin Permisos</h1>
-          <p className="text-gray-600">Su cuenta no tiene roles asignados.</p>
-          <p className="text-sm text-gray-400 mt-2">Contacte su administrador o soporte.</p>
-        </div>
+        <LoadingSpinner />
       </div>
     );
   }
