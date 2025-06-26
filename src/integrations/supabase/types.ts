@@ -858,6 +858,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_company_users: {
+        Args: { _user_id: string; _company_id: string }
+        Returns: boolean
+      }
       create_company_with_setup: {
         Args: {
           p_nit: string
