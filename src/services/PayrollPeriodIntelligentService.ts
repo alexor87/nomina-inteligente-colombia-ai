@@ -5,7 +5,7 @@ import { PayrollPeriodDetectionService, PeriodStatus } from './payroll-intellige
 import { PayrollPeriodValidationService } from './payroll-intelligent/PayrollPeriodValidationService';
 import { PayrollAuditService } from './payroll-intelligent/PayrollAuditService';
 
-export { PeriodStatus } from './payroll-intelligent/PayrollPeriodDetectionService';
+export type { PeriodStatus } from './payroll-intelligent/PayrollPeriodDetectionService';
 
 export class PayrollPeriodIntelligentService {
   // Detectar estado inteligente del módulo de nómina
