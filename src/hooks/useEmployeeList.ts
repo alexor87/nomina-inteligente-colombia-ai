@@ -68,6 +68,7 @@ export const useEmployeeList = () => {
         cargo: emp.cargo,
         empresaId: emp.company_id,
         estadoAfiliacion: emp.estado_afiliacion || 'pendiente',
+        nivelRiesgoARL: emp.nivel_riesgo_arl,
         createdAt: emp.created_at,
         updatedAt: emp.updated_at,
         // Banking information

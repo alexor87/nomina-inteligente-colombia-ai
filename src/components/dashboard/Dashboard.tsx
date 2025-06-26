@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,7 @@ import { useDashboard } from '@/hooks/useDashboard';
 import { RefreshCw, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 
 export const Dashboard = () => {
+  const navigate = useNavigate();
   const {
     metrics,
     alerts,
@@ -49,10 +51,16 @@ export const Dashboard = () => {
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Actualizar
           </Button>
-          <Button className="bg-blue-600 text-white hover:bg-blue-700">
+          <Button 
+            className="bg-blue-600 text-white hover:bg-blue-700"
+            onClick={() => navigate('/payroll')}
+          >
             Procesar Nómina
           </Button>
-          <Button variant="outline">
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/reports')}
+          >
             Generar Reporte
           </Button>
         </div>

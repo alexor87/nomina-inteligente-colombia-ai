@@ -173,7 +173,25 @@ export class EmployeeService {
     if (error) throw error;
   }
 
+  static async checkEmployeeHasPayrolls(employeeId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('payrolls')
+      .select('id')
+      .eq('employee_id', employeeId)
+      .limit(1);
+
+    if (error) throw error;
+    return (data && data.length > 0);
+  }
+
   static async delete(id: string) {
+    // Verificar si el empleado tiene nóminas asociadas
+    const hasPayrolls = await this.checkEmployeeHasPayrolls(id);
+    
+    if (hasPayrolls) {
+      throw new Error('No se puede eliminar el empleado porque tiene nóminas asociadas. Primero debe eliminar o transferir las nóminas.');
+    }
+
     const { error } = await supabase
       .from('employees')
       .delete()

@@ -29,6 +29,7 @@ import EmployeeDetailsPage from '@/pages/EmployeeDetailsPage';
 import CreateEmployeeModernPage from '@/pages/CreateEmployeeModernPage';
 import EditEmployeeModernPage from '@/pages/EditEmployeeModernPage';
 import PayrollPage from '@/pages/PayrollPage';
+import ReportsPage from '@/pages/ReportsPage';
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,9 @@ function App() {
 
                 <Route path="subscription" element={<SubscriptionPage />} />
                 <Route path="billing-history" element={<BillingHistoryPage />} />
+                
+                {/* Nueva ruta para reportes */}
+                <Route path="reports" element={<ReportsPage />} />
               </Route>
             </Routes>
             <Toaster />
