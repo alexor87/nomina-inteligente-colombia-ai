@@ -21,6 +21,7 @@ export class PayrollPeriodIntelligentService {
       
       const companyId = await PayrollPeriodService.getCurrentUserCompanyId();
       if (!companyId) {
+        console.log('❌ No se encontró company_id');
         return {
           action: 'configure',
           message: 'Para poder liquidar la nómina, primero debes configurar la periodicidad desde el módulo de Configuración.',
@@ -28,15 +29,19 @@ export class PayrollPeriodIntelligentService {
         };
       }
 
-      // Verificar configuración de empresa
-      const companySettings = await PayrollPeriodService.getCompanySettings();
+      // Verificar configuración de empresa - forzar refresh
+      const companySettings = await this.getCompanySettingsRefresh(companyId);
       if (!companySettings) {
+        console.log('❌ No se encontró configuración de empresa');
         return {
           action: 'configure',
           message: 'Para poder liquidar la nómina, primero debes configurar la periodicidad desde el módulo de Configuración.',
           title: 'Configuración requerida'
         };
       }
+
+      console.log('✅ Configuración encontrada:', companySettings);
+      console.log('📊 Periodicidad configurada:', companySettings.periodicity);
 
       // Buscar periodo activo (borrador o en proceso)
       const activePeriod = await this.getActivePeriod(companyId);
@@ -47,6 +52,8 @@ export class PayrollPeriodIntelligentService {
           activePeriod.fecha_inicio, 
           activePeriod.fecha_fin
         );
+        
+        console.log('🔄 Periodo activo encontrado:', activePeriod.id);
         
         return {
           action: 'resume',
@@ -63,6 +70,8 @@ export class PayrollPeriodIntelligentService {
         lastClosedPeriod
       );
 
+      console.log('📅 Calculando siguiente periodo:', nextPeriodDates);
+
       if (lastClosedPeriod) {
         const lastPeriodText = PayrollPeriodService.formatPeriodText(
           lastClosedPeriod.fecha_inicio,
@@ -72,6 +81,8 @@ export class PayrollPeriodIntelligentService {
           nextPeriodDates.startDate,
           nextPeriodDates.endDate
         );
+
+        console.log('✅ Último periodo cerrado encontrado, sugeriendo siguiente');
 
         return {
           action: 'create_new',
@@ -87,6 +98,8 @@ export class PayrollPeriodIntelligentService {
       }
 
       // Primer periodo - crear automáticamente
+      console.log('🆕 Primera nómina - creando periodo inicial');
+      
       return {
         action: 'create_new',
         nextPeriod: {
@@ -105,6 +118,28 @@ export class PayrollPeriodIntelligentService {
         message: 'Ocurrió un error al verificar el estado de la nómina. Intenta nuevamente.',
         title: 'Error'
       };
+    }
+  }
+
+  // Obtener configuración de empresa con refresh forzado
+  private static async getCompanySettingsRefresh(companyId: string) {
+    try {
+      // Forzar refresh desde la base de datos
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('company_id', companyId)
+        .single();
+
+      if (error) {
+        console.log('No company settings found, will create defaults');
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error getting company configuration:', error);
+      return null;
     }
   }
 
@@ -143,8 +178,11 @@ export class PayrollPeriodIntelligentService {
     periodicity: string, 
     lastPeriod?: PayrollPeriod | null
   ): { startDate: string; endDate: string } {
+    console.log('📊 Calculando periodo con periodicidad:', periodicity);
+    
     if (!lastPeriod) {
       // Si no hay periodo anterior, usar la fecha actual
+      console.log('📅 No hay periodo anterior, usando fecha actual');
       return PayrollPeriodService.generatePeriodDates(periodicity);
     }
 
@@ -157,16 +195,19 @@ export class PayrollPeriodIntelligentService {
     
     switch (periodicity) {
       case 'semanal':
+        console.log('📅 Calculando periodo semanal');
         nextEndDate = new Date(nextStartDate);
         nextEndDate.setDate(nextStartDate.getDate() + 6);
         break;
         
       case 'quincenal':
+        console.log('📅 Calculando periodo quincenal');
         nextEndDate = new Date(nextStartDate);
         nextEndDate.setDate(nextStartDate.getDate() + 14);
         break;
         
       case 'mensual':
+        console.log('📅 Calculando periodo mensual');
         nextEndDate = new Date(nextStartDate);
         nextEndDate.setMonth(nextStartDate.getMonth() + 1);
         nextEndDate.setDate(0); // Último día del mes
@@ -174,10 +215,16 @@ export class PayrollPeriodIntelligentService {
         
       default:
         // Fallback a mensual
+        console.log('📅 Periodicidad no reconocida, usando mensual como fallback');
         nextEndDate = new Date(nextStartDate);
         nextEndDate.setMonth(nextStartDate.getMonth() + 1);
         nextEndDate.setDate(0);
     }
+
+    console.log('📅 Periodo calculado:', {
+      startDate: nextStartDate.toISOString().split('T')[0],
+      endDate: nextEndDate.toISOString().split('T')[0]
+    });
 
     return {
       startDate: nextStartDate.toISOString().split('T')[0],

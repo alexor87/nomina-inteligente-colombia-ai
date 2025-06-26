@@ -21,8 +21,11 @@ export const usePayrollLiquidationIntelligent = () => {
       const status = await PayrollPeriodIntelligentService.detectPeriodStatus();
       setPeriodStatus(status);
       
+      console.log('📊 Estado detectado:', status);
+      
       // Si es reanudar, ir directo sin mostrar diálogo
       if (status.action === 'resume') {
+        console.log('🔄 Reanudando periodo existente');
         toast({
           title: "Nómina en curso",
           description: status.message,
@@ -32,6 +35,7 @@ export const usePayrollLiquidationIntelligent = () => {
         setShowDialog(false);
       } else {
         // Para otros casos, mostrar diálogo
+        console.log('💬 Mostrando diálogo de decisión');
         setShowDialog(true);
       }
     } catch (error) {
@@ -62,7 +66,6 @@ export const usePayrollLiquidationIntelligent = () => {
       className: "border-blue-200 bg-blue-50"
     });
     
-    // Aquí se puede redirigir a la página específica de liquidación si es necesario
     console.log('📋 Reanudando periodo:', periodStatus.currentPeriod.id);
   }, [periodStatus, toast]);
 
@@ -72,6 +75,8 @@ export const usePayrollLiquidationIntelligent = () => {
     
     setIsProcessing(true);
     try {
+      console.log('🚀 Iniciando creación de nuevo periodo:', periodStatus.nextPeriod);
+      
       // Validar que no haya superposición
       const validation = await PayrollPeriodIntelligentService.validateNonOverlappingPeriod(
         periodStatus.nextPeriod.startDate,
@@ -79,6 +84,7 @@ export const usePayrollLiquidationIntelligent = () => {
       );
 
       if (!validation.isValid) {
+        console.log('❌ Periodo superpuesto detectado');
         toast({
           title: "Periodo superpuesto",
           description: "Ya existe un periodo que se superpone con las fechas seleccionadas",
@@ -90,6 +96,7 @@ export const usePayrollLiquidationIntelligent = () => {
       const newPeriod = await PayrollPeriodIntelligentService.createNextPeriod(periodStatus.nextPeriod);
       
       if (newPeriod) {
+        console.log('✅ Nuevo periodo creado exitosamente:', newPeriod.id);
         setShowDialog(false);
         toast({
           title: "¡Nuevo periodo creado!",
@@ -102,6 +109,7 @@ export const usePayrollLiquidationIntelligent = () => {
           detectPeriodStatus();
         }, 1000);
       } else {
+        console.log('❌ Error creando nuevo periodo');
         toast({
           title: "Error al crear periodo",
           description: "No se pudo crear el nuevo periodo de nómina",
@@ -131,7 +139,6 @@ export const usePayrollLiquidationIntelligent = () => {
       className: "border-yellow-200 bg-yellow-50"
     });
     
-    // Redirigir a vista de solo lectura del último periodo
     console.log('👁️ Viendo periodo anterior:', periodStatus.currentPeriod.id);
   }, [periodStatus, toast]);
 

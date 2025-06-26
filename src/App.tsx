@@ -12,7 +12,7 @@ import { Index } from '@/pages/Index';
 import AuthPage from '@/pages/AuthPage';
 import DashboardPage from '@/pages/DashboardPage';
 import EmployeesPage from '@/pages/EmployeesPage';
-import PayrollPage from '@/pages/PayrollPage';
+import PayrollIntelligentPage from '@/pages/PayrollIntelligentPage';
 import PayrollBackendPage from '@/pages/PayrollBackendPage';
 import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
 import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
@@ -73,7 +73,7 @@ function App() {
               <Route path="/payroll" element={
                 <ProtectedRoute requiredModule="payroll">
                   <Layout>
-                    <PayrollPage />
+                    <PayrollIntelligentPage />
                   </Layout>
                 </ProtectedRoute>
               } />
