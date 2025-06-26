@@ -1,4 +1,3 @@
-
 // Tipos principales de la aplicación
 export interface Employee {
   id: string;
@@ -19,6 +18,7 @@ export interface Employee {
   cargo?: string;
   empresaId: string;
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
+  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
   createdAt: string;
   updatedAt: string;
 }

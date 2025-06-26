@@ -227,7 +227,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     loadCompanyId();
   }, []);
 
-  // Auto-fill titular cuenta based on nombres and apellidos
+  // Auto-fill titular cuenta based on nombres y apellidos
   useEffect(() => {
     if (watchedValues.nombre && watchedValues.apellido) {
       const fullName = watchedValues.segundoNombre 
