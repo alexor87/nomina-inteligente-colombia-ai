@@ -212,7 +212,7 @@ export class RegistrationRecoveryService {
       console.log('🚀 Starting auto-recovery process...');
       
       const incompleteRegistrations = await this.findIncompleteRegistrations();
-      const results = [];
+      const results: Array<{ email: string; success: boolean; error?: string }> = [];
       let completed = 0;
       let failed = 0;
 
