@@ -9,6 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      afp_entities: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      arl_entities: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           actividad_economica: string | null
@@ -141,6 +195,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      compensation_funds: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       dashboard_activity: {
         Row: {
@@ -300,6 +381,7 @@ export type Database = {
           nombre: string
           numero_cuenta: string | null
           salario_base: number
+          segundo_nombre: string | null
           telefono: string | null
           tipo_contrato: string | null
           tipo_cuenta: string | null
@@ -326,6 +408,7 @@ export type Database = {
           nombre: string
           numero_cuenta?: string | null
           salario_base?: number
+          segundo_nombre?: string | null
           telefono?: string | null
           tipo_contrato?: string | null
           tipo_cuenta?: string | null
@@ -352,6 +435,7 @@ export type Database = {
           nombre?: string
           numero_cuenta?: string | null
           salario_base?: number
+          segundo_nombre?: string | null
           telefono?: string | null
           tipo_contrato?: string | null
           tipo_cuenta?: string | null
@@ -368,6 +452,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      eps_entities: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       payroll_novedades: {
         Row: {

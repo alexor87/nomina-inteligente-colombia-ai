@@ -14,6 +14,7 @@ import { CONTRACT_TYPES, TIPOS_DOCUMENTO } from '@/types/employee-config';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
+import { useSecurityEntities } from '@/hooks/useSecurityEntities';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   User, 
@@ -47,6 +48,7 @@ interface EmployeeFormData {
   cedula: string;
   tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
+  segundoNombre: string;
   apellido: string;
   email: string;
   telefono: string;
@@ -117,9 +119,21 @@ const DEPARTAMENTOS_COLOMBIA = [
   'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 'Vaupés', 'Vichada'
 ];
 
+// Salario mínimo 2025 Colombia
+const SALARIO_MINIMO_2025 = 1400000;
+
+const ARL_RISK_LEVELS = [
+  { value: 'I', label: 'Nivel I - Riesgo Mínimo (0.348%)', percentage: '0.348%' },
+  { value: 'II', label: 'Nivel II - Riesgo Bajo (0.435%)', percentage: '0.435%' },
+  { value: 'III', label: 'Nivel III - Riesgo Medio (0.783%)', percentage: '0.783%' },
+  { value: 'IV', label: 'Nivel IV - Riesgo Alto (1.740%)', percentage: '1.740%' },
+  { value: 'V', label: 'Nivel V - Riesgo Máximo (3.219%)', percentage: '3.219%' }
+];
+
 export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFormModernProps) => {
   const { configuration } = useEmployeeGlobalConfiguration();
   const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUD();
+  const { epsEntities, afpEntities, arlEntities, compensationFunds, isLoading: entitiesLoading } = useSecurityEntities();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
@@ -132,6 +146,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       cedula: employee?.cedula || '',
       tipoDocumento: employee?.tipoDocumento || 'CC',
       nombre: employee?.nombre || '',
+      segundoNombre: '',
       apellido: employee?.apellido || '',
       email: employee?.email || '',
       telefono: employee?.telefono || '',
@@ -142,7 +157,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       departamento: '',
       
       // Información Laboral
-      salarioBase: employee?.salarioBase || 1300000,
+      salarioBase: employee?.salarioBase || SALARIO_MINIMO_2025,
       tipoContrato: employee?.tipoContrato || 'indefinido',
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
       periodicidadPago: 'mensual',
@@ -206,12 +221,15 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     loadCompanyId();
   }, []);
 
-  // Auto-fill titular cuenta based on nombre and apellido
+  // Auto-fill titular cuenta based on nombres and apellidos
   useEffect(() => {
     if (watchedValues.nombre && watchedValues.apellido) {
-      setValue('titularCuenta', `${watchedValues.nombre} ${watchedValues.apellido}`);
+      const fullName = watchedValues.segundoNombre 
+        ? `${watchedValues.nombre} ${watchedValues.segundoNombre} ${watchedValues.apellido}`
+        : `${watchedValues.nombre} ${watchedValues.apellido}`;
+      setValue('titularCuenta', fullName);
     }
-  }, [watchedValues.nombre, watchedValues.apellido, setValue]);
+  }, [watchedValues.nombre, watchedValues.segundoNombre, watchedValues.apellido, setValue]);
 
   // Calculate completion percentage
   useEffect(() => {
@@ -250,12 +268,13 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       return;
     }
 
-    // Crear el objeto de empleado básico (manteniendo compatibilidad)
+    // Crear el objeto de empleado con segundo nombre
     const employeeData = {
       empresaId: companyId,
       cedula: data.cedula,
       tipoDocumento: data.tipoDocumento,
       nombre: data.nombre,
+      segundoNombre: data.segundoNombre,
       apellido: data.apellido,
       email: data.email,
       telefono: data.telefono,
@@ -453,6 +472,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                 
                 {renderInlineField('cedula', 'Número de Documento', 'text', undefined, true)}
                 {renderInlineField('nombre', 'Primer Nombre', 'text', undefined, true)}
+                {renderInlineField('segundoNombre', 'Segundo Nombre', 'text', undefined, false)}
                 {renderInlineField('apellido', 'Apellidos', 'text', undefined, true)}
                 
                 {renderInlineField('sexo', 'Sexo', 'select', [
@@ -477,7 +497,24 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
             {/* Información Laboral */}
             {renderSection('laboral', 'Información Laboral', <Briefcase className="w-5 h-5 text-green-600" />, (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {renderInlineField('salarioBase', 'Salario Base', 'number', undefined, true, <DollarSign className="w-4 h-4 text-gray-500" />)}
+                <div className="group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className="w-4 h-4 text-gray-500" />
+                    <Label className="text-sm font-medium text-gray-700">
+                      Salario Base <span className="text-red-500">*</span>
+                    </Label>
+                  </div>
+                  <Input
+                    {...register('salarioBase', { required: 'Salario base es requerido' })}
+                    type="number"
+                    className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                    placeholder={`Mínimo: ${SALARIO_MINIMO_2025.toLocaleString()}`}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Salario mínimo 2025: ${SALARIO_MINIMO_2025.toLocaleString()}</p>
+                  {errors.salarioBase && (
+                    <p className="text-red-500 text-xs mt-1">{errors.salarioBase?.message}</p>
+                  )}
+                </div>
                 
                 {renderInlineField('tipoContrato', 'Tipo de Contrato', 'select', 
                   CONTRACT_TYPES.map(type => ({ value: type.value, label: type.label })), 
@@ -493,13 +530,9 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                 {renderInlineField('cargo', 'Cargo', 'text', undefined, false, <Building className="w-4 h-4 text-gray-500" />)}
                 {renderInlineField('codigoCIIU', 'Código CIIU', 'text', undefined, true)}
                 
-                {renderInlineField('nivelRiesgoARL', 'Nivel de Riesgo ARL', 'select', [
-                  { value: 'I', label: 'Nivel I - Riesgo Mínimo' },
-                  { value: 'II', label: 'Nivel II - Riesgo Bajo' },
-                  { value: 'III', label: 'Nivel III - Riesgo Medio' },
-                  { value: 'IV', label: 'Nivel IV - Riesgo Alto' },
-                  { value: 'V', label: 'Nivel V - Riesgo Máximo' }
-                ], true)}
+                {renderInlineField('nivelRiesgoARL', 'Nivel de Riesgo ARL', 'select', 
+                  ARL_RISK_LEVELS.map(level => ({ value: level.value, label: level.label })), 
+                  true)}
                 
                 {renderInlineField('estado', 'Estado', 'select', 
                   ESTADOS_EMPLEADO.map(estado => ({ value: estado.value, label: estado.label })))}
@@ -561,7 +594,24 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                 ], true)}
                 
                 {renderInlineField('numeroCuenta', 'Número de Cuenta', 'text', undefined, true)}
-                {renderInlineField('titularCuenta', 'Titular de la Cuenta', 'text', undefined, true)}
+                
+                <div className="group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label className="text-sm font-medium text-gray-700">
+                      Titular de la Cuenta <span className="text-red-500">*</span>
+                    </Label>
+                  </div>
+                  <Input
+                    {...register('titularCuenta', { required: 'Titular de la cuenta es requerido' })}
+                    className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                    placeholder="Se auto-completa con nombres y apellidos"
+                    readOnly
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Se completa automáticamente</p>
+                  {errors.titularCuenta && (
+                    <p className="text-red-500 text-xs mt-1">{errors.titularCuenta?.message}</p>
+                  )}
+                </div>
                 
                 {renderInlineField('formaPago', 'Forma de Pago', 'select', [
                   { value: 'dispersion', label: 'Dispersión Bancaria' },
@@ -573,10 +623,78 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
             {/* Afiliaciones */}
             {renderSection('afiliaciones', 'Afiliaciones', <Shield className="w-5 h-5 text-red-600" />, (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {renderInlineField('eps', 'EPS', 'text')}
-                {renderInlineField('afp', 'AFP', 'text')}
-                {renderInlineField('arl', 'ARL', 'text')}
-                {renderInlineField('cajaCompensacion', 'Caja de Compensación', 'text')}
+                <div className="group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label className="text-sm font-medium text-gray-700">EPS</Label>
+                  </div>
+                  <Select onValueChange={(value) => setValue('eps', value)} defaultValue={watchedValues.eps}>
+                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                      <SelectValue placeholder="Seleccionar EPS" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {epsEntities.map((eps) => (
+                        <SelectItem key={eps.id} value={eps.name}>
+                          {eps.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label className="text-sm font-medium text-gray-700">AFP</Label>
+                  </div>
+                  <Select onValueChange={(value) => setValue('afp', value)} defaultValue={watchedValues.afp}>
+                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                      <SelectValue placeholder="Seleccionar AFP" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {afpEntities.map((afp) => (
+                        <SelectItem key={afp.id} value={afp.name}>
+                          {afp.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label className="text-sm font-medium text-gray-700">ARL</Label>
+                  </div>
+                  <Select onValueChange={(value) => setValue('arl', value)} defaultValue={watchedValues.arl}>
+                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                      <SelectValue placeholder="Seleccionar ARL" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {arlEntities.map((arl) => (
+                        <SelectItem key={arl.id} value={arl.name}>
+                          {arl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label className="text-sm font-medium text-gray-700">Caja de Compensación</Label>
+                  </div>
+                  <Select onValueChange={(value) => setValue('cajaCompensacion', value)} defaultValue={watchedValues.cajaCompensacion}>
+                    <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                      <SelectValue placeholder="Seleccionar Caja de Compensación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {compensationFunds.map((fund) => (
+                        <SelectItem key={fund.id} value={fund.name}>
+                          {fund.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {renderInlineField('tipoCotizante', 'Tipo de Cotizante', 'text', undefined, true)}
                 {renderInlineField('subtipoCotizante', 'Subtipo de Cotizante', 'text')}
                 

@@ -1,8 +1,10 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types';
 import { EmployeeDataService } from './EmployeeDataService';
 
 interface EmployeeDataWithBanking extends Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> {
+  segundoNombre?: string;
   banco?: string;
   tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
@@ -55,12 +57,13 @@ export class EmployeeService {
       ? employeeData.estadoAfiliacion
       : 'pendiente';
 
-    // Limpiar y validar datos antes de insertar INCLUYENDO CAMPOS BANCARIOS
+    // Limpiar y validar datos antes de insertar INCLUYENDO SEGUNDO NOMBRE Y CAMPOS BANCARIOS
     const cleanedData = {
       company_id: companyId,
       cedula: String(employeeData.cedula || '').trim(),
       tipo_documento: tipoDocumentoLimpio,
       nombre: String(employeeData.nombre || '').trim(),
+      segundo_nombre: employeeData.segundoNombre ? String(employeeData.segundoNombre).trim() : null,
       apellido: String(employeeData.apellido || '').trim(),
       email: employeeData.email ? String(employeeData.email).trim() : null,
       telefono: employeeData.telefono ? String(employeeData.telefono).trim() : null,
@@ -127,12 +130,13 @@ export class EmployeeService {
     }
   }
 
-  static async update(id: string, updates: Partial<Employee>) {
+  static async update(id: string, updates: Partial<Employee & { segundoNombre?: string }>) {
     const supabaseData: any = {};
     
     if (updates.cedula !== undefined) supabaseData.cedula = updates.cedula;
     if (updates.tipoDocumento !== undefined) supabaseData.tipo_documento = updates.tipoDocumento;
     if (updates.nombre !== undefined) supabaseData.nombre = updates.nombre;
+    if ((updates as any).segundoNombre !== undefined) supabaseData.segundo_nombre = (updates as any).segundoNombre;
     if (updates.apellido !== undefined) supabaseData.apellido = updates.apellido;
     if (updates.email !== undefined) supabaseData.email = updates.email;
     if (updates.telefono !== undefined) supabaseData.telefono = updates.telefono;
