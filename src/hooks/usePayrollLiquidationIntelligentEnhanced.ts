@@ -1,11 +1,12 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { PayrollLiquidationBackendService } from '@/services/PayrollLiquidationBackendService';
+import { PayrollLiquidationBackendService, PayrollCalculationBackendService } from '@/services/PayrollLiquidationBackendService';
 import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/services/PayrollPeriodService';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { calculateEmployeeBackend, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculationsBackend';
 
-export const usePayrollLiquidationBackend = () => {
+export const usePayrollLiquidationIntelligentEnhanced = () => {
   const { toast } = useToast();
   const [currentPeriod, setCurrentPeriod] = useState<DBPayrollPeriod | null>(null);
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
@@ -24,12 +25,12 @@ export const usePayrollLiquidationBackend = () => {
   const initializePeriod = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log('Initializing payroll period...');
+      console.log('🚀 Inicializando período inteligente mejorado...');
       
       let activePeriod = await PayrollPeriodService.getCurrentActivePeriod();
       
       if (!activePeriod) {
-        console.log('No active period found, creating new one...');
+        console.log('📝 No hay período activo, creando uno nuevo...');
         
         const companySettings = await PayrollPeriodService.getCompanySettings();
         const periodicity = companySettings?.periodicity || 'mensual';
@@ -41,15 +42,9 @@ export const usePayrollLiquidationBackend = () => {
           
           if (activePeriod) {
             toast({
-              title: "Nuevo período creado",
-              description: `Período ${PayrollPeriodService.formatPeriodText(startDate, endDate)} creado automáticamente`
-            });
-          } else {
-            console.warn('Could not create payroll period - no company ID available');
-            toast({
-              title: "Configuración requerida",
-              description: "Para usar este módulo, necesitas tener una empresa asignada a tu usuario.",
-              variant: "destructive"
+              title: "✅ Nuevo período creado inteligentemente",
+              description: `Período ${PayrollPeriodService.formatPeriodText(startDate, endDate)} (${periodicity}) creado automáticamente`,
+              className: "border-green-200 bg-green-50"
             });
           }
         }
@@ -57,10 +52,10 @@ export const usePayrollLiquidationBackend = () => {
       
       if (activePeriod) {
         setCurrentPeriod(activePeriod);
-        console.log('Active period loaded:', activePeriod);
+        console.log('✅ Período activo cargado:', activePeriod);
       }
     } catch (error) {
-      console.error('Error initializing period:', error);
+      console.error('❌ Error inicializando período:', error);
       toast({
         title: "Error al inicializar período",
         description: "No se pudo crear el período de nómina. Verifica la configuración.",
@@ -76,16 +71,9 @@ export const usePayrollLiquidationBackend = () => {
     
     setIsLoading(true);
     try {
-      console.log('Loading active employees for payroll liquidation using backend with novedades...');
+      console.log('🔄 Cargando empleados con sistema inteligente mejorado (Backend + Novedades)...');
       const loadedEmployees = await PayrollLiquidationBackendService.loadEmployeesForLiquidation();
-      console.log(`Loaded ${loadedEmployees.length} active employees for payroll:`, loadedEmployees.map(emp => ({
-        id: emp.id,
-        name: emp.name,
-        status: emp.status,
-        bonuses: emp.bonuses,
-        extraHours: emp.extraHours,
-        grossPay: emp.grossPay
-      })));
+      console.log(`📊 Cargados ${loadedEmployees.length} empleados con novedades aplicadas`);
       
       const transformedEmployees: PayrollEmployee[] = loadedEmployees.map(emp => ({
         id: emp.id,
@@ -112,21 +100,22 @@ export const usePayrollLiquidationBackend = () => {
       
       if (transformedEmployees.length > 0) {
         toast({
-          title: "Empleados cargados (Backend + Novedades)",
-          description: `Se cargaron ${transformedEmployees.length} empleados activos con sus novedades aplicadas`
+          title: "🎯 Empleados cargados inteligentemente",
+          description: `${transformedEmployees.length} empleados activos con cálculos backend y novedades aplicadas`,
+          className: "border-blue-200 bg-blue-50"
         });
       } else {
         toast({
-          title: "Sin empleados activos",
-          description: "No se encontraron empleados activos. Agrega empleados en el módulo de Empleados primero.",
+          title: "⚠️ Sin empleados activos",
+          description: "No se encontraron empleados activos. Agrega empleados primero.",
           variant: "destructive"
         });
       }
     } catch (error) {
-      console.error('Error loading employees:', error);
+      console.error('❌ Error cargando empleados:', error);
       toast({
         title: "Error al cargar empleados",
-        description: "No se pudieron cargar los empleados. Verifica la conexión a la base de datos.",
+        description: "No se pudieron cargar los empleados. Verifica la conexión.",
         variant: "destructive"
       });
     } finally {
@@ -137,7 +126,7 @@ export const usePayrollLiquidationBackend = () => {
   const deleteEmployee = useCallback(async (employeeId: string) => {
     if (!currentPeriod || currentPeriod.estado !== 'borrador') {
       toast({
-        title: "Período no editable",
+        title: "❌ Período no editable",
         description: "Solo se pueden eliminar empleados en períodos en estado borrador",
         variant: "destructive"
       });
@@ -148,11 +137,12 @@ export const usePayrollLiquidationBackend = () => {
       setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
       
       toast({
-        title: "Empleado eliminado",
-        description: "El empleado ha sido eliminado de la nómina"
+        title: "🗑️ Empleado eliminado",
+        description: "El empleado ha sido eliminado de la nómina",
+        className: "border-orange-200 bg-orange-50"
       });
     } catch (error) {
-      console.error('Error deleting employee:', error);
+      console.error('❌ Error eliminando empleado:', error);
       toast({
         title: "Error al eliminar empleado",
         description: "No se pudo eliminar el empleado",
@@ -164,7 +154,7 @@ export const usePayrollLiquidationBackend = () => {
   const deleteMultipleEmployees = useCallback(async (employeeIds: string[]) => {
     if (!currentPeriod || currentPeriod.estado !== 'borrador') {
       toast({
-        title: "Período no editable",
+        title: "❌ Período no editable",
         description: "Solo se pueden eliminar empleados en períodos en estado borrador",
         variant: "destructive"
       });
@@ -175,11 +165,12 @@ export const usePayrollLiquidationBackend = () => {
       setEmployees(prev => prev.filter(emp => !employeeIds.includes(emp.id)));
       
       toast({
-        title: "Empleados eliminados",
-        description: `Se eliminaron ${employeeIds.length} empleados de la nómina`
+        title: "🗑️ Empleados eliminados",
+        description: `Se eliminaron ${employeeIds.length} empleados de la nómina`,
+        className: "border-orange-200 bg-orange-50"
       });
     } catch (error) {
-      console.error('Error deleting multiple employees:', error);
+      console.error('❌ Error eliminando empleados:', error);
       toast({
         title: "Error al eliminar empleados",
         description: "No se pudieron eliminar los empleados",
@@ -205,7 +196,7 @@ export const usePayrollLiquidationBackend = () => {
   const updateEmployee = useCallback(async (id: string, field: string, value: number) => {
     if (!currentPeriod || currentPeriod.estado !== 'borrador') {
       toast({
-        title: "Período no editable",
+        title: "❌ Período no editable",
         description: "Solo se pueden hacer cambios en períodos en estado borrador",
         variant: "destructive"
       });
@@ -235,7 +226,7 @@ export const usePayrollLiquidationBackend = () => {
         ));
       }
     } catch (error) {
-      console.error('Error updating employee:', error);
+      console.error('❌ Error actualizando empleado:', error);
       toast({
         title: "Error al actualizar empleado",
         description: "No se pudo recalcular los datos del empleado",
@@ -249,7 +240,7 @@ export const usePayrollLiquidationBackend = () => {
   const updatePeriod = useCallback(async (startDate: string, endDate: string) => {
     if (!currentPeriod || currentPeriod.estado !== 'borrador') {
       toast({
-        title: "Período no editable",
+        title: "❌ Período no editable",
         description: "Solo se pueden cambiar las fechas en períodos en estado borrador",
         variant: "destructive"
       });
@@ -262,7 +253,7 @@ export const usePayrollLiquidationBackend = () => {
       
       if (!validation.isValid) {
         toast({
-          title: "Fechas inválidas",
+          title: "❌ Fechas inválidas",
           description: validation.warnings.join(', '),
           variant: "destructive"
         });
@@ -277,18 +268,11 @@ export const usePayrollLiquidationBackend = () => {
       if (updatedPeriod) {
         setCurrentPeriod(updatedPeriod);
         
-        if (validation.warnings.length > 0) {
-          toast({
-            title: "Período actualizado con advertencias",
-            description: validation.warnings.join(', '),
-            variant: "default"
-          });
-        } else {
-          toast({
-            title: "Período actualizado",
-            description: `Nuevo período: ${PayrollPeriodService.formatPeriodText(startDate, endDate)}`
-          });
-        }
+        toast({
+          title: "✅ Período actualizado inteligentemente",
+          description: `Nuevo período: ${PayrollPeriodService.formatPeriodText(startDate, endDate)}`,
+          className: "border-green-200 bg-green-50"
+        });
 
         const recalculatedEmployees = await Promise.all(
           employees.map(async (emp) => {
@@ -299,7 +283,7 @@ export const usePayrollLiquidationBackend = () => {
         setEmployees(recalculatedEmployees);
       }
     } catch (error) {
-      console.error('Error updating period:', error);
+      console.error('❌ Error actualizando período:', error);
       toast({
         title: "Error al actualizar período",
         description: "No se pudo actualizar el período",
@@ -315,8 +299,9 @@ export const usePayrollLiquidationBackend = () => {
 
     setIsLoading(true);
     toast({
-      title: "Recalculando nómina (Backend + Novedades)",
-      description: "Aplicando configuración legal actualizada y novedades usando el servidor..."
+      title: "🔄 Recalculando nómina inteligentemente",
+      description: "Aplicando configuración legal actualizada y novedades usando backend...",
+      className: "border-blue-200 bg-blue-50"
     });
 
     try {
@@ -348,11 +333,12 @@ export const usePayrollLiquidationBackend = () => {
       setEmployees(transformedEmployees);
 
       toast({
-        title: "Recálculo completado (Backend + Novedades)",
-        description: "Todos los cálculos han sido actualizados con las novedades más recientes."
+        title: "✅ Recálculo completado inteligentemente",
+        description: "Todos los cálculos han sido actualizados con las novedades más recientes.",
+        className: "border-green-200 bg-green-50"
       });
     } catch (error) {
-      console.error('Error in recalculate:', error);
+      console.error('❌ Error en recálculo:', error);
       toast({
         title: "Error en recálculo",
         description: "No se pudo completar el recálculo.",
@@ -369,7 +355,7 @@ export const usePayrollLiquidationBackend = () => {
     const invalidEmployees = employees.filter(emp => emp.status !== 'valid');
     if (invalidEmployees.length > 0) {
       toast({
-        title: "No se puede aprobar",
+        title: "❌ No se puede aprobar",
         description: `Corrige los errores en ${invalidEmployees.length} empleado(s) antes de aprobar.`,
         variant: "destructive"
       });
@@ -378,8 +364,9 @@ export const usePayrollLiquidationBackend = () => {
 
     setIsLoading(true);
     toast({
-      title: "Aprobando período",
-      description: "Guardando nómina y generando comprobantes..."
+      title: "🔄 Aprobando período inteligentemente",
+      description: "Guardando nómina y generando comprobantes automáticamente...",
+      className: "border-blue-200 bg-blue-50"
     });
 
     try {
@@ -413,12 +400,12 @@ export const usePayrollLiquidationBackend = () => {
       };
       
       toast({
-        title: "Período aprobado y cerrado",
-        description: `${employees.length} empleados procesados • ${formatCurrency(summary.totalNetPay)} • Comprobantes generados`,
+        title: "🎉 Período aprobado y cerrado inteligentemente",
+        description: `${employees.length} empleados procesados • ${formatCurrency(summary.totalNetPay)} • Comprobantes generados automáticamente`,
         className: "border-green-200 bg-green-50"
       });
     } catch (error) {
-      console.error('Error approving period:', error);
+      console.error('❌ Error aprobando período:', error);
       toast({
         title: "Error al aprobar",
         description: error instanceof Error ? error.message : "No se pudo aprobar el período.",

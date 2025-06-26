@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { PayrollLiquidation } from '@/components/payroll/PayrollLiquidation';
+import { PayrollLiquidationIntelligentEnhanced } from '@/components/payroll/PayrollLiquidationIntelligentEnhanced';
 import { IntelligentPeriodDialog } from '@/components/payroll/IntelligentPeriodDialog';
 import { usePayrollLiquidationIntelligent } from '@/hooks/usePayrollLiquidationIntelligent';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -26,10 +26,10 @@ const PayrollIntelligentPage = () => {
           <LoadingSpinner size="lg" />
           <div className="space-y-2">
             <h3 className="text-lg font-medium text-gray-900">
-              Verificando estado de la nómina
+              🎯 Verificando estado inteligente de la nómina
             </h3>
             <p className="text-gray-600">
-              Detectando períodos y configuración...
+              Detectando períodos automáticamente y configuración consolidada...
             </p>
           </div>
         </div>
@@ -39,8 +39,8 @@ const PayrollIntelligentPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Componente principal de liquidación */}
-      <PayrollLiquidation />
+      {/* Componente principal de liquidación inteligente consolidado */}
+      <PayrollLiquidationIntelligentEnhanced />
 
       {/* Diálogo inteligente para gestión de períodos */}
       {periodStatus && (

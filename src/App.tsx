@@ -13,7 +13,6 @@ import AuthPage from '@/pages/AuthPage';
 import DashboardPage from '@/pages/DashboardPage';
 import EmployeesPage from '@/pages/EmployeesPage';
 import PayrollIntelligentPage from '@/pages/PayrollIntelligentPage';
-import PayrollBackendPage from '@/pages/PayrollBackendPage';
 import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
 import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
 import VouchersPage from '@/pages/VouchersPage';
@@ -70,18 +69,11 @@ function App() {
                 </ProtectedRoute>
               } />
               
+              {/* Ruta única consolidada de nómina inteligente */}
               <Route path="/payroll" element={
                 <ProtectedRoute requiredModule="payroll">
                   <Layout>
                     <PayrollIntelligentPage />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/payroll-backend" element={
-                <ProtectedRoute requiredModule="payroll">
-                  <Layout>
-                    <PayrollBackendPage />
                   </Layout>
                 </ProtectedRoute>
               } />
