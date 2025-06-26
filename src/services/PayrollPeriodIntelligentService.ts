@@ -14,6 +14,11 @@ export interface PeriodStatus {
 }
 
 export class PayrollPeriodIntelligentService {
+  // Cache para evitar múltiples llamadas
+  private static configCache: { [key: string]: any } = {};
+  private static cacheTimestamp: { [key: string]: number } = {};
+  private static CACHE_DURATION = 5000; // 5 segundos
+
   // Detectar estado inteligente del módulo de nómina
   static async detectPeriodStatus(): Promise<PeriodStatus> {
     try {
@@ -29,8 +34,8 @@ export class PayrollPeriodIntelligentService {
         };
       }
 
-      // Verificar configuración de empresa - forzar refresh
-      const companySettings = await this.getCompanySettingsRefresh(companyId);
+      // Verificar configuración de empresa - forzar refresh completo
+      const companySettings = await this.getCompanySettingsForceRefresh(companyId);
       if (!companySettings) {
         console.log('❌ No se encontró configuración de empresa');
         return {
@@ -121,25 +126,57 @@ export class PayrollPeriodIntelligentService {
     }
   }
 
-  // Obtener configuración de empresa con refresh forzado
-  private static async getCompanySettingsRefresh(companyId: string) {
+  // Obtener configuración de empresa con refresh forzado y sin cache
+  private static async getCompanySettingsForceRefresh(companyId: string) {
     try {
-      // Forzar refresh desde la base de datos
+      console.log('🔄 Forzando refresh completo de configuración para empresa:', companyId);
+      
+      // Invalidar cache explícitamente
+      delete this.configCache[companyId];
+      delete this.cacheTimestamp[companyId];
+      
+      // Hacer consulta directa con timestamp para evitar cache del navegador
+      const timestamp = Date.now();
+      console.log('⏰ Timestamp de consulta:', timestamp);
+      
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
         .eq('company_id', companyId)
+        // Agregar un filtro dummy que siempre sea true para forzar nueva consulta
+        .gte('created_at', '1970-01-01')
         .single();
 
       if (error) {
+        console.log('❌ Error en consulta de configuración:', error);
         console.log('No company settings found, will create defaults');
         return null;
       }
       
+      console.log('✅ Configuración obtenida directamente de BD:', data);
+      console.log('📊 Periodicidad actual en BD:', data.periodicity);
+      
+      // Guardar en cache con timestamp actual
+      this.configCache[companyId] = data;
+      this.cacheTimestamp[companyId] = timestamp;
+      
       return data;
     } catch (error) {
-      console.error('Error getting company configuration:', error);
+      console.error('❌ Error getting company configuration:', error);
       return null;
+    }
+  }
+
+  // Método para invalidar cache manualmente
+  static invalidateConfigurationCache(companyId?: string) {
+    if (companyId) {
+      delete this.configCache[companyId];
+      delete this.cacheTimestamp[companyId];
+      console.log('🗑️ Cache invalidado para empresa:', companyId);
+    } else {
+      this.configCache = {};
+      this.cacheTimestamp = {};
+      console.log('🗑️ Cache completo invalidado');
     }
   }
 
@@ -183,7 +220,9 @@ export class PayrollPeriodIntelligentService {
     if (!lastPeriod) {
       // Si no hay periodo anterior, usar la periodicidad configurada correctamente
       console.log('📅 No hay periodo anterior, generando periodo inicial con periodicidad:', periodicity);
-      return PayrollPeriodService.generatePeriodDates(periodicity);
+      const result = PayrollPeriodService.generatePeriodDates(periodicity);
+      console.log('📅 Periodo inicial generado:', result);
+      return result;
     }
 
     const lastEndDate = new Date(lastPeriod.fecha_fin);

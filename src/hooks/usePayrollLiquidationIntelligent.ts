@@ -17,6 +17,14 @@ export const usePayrollLiquidationIntelligent = () => {
     setIsLoading(true);
     try {
       console.log('🔍 Detectando estado inteligente del módulo...');
+      
+      // Invalidar cache antes de detectar para asegurar datos frescos
+      const companyId = await PayrollPeriodService.getCurrentUserCompanyId();
+      if (companyId) {
+        PayrollPeriodIntelligentService.invalidateConfigurationCache(companyId);
+        console.log('🗑️ Cache invalidado antes de detectar estado');
+      }
+      
       const status = await PayrollPeriodIntelligentService.detectPeriodStatus();
       setPeriodStatus(status);
       
@@ -49,7 +57,7 @@ export const usePayrollLiquidationIntelligent = () => {
       console.error('❌ Error detectando estado:', error);
       toast({
         title: "Error de conexión",
-        description: "No se pudo verificar el estado de la nómina",
+        description: "No se pudo verificar el estado de la nómina. Intenta recargar la página.",
         variant: "destructive"
       });
     } finally {
@@ -57,9 +65,33 @@ export const usePayrollLiquidationIntelligent = () => {
     }
   }, [toast]);
 
-  // Cargar al montar el componente
+  // Cargar al montar el componente y cuando cambie la ruta
   useEffect(() => {
+    console.log('🚀 Hook montado, detectando estado...');
     detectPeriodStatus();
+  }, [detectPeriodStatus]);
+
+  // Escuchar cambios de configuración (cuando el usuario viene de settings)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('📄 Página visible de nuevo, refrescando estado...');
+        detectPeriodStatus();
+      }
+    };
+
+    const handleFocus = () => {
+      console.log('🎯 Ventana enfocada, refrescando estado...');
+      detectPeriodStatus();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [detectPeriodStatus]);
 
   // Reanudar periodo existente
@@ -176,6 +208,12 @@ export const usePayrollLiquidationIntelligent = () => {
     }
   }, [navigate, periodStatus]);
 
+  // Método para refrescar manualmente
+  const refreshPeriodStatus = useCallback(() => {
+    console.log('🔄 Refresh manual solicitado');
+    detectPeriodStatus();
+  }, [detectPeriodStatus]);
+
   return {
     periodStatus,
     showDialog,
@@ -186,6 +224,7 @@ export const usePayrollLiquidationIntelligent = () => {
     handleViewLastPeriod,
     handleGoToSettings,
     handleCloseDialog,
-    detectPeriodStatus
+    detectPeriodStatus,
+    refreshPeriodStatus // Método adicional para refresh manual
   };
 };
