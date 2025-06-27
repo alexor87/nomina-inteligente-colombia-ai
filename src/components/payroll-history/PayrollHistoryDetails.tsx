@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -181,41 +180,40 @@ export const PayrollHistoryDetails = () => {
         voucher = newVoucher;
       }
 
-      // Llamar a la edge function para generar el PDF
-      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+      // Llamar a la edge function para generar y descargar el PDF
+      const response = await supabase.functions.invoke('generate-voucher-pdf', {
         body: { 
           voucherId: voucher.id,
           regenerate: true 
         }
       });
 
-      if (error) {
-        console.error('Error calling generate-voucher-pdf:', error);
+      if (response.error) {
+        console.error('Error calling generate-voucher-pdf:', response.error);
         throw new Error('Error generando el comprobante PDF');
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Error generando el comprobante');
+      // La respuesta ahora es un PDF buffer directo
+      if (response.data) {
+        // Crear un blob desde la respuesta
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        
+        // Crear enlace de descarga
+        const fileName = `comprobante-nomina_${employeeData.cedula}_${period.period.replace(/\s+/g, '_')}.pdf`;
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: "✅ Comprobante descargado",
+          description: `Se descargó el comprobante PDF de ${employee.name}`,
+        });
       }
-
-      console.log('PDF generated successfully:', data.fileName);
-
-      // Crear blob y descargar
-      const htmlBlob = new Blob([data.htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(htmlBlob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = data.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "✅ Comprobante descargado",
-        description: `Se descargó el comprobante de ${employee.name}`,
-      });
 
     } catch (error: any) {
       console.error('Error downloading payslip:', error);

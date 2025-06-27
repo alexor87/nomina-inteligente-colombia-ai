@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -34,7 +33,10 @@ interface VoucherData {
   };
 }
 
-const generatePDFContent = (voucher: VoucherData, companyInfo: any) => {
+const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promise<Uint8Array> => {
+  // Importar jsPDF dinámicamente
+  const { jsPDF } = await import("https://esm.sh/jspdf@2.5.1");
+  
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -43,537 +45,252 @@ const generatePDFContent = (voucher: VoucherData, companyInfo: any) => {
     }).format(amount);
   };
 
-  return `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Comprobante de Nómina - ${voucher.employeeName}</title>
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
+  // Crear nuevo documento PDF
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
 
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-          line-height: 1.6;
-          color: #1a1a1a;
-          background: #ffffff;
-          font-size: 14px;
-        }
+  // Configurar fuente
+  doc.setFont('helvetica');
+  
+  let yPosition = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 20;
+  const contentWidth = pageWidth - (margin * 2);
 
-        .container {
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 40px 30px;
-          background: white;
-        }
+  // ENCABEZADO
+  // Logo/Inicial de la empresa
+  doc.setFillColor(102, 126, 234);
+  doc.rect(margin, yPosition, 15, 15, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  const logoLetter = companyInfo?.razon_social ? companyInfo.razon_social.charAt(0).toUpperCase() : 'E';
+  doc.text(logoLetter, margin + 7.5, yPosition + 10, { align: 'center' });
 
-        /* Header Section */
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 40px;
-          padding-bottom: 30px;
-          border-bottom: 2px solid #f0f0f0;
-        }
+  // Información de la empresa
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(companyInfo?.razon_social || 'Empresa', margin + 20, yPosition + 6);
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`NIT: ${companyInfo?.nit || 'No especificado'}`, margin + 20, yPosition + 12);
+  doc.text(`${companyInfo?.direccion || 'No especificada'}`, margin + 20, yPosition + 16);
 
-        .company-section {
-          flex: 1;
-        }
+  // Título del documento
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('COMPROBANTE DE NÓMINA', pageWidth - margin, yPosition + 6, { align: 'right' });
+  
+  // Información del período
+  doc.setFillColor(248, 249, 255);
+  doc.rect(pageWidth - margin - 60, yPosition + 10, 60, 15, 'F');
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Período: ${voucher.periodo}`, pageWidth - margin - 58, yPosition + 15);
+  doc.text(`Desde: ${new Date(voucher.startDate).toLocaleDateString('es-CO')}`, pageWidth - margin - 58, yPosition + 19);
+  doc.text(`Hasta: ${new Date(voucher.endDate).toLocaleDateString('es-CO')}`, pageWidth - margin - 58, yPosition + 23);
 
-        .company-logo {
-          width: 60px;
-          height: 60px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-weight: 700;
-          font-size: 18px;
-          margin-bottom: 16px;
-        }
+  yPosition += 40;
 
-        .company-name {
-          font-size: 24px;
-          font-weight: 700;
-          color: #1a1a1a;
-          margin-bottom: 8px;
-        }
+  // INFORMACIÓN DEL EMPLEADO
+  doc.setFillColor(249, 250, 251);
+  doc.rect(margin, yPosition, contentWidth, 25, 'F');
+  
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(55, 65, 81);
+  doc.text('👤 Información del Empleado', margin + 5, yPosition + 8);
 
-        .company-details {
-          color: #6b7280;
-          font-size: 13px;
-          line-height: 1.5;
-        }
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(107, 114, 128);
+  
+  // Primera columna
+  doc.text('NOMBRE COMPLETO', margin + 5, yPosition + 15);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(31, 41, 55);
+  doc.text(voucher.employeeName, margin + 5, yPosition + 19);
 
-        .document-info {
-          text-align: right;
-          flex-shrink: 0;
-        }
+  // Segunda columna
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(107, 114, 128);
+  doc.text('DOCUMENTO', margin + 70, yPosition + 15);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(31, 41, 55);
+  doc.text(voucher.employeeCedula, margin + 70, yPosition + 19);
 
-        .document-title {
-          font-size: 28px;
-          font-weight: 800;
-          color: #1a1a1a;
-          margin-bottom: 8px;
-        }
+  // Tercera columna
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(107, 114, 128);
+  doc.text('CARGO', margin + 120, yPosition + 15);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(31, 41, 55);
+  doc.text(voucher.employeePosition || 'No especificado', margin + 120, yPosition + 19);
 
-        .period-info {
-          background: #f8f9ff;
-          padding: 12px 16px;
-          border-radius: 8px;
-          border-left: 4px solid #667eea;
-          font-size: 13px;
-          color: #4b5563;
-        }
+  yPosition += 35;
 
-        /* Employee Section */
-        .employee-section {
-          background: #f9fafb;
-          padding: 24px;
-          border-radius: 12px;
-          margin-bottom: 32px;
-          border: 1px solid #e5e7eb;
-        }
+  // TABLA DE DEVENGOS
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(31, 41, 55);
+  doc.text('💰 Devengos', margin, yPosition);
+  yPosition += 10;
 
-        .employee-header {
-          font-size: 16px;
-          font-weight: 600;
-          color: #374151;
-          margin-bottom: 16px;
-          display: flex;
-          align-items: center;
-        }
+  // Encabezados de tabla
+  doc.setFillColor(249, 250, 251);
+  doc.rect(margin, yPosition, contentWidth, 8, 'F');
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(55, 65, 81);
+  doc.text('Concepto', margin + 3, yPosition + 5);
+  doc.text('Valor', pageWidth - margin - 25, yPosition + 5, { align: 'right' });
+  yPosition += 8;
 
-        .employee-header::before {
-          content: "👤";
-          margin-right: 8px;
-          font-size: 18px;
-        }
+  // Filas de devengos
+  const earnings = [
+    { label: 'Salario Base', value: voucher.salaryDetails.baseSalary },
+    { label: 'Horas Extra', value: voucher.salaryDetails.extraHours, show: voucher.salaryDetails.extraHours > 0 },
+    { label: 'Recargo Nocturno', value: voucher.salaryDetails.nightSurcharge, show: voucher.salaryDetails.nightSurcharge > 0 },
+    { label: 'Recargo Dominical', value: voucher.salaryDetails.sundaySurcharge, show: voucher.salaryDetails.sundaySurcharge > 0 },
+    { label: 'Auxilio de Transporte', value: voucher.salaryDetails.transportAllowance, show: voucher.salaryDetails.transportAllowance > 0 },
+    { label: 'Bonificaciones', value: voucher.salaryDetails.bonuses, show: voucher.salaryDetails.bonuses > 0 }
+  ];
 
-        .employee-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 16px;
-        }
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  
+  for (const earning of earnings) {
+    if (earning.show !== false) {
+      doc.setTextColor(31, 41, 55);
+      doc.text(earning.label, margin + 3, yPosition + 4);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(34, 197, 94);
+      doc.text(formatCurrency(earning.value), pageWidth - margin - 3, yPosition + 4, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPosition += 6;
+    }
+  }
 
-        .employee-field {
-          display: flex;
-          flex-direction: column;
-        }
+  yPosition += 5;
 
-        .field-label {
-          font-size: 12px;
-          font-weight: 500;
-          color: #6b7280;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          margin-bottom: 4px;
-        }
+  // TABLA DE DEDUCCIONES
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(31, 41, 55);
+  doc.text('📉 Deducciones', margin, yPosition);
+  yPosition += 10;
 
-        .field-value {
-          font-size: 14px;
-          font-weight: 600;
-          color: #1f2937;
-        }
+  // Encabezados de tabla
+  doc.setFillColor(249, 250, 251);
+  doc.rect(margin, yPosition, contentWidth, 8, 'F');
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(55, 65, 81);
+  doc.text('Concepto', margin + 3, yPosition + 5);
+  doc.text('Valor', pageWidth - margin - 25, yPosition + 5, { align: 'right' });
+  yPosition += 8;
 
-        /* Tables */
-        .section {
-          margin-bottom: 32px;
-        }
+  // Filas de deducciones
+  const deductions = [
+    { label: 'Salud (4%)', value: voucher.salaryDetails.healthContribution, show: voucher.salaryDetails.healthContribution > 0 },
+    { label: 'Pensión (4%)', value: voucher.salaryDetails.pensionContribution, show: voucher.salaryDetails.pensionContribution > 0 },
+    { label: 'Retención en la Fuente', value: voucher.salaryDetails.withholdingTax, show: voucher.salaryDetails.withholdingTax > 0 },
+    { label: 'Otras Deducciones', value: voucher.salaryDetails.otherDeductions, show: voucher.salaryDetails.otherDeductions > 0 }
+  ];
 
-        .section-title {
-          font-size: 18px;
-          font-weight: 700;
-          color: #1f2937;
-          margin-bottom: 16px;
-          display: flex;
-          align-items: center;
-          padding-bottom: 8px;
-          border-bottom: 2px solid #e5e7eb;
-        }
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  
+  for (const deduction of deductions) {
+    if (deduction.show !== false) {
+      doc.setTextColor(31, 41, 55);
+      doc.text(deduction.label, margin + 3, yPosition + 4);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(239, 68, 68);
+      doc.text(formatCurrency(deduction.value), pageWidth - margin - 3, yPosition + 4, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPosition += 6;
+    }
+  }
 
-        .earnings-title::before {
-          content: "💰";
-          margin-right: 10px;
-          font-size: 20px;
-        }
+  yPosition += 10;
 
-        .deductions-title::before {
-          content: "📉";
-          margin-right: 10px;
-          font-size: 20px;
-        }
+  // TOTALES
+  doc.setFillColor(102, 126, 234);
+  doc.rect(margin, yPosition, contentWidth, 25, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  
+  doc.text('Total Devengado:', margin + 5, yPosition + 8);
+  doc.text(formatCurrency(voucher.salaryDetails.totalEarnings), pageWidth - margin - 5, yPosition + 8, { align: 'right' });
+  
+  doc.text('Total Deducciones:', margin + 5, yPosition + 14);
+  doc.text(formatCurrency(voucher.salaryDetails.totalDeductions), pageWidth - margin - 5, yPosition + 14, { align: 'right' });
+  
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('NETO A PAGAR:', margin + 5, yPosition + 21);
+  doc.text(formatCurrency(voucher.netPay), pageWidth - margin - 5, yPosition + 21, { align: 'right' });
 
-        .payroll-table {
-          width: 100%;
-          border-collapse: collapse;
-          background: white;
-          border-radius: 8px;
-          overflow: hidden;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
+  yPosition += 35;
 
-        .payroll-table th {
-          background: #f9fafb;
-          padding: 16px 20px;
-          text-align: left;
-          font-weight: 600;
-          color: #374151;
-          font-size: 13px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          border-bottom: 2px solid #e5e7eb;
-        }
+  // NETO A PAGAR DESTACADO
+  doc.setFillColor(16, 185, 129);
+  doc.rect(margin, yPosition, contentWidth, 20, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  doc.text('💵 NETO A PAGAR', pageWidth / 2, yPosition + 8, { align: 'center' });
+  
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text(formatCurrency(voucher.netPay), pageWidth / 2, yPosition + 16, { align: 'center' });
 
-        .payroll-table th:last-child {
-          text-align: right;
-        }
+  yPosition += 30;
 
-        .payroll-table td {
-          padding: 16px 20px;
-          border-bottom: 1px solid #f3f4f6;
-          color: #1f2937;
-        }
+  // FOOTER
+  doc.setDrawColor(240, 240, 240);
+  doc.line(margin, yPosition, pageWidth - margin, yPosition);
+  yPosition += 10;
 
-        .payroll-table td:last-child {
-          text-align: right;
-          font-weight: 600;
-        }
+  doc.setTextColor(107, 114, 128);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  
+  const generationDate = new Date().toLocaleDateString('es-CO', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  doc.text(`Fecha de generación: ${generationDate}`, pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 6;
+  
+  doc.setFillColor(254, 243, 199);
+  doc.rect(margin, yPosition, contentWidth, 12, 'F');
+  doc.setTextColor(146, 64, 14);
+  doc.setFontSize(7);
+  doc.text('⚠️ IMPORTANTE: Este comprobante es un documento informativo y no reemplaza la nómina electrónica oficial.', margin + 2, yPosition + 4);
+  doc.text('Para consultas sobre este comprobante, contacte al departamento de recursos humanos.', margin + 2, yPosition + 8);
+  
+  yPosition += 18;
+  doc.setTextColor(107, 114, 128);
+  doc.setFontSize(6);
+  doc.text('Comprobante generado electrónicamente • Válido sin firma autógrafa', pageWidth / 2, yPosition, { align: 'center' });
 
-        .payroll-table tr:hover {
-          background: #f9fafb;
-        }
-
-        /* Totals */
-        .totals-section {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 24px;
-          border-radius: 12px;
-          margin: 32px 0;
-        }
-
-        .total-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-          font-size: 16px;
-        }
-
-        .total-row:last-child {
-          margin-bottom: 0;
-          padding-top: 16px;
-          border-top: 2px solid rgba(255, 255, 255, 0.3);
-          font-size: 24px;
-          font-weight: 800;
-        }
-
-        .net-pay-section {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-          color: white;
-          padding: 32px;
-          border-radius: 16px;
-          text-align: center;
-          margin: 32px 0;
-          box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
-        }
-
-        .net-pay-label {
-          font-size: 16px;
-          opacity: 0.9;
-          margin-bottom: 8px;
-          font-weight: 500;
-        }
-
-        .net-pay-amount {
-          font-size: 36px;
-          font-weight: 900;
-          margin-bottom: 8px;
-        }
-
-        .net-pay-text {
-          font-size: 12px;
-          opacity: 0.8;
-        }
-
-        /* Footer */
-        .footer {
-          margin-top: 48px;
-          padding-top: 24px;
-          border-top: 2px solid #f0f0f0;
-          text-align: center;
-          color: #6b7280;
-          font-size: 12px;
-        }
-
-        .generation-info {
-          margin-bottom: 16px;
-          font-weight: 500;
-        }
-
-        .disclaimer {
-          background: #fef3c7;
-          border: 1px solid #f59e0b;
-          border-radius: 8px;
-          padding: 12px;
-          margin: 16px 0;
-          color: #92400e;
-          font-size: 11px;
-          line-height: 1.4;
-        }
-
-        /* Print Styles */
-        @media print {
-          body {
-            font-size: 12px;
-          }
-          
-          .container {
-            padding: 20px;
-            max-width: none;
-          }
-          
-          .header {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-          }
-          
-          .section {
-            margin-bottom: 20px;
-          }
-          
-          .net-pay-section {
-            margin: 20px 0;
-            padding: 20px;
-          }
-          
-          .footer {
-            margin-top: 30px;
-          }
-        }
-
-        /* Responsive */
-        @media (max-width: 600px) {
-          .container {
-            padding: 20px 16px;
-          }
-          
-          .header {
-            flex-direction: column;
-            text-align: left;
-          }
-          
-          .document-info {
-            text-align: left;
-            margin-top: 20px;
-          }
-          
-          .employee-grid {
-            grid-template-columns: 1fr;
-          }
-          
-          .payroll-table th,
-          .payroll-table td {
-            padding: 12px 16px;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <!-- Header -->
-        <div class="header">
-          <div class="company-section">
-            <div class="company-logo">
-              ${companyInfo?.razon_social ? companyInfo.razon_social.charAt(0).toUpperCase() : 'E'}
-            </div>
-            <div class="company-name">${companyInfo?.razon_social || 'Empresa'}</div>
-            <div class="company-details">
-              <div><strong>NIT:</strong> ${companyInfo?.nit || 'No especificado'}</div>
-              <div><strong>Dirección:</strong> ${companyInfo?.direccion || 'No especificada'}</div>
-              <div><strong>Teléfono:</strong> ${companyInfo?.telefono || 'No especificado'}</div>
-              <div><strong>Email:</strong> ${companyInfo?.email || 'No especificado'}</div>
-            </div>
-          </div>
-          
-          <div class="document-info">
-            <div class="document-title">COMPROBANTE DE NÓMINA</div>
-            <div class="period-info">
-              <div><strong>Período:</strong> ${voucher.periodo}</div>
-              <div><strong>Desde:</strong> ${new Date(voucher.startDate).toLocaleDateString('es-CO')}</div>
-              <div><strong>Hasta:</strong> ${new Date(voucher.endDate).toLocaleDateString('es-CO')}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Employee Information -->
-        <div class="employee-section">
-          <div class="employee-header">Información del Empleado</div>
-          <div class="employee-grid">
-            <div class="employee-field">
-              <div class="field-label">Nombre Completo</div>
-              <div class="field-value">${voucher.employeeName}</div>
-            </div>
-            <div class="employee-field">
-              <div class="field-label">Documento</div>
-              <div class="field-value">${voucher.employeeCedula}</div>
-            </div>
-            <div class="employee-field">
-              <div class="field-label">Cargo</div>
-              <div class="field-value">${voucher.employeePosition || 'No especificado'}</div>
-            </div>
-            <div class="employee-field">
-              <div class="field-label">ID Empleado</div>
-              <div class="field-value">${voucher.employeeId}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Earnings Section -->
-        <div class="section">
-          <div class="section-title earnings-title">Devengos</div>
-          <table class="payroll-table">
-            <thead>
-              <tr>
-                <th>Concepto</th>
-                <th>Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Salario Base</td>
-                <td>${formatCurrency(voucher.salaryDetails.baseSalary)}</td>
-              </tr>
-              ${voucher.salaryDetails.extraHours > 0 ? `
-              <tr>
-                <td>Horas Extra</td>
-                <td>${formatCurrency(voucher.salaryDetails.extraHours)}</td>
-              </tr>
-              ` : ''}
-              ${voucher.salaryDetails.nightSurcharge > 0 ? `
-              <tr>
-                <td>Recargo Nocturno</td>
-                <td>${formatCurrency(voucher.salaryDetails.nightSurcharge)}</td>
-              </tr>
-              ` : ''}
-              ${voucher.salaryDetails.sundaySurcharge > 0 ? `
-              <tr>
-                <td>Recargo Dominical</td>
-                <td>${formatCurrency(voucher.salaryDetails.sundaySurcharge)}</td>
-              </tr>
-              ` : ''}
-              ${voucher.salaryDetails.transportAllowance > 0 ? `
-              <tr>
-                <td>Auxilio de Transporte</td>
-                <td>${formatCurrency(voucher.salaryDetails.transportAllowance)}</td>
-              </tr>
-              ` : ''}
-              ${voucher.salaryDetails.bonuses > 0 ? `
-              <tr>
-                <td>Bonificaciones</td>
-                <td>${formatCurrency(voucher.salaryDetails.bonuses)}</td>
-              </tr>
-              ` : ''}
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Deductions Section -->
-        <div class="section">
-          <div class="section-title deductions-title">Deducciones</div>
-          <table class="payroll-table">
-            <thead>
-              <tr>
-                <th>Concepto</th>
-                <th>Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${voucher.salaryDetails.healthContribution > 0 ? `
-              <tr>
-                <td>Salud (4%)</td>
-                <td>${formatCurrency(voucher.salaryDetails.healthContribution)}</td>
-              </tr>
-              ` : ''}
-              ${voucher.salaryDetails.pensionContribution > 0 ? `
-              <tr>
-                <td>Pensión (4%)</td>
-                <td>${formatCurrency(voucher.salaryDetails.pensionContribution)}</td>
-              </tr>
-              ` : ''}
-              ${voucher.salaryDetails.withholdingTax > 0 ? `
-              <tr>
-                <td>Retención en la Fuente</td>
-                <td>${formatCurrency(voucher.salaryDetails.withholdingTax)}</td>
-              </tr>
-              ` : ''}
-              ${voucher.salaryDetails.otherDeductions > 0 ? `
-              <tr>
-                <td>Otras Deducciones</td>
-                <td>${formatCurrency(voucher.salaryDetails.otherDeductions)}</td>
-              </tr>
-              ` : ''}
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Totals -->
-        <div class="totals-section">
-          <div class="total-row">
-            <span>Total Devengado:</span>
-            <span>${formatCurrency(voucher.salaryDetails.totalEarnings)}</span>
-          </div>
-          <div class="total-row">
-            <span>Total Deducciones:</span>
-            <span>${formatCurrency(voucher.salaryDetails.totalDeductions)}</span>
-          </div>
-          <div class="total-row">
-            <span>NETO A PAGAR:</span>
-            <span>${formatCurrency(voucher.netPay)}</span>
-          </div>
-        </div>
-
-        <!-- Net Pay Highlight -->
-        <div class="net-pay-section">
-          <div class="net-pay-label">💵 NETO A PAGAR</div>
-          <div class="net-pay-amount">${formatCurrency(voucher.netPay)}</div>
-          <div class="net-pay-text">Valor neto a transferir al empleado</div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-          <div class="generation-info">
-            <strong>Fecha de generación:</strong> ${new Date().toLocaleDateString('es-CO', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </div>
-          
-          <div class="disclaimer">
-            ⚠️ <strong>Importante:</strong> Este comprobante es un documento informativo y no reemplaza la nómina electrónica oficial. 
-            Para consultas sobre este comprobante, contacte al departamento de recursos humanos.
-          </div>
-          
-          <div style="margin-top: 16px; font-size: 10px; opacity: 0.7;">
-            Comprobante generado electrónicamente • Válido sin firma autógrafa
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+  // Convertir a buffer
+  const pdfBuffer = doc.output('arraybuffer');
+  return new Uint8Array(pdfBuffer);
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -657,7 +374,8 @@ const handler = async (req: Request): Promise<Response> => {
       }
     };
 
-    const htmlContent = generatePDFContent(voucherData, company);
+    // Generar PDF buffer
+    const pdfBuffer = await generatePDFBuffer(voucherData, company);
     
     // Actualizar el comprobante con el estado generado
     await supabase
@@ -670,14 +388,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Voucher updated successfully');
 
-    const fileName = `comprobante-nomina_${voucherData.employeeCedula}_${voucherData.periodo.replace(/\s+/g, '_')}.html`;
+    const fileName = `comprobante-nomina_${voucherData.employeeCedula}_${voucherData.periodo.replace(/\s+/g, '_')}.pdf`;
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      htmlContent: htmlContent,
-      fileName: fileName
-    }), {
-      headers: { "Content-Type": "application/json", ...corsHeaders },
+    return new Response(pdfBuffer, {
+      headers: { 
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+        ...corsHeaders 
+      },
     });
 
   } catch (error: any) {
