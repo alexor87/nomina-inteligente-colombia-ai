@@ -1,48 +1,32 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 export const useEmployeeSelection = () => {
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
 
-  const toggleEmployeeSelection = (employeeId: string) => {
+  const toggleEmployeeSelection = useCallback((employeeId: string) => {
     setSelectedEmployees(prev => 
       prev.includes(employeeId)
         ? prev.filter(id => id !== employeeId)
         : [...prev, employeeId]
     );
-  };
+  }, []);
 
-  const toggleAllEmployees = (currentPageEmployeeIds: string[]) => {
-    const allCurrentPageSelected = currentPageEmployeeIds.every(id => selectedEmployees.includes(id));
-    
-    if (allCurrentPageSelected) {
-      setSelectedEmployees(prev => prev.filter(id => !currentPageEmployeeIds.includes(id)));
-    } else {
-      setSelectedEmployees(prev => {
-        const newSelected = [...prev];
-        currentPageEmployeeIds.forEach(id => {
-          if (!newSelected.includes(id)) {
-            newSelected.push(id);
-          }
-        });
-        return newSelected;
-      });
-    }
-  };
+  const toggleAllEmployees = useCallback((employeeIds: string[]) => {
+    setSelectedEmployees(prev => {
+      const allSelected = employeeIds.every(id => prev.includes(id));
+      return allSelected ? [] : employeeIds;
+    });
+  }, []);
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedEmployees([]);
-  };
-
-  const exportEmployees = (format: 'excel' | 'pdf') => {
-    console.log(`Exportando empleados en formato: ${format}`);
-  };
+  }, []);
 
   return {
     selectedEmployees,
     toggleEmployeeSelection,
     toggleAllEmployees,
-    clearSelection,
-    exportEmployees
+    clearSelection
   };
 };

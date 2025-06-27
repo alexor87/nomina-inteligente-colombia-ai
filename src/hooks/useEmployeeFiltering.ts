@@ -36,10 +36,15 @@ export const useEmployeeFiltering = (employees: EmployeeWithStatus[]) => {
     });
   };
 
+  const totalEmployees = employees.length;
+  const filteredCount = filteredEmployees.length;
+
   return {
     filters,
     filteredEmployees,
     updateFilters,
-    clearFilters
+    clearFilters,
+    totalEmployees,
+    filteredCount
   };
 };

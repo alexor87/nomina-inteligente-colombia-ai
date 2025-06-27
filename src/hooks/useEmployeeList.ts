@@ -13,9 +13,15 @@ import { useEmployeeCompliance } from '@/hooks/useEmployeeCompliance';
 
 export const useEmployeeList = () => {
   const { toast } = useToast();
-  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [allEmployees, setAllEmployees] = useState<EmployeeWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Convertir Employee a EmployeeWithStatus
+  const mapToEmployeeWithStatus = (employee: Employee): EmployeeWithStatus => ({
+    ...employee,
+    periodicidadPago: (employee.periodicidadPago as 'quincenal' | 'mensual') || 'mensual'
+  });
 
   // Filtros y paginación
   const {
@@ -37,7 +43,7 @@ export const useEmployeeList = () => {
   const {
     selectedEmployees,
     toggleEmployeeSelection,
-    toggleAllEmployees,
+    toggleAllEmployees: toggleAllEmployeesBase,
     clearSelection
   } = useEmployeeSelection();
 
@@ -56,14 +62,20 @@ export const useEmployeeList = () => {
   const employees = filteredEmployees.slice(
     pagination.offset,
     pagination.offset + pagination.itemsPerPage
-  ) as EmployeeWithStatus[];
+  );
+
+  const toggleAllEmployees = useCallback(() => {
+    const currentPageEmployeeIds = employees.map(emp => emp.id);
+    toggleAllEmployeesBase(currentPageEmployeeIds);
+  }, [employees, toggleAllEmployeesBase]);
 
   const loadEmployees = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
       const data = await EmployeeService.getAllEmployees();
-      setAllEmployees(data);
+      const employeesWithStatus = data.map(mapToEmployeeWithStatus);
+      setAllEmployees(employeesWithStatus);
       console.log('👥 Empleados cargados:', data.length);
     } catch (err) {
       console.error('Error loading employees:', err);

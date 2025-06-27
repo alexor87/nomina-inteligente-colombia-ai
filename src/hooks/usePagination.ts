@@ -1,120 +1,74 @@
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 
-export interface PaginationOptions {
-  defaultPageSize?: number;
-  pageSizeOptions?: number[];
-  storageKey?: string;
+interface UsePaginationProps {
+  totalItems: number;
+  itemsPerPage: number;
+  initialPage?: number;
 }
 
-export interface PaginationResult<T> {
+export interface PaginationResult {
   currentPage: number;
-  pageSize: number;
   totalPages: number;
+  itemsPerPage: number;
   totalItems: number;
-  paginatedItems: T[];
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  startIndex: number;
-  endIndex: number;
+  offset: number;
   goToPage: (page: number) => void;
   goToNextPage: () => void;
   goToPreviousPage: () => void;
-  changePageSize: (size: number) => void;
-  pageSizeOptions: number[];
+  goToFirstPage: () => void;
+  goToLastPage: () => void;
+  canGoToNextPage: boolean;
+  canGoToPreviousPage: boolean;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
-export const usePagination = <T>(
-  items: T[],
-  options: PaginationOptions = {}
-): PaginationResult<T> => {
-  const {
-    defaultPageSize = 25,
-    pageSizeOptions = [25, 50, 75, 100],
-    storageKey
-  } = options;
+export const usePagination = ({ 
+  totalItems, 
+  itemsPerPage, 
+  initialPage = 1 
+}: UsePaginationProps): PaginationResult => {
+  const [currentPage, setCurrentPage] = useState(initialPage);
 
-  // Load initial page size from localStorage if storageKey is provided
-  const getInitialPageSize = () => {
-    if (storageKey && typeof window !== 'undefined') {
-      const stored = localStorage.getItem(`pagination_${storageKey}_pageSize`);
-      if (stored) {
-        const parsed = parseInt(stored, 10);
-        if (pageSizeOptions.includes(parsed)) {
-          return parsed;
-        }
-      }
-    }
-    return defaultPageSize;
-  };
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(getInitialPageSize);
-
-  // Calculate pagination values
-  const totalItems = items.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, totalItems);
-  
-  const paginatedItems = useMemo(() => {
-    return items.slice(startIndex, endIndex);
-  }, [items, startIndex, endIndex]);
-
-  const hasNextPage = currentPage < totalPages;
-  const hasPreviousPage = currentPage > 1;
-
-  // Reset to page 1 when items change (e.g., after filtering)
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
-  }, [totalPages, currentPage]);
-
-  // Save page size to localStorage when it changes
-  useEffect(() => {
-    if (storageKey && typeof window !== 'undefined') {
-      localStorage.setItem(`pagination_${storageKey}_pageSize`, pageSize.toString());
-    }
-  }, [pageSize, storageKey]);
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const offset = (currentPage - 1) * itemsPerPage;
 
   const goToPage = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
+    const validPage = Math.max(1, Math.min(page, totalPages));
+    setCurrentPage(validPage);
   };
 
-  const goToNextPage = () => {
-    if (hasNextPage) {
-      setCurrentPage(prev => prev + 1);
-    }
-  };
+  const goToNextPage = () => goToPage(currentPage + 1);
+  const goToPreviousPage = () => goToPage(currentPage - 1);
+  const goToFirstPage = () => goToPage(1);
+  const goToLastPage = () => goToPage(totalPages);
 
-  const goToPreviousPage = () => {
-    if (hasPreviousPage) {
-      setCurrentPage(prev => prev - 1);
-    }
-  };
+  const canGoToNextPage = currentPage < totalPages;
+  const canGoToPreviousPage = currentPage > 1;
 
-  const changePageSize = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1); // Reset to first page when changing page size
-  };
-
-  return {
+  return useMemo(() => ({
     currentPage,
-    pageSize,
     totalPages,
+    itemsPerPage,
     totalItems,
-    paginatedItems,
-    hasNextPage,
-    hasPreviousPage,
-    startIndex,
-    endIndex,
+    offset,
     goToPage,
     goToNextPage,
     goToPreviousPage,
-    changePageSize,
-    pageSizeOptions
-  };
+    goToFirstPage,
+    goToLastPage,
+    canGoToNextPage,
+    canGoToPreviousPage,
+    hasNextPage: canGoToNextPage,
+    hasPreviousPage: canGoToPreviousPage,
+  }), [
+    currentPage,
+    totalPages,
+    itemsPerPage,
+    totalItems,
+    offset,
+    canGoToNextPage,
+    canGoToPreviousPage
+  ]);
 };
