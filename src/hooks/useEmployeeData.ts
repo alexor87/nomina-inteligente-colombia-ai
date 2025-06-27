@@ -119,6 +119,18 @@ export const useEmployeeData = () => {
     }
   };
 
+  // NEW: Function to find employee by ID directly from all loaded employees
+  const findEmployeeById = (employeeId: string): EmployeeWithStatus | undefined => {
+    console.log('🔍 Finding employee by ID:', employeeId);
+    console.log('📋 Available employees:', employees.length);
+    console.log('📊 Employee IDs available:', employees.map(emp => ({ id: emp.id, name: `${emp.nombre} ${emp.apellido}` })));
+    
+    const foundEmployee = employees.find(emp => emp.id === employeeId);
+    console.log('🎯 Found employee:', foundEmployee ? `${foundEmployee.nombre} ${foundEmployee.apellido}` : 'NOT FOUND');
+    
+    return foundEmployee;
+  };
+
   useEffect(() => {
     loadEmployees();
   }, []);
@@ -126,6 +138,7 @@ export const useEmployeeData = () => {
   return {
     employees,
     isLoading,
-    refreshEmployees: loadEmployees
+    refreshEmployees: loadEmployees,
+    findEmployeeById // NEW: Export the direct search function
   };
 };

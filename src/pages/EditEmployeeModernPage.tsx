@@ -1,17 +1,28 @@
 
 import { useNavigate, useParams } from 'react-router-dom';
 import { EmployeeFormModern } from '@/components/employees/EmployeeFormModern';
-import { useEmployeeList } from '@/hooks/useEmployeeList';
+import { useEmployeeData } from '@/hooks/useEmployeeData';
 
 const EditEmployeeModernPage = () => {
   const navigate = useNavigate();
   const { employeeId } = useParams();
-  const { employees, refreshEmployees } = useEmployeeList();
+  const { findEmployeeById, refreshEmployees, isLoading } = useEmployeeData();
   
   console.log('🔍 EditEmployeeModernPage: Looking for employee with ID:', employeeId);
-  console.log('📋 EditEmployeeModernPage: Available employees:', employees.length);
   
-  const employee = employees.find(emp => emp.id === employeeId);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando empleado...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Use direct employee search instead of relying on filtered/paginated data
+  const employee = employeeId ? findEmployeeById(employeeId) : undefined;
   
   console.log('🎯 EditEmployeeModernPage: Found employee:', employee);
   
@@ -29,7 +40,6 @@ const EditEmployeeModernPage = () => {
     });
   } else {
     console.log('❌ EditEmployeeModernPage: No employee found with ID:', employeeId);
-    console.log('📋 Available employee IDs:', employees.map(emp => emp.id));
   }
 
   const handleSuccess = async () => {

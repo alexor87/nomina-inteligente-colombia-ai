@@ -7,8 +7,8 @@ import { useEmployeeModal } from './useEmployeeModal';
 import { useEmployeeCompliance } from './useEmployeeCompliance';
 
 export const useEmployeeList = () => {
-  const { employees, isLoading, refreshEmployees } = useEmployeeData();
-  const { filters, filteredEmployees, updateFilters, clearFilters } = useEmployeeFiltering(employees);
+  const { employees: allEmployees, isLoading, refreshEmployees, findEmployeeById } = useEmployeeData();
+  const { filters, filteredEmployees, updateFilters, clearFilters } = useEmployeeFiltering(allEmployees);
   const { selectedEmployees, toggleEmployeeSelection, toggleAllEmployees, clearSelection, exportEmployees } = useEmployeeSelection();
   const { selectedEmployee, isEmployeeProfileOpen, openEmployeeProfile, closeEmployeeProfile } = useEmployeeModal();
   const { getComplianceIndicators } = useEmployeeCompliance();
@@ -20,8 +20,9 @@ export const useEmployeeList = () => {
   });
 
   return {
-    employees: pagination.paginatedItems, // Return paginated employees
+    employees: pagination.paginatedItems, // Return paginated employees for list display
     allEmployees: filteredEmployees, // Keep reference to all filtered employees
+    rawEmployees: allEmployees, // NEW: All employees without any filters or pagination
     filters,
     selectedEmployees,
     isLoading,
@@ -37,8 +38,9 @@ export const useEmployeeList = () => {
     getComplianceIndicators,
     openEmployeeProfile,
     closeEmployeeProfile,
-    totalEmployees: employees.length,
+    totalEmployees: allEmployees.length,
     filteredCount: filteredEmployees.length,
-    refreshEmployees
+    refreshEmployees,
+    findEmployeeById // NEW: Direct employee search function
   };
 };
