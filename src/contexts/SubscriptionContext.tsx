@@ -85,14 +85,39 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       
       console.log('🔄 Loading subscription for company:', profile.company_id);
       
+      // Use maybeSingle() instead of single() to handle case when no subscription exists
       const { data, error } = await supabase
         .from('company_subscriptions')
         .select('*')
         .eq('company_id', profile.company_id)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        console.warn('⚠️ Subscription not found, creating default subscription:', error.message);
+        console.error('❌ Error loading subscription:', error);
+        setError('Error al cargar suscripción');
+        
+        // Provide a fallback subscription to not block the app
+        setSubscription({
+          id: 'fallback',
+          company_id: profile.company_id!,
+          plan_type: 'profesional',
+          status: 'activa',
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          max_employees: 25,
+          max_payrolls_per_month: 12,
+          features: {
+            email_support: true,
+            phone_support: true,
+            custom_reports: true
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        return;
+      }
+
+      if (!data) {
+        console.warn('⚠️ No subscription found, creating default subscription for company:', profile.company_id);
         
         // Create a default subscription if none exists
         const defaultSubscription = {
