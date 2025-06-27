@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Download, FileText, Eye } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryEmployee } from '@/types/payroll-history';
-import { mockPayrollHistoryPeriods, mockPayrollHistoryEmployees } from '@/data/mockPayrollHistory';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 
 export const PayrollHistoryDetails = () => {
   const { periodId } = useParams<{ periodId: string }>();
@@ -18,17 +18,67 @@ export const PayrollHistoryDetails = () => {
 
   useEffect(() => {
     if (periodId) {
-      // Buscar el período específico
-      const foundPeriod = mockPayrollHistoryPeriods.find(p => p.id === periodId);
-      if (foundPeriod) {
-        setPeriod(foundPeriod);
-        // Cargar empleados del período
-        const periodEmployees = mockPayrollHistoryEmployees.filter(e => e.periodId === periodId);
-        setEmployees(periodEmployees);
-      }
+      loadPeriodDetails();
     }
-    setIsLoading(false);
   }, [periodId]);
+
+  const loadPeriodDetails = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Cargar todos los períodos y buscar el específico
+      const allPeriods = await PayrollHistoryService.getPayrollPeriods();
+      const foundPeriod = allPeriods.find(p => p.id === periodId);
+      
+      if (foundPeriod) {
+        // Convertir el registro a PayrollHistoryPeriod si es necesario
+        const convertedPeriod: PayrollHistoryPeriod = {
+          id: foundPeriod.id,
+          period: foundPeriod.periodo || 'Sin período',
+          startDate: foundPeriod.fechaCreacion || new Date().toISOString().split('T')[0],
+          endDate: foundPeriod.fechaCreacion || new Date().toISOString().split('T')[0],
+          type: 'mensual' as const,
+          employeesCount: foundPeriod.empleados || 0,
+          status: foundPeriod.estado === 'cerrada' || foundPeriod.estado === 'procesada' || foundPeriod.estado === 'pagada' ? 'cerrado' : 
+                 foundPeriod.estado === 'borrador' ? 'revision' : 'con_errores',
+          totalGrossPay: Number(foundPeriod.totalNomina || 0),
+          totalNetPay: Number(foundPeriod.totalNomina || 0),
+          totalDeductions: 0,
+          totalCost: Number(foundPeriod.totalNomina || 0),
+          employerContributions: 0,
+          paymentStatus: foundPeriod.estado === 'pagada' ? 'pagado' as const : 'pendiente' as const,
+          version: 1,
+          createdAt: foundPeriod.fechaCreacion || new Date().toISOString(),
+          updatedAt: foundPeriod.fechaCreacion || new Date().toISOString(),
+        };
+        
+        setPeriod(convertedPeriod);
+        
+        // Por ahora, crear empleados de ejemplo basados en el período
+        // En una implementación real, aquí cargarías los empleados específicos del período
+        const mockEmployees: PayrollHistoryEmployee[] = Array.from({ length: foundPeriod.empleados || 0 }, (_, index) => ({
+          id: `emp-${index + 1}`,
+          periodId: periodId,
+          name: `Empleado ${index + 1}`,
+          position: 'Cargo Ejemplo',
+          grossPay: Number(foundPeriod.totalNomina) / foundPeriod.empleados,
+          deductions: Number(foundPeriod.totalNomina) * 0.08 / foundPeriod.empleados,
+          netPay: Number(foundPeriod.totalNomina) * 0.92 / foundPeriod.empleados,
+          paymentStatus: foundPeriod.estado === 'pagada' ? 'pagado' : 'pendiente',
+        }));
+        
+        setEmployees(mockEmployees);
+      } else {
+        console.log('Período no encontrado:', periodId);
+        setPeriod(null);
+      }
+    } catch (error) {
+      console.error('Error loading period details:', error);
+      setPeriod(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
