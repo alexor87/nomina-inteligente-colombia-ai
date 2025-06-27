@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Employee } from '@/types';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeFormSubmission } from '@/hooks/useEmployeeFormSubmission';
@@ -24,9 +24,6 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   
   // Local state to handle employee data updates
   const [currentEmployee, setCurrentEmployee] = useState<Employee | undefined>(employee);
-  
-  // Sidebar state - expanded by default
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   const { configuration } = useEmployeeGlobalConfiguration();
   
@@ -105,10 +102,6 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     console.log('Duplicating employee...');
   };
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-
   console.log('🎯 EmployeeFormModern: Rendering form with currentEmployee:', {
     id: currentEmployee?.id,
     name: currentEmployee ? `${currentEmployee.nombre} ${currentEmployee.apellido}` : 'undefined'
@@ -116,23 +109,17 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   return (
     <div className="flex min-h-screen bg-white">
-      {/* Sidebar */}
       <NavigationSidebar 
         activeSection={activeSection}
         completionPercentage={completionPercentage}
         scrollToSection={scrollToSection}
-        collapsed={sidebarCollapsed}
-        onToggle={toggleSidebar}
       />
       
-      {/* Main content with dynamic margin based on sidebar state */}
-      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-72'}`}>
+      <div className="flex-1">
         <EmployeeFormHeader
           employee={currentEmployee}
           onCancel={onCancel}
           onDuplicate={handleDuplicate}
-          onToggleSidebar={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
         />
 
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -157,14 +144,6 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           onSubmit={handleSubmit(onSubmit)}
         />
       </div>
-
-      {/* Overlay for mobile/tablet when sidebar is open */}
-      {!sidebarCollapsed && (
-        <div 
-          className="fixed inset-0 bg-black/20 z-40 lg:hidden"
-          onClick={() => setSidebarCollapsed(true)}
-        />
-      )}
     </div>
   );
 };
