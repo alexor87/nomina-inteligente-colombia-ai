@@ -61,13 +61,13 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     memoizedDataRefresh
   );
 
-  const { handleSubmit: handleEditSubmission, isLoading: isEditing } = useEmployeeEditSubmission(
+  const { handleSubmit: handleEditSubmission, isLoading: isEditingLoading } = useEmployeeEditSubmission(
     employee || null,
     onSuccess,
     memoizedDataRefresh
   );
 
-  const isLoading = isCreating || isEditing;
+  const isLoading = isCreating || isEditingLoading;
 
   const onSubmit = async (data: any) => {
     if (!companyId) return;
