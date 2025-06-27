@@ -26,10 +26,22 @@ export const useEmployeeData = () => {
         companyId = supportCompanyId;
         console.log('🔧 Using support company context:', companyId);
       } else {
-        // Caso normal: obtener empresa del usuario actual
-        companyId = await EmployeeDataService.getCurrentUserCompanyId();
-        if (!companyId) {
-          throw new Error('No se pudo obtener la empresa del usuario');
+        try {
+          // Caso normal: obtener empresa del usuario actual
+          companyId = await EmployeeDataService.getCurrentUserCompanyId();
+          if (!companyId) {
+            throw new Error('No se pudo obtener la empresa del usuario');
+          }
+        } catch (error) {
+          console.error('❌ Error getting company ID:', error);
+          toast({
+            title: "Error de configuración",
+            description: "No se pudo obtener la información de la empresa. Por favor, contacta al soporte.",
+            variant: "destructive"
+          });
+          setIsInitialized(true);
+          setIsLoading(false);
+          return;
         }
       }
       
@@ -132,15 +144,17 @@ export const useEmployeeData = () => {
       console.error('❌ Error loading employees:', error);
       toast({
         title: "Error al cargar empleados",
-        description: "No se pudieron cargar los empleados",
+        description: "No se pudieron cargar los empleados. Verifica tu conexión e intenta nuevamente.",
         variant: "destructive"
       });
+      // Set as initialized even on error to prevent infinite loading
+      setIsInitialized(true);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // NEW: Function to update a specific employee in the list
+  // Function to update a specific employee in the list
   const updateEmployeeInList = useCallback((updatedEmployee: EmployeeWithStatus) => {
     console.log('🔄 Updating employee in list:', updatedEmployee.id);
     console.log('📊 Updated employee affiliations:', {
@@ -157,7 +171,7 @@ export const useEmployeeData = () => {
     );
   }, []);
 
-  // IMPROVED: Enhanced function to find employee by ID with better error handling and logging
+  // Enhanced function to find employee by ID with better error handling and logging
   const findEmployeeById = useCallback((employeeId: string): EmployeeWithStatus | undefined => {
     console.log('🔍 CRITICAL: Finding employee by ID:', employeeId);
     console.log('📋 Available employees count:', employees.length);
@@ -194,7 +208,7 @@ export const useEmployeeData = () => {
     return foundEmployee;
   }, [employees, isInitialized, isLoading]);
 
-  // NEW: Function to retry loading a specific employee by ID if not found
+  // Function to retry loading a specific employee by ID if not found
   const retryFindEmployeeById = useCallback(async (employeeId: string): Promise<EmployeeWithStatus | undefined> => {
     console.log('🔄 RETRY: Attempting to reload data and find employee:', employeeId);
     
@@ -227,10 +241,10 @@ export const useEmployeeData = () => {
   return {
     employees,
     isLoading,
-    isInitialized, // NEW: Export initialization state
+    isInitialized,
     refreshEmployees: loadEmployees,
     findEmployeeById,
     updateEmployeeInList,
-    retryFindEmployeeById // NEW: Export retry function
+    retryFindEmployeeById
   };
 };

@@ -1,31 +1,34 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
-interface CompanySubscription {
+interface SubscriptionFeatures {
+  email_support: boolean;
+  phone_support: boolean;
+  custom_reports: boolean;
+}
+
+interface Subscription {
   id: string;
   company_id: string;
   plan_type: 'basico' | 'profesional' | 'empresarial';
   status: 'activa' | 'suspendida' | 'cancelada' | 'trial';
-  trial_ends_at?: string;
+  trial_ends_at: string | null;
   max_employees: number;
   max_payrolls_per_month: number;
-  features: {
-    email_support: boolean;
-    phone_support: boolean;
-    custom_reports: boolean;
-  };
+  features: SubscriptionFeatures;
+  created_at: string;
+  updated_at: string;
 }
 
 interface SubscriptionContextType {
-  subscription: CompanySubscription | null;
+  subscription: Subscription | null;
   loading: boolean;
-  canAddEmployee: boolean;
-  canProcessPayroll: boolean;
-  isTrialExpired: boolean;
-  employeeCount: number;
-  payrollsThisMonth: number;
+  error: string | null;
+  hasFeature: (feature: keyof SubscriptionFeatures) => boolean;
+  canAddEmployees: (currentCount: number) => boolean;
+  canProcessPayroll: (currentCount: number) => boolean;
   refreshSubscription: () => Promise<void>;
 }
 
@@ -39,102 +42,133 @@ export const useSubscription = () => {
   return context;
 };
 
-export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile } = useAuth();
-  const [subscription, setSubscription] = useState<CompanySubscription | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [employeeCount, setEmployeeCount] = useState(0);
-  const [payrollsThisMonth, setPayrollsThisMonth] = useState(0);
+interface SubscriptionProviderProps {
+  children: ReactNode;
+}
 
-  const refreshSubscription = async () => {
-    if (!profile?.company_id) return;
+export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user, profile } = useAuth();
+
+  const loadSubscription = async () => {
+    if (!user || !profile?.company_id) {
+      console.log('🚫 No user or company_id available for subscription');
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
+      setError(null);
       
-      // Cargar suscripción
-      const { data: subscriptionData, error: subError } = await supabase
+      console.log('🔄 Loading subscription for company:', profile.company_id);
+      
+      const { data, error } = await supabase
         .from('company_subscriptions')
         .select('*')
         .eq('company_id', profile.company_id)
         .single();
 
-      if (subError) {
-        console.error('Error loading subscription:', subError);
-        return;
-      }
-
-      // Cast the data to our interface type
-      if (subscriptionData) {
-        const typedSubscription: CompanySubscription = {
-          id: subscriptionData.id,
-          company_id: subscriptionData.company_id,
-          plan_type: subscriptionData.plan_type as 'basico' | 'profesional' | 'empresarial',
-          status: subscriptionData.status as 'activa' | 'suspendida' | 'cancelada' | 'trial',
-          trial_ends_at: subscriptionData.trial_ends_at,
-          max_employees: subscriptionData.max_employees,
-          max_payrolls_per_month: subscriptionData.max_payrolls_per_month,
-          features: subscriptionData.features as {
-            email_support: boolean;
-            phone_support: boolean;
-            custom_reports: boolean;
+      if (error) {
+        console.warn('⚠️ Subscription not found, creating default subscription:', error.message);
+        
+        // Create a default subscription if none exists
+        const defaultSubscription = {
+          company_id: profile.company_id,
+          plan_type: 'profesional' as const,
+          status: 'activa' as const,
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          max_employees: 25,
+          max_payrolls_per_month: 12,
+          features: {
+            email_support: true,
+            phone_support: true,
+            custom_reports: true
           }
         };
-        setSubscription(typedSubscription);
+
+        const { data: newSubscription, error: createError } = await supabase
+          .from('company_subscriptions')
+          .insert(defaultSubscription)
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('❌ Error creating default subscription:', createError);
+          setError('Error al crear suscripción por defecto');
+          // Continue with a fallback subscription to not block the app
+          setSubscription({
+            id: 'temp',
+            ...defaultSubscription,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        } else {
+          console.log('✅ Default subscription created:', newSubscription);
+          setSubscription(newSubscription);
+        }
+      } else {
+        console.log('✅ Subscription loaded:', data);
+        setSubscription(data);
       }
-
-      // Contar empleados activos
-      const { count: empCount } = await supabase
-        .from('employees')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', profile.company_id)
-        .eq('estado', 'activo');
-
-      setEmployeeCount(empCount || 0);
-
-      // Contar nóminas de este mes
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      const { count: payrollCount } = await supabase
-        .from('payrolls')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', profile.company_id)
-        .gte('created_at', startOfMonth.toISOString());
-
-      setPayrollsThisMonth(payrollCount || 0);
-
-    } catch (error) {
-      console.error('Error refreshing subscription:', error);
+    } catch (error: any) {
+      console.error('❌ Error loading subscription:', error);
+      setError(error.message || 'Error al cargar suscripción');
+      
+      // Provide a fallback subscription to not block the app
+      setSubscription({
+        id: 'fallback',
+        company_id: profile.company_id!,
+        plan_type: 'profesional',
+        status: 'activa',
+        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        max_employees: 25,
+        max_payrolls_per_month: 12,
+        features: {
+          email_support: true,
+          phone_support: true,
+          custom_reports: true
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user && profile?.company_id) {
-      refreshSubscription();
-    } else {
-      setLoading(false);
-    }
+    loadSubscription();
   }, [user, profile?.company_id]);
 
-  const canAddEmployee = subscription ? employeeCount < subscription.max_employees : false;
-  const canProcessPayroll = subscription ? payrollsThisMonth < subscription.max_payrolls_per_month : false;
-  
-  const isTrialExpired = subscription?.status === 'trial' && subscription.trial_ends_at 
-    ? new Date() > new Date(subscription.trial_ends_at)
-    : false;
+  const hasFeature = (feature: keyof SubscriptionFeatures): boolean => {
+    if (!subscription) return false;
+    return subscription.features[feature] || false;
+  };
 
-  const value = {
+  const canAddEmployees = (currentCount: number): boolean => {
+    if (!subscription) return true; // Allow if no subscription data
+    return currentCount < subscription.max_employees;
+  };
+
+  const canProcessPayroll = (currentCount: number): boolean => {
+    if (!subscription) return true; // Allow if no subscription data
+    return currentCount < subscription.max_payrolls_per_month;
+  };
+
+  const refreshSubscription = async () => {
+    await loadSubscription();
+  };
+
+  const value: SubscriptionContextType = {
     subscription,
     loading,
-    canAddEmployee,
+    error,
+    hasFeature,
+    canAddEmployees,
     canProcessPayroll,
-    isTrialExpired,
-    employeeCount,
-    payrollsThisMonth,
     refreshSubscription
   };
 
