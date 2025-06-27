@@ -24,7 +24,7 @@ export const PayrollModernHeader = ({
     const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     const month = monthNames[start.getMonth()];
     const year = start.getFullYear();
-    return `${startDay}-${endDay} /${month}/ ${year}`;
+    return `${startDay}-${endDay} ${month} ${year}`;
   };
 
   return (
@@ -32,10 +32,10 @@ export const PayrollModernHeader = ({
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
               Nómina del período {formatPeriod()}
             </h1>
-            <div className="mt-2 text-sm text-gray-500 space-x-4">
+            <div className="text-sm text-gray-500 space-x-4">
               <span>{summary.validEmployees} empleados válidos</span>
               <span>•</span>
               <span>{formatCurrency(summary.totalGrossPay)} devengado</span>

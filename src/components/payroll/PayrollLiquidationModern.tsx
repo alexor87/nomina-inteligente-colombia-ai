@@ -51,18 +51,16 @@ export const PayrollLiquidationModern = () => {
         isLoading={isLoading}
       />
 
-      <div className="max-w-7xl mx-auto">
-        <PayrollModernTable
-          employees={employees}
-          onUpdateEmployee={handleUpdateEmployee}
-          onRecalculate={recalculateAll}
-          isLoading={isLoading}
-          canEdit={canEdit}
-          periodoId={currentPeriod?.id || ''}
-          onRefreshEmployees={refreshEmployees}
-          onDeleteEmployee={deleteEmployee}
-        />
-      </div>
+      <PayrollModernTable
+        employees={employees}
+        onUpdateEmployee={handleUpdateEmployee}
+        onRecalculate={recalculateAll}
+        isLoading={isLoading}
+        canEdit={canEdit}
+        periodoId={currentPeriod?.id || ''}
+        onRefreshEmployees={refreshEmployees}
+        onDeleteEmployee={deleteEmployee}
+      />
     </div>
   );
 };

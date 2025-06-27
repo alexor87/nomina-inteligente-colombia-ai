@@ -69,7 +69,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     await deleteNovedad(id, selectedEmployee.id, true);
   };
 
-  // Estado vacío mejorado siguiendo el ejemplo de Aleluya
+  // Estado vacío siguiendo exactamente el ejemplo de Aleluya
   if (employees.length === 0) {
     return (
       <div className="bg-white min-h-96">
@@ -97,67 +97,68 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   return (
     <>
       <div className="bg-white">
-        <table className="w-full">
-          <thead className="border-b border-gray-200">
-            <tr>
-              <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">
-                Personas
-              </th>
-              <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">
-                Salario base
-              </th>
-              <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">
-                Novedades
-              </th>
-              <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">
-                Total pago empleado
-              </th>
-              <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((employee, index) => (
-              <tr key={employee.id} className={index !== employees.length - 1 ? "border-b border-gray-100" : ""}>
-                <td className="py-4 px-6">
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {employee.name}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {employee.position}
-                    </div>
-                  </div>
-                </td>
-                <td className="py-4 px-6 text-right font-medium text-gray-900">
-                  {formatCurrency(employee.baseSalary)}
-                </td>
-                <td className="py-4 px-6 text-center">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    Ver novedades
-                  </span>
-                </td>
-                <td className="py-4 px-6 text-right font-semibold text-gray-900">
-                  {formatCurrency(employee.netPay)}
-                </td>
-                <td className="py-4 px-6 text-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleOpenNovedades(employee)}
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                </td>
+        <div className="max-w-7xl mx-auto">
+          <table className="w-full">
+            <thead className="border-b border-gray-200">
+              <tr>
+                <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">
+                  Personas
+                </th>
+                <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">
+                  Salario base
+                </th>
+                <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">
+                  Novedades
+                </th>
+                <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">
+                  Total pago empleado
+                </th>
+                <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">
+                  Acciones
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {employees.map((employee, index) => (
+                <tr key={employee.id} className={index !== employees.length - 1 ? "border-b border-gray-100" : ""}>
+                  <td className="py-4 px-6">
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {employee.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {employee.position}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-6 text-right font-medium text-gray-900">
+                    {formatCurrency(employee.baseSalary)}
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Ver novedades
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-right font-semibold text-gray-900">
+                    {formatCurrency(employee.netPay)}
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenNovedades(employee)}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Novedad Drawer */}
       {selectedEmployee && (
         <NovedadDrawer
           isOpen={isDrawerOpen}
