@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,6 @@ export const EmployeeTableReadOnly = ({
   allCurrentPageSelected,
   onToggleEmployeeSelection,
   onToggleAllEmployees,
-  onOpenEmployeeProfile,
   onEditEmployee,
   onDeleteEmployee,
   onStatusChange,
@@ -151,10 +151,9 @@ export const EmployeeTableReadOnly = ({
             return (
               <TableRow
                 key={employee.id}
-                className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'}`}
+                className={`transition-colors ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'}`}
                 onMouseEnter={() => setHoveredRow(employee.id)}
                 onMouseLeave={() => setHoveredRow(null)}
-                onClick={() => onOpenEmployeeProfile(employee)}
               >
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Checkbox
@@ -229,10 +228,6 @@ export const EmployeeTableReadOnly = ({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={() => onOpenEmployeeProfile(employee)}>
-                        <User className="mr-2 h-4 w-4" />
-                        Ver detalles
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEditEmployee(employee)}>
                         <Edit className="mr-2 h-4 w-4" />
                         Editar empleado

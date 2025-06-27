@@ -1,6 +1,5 @@
 
 import { useNavigate, useParams } from 'react-router-dom';
-import { EmployeeDetails } from '@/components/employees/EmployeeDetails';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 
 const EmployeeDetailsPage = () => {
@@ -18,21 +17,16 @@ const EmployeeDetailsPage = () => {
     navigate('/employees');
   };
 
+  // Redirigir inmediatamente a la lista de empleados
+  // ya que la funcionalidad de ver detalles está desactivada
   if (!employee) {
-    return (
-      <div className="p-6">
-        <p>Empleado no encontrado</p>
-      </div>
-    );
+    navigate('/employees');
+    return null;
   }
 
-  return (
-    <EmployeeDetails 
-      employee={employee}
-      onEdit={handleEdit}
-      onClose={handleClose}
-    />
-  );
+  // Redirigir a la página de edición en lugar de mostrar detalles
+  navigate(`/employees/${employeeId}/edit`);
+  return null;
 };
 
 export default EmployeeDetailsPage;

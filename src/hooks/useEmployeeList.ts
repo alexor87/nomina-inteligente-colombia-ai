@@ -8,7 +8,6 @@ import { EmployeeWithStatus } from '@/types/employee-extended';
 import { usePagination } from '@/hooks/usePagination';
 import { useEmployeeFiltering } from '@/hooks/useEmployeeFiltering';
 import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
-import { useEmployeeModal } from '@/hooks/useEmployeeModal';
 import { useEmployeeCompliance } from '@/hooks/useEmployeeCompliance';
 
 export const useEmployeeList = () => {
@@ -46,14 +45,6 @@ export const useEmployeeList = () => {
     toggleAllEmployees: toggleAllEmployeesBase,
     clearSelection
   } = useEmployeeSelection();
-
-  // Modal de empleado
-  const {
-    selectedEmployee,
-    isEmployeeProfileOpen,
-    openEmployeeProfile,
-    closeEmployeeProfile
-  } = useEmployeeModal();
 
   // Compliance indicators
   const { getComplianceIndicators } = useEmployeeCompliance();
@@ -128,12 +119,6 @@ export const useEmployeeList = () => {
     toggleEmployeeSelection,
     toggleAllEmployees,
     clearSelection,
-    
-    // Modal
-    selectedEmployee,
-    isEmployeeProfileOpen,
-    openEmployeeProfile,
-    closeEmployeeProfile,
     
     // Compliance
     getComplianceIndicators,
