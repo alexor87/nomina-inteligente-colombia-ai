@@ -6,6 +6,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Layout } from '@/components/layout/Layout';
+import { useRealtimeCleanup } from '@/hooks/useRealtimeCleanup';
 
 // Auth components
 import LoginPage from '@/pages/LoginPage';
@@ -33,48 +34,57 @@ import ReportsPage from '@/pages/ReportsPage';
 
 const queryClient = new QueryClient();
 
+function AppContent() {
+  // Hook para limpiar suscripciones realtime
+  useRealtimeCleanup();
+
+  return (
+    <Router>
+      <Routes>
+        {/* Auth routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+        <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+        <Route path="/logout" element={<LogoutPage />} />
+        
+        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          
+          {/* Ruta actualizada para liquidación inteligente silenciosa */}
+          <Route path="payroll" element={<PayrollIntelligentSilentPage />} />
+          
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="employees/create" element={<CreateEmployeeModernPage />} />
+          <Route path="employees/:employeeId" element={<EmployeeDetailsPage />} />
+          <Route path="employees/:employeeId/edit" element={<EditEmployeeModernPage />} />
+          
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="company-settings" element={<CompanySettingsPage />} />
+          
+          <Route path="payroll-history" element={<PayrollHistoryPage />} />
+          <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
+
+          <Route path="subscription" element={<SubscriptionPage />} />
+          <Route path="billing-history" element={<BillingHistoryPage />} />
+          
+          {/* Nueva ruta para reportes */}
+          <Route path="reports" element={<ReportsPage />} />
+        </Route>
+      </Routes>
+      <Toaster />
+    </Router>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SubscriptionProvider>
-          <Router>
-            <Routes>
-              {/* Auth routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-              <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
-              <Route path="/logout" element={<LogoutPage />} />
-              
-              <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<DashboardPage />} />
-                
-                {/* Ruta actualizada para liquidación inteligente silenciosa */}
-                <Route path="payroll" element={<PayrollIntelligentSilentPage />} />
-                
-                <Route path="employees" element={<EmployeesPage />} />
-                <Route path="employees/create" element={<CreateEmployeeModernPage />} />
-                <Route path="employees/:employeeId" element={<EmployeeDetailsPage />} />
-                <Route path="employees/:employeeId/edit" element={<EditEmployeeModernPage />} />
-                
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="company-settings" element={<CompanySettingsPage />} />
-                
-                <Route path="payroll-history" element={<PayrollHistoryPage />} />
-                <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
-
-                <Route path="subscription" element={<SubscriptionPage />} />
-                <Route path="billing-history" element={<BillingHistoryPage />} />
-                
-                {/* Nueva ruta para reportes */}
-                <Route path="reports" element={<ReportsPage />} />
-              </Route>
-            </Routes>
-            <Toaster />
-          </Router>
+          <AppContent />
         </SubscriptionProvider>
       </AuthProvider>
     </QueryClientProvider>

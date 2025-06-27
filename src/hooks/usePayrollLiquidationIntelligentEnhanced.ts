@@ -1,6 +1,6 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimePayroll } from '@/hooks/useRealtimePayroll';
 import { PayrollLiquidationBackendService, PayrollCalculationBackendService } from '@/services/PayrollLiquidationBackendService';
 import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/services/PayrollPeriodService';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
@@ -20,6 +20,18 @@ export const usePayrollLiquidationIntelligentEnhanced = () => {
     totalNetPay: 0,
     employerContributions: 0,
     totalPayrollCost: 0
+  });
+
+  // Integrar realtime para actualizaciones automáticas
+  useRealtimePayroll({
+    onPayrollChange: useCallback(() => {
+      console.log('🔄 Detectado cambio en nómina via realtime, recargando...');
+      if (currentPeriod) {
+        loadEmployees();
+      } else {
+        initializePeriod();
+      }
+    }, [currentPeriod])
   });
 
   const initializePeriod = useCallback(async () => {
