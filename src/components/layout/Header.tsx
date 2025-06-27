@@ -5,15 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Building2, Crown, AlertTriangle } from 'lucide-react';
 import { UserMenu } from './UserMenu';
+import { CompanySelector } from './CompanySelector';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
 export const Header = () => {
-  const { user, profile, isSuperAdmin } = useAuth();
+  const { user, profile, isSuperAdmin, roles } = useAuth();
   const { subscription, isTrialExpired } = useSubscription();
 
   const getCompanyName = () => {
     if (isSuperAdmin) return 'Super Admin Panel';
+    
+    // Si hay múltiples empresas, no mostrar el nombre aquí porque ya está en el selector
+    if (roles.length > 1) return null;
+    
     return profile?.company_id ? 'Mi Empresa' : 'Sin Empresa';
   };
 
@@ -66,6 +71,8 @@ export const Header = () => {
     );
   };
 
+  const companyName = getCompanyName();
+
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -79,9 +86,18 @@ export const Header = () => {
           
           <div className="hidden md:flex items-center space-x-3">
             <span className="text-sm text-gray-600">|</span>
-            <span className="text-sm font-medium text-gray-900">
-              {getCompanyName()}
-            </span>
+            
+            {/* Selector de empresa si hay múltiples empresas */}
+            {roles.length > 1 ? (
+              <CompanySelector />
+            ) : (
+              companyName && (
+                <span className="text-sm font-medium text-gray-900">
+                  {companyName}
+                </span>
+              )
+            )}
+            
             {getSubscriptionBadge()}
           </div>
         </div>
