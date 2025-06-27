@@ -1,14 +1,13 @@
-
-import { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 import { EmployeeTransformationService } from '@/services/EmployeeTransformationService';
 import { EmployeeDataService } from '@/services/EmployeeDataService';
 
 export const useEmployeeDataFixed = () => {
-  const [employees, setEmployees] = React.useState<EmployeeWithStatus[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [isInitialized, setIsInitialized] = React.useState(false);
+  const [employees, setEmployees] = useState<EmployeeWithStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load employees function
   const loadEmployees = useCallback(async () => {
