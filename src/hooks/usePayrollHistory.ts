@@ -1,13 +1,19 @@
-
 import { useState, useCallback } from 'react';
 import { PayrollHistoryPeriod, ReopenPeriodData, EditWizardSteps, AuditLog } from '@/types/payroll-history';
+import { PayrollReopenService, ReopenPeriodRequest } from '@/services/PayrollReopenService';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UsePayrollHistoryReturn {
   isLoading: boolean;
   isReopening: boolean;
   isExporting: boolean;
-  reopenPeriod: (data: ReopenPeriodData) => Promise<PayrollHistoryPeriod>;
+  canUserReopenPeriods: boolean;
+  checkUserPermissions: () => Promise<void>;
+  reopenPeriod: (periodo: string) => Promise<void>;
+  closePeriodAgain: (periodo: string) => Promise<void>;
+  canReopenPeriod: (periodo: string) => Promise<{canReopen: boolean, reason?: string, hasVouchers: boolean}>;
   closePeriodWithWizard: (periodId: string, wizardSteps: EditWizardSteps) => Promise<void>;
   exportToExcel: (periods: PayrollHistoryPeriod[]) => Promise<void>;
   downloadFile: (fileUrl: string, fileName: string) => Promise<void>;
@@ -18,60 +24,115 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const [isReopening, setIsReopening] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [canUserReopenPeriods, setCanUserReopenPeriods] = useState(false);
 
-  const reopenPeriod = useCallback(async (data: ReopenPeriodData): Promise<PayrollHistoryPeriod> => {
+  const checkUserPermissions = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
+      if (!companyId) return;
+
+      const canReopen = await PayrollReopenService.canUserReopenPeriods(user.id, companyId);
+      setCanUserReopenPeriods(canReopen);
+    } catch (error) {
+      console.error('Error checking user permissions:', error);
+      setCanUserReopenPeriods(false);
+    }
+  }, []);
+
+  const canReopenPeriod = useCallback(async (periodo: string): Promise<{canReopen: boolean, reason?: string, hasVouchers: boolean}> => {
+    try {
+      const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
+      if (!companyId) {
+        return { canReopen: false, reason: 'No se encontró la empresa', hasVouchers: false };
+      }
+
+      return await PayrollReopenService.canReopenPeriod(periodo, companyId);
+    } catch (error) {
+      console.error('Error checking if period can be reopened:', error);
+      return { canReopen: false, reason: 'Error verificando período', hasVouchers: false };
+    }
+  }, []);
+
+  const reopenPeriod = useCallback(async (periodo: string): Promise<void> => {
     setIsReopening(true);
     try {
-      // Simulación de API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Crear nueva versión del período
-      const newVersion: PayrollHistoryPeriod = {
-        id: `${data.periodId}-v${Date.now()}`,
-        period: "1 al 15 de Mayo 2025 (v2)",
-        startDate: '2025-05-01',
-        endDate: '2025-05-15',
-        type: 'quincenal',
-        employeesCount: 12,
-        status: 'editado',
-        totalGrossPay: 45000000,
-        totalNetPay: 38500000,
-        totalDeductions: 6500000,
-        totalCost: 51750000,
-        employerContributions: 6750000,
-        paymentStatus: 'pendiente',
-        version: 2,
-        originalId: data.periodId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        editedBy: data.userId,
-        editReason: data.reason
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se encontró la empresa del usuario');
+      }
+
+      const request: ReopenPeriodRequest = {
+        periodo,
+        companyId,
+        userId: user.id,
+        userEmail: user.email || ''
       };
 
-      // Crear log de auditoría
-      await createAuditLog({
-        periodId: data.periodId,
-        action: 'reopened',
-        userId: data.userId,
-        userName: 'Admin Usuario',
-        details: `Período reabierto para edición. Motivo: ${data.reason}`
-      });
+      await PayrollReopenService.reopenPeriod(request);
 
       toast({
-        title: "Período reabierto exitosamente",
-        description: "Se ha creado una nueva versión para edición",
+        title: "✅ Período reabierto correctamente",
+        description: "Ahora puedes editar la nómina. Los cambios se registrarán en el historial.",
       });
 
-      return newVersion;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error reopening period:', error);
       toast({
         title: "Error al reabrir período",
-        description: "No se pudo reabrir el período. Intente nuevamente.",
+        description: error.message || "No se pudo reabrir el período. Intente nuevamente.",
         variant: "destructive",
       });
       throw error;
     } finally {
       setIsReopening(false);
+    }
+  }, []);
+
+  const closePeriodAgain = useCallback(async (periodo: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se encontró la empresa del usuario');
+      }
+
+      const request: ReopenPeriodRequest = {
+        periodo,
+        companyId,
+        userId: user.id,
+        userEmail: user.email || ''
+      };
+
+      await PayrollReopenService.closePeriodAgain(request);
+
+      toast({
+        title: "Período cerrado nuevamente",
+        description: "El período ha sido cerrado correctamente.",
+      });
+
+    } catch (error: any) {
+      console.error('Error closing period again:', error);
+      toast({
+        title: "Error al cerrar período",
+        description: error.message || "No se pudo cerrar el período.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -188,7 +249,11 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
     isLoading,
     isReopening,
     isExporting,
+    canUserReopenPeriods,
+    checkUserPermissions,
     reopenPeriod,
+    closePeriodAgain,
+    canReopenPeriod,
     closePeriodWithWizard,
     exportToExcel,
     downloadFile,

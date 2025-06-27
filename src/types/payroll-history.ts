@@ -4,9 +4,9 @@ export interface PayrollHistoryPeriod {
   period: string;
   startDate: string;
   endDate: string;
-  type: 'semanal' | 'quincenal' | 'mensual' | 'personalizado'; // Actualizado para incluir todos los tipos
+  type: 'semanal' | 'quincenal' | 'mensual' | 'personalizado';
   employeesCount: number;
-  status: 'cerrado' | 'con_errores' | 'revision' | 'editado';
+  status: 'cerrado' | 'con_errores' | 'revision' | 'editado' | 'reabierto';
   totalGrossPay: number;
   totalNetPay: number;
   totalDeductions: number;
@@ -21,6 +21,10 @@ export interface PayrollHistoryPeriod {
   editedBy?: string;
   editReason?: string;
   costCenter?: string;
+  editable?: boolean;
+  reopenedBy?: string;
+  reopenedAt?: string;
+  reportedToDian?: boolean;
 }
 
 export interface PayrollHistoryEmployee {
@@ -42,7 +46,7 @@ export interface PayrollHistoryFilters {
   };
   status?: string;
   costCenter?: string;
-  periodType?: 'semanal' | 'quincenal' | 'mensual' | 'personalizado'; // Actualizado
+  periodType?: 'semanal' | 'quincenal' | 'mensual' | 'personalizado';
   employeeSearch?: string;
 }
 
@@ -88,4 +92,19 @@ export interface AuditLog {
   timestamp: string;
   details: string;
   changes?: Record<string, any>;
+}
+
+// Nuevos tipos para la funcionalidad de reapertura
+export interface ReopenAuditLog {
+  id: string;
+  companyId: string;
+  periodo: string;
+  userId: string;
+  userEmail: string;
+  action: 'reabierto' | 'cerrado_nuevamente';
+  previousState: string;
+  newState: string;
+  hasVouchers: boolean;
+  notes?: string;
+  createdAt: string;
 }

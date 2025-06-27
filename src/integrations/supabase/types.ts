@@ -806,6 +806,56 @@ export type Database = {
           },
         ]
       }
+      payroll_reopen_audit: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string | null
+          has_vouchers: boolean | null
+          id: string
+          new_state: string | null
+          notes: string | null
+          periodo: string
+          previous_state: string | null
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string | null
+          has_vouchers?: boolean | null
+          id?: string
+          new_state?: string | null
+          notes?: string | null
+          periodo: string
+          previous_state?: string | null
+          user_email: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string | null
+          has_vouchers?: boolean | null
+          id?: string
+          new_state?: string | null
+          notes?: string | null
+          periodo?: string
+          previous_state?: string | null
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_reopen_audit_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_vouchers: {
         Row: {
           company_id: string
@@ -902,8 +952,10 @@ export type Database = {
           company_id: string
           created_at: string
           dias_trabajados: number | null
+          editable: boolean | null
           employee_id: string
           estado: string | null
+          fecha_reapertura: string | null
           horas_extra: number | null
           id: string
           intereses_cesantias: number | null
@@ -912,8 +964,10 @@ export type Database = {
           pension_empleado: number | null
           periodo: string
           prima: number | null
+          reabierto_por: string | null
           recargo_dominical: number | null
           recargo_nocturno: number | null
+          reportado_dian: boolean | null
           retencion_fuente: number | null
           salario_base: number
           salud_empleado: number | null
@@ -929,8 +983,10 @@ export type Database = {
           company_id: string
           created_at?: string
           dias_trabajados?: number | null
+          editable?: boolean | null
           employee_id: string
           estado?: string | null
+          fecha_reapertura?: string | null
           horas_extra?: number | null
           id?: string
           intereses_cesantias?: number | null
@@ -939,8 +995,10 @@ export type Database = {
           pension_empleado?: number | null
           periodo: string
           prima?: number | null
+          reabierto_por?: string | null
           recargo_dominical?: number | null
           recargo_nocturno?: number | null
+          reportado_dian?: boolean | null
           retencion_fuente?: number | null
           salario_base?: number
           salud_empleado?: number | null
@@ -956,8 +1014,10 @@ export type Database = {
           company_id?: string
           created_at?: string
           dias_trabajados?: number | null
+          editable?: boolean | null
           employee_id?: string
           estado?: string | null
+          fecha_reapertura?: string | null
           horas_extra?: number | null
           id?: string
           intereses_cesantias?: number | null
@@ -966,8 +1026,10 @@ export type Database = {
           pension_empleado?: number | null
           periodo?: string
           prima?: number | null
+          reabierto_por?: string | null
           recargo_dominical?: number | null
           recargo_nocturno?: number | null
+          reportado_dian?: boolean | null
           retencion_fuente?: number | null
           salario_base?: number
           salud_empleado?: number | null

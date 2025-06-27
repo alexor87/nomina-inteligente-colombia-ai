@@ -2,19 +2,25 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText } from 'lucide-react';
+import { Eye, Download, FileText, Unlock, Lock } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
   onViewDetails: (period: PayrollHistoryPeriod) => void;
+  onReopenPeriod?: (period: PayrollHistoryPeriod) => void;
+  onClosePeriod?: (period: PayrollHistoryPeriod) => void;
   onDownloadFile?: (fileUrl: string, fileName: string) => void;
+  canUserReopenPeriods?: boolean;
 }
 
 export const PayrollHistoryTable = ({ 
   periods, 
   onViewDetails,
-  onDownloadFile 
+  onReopenPeriod,
+  onClosePeriod,
+  onDownloadFile,
+  canUserReopenPeriods = false
 }: PayrollHistoryTableProps) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -29,7 +35,8 @@ export const PayrollHistoryTable = ({
       cerrado: { color: 'bg-green-100 text-green-800', text: 'Cerrado', icon: '✓' },
       con_errores: { color: 'bg-red-100 text-red-800', text: 'Con errores', icon: '✗' },
       revision: { color: 'bg-yellow-100 text-yellow-800', text: 'En revisión', icon: '⚠' },
-      editado: { color: 'bg-blue-100 text-blue-800', text: 'Editado', icon: '✏' }
+      editado: { color: 'bg-blue-100 text-blue-800', text: 'Editado', icon: '✏' },
+      reabierto: { color: 'bg-amber-100 text-amber-800', text: 'Reabierto', icon: '🟡' }
     };
     
     const config = statusConfig[status];
@@ -63,6 +70,16 @@ export const PayrollHistoryTable = ({
     }
   };
 
+  const canReopenPeriod = (period: PayrollHistoryPeriod) => {
+    return canUserReopenPeriods && 
+           (period.status === 'cerrado' || period.status === 'con_errores') && 
+           !period.reportedToDian;
+  };
+
+  const canClosePeriod = (period: PayrollHistoryPeriod) => {
+    return canUserReopenPeriods && period.status === 'reabierto';
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <Table>
@@ -91,6 +108,11 @@ export const PayrollHistoryTable = ({
                   {period.editedBy && (
                     <div className="text-xs text-gray-400">
                       Editado por {period.editedBy.split('@')[0]}
+                    </div>
+                  )}
+                  {period.reopenedBy && (
+                    <div className="text-xs text-amber-600">
+                      Reabierto por {period.reopenedBy.split('@')[0]}
                     </div>
                   )}
                 </div>
@@ -138,6 +160,31 @@ export const PayrollHistoryTable = ({
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
+                  
+                  {canReopenPeriod(period) && onReopenPeriod && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onReopenPeriod(period)}
+                      className="text-amber-600 hover:text-amber-800"
+                      title="Reabrir período"
+                    >
+                      <Unlock className="h-4 w-4" />
+                    </Button>
+                  )}
+
+                  {canClosePeriod(period) && onClosePeriod && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onClosePeriod(period)}
+                      className="text-green-600 hover:text-green-800"
+                      title="Cerrar nuevamente"
+                    >
+                      <Lock className="h-4 w-4" />
+                    </Button>
+                  )}
+                  
                   <Button 
                     variant="ghost" 
                     size="sm"

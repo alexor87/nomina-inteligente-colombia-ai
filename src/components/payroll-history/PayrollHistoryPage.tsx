@@ -1,19 +1,20 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
+import { ReopenPeriodModal } from './ReopenPeriodModal';
 import { EditWizard } from './EditWizard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Clock, AlertCircle } from 'lucide-react';
+import { FileText, Download, Clock, AlertCircle, ArrowRight } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryFilters as FiltersType } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/ui/PaginationControls';
-import { useEffect } from 'react';
+import { toast } from '@/hooks/use-toast';
 
 export const PayrollHistoryPage = () => {
   const navigate = useNavigate();
@@ -21,7 +22,9 @@ export const PayrollHistoryPage = () => {
   const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<PayrollHistoryPeriod | null>(null);
+  const [showReopenModal, setShowReopenModal] = useState(false);
   const [showEditWizard, setShowEditWizard] = useState(false);
+  const [hasVouchers, setHasVouchers] = useState(false);
   const [filters, setFilters] = useState<FiltersType>({
     dateRange: {},
     status: '',
@@ -32,7 +35,13 @@ export const PayrollHistoryPage = () => {
 
   const {
     isLoading: isProcessing,
+    isReopening,
     isExporting,
+    canUserReopenPeriods,
+    checkUserPermissions,
+    reopenPeriod,
+    closePeriodAgain,
+    canReopenPeriod,
     closePeriodWithWizard,
     exportToExcel,
     downloadFile
@@ -47,7 +56,8 @@ export const PayrollHistoryPage = () => {
 
   useEffect(() => {
     loadPayrollHistory();
-  }, []);
+    checkUserPermissions();
+  }, [checkUserPermissions]);
 
   useEffect(() => {
     applyFilters();
@@ -60,13 +70,16 @@ export const PayrollHistoryPage = () => {
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
         // Fix the status mapping logic
-        let mappedStatus: 'cerrado' | 'con_errores' | 'revision' = 'revision';
+        let mappedStatus: 'cerrado' | 'con_errores' | 'revision' | 'reabierto' = 'revision';
         
         switch (record.estado) {
           case 'cerrada':
           case 'procesada':
           case 'pagada':
             mappedStatus = 'cerrado';
+            break;
+          case 'reabierto':
+            mappedStatus = 'reabierto';
             break;
           case 'borrador':
             mappedStatus = 'revision';
@@ -95,6 +108,8 @@ export const PayrollHistoryPage = () => {
           version: 1,
           createdAt: record.fechaCreacion || new Date().toISOString(),
           updatedAt: record.fechaCreacion || new Date().toISOString(),
+          editable: true, // Default to true, will be updated from DB
+          reportedToDian: false // Default to false
         };
       });
       setPeriods(convertedPeriods);
@@ -137,6 +152,75 @@ export const PayrollHistoryPage = () => {
     navigate(`/app/payroll-history/${period.id}`);
   };
 
+  const handleReopenPeriod = async (period: PayrollHistoryPeriod) => {
+    try {
+      // Verificar si se puede reabrir y si tiene comprobantes
+      const { canReopen, reason, hasVouchers: periodHasVouchers } = await canReopenPeriod(period.period);
+      
+      if (!canReopen) {
+        toast({
+          title: "No se puede reabrir",
+          description: reason || "Este período no puede ser reabierto",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setSelectedPeriod(period);
+      setHasVouchers(periodHasVouchers);
+      setShowReopenModal(true);
+    } catch (error) {
+      console.error('Error checking reopen status:', error);
+      toast({
+        title: "Error",
+        description: "Error verificando el estado del período",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleClosePeriod = async (period: PayrollHistoryPeriod) => {
+    try {
+      await closePeriodAgain(period.period);
+      await loadPayrollHistory(); // Reload to show updated status
+    } catch (error) {
+      console.error('Error closing period:', error);
+    }
+  };
+
+  const handleReopenConfirm = async () => {
+    if (!selectedPeriod) return;
+    
+    try {
+      await reopenPeriod(selectedPeriod.period);
+      await loadPayrollHistory(); // Reload to show updated status
+      setShowReopenModal(false);
+      setSelectedPeriod(null);
+      
+      // Mostrar botón para ir a liquidar
+      toast({
+        title: "¿Quieres ir a liquidar?",
+        description: (
+          <div className="flex items-center gap-2 mt-2">
+            <span>El período fue reabierto correctamente.</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate('/app/payroll')}
+              className="ml-2"
+            >
+              <ArrowRight className="h-3 w-3 mr-1" />
+              Ir a liquidar
+            </Button>
+          </div>
+        ),
+      });
+      
+    } catch (error) {
+      console.error('Error reopening period:', error);
+    }
+  };
+
   const handleExportToExcel = async () => {
     await exportToExcel(filteredPeriods);
   };
@@ -159,7 +243,8 @@ export const PayrollHistoryPage = () => {
       total: filteredPeriods.length,
       cerrados: filteredPeriods.filter(p => p.status === 'cerrado').length,
       conErrores: filteredPeriods.filter(p => p.status === 'con_errores').length,
-      enRevision: filteredPeriods.filter(p => p.status === 'revision').length
+      enRevision: filteredPeriods.filter(p => p.status === 'revision').length,
+      reabiertos: filteredPeriods.filter(p => p.status === 'reabierto').length
     };
     return summary;
   };
@@ -209,7 +294,7 @@ export const PayrollHistoryPage = () => {
 
       <div className="p-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -230,6 +315,18 @@ export const PayrollHistoryPage = () => {
                   <p className="text-2xl font-bold text-green-600">{statusSummary.cerrados}</p>
                 </div>
                 <Badge className="bg-green-100 text-green-800">✓</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Reabiertos</p>
+                  <p className="text-2xl font-bold text-amber-600">{statusSummary.reabiertos}</p>
+                </div>
+                <Badge className="bg-amber-100 text-amber-800">🟡</Badge>
               </div>
             </CardContent>
           </Card>
@@ -270,7 +367,10 @@ export const PayrollHistoryPage = () => {
           <PayrollHistoryTable
             periods={pagination.paginatedItems}
             onViewDetails={handleViewDetails}
+            onReopenPeriod={handleReopenPeriod}
+            onClosePeriod={handleClosePeriod}
             onDownloadFile={downloadFile}
+            canUserReopenPeriods={canUserReopenPeriods}
           />
           
           <PaginationControls 
@@ -279,6 +379,22 @@ export const PayrollHistoryPage = () => {
           />
         </div>
       </div>
+
+      {/* Reopen Period Modal */}
+      {showReopenModal && selectedPeriod && (
+        <ReopenPeriodModal
+          isOpen={showReopenModal}
+          onClose={() => {
+            setShowReopenModal(false);
+            setSelectedPeriod(null);
+            setHasVouchers(false);
+          }}
+          onConfirm={handleReopenConfirm}
+          period={selectedPeriod}
+          isProcessing={isReopening}
+          hasVouchers={hasVouchers}
+        />
+      )}
 
       {/* Edit Wizard Modal */}
       {showEditWizard && (
