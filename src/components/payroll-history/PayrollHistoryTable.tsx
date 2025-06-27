@@ -30,6 +30,23 @@ export const PayrollHistoryTable = ({
     }).format(amount);
   };
 
+  const formatPeriodDate = (startDate: string, endDate: string) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const monthNames = [
+      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+    ];
+    
+    const startDay = start.getDate();
+    const endDay = end.getDate();
+    const month = monthNames[start.getMonth()];
+    const year = start.getFullYear();
+    
+    return `${startDay}-${endDay}/${month}/${year}`;
+  };
+
   const getStatusBadge = (status: PayrollHistoryPeriod['status']) => {
     const statusConfig = {
       cerrado: { color: 'bg-green-100 text-green-800', text: 'Cerrado', icon: '✓' },
@@ -100,7 +117,12 @@ export const PayrollHistoryTable = ({
             <TableRow key={period.id} className="hover:bg-gray-50">
               <TableCell className="font-medium">
                 <div>
-                  <div className="text-sm font-medium text-gray-900">{period.period}</div>
+                  <button
+                    onClick={() => onViewDetails(period)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  >
+                    {formatPeriodDate(period.startDate, period.endDate)}
+                  </button>
                   <div className="text-xs text-gray-500 capitalize">{period.type}</div>
                   {period.version > 1 && (
                     <div className="text-xs text-blue-600 font-medium">v{period.version}</div>
