@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Employee } from '@/types';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeFormSubmission } from '@/hooks/useEmployeeFormSubmission';
@@ -25,6 +25,10 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   // Local state to handle employee data updates
   const [currentEmployee, setCurrentEmployee] = useState<Employee | undefined>(employee);
   
+  // Sidebar state - collapsed by default
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  
   const { configuration } = useEmployeeGlobalConfiguration();
   
   const {
@@ -46,6 +50,24 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     setIsDraft,
     scrollToSection
   } = useEmployeeForm(currentEmployee);
+
+  // Handle click outside sidebar to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node) &&
+        !sidebarCollapsed
+      ) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [sidebarCollapsed]);
 
   // Handle data refresh callback
   const handleDataRefresh = (updatedEmployee: Employee) => {
@@ -102,6 +124,10 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     console.log('Duplicating employee...');
   };
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
   console.log('🎯 EmployeeFormModern: Rendering form with currentEmployee:', {
     id: currentEmployee?.id,
     name: currentEmployee ? `${currentEmployee.nombre} ${currentEmployee.apellido}` : 'undefined'
@@ -109,17 +135,25 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   return (
     <div className="flex min-h-screen bg-white">
-      <NavigationSidebar 
-        activeSection={activeSection}
-        completionPercentage={completionPercentage}
-        scrollToSection={scrollToSection}
-      />
+      {/* Sidebar with ref for click outside detection */}
+      <div ref={sidebarRef}>
+        <NavigationSidebar 
+          activeSection={activeSection}
+          completionPercentage={completionPercentage}
+          scrollToSection={scrollToSection}
+          collapsed={sidebarCollapsed}
+          onToggle={toggleSidebar}
+        />
+      </div>
       
-      <div className="flex-1">
+      {/* Main content with dynamic margin based on sidebar state */}
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-72'}`}>
         <EmployeeFormHeader
           employee={currentEmployee}
           onCancel={onCancel}
           onDuplicate={handleDuplicate}
+          onToggleSidebar={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
         />
 
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -144,6 +178,14 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           onSubmit={handleSubmit(onSubmit)}
         />
       </div>
+
+      {/* Overlay for mobile/tablet when sidebar is open */}
+      {!sidebarCollapsed && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-40 lg:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
     </div>
   );
 };
