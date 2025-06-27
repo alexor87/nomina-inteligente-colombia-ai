@@ -7,6 +7,7 @@ import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Layout } from '@/components/layout/Layout';
 import { useRealtimeCleanup } from '@/hooks/useRealtimeCleanup';
+import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 
 // Public pages
 import { Index } from '@/pages/Index';
@@ -39,6 +40,9 @@ const queryClient = new QueryClient();
 function AppContent() {
   // Hook para limpiar suscripciones realtime
   useRealtimeCleanup();
+  
+  // Hook para cerrar sesión automáticamente por inactividad (10 minutos)
+  useInactivityTimeout(10);
 
   return (
     <Router>

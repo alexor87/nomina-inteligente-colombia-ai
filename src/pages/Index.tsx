@@ -10,13 +10,36 @@ import {
   Shield, 
   Clock,
   Building2,
-  User,
   ArrowRight
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
 
 export const Index = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/app/dashboard');
+    }
+  }, [user, loading, navigate]);
+
+  // Show loading while checking auth status
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Only show landing page for non-authenticated users
+  if (user) {
+    return null; // Will redirect via useEffect
+  }
 
   const features = [
     {
@@ -125,30 +148,14 @@ export const Index = () => {
             Automatiza el cálculo de nómina, gestiona a tus empleados y cumple con todas las obligaciones laborales de Colombia desde una sola plataforma.
           </p>
           
-          {/* Registration Options */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
-            <Card className="w-full sm:w-80 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/register')}>
-              <CardHeader className="text-center">
-                <User className="h-12 w-12 text-blue-600 mx-auto mb-2" />
-                <CardTitle className="text-lg">Registro Individual</CardTitle>
-                <CardDescription>
-                  Crea tu cuenta personal para acceder a la plataforma
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full" onClick={(e) => {e.stopPropagation(); navigate('/register')}}>
-                  Registrarse como Usuario
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="w-full sm:w-80 hover:shadow-lg transition-shadow cursor-pointer border-blue-200" onClick={() => navigate('/register/company')}>
+          {/* Company Registration CTA */}
+          <div className="flex flex-col items-center mb-8">
+            <Card className="w-full max-w-md hover:shadow-lg transition-shadow cursor-pointer border-blue-200" onClick={() => navigate('/register/company')}>
               <CardHeader className="text-center">
                 <Building2 className="h-12 w-12 text-blue-600 mx-auto mb-2" />
                 <CardTitle className="text-lg">Registro Empresarial</CardTitle>
                 <CardDescription>
-                  Registra tu empresa y comienza con 30 días gratis
+                  Registra tu empresa y comienza con 15 días gratis
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -157,7 +164,7 @@ export const Index = () => {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <div className="text-center mt-2">
-                  <Badge variant="secondary">30 días gratis</Badge>
+                  <Badge variant="secondary">15 días gratis</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -208,7 +215,7 @@ export const Index = () => {
               Planes que se adaptan a tu empresa
             </h3>
             <p className="text-xl text-gray-600">
-              Comienza con 30 días gratis, sin compromisos
+              Comienza con 15 días gratis, sin compromisos
             </p>
           </div>
 

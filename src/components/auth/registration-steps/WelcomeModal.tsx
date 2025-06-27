@@ -2,14 +2,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, User, Sparkles } from 'lucide-react';
+import { Building2, Sparkles } from 'lucide-react';
 
 interface WelcomeModalProps {
   onNext: () => void;
 }
 
 export const WelcomeModal = ({ onNext }: WelcomeModalProps) => {
-  const [selectedRole, setSelectedRole] = useState<'empresa' | 'empleado' | null>(null);
+  const [selectedRole, setSelectedRole] = useState<'empresa' | null>(null);
 
   const handleContinue = () => {
     if (selectedRole === 'empresa') {
@@ -48,32 +48,7 @@ export const WelcomeModal = ({ onNext }: WelcomeModalProps) => {
               </div>
             </div>
           </div>
-
-          <div 
-            className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-              selectedRole === 'empleado' 
-                ? 'border-blue-500 bg-blue-50' 
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
-            onClick={() => setSelectedRole('empleado')}
-          >
-            <div className="flex items-center">
-              <User className="h-6 w-6 text-green-600 mr-3" />
-              <div>
-                <p className="font-medium">Empleado</p>
-                <p className="text-sm text-gray-600">Consulto mi información laboral</p>
-              </div>
-            </div>
-          </div>
         </div>
-
-        {selectedRole === 'empleado' && (
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              ¡Genial! Pronto habilitaremos la experiencia para empleados.
-            </p>
-          </div>
-        )}
 
         <Button 
           onClick={handleContinue}
