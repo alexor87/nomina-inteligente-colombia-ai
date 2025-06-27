@@ -96,9 +96,10 @@ export const useEmployeeFormSubmission = (employee?: Employee, onSuccess?: () =>
       estadoAfiliacion: sanitizedData.estadoAfiliacion
     });
 
-    // Prepare employee data - let the validation service handle all conversions
+    // Prepare employee data - add required fields for Employee type
     const employeeData = {
       ...sanitizedData,
+      empresaId: companyId, // Add required empresaId field
       // Clear subtipoCotizanteId if no subtipos are available
       subtipoCotizanteId: subtiposCotizante.length > 0 ? sanitizedData.subtipoCotizanteId : null
     };
