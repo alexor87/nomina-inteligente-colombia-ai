@@ -22,6 +22,7 @@ import PayrollIntelligentSilentPage from '@/pages/PayrollIntelligentSilentPage';
 import EmployeesPage from '@/pages/EmployeesPage';
 import SettingsPage from '@/pages/SettingsPage';
 import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
+import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
 import CompanySettingsPage from '@/pages/CompanySettingsPage';
 import SubscriptionPage from '@/pages/SubscriptionPage';
 import BillingHistoryPage from '@/pages/BillingHistoryPage';
@@ -69,6 +70,7 @@ function AppContent() {
           <Route path="company-settings" element={<CompanySettingsPage />} />
           
           <Route path="payroll-history" element={<PayrollHistoryPage />} />
+          <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
 
           <Route path="subscription" element={<SubscriptionPage />} />
           <Route path="billing-history" element={<BillingHistoryPage />} />
@@ -86,6 +88,7 @@ function AppContent() {
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
         <Route path="/company-settings" element={<Navigate to="/app/company-settings" replace />} />
         <Route path="/payroll-history" element={<Navigate to="/app/payroll-history" replace />} />
+        <Route path="/payroll-history/:periodId" element={<Navigate to="/app/payroll-history/:periodId" replace />} />
         <Route path="/subscription" element={<Navigate to="/app/subscription" replace />} />
         <Route path="/billing-history" element={<Navigate to="/app/billing-history" replace />} />
         <Route path="/reports" element={<Navigate to="/app/reports" replace />} />

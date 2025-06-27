@@ -2,17 +2,19 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Edit, FileText } from 'lucide-react';
+import { Eye, Download, Edit, FileText } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
+  onViewDetails: (period: PayrollHistoryPeriod) => void;
   onReopenPeriod: (period: PayrollHistoryPeriod) => void;
   onDownloadFile?: (fileUrl: string, fileName: string) => void;
 }
 
 export const PayrollHistoryTable = ({ 
   periods, 
+  onViewDetails,
   onReopenPeriod, 
   onDownloadFile 
 }: PayrollHistoryTableProps) => {
@@ -134,6 +136,15 @@ export const PayrollHistoryTable = ({
               </TableCell>
               <TableCell>
                 <div className="flex items-center justify-center space-x-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => onViewDetails(period)}
+                    className="text-blue-600 hover:text-blue-800"
+                    title="Ver detalles"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   <Button 
                     variant="ghost" 
                     size="sm"
