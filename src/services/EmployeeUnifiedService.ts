@@ -74,15 +74,23 @@ export class EmployeeUnifiedService {
   private static mapEmployeeToDatabase(employee: Partial<EmployeeDataWithExtended>) {
     console.log('🔄 Mapping frontend employee to database format:', employee);
     
-    // Helper function to handle text fields - convert empty strings to null
+    // Helper function to handle text fields - convert empty strings and 'null' to null
     const cleanTextField = (value: any) => {
-      if (value === '' || value === undefined) return null;
-      return value ? String(value).trim() : null;
+      if (value === '' || value === undefined || value === null || value === 'null') return null;
+      if (typeof value === 'string') return value.trim() || null;
+      return value ? String(value).trim() || null : null;
     };
 
-    // Helper function to handle UUID fields - convert empty strings to null
+    // Helper function to handle UUID fields - convert empty strings and 'null' to null
     const cleanUuidField = (value: any) => {
-      if (!value || value === '') return null;
+      if (value === '' || value === undefined || value === null || value === 'null') return null;
+      if (typeof value === 'string') return value.trim() || null;
+      return value;
+    };
+
+    // Helper function to handle date fields
+    const cleanDateField = (value: any) => {
+      if (value === '' || value === undefined || value === null || value === 'null') return null;
       return value;
     };
 
@@ -111,15 +119,15 @@ export class EmployeeUnifiedService {
       numero_cuenta: cleanTextField(employee.numeroCuenta),
       titular_cuenta: cleanTextField(employee.titularCuenta),
       sexo: employee.sexo,
-      fecha_nacimiento: employee.fechaNacimiento,
+      fecha_nacimiento: cleanDateField(employee.fechaNacimiento),
       direccion: cleanTextField(employee.direccion),
       ciudad: cleanTextField(employee.ciudad),
       departamento: employee.departamento,
       periodicidad_pago: employee.periodicidadPago,
       codigo_ciiu: cleanTextField(employee.codigoCIIU),
       centro_costos: cleanTextField(employee.centroCostos),
-      fecha_firma_contrato: employee.fechaFirmaContrato,
-      fecha_finalizacion_contrato: employee.fechaFinalizacionContrato,
+      fecha_firma_contrato: cleanDateField(employee.fechaFirmaContrato),
+      fecha_finalizacion_contrato: cleanDateField(employee.fechaFinalizacionContrato),
       tipo_jornada: employee.tipoJornada,
       dias_trabajo: employee.diasTrabajo,
       horas_trabajo: employee.horasTrabajo,
@@ -127,7 +135,7 @@ export class EmployeeUnifiedService {
       clausulas_especiales: cleanTextField(employee.clausulasEspeciales),
       forma_pago: employee.formaPago,
       regimen_salud: employee.regimenSalud,
-      // CRITICAL: Handle new optional fields properly
+      // CRITICAL: Handle UUID fields with proper cleaning
       tipo_cotizante_id: cleanUuidField(employee.tipoCotizanteId),
       subtipo_cotizante_id: cleanUuidField(employee.subtipoCotizanteId)
     };

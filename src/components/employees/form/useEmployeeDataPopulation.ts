@@ -25,83 +25,96 @@ export const useEmployeeDataPopulation = (
     }
 
     console.log('🔄 useEmployeeDataPopulation: STARTING to set form values from employee:', employee);
-    console.log('📊 AFFILIATIONS DATA FROM DB (DETAILED):', {
-      eps: { value: employee.eps, type: typeof employee.eps, isNull: employee.eps === null, isEmpty: employee.eps === '' },
-      afp: { value: employee.afp, type: typeof employee.afp, isNull: employee.afp === null, isEmpty: employee.afp === '' },
-      arl: { value: employee.arl, type: typeof employee.arl, isNull: employee.arl === null, isEmpty: employee.arl === '' },
-      cajaCompensacion: { value: employee.cajaCompensacion, type: typeof employee.cajaCompensacion, isNull: employee.cajaCompensacion === null, isEmpty: employee.cajaCompensacion === '' },
-      tipoCotizanteId: { value: employee.tipoCotizanteId, type: typeof employee.tipoCotizanteId, isNull: employee.tipoCotizanteId === null, isEmpty: employee.tipoCotizanteId === '' },
-      subtipoCotizanteId: { value: employee.subtipoCotizanteId, type: typeof employee.subtipoCotizanteId, isNull: employee.subtipoCotizanteId === null, isEmpty: employee.subtipoCotizanteId === '' }
-    });
     
-    // Helper functions
-    const handleTextValue = (value: any) => {
-      if (value === null || value === undefined) return '';
+    // Helper functions with improved null/undefined handling
+    const handleTextValue = (value: any): string => {
+      if (value === null || value === undefined || value === 'null') return '';
       return String(value).trim();
     };
     
-    const handleAffiliationValue = (value: any) => {
-      if (value === null || value === undefined) return '';
+    const handleOptionalValue = (value: any): string => {
+      if (value === null || value === undefined || value === 'null' || value === '') return '';
       return String(value).trim();
+    };
+
+    const handleDateValue = (value: any): string => {
+      if (value === null || value === undefined || value === 'null' || value === '') return '';
+      return String(value);
+    };
+
+    const handleUuidValue = (value: any): string => {
+      if (value === null || value === undefined || value === 'null' || value === '') return '';
+      return String(value);
     };
     
     // Batch all setValue operations
     const setFormValues = () => {
       // Basic Information
-      setValue('cedula', employee.cedula);
+      setValue('cedula', employee.cedula || '');
       setValue('tipoDocumento', employee.tipoDocumento || 'CC');
-      setValue('nombre', employee.nombre);
-      setValue('segundoNombre', (employee as any).segundoNombre || '');
-      setValue('apellido', employee.apellido);
-      setValue('email', employee.email || '');
-      setValue('telefono', employee.telefono || '');
+      setValue('nombre', employee.nombre || '');
+      setValue('segundoNombre', handleOptionalValue((employee as any).segundoNombre));
+      setValue('apellido', employee.apellido || '');
+      setValue('email', handleOptionalValue(employee.email));
+      setValue('telefono', handleOptionalValue(employee.telefono));
       
       // Extended personal information
       setValue('sexo', (employee as any).sexo || 'M');
-      setValue('fechaNacimiento', handleTextValue((employee as any).fechaNacimiento));
-      setValue('direccion', handleTextValue((employee as any).direccion));
-      setValue('ciudad', handleTextValue((employee as any).ciudad));
-      setValue('departamento', handleTextValue((employee as any).departamento));
+      setValue('fechaNacimiento', handleDateValue((employee as any).fechaNacimiento));
+      setValue('direccion', handleOptionalValue((employee as any).direccion));
+      setValue('ciudad', handleOptionalValue((employee as any).ciudad));
+      setValue('departamento', handleOptionalValue((employee as any).departamento));
       
       // Labor Information
-      setValue('salarioBase', employee.salarioBase || 0);
+      setValue('salarioBase', Number(employee.salarioBase) || 0);
       setValue('tipoContrato', employee.tipoContrato || 'indefinido');
       setValue('fechaIngreso', employee.fechaIngreso || '');
       setValue('periodicidadPago', (employee as any).periodicidadPago || 'mensual');
-      setValue('cargo', handleTextValue(employee.cargo));
-      setValue('codigoCIIU', handleTextValue((employee as any).codigoCIIU));
+      setValue('cargo', handleOptionalValue(employee.cargo));
+      setValue('codigoCIIU', handleOptionalValue((employee as any).codigoCIIU));
       setValue('nivelRiesgoARL', employee.nivelRiesgoARL || 'I');
       setValue('estado', employee.estado || 'activo');
-      setValue('centroCostos', handleTextValue((employee as any).centroCostos));
+      setValue('centroCostos', handleOptionalValue((employee as any).centroCostos));
       
       // Contract details
-      setValue('fechaFirmaContrato', handleTextValue((employee as any).fechaFirmaContrato));
-      setValue('fechaFinalizacionContrato', handleTextValue((employee as any).fechaFinalizacionContrato));
+      setValue('fechaFirmaContrato', handleDateValue((employee as any).fechaFirmaContrato));
+      setValue('fechaFinalizacionContrato', handleDateValue((employee as any).fechaFinalizacionContrato));
       setValue('tipoJornada', (employee as any).tipoJornada || 'completa');
-      setValue('diasTrabajo', (employee as any).diasTrabajo || 30);
-      setValue('horasTrabajo', (employee as any).horasTrabajo || 8);
-      setValue('beneficiosExtralegales', (employee as any).beneficiosExtralegales || false);
-      setValue('clausulasEspeciales', handleTextValue((employee as any).clausulasEspeciales));
+      setValue('diasTrabajo', Number((employee as any).diasTrabajo) || 30);
+      setValue('horasTrabajo', Number((employee as any).horasTrabajo) || 8);
+      setValue('beneficiosExtralegales', Boolean((employee as any).beneficiosExtralegales));
+      setValue('clausulasEspeciales', handleOptionalValue((employee as any).clausulasEspeciales));
       
       // Banking Information
-      setValue('banco', employee.banco || '');
+      setValue('banco', handleOptionalValue(employee.banco));
       setValue('tipoCuenta', employee.tipoCuenta || 'ahorros');
-      setValue('numeroCuenta', employee.numeroCuenta || '');
-      setValue('titularCuenta', employee.titularCuenta || '');
+      setValue('numeroCuenta', handleOptionalValue(employee.numeroCuenta));
+      setValue('titularCuenta', handleOptionalValue(employee.titularCuenta));
       setValue('formaPago', (employee as any).formaPago || 'dispersion');
       
-      // Affiliations - CRITICAL SECTION
+      // Affiliations - FIXED SECTION
       console.log('🚨 CRITICAL: Processing affiliations data...');
-      setValue('eps', handleAffiliationValue(employee.eps));
-      setValue('afp', handleAffiliationValue(employee.afp));
-      setValue('arl', handleAffiliationValue(employee.arl));
-      setValue('cajaCompensacion', handleAffiliationValue(employee.cajaCompensacion));
-      setValue('tipoCotizanteId', handleAffiliationValue(employee.tipoCotizanteId));
-      setValue('subtipoCotizanteId', handleAffiliationValue(employee.subtipoCotizanteId));
+      setValue('eps', handleOptionalValue(employee.eps));
+      setValue('afp', handleOptionalValue(employee.afp));
+      setValue('arl', handleOptionalValue(employee.arl));
+      setValue('cajaCompensacion', handleOptionalValue(employee.cajaCompensacion));
+      
+      // UUID fields with special handling
+      setValue('tipoCotizanteId', handleUuidValue(employee.tipoCotizanteId));
+      setValue('subtipoCotizanteId', handleUuidValue(employee.subtipoCotizanteId));
+      
       setValue('regimenSalud', (employee as any).regimenSalud || 'contributivo');
       setValue('estadoAfiliacion', employee.estadoAfiliacion || 'pendiente');
       
       console.log('✅ useEmployeeDataPopulation: All form values set from employee data');
+      console.log('🔍 AFFILIATIONS SET:', {
+        eps: handleOptionalValue(employee.eps),
+        afp: handleOptionalValue(employee.afp),
+        arl: handleOptionalValue(employee.arl),
+        cajaCompensacion: handleOptionalValue(employee.cajaCompensacion),
+        tipoCotizanteId: handleUuidValue(employee.tipoCotizanteId),
+        subtipoCotizanteId: handleUuidValue(employee.subtipoCotizanteId)
+      });
     };
 
     // Set all form values at once

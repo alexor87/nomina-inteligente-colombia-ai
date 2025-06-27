@@ -11,7 +11,7 @@ export const useEmployeeFormSubmissionFixed = (
 ) => {
   const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUDFixed();
 
-  // Function to sanitize form fields
+  // Function to sanitize form fields with improved handling
   const sanitizeFormFields = useCallback((data: EmployeeFormData) => {
     console.log('🧹 Sanitizing form fields:', data);
     
@@ -45,28 +45,47 @@ export const useEmployeeFormSubmissionFixed = (
 
     const sanitizedData = { ...data };
     
-    // Sanitize date fields
+    // Sanitize date fields - convert empty strings to null
     dateFields.forEach(field => {
-      if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
+      const value = sanitizedData[field];
+      if (value === '' || value === undefined || value === null || value === 'null') {
         (sanitizedData as any)[field] = null;
       }
     });
 
-    // Sanitize text fields
+    // Sanitize text fields - convert empty strings to null
     textFields.forEach(field => {
-      if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
+      const value = sanitizedData[field];
+      if (value === '' || value === undefined || value === null || value === 'null') {
         (sanitizedData as any)[field] = null;
+      } else if (typeof value === 'string') {
+        (sanitizedData as any)[field] = value.trim();
       }
     });
 
     // CRITICAL: Sanitize UUID fields properly
     uuidFields.forEach(field => {
-      if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
+      const value = sanitizedData[field];
+      if (value === '' || value === undefined || value === null || value === 'null') {
         (sanitizedData as any)[field] = null;
       }
     });
 
+    // Handle segundoNombre separately
+    if (sanitizedData.segundoNombre === '' || sanitizedData.segundoNombre === undefined || sanitizedData.segundoNombre === null) {
+      sanitizedData.segundoNombre = '';
+    }
+
     console.log('✅ Sanitized data:', sanitizedData);
+    console.log('🔍 SANITIZED AFFILIATIONS:', {
+      eps: sanitizedData.eps,
+      afp: sanitizedData.afp,
+      arl: sanitizedData.arl,
+      cajaCompensacion: sanitizedData.cajaCompensacion,
+      tipoCotizanteId: sanitizedData.tipoCotizanteId,
+      subtipoCotizanteId: sanitizedData.subtipoCotizanteId
+    });
+    
     return sanitizedData;
   }, []);
 
