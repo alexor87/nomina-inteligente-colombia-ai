@@ -56,8 +56,6 @@ export const AffiliationsSection = ({
           <SecurityEntitiesSection
             control={control}
             errors={errors}
-            watchedValues={watchedValues}
-            setValue={setValue}
             epsEntities={epsEntities}
             afpEntities={afpEntities}
             arlEntities={arlEntities}
