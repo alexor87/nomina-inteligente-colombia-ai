@@ -9,6 +9,10 @@ export interface PayrollHistoryRecord {
   totalNomina: number;
   estado: 'borrador' | 'procesada' | 'pagada' | 'cerrada';
   companyId: string;
+  editable?: boolean;
+  reabierto_por?: string;
+  fecha_reapertura?: string;
+  reportado_dian?: boolean;
 }
 
 export class PayrollHistoryService {
@@ -72,7 +76,11 @@ export class PayrollHistoryService {
         empleados: records.length,
         totalNomina: records.reduce((sum, r) => sum + Number(r.neto_pagado || 0), 0),
         estado: records[0].estado,
-        companyId
+        companyId,
+        editable: records[0].editable,
+        reabierto_por: records[0].reabierto_por,
+        fecha_reapertura: records[0].fecha_reapertura,
+        reportado_dian: records[0].reportado_dian
       }));
 
       console.log('Processed payroll periods:', periods.length);
