@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/pagination';
 import { PaginationResult } from '@/hooks/usePagination';
 
-interface PaginationControlsProps<T> {
+interface PaginationControlsProps<T = any> {
   pagination: PaginationResult<T>;
   itemName?: string;
 }

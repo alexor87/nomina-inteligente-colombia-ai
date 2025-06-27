@@ -110,7 +110,14 @@ export const useEmployeeCRUD = () => {
     setIsLoading(true);
     try {
       console.log('Changing employee status:', { id, newStatus });
-      await EmployeeService.changeStatus(id, newStatus);
+      
+      // Validate the status before sending
+      const validStatuses = ['activo', 'inactivo', 'vacaciones', 'incapacidad'];
+      if (!validStatuses.includes(newStatus)) {
+        throw new Error(`Estado inválido: ${newStatus}. Estados válidos: ${validStatuses.join(', ')}`);
+      }
+      
+      await EmployeeService.changeStatus(id, newStatus as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad');
       
       toast({
         title: "Estado actualizado",

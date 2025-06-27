@@ -1,5 +1,3 @@
-
-
 export interface User {
   id: string;
   email: string;
@@ -22,12 +20,14 @@ export interface Company {
 
 export interface Employee {
   id: string;
+  empresaId: string;
+  company_id?: string; // Add this for backward compatibility
   cedula: string;
   tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
   segundoNombre?: string;
   apellido: string;
-  email: string;
+  email?: string;
   telefono?: string;
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
@@ -38,21 +38,13 @@ export interface Employee {
   arl?: string;
   cajaCompensacion?: string;
   cargo?: string;
-  empresaId: string;
-  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
+  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  createdAt?: string; // Make this optional to match EmployeeWithStatus
-  updatedAt?: string;
-  // Banking information
   banco?: string;
   tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
-  // Additional fields for compatibility
-  tipoCotizanteId?: string;
-  subtipoCotizanteId?: string;
-  // Extended fields
-  sexo?: 'M' | 'F' | 'O'; // Updated to match form data type
+  sexo?: 'M' | 'F' | 'O';
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
@@ -62,13 +54,18 @@ export interface Employee {
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada?: string;
+  tipoJornada?: 'completa' | 'parcial' | 'horas';
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
   clausulasEspeciales?: string;
-  formaPago?: string;
-  regimenSalud?: string;
+  formaPago?: 'dispersion' | 'manual';
+  regimenSalud?: 'contributivo' | 'subsidiado';
+  tipoCotizanteId?: string;
+  subtipoCotizanteId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // Legacy fields for backward compatibility
   avatar?: string;
   centrosocial?: string;
   ultimaLiquidacion?: string;
@@ -133,4 +130,3 @@ export interface DashboardMetrics {
   gastosNomina: number;
   tendenciaMensual: number;
 }
-

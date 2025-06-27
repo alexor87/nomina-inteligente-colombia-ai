@@ -7,12 +7,22 @@ interface UsePaginationProps {
   initialPage?: number;
 }
 
-export interface PaginationResult {
+interface UsePaginationOptions {
+  defaultPageSize?: number;
+  pageSizeOptions?: number[];
+  storageKey?: string;
+}
+
+export interface PaginationResult<T = any> {
   currentPage: number;
   totalPages: number;
   itemsPerPage: number;
+  pageSize: number;
   totalItems: number;
   offset: number;
+  startIndex: number;
+  endIndex: number;
+  paginatedItems: T[];
   goToPage: (page: number) => void;
   goToNextPage: () => void;
   goToPreviousPage: () => void;
@@ -22,17 +32,39 @@ export interface PaginationResult {
   canGoToPreviousPage: boolean;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+  changePageSize: (size: number) => void;
+  pageSizeOptions: number[];
 }
 
-export const usePagination = ({ 
-  totalItems, 
-  itemsPerPage, 
-  initialPage = 1 
-}: UsePaginationProps): PaginationResult => {
-  const [currentPage, setCurrentPage] = useState(initialPage);
+// Overloaded function signatures
+export function usePagination<T>(
+  items: T[],
+  options?: UsePaginationOptions
+): PaginationResult<T>;
 
-  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-  const offset = (currentPage - 1) * itemsPerPage;
+export function usePagination(props: UsePaginationProps): PaginationResult;
+
+export function usePagination<T>(
+  itemsOrProps: T[] | UsePaginationProps,
+  options?: UsePaginationOptions
+): PaginationResult<T> {
+  // Handle both function signatures
+  const isLegacyInterface = !Array.isArray(itemsOrProps) && 'totalItems' in itemsOrProps;
+  
+  const items = isLegacyInterface ? [] as T[] : itemsOrProps as T[];
+  const totalItems = isLegacyInterface ? (itemsOrProps as UsePaginationProps).totalItems : items.length;
+  const defaultPageSize = isLegacyInterface ? (itemsOrProps as UsePaginationProps).itemsPerPage : (options?.defaultPageSize || 10);
+  const initialPage = isLegacyInterface ? (itemsOrProps as UsePaginationProps).initialPage || 1 : 1;
+
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
+
+  const pageSizeOptions = options?.pageSizeOptions || [10, 25, 50, 100];
+
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const offset = (currentPage - 1) * pageSize;
+  const startIndex = offset;
+  const endIndex = Math.min(offset + pageSize, totalItems);
 
   const goToPage = (page: number) => {
     const validPage = Math.max(1, Math.min(page, totalPages));
@@ -44,15 +76,27 @@ export const usePagination = ({
   const goToFirstPage = () => goToPage(1);
   const goToLastPage = () => goToPage(totalPages);
 
+  const changePageSize = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
   const canGoToNextPage = currentPage < totalPages;
   const canGoToPreviousPage = currentPage > 1;
+
+  // Get paginated items for array-based usage
+  const paginatedItems = isLegacyInterface ? [] as T[] : items.slice(offset, offset + pageSize);
 
   return useMemo(() => ({
     currentPage,
     totalPages,
-    itemsPerPage,
+    itemsPerPage: pageSize,
+    pageSize,
     totalItems,
     offset,
+    startIndex,
+    endIndex,
+    paginatedItems,
     goToPage,
     goToNextPage,
     goToPreviousPage,
@@ -62,13 +106,19 @@ export const usePagination = ({
     canGoToPreviousPage,
     hasNextPage: canGoToNextPage,
     hasPreviousPage: canGoToPreviousPage,
+    changePageSize,
+    pageSizeOptions
   }), [
     currentPage,
     totalPages,
-    itemsPerPage,
+    pageSize,
     totalItems,
     offset,
+    startIndex,
+    endIndex,
+    paginatedItems,
     canGoToNextPage,
-    canGoToPreviousPage
+    canGoToPreviousPage,
+    pageSizeOptions
   ]);
-};
+}
