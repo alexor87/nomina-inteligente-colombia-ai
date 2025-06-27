@@ -8,7 +8,6 @@ import { AportesSettings } from '@/components/settings/AportesSettings';
 import { NominaElectronicaSettings } from '@/components/settings/NominaElectronicaSettings';
 import { UsuariosRolesSettings } from '@/components/settings/UsuariosRolesSettings';
 import { EmpleadosSettings } from '@/components/settings/EmpleadosSettings';
-import { DispersionBancariaSettings } from '@/components/settings/DispersionBancariaSettings';
 import { NotificacionesSettings } from '@/components/settings/NotificacionesSettings';
 import { FacturacionPlanSettings } from '@/components/settings/FacturacionPlanSettings';
 import { IntegracionesSettings } from '@/components/settings/IntegracionesSettings';
@@ -25,14 +24,13 @@ const SettingsPage = () => {
 
       <Card className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-11 gap-1 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10 gap-1 h-auto p-1">
             <TabsTrigger value="empresa" className="text-xs">🧾 Empresa</TabsTrigger>
             <TabsTrigger value="contrato" className="text-xs">📄 Contrato</TabsTrigger>
             <TabsTrigger value="aportes" className="text-xs">💰 Aportes</TabsTrigger>
             <TabsTrigger value="nomina-electronica" className="text-xs">💻 DIAN</TabsTrigger>
             <TabsTrigger value="usuarios" className="text-xs">🧑‍💼 Usuarios</TabsTrigger>
             <TabsTrigger value="empleados" className="text-xs">🧑‍🔧 Empleados</TabsTrigger>
-            <TabsTrigger value="dispersion" className="text-xs">🏦 Bancos</TabsTrigger>
             <TabsTrigger value="notificaciones" className="text-xs">✉️ Alertas</TabsTrigger>
             <TabsTrigger value="facturacion" className="text-xs">📦 Plan</TabsTrigger>
             <TabsTrigger value="integraciones" className="text-xs">🔌 APIs</TabsTrigger>
@@ -62,10 +60,6 @@ const SettingsPage = () => {
 
             <TabsContent value="empleados">
               <EmpleadosSettings />
-            </TabsContent>
-
-            <TabsContent value="dispersion">
-              <DispersionBancariaSettings />
             </TabsContent>
 
             <TabsContent value="notificaciones">
