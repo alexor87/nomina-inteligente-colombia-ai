@@ -8,15 +8,15 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Layout } from '@/components/layout/Layout';
 import { useRealtimeCleanup } from '@/hooks/useRealtimeCleanup';
 
-// Auth components
-import LoginPage from '@/pages/LoginPage';
-import RegisterPage from '@/pages/RegisterPage';
+// Public pages
+import { Index } from '@/pages/Index';
+import AuthPage from '@/pages/AuthPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import VerifyEmailPage from '@/pages/VerifyEmailPage';
 import LogoutPage from '@/pages/LogoutPage';
 
-// Pages
+// Protected pages
 import DashboardPage from '@/pages/DashboardPage';
 import PayrollIntelligentSilentPage from '@/pages/PayrollIntelligentSilentPage';
 import EmployeesPage from '@/pages/EmployeesPage';
@@ -41,16 +41,21 @@ function AppContent() {
   return (
     <Router>
       <Routes>
-        {/* Auth routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        {/* Public root page - Landing page */}
+        <Route path="/" element={<Index />} />
+        
+        {/* Auth routes - Public */}
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/login" element={<Navigate to="/auth" replace />} />
+        <Route path="/register" element={<Navigate to="/auth" replace />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
         <Route path="/logout" element={<LogoutPage />} />
         
-        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
+        {/* Protected routes - Main app */}
+        <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route index element={<Navigate to="/app/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           
           {/* Ruta actualizada para liquidación inteligente silenciosa */}
@@ -70,9 +75,19 @@ function AppContent() {
           <Route path="subscription" element={<SubscriptionPage />} />
           <Route path="billing-history" element={<BillingHistoryPage />} />
           
-          {/* Nueva ruta para reportes */}
           <Route path="reports" element={<ReportsPage />} />
         </Route>
+
+        {/* Legacy redirects for backward compatibility */}
+        <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
+        <Route path="/payroll" element={<Navigate to="/app/payroll" replace />} />
+        <Route path="/employees" element={<Navigate to="/app/employees" replace />} />
+        <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+        <Route path="/company-settings" element={<Navigate to="/app/company-settings" replace />} />
+        <Route path="/payroll-history" element={<Navigate to="/app/payroll-history" replace />} />
+        <Route path="/subscription" element={<Navigate to="/app/subscription" replace />} />
+        <Route path="/billing-history" element={<Navigate to="/app/billing-history" replace />} />
+        <Route path="/reports" element={<Navigate to="/app/reports" replace />} />
       </Routes>
       <Toaster />
     </Router>

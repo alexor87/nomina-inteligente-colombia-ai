@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Building2 } from 'lucide-react';
 
 const AuthPage = () => {
   const { signIn, signUp, user } = useAuth();
@@ -18,7 +19,7 @@ const AuthPage = () => {
   // Redirigir si ya está autenticado
   React.useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     }
   }, [user, navigate]);
 
@@ -63,7 +64,7 @@ const AuthPage = () => {
           title: "Bienvenido",
           description: "Has iniciado sesión correctamente."
         });
-        navigate('/dashboard');
+        navigate('/app/dashboard');
       }
     } catch (error) {
       console.error('Unexpected login error:', error);
@@ -140,11 +141,14 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600 mb-2">NóminaCol</h1>
-          <p className="text-gray-600">Sistema de gestión de nómina</p>
+          <div className="flex items-center justify-center mb-4">
+            <Building2 className="h-12 w-12 text-blue-600 mr-2" />
+            <h1 className="text-3xl font-bold text-blue-600">Nómina Inteligente</h1>
+          </div>
+          <p className="text-gray-600">Sistema de gestión de nómina empresarial</p>
         </div>
 
         <Card className="p-6">
@@ -163,7 +167,7 @@ const AuthPage = () => {
                     type="email"
                     value={loginForm.email}
                     onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="alexor87@gmail.com"
+                    placeholder="ejemplo@empresa.com"
                     required
                   />
                 </div>
@@ -174,7 +178,7 @@ const AuthPage = () => {
                     type="password"
                     value={loginForm.password}
                     onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-                    placeholder="admin123456"
+                    placeholder="Tu contraseña"
                     required
                   />
                 </div>
@@ -185,12 +189,6 @@ const AuthPage = () => {
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-4">
-              <div className="bg-blue-50 p-3 rounded-lg mb-4 text-sm">
-                <strong>Credenciales de prueba:</strong><br/>
-                Email: alexor87@gmail.com<br/>
-                Contraseña: admin123456
-              </div>
-              
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -221,7 +219,7 @@ const AuthPage = () => {
                     type="email"
                     value={signupForm.email}
                     onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="alexor87@gmail.com"
+                    placeholder="ejemplo@empresa.com"
                     required
                   />
                 </div>
@@ -237,12 +235,22 @@ const AuthPage = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Registrando...' : 'Registrarse'}
+                  {loading ? 'Registrando...' : 'Crear Cuenta'}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
         </Card>
+
+        <div className="text-center mt-4">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/')}
+            className="text-blue-600 hover:text-blue-700"
+          >
+            ← Volver al inicio
+          </Button>
+        </div>
       </div>
     </div>
   );

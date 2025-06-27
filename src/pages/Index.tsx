@@ -12,7 +12,7 @@ export const Index = () => {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     }
   }, [user, loading, navigate]);
 
@@ -120,7 +120,7 @@ export const Index = () => {
             <Button 
               size="lg" 
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
-              onClick={() => navigate('/register-company')}
+              onClick={() => navigate('/auth')}
             >
               Comenzar Trial Gratuito
             </Button>
@@ -198,7 +198,7 @@ export const Index = () => {
                 <Button 
                   className="w-full" 
                   variant={plan.popular ? "default" : "outline"}
-                  onClick={() => navigate('/register-company')}
+                  onClick={() => navigate('/auth')}
                 >
                   Comenzar Trial
                 </Button>
@@ -222,7 +222,7 @@ export const Index = () => {
                 size="lg" 
                 variant="secondary"
                 className="bg-white text-blue-600 hover:bg-gray-100"
-                onClick={() => navigate('/register-company')}
+                onClick={() => navigate('/auth')}
               >
                 Crear mi cuenta empresarial
               </Button>
