@@ -98,8 +98,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     }
   }, [employee?.tipoCotizanteId]); // Removed fetchSubtipos from dependencies to avoid loops
 
-  // Function to sanitize date fields - convert empty strings to null
-  const sanitizeDateFields = (data: EmployeeFormData) => {
+  // Function to sanitize date and UUID fields - convert empty strings to null
+  const sanitizeFormFields = (data: EmployeeFormData) => {
     const dateFields = [
       'fechaNacimiento',
       'fechaIngreso',
@@ -107,11 +107,23 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       'fechaFinalizacionContrato'
     ] as const;
 
+    const uuidFields = [
+      'tipoCotizanteId',
+      'subtipoCotizanteId'
+    ] as const;
+
     const sanitizedData = { ...data };
     
+    // Sanitize date fields
     dateFields.forEach(field => {
       if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
-        // Convert empty strings to null for date fields
+        (sanitizedData as any)[field] = null;
+      }
+    });
+
+    // Sanitize UUID fields
+    uuidFields.forEach(field => {
+      if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
         (sanitizedData as any)[field] = null;
       }
     });
@@ -134,8 +146,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       return;
     }
 
-    // Sanitize date fields before sending
-    const sanitizedData = sanitizeDateFields(data);
+    // Sanitize date and UUID fields before sending
+    const sanitizedData = sanitizeFormFields(data);
     console.log('🧹 Sanitized data:', sanitizedData);
 
     const employeeData = {
