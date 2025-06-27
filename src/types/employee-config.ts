@@ -17,6 +17,15 @@ export const TIPOS_DOCUMENTO = [
   { value: 'PPT', label: 'Permiso por Protección Temporal' }
 ] as const;
 
+export const DEPARTAMENTOS_COLOMBIA = [
+  'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 
+  'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 
+  'Cundinamarca', 'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 
+  'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda', 
+  'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 
+  'Vaupés', 'Vichada'
+] as const;
+
 export const ARL_RISK_LEVELS = [
   { value: 'I', label: 'Nivel I - Riesgo Mínimo' },
   { value: 'II', label: 'Nivel II - Riesgo Bajo' },
