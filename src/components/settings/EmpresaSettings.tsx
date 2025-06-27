@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 import { CompanyConfigurationService } from '@/services/CompanyConfigurationService';
+import { CostCenterManagement } from './CostCenterManagement';
+import { BranchManagement } from './BranchManagement';
 import { Info, Upload } from 'lucide-react';
 
 interface CompanyData {
@@ -553,6 +554,12 @@ export const EmpresaSettings = () => {
             </div>
           </div>
         </Card>
+
+        {/* Nueva sección: Centros de Costo */}
+        <CostCenterManagement />
+
+        {/* Nueva sección: Sucursales */}
+        <BranchManagement />
 
         {/* Controles inferiores */}
         <Card className="p-6">

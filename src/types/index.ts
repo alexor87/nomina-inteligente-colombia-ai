@@ -130,3 +130,7 @@ export interface DashboardMetrics {
   gastosNomina: number;
   tendenciaMensual: number;
 }
+
+// Re-export new types
+export * from './cost-centers';
+export * from './branches';
