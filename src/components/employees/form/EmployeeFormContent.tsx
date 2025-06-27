@@ -1,7 +1,9 @@
+
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { PersonalInfoSection } from './PersonalInfoSection';
 import { LaborInfoSection } from './LaborInfoSection';
 import { BankingInfoSection } from './BankingInfoSection';
+import { AffiliationsSection } from './AffiliationsSection';
 import { EmployeeFormData } from './types';
 
 interface EmployeeFormContentProps {
@@ -48,6 +50,14 @@ export const EmployeeFormContent = ({
             watch={watch}
             arlRiskLevels={arlRiskLevels}
             register={register}
+          />
+        </div>
+
+        {/* Affiliations Section */}
+        <div id="section-afiliaciones">
+          <AffiliationsSection
+            control={control}
+            errors={errors}
           />
         </div>
 
