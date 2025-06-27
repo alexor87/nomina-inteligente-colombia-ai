@@ -22,7 +22,6 @@ import PayrollIntelligentSilentPage from '@/pages/PayrollIntelligentSilentPage';
 import EmployeesPage from '@/pages/EmployeesPage';
 import SettingsPage from '@/pages/SettingsPage';
 import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
-import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
 import CompanySettingsPage from '@/pages/CompanySettingsPage';
 import SubscriptionPage from '@/pages/SubscriptionPage';
 import BillingHistoryPage from '@/pages/BillingHistoryPage';
@@ -70,7 +69,6 @@ function AppContent() {
           <Route path="company-settings" element={<CompanySettingsPage />} />
           
           <Route path="payroll-history" element={<PayrollHistoryPage />} />
-          <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
 
           <Route path="subscription" element={<SubscriptionPage />} />
           <Route path="billing-history" element={<BillingHistoryPage />} />

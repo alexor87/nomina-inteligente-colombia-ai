@@ -1,5 +1,5 @@
+
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { ReopenDialog } from './ReopenDialog';
@@ -16,7 +16,6 @@ import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useEffect } from 'react';
 
 export const PayrollHistoryPage = () => {
-  const navigate = useNavigate();
   const [periods, setPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -134,10 +133,6 @@ export const PayrollHistoryPage = () => {
     }
 
     setFilteredPeriods(filtered);
-  };
-
-  const handleViewDetails = (period: PayrollHistoryPeriod) => {
-    navigate(`/payroll-history/${period.id}`);
   };
 
   const handleReopenPeriod = (period: PayrollHistoryPeriod) => {
@@ -295,7 +290,6 @@ export const PayrollHistoryPage = () => {
         <div className="bg-white rounded-lg shadow">
           <PayrollHistoryTable
             periods={pagination.paginatedItems}
-            onViewDetails={handleViewDetails}
             onReopenPeriod={handleReopenPeriod}
             onDownloadFile={downloadFile}
           />
