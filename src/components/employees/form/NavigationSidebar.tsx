@@ -13,11 +13,11 @@ export const NavigationSidebar = ({
   scrollToSection 
 }: NavigationSidebarProps) => {
   const sections = [
-    { id: 'section-personal', title: 'Información Personal', icon: '👤' },
-    { id: 'section-laboral', title: 'Información Laboral', icon: '💼' },
-    { id: 'section-afiliaciones', title: 'Afiliaciones', icon: '🏥' },
-    { id: 'section-bancaria', title: 'Información Bancaria', icon: '🏦' },
-    { id: 'section-personalizados', title: 'Campos Personalizados', icon: '⚙️' }
+    { id: 'personal', title: 'Información Personal', icon: '👤' },
+    { id: 'laboral', title: 'Información Laboral', icon: '💼' },
+    { id: 'afiliaciones', title: 'Afiliaciones', icon: '🏥' },
+    { id: 'bancaria', title: 'Información Bancaria', icon: '🏦' },
+    { id: 'personalizados', title: 'Campos Personalizados', icon: '⚙️' }
   ];
 
   return (
