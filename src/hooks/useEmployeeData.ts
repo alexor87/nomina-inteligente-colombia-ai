@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeDataService } from '@/services/EmployeeDataService';
@@ -10,24 +10,21 @@ export const useEmployeeData = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
 
-  const loadEmployees = async () => {
+  const loadEmployees = useCallback(async () => {
     try {
       setIsLoading(true);
       console.log('🔄 useEmployeeData: Starting to load employees...');
       
-      // Verificar si hay un parámetro de empresa de soporte en la URL
       const urlParams = new URLSearchParams(window.location.search);
       const supportCompanyId = urlParams.get('support_company');
       
       let companyId: string;
       
       if (supportCompanyId) {
-        // Si hay un parámetro de empresa de soporte, usar ese
         companyId = supportCompanyId;
         console.log('🔧 Using support company context:', companyId);
       } else {
         try {
-          // Caso normal: obtener empresa del usuario actual
           companyId = await EmployeeDataService.getCurrentUserCompanyId();
           if (!companyId) {
             throw new Error('No se pudo obtener la empresa del usuario');
@@ -48,17 +45,9 @@ export const useEmployeeData = () => {
       const rawData = await EmployeeDataService.getEmployees(companyId);
       console.log('📋 Raw employee data from database:', rawData);
       
-      // Transform raw employee data to EmployeeWithStatus format with ALL fields mapped
+      // Transform raw employee data to EmployeeWithStatus format
       const transformedData = rawData.map((emp: any): EmployeeWithStatus => {
         console.log('🔄 Transforming employee:', emp.nombre, emp.apellido);
-        console.log('📊 CRITICAL: Employee raw affiliations data:', {
-          eps: emp.eps,
-          afp: emp.afp,
-          arl: emp.arl,
-          caja_compensacion: emp.caja_compensacion,
-          tipo_cotizante_id: emp.tipo_cotizante_id,
-          subtipo_cotizante_id: emp.subtipo_cotizante_id
-        });
         
         const transformed = {
           id: emp.id,
@@ -113,19 +102,10 @@ export const useEmployeeData = () => {
           subtipoCotizanteId: emp.subtipo_cotizante_id,
           // Legacy fields for compatibility
           avatar: emp.avatar,
-          centrosocial: emp.centro_costos, // Map centro_costos to centrosocial for backward compatibility
+          centrosocial: emp.centro_costos,
           ultimaLiquidacion: emp.ultima_liquidacion,
           contratoVencimiento: emp.contrato_vencimiento
         };
-
-        console.log('✅ CRITICAL: Transformed employee affiliations:', {
-          eps: transformed.eps,
-          afp: transformed.afp,
-          arl: transformed.arl,
-          cajaCompensacion: transformed.cajaCompensacion,
-          tipoCotizanteId: transformed.tipoCotizanteId,
-          subtipoCotizanteId: transformed.subtipoCotizanteId
-        });
 
         return transformed;
       });
@@ -147,22 +127,15 @@ export const useEmployeeData = () => {
         description: "No se pudieron cargar los empleados. Verifica tu conexión e intenta nuevamente.",
         variant: "destructive"
       });
-      // Set as initialized even on error to prevent infinite loading
       setIsInitialized(true);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
-  // Function to update a specific employee in the list
+  // Memoized function to update a specific employee in the list
   const updateEmployeeInList = useCallback((updatedEmployee: EmployeeWithStatus) => {
     console.log('🔄 Updating employee in list:', updatedEmployee.id);
-    console.log('📊 Updated employee affiliations:', {
-      eps: updatedEmployee.eps,
-      afp: updatedEmployee.afp,
-      arl: updatedEmployee.arl,
-      cajaCompensacion: updatedEmployee.cajaCompensacion
-    });
     
     setEmployees(prevEmployees => 
       prevEmployees.map(emp => 
@@ -171,44 +144,28 @@ export const useEmployeeData = () => {
     );
   }, []);
 
-  // Enhanced function to find employee by ID with better error handling and logging
+  // Memoized function to find employee by ID
   const findEmployeeById = useCallback((employeeId: string): EmployeeWithStatus | undefined => {
-    console.log('🔍 CRITICAL: Finding employee by ID:', employeeId);
+    console.log('🔍 Finding employee by ID:', employeeId);
     console.log('📋 Available employees count:', employees.length);
-    console.log('🔄 Is data initialized?', isInitialized);
-    console.log('⏳ Is loading?', isLoading);
     
     if (!isInitialized || isLoading) {
-      console.log('⚠️ CRITICAL: Data not ready yet, returning undefined');
+      console.log('⚠️ Data not ready yet, returning undefined');
       return undefined;
     }
 
-    console.log('📊 All employee IDs available:', employees.map(emp => ({ id: emp.id, name: `${emp.nombre} ${emp.apellido}` })));
-    
     const foundEmployee = employees.find(emp => emp.id === employeeId);
     
     if (foundEmployee) {
-      console.log('✅ CRITICAL: Found employee:', {
-        id: foundEmployee.id,
-        name: `${foundEmployee.nombre} ${foundEmployee.apellido}`,
-        affiliations: {
-          eps: foundEmployee.eps,
-          afp: foundEmployee.afp,
-          arl: foundEmployee.arl,
-          cajaCompensacion: foundEmployee.cajaCompensacion,
-          tipoCotizanteId: foundEmployee.tipoCotizanteId,
-          subtipoCotizanteId: foundEmployee.subtipoCotizanteId
-        }
-      });
+      console.log('✅ Found employee:', foundEmployee.nombre, foundEmployee.apellido);
     } else {
-      console.log('❌ CRITICAL: Employee NOT FOUND with ID:', employeeId);
-      console.log('🔍 Available employee IDs:', employees.map(emp => emp.id));
+      console.log('❌ Employee not found with ID:', employeeId);
     }
     
     return foundEmployee;
   }, [employees, isInitialized, isLoading]);
 
-  // Function to retry loading a specific employee by ID if not found
+  // Memoized retry function
   const retryFindEmployeeById = useCallback(async (employeeId: string): Promise<EmployeeWithStatus | undefined> => {
     console.log('🔄 RETRY: Attempting to reload data and find employee:', employeeId);
     
@@ -232,13 +189,14 @@ export const useEmployeeData = () => {
     }
     
     return employee;
-  }, [findEmployeeById]);
+  }, [findEmployeeById, loadEmployees]);
 
   useEffect(() => {
     loadEmployees();
-  }, []);
+  }, []); // Remove loadEmployees from dependencies to prevent loops
 
-  return {
+  // Memoize the return object to prevent unnecessary re-renders
+  const returnValue = useMemo(() => ({
     employees,
     isLoading,
     isInitialized,
@@ -246,5 +204,7 @@ export const useEmployeeData = () => {
     findEmployeeById,
     updateEmployeeInList,
     retryFindEmployeeById
-  };
+  }), [employees, isLoading, isInitialized, loadEmployees, findEmployeeById, updateEmployeeInList, retryFindEmployeeById]);
+
+  return returnValue;
 };

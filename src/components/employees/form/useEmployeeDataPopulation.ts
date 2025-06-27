@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+
+import { useEffect, useMemo } from 'react';
 import { UseFormSetValue, UseFormTrigger } from 'react-hook-form';
 import { Employee } from '@/types';
 import { EmployeeFormData } from './types';
@@ -8,230 +9,119 @@ export const useEmployeeDataPopulation = (
   setValue: UseFormSetValue<EmployeeFormData>,
   trigger: UseFormTrigger<EmployeeFormData>
 ) => {
+  // Memoize the employee ID and timestamp to prevent unnecessary effects
+  const employeeKey = useMemo(() => {
+    if (!employee) return null;
+    return `${employee.id}-${employee.updatedAt}`;
+  }, [employee?.id, employee?.updatedAt]);
+
   useEffect(() => {
     console.log('🔄 useEmployeeDataPopulation: useEffect triggered');
-    console.log('📋 Employee data received:', employee);
-    console.log('📊 Employee ID:', employee?.id);
-    console.log('🎯 Employee updated timestamp:', employee?.updatedAt);
+    console.log('📋 Employee key:', employeeKey);
     
-    if (employee) {
-      console.log('🔄 useEmployeeDataPopulation: STARTING to set form values from employee:', employee);
-      console.log('📋 Employee fields available:', Object.keys(employee));
-      console.log('🎯 Employee full data:', employee);
-      console.log('📊 AFFILIATIONS DATA FROM DB (DETAILED):', {
-        eps: { value: employee.eps, type: typeof employee.eps, isNull: employee.eps === null, isEmpty: employee.eps === '' },
-        afp: { value: employee.afp, type: typeof employee.afp, isNull: employee.afp === null, isEmpty: employee.afp === '' },
-        arl: { value: employee.arl, type: typeof employee.arl, isNull: employee.arl === null, isEmpty: employee.arl === '' },
-        cajaCompensacion: { value: employee.cajaCompensacion, type: typeof employee.cajaCompensacion, isNull: employee.cajaCompensacion === null, isEmpty: employee.cajaCompensacion === '' },
-        tipoCotizanteId: { value: employee.tipoCotizanteId, type: typeof employee.tipoCotizanteId, isNull: employee.tipoCotizanteId === null, isEmpty: employee.tipoCotizanteId === '' },
-        subtipoCotizanteId: { value: employee.subtipoCotizanteId, type: typeof employee.subtipoCotizanteId, isNull: employee.subtipoCotizanteId === null, isEmpty: employee.subtipoCotizanteId === '' },
-        regimenSalud: { value: (employee as any).regimenSalud, type: typeof (employee as any).regimenSalud },
-        estadoAfiliacion: { value: employee.estadoAfiliacion, type: typeof employee.estadoAfiliacion }
-      });
-      
-      // Batch all setValue operations to avoid multiple re-renders
-      const updates: Array<[keyof EmployeeFormData, any]> = [];
-      
-      // Helper function to handle null/undefined values for regular text fields
-      const handleTextValue = (value: any) => {
-        if (value === null || value === undefined) return '';
-        return String(value).trim();
-      };
+    if (!employee || !employeeKey) {
+      console.log('⚠️ useEmployeeDataPopulation: No employee data provided');
+      return;
+    }
 
-      // NEW: Helper function specifically for affiliation fields - keeps actual values
-      const handleAffiliationValue = (value: any) => {
-        // For affiliations, only convert to empty string if it's actually null/undefined
-        // Keep the actual string values as they are
-        if (value === null || value === undefined) return '';
-        return String(value).trim();
-      };
+    console.log('🔄 useEmployeeDataPopulation: STARTING to set form values from employee:', employee);
+    console.log('📊 AFFILIATIONS DATA FROM DB (DETAILED):', {
+      eps: { value: employee.eps, type: typeof employee.eps, isNull: employee.eps === null, isEmpty: employee.eps === '' },
+      afp: { value: employee.afp, type: typeof employee.afp, isNull: employee.afp === null, isEmpty: employee.afp === '' },
+      arl: { value: employee.arl, type: typeof employee.arl, isNull: employee.arl === null, isEmpty: employee.arl === '' },
+      cajaCompensacion: { value: employee.cajaCompensacion, type: typeof employee.cajaCompensacion, isNull: employee.cajaCompensacion === null, isEmpty: employee.cajaCompensacion === '' },
+      tipoCotizanteId: { value: employee.tipoCotizanteId, type: typeof employee.tipoCotizanteId, isNull: employee.tipoCotizanteId === null, isEmpty: employee.tipoCotizanteId === '' },
+      subtipoCotizanteId: { value: employee.subtipoCotizanteId, type: typeof employee.subtipoCotizanteId, isNull: employee.subtipoCotizanteId === null, isEmpty: employee.subtipoCotizanteId === '' }
+    });
+    
+    // Helper functions
+    const handleTextValue = (value: any) => {
+      if (value === null || value === undefined) return '';
+      return String(value).trim();
+    };
+    
+    const handleAffiliationValue = (value: any) => {
+      if (value === null || value === undefined) return '';
+      return String(value).trim();
+    };
+    
+    // Batch all setValue operations
+    const setFormValues = () => {
+      // Basic Information
+      setValue('cedula', employee.cedula);
+      setValue('tipoDocumento', employee.tipoDocumento || 'CC');
+      setValue('nombre', employee.nombre);
+      setValue('segundoNombre', (employee as any).segundoNombre || '');
+      setValue('apellido', employee.apellido);
+      setValue('email', employee.email || '');
+      setValue('telefono', employee.telefono || '');
       
-      // Información Personal - Verificación detallada
-      if (employee.cedula) {
-        console.log('✅ Setting cedula:', employee.cedula);
-        updates.push(['cedula', employee.cedula]);
-      }
-      if (employee.tipoDocumento) {
-        console.log('✅ Setting tipoDocumento:', employee.tipoDocumento);
-        updates.push(['tipoDocumento', employee.tipoDocumento]);
-      }
-      if (employee.nombre) {
-        console.log('✅ Setting nombre:', employee.nombre);
-        updates.push(['nombre', employee.nombre]);
-      }
-      if ((employee as any).segundoNombre) {
-        console.log('✅ Setting segundoNombre:', (employee as any).segundoNombre);
-        updates.push(['segundoNombre', (employee as any).segundoNombre]);
-      }
-      if (employee.apellido) {
-        console.log('✅ Setting apellido:', employee.apellido);
-        updates.push(['apellido', employee.apellido]);
-      }
-      if (employee.email) {
-        console.log('✅ Setting email:', employee.email);
-        updates.push(['email', employee.email]);
-      }
-      if (employee.telefono) {
-        console.log('✅ Setting telefono:', employee.telefono);
-        updates.push(['telefono', employee.telefono]);
-      }
+      // Extended personal information
+      setValue('sexo', (employee as any).sexo || 'M');
+      setValue('fechaNacimiento', handleTextValue((employee as any).fechaNacimiento));
+      setValue('direccion', handleTextValue((employee as any).direccion));
+      setValue('ciudad', handleTextValue((employee as any).ciudad));
+      setValue('departamento', handleTextValue((employee as any).departamento));
       
-      // Campos extendidos de información personal
-      updates.push(['sexo', (employee as any).sexo || 'M']);
-      updates.push(['fechaNacimiento', handleTextValue((employee as any).fechaNacimiento)]);
-      updates.push(['direccion', handleTextValue((employee as any).direccion)]);
-      updates.push(['ciudad', handleTextValue((employee as any).ciudad)]);
-      updates.push(['departamento', handleTextValue((employee as any).departamento)]);
+      // Labor Information
+      setValue('salarioBase', employee.salarioBase || 0);
+      setValue('tipoContrato', employee.tipoContrato || 'indefinido');
+      setValue('fechaIngreso', employee.fechaIngreso || '');
+      setValue('periodicidadPago', (employee as any).periodicidadPago || 'mensual');
+      setValue('cargo', handleTextValue(employee.cargo));
+      setValue('codigoCIIU', handleTextValue((employee as any).codigoCIIU));
+      setValue('nivelRiesgoARL', employee.nivelRiesgoARL || 'I');
+      setValue('estado', employee.estado || 'activo');
+      setValue('centroCostos', handleTextValue((employee as any).centroCostos));
       
-      // Información Laboral
-      if (employee.salarioBase) {
-        console.log('✅ Setting salarioBase:', employee.salarioBase);
-        updates.push(['salarioBase', employee.salarioBase]);
-      }
-      if (employee.tipoContrato) {
-        console.log('✅ Setting tipoContrato:', employee.tipoContrato);
-        updates.push(['tipoContrato', employee.tipoContrato]);
-      }
-      if (employee.fechaIngreso) {
-        console.log('✅ Setting fechaIngreso:', employee.fechaIngreso);
-        updates.push(['fechaIngreso', employee.fechaIngreso]);
-      }
+      // Contract details
+      setValue('fechaFirmaContrato', handleTextValue((employee as any).fechaFirmaContrato));
+      setValue('fechaFinalizacionContrato', handleTextValue((employee as any).fechaFinalizacionContrato));
+      setValue('tipoJornada', (employee as any).tipoJornada || 'completa');
+      setValue('diasTrabajo', (employee as any).diasTrabajo || 30);
+      setValue('horasTrabajo', (employee as any).horasTrabajo || 8);
+      setValue('beneficiosExtralegales', (employee as any).beneficiosExtralegales || false);
+      setValue('clausulasEspeciales', handleTextValue((employee as any).clausulasEspeciales));
       
-      updates.push(['periodicidadPago', (employee as any).periodicidadPago || 'mensual']);
-      updates.push(['cargo', handleTextValue(employee.cargo)]);
-      updates.push(['codigoCIIU', handleTextValue((employee as any).codigoCIIU)]);
-      updates.push(['nivelRiesgoARL', employee.nivelRiesgoARL || 'I']);
-      updates.push(['estado', employee.estado || 'activo']);
-      updates.push(['centroCostos', handleTextValue((employee as any).centroCostos)]);
+      // Banking Information
+      setValue('banco', employee.banco || '');
+      setValue('tipoCuenta', employee.tipoCuenta || 'ahorros');
+      setValue('numeroCuenta', employee.numeroCuenta || '');
+      setValue('titularCuenta', employee.titularCuenta || '');
+      setValue('formaPago', (employee as any).formaPago || 'dispersion');
       
-      // Detalles del Contrato
-      updates.push(['fechaFirmaContrato', handleTextValue((employee as any).fechaFirmaContrato)]);
-      updates.push(['fechaFinalizacionContrato', handleTextValue((employee as any).fechaFinalizacionContrato)]);
-      updates.push(['tipoJornada', (employee as any).tipoJornada || 'completa']);
-      updates.push(['diasTrabajo', (employee as any).diasTrabajo || 30]);
-      updates.push(['horasTrabajo', (employee as any).horasTrabajo || 8]);
-      updates.push(['beneficiosExtralegales', (employee as any).beneficiosExtralegales || false]);
-      updates.push(['clausulasEspeciales', handleTextValue((employee as any).clausulasEspeciales)]);
-      
-      // Información Bancaria
-      if (employee.banco) {
-        console.log('✅ Setting banco:', employee.banco);
-        updates.push(['banco', employee.banco]);
-      }
-      updates.push(['tipoCuenta', employee.tipoCuenta || 'ahorros']);
-      if (employee.numeroCuenta) {
-        console.log('✅ Setting numeroCuenta:', employee.numeroCuenta);
-        updates.push(['numeroCuenta', employee.numeroCuenta]);
-      }
-      if (employee.titularCuenta) {
-        console.log('✅ Setting titularCuenta:', employee.titularCuenta);
-        updates.push(['titularCuenta', employee.titularCuenta]);
-      }
-      updates.push(['formaPago', (employee as any).formaPago || 'dispersion']);
-      
-      // Afiliaciones - CRITICAL SECTION WITH IMPROVED LOGIC
-      console.log('🚨 CRITICAL: Processing affiliations data with improved logic...');
-      console.log('📊 Raw affiliations from employee object:');
-      console.log('  - EPS:', { value: employee.eps, type: typeof employee.eps, isNull: employee.eps === null, hasValue: !!employee.eps });
-      console.log('  - AFP:', { value: employee.afp, type: typeof employee.afp, isNull: employee.afp === null, hasValue: !!employee.afp });
-      console.log('  - ARL:', { value: employee.arl, type: typeof employee.arl, isNull: employee.arl === null, hasValue: !!employee.arl });
-      console.log('  - CajaCompensacion:', { value: employee.cajaCompensacion, type: typeof employee.cajaCompensacion, isNull: employee.cajaCompensacion === null, hasValue: !!employee.cajaCompensacion });
-      console.log('  - TipoCotizanteId:', { value: employee.tipoCotizanteId, type: typeof employee.tipoCotizanteId, isNull: employee.tipoCotizanteId === null, hasValue: !!employee.tipoCotizanteId });
-      console.log('  - SubtipoCotizanteId:', { value: employee.subtipoCotizanteId, type: typeof employee.subtipoCotizanteId, isNull: employee.subtipoCotizanteId === null, hasValue: !!employee.subtipoCotizanteId });
-      
-      // Process affiliations with improved logic - only set if there's an actual value
-      // EPS
-      if (employee.eps !== null && employee.eps !== undefined) {
-        const epsValue = handleAffiliationValue(employee.eps);
-        console.log('✅ Setting EPS to:', epsValue);
-        updates.push(['eps', epsValue]);
-      } else {
-        console.log('⚠️ EPS is null/undefined, setting empty string');
-        updates.push(['eps', '']);
-      }
-
-      // AFP
-      if (employee.afp !== null && employee.afp !== undefined) {
-        const afpValue = handleAffiliationValue(employee.afp);
-        console.log('✅ Setting AFP to:', afpValue);
-        updates.push(['afp', afpValue]);
-      } else {
-        console.log('⚠️ AFP is null/undefined, setting empty string');
-        updates.push(['afp', '']);
-      }
-
-      // ARL
-      if (employee.arl !== null && employee.arl !== undefined) {
-        const arlValue = handleAffiliationValue(employee.arl);
-        console.log('✅ Setting ARL to:', arlValue);
-        updates.push(['arl', arlValue]);
-      } else {
-        console.log('⚠️ ARL is null/undefined, setting empty string');
-        updates.push(['arl', '']);
-      }
-
-      // Caja de Compensación
-      if (employee.cajaCompensacion !== null && employee.cajaCompensacion !== undefined) {
-        const cajaValue = handleAffiliationValue(employee.cajaCompensacion);
-        console.log('✅ Setting CajaCompensacion to:', cajaValue);
-        updates.push(['cajaCompensacion', cajaValue]);
-      } else {
-        console.log('⚠️ CajaCompensacion is null/undefined, setting empty string');
-        updates.push(['cajaCompensacion', '']);
-      }
-
-      // Tipo Cotizante ID
-      if (employee.tipoCotizanteId !== null && employee.tipoCotizanteId !== undefined) {
-        const tipoValue = handleAffiliationValue(employee.tipoCotizanteId);
-        console.log('✅ Setting TipoCotizanteId to:', tipoValue);
-        updates.push(['tipoCotizanteId', tipoValue]);
-      } else {
-        console.log('⚠️ TipoCotizanteId is null/undefined, setting empty string');
-        updates.push(['tipoCotizanteId', '']);
-      }
-
-      // Subtipo Cotizante ID
-      if (employee.subtipoCotizanteId !== null && employee.subtipoCotizanteId !== undefined) {
-        const subtipoValue = handleAffiliationValue(employee.subtipoCotizanteId);
-        console.log('✅ Setting SubtipoCotizanteId to:', subtipoValue);
-        updates.push(['subtipoCotizanteId', subtipoValue]);
-      } else {
-        console.log('⚠️ SubtipoCotizanteId is null/undefined, setting empty string');
-        updates.push(['subtipoCotizanteId', '']);
-      }
-
-      // Other affiliation fields
-      updates.push(['regimenSalud', (employee as any).regimenSalud || 'contributivo']);
-      updates.push(['estadoAfiliacion', employee.estadoAfiliacion || 'pendiente']);
-      
-      // Apply all updates with detailed logging
-      console.log('📦 Applying', updates.length, 'form updates...');
-      updates.forEach(([field, value]) => {
-        console.log(`🔧 Setting field "${field}" to:`, value, `(type: ${typeof value})`);
-        setValue(field, value);
-      });
+      // Affiliations - CRITICAL SECTION
+      console.log('🚨 CRITICAL: Processing affiliations data...');
+      setValue('eps', handleAffiliationValue(employee.eps));
+      setValue('afp', handleAffiliationValue(employee.afp));
+      setValue('arl', handleAffiliationValue(employee.arl));
+      setValue('cajaCompensacion', handleAffiliationValue(employee.cajaCompensacion));
+      setValue('tipoCotizanteId', handleAffiliationValue(employee.tipoCotizanteId));
+      setValue('subtipoCotizanteId', handleAffiliationValue(employee.subtipoCotizanteId));
+      setValue('regimenSalud', (employee as any).regimenSalud || 'contributivo');
+      setValue('estadoAfiliacion', employee.estadoAfiliacion || 'pendiente');
       
       console.log('✅ useEmployeeDataPopulation: All form values set from employee data');
-      console.log('🎯 FINAL AFFILIATIONS SET IN FORM:', {
-        eps: updates.find(([field]) => field === 'eps')?.[1],
-        afp: updates.find(([field]) => field === 'afp')?.[1],
-        arl: updates.find(([field]) => field === 'arl')?.[1],
-        cajaCompensacion: updates.find(([field]) => field === 'cajaCompensacion')?.[1],
-        tipoCotizanteId: updates.find(([field]) => field === 'tipoCotizanteId')?.[1],
-        subtipoCotizanteId: updates.find(([field]) => field === 'subtipoCotizanteId')?.[1]
-      });
-      
-      // Force trigger validation after setting values with a small delay
-      setTimeout(() => {
+    };
+
+    // Set all form values at once
+    setFormValues();
+    
+    // Trigger validation after a brief delay to ensure all values are set
+    const validateForm = async () => {
+      try {
         console.log('🔄 Triggering form validation...');
-        trigger().then(() => {
-          console.log('✅ Form validation completed');
-        }).catch((error) => {
-          console.error('❌ Form validation error:', error);
-        });
-      }, 200);
-    } else {
-      console.log('⚠️ useEmployeeDataPopulation: No employee data provided');
-    }
-  }, [employee?.id, employee?.updatedAt, setValue, trigger]); // Added specific dependencies
+        await trigger();
+        console.log('✅ Form validation completed');
+      } catch (error) {
+        console.error('❌ Form validation error:', error);
+      }
+    };
+
+    const timeoutId = setTimeout(validateForm, 100);
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [employeeKey, setValue, trigger]); // Use memoized employeeKey instead of employee object
 };

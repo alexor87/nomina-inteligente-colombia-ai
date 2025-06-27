@@ -2,69 +2,49 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { EmployeeFormModern } from '@/components/employees/EmployeeFormModern';
 import { useEmployeeData } from '@/hooks/useEmployeeData';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 
 const EditEmployeeModernPage = () => {
   const navigate = useNavigate();
   const { employeeId } = useParams();
-  const { findEmployeeById, refreshEmployees, isLoading, isInitialized, updateEmployeeInList, retryFindEmployeeById } = useEmployeeData();
+  const { findEmployeeById, refreshEmployees, isLoading, isInitialized, updateEmployeeInList } = useEmployeeData();
   const [employee, setEmployee] = useState<EmployeeWithStatus | undefined>(undefined);
   const [dataReady, setDataReady] = useState(false);
   
   console.log('🔍 EditEmployeeModernPage: Looking for employee with ID:', employeeId);
   console.log('📊 EditEmployeeModernPage: isLoading:', isLoading, 'isInitialized:', isInitialized);
   
-  // NEW: Effect to handle employee loading with retry mechanism
+  // Memoized function to load employee data
+  const loadEmployeeData = useCallback(async () => {
+    if (!employeeId || !isInitialized || isLoading) {
+      return;
+    }
+
+    console.log('🔄 EditEmployeeModernPage: Loading employee data...');
+    
+    // Try to find employee in current data
+    const foundEmployee = findEmployeeById(employeeId);
+    
+    if (foundEmployee) {
+      console.log('✅ EditEmployeeModernPage: Employee found:', {
+        id: foundEmployee.id,
+        nombre: foundEmployee.nombre,
+        apellido: foundEmployee.apellido,
+        updatedAt: foundEmployee.updatedAt
+      });
+      setEmployee(foundEmployee);
+    } else {
+      console.log('❌ EditEmployeeModernPage: Employee not found');
+    }
+    
+    setDataReady(true);
+  }, [employeeId, isInitialized, isLoading, findEmployeeById]);
+
+  // Effect to load employee when data becomes available
   useEffect(() => {
-    const loadEmployee = async () => {
-      if (!employeeId) {
-        console.log('❌ EditEmployeeModernPage: No employeeId provided');
-        setDataReady(true);
-        return;
-      }
-
-      console.log('🔄 EditEmployeeModernPage: Attempting to load employee...');
-      
-      // Wait for data to be initialized
-      if (!isInitialized || isLoading) {
-        console.log('⏳ EditEmployeeModernPage: Waiting for data to be initialized...');
-        return;
-      }
-
-      // Try to find employee
-      let foundEmployee = findEmployeeById(employeeId);
-      
-      if (!foundEmployee) {
-        console.log('⚠️ EditEmployeeModernPage: Employee not found, trying retry mechanism...');
-        foundEmployee = await retryFindEmployeeById(employeeId);
-      }
-
-      if (foundEmployee) {
-        console.log('✅ EditEmployeeModernPage: Employee loaded successfully:', {
-          id: foundEmployee.id,
-          nombre: foundEmployee.nombre,
-          apellido: foundEmployee.apellido,
-          cedula: foundEmployee.cedula,
-          // CRITICAL: Log affiliations data
-          eps: foundEmployee.eps,
-          afp: foundEmployee.afp,
-          arl: foundEmployee.arl,
-          cajaCompensacion: foundEmployee.cajaCompensacion,
-          tipoCotizanteId: foundEmployee.tipoCotizanteId,
-          subtipoCotizanteId: foundEmployee.subtipoCotizanteId,
-          updatedAt: foundEmployee.updatedAt
-        });
-        setEmployee(foundEmployee);
-      } else {
-        console.log('❌ EditEmployeeModernPage: Employee not found even after retry');
-      }
-      
-      setDataReady(true);
-    };
-
-    loadEmployee();
-  }, [employeeId, isInitialized, isLoading, findEmployeeById, retryFindEmployeeById]);
+    loadEmployeeData();
+  }, [loadEmployeeData]);
 
   // Show loading state while data is being fetched or employee is being found
   if (isLoading || !dataReady) {
@@ -79,34 +59,25 @@ const EditEmployeeModernPage = () => {
     );
   }
 
-  const handleSuccess = async () => {
+  const handleSuccess = useCallback(async () => {
     console.log('🔄 EditEmployeeModernPage: handleSuccess called, refreshing employees...');
-    
-    // Refrescar la lista de empleados después de la actualización
     await refreshEmployees();
-    
     console.log('✅ EditEmployeeModernPage: employees refreshed, navigating back');
-    navigate('/employees');
-  };
+    navigate('/app/employees');
+  }, [refreshEmployees, navigate]);
 
-  const handleCancel = () => {
-    navigate('/employees');
-  };
+  const handleCancel = useCallback(() => {
+    navigate('/app/employees');
+  }, [navigate]);
 
   // Enhanced data refresh callback
-  const handleEmployeeDataRefresh = (updatedEmployee: any) => {
+  const handleEmployeeDataRefresh = useCallback((updatedEmployee: any) => {
     console.log('🔄 EditEmployeeModernPage: handleEmployeeDataRefresh called with:', updatedEmployee);
-    console.log('📊 Updated employee affiliations in page:', {
-      eps: updatedEmployee.eps,
-      afp: updatedEmployee.afp,
-      arl: updatedEmployee.arl,
-      cajaCompensacion: updatedEmployee.cajaCompensacion
-    });
     
     // Update the employee in the list and local state
     updateEmployeeInList(updatedEmployee);
     setEmployee(updatedEmployee);
-  };
+  }, [updateEmployeeInList]);
 
   if (!employee) {
     return (
@@ -119,7 +90,7 @@ const EditEmployeeModernPage = () => {
             <small>ID buscado: {employeeId}</small>
           </p>
           <button 
-            onClick={() => navigate('/employees')}
+            onClick={() => navigate('/app/employees')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Volver a Empleados
@@ -131,7 +102,7 @@ const EditEmployeeModernPage = () => {
 
   return (
     <EmployeeFormModern 
-      key={`employee-${employee.id}-${employee.updatedAt}`} // Force re-render when employee data changes
+      key={employee.id} // Use only ID as key to prevent unnecessary re-renders
       employee={employee}
       onSuccess={handleSuccess}
       onCancel={handleCancel}
