@@ -30,6 +30,7 @@ interface SubscriptionContextType {
   canAddEmployees: (currentCount: number) => boolean;
   canProcessPayroll: (currentCount: number) => boolean;
   refreshSubscription: () => Promise<void>;
+  isTrialExpired: boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -107,11 +108,37 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           });
         } else {
           console.log('✅ Default subscription created:', newSubscription);
-          setSubscription(newSubscription);
+          // Transform the data to match our interface
+          const transformedSubscription: Subscription = {
+            id: newSubscription.id,
+            company_id: newSubscription.company_id,
+            plan_type: newSubscription.plan_type as 'basico' | 'profesional' | 'empresarial',
+            status: newSubscription.status as 'activa' | 'suspendida' | 'cancelada' | 'trial',
+            trial_ends_at: newSubscription.trial_ends_at,
+            max_employees: newSubscription.max_employees,
+            max_payrolls_per_month: newSubscription.max_payrolls_per_month,
+            features: newSubscription.features as SubscriptionFeatures,
+            created_at: newSubscription.created_at,
+            updated_at: newSubscription.updated_at
+          };
+          setSubscription(transformedSubscription);
         }
       } else {
         console.log('✅ Subscription loaded:', data);
-        setSubscription(data);
+        // Transform the data to match our interface
+        const transformedSubscription: Subscription = {
+          id: data.id,
+          company_id: data.company_id,
+          plan_type: data.plan_type as 'basico' | 'profesional' | 'empresarial',
+          status: data.status as 'activa' | 'suspendida' | 'cancelada' | 'trial',
+          trial_ends_at: data.trial_ends_at,
+          max_employees: data.max_employees,
+          max_payrolls_per_month: data.max_payrolls_per_month,
+          features: data.features as SubscriptionFeatures,
+          created_at: data.created_at,
+          updated_at: data.updated_at
+        };
+        setSubscription(transformedSubscription);
       }
     } catch (error: any) {
       console.error('❌ Error loading subscription:', error);
@@ -162,6 +189,11 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     await loadSubscription();
   };
 
+  const isTrialExpired = (): boolean => {
+    if (!subscription || !subscription.trial_ends_at) return false;
+    return new Date() > new Date(subscription.trial_ends_at);
+  };
+
   const value: SubscriptionContextType = {
     subscription,
     loading,
@@ -169,7 +201,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     hasFeature,
     canAddEmployees,
     canProcessPayroll,
-    refreshSubscription
+    refreshSubscription,
+    isTrialExpired: isTrialExpired()
   };
 
   return (
