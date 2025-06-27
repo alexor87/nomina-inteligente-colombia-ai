@@ -13,277 +13,563 @@ interface VoucherData {
   employeeName: string;
   employeeId: string;
   employeeCedula: string;
+  employeePosition: string;
   periodo: string;
   startDate: string;
   endDate: string;
   netPay: number;
   salaryDetails: {
     baseSalary: number;
-    overtime: number;
+    extraHours: number;
+    nightSurcharge: number;
+    sundaySurcharge: number;
+    transportAllowance: number;
     bonuses: number;
     totalEarnings: number;
     healthContribution: number;
     pensionContribution: number;
     withholdingTax: number;
+    otherDeductions: number;
     totalDeductions: number;
   };
 }
 
 const generatePDFContent = (voucher: VoucherData, companyInfo: any) => {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
   return `
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
       <meta charset="UTF-8">
-      <title>Comprobante de Pago - ${voucher.employeeName}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Comprobante de Nómina - ${voucher.employeeName}</title>
       <style>
-        @page {
-          size: A4;
-          margin: 20mm;
-        }
-        body { 
-          font-family: Arial, sans-serif; 
+        * {
           margin: 0;
           padding: 0;
-          background-color: white;
-          color: #333;
-          font-size: 12px;
-          line-height: 1.4;
+          box-sizing: border-box;
         }
-        .header { 
-          text-align: center; 
-          border-bottom: 3px solid #2563eb; 
-          padding-bottom: 20px; 
-          margin-bottom: 30px; 
+
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+          line-height: 1.6;
+          color: #1a1a1a;
+          background: #ffffff;
+          font-size: 14px;
         }
+
+        .container {
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 40px 30px;
+          background: white;
+        }
+
+        /* Header Section */
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 40px;
+          padding-bottom: 30px;
+          border-bottom: 2px solid #f0f0f0;
+        }
+
+        .company-section {
+          flex: 1;
+        }
+
         .company-logo {
-          width: 80px;
-          height: 50px;
-          background-color: #f8fafc;
-          margin: 0 auto 15px;
+          width: 60px;
+          height: 60px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 2px solid #e2e8f0;
+          color: white;
+          font-weight: 700;
+          font-size: 18px;
+          margin-bottom: 16px;
+        }
+
+        .company-name {
+          font-size: 24px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin-bottom: 8px;
+        }
+
+        .company-details {
+          color: #6b7280;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .document-info {
+          text-align: right;
+          flex-shrink: 0;
+        }
+
+        .document-title {
+          font-size: 28px;
+          font-weight: 800;
+          color: #1a1a1a;
+          margin-bottom: 8px;
+        }
+
+        .period-info {
+          background: #f8f9ff;
+          padding: 12px 16px;
           border-radius: 8px;
-          font-weight: bold;
-          color: #64748b;
+          border-left: 4px solid #667eea;
+          font-size: 13px;
+          color: #4b5563;
         }
-        .company-info, .employee-info { 
-          margin-bottom: 25px; 
-          background-color: #f8fafc;
-          padding: 15px;
-          border-radius: 8px;
-          border: 1px solid #e2e8f0;
+
+        /* Employee Section */
+        .employee-section {
+          background: #f9fafb;
+          padding: 24px;
+          border-radius: 12px;
+          margin-bottom: 32px;
+          border: 1px solid #e5e7eb;
         }
-        .section-title { 
-          font-weight: bold; 
-          color: #1e293b; 
-          font-size: 14px; 
-          margin-bottom: 12px;
-          text-transform: uppercase;
-          border-bottom: 2px solid #3b82f6;
-          padding-bottom: 5px;
-          letter-spacing: 0.5px;
-        }
-        .info-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 25px;
-          margin-bottom: 25px;
-        }
-        .detail-row { 
-          display: flex; 
-          justify-content: space-between; 
-          padding: 10px 0; 
-          border-bottom: 1px solid #e2e8f0; 
-        }
-        .detail-row:last-child {
-          border-bottom: none;
-        }
-        .detail-label {
-          font-weight: 500;
-          color: #475569;
-        }
-        .detail-value {
-          font-weight: 600;
-          color: #1e293b;
-        }
-        .total-row { 
-          font-weight: bold; 
-          background-color: #f1f5f9; 
-          padding: 15px; 
-          margin-top: 15px;
-          border-radius: 8px;
-          border: 1px solid #cbd5e1;
-        }
-        .net-pay-row {
-          background-color: #dbeafe; 
+
+        .employee-header {
           font-size: 16px;
-          color: #1d4ed8;
-          border: 2px solid #3b82f6;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
         }
-        .signature-section { 
-          margin-top: 40px; 
-          text-align: center;
-          border-top: 2px solid #e2e8f0;
-          padding-top: 25px;
+
+        .employee-header::before {
+          content: "👤";
+          margin-right: 8px;
+          font-size: 18px;
         }
-        .payroll-details {
-          margin-bottom: 25px;
+
+        .employee-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 16px;
         }
-        .earnings-section, .deductions-section {
-          margin-bottom: 25px;
-          background-color: white;
-          border: 1px solid #e2e8f0;
+
+        .employee-field {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .field-label {
+          font-size: 12px;
+          font-weight: 500;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 4px;
+        }
+
+        .field-value {
+          font-size: 14px;
+          font-weight: 600;
+          color: #1f2937;
+        }
+
+        /* Tables */
+        .section {
+          margin-bottom: 32px;
+        }
+
+        .section-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #1f2937;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          padding-bottom: 8px;
+          border-bottom: 2px solid #e5e7eb;
+        }
+
+        .earnings-title::before {
+          content: "💰";
+          margin-right: 10px;
+          font-size: 20px;
+        }
+
+        .deductions-title::before {
+          content: "📉";
+          margin-right: 10px;
+          font-size: 20px;
+        }
+
+        .payroll-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
           border-radius: 8px;
           overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
-        .section-header {
-          background-color: #f8fafc;
-          padding: 12px 15px;
-          font-weight: bold;
-          color: #1e293b;
-          border-bottom: 1px solid #e2e8f0;
+
+        .payroll-table th {
+          background: #f9fafb;
+          padding: 16px 20px;
+          text-align: left;
+          font-weight: 600;
+          color: #374151;
+          font-size: 13px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          border-bottom: 2px solid #e5e7eb;
         }
-        .section-content {
-          padding: 15px;
+
+        .payroll-table th:last-child {
+          text-align: right;
         }
+
+        .payroll-table td {
+          padding: 16px 20px;
+          border-bottom: 1px solid #f3f4f6;
+          color: #1f2937;
+        }
+
+        .payroll-table td:last-child {
+          text-align: right;
+          font-weight: 600;
+        }
+
+        .payroll-table tr:hover {
+          background: #f9fafb;
+        }
+
+        /* Totals */
+        .totals-section {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 24px;
+          border-radius: 12px;
+          margin: 32px 0;
+        }
+
+        .total-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+          font-size: 16px;
+        }
+
+        .total-row:last-child {
+          margin-bottom: 0;
+          padding-top: 16px;
+          border-top: 2px solid rgba(255, 255, 255, 0.3);
+          font-size: 24px;
+          font-weight: 800;
+        }
+
+        .net-pay-section {
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white;
+          padding: 32px;
+          border-radius: 16px;
+          text-align: center;
+          margin: 32px 0;
+          box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .net-pay-label {
+          font-size: 16px;
+          opacity: 0.9;
+          margin-bottom: 8px;
+          font-weight: 500;
+        }
+
+        .net-pay-amount {
+          font-size: 36px;
+          font-weight: 900;
+          margin-bottom: 8px;
+        }
+
+        .net-pay-text {
+          font-size: 12px;
+          opacity: 0.8;
+        }
+
+        /* Footer */
+        .footer {
+          margin-top: 48px;
+          padding-top: 24px;
+          border-top: 2px solid #f0f0f0;
+          text-align: center;
+          color: #6b7280;
+          font-size: 12px;
+        }
+
+        .generation-info {
+          margin-bottom: 16px;
+          font-weight: 500;
+        }
+
+        .disclaimer {
+          background: #fef3c7;
+          border: 1px solid #f59e0b;
+          border-radius: 8px;
+          padding: 12px;
+          margin: 16px 0;
+          color: #92400e;
+          font-size: 11px;
+          line-height: 1.4;
+        }
+
+        /* Print Styles */
         @media print {
-          body { 
-            margin: 0;
-            font-size: 11px;
+          body {
+            font-size: 12px;
           }
-          .header { 
-            page-break-inside: avoid; 
+          
+          .container {
+            padding: 20px;
+            max-width: none;
           }
-          .info-grid {
-            page-break-inside: avoid;
+          
+          .header {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
           }
-          .earnings-section, .deductions-section {
-            page-break-inside: avoid;
+          
+          .section {
+            margin-bottom: 20px;
+          }
+          
+          .net-pay-section {
+            margin: 20px 0;
+            padding: 20px;
+          }
+          
+          .footer {
+            margin-top: 30px;
+          }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+          .container {
+            padding: 20px 16px;
+          }
+          
+          .header {
+            flex-direction: column;
+            text-align: left;
+          }
+          
+          .document-info {
+            text-align: left;
+            margin-top: 20px;
+          }
+          
+          .employee-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .payroll-table th,
+          .payroll-table td {
+            padding: 12px 16px;
           }
         }
       </style>
     </head>
     <body>
-      <div class="header">
-        <div class="company-logo">LOGO</div>
-        <h1 style="margin: 0; color: #1e293b; font-size: 18px;">COMPROBANTE DE PAGO DE NÓMINA</h1>
-        <p style="margin: 10px 0 0 0; color: #64748b;"><strong>Período:</strong> ${new Date(voucher.startDate).toLocaleDateString('es-CO')} al ${new Date(voucher.endDate).toLocaleDateString('es-CO')}</p>
-      </div>
-
-      <div class="info-grid">
-        <div class="company-info">
-          <div class="section-title">Información de la Empresa</div>
-          <div class="detail-row">
-            <span class="detail-label">Razón Social:</span>
-            <span class="detail-value">${companyInfo?.razon_social || 'No especificada'}</span>
+      <div class="container">
+        <!-- Header -->
+        <div class="header">
+          <div class="company-section">
+            <div class="company-logo">
+              ${companyInfo?.razon_social ? companyInfo.razon_social.charAt(0).toUpperCase() : 'E'}
+            </div>
+            <div class="company-name">${companyInfo?.razon_social || 'Empresa'}</div>
+            <div class="company-details">
+              <div><strong>NIT:</strong> ${companyInfo?.nit || 'No especificado'}</div>
+              <div><strong>Dirección:</strong> ${companyInfo?.direccion || 'No especificada'}</div>
+              <div><strong>Teléfono:</strong> ${companyInfo?.telefono || 'No especificado'}</div>
+              <div><strong>Email:</strong> ${companyInfo?.email || 'No especificado'}</div>
+            </div>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">NIT:</span>
-            <span class="detail-value">${companyInfo?.nit || 'No especificado'}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Dirección:</span>
-            <span class="detail-value">${companyInfo?.direccion || 'No especificada'}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Teléfono:</span>
-            <span class="detail-value">${companyInfo?.telefono || 'No especificado'}</span>
-          </div>
-        </div>
-
-        <div class="employee-info">
-          <div class="section-title">Información del Empleado</div>
-          <div class="detail-row">
-            <span class="detail-label">Nombre:</span>
-            <span class="detail-value">${voucher.employeeName}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Cédula:</span>
-            <span class="detail-value">${voucher.employeeCedula}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Período:</span>
-            <span class="detail-value">${voucher.periodo}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">ID Empleado:</span>
-            <span class="detail-value">${voucher.employeeId}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="earnings-section">
-        <div class="section-header">💰 DEVENGADOS</div>
-        <div class="section-content">
-          <div class="detail-row">
-            <span class="detail-label">Salario Básico</span>
-            <span class="detail-value">$${voucher.salaryDetails.baseSalary.toLocaleString('es-CO')}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Horas Extra</span>
-            <span class="detail-value">$${voucher.salaryDetails.overtime.toLocaleString('es-CO')}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Bonificaciones</span>
-            <span class="detail-value">$${voucher.salaryDetails.bonuses.toLocaleString('es-CO')}</span>
-          </div>
-          <div class="total-row">
-            <div class="detail-row">
-              <span>TOTAL DEVENGADO</span>
-              <span>$${voucher.salaryDetails.totalEarnings.toLocaleString('es-CO')}</span>
+          
+          <div class="document-info">
+            <div class="document-title">COMPROBANTE DE NÓMINA</div>
+            <div class="period-info">
+              <div><strong>Período:</strong> ${voucher.periodo}</div>
+              <div><strong>Desde:</strong> ${new Date(voucher.startDate).toLocaleDateString('es-CO')}</div>
+              <div><strong>Hasta:</strong> ${new Date(voucher.endDate).toLocaleDateString('es-CO')}</div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="deductions-section">
-        <div class="section-header">📉 DEDUCCIONES</div>
-        <div class="section-content">
-          <div class="detail-row">
-            <span class="detail-label">Salud (4%)</span>
-            <span class="detail-value">$${voucher.salaryDetails.healthContribution.toLocaleString('es-CO')}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Pensión (4%)</span>
-            <span class="detail-value">$${voucher.salaryDetails.pensionContribution.toLocaleString('es-CO')}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Retención en la Fuente</span>
-            <span class="detail-value">$${voucher.salaryDetails.withholdingTax.toLocaleString('es-CO')}</span>
-          </div>
-          <div class="total-row">
-            <div class="detail-row">
-              <span>TOTAL DEDUCCIONES</span>
-              <span>$${voucher.salaryDetails.totalDeductions.toLocaleString('es-CO')}</span>
+        <!-- Employee Information -->
+        <div class="employee-section">
+          <div class="employee-header">Información del Empleado</div>
+          <div class="employee-grid">
+            <div class="employee-field">
+              <div class="field-label">Nombre Completo</div>
+              <div class="field-value">${voucher.employeeName}</div>
+            </div>
+            <div class="employee-field">
+              <div class="field-label">Documento</div>
+              <div class="field-value">${voucher.employeeCedula}</div>
+            </div>
+            <div class="employee-field">
+              <div class="field-label">Cargo</div>
+              <div class="field-value">${voucher.employeePosition || 'No especificado'}</div>
+            </div>
+            <div class="employee-field">
+              <div class="field-label">ID Empleado</div>
+              <div class="field-value">${voucher.employeeId}</div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="total-row net-pay-row">
-        <div class="detail-row">
-          <span style="font-size: 18px;">💵 NETO A PAGAR</span>
-          <span style="font-size: 18px;">$${voucher.netPay.toLocaleString('es-CO')}</span>
+        <!-- Earnings Section -->
+        <div class="section">
+          <div class="section-title earnings-title">Devengos</div>
+          <table class="payroll-table">
+            <thead>
+              <tr>
+                <th>Concepto</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Salario Base</td>
+                <td>${formatCurrency(voucher.salaryDetails.baseSalary)}</td>
+              </tr>
+              ${voucher.salaryDetails.extraHours > 0 ? `
+              <tr>
+                <td>Horas Extra</td>
+                <td>${formatCurrency(voucher.salaryDetails.extraHours)}</td>
+              </tr>
+              ` : ''}
+              ${voucher.salaryDetails.nightSurcharge > 0 ? `
+              <tr>
+                <td>Recargo Nocturno</td>
+                <td>${formatCurrency(voucher.salaryDetails.nightSurcharge)}</td>
+              </tr>
+              ` : ''}
+              ${voucher.salaryDetails.sundaySurcharge > 0 ? `
+              <tr>
+                <td>Recargo Dominical</td>
+                <td>${formatCurrency(voucher.salaryDetails.sundaySurcharge)}</td>
+              </tr>
+              ` : ''}
+              ${voucher.salaryDetails.transportAllowance > 0 ? `
+              <tr>
+                <td>Auxilio de Transporte</td>
+                <td>${formatCurrency(voucher.salaryDetails.transportAllowance)}</td>
+              </tr>
+              ` : ''}
+              ${voucher.salaryDetails.bonuses > 0 ? `
+              <tr>
+                <td>Bonificaciones</td>
+                <td>${formatCurrency(voucher.salaryDetails.bonuses)}</td>
+              </tr>
+              ` : ''}
+            </tbody>
+          </table>
         </div>
-      </div>
 
-      <div class="signature-section">
-        <p><strong>Fecha de generación:</strong> ${new Date().toLocaleDateString('es-CO', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })}</p>
-        <p style="margin-top: 25px; font-size: 11px; color: #64748b;">
-          Este documento fue generado electrónicamente y es válido sin firma autógrafa.
-        </p>
-        <p style="font-size: 10px; color: #94a3b8; margin-top: 20px;">
-          Para consultas sobre este comprobante, contacte al departamento de recursos humanos.
-        </p>
+        <!-- Deductions Section -->
+        <div class="section">
+          <div class="section-title deductions-title">Deducciones</div>
+          <table class="payroll-table">
+            <thead>
+              <tr>
+                <th>Concepto</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${voucher.salaryDetails.healthContribution > 0 ? `
+              <tr>
+                <td>Salud (4%)</td>
+                <td>${formatCurrency(voucher.salaryDetails.healthContribution)}</td>
+              </tr>
+              ` : ''}
+              ${voucher.salaryDetails.pensionContribution > 0 ? `
+              <tr>
+                <td>Pensión (4%)</td>
+                <td>${formatCurrency(voucher.salaryDetails.pensionContribution)}</td>
+              </tr>
+              ` : ''}
+              ${voucher.salaryDetails.withholdingTax > 0 ? `
+              <tr>
+                <td>Retención en la Fuente</td>
+                <td>${formatCurrency(voucher.salaryDetails.withholdingTax)}</td>
+              </tr>
+              ` : ''}
+              ${voucher.salaryDetails.otherDeductions > 0 ? `
+              <tr>
+                <td>Otras Deducciones</td>
+                <td>${formatCurrency(voucher.salaryDetails.otherDeductions)}</td>
+              </tr>
+              ` : ''}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Totals -->
+        <div class="totals-section">
+          <div class="total-row">
+            <span>Total Devengado:</span>
+            <span>${formatCurrency(voucher.salaryDetails.totalEarnings)}</span>
+          </div>
+          <div class="total-row">
+            <span>Total Deducciones:</span>
+            <span>${formatCurrency(voucher.salaryDetails.totalDeductions)}</span>
+          </div>
+          <div class="total-row">
+            <span>NETO A PAGAR:</span>
+            <span>${formatCurrency(voucher.netPay)}</span>
+          </div>
+        </div>
+
+        <!-- Net Pay Highlight -->
+        <div class="net-pay-section">
+          <div class="net-pay-label">💵 NETO A PAGAR</div>
+          <div class="net-pay-amount">${formatCurrency(voucher.netPay)}</div>
+          <div class="net-pay-text">Valor neto a transferir al empleado</div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <div class="generation-info">
+            <strong>Fecha de generación:</strong> ${new Date().toLocaleDateString('es-CO', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </div>
+          
+          <div class="disclaimer">
+            ⚠️ <strong>Importante:</strong> Este comprobante es un documento informativo y no reemplaza la nómina electrónica oficial. 
+            Para consultas sobre este comprobante, contacte al departamento de recursos humanos.
+          </div>
+          
+          <div style="margin-top: 16px; font-size: 10px; opacity: 0.7;">
+            Comprobante generado electrónicamente • Válido sin firma autógrafa
+          </div>
+        </div>
       </div>
     </body>
     </html>
@@ -304,13 +590,26 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Generating voucher PDF for:', voucherId);
 
-    // Obtener datos del comprobante
+    // Obtener datos del comprobante con información completa
     const { data: voucher, error: voucherError } = await supabase
       .from('payroll_vouchers')
       .select(`
         *,
-        employees (nombre, apellido, cedula, email),
-        payrolls (salario_base, total_devengado, total_deducciones, salud_empleado, pension_empleado, retencion_fuente, bonificaciones)
+        employees (nombre, apellido, cedula, email, cargo),
+        payrolls (
+          salario_base, 
+          total_devengado, 
+          total_deducciones, 
+          salud_empleado, 
+          pension_empleado, 
+          retencion_fuente, 
+          bonificaciones,
+          horas_extra,
+          recargo_nocturno,
+          recargo_dominical,
+          auxilio_transporte,
+          otras_deducciones
+        )
       `)
       .eq('id', voucherId)
       .single();
@@ -337,18 +636,23 @@ const handler = async (req: Request): Promise<Response> => {
       employeeName: `${voucher.employees.nombre} ${voucher.employees.apellido}`,
       employeeId: voucher.employee_id,
       employeeCedula: voucher.employees.cedula,
+      employeePosition: voucher.employees.cargo,
       periodo: voucher.periodo,
       startDate: voucher.start_date,
       endDate: voucher.end_date,
       netPay: voucher.net_pay,
       salaryDetails: {
         baseSalary: voucher.payrolls?.salario_base || voucher.net_pay,
-        overtime: 0,
+        extraHours: voucher.payrolls?.horas_extra || 0,
+        nightSurcharge: voucher.payrolls?.recargo_nocturno || 0,
+        sundaySurcharge: voucher.payrolls?.recargo_dominical || 0,
+        transportAllowance: voucher.payrolls?.auxilio_transporte || 0,
         bonuses: voucher.payrolls?.bonificaciones || 0,
         totalEarnings: voucher.payrolls?.total_devengado || voucher.net_pay,
         healthContribution: voucher.payrolls?.salud_empleado || 0,
         pensionContribution: voucher.payrolls?.pension_empleado || 0,
         withholdingTax: voucher.payrolls?.retencion_fuente || 0,
+        otherDeductions: voucher.payrolls?.otras_deducciones || 0,
         totalDeductions: voucher.payrolls?.total_deducciones || 0
       }
     };
@@ -366,10 +670,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Voucher updated successfully');
 
+    const fileName = `comprobante-nomina_${voucherData.employeeCedula}_${voucherData.periodo.replace(/\s+/g, '_')}.html`;
+
     return new Response(JSON.stringify({ 
       success: true, 
       htmlContent: htmlContent,
-      fileName: `comprobante_${voucherData.employeeCedula}_${voucherData.periodo.replace(/\s+/g, '_')}.html`
+      fileName: fileName
     }), {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
