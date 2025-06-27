@@ -75,14 +75,28 @@ export class EmployeeCRUDService {
   }
 
   static async update(id: string, updates: Partial<Employee & { segundoNombre?: string; tipoCotizanteId?: string; subtipoCotizanteId?: string }>) {
-    const supabaseData = EmployeeValidationService.prepareUpdateData(updates);
+    console.log('🔄 EmployeeCRUDService.update called with:', { id, updates });
+    
+    if (!id) {
+      throw new Error('ID de empleado es requerido para actualizar');
+    }
 
-    const { error } = await supabase
+    const supabaseData = EmployeeValidationService.prepareUpdateData(updates);
+    console.log('📤 Sending update to Supabase:', supabaseData);
+
+    const { data, error } = await supabase
       .from('employees')
       .update(supabaseData)
-      .eq('id', id);
+      .eq('id', id)
+      .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error updating employee:', error);
+      throw new Error(`Error al actualizar empleado: ${error.message}`);
+    }
+
+    console.log('✅ Employee updated successfully:', data);
+    return data;
   }
 
   static async delete(id: string) {

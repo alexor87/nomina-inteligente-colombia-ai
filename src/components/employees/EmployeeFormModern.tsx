@@ -314,6 +314,9 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
   };
 
   const onSubmit = async (data: EmployeeFormData) => {
+    console.log('🚀 EmployeeFormModern onSubmit called with data:', data);
+    console.log('📝 Employee being edited:', employee);
+    
     if (!companyId) {
       console.error('No company ID available');
       return;
@@ -349,12 +352,18 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       subtipoCotizanteId: data.subtipoCotizanteId
     };
 
+    console.log('📋 Employee data to be sent:', employeeData);
+
     let result;
     if (employee) {
+      console.log('🔄 Updating employee with ID:', employee.id);
       result = await updateEmployee(employee.id, employeeData);
     } else {
+      console.log('➕ Creating new employee');
       result = await createEmployee(employeeData);
     }
+
+    console.log('✅ Operation result:', result);
 
     if (result.success) {
       onSuccess();

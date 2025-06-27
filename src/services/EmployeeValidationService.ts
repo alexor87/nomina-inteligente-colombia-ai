@@ -72,8 +72,12 @@ export class EmployeeValidationService {
   }
 
   static prepareUpdateData(updates: any) {
+    console.log('🔄 Preparing update data from:', updates);
+    
     const supabaseData: any = {};
     
+    // Mapear empresaId a company_id para actualizaciones
+    if (updates.empresaId !== undefined) supabaseData.company_id = updates.empresaId;
     if (updates.cedula !== undefined) supabaseData.cedula = updates.cedula;
     if (updates.tipoDocumento !== undefined) supabaseData.tipo_documento = updates.tipoDocumento;
     if (updates.nombre !== undefined) supabaseData.nombre = updates.nombre;
@@ -102,6 +106,7 @@ export class EmployeeValidationService {
     if (updates.tipoCotizanteId !== undefined) supabaseData.tipo_cotizante_id = updates.tipoCotizanteId;
     if (updates.subtipoCotizanteId !== undefined) supabaseData.subtipo_cotizante_id = updates.subtipoCotizanteId;
 
+    console.log('✅ Mapped update data to:', supabaseData);
     return supabaseData;
   }
 }
