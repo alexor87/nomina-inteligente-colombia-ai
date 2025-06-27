@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -154,6 +155,63 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
   const [isDraft, setIsDraft] = useState(false);
   const [arlRiskLevels, setArlRiskLevels] = useState<{ value: string; label: string; percentage: string }[]>(DEFAULT_ARL_RISK_LEVELS);
   
+  const { register, handleSubmit, formState: { errors }, setValue, watch, trigger, reset } = useForm<EmployeeFormData>({
+    defaultValues: {
+      // Información Personal
+      cedula: '',
+      tipoDocumento: 'CC',
+      nombre: '',
+      segundoNombre: '',
+      apellido: '',
+      email: '',
+      telefono: '',
+      sexo: 'M',
+      fechaNacimiento: '',
+      direccion: '',
+      ciudad: '',
+      departamento: '',
+      
+      // Información Laboral
+      salarioBase: SALARIO_MINIMO_2025,
+      tipoContrato: 'indefinido',
+      fechaIngreso: new Date().toISOString().split('T')[0],
+      periodicidadPago: 'mensual',
+      cargo: '',
+      codigoCIIU: '',
+      nivelRiesgoARL: 'I',
+      estado: 'activo',
+      centroCostos: '',
+      
+      // Detalles del Contrato
+      fechaFirmaContrato: '',
+      fechaFinalizacionContrato: '',
+      tipoJornada: 'completa',
+      diasTrabajo: 30,
+      horasTrabajo: 8,
+      beneficiosExtralegales: false,
+      clausulasEspeciales: '',
+      
+      // Información Bancaria
+      banco: '',
+      tipoCuenta: 'ahorros',
+      numeroCuenta: '',
+      titularCuenta: '',
+      formaPago: 'dispersion',
+      
+      // Afiliaciones
+      eps: '',
+      afp: '',
+      arl: '',
+      cajaCompensacion: '',
+      tipoCotizanteId: '',
+      subtipoCotizanteId: '',
+      regimenSalud: 'contributivo',
+      estadoAfiliacion: 'pendiente'
+    }
+  });
+
+  const watchedValues = watch();
+
   // Obtener configuración actual para ARL con fallback
   useEffect(() => {
     try {
@@ -179,63 +237,6 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     }
   }, []);
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch, trigger, reset } = useForm<EmployeeFormData>({
-    defaultValues: {
-      // Información Personal
-      cedula: employee?.cedula || '',
-      tipoDocumento: employee?.tipoDocumento || 'CC',
-      nombre: employee?.nombre || '',
-      segundoNombre: '',
-      apellido: employee?.apellido || '',
-      email: employee?.email || '',
-      telefono: employee?.telefono || '',
-      sexo: 'M',
-      fechaNacimiento: '',
-      direccion: '',
-      ciudad: '',
-      departamento: '',
-      
-      // Información Laboral
-      salarioBase: employee?.salarioBase || SALARIO_MINIMO_2025,
-      tipoContrato: employee?.tipoContrato || 'indefinido',
-      fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
-      periodicidadPago: 'mensual',
-      cargo: employee?.cargo || '',
-      codigoCIIU: '',
-      nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
-      estado: employee?.estado || 'activo',
-      centroCostos: '',
-      
-      // Detalles del Contrato
-      fechaFirmaContrato: '',
-      fechaFinalizacionContrato: '',
-      tipoJornada: 'completa',
-      diasTrabajo: 30,
-      horasTrabajo: 8,
-      beneficiosExtralegales: false,
-      clausulasEspeciales: '',
-      
-      // Información Bancaria
-      banco: '',
-      tipoCuenta: 'ahorros',
-      numeroCuenta: '',
-      titularCuenta: '',
-      formaPago: 'dispersion',
-      
-      // Afiliaciones
-      eps: employee?.eps || '',
-      afp: employee?.afp || '',
-      arl: employee?.arl || '',
-      cajaCompensacion: employee?.cajaCompensacion || '',
-      tipoCotizanteId: employee?.tipoCotizanteId || '',
-      subtipoCotizanteId: employee?.subtipoCotizanteId || '',
-      regimenSalud: 'contributivo',
-      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente'
-    }
-  });
-
-  const watchedValues = watch();
-
   // Obtener company_id del usuario actual
   useEffect(() => {
     const loadCompanyId = async () => {
@@ -260,71 +261,39 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     loadCompanyId();
   }, []);
 
-  // NUEVO: Actualizar formulario cuando cambie el empleado
+  // Actualizar formulario cuando cambie el empleado
   useEffect(() => {
     if (employee) {
       console.log('🔄 EmployeeFormModern: Setting form values from employee:', employee);
       
-      // Resetear el formulario con los valores del empleado
-      reset({
-        // Información Personal
-        cedula: employee.cedula || '',
-        tipoDocumento: employee.tipoDocumento || 'CC',
-        nombre: employee.nombre || '',
-        segundoNombre: '',
-        apellido: employee.apellido || '',
-        email: employee.email || '',
-        telefono: employee.telefono || '',
-        sexo: 'M',
-        fechaNacimiento: '',
-        direccion: '',
-        ciudad: '',
-        departamento: '',
-        
-        // Información Laboral
-        salarioBase: employee.salarioBase || SALARIO_MINIMO_2025,
-        tipoContrato: employee.tipoContrato || 'indefinido',
-        fechaIngreso: employee.fechaIngreso || new Date().toISOString().split('T')[0],
-        periodicidadPago: 'mensual',
-        cargo: employee.cargo || '',
-        codigoCIIU: '',
-        nivelRiesgoARL: employee.nivelRiesgoARL || 'I',
-        estado: employee.estado || 'activo',
-        centroCostos: '',
-        
-        // Detalles del Contrato
-        fechaFirmaContrato: '',
-        fechaFinalizacionContrato: '',
-        tipoJornada: 'completa',
-        diasTrabajo: 30,
-        horasTrabajo: 8,
-        beneficiosExtralegales: false,
-        clausulasEspeciales: '',
-        
-        // Información Bancaria
-        banco: '',
-        tipoCuenta: 'ahorros',
-        numeroCuenta: '',
-        titularCuenta: '',
-        formaPago: 'dispersion',
-        
-        // Afiliaciones
-        eps: employee.eps || '',
-        afp: employee.afp || '',
-        arl: employee.arl || '',
-        cajaCompensacion: employee.cajaCompensacion || '',
-        tipoCotizanteId: employee.tipoCotizanteId || '',
-        subtipoCotizanteId: employee.subtipoCotizanteId || '',
-        regimenSalud: 'contributivo',
-        estadoAfiliacion: employee.estadoAfiliacion || 'pendiente'
-      });
+      // Usar setValue para cada campo individualmente para asegurar que los valores se actualicen correctamente
+      setValue('cedula', employee.cedula || '');
+      setValue('tipoDocumento', employee.tipoDocumento || 'CC');
+      setValue('nombre', employee.nombre || '');
+      setValue('segundoNombre', '');
+      setValue('apellido', employee.apellido || '');
+      setValue('email', employee.email || '');
+      setValue('telefono', employee.telefono || '');
+      setValue('salarioBase', employee.salarioBase || SALARIO_MINIMO_2025);
+      setValue('tipoContrato', employee.tipoContrato || 'indefinido');
+      setValue('fechaIngreso', employee.fechaIngreso || new Date().toISOString().split('T')[0]);
+      setValue('cargo', employee.cargo || '');
+      setValue('nivelRiesgoARL', employee.nivelRiesgoARL || 'I');
+      setValue('estado', employee.estado || 'activo');
+      setValue('eps', employee.eps || '');
+      setValue('afp', employee.afp || '');
+      setValue('arl', employee.arl || '');
+      setValue('cajaCompensacion', employee.cajaCompensacion || '');
+      setValue('tipoCotizanteId', employee.tipoCotizanteId || '');
+      setValue('subtipoCotizanteId', employee.subtipoCotizanteId || '');
+      setValue('estadoAfiliacion', employee.estadoAfiliacion || 'pendiente');
 
       // Si hay tipoCotizanteId, cargar los subtipos
       if (employee.tipoCotizanteId) {
         fetchSubtipos(employee.tipoCotizanteId);
       }
     }
-  }, [employee, reset, fetchSubtipos]);
+  }, [employee, setValue, fetchSubtipos]);
 
   // Auto-fill titular cuenta based on nombres y apellidos
   useEffect(() => {
@@ -514,7 +483,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       {type === 'select' && options ? (
         <Select 
           onValueChange={(value) => setValue(name, value as any)}
-          defaultValue={watchedValues[name] as string}
+          value={watchedValues[name] as string}
         >
           <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
             <SelectValue placeholder={`Seleccionar ${label.toLowerCase()}`} />
@@ -677,7 +646,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                       Nivel de Riesgo ARL <span className="text-red-500">*</span>
                     </Label>
                   </div>
-                  <Select onValueChange={(value) => setValue('nivelRiesgoARL', value as any)} defaultValue={watchedValues.nivelRiesgoARL}>
+                  <Select onValueChange={(value) => setValue('nivelRiesgoARL', value as any)} value={watchedValues.nivelRiesgoARL}>
                     <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                       <SelectValue placeholder="Seleccionar nivel de riesgo" />
                     </SelectTrigger>
@@ -766,10 +735,9 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                   <Input
                     {...register('titularCuenta', { required: 'Titular de la cuenta es requerido' })}
                     className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                    placeholder="Se auto-completa con nombres y apellidos"
-                    readOnly
+                    placeholder="Nombre completo del titular"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Se completa automáticamente</p>
+                  <p className="text-xs text-gray-500 mt-1">Se completa automáticamente con nombre y apellidos</p>
                   {errors.titularCuenta && (
                     <p className="text-red-500 text-xs mt-1">{errors.titularCuenta?.message}</p>
                   )}
@@ -796,7 +764,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                     <div className="flex items-center gap-2 mb-1">
                       <Label className="text-sm font-medium text-gray-700">EPS</Label>
                     </div>
-                    <Select onValueChange={(value) => setValue('eps', value)} defaultValue={watchedValues.eps}>
+                    <Select onValueChange={(value) => setValue('eps', value)} value={watchedValues.eps}>
                       <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                         <SelectValue placeholder="Seleccionar EPS" />
                       </SelectTrigger>
@@ -814,7 +782,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                     <div className="flex items-center gap-2 mb-1">
                       <Label className="text-sm font-medium text-gray-700">AFP</Label>
                     </div>
-                    <Select onValueChange={(value) => setValue('afp', value)} defaultValue={watchedValues.afp}>
+                    <Select onValueChange={(value) => setValue('afp', value)} value={watchedValues.afp}>
                       <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                         <SelectValue placeholder="Seleccionar AFP" />
                       </SelectTrigger>
@@ -832,7 +800,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                     <div className="flex items-center gap-2 mb-1">
                       <Label className="text-sm font-medium text-gray-700">ARL</Label>
                     </div>
-                    <Select onValueChange={(value) => setValue('arl', value)} defaultValue={watchedValues.arl}>
+                    <Select onValueChange={(value) => setValue('arl', value)} value={watchedValues.arl}>
                       <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                         <SelectValue placeholder="Seleccionar ARL" />
                       </SelectTrigger>
@@ -850,7 +818,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                     <div className="flex items-center gap-2 mb-1">
                       <Label className="text-sm font-medium text-gray-700">Caja de Compensación</Label>
                     </div>
-                    <Select onValueChange={(value) => setValue('cajaCompensacion', value)} defaultValue={watchedValues.cajaCompensacion}>
+                    <Select onValueChange={(value) => setValue('cajaCompensacion', value)} value={watchedValues.cajaCompensacion}>
                       <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                         <SelectValue placeholder="Seleccionar Caja de Compensación" />
                       </SelectTrigger>
@@ -879,7 +847,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                     </div>
                     <Select 
                       onValueChange={handleTipoCotizanteChange} 
-                      defaultValue={watchedValues.tipoCotizanteId}
+                      value={watchedValues.tipoCotizanteId}
                       disabled={isLoadingTipos}
                     >
                       <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
@@ -918,7 +886,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                     </div>
                     <Select 
                       onValueChange={(value) => setValue('subtipoCotizanteId', value)} 
-                      defaultValue={watchedValues.subtipoCotizanteId}
+                      value={watchedValues.subtipoCotizanteId}
                       disabled={!watchedValues.tipoCotizanteId || isLoadingSubtipos || subtiposCotizante.length === 0}
                     >
                       <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
