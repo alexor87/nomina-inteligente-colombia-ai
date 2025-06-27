@@ -5,14 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, Mail } from 'lucide-react';
+import { UserPlus, Mail, X } from 'lucide-react';
 import { useCompanyRegistrationStore } from '../hooks/useCompanyRegistrationStore';
 
 interface TeamInvitationStepProps {
   onNext: () => void;
+  onCancel?: () => void;
 }
 
-export const TeamInvitationStep = ({ onNext }: TeamInvitationStepProps) => {
+export const TeamInvitationStep = ({ onNext, onCancel }: TeamInvitationStepProps) => {
   const { data, updateData } = useCompanyRegistrationStore();
   const [invitationData, setInvitationData] = useState({
     role: data.invitedMember?.role || '',
@@ -42,7 +43,16 @@ export const TeamInvitationStep = ({ onNext }: TeamInvitationStepProps) => {
   };
 
   return (
-    <Card className="w-full max-w-lg mx-4 animate-fade-in">
+    <Card className="w-full max-w-lg mx-4 animate-fade-in relative">
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 p-1 hover:bg-gray-100 rounded-full transition-colors z-10"
+        >
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
+      )}
+      
       <CardHeader className="text-center">
         <div className="flex items-center justify-center mb-4">
           <UserPlus className="h-6 w-6 text-blue-600 mr-2" />

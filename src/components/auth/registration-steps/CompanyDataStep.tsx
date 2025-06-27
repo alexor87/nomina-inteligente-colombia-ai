@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,16 +5,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Building2, ArrowLeft } from 'lucide-react';
+import { Building2, X } from 'lucide-react';
 import { useCompanyRegistrationStore } from '../hooks/useCompanyRegistrationStore';
 import { calculateVerificationDigit } from '../utils/digitVerification';
 import { industryCategories } from '../utils/industryData';
 
 interface CompanyDataStepProps {
   onNext: () => void;
+  onCancel?: () => void;
 }
 
-export const CompanyDataStep = ({ onNext }: CompanyDataStepProps) => {
+export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
   const { data, updateData } = useCompanyRegistrationStore();
   const [formData, setFormData] = useState({
     identificationType: data.identificationType || 'NIT',
@@ -80,7 +80,15 @@ export const CompanyDataStep = ({ onNext }: CompanyDataStepProps) => {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-4 animate-slide-in-right">
+    <Card className="w-full max-w-2xl mx-4 animate-slide-in-right relative">
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 p-1 hover:bg-gray-100 rounded-full transition-colors z-10"
+        >
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
+      )}
       <CardHeader>
         <div className="flex items-center">
           <Building2 className="h-6 w-6 text-blue-600 mr-2" />
@@ -205,7 +213,16 @@ export const CompanyDataStep = ({ onNext }: CompanyDataStepProps) => {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex gap-3 justify-end">
+          {onCancel && (
+            <Button 
+              onClick={onCancel}
+              variant="outline"
+              className="px-8"
+            >
+              Cancelar
+            </Button>
+          )}
           <Button onClick={handleContinue} className="px-8">
             Continuar
           </Button>
