@@ -13,13 +13,20 @@ export const Header = () => {
   const { user, profile, isSuperAdmin, roles } = useAuth();
   const { subscription, isTrialExpired } = useSubscription();
 
-  const getCompanyName = () => {
+  const getCompanyDisplayName = () => {
     if (isSuperAdmin) return 'Super Admin Panel';
     
-    // Si hay múltiples empresas, no mostrar el nombre aquí porque ya está en el selector
-    if (roles.length > 1) return null;
+    // Para empresas múltiples, mostrar un nombre genérico ya que el selector está visible
+    if (roles.length > 1) return 'Nómina Inteligente';
     
-    return profile?.company_id ? 'Mi Empresa' : 'Sin Empresa';
+    // Para una sola empresa, intentar obtener el nombre de la empresa
+    if (profile?.company_id) {
+      // Aquí podrías obtener el nombre real de la empresa desde el contexto o estado
+      // Por ahora usaremos un nombre genérico
+      return 'Mi Empresa';
+    }
+    
+    return 'Nómina Inteligente';
   };
 
   const getSubscriptionBadge = () => {
@@ -71,7 +78,7 @@ export const Header = () => {
     );
   };
 
-  const companyName = getCompanyName();
+  const companyDisplayName = getCompanyDisplayName();
 
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
@@ -80,7 +87,7 @@ export const Header = () => {
           <div className="flex items-center space-x-2">
             <Building2 className="h-6 w-6 text-blue-600" />
             <h1 className="text-xl font-semibold text-gray-900">
-              Nómina Inteligente
+              {companyDisplayName}
             </h1>
           </div>
           
@@ -88,15 +95,7 @@ export const Header = () => {
             <span className="text-sm text-gray-600">|</span>
             
             {/* Selector de empresa si hay múltiples empresas */}
-            {roles.length > 1 ? (
-              <CompanySelector />
-            ) : (
-              companyName && (
-                <span className="text-sm font-medium text-gray-900">
-                  {companyName}
-                </span>
-              )
-            )}
+            {roles.length > 1 && <CompanySelector />}
             
             {getSubscriptionBadge()}
           </div>
