@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowLeft, Download, FileText, Eye } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const PayrollHistoryDetails = () => {
   const { periodId } = useParams<{ periodId: string }>();
@@ -31,7 +31,7 @@ export const PayrollHistoryDetails = () => {
       const foundPeriod = allPeriods.find(p => p.id === periodId);
       
       if (foundPeriod) {
-        // Convertir el registro a PayrollHistoryPeriod si es necesario
+        // Convertir el registro a PayrollHistoryPeriod
         const convertedPeriod: PayrollHistoryPeriod = {
           id: foundPeriod.id,
           period: foundPeriod.periodo || 'Sin período',
@@ -54,20 +54,8 @@ export const PayrollHistoryDetails = () => {
         
         setPeriod(convertedPeriod);
         
-        // Por ahora, crear empleados de ejemplo basados en el período
-        // En una implementación real, aquí cargarías los empleados específicos del período
-        const mockEmployees: PayrollHistoryEmployee[] = Array.from({ length: foundPeriod.empleados || 0 }, (_, index) => ({
-          id: `emp-${index + 1}`,
-          periodId: periodId,
-          name: `Empleado ${index + 1}`,
-          position: 'Cargo Ejemplo',
-          grossPay: Number(foundPeriod.totalNomina) / foundPeriod.empleados,
-          deductions: Number(foundPeriod.totalNomina) * 0.08 / foundPeriod.empleados,
-          netPay: Number(foundPeriod.totalNomina) * 0.92 / foundPeriod.empleados,
-          paymentStatus: foundPeriod.estado === 'pagada' ? 'pagado' : 'pendiente',
-        }));
-        
-        setEmployees(mockEmployees);
+        // Cargar empleados reales del período desde la tabla payrolls
+        await loadRealEmployees(foundPeriod.periodo);
       } else {
         console.log('Período no encontrado:', periodId);
         setPeriod(null);
@@ -77,6 +65,58 @@ export const PayrollHistoryDetails = () => {
       setPeriod(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadRealEmployees = async (periodo: string) => {
+    try {
+      const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
+      if (!companyId) return;
+
+      console.log('Loading real employees for period:', periodo);
+
+      const { data: payrollData, error } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees (
+            nombre,
+            apellido,
+            cargo,
+            cedula
+          )
+        `)
+        .eq('company_id', companyId)
+        .eq('periodo', periodo);
+
+      if (error) {
+        console.error('Error loading payroll employees:', error);
+        return;
+      }
+
+      console.log('Payroll data loaded:', payrollData?.length || 0);
+
+      if (payrollData && payrollData.length > 0) {
+        const realEmployees: PayrollHistoryEmployee[] = payrollData.map((payroll) => ({
+          id: payroll.id,
+          periodId: periodId!,
+          name: payroll.employees ? `${payroll.employees.nombre} ${payroll.employees.apellido}` : 'Empleado sin nombre',
+          position: payroll.employees?.cargo || 'Sin cargo',
+          grossPay: Number(payroll.total_devengado || 0),
+          deductions: Number(payroll.total_deducciones || 0),
+          netPay: Number(payroll.neto_pagado || 0),
+          paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente',
+        }));
+
+        console.log('Real employees processed:', realEmployees.length);
+        setEmployees(realEmployees);
+      } else {
+        console.log('No payroll data found for period:', periodo);
+        setEmployees([]);
+      }
+    } catch (error) {
+      console.error('Error loading real employees:', error);
+      setEmployees([]);
     }
   };
 
