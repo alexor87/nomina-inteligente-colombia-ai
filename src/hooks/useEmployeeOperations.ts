@@ -4,7 +4,7 @@ import { EmployeeWithStatus } from '@/types/employee-extended';
 
 export const useEmployeeOperations = (
   employees: EmployeeWithStatus[],
-  setEmployees: (employees: EmployeeWithStatus[]) => void,
+  setEmployees: React.Dispatch<React.SetStateAction<EmployeeWithStatus[]>>,
   isInitialized: boolean,
   isLoading: boolean
 ) => {
