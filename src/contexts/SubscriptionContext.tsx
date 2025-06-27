@@ -47,6 +47,25 @@ interface SubscriptionProviderProps {
   children: ReactNode;
 }
 
+// Helper function to safely convert features from Supabase Json type
+const convertFeatures = (features: any): SubscriptionFeatures => {
+  const defaultFeatures: SubscriptionFeatures = {
+    email_support: true,
+    phone_support: false,
+    custom_reports: false
+  };
+
+  if (!features || typeof features !== 'object') {
+    return defaultFeatures;
+  }
+
+  return {
+    email_support: Boolean(features.email_support ?? defaultFeatures.email_support),
+    phone_support: Boolean(features.phone_support ?? defaultFeatures.phone_support),
+    custom_reports: Boolean(features.custom_reports ?? defaultFeatures.custom_reports)
+  };
+};
+
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,7 +136,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
             trial_ends_at: newSubscription.trial_ends_at,
             max_employees: newSubscription.max_employees,
             max_payrolls_per_month: newSubscription.max_payrolls_per_month,
-            features: newSubscription.features as SubscriptionFeatures,
+            features: convertFeatures(newSubscription.features),
             created_at: newSubscription.created_at,
             updated_at: newSubscription.updated_at
           };
@@ -134,7 +153,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           trial_ends_at: data.trial_ends_at,
           max_employees: data.max_employees,
           max_payrolls_per_month: data.max_payrolls_per_month,
-          features: data.features as SubscriptionFeatures,
+          features: convertFeatures(data.features),
           created_at: data.created_at,
           updated_at: data.updated_at
         };
