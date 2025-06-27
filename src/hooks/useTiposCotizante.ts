@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface TipoCotizante {
@@ -50,8 +50,8 @@ export const useTiposCotizante = () => {
     fetchTipos();
   }, []);
 
-  // Función para cargar subtipos por tipo
-  const fetchSubtipos = async (tipoCotizanteId: string) => {
+  // Función para cargar subtipos por tipo - usando useCallback para estabilizar la referencia
+  const fetchSubtipos = useCallback(async (tipoCotizanteId: string) => {
     try {
       setIsLoadingSubtipos(true);
       setError(null);
@@ -73,12 +73,12 @@ export const useTiposCotizante = () => {
     } finally {
       setIsLoadingSubtipos(false);
     }
-  };
+  }, []);
 
   // Función para limpiar subtipos
-  const clearSubtipos = () => {
+  const clearSubtipos = useCallback(() => {
     setSubtiposCotizante([]);
-  };
+  }, []);
 
   return {
     tiposCotizante,

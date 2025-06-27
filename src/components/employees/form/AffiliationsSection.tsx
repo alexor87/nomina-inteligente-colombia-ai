@@ -41,28 +41,31 @@ export const AffiliationsSection = ({
   tiposError,
   handleTipoCotizanteChange
 }: AffiliationsSectionProps) => {
+  // Check if subtipo is required based on available subtipos
+  const isSubtipoRequired = subtiposCotizante.length > 0 && watchedValues.tipoCotizanteId;
+  
   return (
-    <div className="space-y-8">
-      <div className="border-t border-gray-100 pt-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-6">Afiliaciones</h2>
+    <div className="space-y-6">
+      <div className="pt-6">
+        <h2 className="text-base font-medium text-gray-900 mb-4">Afiliaciones</h2>
         
         {tiposError && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
             <p className="text-red-600 text-sm">{tiposError}</p>
           </div>
         )}
         
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-normal text-gray-600">EPS</Label>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label className="text-sm text-gray-600">EPS</Label>
               <Select onValueChange={(value) => setValue('eps', value)} value={watchedValues.eps}>
-                <SelectTrigger className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md">
+                <SelectTrigger className="h-8 text-sm border-gray-200 bg-white">
                   <SelectValue placeholder="Seleccionar EPS" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectContent className="bg-white border-gray-200">
                   {epsEntities.map((eps) => (
-                    <SelectItem key={eps.id} value={eps.name} className="hover:bg-gray-50 focus:bg-gray-50">
+                    <SelectItem key={eps.id} value={eps.name} className="text-sm">
                       {eps.name}
                     </SelectItem>
                   ))}
@@ -70,15 +73,15 @@ export const AffiliationsSection = ({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm font-normal text-gray-600">AFP</Label>
+            <div className="space-y-1">
+              <Label className="text-sm text-gray-600">AFP</Label>
               <Select onValueChange={(value) => setValue('afp', value)} value={watchedValues.afp}>
-                <SelectTrigger className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md">
+                <SelectTrigger className="h-8 text-sm border-gray-200 bg-white">
                   <SelectValue placeholder="Seleccionar AFP" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectContent className="bg-white border-gray-200">
                   {afpEntities.map((afp) => (
-                    <SelectItem key={afp.id} value={afp.name} className="hover:bg-gray-50 focus:bg-gray-50">
+                    <SelectItem key={afp.id} value={afp.name} className="text-sm">
                       {afp.name}
                     </SelectItem>
                   ))}
@@ -86,15 +89,15 @@ export const AffiliationsSection = ({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm font-normal text-gray-600">ARL</Label>
+            <div className="space-y-1">
+              <Label className="text-sm text-gray-600">ARL</Label>
               <Select onValueChange={(value) => setValue('arl', value)} value={watchedValues.arl}>
-                <SelectTrigger className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md">
+                <SelectTrigger className="h-8 text-sm border-gray-200 bg-white">
                   <SelectValue placeholder="Seleccionar ARL" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectContent className="bg-white border-gray-200">
                   {arlEntities.map((arl) => (
-                    <SelectItem key={arl.id} value={arl.name} className="hover:bg-gray-50 focus:bg-gray-50">
+                    <SelectItem key={arl.id} value={arl.name} className="text-sm">
                       {arl.name}
                     </SelectItem>
                   ))}
@@ -102,15 +105,15 @@ export const AffiliationsSection = ({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm font-normal text-gray-600">Caja de Compensación</Label>
+            <div className="space-y-1">
+              <Label className="text-sm text-gray-600">Caja de Compensación</Label>
               <Select onValueChange={(value) => setValue('cajaCompensacion', value)} value={watchedValues.cajaCompensacion}>
-                <SelectTrigger className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md">
+                <SelectTrigger className="h-8 text-sm border-gray-200 bg-white">
                   <SelectValue placeholder="Seleccionar Caja de Compensación" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectContent className="bg-white border-gray-200">
                   {compensationFunds.map((fund) => (
-                    <SelectItem key={fund.id} value={fund.name} className="hover:bg-gray-50 focus:bg-gray-50">
+                    <SelectItem key={fund.id} value={fund.name} className="text-sm">
                       {fund.name}
                     </SelectItem>
                   ))}
@@ -119,21 +122,25 @@ export const AffiliationsSection = ({
             </div>
 
             {/* Tipo de Cotizante */}
-            <div className="space-y-1.5">
-              <Label className="text-sm font-normal text-gray-600">
-                Tipo de Cotizante <span className="text-red-400 ml-1">*</span>
+            <div className="space-y-1">
+              <Label className="text-sm text-gray-600">
+                Tipo de Cotizante <span className="text-red-400">*</span>
               </Label>
               <Select 
-                onValueChange={handleTipoCotizanteChange} 
+                onValueChange={(value) => {
+                  handleTipoCotizanteChange(value);
+                  // Clear subtipo when changing tipo
+                  setValue('subtipoCotizanteId', '');
+                }} 
                 value={watchedValues.tipoCotizanteId}
                 disabled={isLoadingTipos}
               >
-                <SelectTrigger className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md">
+                <SelectTrigger className="h-8 text-sm border-gray-200 bg-white">
                   <SelectValue placeholder={isLoadingTipos ? "Cargando..." : "Seleccionar tipo de cotizante"} />
                 </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectContent className="bg-white border-gray-200">
                   {tiposCotizante.map((tipo) => (
-                    <SelectItem key={tipo.id} value={tipo.id} className="hover:bg-gray-50 focus:bg-gray-50">
+                    <SelectItem key={tipo.id} value={tipo.id} className="text-sm">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-200">
                           {tipo.codigo}
@@ -149,47 +156,47 @@ export const AffiliationsSection = ({
               )}
             </div>
 
-            {/* Subtipo de Cotizante */}
-            <div className="space-y-1.5">
-              <Label className="text-sm font-normal text-gray-600">
-                Subtipo de Cotizante <span className="text-red-400 ml-1">*</span>
-              </Label>
-              <Select 
-                onValueChange={(value) => setValue('subtipoCotizanteId', value)} 
-                value={watchedValues.subtipoCotizanteId}
-                disabled={!watchedValues.tipoCotizanteId || isLoadingSubtipos || subtiposCotizante.length === 0}
-              >
-                <SelectTrigger className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md">
-                  <SelectValue placeholder={
-                    !watchedValues.tipoCotizanteId 
-                      ? "Primero selecciona un tipo de cotizante"
-                      : isLoadingSubtipos 
+            {/* Subtipo de Cotizante - Only show if tipo is selected */}
+            {watchedValues.tipoCotizanteId && (
+              <div className="space-y-1">
+                <Label className="text-sm text-gray-600">
+                  Subtipo de Cotizante {isSubtipoRequired && <span className="text-red-400">*</span>}
+                </Label>
+                <Select 
+                  onValueChange={(value) => setValue('subtipoCotizanteId', value)} 
+                  value={watchedValues.subtipoCotizanteId}
+                  disabled={isLoadingSubtipos}
+                >
+                  <SelectTrigger className="h-8 text-sm border-gray-200 bg-white">
+                    <SelectValue placeholder={
+                      isLoadingSubtipos 
                         ? "Cargando subtipos..."
                         : subtiposCotizante.length === 0
-                          ? "Este tipo de cotizante no requiere subtipo"
+                          ? "Este tipo no requiere subtipo"
                           : "Seleccionar subtipo de cotizante"
-                  } />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200 shadow-lg">
-                  {subtiposCotizante.map((subtipo) => (
-                    <SelectItem key={subtipo.id} value={subtipo.id} className="hover:bg-gray-50 focus:bg-gray-50">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-200">
-                          {subtipo.codigo}
-                        </Badge>
-                        <span>{subtipo.nombre}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {subtiposCotizante.length === 0 && watchedValues.tipoCotizanteId && !isLoadingSubtipos && (
-                <p className="text-xs text-gray-500 mt-1">Este tipo de cotizante no requiere subtipo</p>
-              )}
-              {errors.subtipoCotizanteId && (
-                <p className="text-red-400 text-xs mt-1">Subtipo de cotizante es requerido</p>
-              )}
-            </div>
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200">
+                    {subtiposCotizante.map((subtipo) => (
+                      <SelectItem key={subtipo.id} value={subtipo.id} className="text-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-200">
+                            {subtipo.codigo}
+                          </Badge>
+                          <span>{subtipo.nombre}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {subtiposCotizante.length === 0 && !isLoadingSubtipos && (
+                  <p className="text-xs text-gray-500 mt-1">Este tipo de cotizante no requiere subtipo</p>
+                )}
+                {isSubtipoRequired && errors.subtipoCotizanteId && (
+                  <p className="text-red-400 text-xs mt-1">Subtipo de cotizante es requerido</p>
+                )}
+              </div>
+            )}
             
             <FormField
               name="regimenSalud"

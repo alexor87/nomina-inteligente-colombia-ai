@@ -73,26 +73,30 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     }
   }, [employee]);
 
-  // Handle tipo cotizante change
+  // Handle tipo cotizante change - improved with better error handling
   const handleTipoCotizanteChange = async (tipoCotizanteId: string) => {
     console.log('🔄 Changing tipo cotizante to:', tipoCotizanteId);
     setValue('tipoCotizanteId', tipoCotizanteId);
-    setValue('subtipoCotizanteId', ''); // Clear subtipo when changing tipo
+    setValue('subtipoCotizanteId', ''); // Always clear subtipo when changing tipo
     
     if (tipoCotizanteId) {
-      await fetchSubtipos(tipoCotizanteId);
+      try {
+        await fetchSubtipos(tipoCotizanteId);
+      } catch (error) {
+        console.error('Error fetching subtipos:', error);
+      }
     } else {
       clearSubtipos();
     }
   };
 
-  // Load subtipos when employee has tipoCotizanteId
+  // Load subtipos when employee has tipoCotizanteId - only on mount
   useEffect(() => {
     if (employee?.tipoCotizanteId) {
       console.log('🔄 Loading subtipos for tipoCotizanteId:', employee.tipoCotizanteId);
       fetchSubtipos(employee.tipoCotizanteId);
     }
-  }, [employee?.tipoCotizanteId, fetchSubtipos]);
+  }, [employee?.tipoCotizanteId]); // Removed fetchSubtipos from dependencies to avoid loops
 
   const onSubmit = async (data: EmployeeFormData) => {
     console.log('🚀 EmployeeFormModern onSubmit called with data:', data);
@@ -103,10 +107,18 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       return;
     }
 
+    // Validate subtipo if required
+    if (data.tipoCotizanteId && subtiposCotizante.length > 0 && !data.subtipoCotizanteId) {
+      console.error('Subtipo de cotizante is required for this tipo');
+      return;
+    }
+
     const employeeData = {
       empresaId: companyId,
       ...data,
-      salarioBase: Number(data.salarioBase)
+      salarioBase: Number(data.salarioBase),
+      // Clear subtipoCotizanteId if no subtipos are available
+      subtipoCotizanteId: subtiposCotizante.length > 0 ? data.subtipoCotizanteId : null
     };
 
     console.log('📋 Employee data to be sent:', employeeData);
