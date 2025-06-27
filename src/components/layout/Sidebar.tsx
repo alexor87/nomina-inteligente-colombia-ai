@@ -22,7 +22,6 @@ const navigation = [
   { name: 'Empleados', href: '/employees', icon: Users, module: 'employees' },
   { name: 'Liquidar Nómina', href: '/payroll', icon: Calculator, module: 'payroll' },
   { name: 'Historial Nómina', href: '/payroll-history', icon: History, module: 'payroll-history' },
-  { name: 'Comprobantes', href: '/vouchers', icon: Receipt, module: 'vouchers' },
   { name: 'Pagos y Dispersión', href: '/payments', icon: CreditCard, module: 'payments' },
   { name: 'Reportes', href: '/reports', icon: BarChart3, module: 'reports' },
   { name: 'Configuración', href: '/settings', icon: Settings, module: 'settings' },
