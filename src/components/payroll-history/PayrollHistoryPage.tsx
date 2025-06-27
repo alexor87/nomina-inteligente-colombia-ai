@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
@@ -69,8 +68,8 @@ export const PayrollHistoryPage = () => {
       const data = await PayrollHistoryService.getPayrollPeriods();
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
-        // Fix the status mapping logic
-        let mappedStatus: 'cerrado' | 'con_errores' | 'revision' | 'reabierto' = 'revision';
+        // Fix the status mapping logic to handle all possible estados
+        let mappedStatus: 'cerrado' | 'con_errores' | 'revision' | 'editado' | 'reabierto' = 'revision';
         
         switch (record.estado) {
           case 'cerrada':
