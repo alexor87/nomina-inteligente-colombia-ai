@@ -27,7 +27,7 @@ export class PayrollReopenService {
         .select('role')
         .eq('user_id', userId)
         .eq('company_id', companyId)
-        .in('role', ['administrador', 'superadmin']);
+        .in('role', ['administrador']);
 
       if (error) {
         console.error('Error checking user permissions:', error);
