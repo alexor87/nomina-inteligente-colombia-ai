@@ -2,6 +2,7 @@
 import { Control, FieldErrors } from 'react-hook-form';
 import { FormField } from './FormField';
 import { EmployeeFormData } from './types';
+import { useAffiliationEntities } from '@/hooks/useAffiliationEntities';
 
 interface AffiliationsSectionProps {
   control: Control<EmployeeFormData>;
@@ -9,6 +10,16 @@ interface AffiliationsSectionProps {
 }
 
 export const AffiliationsSection = ({ control, errors }: AffiliationsSectionProps) => {
+  const {
+    epsOptions,
+    afpOptions,
+    arlOptions,
+    compensationOptions,
+    tipoCotizanteOptions,
+    subtipoCotizanteOptions,
+    isLoading
+  } = useAffiliationEntities();
+
   const regimenSaludOptions = [
     { value: 'contributivo', label: 'Contributivo' },
     { value: 'subsidiado', label: 'Subsidiado' }
@@ -20,6 +31,17 @@ export const AffiliationsSection = ({ control, errors }: AffiliationsSectionProp
     { value: 'inconsistente', label: 'Inconsistente' }
   ];
 
+  if (isLoading) {
+    return (
+      <div className="border-t border-gray-100 pt-8">
+        <h2 className="text-lg font-medium text-gray-900 mb-6">Información de Afiliaciones</h2>
+        <div className="flex items-center justify-center py-8">
+          <div className="text-gray-500">Cargando opciones de afiliación...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="border-t border-gray-100 pt-8">
       <h2 className="text-lg font-medium text-gray-900 mb-6">Información de Afiliaciones</h2>
@@ -29,40 +51,44 @@ export const AffiliationsSection = ({ control, errors }: AffiliationsSectionProp
         <FormField
           name="eps"
           label="EPS"
-          type="text"
+          type="select"
           control={control}
           errors={errors}
-          placeholder="EPS del empleado"
+          options={epsOptions}
+          placeholder="Seleccionar EPS"
         />
 
         {/* AFP */}
         <FormField
           name="afp"
           label="AFP/Fondo de Pensiones"
-          type="text"
+          type="select"
           control={control}
           errors={errors}
-          placeholder="AFP del empleado"
+          options={afpOptions}
+          placeholder="Seleccionar AFP"
         />
 
         {/* ARL */}
         <FormField
           name="arl"
           label="ARL"
-          type="text"
+          type="select"
           control={control}
           errors={errors}
-          placeholder="ARL del empleado"
+          options={arlOptions}
+          placeholder="Seleccionar ARL"
         />
 
         {/* Caja de Compensación */}
         <FormField
           name="cajaCompensacion"
           label="Caja de Compensación"
-          type="text"
+          type="select"
           control={control}
           errors={errors}
-          placeholder="Caja de compensación"
+          options={compensationOptions}
+          placeholder="Seleccionar Caja de Compensación"
         />
 
         {/* Régimen de Salud */}
@@ -87,24 +113,26 @@ export const AffiliationsSection = ({ control, errors }: AffiliationsSectionProp
           required
         />
 
-        {/* Tipo Cotizante ID */}
+        {/* Tipo Cotizante */}
         <FormField
           name="tipoCotizanteId"
           label="Tipo de Cotizante"
-          type="text"
+          type="select"
           control={control}
           errors={errors}
-          placeholder="ID del tipo de cotizante"
+          options={tipoCotizanteOptions}
+          placeholder="Seleccionar Tipo de Cotizante"
         />
 
-        {/* Subtipo Cotizante ID */}
+        {/* Subtipo Cotizante */}
         <FormField
           name="subtipoCotizanteId"
           label="Subtipo de Cotizante"
-          type="text"
+          type="select"
           control={control}
           errors={errors}
-          placeholder="ID del subtipo de cotizante"
+          options={subtipoCotizanteOptions}
+          placeholder="Seleccionar Subtipo de Cotizante"
         />
       </div>
 
