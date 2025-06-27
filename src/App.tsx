@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionProvider';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Layout } from '@/components/layout/Layout';
 import { useRealtimeCleanup } from '@/hooks/useRealtimeCleanup';
