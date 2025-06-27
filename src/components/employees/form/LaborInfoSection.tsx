@@ -1,7 +1,5 @@
 
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Briefcase, DollarSign, Calendar, Shield, Building, Hash } from 'lucide-react';
 import { FormField } from './FormField';
 import { EmployeeFormData } from './types';
 
@@ -53,160 +51,143 @@ export const LaborInfoSection = ({
   ];
 
   return (
-    <Card className="border-l-4 border-l-green-500">
-      <CardHeader className="pb-4">
-        <div className="flex items-center gap-2">
-          <Briefcase className="w-5 h-5 text-green-600" />
-          <CardTitle className="text-lg text-gray-800">Información Laboral</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Salario y Contrato */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            name="salarioBase"
-            label="Salario Base"
-            type="number"
-            control={control}
-            errors={errors}
-            required
-            icon={<DollarSign className="w-4 h-4 text-gray-500" />}
-            helpText="Salario base mensual"
-          />
-          
-          <FormField
-            name="tipoContrato"
-            label="Tipo de Contrato"
-            type="select"
-            control={control}
-            errors={errors}
-            options={tipoContratoOptions}
-            required
-            icon={<Briefcase className="w-4 h-4 text-gray-500" />}
-          />
-          
-          <FormField
-            name="periodicidadPago"
-            label="Periodicidad de Pago"
-            type="select"
-            control={control}
-            errors={errors}
-            options={periodicidadPagoOptions}
-            icon={<Calendar className="w-4 h-4 text-gray-500" />}
-          />
-        </div>
+    <div className="space-y-8">
+      <div className="border-t border-gray-100 pt-8">
+        <h2 className="text-lg font-medium text-gray-900 mb-6">Información Laboral</h2>
+        
+        <div className="space-y-6">
+          {/* Salario y Contrato */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              name="salarioBase"
+              label="Salario Base"
+              type="number"
+              control={control}
+              errors={errors}
+              required
+              placeholder="0"
+            />
+            
+            <FormField
+              name="tipoContrato"
+              label="Tipo de Contrato"
+              type="select"
+              control={control}
+              errors={errors}
+              options={tipoContratoOptions}
+              required
+            />
+            
+            <FormField
+              name="periodicidadPago"
+              label="Periodicidad de Pago"
+              type="select"
+              control={control}
+              errors={errors}
+              options={periodicidadPagoOptions}
+            />
+          </div>
 
-        {/* Fechas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            name="fechaIngreso"
-            label="Fecha de Ingreso"
-            type="date"
-            control={control}
-            errors={errors}
-            required
-            icon={<Calendar className="w-4 h-4 text-gray-500" />}
-          />
-          
-          <FormField
-            name="fechaFirmaContrato"
-            label="Fecha Firma Contrato"
-            type="date"
-            control={control}
-            errors={errors}
-            icon={<Calendar className="w-4 h-4 text-gray-500" />}
-          />
-        </div>
+          {/* Fechas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              name="fechaIngreso"
+              label="Fecha de Ingreso"
+              type="date"
+              control={control}
+              errors={errors}
+              required
+            />
+            
+            <FormField
+              name="fechaFirmaContrato"
+              label="Fecha Firma Contrato"
+              type="date"
+              control={control}
+              errors={errors}
+            />
+          </div>
 
-        {/* Cargo y Centro de Costos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            name="cargo"
-            label="Cargo"
-            type="text"
-            control={control}
-            errors={errors}
-            icon={<Briefcase className="w-4 h-4 text-gray-500" />}
-            helpText="Posición o cargo del empleado"
-          />
-          
-          <FormField
-            name="centroCostos"
-            label="Centro de Costos"
-            type="text"
-            control={control}
-            errors={errors}
-            icon={<Building className="w-4 h-4 text-gray-500" />}
-          />
-        </div>
+          {/* Cargo y Centro de Costos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              name="cargo"
+              label="Cargo"
+              type="text"
+              control={control}
+              errors={errors}
+            />
+            
+            <FormField
+              name="centroCostos"
+              label="Centro de Costos"
+              type="text"
+              control={control}
+              errors={errors}
+            />
+          </div>
 
-        {/* Código CIIU y Nivel de Riesgo ARL */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            name="codigoCIIU"
-            label="Código CIIU"
-            type="text"
-            control={control}
-            errors={errors}
-            icon={<Hash className="w-4 h-4 text-gray-500" />}
-            helpText="Clasificación Industrial Internacional Uniforme"
-          />
-          
-          <FormField
-            name="nivelRiesgoARL"
-            label="Nivel de Riesgo ARL"
-            type="select"
-            control={control}
-            errors={errors}
-            options={arlRiskLevels}
-            icon={<Shield className="w-4 h-4 text-gray-500" />}
-          />
-        </div>
+          {/* Código CIIU y Nivel de Riesgo ARL */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              name="codigoCIIU"
+              label="Código CIIU"
+              type="text"
+              control={control}
+              errors={errors}
+            />
+            
+            <FormField
+              name="nivelRiesgoARL"
+              label="Nivel de Riesgo ARL"
+              type="select"
+              control={control}
+              errors={errors}
+              options={arlRiskLevels}
+            />
+          </div>
 
-        {/* Jornada Laboral */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            name="tipoJornada"
-            label="Tipo de Jornada"
-            type="select"
-            control={control}
-            errors={errors}
-            options={tipoJornadaOptions}
-            icon={<Briefcase className="w-4 h-4 text-gray-500" />}
-          />
-          
-          <FormField
-            name="diasTrabajo"
-            label="Días de Trabajo"
-            type="number"
-            control={control}
-            errors={errors}
-            icon={<Calendar className="w-4 h-4 text-gray-500" />}
-          />
-          
-          <FormField
-            name="horasTrabajo"
-            label="Horas de Trabajo"
-            type="number"
-            control={control}
-            errors={errors}
-            icon={<Calendar className="w-4 h-4 text-gray-500" />}
-          />
-        </div>
+          {/* Jornada Laboral */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              name="tipoJornada"
+              label="Tipo de Jornada"
+              type="select"
+              control={control}
+              errors={errors}
+              options={tipoJornadaOptions}
+            />
+            
+            <FormField
+              name="diasTrabajo"
+              label="Días de Trabajo"
+              type="number"
+              control={control}
+              errors={errors}
+            />
+            
+            <FormField
+              name="horasTrabajo"
+              label="Horas de Trabajo"
+              type="number"
+              control={control}
+              errors={errors}
+            />
+          </div>
 
-        {/* Estado */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            name="estado"
-            label="Estado"
-            type="select"
-            control={control}
-            errors={errors}
-            options={estadoOptions}
-            icon={<Shield className="w-4 h-4 text-gray-500" />}
-          />
+          {/* Estado */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              name="estado"
+              label="Estado"
+              type="select"
+              control={control}
+              errors={errors}
+              options={estadoOptions}
+            />
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

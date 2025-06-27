@@ -1,3 +1,4 @@
+
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { PersonalInfoSection } from './PersonalInfoSection';
 import { LaborInfoSection } from './LaborInfoSection';
@@ -47,7 +48,7 @@ export const EmployeeFormContent = ({
   configuration
 }: EmployeeFormContentProps) => {
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="max-w-4xl mx-auto px-6 py-8">
       <div className="space-y-0">
         {/* Personal Information Section */}
         <div id="section-personal">
@@ -107,7 +108,8 @@ export const EmployeeFormContent = ({
 
         {/* Custom Fields Section - Only if configured */}
         {configuration.customFields.length > 0 && (
-          <div id="section-personalizados">
+          <div id="section-personalizados" className="border-t border-gray-100 pt-8">
+            <h2 className="text-lg font-medium text-gray-900 mb-6">Campos Personalizados</h2>
             {/* Custom fields implementation would go here */}
           </div>
         )}

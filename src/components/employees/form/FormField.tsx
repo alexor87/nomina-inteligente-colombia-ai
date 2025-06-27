@@ -3,7 +3,6 @@ import { Control, FieldErrors, Controller } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Info } from 'lucide-react';
 import { EmployeeFormData } from './types';
 
 interface FormFieldProps {
@@ -14,8 +13,7 @@ interface FormFieldProps {
   errors: FieldErrors<EmployeeFormData>;
   options?: { value: string; label: string }[];
   required?: boolean;
-  icon?: React.ReactNode;
-  helpText?: string;
+  placeholder?: string;
 }
 
 export const FormField = ({
@@ -26,25 +24,14 @@ export const FormField = ({
   errors,
   options,
   required = false,
-  icon,
-  helpText
+  placeholder
 }: FormFieldProps) => {
   return (
-    <div className="group">
-      <div className="flex items-center gap-2 mb-1">
-        {icon}
-        <Label className="text-sm font-medium text-gray-700">
-          {label} {required && <span className="text-red-500">*</span>}
-        </Label>
-        {helpText && (
-          <div className="relative group/tooltip">
-            <Info className="w-3 h-3 text-gray-400 cursor-help" />
-            <div className="absolute left-0 bottom-full mb-1 hidden group-hover/tooltip:block bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
-              {helpText}
-            </div>
-          </div>
-        )}
-      </div>
+    <div className="space-y-1.5">
+      <Label className="text-sm font-normal text-gray-600">
+        {label}
+        {required && <span className="text-red-400 ml-1">*</span>}
+      </Label>
       
       <Controller
         name={name}
@@ -57,12 +44,16 @@ export const FormField = ({
                 onValueChange={field.onChange}
                 value={field.value?.toString() || ''}
               >
-                <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                  <SelectValue placeholder={`Seleccionar ${label.toLowerCase()}`} />
+                <SelectTrigger className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md">
+                  <SelectValue placeholder={placeholder || `Seleccionar ${label.toLowerCase()}`} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border-gray-200 shadow-lg">
                   {options.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
+                    <SelectItem 
+                      key={option.value} 
+                      value={option.value}
+                      className="hover:bg-gray-50 focus:bg-gray-50"
+                    >
                       {option.label}
                     </SelectItem>
                   ))}
@@ -75,8 +66,8 @@ export const FormField = ({
             <Input
               {...field}
               type={type}
-              className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-              placeholder={`Ingresa ${label.toLowerCase()}`}
+              className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md"
+              placeholder={placeholder || `Ingresa ${label.toLowerCase()}`}
               value={field.value?.toString() || ''}
               onChange={(e) => {
                 const value = type === 'number' ? Number(e.target.value) || 0 : e.target.value;
@@ -88,7 +79,7 @@ export const FormField = ({
       />
       
       {errors[name] && (
-        <p className="text-red-500 text-xs mt-1">{errors[name]?.message}</p>
+        <p className="text-red-400 text-xs mt-1">{errors[name]?.message}</p>
       )}
     </div>
   );
