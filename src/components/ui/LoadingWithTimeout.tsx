@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LoadingWithTimeoutProps {
   message?: string;
@@ -15,6 +16,7 @@ export const LoadingWithTimeout = ({
   redirectTo = "/error"
 }: LoadingWithTimeoutProps) => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [timeLeft, setTimeLeft] = useState(timeout);
 
   useEffect(() => {
@@ -23,8 +25,16 @@ export const LoadingWithTimeout = ({
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(countdownInterval);
-          console.warn(`Loading timeout reached after ${timeout} seconds, redirecting to ${redirectTo}`);
-          navigate(redirectTo, { replace: true });
+          console.warn(`Loading timeout reached after ${timeout} seconds, forcing logout and redirecting to ${redirectTo}`);
+          
+          // Force logout before redirecting
+          signOut().then(() => {
+            navigate(redirectTo, { replace: true });
+          }).catch(() => {
+            // Even if logout fails, still redirect
+            navigate(redirectTo, { replace: true });
+          });
+          
           return 0;
         }
         return prev - 1;
@@ -32,7 +42,7 @@ export const LoadingWithTimeout = ({
     }, 1000);
 
     return () => clearInterval(countdownInterval);
-  }, [timeout, redirectTo, navigate]);
+  }, [timeout, redirectTo, navigate, signOut]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">

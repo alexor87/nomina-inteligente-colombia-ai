@@ -4,10 +4,12 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Home, LogIn } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const NotFound = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   useEffect(() => {
     console.error(
@@ -16,11 +18,15 @@ const NotFound = () => {
     );
   }, [location.pathname]);
 
-  const handleGoToLogin = () => {
-    navigate('/login');
+  const handleGoToLogin = async () => {
+    // Force logout before going to login
+    await signOut();
+    navigate('/auth');
   };
 
-  const handleGoToHome = () => {
+  const handleGoToHome = async () => {
+    // Force logout before going to home
+    await signOut();
     navigate('/');
   };
 
