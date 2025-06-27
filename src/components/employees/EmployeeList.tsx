@@ -16,7 +16,7 @@ import { EmployeeListHeader } from './EmployeeListHeader';
 import { EmployeeSearchBar } from './EmployeeSearchBar';
 import { EmployeeFiltersCollapsible } from './EmployeeFiltersCollapsible';
 import { EmployeeBulkActions } from './EmployeeBulkActions';
-import { EmployeeTable } from './EmployeeTable';
+import { EmployeeTableReadOnly } from './EmployeeTableReadOnly';
 import { EmployeeEmptyState } from './EmployeeEmptyState';
 import { SupportModeAlert } from './SupportModeAlert';
 
@@ -64,10 +64,6 @@ export const EmployeeList = () => {
 
   const handleCreateEmployee = () => {
     navigate('/employees/create');
-  };
-
-  const handleEditEmployee = (employee: EmployeeWithStatus) => {
-    navigate(`/employees/${employee.id}/edit`);
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
@@ -236,14 +232,13 @@ export const EmployeeList = () => {
           <CardContent className="p-0">
             {employees.length > 0 ? (
               <>
-                <EmployeeTable
+                <EmployeeTableReadOnly
                   employees={employees}
                   selectedEmployees={selectedEmployees}
                   allCurrentPageSelected={allCurrentPageSelected}
                   onToggleEmployeeSelection={toggleEmployeeSelection}
                   onToggleAllEmployees={toggleAllEmployees}
                   onOpenEmployeeProfile={openEmployeeProfile}
-                  onEditEmployee={handleEditEmployee}
                   onDeleteEmployee={handleDeleteEmployee}
                   onStatusChange={handleStatusChange}
                   getComplianceIndicators={getComplianceIndicators}
