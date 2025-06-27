@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { ArrowLeft, Download, FileText, Eye } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 export const PayrollHistoryDetails = () => {
   const { periodId } = useParams<{ periodId: string }>();
@@ -15,6 +17,7 @@ export const PayrollHistoryDetails = () => {
   const [period, setPeriod] = useState<PayrollHistoryPeriod | null>(null);
   const [employees, setEmployees] = useState<PayrollHistoryEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [downloadingVouchers, setDownloadingVouchers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (periodId) {
@@ -120,6 +123,116 @@ export const PayrollHistoryDetails = () => {
     }
   };
 
+  const downloadPayslip = async (employee: PayrollHistoryEmployee) => {
+    if (!period) return;
+
+    setDownloadingVouchers(prev => new Set(prev).add(employee.id));
+    
+    try {
+      console.log('Generating voucher for employee:', employee.name);
+      
+      // Buscar o crear el comprobante
+      const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
+      if (!companyId) throw new Error('No se encontró la empresa');
+
+      // Buscar el empleado para obtener su ID real
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('id, cedula')
+        .eq('company_id', companyId)
+        .ilike('nombre', `%${employee.name.split(' ')[0]}%`)
+        .single();
+
+      if (employeeError || !employeeData) {
+        throw new Error('No se encontró el empleado');
+      }
+
+      // Buscar comprobante existente
+      let { data: voucher, error: voucherError } = await supabase
+        .from('payroll_vouchers')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('employee_id', employeeData.id)
+        .eq('periodo', period.period)
+        .single();
+
+      // Si no existe el comprobante, crearlo
+      if (voucherError || !voucher) {
+        console.log('Creating new voucher for employee:', employee.name);
+        
+        const { data: newVoucher, error: createError } = await supabase
+          .from('payroll_vouchers')
+          .insert({
+            company_id: companyId,
+            employee_id: employeeData.id,
+            periodo: period.period,
+            start_date: period.startDate,
+            end_date: period.endDate,
+            net_pay: employee.netPay,
+            voucher_status: 'pendiente'
+          })
+          .select()
+          .single();
+
+        if (createError || !newVoucher) {
+          throw new Error('Error creando el comprobante');
+        }
+        
+        voucher = newVoucher;
+      }
+
+      // Llamar a la edge function para generar el PDF
+      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+        body: { 
+          voucherId: voucher.id,
+          regenerate: true 
+        }
+      });
+
+      if (error) {
+        console.error('Error calling generate-voucher-pdf:', error);
+        throw new Error('Error generando el comprobante PDF');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Error generando el comprobante');
+      }
+
+      console.log('PDF generated successfully:', data.fileName);
+
+      // Crear blob y descargar
+      const htmlBlob = new Blob([data.htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(htmlBlob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = data.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "✅ Comprobante descargado",
+        description: `Se descargó el comprobante de ${employee.name}`,
+      });
+
+    } catch (error: any) {
+      console.error('Error downloading payslip:', error);
+      toast({
+        title: "Error al descargar comprobante",
+        description: error.message || "No se pudo descargar el comprobante",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingVouchers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employee.id);
+        return newSet;
+      });
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -158,13 +271,6 @@ export const PayrollHistoryDetails = () => {
         {config.text}
       </Badge>
     );
-  };
-
-  const handleDownloadPayslip = (employee: PayrollHistoryEmployee) => {
-    if (employee.payslipUrl) {
-      console.log('Descargando comprobante de:', employee.name);
-      // Aquí iría la lógica real de descarga
-    }
   };
 
   if (isLoading) {
@@ -313,7 +419,7 @@ export const PayrollHistoryDetails = () => {
           </Card>
         </div>
 
-        {/* Tabla de Empleados */}
+        {/* Tabla de Empleados con botones de descarga mejorados */}
         <Card>
           <CardHeader>
             <CardTitle>Empleados del Período</CardTitle>
@@ -328,7 +434,7 @@ export const PayrollHistoryDetails = () => {
                   <TableHead className="text-right">Deducciones</TableHead>
                   <TableHead className="text-right">Neto</TableHead>
                   <TableHead>Estado Pago</TableHead>
-                  <TableHead className="text-center">Acciones</TableHead>
+                  <TableHead className="text-center">Comprobante</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -349,26 +455,25 @@ export const PayrollHistoryDetails = () => {
                       {getPaymentStatusBadge(employee.paymentStatus)}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center justify-center space-x-1">
-                        {employee.payslipUrl && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDownloadPayslip(employee)}
-                            className="text-blue-600 hover:text-blue-800"
-                            title="Ver comprobante"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
+                      <div className="flex items-center justify-center">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => handleDownloadPayslip(employee)}
-                          className="text-green-600 hover:text-green-800"
-                          title="Descargar comprobante"
+                          onClick={() => downloadPayslip(employee)}
+                          disabled={downloadingVouchers.has(employee.id)}
+                          className="text-blue-600 hover:text-blue-800 border-blue-200 hover:border-blue-300"
                         >
-                          <Download className="h-4 w-4" />
+                          {downloadingVouchers.has(employee.id) ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                              Generando...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-3 w-3 mr-1" />
+                              PDF
+                            </>
+                          )}
                         </Button>
                       </div>
                     </TableCell>
