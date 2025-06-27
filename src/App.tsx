@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -28,7 +27,7 @@ import SubscriptionPage from '@/pages/SubscriptionPage';
 import BillingHistoryPage from '@/pages/BillingHistoryPage';
 import EmployeeDetailsPage from '@/pages/EmployeeDetailsPage';
 import CreateEmployeeModernPage from '@/pages/CreateEmployeeModernPage';
-import EditEmployeeModernPage from '@/pages/EditEmployeeModernPage';
+import EditEmployeeModernPageFixed from '@/pages/EditEmployeeModernPageFixed';
 import PayrollPage from '@/pages/PayrollPage';
 import ReportsPage from '@/pages/ReportsPage';
 
@@ -64,7 +63,7 @@ function AppContent() {
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="employees/create" element={<CreateEmployeeModernPage />} />
           <Route path="employees/:employeeId" element={<EmployeeDetailsPage />} />
-          <Route path="employees/:employeeId/edit" element={<EditEmployeeModernPage />} />
+          <Route path="employees/:employeeId/edit" element={<EditEmployeeModernPageFixed />} />
           
           <Route path="settings" element={<SettingsPage />} />
           <Route path="company-settings" element={<CompanySettingsPage />} />

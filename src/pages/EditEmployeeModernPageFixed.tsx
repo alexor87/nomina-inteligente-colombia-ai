@@ -7,10 +7,11 @@ import { EmployeeWithStatus } from '@/types/employee-extended';
 
 const EditEmployeeModernPageFixed = () => {
   const navigate = useNavigate();
-  const { employeeId } = useParams();
-  const { findEmployeeById, refreshEmployees, isLoading, isInitialized, updateEmployeeInList } = useEmployeeDataFixed();
+  const { employeeId } = useParams<{ employeeId: string }>();
+  const { findEmployeeById, refreshEmployees, isLoading, isInitialized, updateEmployeeInList, retryFindEmployeeById } = useEmployeeDataFixed();
   const [employee, setEmployee] = useState<EmployeeWithStatus | undefined>(undefined);
   const [dataReady, setDataReady] = useState(false);
+  const [hasRetried, setHasRetried] = useState(false);
   
   console.log('🔍 EditEmployeeModernPageFixed: Looking for employee with ID:', employeeId);
   console.log('📊 EditEmployeeModernPageFixed: isLoading:', isLoading, 'isInitialized:', isInitialized);
@@ -33,12 +34,20 @@ const EditEmployeeModernPageFixed = () => {
         updatedAt: foundEmployee.updatedAt
       });
       setEmployee(foundEmployee);
+      setDataReady(true);
+    } else if (!hasRetried) {
+      console.log('⚠️ EditEmployeeModernPageFixed: Employee not found, attempting retry...');
+      setHasRetried(true);
+      const retriedEmployee = await retryFindEmployeeById(employeeId);
+      if (retriedEmployee) {
+        setEmployee(retriedEmployee);
+      }
+      setDataReady(true);
     } else {
-      console.log('❌ EditEmployeeModernPageFixed: Employee not found');
+      console.log('❌ EditEmployeeModernPageFixed: Employee not found after retry');
+      setDataReady(true);
     }
-    
-    setDataReady(true);
-  }, [employeeId, isInitialized, isLoading, findEmployeeById]);
+  }, [employeeId, isInitialized, isLoading, findEmployeeById, retryFindEmployeeById, hasRetried]);
 
   // Effect to load employee when data becomes available
   useEffect(() => {

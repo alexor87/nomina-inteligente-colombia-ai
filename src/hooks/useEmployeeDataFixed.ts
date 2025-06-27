@@ -1,6 +1,6 @@
-import React, { useEffect, useCallback, useMemo, useState } from 'react';
+
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
-import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 import { EmployeeTransformationService } from '@/services/EmployeeTransformationService';
 import { EmployeeDataService } from '@/services/EmployeeDataService';
 
@@ -99,7 +99,7 @@ export const useEmployeeDataFixed = () => {
   // Load employees on mount
   useEffect(() => {
     loadEmployees();
-  }, []);
+  }, [loadEmployees]);
 
   // Memoize the return object
   const returnValue = useMemo(() => ({
