@@ -98,6 +98,27 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     }
   }, [employee?.tipoCotizanteId]); // Removed fetchSubtipos from dependencies to avoid loops
 
+  // Function to sanitize date fields - convert empty strings to null
+  const sanitizeDateFields = (data: EmployeeFormData) => {
+    const dateFields = [
+      'fechaNacimiento',
+      'fechaIngreso',
+      'fechaFirmaContrato',
+      'fechaFinalizacionContrato'
+    ] as const;
+
+    const sanitizedData = { ...data };
+    
+    dateFields.forEach(field => {
+      if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
+        // Convert empty strings to null for date fields
+        (sanitizedData as any)[field] = null;
+      }
+    });
+
+    return sanitizedData;
+  };
+
   const onSubmit = async (data: EmployeeFormData) => {
     console.log('🚀 EmployeeFormModern onSubmit called with data:', data);
     console.log('📝 Employee being edited:', employee);
@@ -113,12 +134,16 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       return;
     }
 
+    // Sanitize date fields before sending
+    const sanitizedData = sanitizeDateFields(data);
+    console.log('🧹 Sanitized data:', sanitizedData);
+
     const employeeData = {
       empresaId: companyId,
-      ...data,
-      salarioBase: Number(data.salarioBase),
+      ...sanitizedData,
+      salarioBase: Number(sanitizedData.salarioBase),
       // Clear subtipoCotizanteId if no subtipos are available
-      subtipoCotizanteId: subtiposCotizante.length > 0 ? data.subtipoCotizanteId : null
+      subtipoCotizanteId: subtiposCotizante.length > 0 ? sanitizedData.subtipoCotizanteId : null
     };
 
     console.log('📋 Employee data to be sent:', employeeData);
