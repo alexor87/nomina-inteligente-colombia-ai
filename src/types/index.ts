@@ -1,4 +1,5 @@
 
+
 export interface User {
   id: string;
   email: string;
@@ -51,7 +52,7 @@ export interface Employee {
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
   // Extended fields
-  sexo?: 'M' | 'F';
+  sexo?: 'M' | 'F' | 'O'; // Updated to match form data type
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
@@ -132,3 +133,4 @@ export interface DashboardMetrics {
   gastosNomina: number;
   tendenciaMensual: number;
 }
+
