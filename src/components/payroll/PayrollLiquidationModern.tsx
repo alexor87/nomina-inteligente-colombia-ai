@@ -31,16 +31,9 @@ export const PayrollLiquidationModern = () => {
   if (!currentPeriod) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium text-gray-900">
-              🎯 Preparando liquidación inteligente
-            </h3>
-            <p className="text-gray-600">
-              Configurando el período y cargando empleados...
-            </p>
-          </div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Preparando liquidación...</p>
         </div>
       </div>
     );
@@ -48,7 +41,6 @@ export const PayrollLiquidationModern = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Sticky Header */}
       <PayrollModernHeader
         period={currentPeriod}
         isValid={isValid}
@@ -58,20 +50,18 @@ export const PayrollLiquidationModern = () => {
         isLoading={isLoading}
       />
 
-      {/* Summary Cards */}
-      <PayrollModernSummary summary={summary} />
-
-      {/* Main Table */}
-      <PayrollModernTable
-        employees={employees}
-        onUpdateEmployee={handleUpdateEmployee}
-        onRecalculate={recalculateAll}
-        isLoading={isLoading}
-        canEdit={canEdit}
-        periodoId={currentPeriod?.id || ''}
-        onRefreshEmployees={refreshEmployees}
-        onDeleteEmployee={deleteEmployee}
-      />
+      <div className="max-w-6xl mx-auto px-6">
+        <PayrollModernTable
+          employees={employees}
+          onUpdateEmployee={handleUpdateEmployee}
+          onRecalculate={recalculateAll}
+          isLoading={isLoading}
+          canEdit={canEdit}
+          periodoId={currentPeriod?.id || ''}
+          onRefreshEmployees={refreshEmployees}
+          onDeleteEmployee={deleteEmployee}
+        />
+      </div>
     </div>
   );
 };
