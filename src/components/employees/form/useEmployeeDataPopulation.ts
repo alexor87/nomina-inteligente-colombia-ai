@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { UseFormSetValue, UseFormTrigger } from 'react-hook-form';
 import { Employee } from '@/types';
@@ -33,39 +32,47 @@ export const useEmployeeDataPopulation = (
       // Batch all setValue operations to avoid multiple re-renders
       const updates: Array<[keyof EmployeeFormData, any]> = [];
       
-      // Helper function to handle null/undefined values for text fields
+      // Helper function to handle null/undefined values for regular text fields
       const handleTextValue = (value: any) => {
+        if (value === null || value === undefined) return '';
+        return String(value).trim();
+      };
+
+      // NEW: Helper function specifically for affiliation fields - keeps actual values
+      const handleAffiliationValue = (value: any) => {
+        // For affiliations, only convert to empty string if it's actually null/undefined
+        // Keep the actual string values as they are
         if (value === null || value === undefined) return '';
         return String(value).trim();
       };
       
       // Información Personal - Verificación detallada
       if (employee.cedula) {
-        console.log('Setting cedula:', employee.cedula);
+        console.log('✅ Setting cedula:', employee.cedula);
         updates.push(['cedula', employee.cedula]);
       }
       if (employee.tipoDocumento) {
-        console.log('Setting tipoDocumento:', employee.tipoDocumento);
+        console.log('✅ Setting tipoDocumento:', employee.tipoDocumento);
         updates.push(['tipoDocumento', employee.tipoDocumento]);
       }
       if (employee.nombre) {
-        console.log('Setting nombre:', employee.nombre);
+        console.log('✅ Setting nombre:', employee.nombre);
         updates.push(['nombre', employee.nombre]);
       }
       if ((employee as any).segundoNombre) {
-        console.log('Setting segundoNombre:', (employee as any).segundoNombre);
+        console.log('✅ Setting segundoNombre:', (employee as any).segundoNombre);
         updates.push(['segundoNombre', (employee as any).segundoNombre]);
       }
       if (employee.apellido) {
-        console.log('Setting apellido:', employee.apellido);
+        console.log('✅ Setting apellido:', employee.apellido);
         updates.push(['apellido', employee.apellido]);
       }
       if (employee.email) {
-        console.log('Setting email:', employee.email);
+        console.log('✅ Setting email:', employee.email);
         updates.push(['email', employee.email]);
       }
       if (employee.telefono) {
-        console.log('Setting telefono:', employee.telefono);
+        console.log('✅ Setting telefono:', employee.telefono);
         updates.push(['telefono', employee.telefono]);
       }
       
@@ -78,15 +85,15 @@ export const useEmployeeDataPopulation = (
       
       // Información Laboral
       if (employee.salarioBase) {
-        console.log('Setting salarioBase:', employee.salarioBase);
+        console.log('✅ Setting salarioBase:', employee.salarioBase);
         updates.push(['salarioBase', employee.salarioBase]);
       }
       if (employee.tipoContrato) {
-        console.log('Setting tipoContrato:', employee.tipoContrato);
+        console.log('✅ Setting tipoContrato:', employee.tipoContrato);
         updates.push(['tipoContrato', employee.tipoContrato]);
       }
       if (employee.fechaIngreso) {
-        console.log('Setting fechaIngreso:', employee.fechaIngreso);
+        console.log('✅ Setting fechaIngreso:', employee.fechaIngreso);
         updates.push(['fechaIngreso', employee.fechaIngreso]);
       }
       
@@ -108,53 +115,92 @@ export const useEmployeeDataPopulation = (
       
       // Información Bancaria
       if (employee.banco) {
-        console.log('Setting banco:', employee.banco);
+        console.log('✅ Setting banco:', employee.banco);
         updates.push(['banco', employee.banco]);
       }
       updates.push(['tipoCuenta', employee.tipoCuenta || 'ahorros']);
       if (employee.numeroCuenta) {
-        console.log('Setting numeroCuenta:', employee.numeroCuenta);
+        console.log('✅ Setting numeroCuenta:', employee.numeroCuenta);
         updates.push(['numeroCuenta', employee.numeroCuenta]);
       }
       if (employee.titularCuenta) {
-        console.log('Setting titularCuenta:', employee.titularCuenta);
+        console.log('✅ Setting titularCuenta:', employee.titularCuenta);
         updates.push(['titularCuenta', employee.titularCuenta]);
       }
       updates.push(['formaPago', (employee as any).formaPago || 'dispersion']);
       
-      // Afiliaciones - CRITICAL SECTION WITH DETAILED LOGGING
-      console.log('🚨 CRITICAL: Processing affiliations data...');
+      // Afiliaciones - CRITICAL SECTION WITH IMPROVED LOGIC
+      console.log('🚨 CRITICAL: Processing affiliations data with improved logic...');
       console.log('📊 Raw affiliations from employee object:');
-      console.log('  - EPS:', { value: employee.eps, type: typeof employee.eps, isNull: employee.eps === null });
-      console.log('  - AFP:', { value: employee.afp, type: typeof employee.afp, isNull: employee.afp === null });
-      console.log('  - ARL:', { value: employee.arl, type: typeof employee.arl, isNull: employee.arl === null });
-      console.log('  - CajaCompensacion:', { value: employee.cajaCompensacion, type: typeof employee.cajaCompensacion, isNull: employee.cajaCompensacion === null });
-      console.log('  - TipoCotizanteId:', { value: employee.tipoCotizanteId, type: typeof employee.tipoCotizanteId, isNull: employee.tipoCotizanteId === null });
-      console.log('  - SubtipoCotizanteId:', { value: employee.subtipoCotizanteId, type: typeof employee.subtipoCotizanteId, isNull: employee.subtipoCotizanteId === null });
+      console.log('  - EPS:', { value: employee.eps, type: typeof employee.eps, isNull: employee.eps === null, hasValue: !!employee.eps });
+      console.log('  - AFP:', { value: employee.afp, type: typeof employee.afp, isNull: employee.afp === null, hasValue: !!employee.afp });
+      console.log('  - ARL:', { value: employee.arl, type: typeof employee.arl, isNull: employee.arl === null, hasValue: !!employee.arl });
+      console.log('  - CajaCompensacion:', { value: employee.cajaCompensacion, type: typeof employee.cajaCompensacion, isNull: employee.cajaCompensacion === null, hasValue: !!employee.cajaCompensacion });
+      console.log('  - TipoCotizanteId:', { value: employee.tipoCotizanteId, type: typeof employee.tipoCotizanteId, isNull: employee.tipoCotizanteId === null, hasValue: !!employee.tipoCotizanteId });
+      console.log('  - SubtipoCotizanteId:', { value: employee.subtipoCotizanteId, type: typeof employee.subtipoCotizanteId, isNull: employee.subtipoCotizanteId === null, hasValue: !!employee.subtipoCotizanteId });
       
-      // Process affiliations with explicit null/empty handling
-      const epsValue = handleTextValue(employee.eps);
-      const afpValue = handleTextValue(employee.afp);
-      const arlValue = handleTextValue(employee.arl);
-      const cajaCompensacionValue = handleTextValue(employee.cajaCompensacion);
-      const tipoCotizanteIdValue = handleTextValue(employee.tipoCotizanteId);
-      const subtipoCotizanteIdValue = handleTextValue(employee.subtipoCotizanteId);
-      
-      console.log('🔧 Processed affiliation values:');
-      console.log('  - EPS processed:', epsValue);
-      console.log('  - AFP processed:', afpValue);
-      console.log('  - ARL processed:', arlValue);
-      console.log('  - CajaCompensacion processed:', cajaCompensacionValue);
-      console.log('  - TipoCotizanteId processed:', tipoCotizanteIdValue);
-      console.log('  - SubtipoCotizanteId processed:', subtipoCotizanteIdValue);
-      
-      // Set affiliation values
-      updates.push(['eps', epsValue]);
-      updates.push(['afp', afpValue]);
-      updates.push(['arl', arlValue]);
-      updates.push(['cajaCompensacion', cajaCompensacionValue]);
-      updates.push(['tipoCotizanteId', tipoCotizanteIdValue]);
-      updates.push(['subtipoCotizanteId', subtipoCotizanteIdValue]);
+      // Process affiliations with improved logic - only set if there's an actual value
+      // EPS
+      if (employee.eps !== null && employee.eps !== undefined) {
+        const epsValue = handleAffiliationValue(employee.eps);
+        console.log('✅ Setting EPS to:', epsValue);
+        updates.push(['eps', epsValue]);
+      } else {
+        console.log('⚠️ EPS is null/undefined, setting empty string');
+        updates.push(['eps', '']);
+      }
+
+      // AFP
+      if (employee.afp !== null && employee.afp !== undefined) {
+        const afpValue = handleAffiliationValue(employee.afp);
+        console.log('✅ Setting AFP to:', afpValue);
+        updates.push(['afp', afpValue]);
+      } else {
+        console.log('⚠️ AFP is null/undefined, setting empty string');
+        updates.push(['afp', '']);
+      }
+
+      // ARL
+      if (employee.arl !== null && employee.arl !== undefined) {
+        const arlValue = handleAffiliationValue(employee.arl);
+        console.log('✅ Setting ARL to:', arlValue);
+        updates.push(['arl', arlValue]);
+      } else {
+        console.log('⚠️ ARL is null/undefined, setting empty string');
+        updates.push(['arl', '']);
+      }
+
+      // Caja de Compensación
+      if (employee.cajaCompensacion !== null && employee.cajaCompensacion !== undefined) {
+        const cajaValue = handleAffiliationValue(employee.cajaCompensacion);
+        console.log('✅ Setting CajaCompensacion to:', cajaValue);
+        updates.push(['cajaCompensacion', cajaValue]);
+      } else {
+        console.log('⚠️ CajaCompensacion is null/undefined, setting empty string');
+        updates.push(['cajaCompensacion', '']);
+      }
+
+      // Tipo Cotizante ID
+      if (employee.tipoCotizanteId !== null && employee.tipoCotizanteId !== undefined) {
+        const tipoValue = handleAffiliationValue(employee.tipoCotizanteId);
+        console.log('✅ Setting TipoCotizanteId to:', tipoValue);
+        updates.push(['tipoCotizanteId', tipoValue]);
+      } else {
+        console.log('⚠️ TipoCotizanteId is null/undefined, setting empty string');
+        updates.push(['tipoCotizanteId', '']);
+      }
+
+      // Subtipo Cotizante ID
+      if (employee.subtipoCotizanteId !== null && employee.subtipoCotizanteId !== undefined) {
+        const subtipoValue = handleAffiliationValue(employee.subtipoCotizanteId);
+        console.log('✅ Setting SubtipoCotizanteId to:', subtipoValue);
+        updates.push(['subtipoCotizanteId', subtipoValue]);
+      } else {
+        console.log('⚠️ SubtipoCotizanteId is null/undefined, setting empty string');
+        updates.push(['subtipoCotizanteId', '']);
+      }
+
+      // Other affiliation fields
       updates.push(['regimenSalud', (employee as any).regimenSalud || 'contributivo']);
       updates.push(['estadoAfiliacion', employee.estadoAfiliacion || 'pendiente']);
       
@@ -167,12 +213,12 @@ export const useEmployeeDataPopulation = (
       
       console.log('✅ useEmployeeDataPopulation: All form values set from employee data');
       console.log('🎯 FINAL AFFILIATIONS SET IN FORM:', {
-        eps: epsValue,
-        afp: afpValue,
-        arl: arlValue,
-        cajaCompensacion: cajaCompensacionValue,
-        tipoCotizanteId: tipoCotizanteIdValue,
-        subtipoCotizanteId: subtipoCotizanteIdValue
+        eps: updates.find(([field]) => field === 'eps')?.[1],
+        afp: updates.find(([field]) => field === 'afp')?.[1],
+        arl: updates.find(([field]) => field === 'arl')?.[1],
+        cajaCompensacion: updates.find(([field]) => field === 'cajaCompensacion')?.[1],
+        tipoCotizanteId: updates.find(([field]) => field === 'tipoCotizanteId')?.[1],
+        subtipoCotizanteId: updates.find(([field]) => field === 'subtipoCotizanteId')?.[1]
       });
       
       // Force trigger validation after setting values with a small delay
@@ -187,5 +233,5 @@ export const useEmployeeDataPopulation = (
     } else {
       console.log('⚠️ useEmployeeDataPopulation: No employee data provided');
     }
-  }, [employee, setValue, trigger]); // Keep employee as dependency to re-run when it changes
+  }, [employee?.id, employee?.updatedAt, setValue, trigger]); // Added specific dependencies
 };

@@ -92,7 +92,21 @@ export class EmployeeDataService {
       }
 
       console.log('✅ Employees fetched with all fields:', data?.length || 0);
-      console.log('📊 Sample employee data:', data?.[0]);
+      console.log('📊 Raw employee data sample (first employee):', data?.[0]);
+      
+      // CRITICAL: Log specific affiliations data from database
+      if (data && data.length > 0) {
+        const firstEmployee = data[0];
+        console.log('🔍 AFFILIATIONS FROM DATABASE (RAW):', {
+          eps: { value: firstEmployee.eps, type: typeof firstEmployee.eps, isNull: firstEmployee.eps === null },
+          afp: { value: firstEmployee.afp, type: typeof firstEmployee.afp, isNull: firstEmployee.afp === null },
+          arl: { value: firstEmployee.arl, type: typeof firstEmployee.arl, isNull: firstEmployee.arl === null },
+          caja_compensacion: { value: firstEmployee.caja_compensacion, type: typeof firstEmployee.caja_compensacion, isNull: firstEmployee.caja_compensacion === null },
+          tipo_cotizante_id: { value: firstEmployee.tipo_cotizante_id, type: typeof firstEmployee.tipo_cotizante_id, isNull: firstEmployee.tipo_cotizante_id === null },
+          subtipo_cotizante_id: { value: firstEmployee.subtipo_cotizante_id, type: typeof firstEmployee.subtipo_cotizante_id, isNull: firstEmployee.subtipo_cotizante_id === null }
+        });
+      }
+      
       return data || [];
     } catch (error) {
       console.error('❌ Error in getEmployees:', error);
