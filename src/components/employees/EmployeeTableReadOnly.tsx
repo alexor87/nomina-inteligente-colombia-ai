@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,7 +29,6 @@ interface EmployeeTableReadOnlyProps {
   allCurrentPageSelected: boolean;
   onToggleEmployeeSelection: (employeeId: string) => void;
   onToggleAllEmployees: () => void;
-  onOpenEmployeeProfile: (employee: EmployeeWithStatus) => void;
   onEditEmployee: (employee: EmployeeWithStatus) => void;
   onDeleteEmployee: (employeeId: string) => void;
   onStatusChange: (employeeId: string, status: string) => void;
