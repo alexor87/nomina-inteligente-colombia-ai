@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,7 +17,8 @@ import {
   AlertCircle, 
   CheckCircle, 
   XCircle,
-  Clock
+  Clock,
+  Edit
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { EmployeeWithStatus } from '@/types/employee-extended';
@@ -30,6 +30,7 @@ interface EmployeeTableReadOnlyProps {
   onToggleEmployeeSelection: (employeeId: string) => void;
   onToggleAllEmployees: () => void;
   onOpenEmployeeProfile: (employee: EmployeeWithStatus) => void;
+  onEditEmployee: (employee: EmployeeWithStatus) => void;
   onDeleteEmployee: (employeeId: string) => void;
   onStatusChange: (employeeId: string, status: string) => void;
   getComplianceIndicators: (employee: EmployeeWithStatus) => any;
@@ -42,6 +43,7 @@ export const EmployeeTableReadOnly = ({
   onToggleEmployeeSelection,
   onToggleAllEmployees,
   onOpenEmployeeProfile,
+  onEditEmployee,
   onDeleteEmployee,
   onStatusChange,
   getComplianceIndicators
@@ -230,6 +232,10 @@ export const EmployeeTableReadOnly = ({
                       <DropdownMenuItem onClick={() => onOpenEmployeeProfile(employee)}>
                         <User className="mr-2 h-4 w-4" />
                         Ver detalles
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onEditEmployee(employee)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar empleado
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'activo')}>
                         <CheckCircle className="mr-2 h-4 w-4" />

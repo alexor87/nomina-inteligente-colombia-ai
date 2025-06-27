@@ -7,6 +7,7 @@ import { useEmployeeFormState } from './useEmployeeFormState';
 import { useARLRiskLevels } from './useARLRiskLevels';
 import { useCompanyId } from './useCompanyId';
 import { useEmployeeFormEffects } from './useEmployeeFormEffects';
+import { useEmployeeFormPopulation } from './useEmployeeFormPopulation';
 
 export const useEmployeeForm = (employee?: Employee) => {
   console.log('🔄 useEmployeeForm: Hook called with employee:', employee?.id);
@@ -24,7 +25,7 @@ export const useEmployeeForm = (employee?: Employee) => {
     scrollToSection
   } = useEmployeeFormState();
 
-  // Initialize form with defaults (only for creation, not editing)
+  // Initialize form with defaults or employee data
   const { register, handleSubmit, formState: { errors }, setValue, watch, trigger, reset, control } = useForm<EmployeeFormData>({
     defaultValues: getEmployeeFormDefaults(),
     mode: 'onChange' // Enable real-time validation
@@ -37,6 +38,9 @@ export const useEmployeeForm = (employee?: Employee) => {
 
   // Load company ID
   useCompanyId(setCompanyId);
+
+  // Populate form when employee data is available (for editing)
+  useEmployeeFormPopulation(employee || null, setValue, trigger);
 
   // Handle form effects (auto-fill, completion calculation)
   useEmployeeFormEffects(watchedValues, setValue, setCompletionPercentage);

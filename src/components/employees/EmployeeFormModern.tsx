@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Employee } from '@/types';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeFormSubmission } from '@/hooks/useEmployeeFormSubmission';
+import { useEmployeeEditSubmission } from '@/hooks/useEmployeeEditSubmission';
 
 // Import refactored components
 import { NavigationSidebar } from './form/NavigationSidebar';
@@ -22,6 +23,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   console.log('🔄 EmployeeFormModern: Component rendered');
   console.log('🔄 EmployeeFormModern: Received employee:', employee ? `${employee.nombre} ${employee.apellido} (${employee.id})` : 'undefined');
   
+  const isEditing = !!employee;
   const { configuration } = useEmployeeGlobalConfiguration();
   
   const {
@@ -52,25 +54,43 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     };
   }, [onDataRefresh]);
 
-  const { handleSubmit: handleFormSubmission, isLoading } = useEmployeeFormSubmission(
-    employee, 
+  // Use different submission hooks based on whether we're creating or editing
+  const { handleSubmit: handleCreateSubmission, isLoading: isCreating } = useEmployeeFormSubmission(
+    undefined, // No employee for creation
     onSuccess, 
     memoizedDataRefresh
   );
 
+  const { handleSubmit: handleEditSubmission, isLoading: isEditing } = useEmployeeEditSubmission(
+    employee || null,
+    onSuccess,
+    memoizedDataRefresh
+  );
+
+  const isLoading = isCreating || isEditing;
+
   const onSubmit = async (data: any) => {
     if (!companyId) return;
     console.log('🚀 EmployeeFormModern: Form submission triggered with data:', data);
-    await handleFormSubmission(data, companyId, []);
+    
+    if (employee) {
+      // Edit mode
+      await handleEditSubmission(data);
+    } else {
+      // Create mode
+      await handleCreateSubmission(data, companyId, []);
+    }
   };
 
   const handleDuplicate = () => {
     console.log('Duplicating employee...');
+    // TODO: Implement duplication logic
   };
 
   console.log('🎯 EmployeeFormModern: Rendering form with employee:', {
     id: employee?.id,
-    name: employee ? `${employee.nombre} ${employee.apellido}` : 'undefined'
+    name: employee ? `${employee.nombre} ${employee.apellido}` : 'undefined',
+    mode: isEditing ? 'edit' : 'create'
   });
 
   return (

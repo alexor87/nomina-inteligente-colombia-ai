@@ -63,7 +63,11 @@ export const EmployeeList = () => {
   ).length;
 
   const handleCreateEmployee = () => {
-    navigate('/employees/create');
+    navigate('/app/employees/create');
+  };
+
+  const handleEditEmployee = (employee: any) => {
+    navigate(`/app/employees/${employee.id}/edit`);
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
@@ -239,6 +243,7 @@ export const EmployeeList = () => {
                   onToggleEmployeeSelection={toggleEmployeeSelection}
                   onToggleAllEmployees={toggleAllEmployees}
                   onOpenEmployeeProfile={openEmployeeProfile}
+                  onEditEmployee={handleEditEmployee}
                   onDeleteEmployee={handleDeleteEmployee}
                   onStatusChange={handleStatusChange}
                   getComplianceIndicators={getComplianceIndicators}
