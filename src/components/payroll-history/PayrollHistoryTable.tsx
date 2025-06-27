@@ -2,20 +2,18 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, Edit, FileText } from 'lucide-react';
+import { Eye, Download, FileText } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
   onViewDetails: (period: PayrollHistoryPeriod) => void;
-  onReopenPeriod: (period: PayrollHistoryPeriod) => void;
   onDownloadFile?: (fileUrl: string, fileName: string) => void;
 }
 
 export const PayrollHistoryTable = ({ 
   periods, 
   onViewDetails,
-  onReopenPeriod, 
   onDownloadFile 
 }: PayrollHistoryTableProps) => {
   const formatCurrency = (amount: number) => {
@@ -63,11 +61,6 @@ export const PayrollHistoryTable = ({
     if (period.pilaFileUrl && onDownloadFile) {
       onDownloadFile(period.pilaFileUrl, `pila-${period.id}.txt`);
     }
-  };
-
-  const canReopen = (period: PayrollHistoryPeriod) => {
-    // Lógica para determinar si se puede reabrir
-    return period.status === 'cerrado' || period.status === 'con_errores';
   };
 
   return (
@@ -144,16 +137,6 @@ export const PayrollHistoryTable = ({
                     title="Ver detalles"
                   >
                     <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => onReopenPeriod(period)}
-                    className="text-orange-600 hover:text-orange-800"
-                    disabled={!canReopen(period)}
-                    title={canReopen(period) ? "Reabrir período" : "No se puede reabrir"}
-                  >
-                    <Edit className="h-4 w-4" />
                   </Button>
                   <Button 
                     variant="ghost" 

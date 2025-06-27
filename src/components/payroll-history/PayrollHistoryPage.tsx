@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
-import { ReopenDialog } from './ReopenDialog';
 import { EditWizard } from './EditWizard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,6 @@ export const PayrollHistoryPage = () => {
   const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<PayrollHistoryPeriod | null>(null);
-  const [showReopenDialog, setShowReopenDialog] = useState(false);
   const [showEditWizard, setShowEditWizard] = useState(false);
   const [filters, setFilters] = useState<FiltersType>({
     dateRange: {},
@@ -34,9 +32,7 @@ export const PayrollHistoryPage = () => {
 
   const {
     isLoading: isProcessing,
-    isReopening,
     isExporting,
-    reopenPeriod,
     closePeriodWithWizard,
     exportToExcel,
     downloadFile
@@ -141,31 +137,8 @@ export const PayrollHistoryPage = () => {
     navigate(`/app/payroll-history/${period.id}`);
   };
 
-  const handleReopenPeriod = (period: PayrollHistoryPeriod) => {
-    setSelectedPeriod(period);
-    setShowReopenDialog(true);
-  };
-
   const handleExportToExcel = async () => {
     await exportToExcel(filteredPeriods);
-  };
-
-  const handleReopenConfirm = async (reason: string) => {
-    if (!selectedPeriod) return;
-    
-    try {
-      const newPeriod = await reopenPeriod({
-        periodId: selectedPeriod.id,
-        reason,
-        userId: 'admin@empresa.com'
-      });
-      
-      setPeriods(prev => [newPeriod, ...prev]);
-      setShowReopenDialog(false);
-      setSelectedPeriod(null);
-    } catch (error) {
-      console.error('Error reopening period:', error);
-    }
   };
 
   const handleEditWizardComplete = async (steps: any) => {
@@ -297,7 +270,6 @@ export const PayrollHistoryPage = () => {
           <PayrollHistoryTable
             periods={pagination.paginatedItems}
             onViewDetails={handleViewDetails}
-            onReopenPeriod={handleReopenPeriod}
             onDownloadFile={downloadFile}
           />
           
@@ -308,20 +280,7 @@ export const PayrollHistoryPage = () => {
         </div>
       </div>
 
-      {/* Modals */}
-      {showReopenDialog && selectedPeriod && (
-        <ReopenDialog
-          isOpen={showReopenDialog}
-          onClose={() => {
-            setShowReopenDialog(false);
-            setSelectedPeriod(null);
-          }}
-          onConfirm={handleReopenConfirm}
-          period={selectedPeriod}
-          isProcessing={isReopening}
-        />
-      )}
-
+      {/* Edit Wizard Modal */}
       {showEditWizard && (
         <EditWizard
           isOpen={showEditWizard}
