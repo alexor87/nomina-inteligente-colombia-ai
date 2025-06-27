@@ -4,7 +4,11 @@ import { Employee } from '@/types';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { EmployeeFormData } from '@/components/employees/form/types';
 
-export const useEmployeeFormSubmission = (employee?: Employee, onSuccess?: () => void) => {
+export const useEmployeeFormSubmission = (
+  employee?: Employee, 
+  onSuccess?: () => void,
+  onDataRefresh?: (updatedEmployee: Employee) => void
+) => {
   const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUD();
 
   // Function to sanitize date and UUID fields - convert empty strings to null
@@ -118,12 +122,19 @@ export const useEmployeeFormSubmission = (employee?: Employee, onSuccess?: () =>
     console.log('✅ Operation result:', result);
 
     if (result.success) {
-      console.log('🎉 Operation successful, calling onSuccess');
+      console.log('🎉 Operation successful, calling callbacks');
+      
+      // NEW: If we have the updated employee data, refresh the form
+      if (result.data && onDataRefresh) {
+        console.log('🔄 Refreshing form data with updated employee:', result.data);
+        onDataRefresh(result.data);
+      }
+      
       onSuccess?.();
     } else {
       console.error('❌ Operation failed:', result.error);
     }
-  }, [employee, createEmployee, updateEmployee, sanitizeFormFields, onSuccess]);
+  }, [employee, createEmployee, updateEmployee, sanitizeFormFields, onSuccess, onDataRefresh]);
 
   return {
     handleSubmit,

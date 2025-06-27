@@ -14,6 +14,16 @@ export const useEmployeeDataPopulation = (
       console.log('🔄 useEmployeeDataPopulation: STARTING to set form values from employee:', employee);
       console.log('📋 Employee fields available:', Object.keys(employee));
       console.log('🎯 Employee full data:', employee);
+      console.log('📊 AFFILIATIONS DATA FROM DB:', {
+        eps: employee.eps,
+        afp: employee.afp,
+        arl: employee.arl,
+        cajaCompensacion: employee.cajaCompensacion,
+        tipoCotizanteId: employee.tipoCotizanteId,
+        subtipoCotizanteId: employee.subtipoCotizanteId,
+        regimenSalud: (employee as any).regimenSalud,
+        estadoAfiliacion: employee.estadoAfiliacion
+      });
       
       // Batch all setValue operations to avoid multiple re-renders
       const updates: Array<[keyof EmployeeFormData, any]> = [];
@@ -104,7 +114,7 @@ export const useEmployeeDataPopulation = (
       }
       updates.push(['formaPago', (employee as any).formaPago || 'dispersion']);
       
-      // Afiliaciones - CORREGIR EL MANEJO DE VALORES NULOS
+      // Afiliaciones - MEJORADO EL MANEJO CON LOGGING DETALLADO
       console.log('🔄 Processing affiliations data...');
       console.log('📊 EPS value from DB:', employee.eps, 'Type:', typeof employee.eps);
       console.log('📊 AFP value from DB:', employee.afp, 'Type:', typeof employee.afp);
@@ -135,6 +145,12 @@ export const useEmployeeDataPopulation = (
       });
       
       console.log('✅ useEmployeeDataPopulation: All form values set from employee data');
+      console.log('🎯 AFFILIATIONS SET IN FORM:', {
+        eps: handleTextValue(employee.eps),
+        afp: handleTextValue(employee.afp),
+        arl: handleTextValue(employee.arl),
+        cajaCompensacion: handleTextValue(employee.cajaCompensacion)
+      });
       
       // Force trigger validation after setting values
       setTimeout(() => {
@@ -144,5 +160,5 @@ export const useEmployeeDataPopulation = (
     } else {
       console.log('⚠️ useEmployeeDataPopulation: No employee data provided');
     }
-  }, [employee, setValue, trigger]);
+  }, [employee, setValue, trigger]); // Added employee.updatedAt as dependency to re-run when employee is updated
 };

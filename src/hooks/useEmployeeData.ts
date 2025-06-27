@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeDataService } from '@/services/EmployeeDataService';
@@ -119,7 +119,24 @@ export const useEmployeeData = () => {
     }
   };
 
-  // NEW: Function to find employee by ID directly from all loaded employees
+  // NEW: Function to update a specific employee in the list
+  const updateEmployeeInList = useCallback((updatedEmployee: EmployeeWithStatus) => {
+    console.log('🔄 Updating employee in list:', updatedEmployee.id);
+    console.log('📊 Updated employee affiliations:', {
+      eps: updatedEmployee.eps,
+      afp: updatedEmployee.afp,
+      arl: updatedEmployee.arl,
+      cajaCompensacion: updatedEmployee.cajaCompensacion
+    });
+    
+    setEmployees(prevEmployees => 
+      prevEmployees.map(emp => 
+        emp.id === updatedEmployee.id ? updatedEmployee : emp
+      )
+    );
+  }, []);
+
+  // Function to find employee by ID directly from all loaded employees
   const findEmployeeById = (employeeId: string): EmployeeWithStatus | undefined => {
     console.log('🔍 Finding employee by ID:', employeeId);
     console.log('📋 Available employees:', employees.length);
@@ -139,6 +156,7 @@ export const useEmployeeData = () => {
     employees,
     isLoading,
     refreshEmployees: loadEmployees,
-    findEmployeeById // NEW: Export the direct search function
+    findEmployeeById,
+    updateEmployeeInList // NEW: Export the update function
   };
 };

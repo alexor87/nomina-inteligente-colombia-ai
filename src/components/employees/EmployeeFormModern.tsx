@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Employee } from '@/types';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useSecurityEntities } from '@/hooks/useSecurityEntities';
@@ -22,6 +22,9 @@ interface EmployeeFormModernProps {
 export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFormModernProps) => {
   console.log('🔄 EmployeeFormModern: Received employee prop:', employee);
   
+  // NEW: Local state to handle employee data updates
+  const [currentEmployee, setCurrentEmployee] = useState<Employee | undefined>(employee);
+  
   const { configuration } = useEmployeeGlobalConfiguration();
   const { epsEntities, afpEntities, arlEntities, compensationFunds, isLoading: entitiesLoading } = useSecurityEntities();
   
@@ -43,9 +46,25 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     setActiveSection,
     setIsDraft,
     scrollToSection
-  } = useEmployeeForm(employee);
+  } = useEmployeeForm(currentEmployee); // Use currentEmployee instead of employee
 
-  const { handleSubmit: handleFormSubmission, isLoading } = useEmployeeFormSubmission(employee, onSuccess);
+  // NEW: Handle data refresh callback
+  const handleDataRefresh = (updatedEmployee: Employee) => {
+    console.log('🔄 EmployeeFormModern: Received updated employee data:', updatedEmployee);
+    console.log('📊 Updated affiliations:', {
+      eps: updatedEmployee.eps,
+      afp: updatedEmployee.afp,
+      arl: updatedEmployee.arl,
+      cajaCompensacion: updatedEmployee.cajaCompensacion
+    });
+    setCurrentEmployee(updatedEmployee);
+  };
+
+  const { handleSubmit: handleFormSubmission, isLoading } = useEmployeeFormSubmission(
+    currentEmployee, 
+    onSuccess, 
+    handleDataRefresh // Pass the refresh callback
+  );
   
   const {
     tiposCotizante,
@@ -54,9 +73,9 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     isLoadingSubtipos,
     tiposError,
     handleTipoCotizanteChange
-  } = useTipoCotizanteManager(employee, setValue);
+  } = useTipoCotizanteManager(currentEmployee, setValue); // Use currentEmployee
 
-  // Debug: Log when employee prop changes
+  // Update currentEmployee when employee prop changes
   useEffect(() => {
     console.log('🔄 EmployeeFormModern: Employee prop changed:', employee);
     if (employee) {
@@ -67,9 +86,15 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
         cedula: employee.cedula,
         email: employee.email,
         salarioBase: employee.salarioBase,
+        // Log affiliations specifically
+        eps: employee.eps,
+        afp: employee.afp,
+        arl: employee.arl,
+        cajaCompensacion: employee.cajaCompensacion,
         // Log all available fields
         ...employee
       });
+      setCurrentEmployee(employee);
     }
   }, [employee]);
 
@@ -92,7 +117,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
       
       <div className="flex-1">
         <EmployeeFormHeader
-          employee={employee}
+          employee={currentEmployee}
           onCancel={onCancel}
           onDuplicate={handleDuplicate}
         />
@@ -121,7 +146,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
         </form>
 
         <EmployeeFormFooter
-          employee={employee}
+          employee={currentEmployee}
           completionPercentage={completionPercentage}
           isDraft={isDraft}
           setIsDraft={setIsDraft}
