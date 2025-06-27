@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryService } from './PayrollHistoryService';
 
@@ -51,7 +50,7 @@ export class PayrollReopenService {
       // Verificar estado actual del período
       const { data: payrollData, error: payrollError } = await supabase
         .from('payrolls')
-        .select('estado, reportado_dian, editable')
+        .select('estado, reportado_dian, editable, reabierto_por')
         .eq('company_id', companyId)
         .eq('periodo', periodo)
         .limit(1);
@@ -75,11 +74,21 @@ export class PayrollReopenService {
         };
       }
 
-      // No se puede reabrir si ya está abierto
-      if (payroll.editable && payroll.estado !== 'cerrada') {
+      // Verificar si ya está reabierto
+      if (payroll.reabierto_por) {
         return { 
           canReopen: false, 
-          reason: 'El período ya está abierto para edición',
+          reason: 'El período ya está reabierto para edición',
+          hasVouchers: false
+        };
+      }
+
+      // Solo se puede reabrir si está en estado cerrado/procesado/pagado
+      const canReopenStates = ['cerrada', 'procesada', 'pagada'];
+      if (!canReopenStates.includes(payroll.estado)) {
+        return { 
+          canReopen: false, 
+          reason: 'Solo se pueden reabrir períodos que estén cerrados',
           hasVouchers: false
         };
       }
@@ -136,7 +145,7 @@ export class PayrollReopenService {
       const { error: updateError } = await supabase
         .from('payrolls')
         .update({
-          estado: 'reabierto',
+          estado: 'borrador',
           editable: true,
           reabierto_por: request.userId,
           fecha_reapertura: new Date().toISOString(),
@@ -195,7 +204,7 @@ export class PayrollReopenService {
 
     } catch (error) {
       console.error('Error closing period again:', error);
-      throw error;
+      throw new Error('Error al cerrar el período');
     }
   }
 
