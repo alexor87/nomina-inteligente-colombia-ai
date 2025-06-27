@@ -2,16 +2,72 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { EmployeeFormModern } from '@/components/employees/EmployeeFormModern';
 import { useEmployeeData } from '@/hooks/useEmployeeData';
+import { useEffect, useState } from 'react';
+import { EmployeeWithStatus } from '@/types/employee-extended';
 
 const EditEmployeeModernPage = () => {
   const navigate = useNavigate();
   const { employeeId } = useParams();
-  const { findEmployeeById, refreshEmployees, isLoading, updateEmployeeInList } = useEmployeeData();
+  const { findEmployeeById, refreshEmployees, isLoading, isInitialized, updateEmployeeInList, retryFindEmployeeById } = useEmployeeData();
+  const [employee, setEmployee] = useState<EmployeeWithStatus | undefined>(undefined);
+  const [dataReady, setDataReady] = useState(false);
   
   console.log('🔍 EditEmployeeModernPage: Looking for employee with ID:', employeeId);
-  console.log('📊 EditEmployeeModernPage: isLoading:', isLoading);
+  console.log('📊 EditEmployeeModernPage: isLoading:', isLoading, 'isInitialized:', isInitialized);
   
-  if (isLoading) {
+  // NEW: Effect to handle employee loading with retry mechanism
+  useEffect(() => {
+    const loadEmployee = async () => {
+      if (!employeeId) {
+        console.log('❌ EditEmployeeModernPage: No employeeId provided');
+        setDataReady(true);
+        return;
+      }
+
+      console.log('🔄 EditEmployeeModernPage: Attempting to load employee...');
+      
+      // Wait for data to be initialized
+      if (!isInitialized || isLoading) {
+        console.log('⏳ EditEmployeeModernPage: Waiting for data to be initialized...');
+        return;
+      }
+
+      // Try to find employee
+      let foundEmployee = findEmployeeById(employeeId);
+      
+      if (!foundEmployee) {
+        console.log('⚠️ EditEmployeeModernPage: Employee not found, trying retry mechanism...');
+        foundEmployee = await retryFindEmployeeById(employeeId);
+      }
+
+      if (foundEmployee) {
+        console.log('✅ EditEmployeeModernPage: Employee loaded successfully:', {
+          id: foundEmployee.id,
+          nombre: foundEmployee.nombre,
+          apellido: foundEmployee.apellido,
+          cedula: foundEmployee.cedula,
+          // CRITICAL: Log affiliations data
+          eps: foundEmployee.eps,
+          afp: foundEmployee.afp,
+          arl: foundEmployee.arl,
+          cajaCompensacion: foundEmployee.cajaCompensacion,
+          tipoCotizanteId: foundEmployee.tipoCotizanteId,
+          subtipoCotizanteId: foundEmployee.subtipoCotizanteId,
+          updatedAt: foundEmployee.updatedAt
+        });
+        setEmployee(foundEmployee);
+      } else {
+        console.log('❌ EditEmployeeModernPage: Employee not found even after retry');
+      }
+      
+      setDataReady(true);
+    };
+
+    loadEmployee();
+  }, [employeeId, isInitialized, isLoading, findEmployeeById, retryFindEmployeeById]);
+
+  // Show loading state while data is being fetched or employee is being found
+  if (isLoading || !dataReady) {
     console.log('⏳ EditEmployeeModernPage: Still loading employee data...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -21,35 +77,6 @@ const EditEmployeeModernPage = () => {
         </div>
       </div>
     );
-  }
-  
-  // Use direct employee search instead of relying on filtered/paginated data
-  const employee = employeeId ? findEmployeeById(employeeId) : undefined;
-  
-  console.log('🎯 EditEmployeeModernPage: Found employee:', employee ? 'YES' : 'NO');
-  
-  if (employee) {
-    console.log('✅ EditEmployeeModernPage: Employee details:', {
-      id: employee.id,
-      nombre: employee.nombre,
-      apellido: employee.apellido,
-      cedula: employee.cedula,
-      salarioBase: employee.salarioBase,
-      tipoContrato: employee.tipoContrato,
-      fechaIngreso: employee.fechaIngreso,
-      // CRITICAL: Log affiliations data
-      eps: employee.eps,
-      afp: employee.afp,
-      arl: employee.arl,
-      cajaCompensacion: employee.cajaCompensacion,
-      tipoCotizanteId: employee.tipoCotizanteId,
-      subtipoCotizanteId: employee.subtipoCotizanteId,
-      updatedAt: employee.updatedAt,
-      // Log all fields for debugging
-      allFields: Object.keys(employee)
-    });
-  } else {
-    console.log('❌ EditEmployeeModernPage: No employee found with ID:', employeeId);
   }
 
   const handleSuccess = async () => {
@@ -76,8 +103,9 @@ const EditEmployeeModernPage = () => {
       cajaCompensacion: updatedEmployee.cajaCompensacion
     });
     
-    // Update the employee in the list
+    // Update the employee in the list and local state
     updateEmployeeInList(updatedEmployee);
+    setEmployee(updatedEmployee);
   };
 
   if (!employee) {

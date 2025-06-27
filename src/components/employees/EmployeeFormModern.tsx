@@ -22,14 +22,15 @@ interface EmployeeFormModernProps {
 
 export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefresh }: EmployeeFormModernProps) => {
   console.log('🔄 EmployeeFormModern: Component rendered/re-rendered');
-  console.log('🔄 EmployeeFormModern: Received employee prop:', employee);
-  console.log('📊 EmployeeFormModern: Employee affiliations from props:', {
+  console.log('🔄 EmployeeFormModern: Received employee prop:', employee ? `${employee.nombre} ${employee.apellido} (${employee.id})` : 'undefined');
+  console.log('📊 CRITICAL: EmployeeFormModern - Employee affiliations from props:', {
     eps: employee?.eps,
     afp: employee?.afp,
     arl: employee?.arl,
     cajaCompensacion: employee?.cajaCompensacion,
     tipoCotizanteId: employee?.tipoCotizanteId,
-    subtipoCotizanteId: employee?.subtipoCotizanteId
+    subtipoCotizanteId: employee?.subtipoCotizanteId,
+    updatedAt: employee?.updatedAt
   });
   
   // Local state to handle employee data updates
@@ -61,7 +62,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   // Handle data refresh callback
   const handleDataRefresh = (updatedEmployee: Employee) => {
     console.log('🔄 EmployeeFormModern: Received updated employee data from submission:', updatedEmployee);
-    console.log('📊 Updated affiliations in form component:', {
+    console.log('📊 CRITICAL: Updated affiliations in form component:', {
       eps: updatedEmployee.eps,
       afp: updatedEmployee.afp,
       arl: updatedEmployee.arl,
@@ -92,27 +93,17 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     handleTipoCotizanteChange
   } = useTipoCotizanteManager(currentEmployee, setValue);
 
-  // Update currentEmployee when employee prop changes (including on initial load)
+  // CRITICAL: Update currentEmployee when employee prop changes (including on initial load)
   useEffect(() => {
-    console.log('🔄 EmployeeFormModern: Employee prop changed:', employee);
-    console.log('📊 EmployeeFormModern: New employee affiliations:', {
-      eps: employee?.eps,
-      afp: employee?.afp,
-      arl: employee?.arl,
-      cajaCompensacion: employee?.cajaCompensacion,
-      tipoCotizanteId: employee?.tipoCotizanteId,
-      subtipoCotizanteId: employee?.subtipoCotizanteId,
-      updatedAt: employee?.updatedAt
-    });
+    console.log('🔄 EmployeeFormModern: Employee prop changed effect triggered');
+    console.log('📊 Previous employee:', currentEmployee ? `${currentEmployee.nombre} ${currentEmployee.apellido}` : 'undefined');
+    console.log('📊 New employee:', employee ? `${employee.nombre} ${employee.apellido}` : 'undefined');
     
     if (employee) {
-      console.log('📋 Employee data for form (COMPLETE):', {
+      console.log('📋 CRITICAL: Employee data for form (AFFILIATIONS FOCUS):', {
         id: employee.id,
         nombre: employee.nombre,
         apellido: employee.apellido,
-        cedula: employee.cedula,
-        email: employee.email,
-        salarioBase: employee.salarioBase,
         // Log affiliations specifically
         eps: employee.eps,
         afp: employee.afp,
@@ -120,18 +111,31 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
         cajaCompensacion: employee.cajaCompensacion,
         tipoCotizanteId: employee.tipoCotizanteId,
         subtipoCotizanteId: employee.subtipoCotizanteId,
-        updatedAt: employee.updatedAt,
-        // Log all available fields
-        ...employee
+        updatedAt: employee.updatedAt
       });
-      setCurrentEmployee(employee);
+      
+      // Only update if it's actually a different employee or if affiliations have changed
+      const shouldUpdate = !currentEmployee || 
+                          currentEmployee.id !== employee.id || 
+                          currentEmployee.updatedAt !== employee.updatedAt ||
+                          currentEmployee.eps !== employee.eps ||
+                          currentEmployee.afp !== employee.afp ||
+                          currentEmployee.arl !== employee.arl ||
+                          currentEmployee.cajaCompensacion !== employee.cajaCompensacion;
+      
+      if (shouldUpdate) {
+        console.log('✅ EmployeeFormModern: Updating currentEmployee state');
+        setCurrentEmployee(employee);
+      } else {
+        console.log('⚠️ EmployeeFormModern: No update needed, employee data is the same');
+      }
     }
-  }, [employee?.id, employee?.updatedAt, employee]); // Added updatedAt to trigger re-population on data changes
+  }, [employee?.id, employee?.updatedAt, employee?.eps, employee?.afp, employee?.arl, employee?.cajaCompensacion, employee]); // Enhanced dependency array
 
   const onSubmit = async (data: any) => {
     if (!companyId) return;
     console.log('🚀 EmployeeFormModern: Form submission triggered with data:', data);
-    console.log('📊 Affiliations being submitted:', {
+    console.log('📊 CRITICAL: Affiliations being submitted:', {
       eps: data.eps,
       afp: data.afp,
       arl: data.arl,
@@ -148,6 +152,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   console.log('🎯 EmployeeFormModern: Rendering form with currentEmployee:', {
     id: currentEmployee?.id,
+    name: currentEmployee ? `${currentEmployee.nombre} ${currentEmployee.apellido}` : 'undefined',
     affiliations: {
       eps: currentEmployee?.eps,
       afp: currentEmployee?.afp,

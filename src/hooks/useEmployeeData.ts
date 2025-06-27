@@ -7,11 +7,13 @@ import { EmployeeDataService } from '@/services/EmployeeDataService';
 export const useEmployeeData = () => {
   const [employees, setEmployees] = useState<EmployeeWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
 
   const loadEmployees = async () => {
     try {
       setIsLoading(true);
+      console.log('🔄 useEmployeeData: Starting to load employees...');
       
       // Verificar si hay un parámetro de empresa de soporte en la URL
       const urlParams = new URLSearchParams(window.location.search);
@@ -37,9 +39,16 @@ export const useEmployeeData = () => {
       // Transform raw employee data to EmployeeWithStatus format with ALL fields mapped
       const transformedData = rawData.map((emp: any): EmployeeWithStatus => {
         console.log('🔄 Transforming employee:', emp.nombre, emp.apellido);
-        console.log('📊 Employee raw data:', emp);
+        console.log('📊 CRITICAL: Employee raw affiliations data:', {
+          eps: emp.eps,
+          afp: emp.afp,
+          arl: emp.arl,
+          caja_compensacion: emp.caja_compensacion,
+          tipo_cotizante_id: emp.tipo_cotizante_id,
+          subtipo_cotizante_id: emp.subtipo_cotizante_id
+        });
         
-        return {
+        const transformed = {
           id: emp.id,
           cedula: emp.cedula,
           tipoDocumento: emp.tipo_documento || 'CC',
@@ -96,10 +105,22 @@ export const useEmployeeData = () => {
           ultimaLiquidacion: emp.ultima_liquidacion,
           contratoVencimiento: emp.contrato_vencimiento
         };
+
+        console.log('✅ CRITICAL: Transformed employee affiliations:', {
+          eps: transformed.eps,
+          afp: transformed.afp,
+          arl: transformed.arl,
+          cajaCompensacion: transformed.cajaCompensacion,
+          tipoCotizanteId: transformed.tipoCotizanteId,
+          subtipoCotizanteId: transformed.subtipoCotizanteId
+        });
+
+        return transformed;
       });
       
-      console.log('✅ Transformed employee data with all fields:', transformedData);
+      console.log('✅ All employees transformed, total:', transformedData.length);
       setEmployees(transformedData);
+      setIsInitialized(true);
       
       if (supportCompanyId) {
         toast({
@@ -136,17 +157,68 @@ export const useEmployeeData = () => {
     );
   }, []);
 
-  // Function to find employee by ID directly from all loaded employees
-  const findEmployeeById = (employeeId: string): EmployeeWithStatus | undefined => {
-    console.log('🔍 Finding employee by ID:', employeeId);
-    console.log('📋 Available employees:', employees.length);
-    console.log('📊 Employee IDs available:', employees.map(emp => ({ id: emp.id, name: `${emp.nombre} ${emp.apellido}` })));
+  // IMPROVED: Enhanced function to find employee by ID with better error handling and logging
+  const findEmployeeById = useCallback((employeeId: string): EmployeeWithStatus | undefined => {
+    console.log('🔍 CRITICAL: Finding employee by ID:', employeeId);
+    console.log('📋 Available employees count:', employees.length);
+    console.log('🔄 Is data initialized?', isInitialized);
+    console.log('⏳ Is loading?', isLoading);
+    
+    if (!isInitialized || isLoading) {
+      console.log('⚠️ CRITICAL: Data not ready yet, returning undefined');
+      return undefined;
+    }
+
+    console.log('📊 All employee IDs available:', employees.map(emp => ({ id: emp.id, name: `${emp.nombre} ${emp.apellido}` })));
     
     const foundEmployee = employees.find(emp => emp.id === employeeId);
-    console.log('🎯 Found employee:', foundEmployee ? `${foundEmployee.nombre} ${foundEmployee.apellido}` : 'NOT FOUND');
+    
+    if (foundEmployee) {
+      console.log('✅ CRITICAL: Found employee:', {
+        id: foundEmployee.id,
+        name: `${foundEmployee.nombre} ${foundEmployee.apellido}`,
+        affiliations: {
+          eps: foundEmployee.eps,
+          afp: foundEmployee.afp,
+          arl: foundEmployee.arl,
+          cajaCompensacion: foundEmployee.cajaCompensacion,
+          tipoCotizanteId: foundEmployee.tipoCotizanteId,
+          subtipoCotizanteId: foundEmployee.subtipoCotizanteId
+        }
+      });
+    } else {
+      console.log('❌ CRITICAL: Employee NOT FOUND with ID:', employeeId);
+      console.log('🔍 Available employee IDs:', employees.map(emp => emp.id));
+    }
     
     return foundEmployee;
-  };
+  }, [employees, isInitialized, isLoading]);
+
+  // NEW: Function to retry loading a specific employee by ID if not found
+  const retryFindEmployeeById = useCallback(async (employeeId: string): Promise<EmployeeWithStatus | undefined> => {
+    console.log('🔄 RETRY: Attempting to reload data and find employee:', employeeId);
+    
+    // First try to find in current data
+    let employee = findEmployeeById(employeeId);
+    if (employee) {
+      console.log('✅ RETRY: Found employee in current data');
+      return employee;
+    }
+    
+    // If not found, reload all data
+    console.log('🔄 RETRY: Employee not found, reloading all data...');
+    await loadEmployees();
+    
+    // Try again after reload
+    employee = findEmployeeById(employeeId);
+    if (employee) {
+      console.log('✅ RETRY: Found employee after reload');
+    } else {
+      console.log('❌ RETRY: Employee still not found after reload');
+    }
+    
+    return employee;
+  }, [findEmployeeById]);
 
   useEffect(() => {
     loadEmployees();
@@ -155,8 +227,10 @@ export const useEmployeeData = () => {
   return {
     employees,
     isLoading,
+    isInitialized, // NEW: Export initialization state
     refreshEmployees: loadEmployees,
     findEmployeeById,
-    updateEmployeeInList // NEW: Export the update function
+    updateEmployeeInList,
+    retryFindEmployeeById // NEW: Export retry function
   };
 };
