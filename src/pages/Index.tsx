@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,11 +17,19 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { CompanyRegistrationWizard } from "@/components/auth/CompanyRegistrationWizard";
+import { CompanyService } from "@/services/CompanyService";
+import { useToast } from "@/hooks/use-toast";
+import { useCompanyRegistrationStore } from "@/components/auth/hooks/useCompanyRegistrationStore";
 
 export const Index = () => {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, refreshUserData } = useAuth();
+  const { toast } = useToast();
+  const [showRegistrationWizard, setShowRegistrationWizard] = useState(false);
+  const [processingRegistration, setProcessingRegistration] = useState(false);
+  const { data } = useCompanyRegistrationStore();
 
   // Redirect authenticated users to dashboard
   useEffect(() => {
@@ -46,6 +53,81 @@ export const Index = () => {
   // Only show landing page for non-authenticated users
   if (user) {
     return null; // Will redirect via useEffect
+  }
+
+  const handleRegistrationComplete = async () => {
+    setProcessingRegistration(true);
+    
+    try {
+      console.log('Processing company registration:', data);
+      
+      // Convert wizard data to company registration format
+      const registrationData = {
+        nit: `${data.identificationNumber}-${data.verificationDigit}`,
+        razon_social: data.identificationNumber || 'Mi Empresa',
+        email: data.invitedMember?.email || 'contacto@empresa.com',
+        telefono: '',
+        ciudad: 'Bogotá',
+        plan: 'profesional' as const,
+      };
+
+      const companyId = await CompanyService.createCompany({
+        nit: registrationData.nit,
+        razon_social: registrationData.razon_social,
+        email: registrationData.email,
+        telefono: registrationData.telefono,
+        ciudad: registrationData.ciudad,
+        plan: registrationData.plan,
+      });
+      
+      console.log('Company created successfully:', companyId);
+      
+      // Refresh user data to ensure roles and profile are loaded
+      await refreshUserData();
+      
+      toast({
+        title: "¡Bienvenido a NóminaFácil!",
+        description: "Tu empresa ha sido registrada exitosamente. ¡Comienza tu prueba gratuita!",
+      });
+
+      // Navigate to dashboard
+      setTimeout(() => {
+        navigate('/app/dashboard');
+      }, 1500);
+      
+    } catch (error: any) {
+      console.error('Error creating company:', error);
+      
+      let errorMessage = "Ha ocurrido un error inesperado";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Error al registrar empresa",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingRegistration(false);
+      setShowRegistrationWizard(false);
+    }
+  };
+
+  const handleCancelRegistration = () => {
+    setShowRegistrationWizard(false);
+  };
+
+  if (processingRegistration) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Configurando tu empresa...</p>
+        </div>
+      </div>
+    );
   }
 
   const features = [
@@ -163,6 +245,14 @@ export const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      {/* Registration Wizard Overlay */}
+      {showRegistrationWizard && (
+        <CompanyRegistrationWizard 
+          onComplete={handleRegistrationComplete} 
+          onCancel={handleCancelRegistration}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-blue-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -179,7 +269,7 @@ export const Index = () => {
               <Button variant="ghost" onClick={() => navigate('/auth')} className="text-gray-700 hover:text-blue-600">
                 Iniciar Sesión
               </Button>
-              <Button onClick={() => navigate('/auth')} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => setShowRegistrationWizard(true)} className="bg-blue-600 hover:bg-blue-700">
                 Comenzar Prueba
               </Button>
             </div>
@@ -211,7 +301,7 @@ export const Index = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Button 
               size="lg" 
-              onClick={() => navigate('/auth')}
+              onClick={() => setShowRegistrationWizard(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
             >
               Comenzar Prueba Gratuita
@@ -220,7 +310,7 @@ export const Index = () => {
             <Button 
               size="lg" 
               variant="outline" 
-              onClick={() => navigate('/auth')}
+              onClick={() => setShowRegistrationWizard(true)}
               className="border-blue-200 text-blue-600 hover:bg-blue-50 px-8 py-4 text-lg font-semibold"
             >
               Ver Demo
@@ -367,7 +457,7 @@ export const Index = () => {
                         ? "bg-blue-600 hover:bg-blue-700 text-white" 
                         : "bg-gray-100 hover:bg-gray-200 text-gray-900"
                     }`}
-                    onClick={() => navigate('/auth')}
+                    onClick={() => setShowRegistrationWizard(true)}
                   >
                     Comenzar Trial Gratuito
                   </Button>
@@ -392,7 +482,7 @@ export const Index = () => {
             <Button 
               size="lg" 
               className="bg-white text-blue-600 hover:bg-gray-100 font-semibold px-8 py-4"
-              onClick={() => navigate('/auth')}
+              onClick={() => setShowRegistrationWizard(true)}
             >
               Comenzar Trial Gratuito
               <ArrowRight className="ml-2 h-5 w-5" />
@@ -401,7 +491,7 @@ export const Index = () => {
               size="lg" 
               variant="outline" 
               className="border-white text-white hover:bg-white hover:text-blue-600 font-semibold px-8 py-4"
-              onClick={() => navigate('/auth')}
+              onClick={() => setShowRegistrationWizard(true)}
             >
               Contactar Ventas
             </Button>
