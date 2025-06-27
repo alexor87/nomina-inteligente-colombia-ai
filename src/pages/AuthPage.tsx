@@ -2,19 +2,25 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2 } from 'lucide-react';
+import { Building2, ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { CompanyRegistrationWizard } from '@/components/auth/CompanyRegistrationWizard';
+import { CompanyService } from '@/services/CompanyService';
+import { useCompanyRegistrationStore } from '@/components/auth/hooks/useCompanyRegistrationStore';
 
 const AuthPage = () => {
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, user, refreshUserData } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegistrationWizard, setShowRegistrationWizard] = useState(false);
+  const [processingRegistration, setProcessingRegistration] = useState(false);
+  const { data } = useCompanyRegistrationStore();
 
   // Redirigir si ya está autenticado
   React.useEffect(() => {
@@ -26,13 +32,6 @@ const AuthPage = () => {
   const [loginForm, setLoginForm] = useState({
     email: '',
     password: ''
-  });
-
-  const [signupForm, setSignupForm] = useState({
-    email: '',
-    password: '',
-    firstName: '',
-    lastName: ''
   });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -78,178 +77,212 @@ const AuthPage = () => {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  const handleRegistrationComplete = async () => {
+    setProcessingRegistration(true);
+    
     try {
-      console.log('Attempting signup with:', { 
-        email: signupForm.email, 
-        firstName: signupForm.firstName, 
-        lastName: signupForm.lastName 
+      console.log('Processing company registration:', data);
+      
+      // Convert wizard data to company registration format
+      const registrationData = {
+        nit: `${data.identificationNumber}-${data.verificationDigit}`,
+        razon_social: data.identificationNumber || 'Mi Empresa',
+        email: data.invitedMember?.email || 'contacto@empresa.com',
+        telefono: '',
+        ciudad: 'Bogotá',
+        plan: 'profesional' as const,
+      };
+
+      const companyId = await CompanyService.createCompany({
+        nit: registrationData.nit,
+        razon_social: registrationData.razon_social,
+        email: registrationData.email,
+        telefono: registrationData.telefono,
+        ciudad: registrationData.ciudad,
+        plan: registrationData.plan,
       });
       
-      const { error } = await signUp(
-        signupForm.email, 
-        signupForm.password, 
-        signupForm.firstName, 
-        signupForm.lastName
-      );
+      console.log('Company created successfully:', companyId);
       
-      if (error) {
-        console.error('Signup error:', error);
-        let errorMessage = 'Ocurrió un error inesperado.';
-        
-        if (error.message === 'User already registered') {
-          errorMessage = 'El usuario ya está registrado. Intenta iniciar sesión.';
-        } else if (error.message.includes('email_address_invalid')) {
-          errorMessage = 'El formato del email no es válido. Usa un email como ejemplo@dominio.com';
-        } else if (error.message.includes('weak_password')) {
-          errorMessage = 'La contraseña debe tener al menos 6 caracteres.';
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-        
-        toast({
-          title: "Error de registro",
-          description: errorMessage,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Registro exitoso",
-          description: "Se ha enviado un email de confirmación a tu correo."
-        });
-        // Limpiar formulario
-        setSignupForm({
-          email: '',
-          password: '',
-          firstName: '',
-          lastName: ''
-        });
-      }
-    } catch (error) {
-      console.error('Unexpected signup error:', error);
+      // Refresh user data to ensure roles and profile are loaded
+      await refreshUserData();
+      
       toast({
-        title: "Error",
-        description: "Ocurrió un error inesperado.",
+        title: "¡Bienvenido a NóminaFácil!",
+        description: "Tu empresa ha sido registrada exitosamente. ¡Comienza tu prueba gratuita!",
+      });
+
+      // Navigate to dashboard
+      setTimeout(() => {
+        navigate('/app/dashboard');
+      }, 1500);
+      
+    } catch (error: any) {
+      console.error('Error creating company:', error);
+      
+      let errorMessage = "Ha ocurrido un error inesperado";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Error al registrar empresa",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setProcessingRegistration(false);
+      setShowRegistrationWizard(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <Building2 className="h-12 w-12 text-blue-600 mr-2" />
-            <h1 className="text-3xl font-bold text-blue-600">Nómina Inteligente</h1>
-          </div>
-          <p className="text-gray-600">Sistema de gestión de nómina empresarial</p>
+  if (processingRegistration) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Configurando tu empresa...</p>
         </div>
+      </div>
+    );
+  }
 
-        <Card className="p-6">
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
-              <TabsTrigger value="signup">Registrarse</TabsTrigger>
-            </TabsList>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      {/* Registration Wizard Overlay */}
+      {showRegistrationWizard && (
+        <CompanyRegistrationWizard onComplete={handleRegistrationComplete} />
+      )}
 
-            <TabsContent value="login" className="space-y-4">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-sm border-b border-blue-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Volver al inicio
+            </button>
+            
+            <div className="flex items-center">
+              <Building2 className="h-8 w-8 text-blue-600 mr-2" />
+              <h1 className="text-xl font-bold text-blue-600">NóminaFácil</h1>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-4">
+        <div className="w-full max-w-md">
+          <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardHeader className="text-center pb-8">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Building2 className="h-8 w-8 text-blue-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">Iniciar Sesión</CardTitle>
+              <p className="text-gray-600 mt-2">
+                Accede a tu plataforma de gestión de nómina
+              </p>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={loginForm.email}
-                    onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="ejemplo@empresa.com"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contraseña</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={loginForm.password}
-                    onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-                    placeholder="Tu contraseña"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-                </Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="signup" className="space-y-4">
-              <form onSubmit={handleSignup} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Nombre</Label>
+                  <Label htmlFor="email" className="text-gray-700 font-medium">
+                    Correo electrónico
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                     <Input
-                      id="firstName"
-                      type="text"
-                      value={signupForm.firstName}
-                      onChange={(e) => setSignupForm(prev => ({ ...prev, firstName: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Apellido</Label>
-                    <Input
-                      id="lastName"
-                      type="text"
-                      value={signupForm.lastName}
-                      onChange={(e) => setSignupForm(prev => ({ ...prev, lastName: e.target.value }))}
+                      id="email"
+                      type="email"
+                      value={loginForm.email}
+                      onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="ejemplo@empresa.com"
+                      className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                       required
                     />
                   </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="signupEmail">Email</Label>
-                  <Input
-                    id="signupEmail"
-                    type="email"
-                    value={signupForm.email}
-                    onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="ejemplo@empresa.com"
-                    required
-                  />
+                  <Label htmlFor="password" className="text-gray-700 font-medium">
+                    Contraseña
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={loginForm.password}
+                      onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="Tu contraseña"
+                      className="pl-10 pr-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signupPassword">Contraseña</Label>
-                  <Input
-                    id="signupPassword"
-                    type="password"
-                    value={signupForm.password}
-                    onChange={(e) => setSignupForm(prev => ({ ...prev, password: e.target.value }))}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Registrando...' : 'Crear Cuenta'}
+
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Iniciando sesión...
+                    </div>
+                  ) : (
+                    'Iniciar Sesión'
+                  )}
                 </Button>
               </form>
-            </TabsContent>
-          </Tabs>
-        </Card>
 
-        <div className="text-center mt-4">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/')}
-            className="text-blue-600 hover:text-blue-700"
-          >
-            ← Volver al inicio
-          </Button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">¿No tienes cuenta?</span>
+                </div>
+              </div>
+
+              <Button
+                onClick={() => setShowRegistrationWizard(true)}
+                variant="outline"
+                className="w-full h-12 border-blue-200 text-blue-600 hover:bg-blue-50 font-medium"
+              >
+                Registrar mi empresa
+              </Button>
+
+              <div className="text-center">
+                <button className="text-sm text-blue-600 hover:text-blue-700 hover:underline">
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="text-center mt-8">
+            <p className="text-gray-600 text-sm">
+              Al iniciar sesión, aceptas nuestros{' '}
+              <a href="#" className="text-blue-600 hover:underline">Términos de Servicio</a>{' '}
+              y{' '}
+              <a href="#" className="text-blue-600 hover:underline">Política de Privacidad</a>
+            </p>
+          </div>
         </div>
       </div>
     </div>
