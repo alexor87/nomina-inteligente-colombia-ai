@@ -85,19 +85,18 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       
       console.log('🔄 Loading subscription for company:', profile.company_id);
       
-      // Use maybeSingle() instead of single() to handle case when no subscription exists
-      const { data, error } = await supabase
+      // Use maybeSingle() to handle case when no subscription exists
+      const { data, error: queryError } = await supabase
         .from('company_subscriptions')
         .select('*')
         .eq('company_id', profile.company_id)
         .maybeSingle();
 
-      if (error) {
-        console.error('❌ Error loading subscription:', error);
-        setError('Error al cargar suscripción');
+      if (queryError) {
+        console.error('❌ Error loading subscription:', queryError);
         
-        // Provide a fallback subscription to not block the app
-        setSubscription({
+        // Create a fallback subscription to not block the app
+        const fallbackSubscription: Subscription = {
           id: 'fallback',
           company_id: profile.company_id!,
           plan_type: 'profesional',
@@ -112,7 +111,10 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           },
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        };
+        
+        setSubscription(fallbackSubscription);
+        setError('Usando suscripción por defecto');
         return;
       }
 
@@ -138,19 +140,22 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           .from('company_subscriptions')
           .insert(defaultSubscription)
           .select()
-          .single();
+          .maybeSingle();
 
         if (createError) {
           console.error('❌ Error creating default subscription:', createError);
-          setError('Error al crear suscripción por defecto');
-          // Continue with a fallback subscription to not block the app
-          setSubscription({
+          
+          // Use fallback subscription to not block the app
+          const fallbackSubscription: Subscription = {
             id: 'temp',
             ...defaultSubscription,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          });
-        } else {
+          };
+          
+          setSubscription(fallbackSubscription);
+          setError('Usando suscripción temporal');
+        } else if (newSubscription) {
           console.log('✅ Default subscription created:', newSubscription);
           // Transform the data to match our interface
           const transformedSubscription: Subscription = {
@@ -186,10 +191,9 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       }
     } catch (error: any) {
       console.error('❌ Error loading subscription:', error);
-      setError(error.message || 'Error al cargar suscripción');
       
       // Provide a fallback subscription to not block the app
-      setSubscription({
+      const fallbackSubscription: Subscription = {
         id: 'fallback',
         company_id: profile.company_id!,
         plan_type: 'profesional',
@@ -204,7 +208,10 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      });
+      };
+      
+      setSubscription(fallbackSubscription);
+      setError('Error al cargar suscripción, usando configuración por defecto');
     } finally {
       setLoading(false);
     }
