@@ -21,6 +21,16 @@ export const useEmployeeFormSubmission = (employee?: Employee, onSuccess?: () =>
       'subtipoCotizanteId'
     ] as const;
 
+    const textFields = [
+      'eps',
+      'afp', 
+      'arl',
+      'cajaCompensacion',
+      'banco',
+      'numeroCuenta',
+      'titularCuenta'
+    ] as const;
+
     const sanitizedData = { ...data };
     
     // Sanitize date fields
@@ -37,12 +47,29 @@ export const useEmployeeFormSubmission = (employee?: Employee, onSuccess?: () =>
       }
     });
 
+    // Sanitize text fields - convert empty strings to null for database
+    textFields.forEach(field => {
+      if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
+        (sanitizedData as any)[field] = null;
+      }
+    });
+
     return sanitizedData;
   }, []);
 
   const handleSubmit = useCallback(async (data: EmployeeFormData, companyId: string, subtiposCotizante: any[]) => {
     console.log('🚀 Form submission called with data:', data);
     console.log('📝 Employee being edited:', employee);
+    console.log('🔍 Affiliations data being submitted:', {
+      eps: data.eps,
+      afp: data.afp,
+      arl: data.arl,
+      cajaCompensacion: data.cajaCompensacion,
+      tipoCotizanteId: data.tipoCotizanteId,
+      subtipoCotizanteId: data.subtipoCotizanteId,
+      regimenSalud: data.regimenSalud,
+      estadoAfiliacion: data.estadoAfiliacion
+    });
     
     if (!companyId) {
       console.error('No company ID available');
@@ -58,16 +85,25 @@ export const useEmployeeFormSubmission = (employee?: Employee, onSuccess?: () =>
     // Sanitize date and UUID fields before sending
     const sanitizedData = sanitizeFormFields(data);
     console.log('🧹 Sanitized data:', sanitizedData);
+    console.log('🔍 Sanitized affiliations data:', {
+      eps: sanitizedData.eps,
+      afp: sanitizedData.afp,
+      arl: sanitizedData.arl,
+      cajaCompensacion: sanitizedData.cajaCompensacion,
+      tipoCotizanteId: sanitizedData.tipoCotizanteId,
+      subtipoCotizanteId: sanitizedData.subtipoCotizanteId,
+      regimenSalud: sanitizedData.regimenSalud,
+      estadoAfiliacion: sanitizedData.estadoAfiliacion
+    });
 
+    // Prepare employee data - let the validation service handle all conversions
     const employeeData = {
-      empresaId: companyId,
       ...sanitizedData,
-      salarioBase: Number(sanitizedData.salarioBase),
       // Clear subtipoCotizanteId if no subtipos are available
       subtipoCotizanteId: subtiposCotizante.length > 0 ? sanitizedData.subtipoCotizanteId : null
     };
 
-    console.log('📋 Employee data to be sent:', employeeData);
+    console.log('📋 Final employee data to be sent:', employeeData);
 
     let result;
     if (employee) {

@@ -18,6 +18,9 @@ export const useEmployeeDataPopulation = (
       // Batch all setValue operations to avoid multiple re-renders
       const updates: Array<[keyof EmployeeFormData, any]> = [];
       
+      // Helper function to handle null/undefined values for text fields
+      const handleTextValue = (value: any) => value || '';
+      
       // Información Personal - Verificación detallada
       if (employee.cedula) {
         console.log('Setting cedula:', employee.cedula);
@@ -50,10 +53,10 @@ export const useEmployeeDataPopulation = (
       
       // Campos extendidos de información personal
       updates.push(['sexo', (employee as any).sexo || 'M']);
-      updates.push(['fechaNacimiento', (employee as any).fechaNacimiento || '']);
-      updates.push(['direccion', (employee as any).direccion || '']);
-      updates.push(['ciudad', (employee as any).ciudad || '']);
-      updates.push(['departamento', (employee as any).departamento || '']);
+      updates.push(['fechaNacimiento', handleTextValue((employee as any).fechaNacimiento)]);
+      updates.push(['direccion', handleTextValue((employee as any).direccion)]);
+      updates.push(['ciudad', handleTextValue((employee as any).ciudad)]);
+      updates.push(['departamento', handleTextValue((employee as any).departamento)]);
       
       // Información Laboral
       if (employee.salarioBase) {
@@ -70,20 +73,20 @@ export const useEmployeeDataPopulation = (
       }
       
       updates.push(['periodicidadPago', (employee as any).periodicidadPago || 'mensual']);
-      updates.push(['cargo', employee.cargo || '']);
-      updates.push(['codigoCIIU', (employee as any).codigoCIIU || '']);
+      updates.push(['cargo', handleTextValue(employee.cargo)]);
+      updates.push(['codigoCIIU', handleTextValue((employee as any).codigoCIIU)]);
       updates.push(['nivelRiesgoARL', employee.nivelRiesgoARL || 'I']);
       updates.push(['estado', employee.estado || 'activo']);
-      updates.push(['centroCostos', (employee as any).centroCostos || '']);
+      updates.push(['centroCostos', handleTextValue((employee as any).centroCostos)]);
       
       // Detalles del Contrato
-      updates.push(['fechaFirmaContrato', (employee as any).fechaFirmaContrato || '']);
-      updates.push(['fechaFinalizacionContrato', (employee as any).fechaFinalizacionContrato || '']);
+      updates.push(['fechaFirmaContrato', handleTextValue((employee as any).fechaFirmaContrato)]);
+      updates.push(['fechaFinalizacionContrato', handleTextValue((employee as any).fechaFinalizacionContrato)]);
       updates.push(['tipoJornada', (employee as any).tipoJornada || 'completa']);
       updates.push(['diasTrabajo', (employee as any).diasTrabajo || 30]);
       updates.push(['horasTrabajo', (employee as any).horasTrabajo || 8]);
       updates.push(['beneficiosExtralegales', (employee as any).beneficiosExtralegales || false]);
-      updates.push(['clausulasEspeciales', (employee as any).clausulasEspeciales || '']);
+      updates.push(['clausulasEspeciales', handleTextValue((employee as any).clausulasEspeciales)]);
       
       // Información Bancaria
       if (employee.banco) {
@@ -101,32 +104,33 @@ export const useEmployeeDataPopulation = (
       }
       updates.push(['formaPago', (employee as any).formaPago || 'dispersion']);
       
-      // Afiliaciones
-      if (employee.eps) {
-        console.log('Setting eps:', employee.eps);
-        updates.push(['eps', employee.eps]);
-      }
-      if (employee.afp) {
-        console.log('Setting afp:', employee.afp);
-        updates.push(['afp', employee.afp]);
-      }
-      if (employee.arl) {
-        console.log('Setting arl:', employee.arl);
-        updates.push(['arl', employee.arl]);
-      }
-      if (employee.cajaCompensacion) {
-        console.log('Setting cajaCompensacion:', employee.cajaCompensacion);
-        updates.push(['cajaCompensacion', employee.cajaCompensacion]);
-      }
+      // Afiliaciones - CORREGIR EL MANEJO DE VALORES NULOS
+      console.log('🔄 Processing affiliations data...');
+      console.log('📊 EPS value from DB:', employee.eps, 'Type:', typeof employee.eps);
+      console.log('📊 AFP value from DB:', employee.afp, 'Type:', typeof employee.afp);
+      console.log('📊 ARL value from DB:', employee.arl, 'Type:', typeof employee.arl);
+      console.log('📊 CajaCompensacion value from DB:', employee.cajaCompensacion, 'Type:', typeof employee.cajaCompensacion);
+      console.log('📊 TipoCotizanteId value from DB:', employee.tipoCotizanteId, 'Type:', typeof employee.tipoCotizanteId);
+      console.log('📊 SubtipoCotizanteId value from DB:', employee.subtipoCotizanteId, 'Type:', typeof employee.subtipoCotizanteId);
+      console.log('📊 RegimenSalud value from DB:', (employee as any).regimenSalud, 'Type:', typeof (employee as any).regimenSalud);
+      console.log('📊 EstadoAfiliacion value from DB:', employee.estadoAfiliacion, 'Type:', typeof employee.estadoAfiliacion);
       
-      updates.push(['tipoCotizanteId', employee.tipoCotizanteId || '']);
-      updates.push(['subtipoCotizanteId', employee.subtipoCotizanteId || '']);
+      // Manejo específico de afiliaciones con valores nulos convertidos a strings vacíos
+      updates.push(['eps', handleTextValue(employee.eps)]);
+      updates.push(['afp', handleTextValue(employee.afp)]);
+      updates.push(['arl', handleTextValue(employee.arl)]);
+      updates.push(['cajaCompensacion', handleTextValue(employee.cajaCompensacion)]);
+      
+      // Tipos de cotizante - manejar IDs como strings vacíos si son null
+      updates.push(['tipoCotizanteId', handleTextValue(employee.tipoCotizanteId)]);
+      updates.push(['subtipoCotizanteId', handleTextValue(employee.subtipoCotizanteId)]);
       updates.push(['regimenSalud', (employee as any).regimenSalud || 'contributivo']);
       updates.push(['estadoAfiliacion', employee.estadoAfiliacion || 'pendiente']);
       
       // Apply all updates
       console.log('📦 Applying', updates.length, 'form updates...');
       updates.forEach(([field, value]) => {
+        console.log(`🔧 Setting ${field}:`, value);
         setValue(field, value);
       });
       

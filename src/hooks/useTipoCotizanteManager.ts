@@ -16,14 +16,16 @@ export const useTipoCotizanteManager = (employee?: Employee, setValue?: UseFormS
     clearSubtipos 
   } = useTiposCotizante();
 
-  // Handle tipo cotizante change - improved with better error handling
+  // Handle tipo cotizante change - optimized to avoid duplicate setValue calls
   const handleTipoCotizanteChange = useCallback(async (tipoCotizanteId: string) => {
     console.log('🔄 Changing tipo cotizante to:', tipoCotizanteId);
-    setValue?.('tipoCotizanteId', tipoCotizanteId);
-    setValue?.('subtipoCotizanteId', ''); // Always clear subtipo when changing tipo
+    
+    // Only clear subtipo, don't set tipoCotizanteId here as it's already set by the Controller
+    setValue?.('subtipoCotizanteId', '');
     
     if (tipoCotizanteId) {
       try {
+        console.log('📥 Fetching subtipos for tipoCotizanteId:', tipoCotizanteId);
         await fetchSubtipos(tipoCotizanteId);
       } catch (error) {
         console.error('Error fetching subtipos:', error);
@@ -36,7 +38,7 @@ export const useTipoCotizanteManager = (employee?: Employee, setValue?: UseFormS
   // Load subtipos when employee has tipoCotizanteId - only on mount
   useEffect(() => {
     if (employee?.tipoCotizanteId) {
-      console.log('🔄 Loading subtipos for tipoCotizanteId:', employee.tipoCotizanteId);
+      console.log('🔄 Loading subtipos for existing employee tipoCotizanteId:', employee.tipoCotizanteId);
       fetchSubtipos(employee.tipoCotizanteId);
     }
   }, [employee?.tipoCotizanteId, fetchSubtipos]);
