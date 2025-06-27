@@ -84,23 +84,20 @@ export const CompanySelector = () => {
 
       if (error) throw error;
 
-      // Refrescar datos del usuario
-      await refreshUserData();
-
-      // Actualizar estado local
-      setCompanies(prev => prev.map(c => ({
-        ...c,
-        isActive: c.id === companyId
-      })));
-
       const selectedCompany = companies.find(c => c.id === companyId);
       
       toast({
         title: "Empresa cambiada",
-        description: `Ahora estás viendo: ${selectedCompany?.name}`,
+        description: `Cambiando a: ${selectedCompany?.name}`,
       });
 
       setIsOpen(false);
+
+      // Recargar la página automáticamente después de un breve delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
     } catch (error) {
       console.error('Error changing company:', error);
       toast({
@@ -108,7 +105,6 @@ export const CompanySelector = () => {
         description: "No se pudo cambiar la empresa",
         variant: "destructive"
       });
-    } finally {
       setIsChanging(false);
     }
   };
@@ -148,6 +144,7 @@ export const CompanySelector = () => {
             key={company.id}
             onClick={() => changeCompany(company.id)}
             className="flex items-center justify-between cursor-pointer"
+            disabled={isChanging}
           >
             <div className="flex flex-col flex-1">
               <span className="font-medium">{company.name}</span>
