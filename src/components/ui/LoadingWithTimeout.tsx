@@ -10,24 +10,48 @@ interface LoadingWithTimeoutProps {
   redirectTo?: string;
 }
 
+const motivationalMessages = [
+  "Preparando tu experiencia...",
+  "Cargando datos importantes...",
+  "Casi listo, un momento más...",
+  "Configurando tu sesión...",
+  "Verificando permisos...",
+  "Optimizando la plataforma...",
+  "Sincronizando información...",
+  "¡Ya casi terminamos!",
+  "Preparando el dashboard...",
+  "Validando credenciales..."
+];
+
 export const LoadingWithTimeout = ({ 
-  message = "Cargando...", 
+  message, 
   timeout = 7,
   redirectTo = "/error"
 }: LoadingWithTimeoutProps) => {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const [timeLeft, setTimeLeft] = useState(timeout);
+  const [currentMessage, setCurrentMessage] = useState(
+    message || motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+  );
 
   useEffect(() => {
+    // Change motivational message every 2 seconds if no custom message provided
+    let messageInterval: NodeJS.Timeout;
+    if (!message) {
+      messageInterval = setInterval(() => {
+        setCurrentMessage(motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]);
+      }, 2000);
+    }
+
     // Countdown timer
     const countdownInterval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(countdownInterval);
-          console.warn(`Loading timeout reached after ${timeout} seconds, forcing logout and redirecting to ${redirectTo}`);
+          if (messageInterval) clearInterval(messageInterval);
           
-          // Force logout before redirecting
+          // Force logout before redirecting (silent)
           signOut().then(() => {
             navigate(redirectTo, { replace: true });
           }).catch(() => {
@@ -41,20 +65,17 @@ export const LoadingWithTimeout = ({
       });
     }, 1000);
 
-    return () => clearInterval(countdownInterval);
-  }, [timeout, redirectTo, navigate, signOut]);
+    return () => {
+      clearInterval(countdownInterval);
+      if (messageInterval) clearInterval(messageInterval);
+    };
+  }, [timeout, redirectTo, navigate, signOut, message]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       <div className="text-center">
         <LoadingSpinner />
-        <p className="mt-4 text-gray-600">{message}</p>
-        <p className="mt-2 text-sm text-gray-400">
-          Si esto toma más tiempo del esperado, serás redirigido automáticamente...
-        </p>
-        <p className="mt-1 text-xs text-gray-400">
-          ({timeLeft}s restantes)
-        </p>
+        <p className="mt-4 text-gray-600 animate-pulse">{currentMessage}</p>
       </div>
     </div>
   );
