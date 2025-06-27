@@ -9,11 +9,12 @@ import { useCompanyRegistrationStore } from './hooks/useCompanyRegistrationStore
 
 interface CompanyRegistrationWizardProps {
   onComplete: () => void;
+  onCancel?: () => void;
 }
 
 export type WizardStep = 'welcome' | 'company-data' | 'functional-area' | 'team-invitation' | 'final';
 
-export const CompanyRegistrationWizard = ({ onComplete }: CompanyRegistrationWizardProps) => {
+export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegistrationWizardProps) => {
   const [currentStep, setCurrentStep] = useState<WizardStep>('welcome');
   const { clearStore } = useCompanyRegistrationStore();
 
@@ -41,20 +42,29 @@ export const CompanyRegistrationWizard = ({ onComplete }: CompanyRegistrationWiz
     onComplete();
   };
 
+  const handleCancel = () => {
+    // Clear saved progress
+    localStorage.removeItem('company-registration-step');
+    clearStore();
+    if (onCancel) {
+      onCancel();
+    }
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 'welcome':
-        return <WelcomeModal onNext={() => handleStepComplete('company-data')} />;
+        return <WelcomeModal onNext={() => handleStepComplete('company-data')} onCancel={handleCancel} />;
       case 'company-data':
-        return <CompanyDataStep onNext={() => handleStepComplete('functional-area')} />;
+        return <CompanyDataStep onNext={() => handleStepComplete('functional-area')} onCancel={handleCancel} />;
       case 'functional-area':
-        return <FunctionalAreaStep onNext={() => handleStepComplete('team-invitation')} />;
+        return <FunctionalAreaStep onNext={() => handleStepComplete('team-invitation')} onCancel={handleCancel} />;
       case 'team-invitation':
-        return <TeamInvitationStep onNext={() => handleStepComplete('final')} />;
+        return <TeamInvitationStep onNext={() => handleStepComplete('final')} onCancel={handleCancel} />;
       case 'final':
-        return <FinalStep onComplete={handleFinalComplete} />;
+        return <FinalStep onComplete={handleFinalComplete} onCancel={handleCancel} />;
       default:
-        return <WelcomeModal onNext={() => handleStepComplete('company-data')} />;
+        return <WelcomeModal onNext={() => handleStepComplete('company-data')} onCancel={handleCancel} />;
     }
   };
 

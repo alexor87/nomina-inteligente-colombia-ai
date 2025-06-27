@@ -2,13 +2,14 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 
 interface FinalStepProps {
   onComplete: () => void;
+  onCancel?: () => void;
 }
 
-export const FinalStep = ({ onComplete }: FinalStepProps) => {
+export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
   const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
@@ -19,6 +20,15 @@ export const FinalStep = ({ onComplete }: FinalStepProps) => {
 
   return (
     <Card className="w-full max-w-lg mx-4 animate-scale-in relative overflow-hidden">
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 p-1 hover:bg-gray-100 rounded-full transition-colors z-20"
+        >
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
+      )}
+
       {showConfetti && (
         <div className="absolute inset-0 pointer-events-none">
           <div className="confetti-animation">
@@ -68,13 +78,24 @@ export const FinalStep = ({ onComplete }: FinalStepProps) => {
           </div>
         </div>
 
-        <Button 
-          onClick={onComplete}
-          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3"
-          size="lg"
-        >
-          Comencemos 🚀
-        </Button>
+        <div className="flex gap-3">
+          {onCancel && (
+            <Button 
+              onClick={onCancel}
+              variant="outline"
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+          )}
+          <Button 
+            onClick={onComplete}
+            className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3"
+            size="lg"
+          >
+            Comencemos 🚀
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

@@ -2,13 +2,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Sparkles } from 'lucide-react';
+import { Building2, Sparkles, X } from 'lucide-react';
 
 interface WelcomeModalProps {
   onNext: () => void;
+  onCancel?: () => void;
 }
 
-export const WelcomeModal = ({ onNext }: WelcomeModalProps) => {
+export const WelcomeModal = ({ onNext, onCancel }: WelcomeModalProps) => {
   const [selectedRole, setSelectedRole] = useState<'empresa' | null>(null);
 
   const handleContinue = () => {
@@ -18,7 +19,16 @@ export const WelcomeModal = ({ onNext }: WelcomeModalProps) => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-4 animate-scale-in">
+    <Card className="w-full max-w-md mx-4 animate-scale-in relative">
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 p-1 hover:bg-gray-100 rounded-full transition-colors z-10"
+        >
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
+      )}
+      
       <CardHeader className="text-center">
         <div className="flex items-center justify-center mb-4">
           <Sparkles className="h-8 w-8 text-blue-600 mr-2" />
@@ -50,13 +60,24 @@ export const WelcomeModal = ({ onNext }: WelcomeModalProps) => {
           </div>
         </div>
 
-        <Button 
-          onClick={handleContinue}
-          disabled={selectedRole !== 'empresa'}
-          className="w-full"
-        >
-          Continuar
-        </Button>
+        <div className="flex gap-3 pt-4">
+          {onCancel && (
+            <Button 
+              onClick={onCancel}
+              variant="outline"
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+          )}
+          <Button 
+            onClick={handleContinue}
+            disabled={selectedRole !== 'empresa'}
+            className="flex-1"
+          >
+            Continuar
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

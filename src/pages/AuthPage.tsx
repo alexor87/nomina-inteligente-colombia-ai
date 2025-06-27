@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -137,6 +136,10 @@ const AuthPage = () => {
     }
   };
 
+  const handleCancelRegistration = () => {
+    setShowRegistrationWizard(false);
+  };
+
   if (processingRegistration) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
@@ -152,7 +155,10 @@ const AuthPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       {/* Registration Wizard Overlay */}
       {showRegistrationWizard && (
-        <CompanyRegistrationWizard onComplete={handleRegistrationComplete} />
+        <CompanyRegistrationWizard 
+          onComplete={handleRegistrationComplete} 
+          onCancel={handleCancelRegistration}
+        />
       )}
 
       {/* Header */}

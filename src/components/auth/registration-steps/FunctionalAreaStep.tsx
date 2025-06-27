@@ -3,14 +3,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users } from 'lucide-react';
+import { Users, X } from 'lucide-react';
 import { useCompanyRegistrationStore } from '../hooks/useCompanyRegistrationStore';
 
 interface FunctionalAreaStepProps {
   onNext: () => void;
+  onCancel?: () => void;
 }
 
-export const FunctionalAreaStep = ({ onNext }: FunctionalAreaStepProps) => {
+export const FunctionalAreaStep = ({ onNext, onCancel }: FunctionalAreaStepProps) => {
   const { data, updateData } = useCompanyRegistrationStore();
   const [selectedArea, setSelectedArea] = useState(data.functionalArea || '');
 
@@ -31,7 +32,16 @@ export const FunctionalAreaStep = ({ onNext }: FunctionalAreaStepProps) => {
   };
 
   return (
-    <Card className="w-full max-w-lg mx-4 animate-fade-in">
+    <Card className="w-full max-w-lg mx-4 animate-fade-in relative">
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 p-1 hover:bg-gray-100 rounded-full transition-colors z-10"
+        >
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
+      )}
+      
       <CardHeader className="text-center">
         <div className="flex items-center justify-center mb-4">
           <Users className="h-6 w-6 text-blue-600 mr-2" />
@@ -61,11 +71,20 @@ export const FunctionalAreaStep = ({ onNext }: FunctionalAreaStepProps) => {
           ))}
         </div>
 
-        <div className="flex justify-end pt-4">
+        <div className="flex gap-3 pt-4">
+          {onCancel && (
+            <Button 
+              onClick={onCancel}
+              variant="outline"
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+          )}
           <Button 
             onClick={handleContinue} 
             disabled={!selectedArea}
-            className="px-8"
+            className="flex-1"
           >
             Continuar
           </Button>
