@@ -82,6 +82,9 @@ function AppContent() {
         <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
         <Route path="/payroll" element={<Navigate to="/app/payroll" replace />} />
         <Route path="/employees" element={<Navigate to="/app/employees" replace />} />
+        <Route path="/employees/create" element={<Navigate to="/app/employees/create" replace />} />
+        <Route path="/employees/:employeeId" element={<Navigate to="/app/employees/:employeeId" replace />} />
+        <Route path="/employees/:employeeId/edit" element={<Navigate to="/app/employees/:employeeId/edit" replace />} />
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
         <Route path="/company-settings" element={<Navigate to="/app/company-settings" replace />} />
         <Route path="/payroll-history" element={<Navigate to="/app/payroll-history" replace />} />
