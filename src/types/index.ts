@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   email: string;
@@ -39,8 +40,8 @@ export interface Employee {
   empresaId: string;
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string; // Make this optional to match EmployeeWithStatus
+  updatedAt?: string;
   // Banking information
   banco?: string;
   tipoCuenta?: 'ahorros' | 'corriente';
@@ -49,10 +50,85 @@ export interface Employee {
   // Additional fields for compatibility
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
+  // Extended fields
+  sexo?: 'M' | 'F';
+  fechaNacimiento?: string;
+  direccion?: string;
+  ciudad?: string;
+  departamento?: string;
+  periodicidadPago?: string;
+  codigoCIIU?: string;
+  centroCostos?: string;
+  fechaFirmaContrato?: string;
+  fechaFinalizacionContrato?: string;
+  tipoJornada?: string;
+  diasTrabajo?: number;
+  horasTrabajo?: number;
+  beneficiosExtralegales?: boolean;
+  clausulasEspeciales?: string;
+  formaPago?: string;
+  regimenSalud?: string;
+  avatar?: string;
+  centrosocial?: string;
+  ultimaLiquidacion?: string;
+  contratoVencimiento?: string;
 }
 
 export interface ApiResponse<T> {
   data: T | null;
   error: string | null;
   success: boolean;
+}
+
+// Payroll types
+export interface PayrollCalculation {
+  salarioBase: number;
+  diasTrabajados: number;
+  horasExtra?: number;
+  recargoNocturno?: number;
+  recargoDominical?: number;
+  bonificaciones?: number;
+}
+
+export interface LegalValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface Payroll {
+  id: string;
+  empleadoId: string;
+  empresaId: string;
+  periodo: string;
+  estado: 'borrador' | 'procesada' | 'pagada' | 'anulada';
+  salarioBase: number;
+  diasTrabajados: number;
+  horasExtra: number;
+  recargoNocturno: number;
+  recargoDominical: number;
+  auxilioTransporte: number;
+  bonificaciones: number;
+  cesantias: number;
+  interesesCesantias: number;
+  prima: number;
+  vacaciones: number;
+  saludEmpleado: number;
+  pensionEmpleado: number;
+  retencionFuente: number;
+  otrasDeduciones: number;
+  totalDevengado: number;
+  totalDeducciones: number;
+  netoPagado: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Dashboard types
+export interface DashboardMetrics {
+  totalEmpleados: number;
+  nominasProcesadas: number;
+  alertasLegales: number;
+  gastosNomina: number;
+  tendenciaMensual: number;
 }
