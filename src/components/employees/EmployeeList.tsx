@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -18,6 +17,7 @@ import { EmployeeBulkActions } from './EmployeeBulkActions';
 import { EmployeeTableReadOnly } from './EmployeeTableReadOnly';
 import { EmployeeEmptyState } from './EmployeeEmptyState';
 import { SupportModeAlert } from './SupportModeAlert';
+import { EmployeeCRUDService } from '@/services/EmployeeCRUDService';
 
 export const EmployeeList = () => {
   const navigate = useNavigate();
@@ -66,11 +66,33 @@ export const EmployeeList = () => {
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este empleado?')) {
-      const result = await deleteEmployee(employeeId);
-      if (result.success) {
-        refreshEmployees();
+    try {
+      // Check if employee has associated payrolls
+      const hasPayrolls = await EmployeeCRUDService.checkEmployeeHasPayrolls(employeeId);
+      
+      if (hasPayrolls) {
+        toast({
+          title: "No se puede eliminar el empleado",
+          description: "El empleado tiene nóminas asociadas. Primero debe eliminar o transferir las nóminas.",
+          variant: "destructive"
+        });
+        return;
       }
+
+      // Confirm deletion
+      if (window.confirm('¿Estás seguro de que deseas eliminar este empleado?')) {
+        const result = await deleteEmployee(employeeId);
+        if (result.success) {
+          refreshEmployees();
+        }
+      }
+    } catch (error) {
+      console.error('Error checking employee payrolls:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo verificar si el empleado tiene nóminas asociadas.",
+        variant: "destructive"
+      });
     }
   };
 

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,8 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,7 +20,9 @@ import {
   CheckCircle, 
   XCircle,
   Clock,
-  Edit
+  Edit,
+  UserCheck,
+  UserX
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { EmployeeWithStatus } from '@/types/employee-extended';
@@ -118,6 +122,14 @@ export const EmployeeTableReadOnly = ({
     onStatusChange(employeeId, newStatus);
   };
 
+  const handleActivateEmployee = (employeeId: string) => {
+    handleStatusChange(employeeId, 'activo');
+  };
+
+  const handleDeactivateEmployee = (employeeId: string) => {
+    handleStatusChange(employeeId, 'inactivo');
+  };
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -145,6 +157,7 @@ export const EmployeeTableReadOnly = ({
             const isSelected = selectedEmployees.includes(employee.id);
             const indicators = getComplianceIndicators(employee);
             const isHovered = hoveredRow === employee.id;
+            const isActive = employee.estado === 'activo';
 
             return (
               <TableRow
@@ -230,18 +243,28 @@ export const EmployeeTableReadOnly = ({
                         <Edit className="mr-2 h-4 w-4" />
                         Editar empleado
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'activo')}>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Marcar como activo
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'inactivo')}>
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Marcar como inactivo
-                      </DropdownMenuItem>
+                      
+                      <DropdownMenuSeparator />
+                      
+                      {!isActive ? (
+                        <DropdownMenuItem onClick={() => handleActivateEmployee(employee.id)}>
+                          <UserCheck className="mr-2 h-4 w-4 text-green-600" />
+                          Activar empleado
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => handleDeactivateEmployee(employee.id)}>
+                          <UserX className="mr-2 h-4 w-4 text-orange-600" />
+                          Desactivar empleado
+                        </DropdownMenuItem>
+                      )}
+                      
                       <DropdownMenuItem onClick={() => handleStatusChange(employee.id, 'vacaciones')}>
                         <Clock className="mr-2 h-4 w-4" />
                         Marcar en vacaciones
                       </DropdownMenuItem>
+                      
+                      <DropdownMenuSeparator />
+                      
                       <DropdownMenuItem 
                         onClick={() => onDeleteEmployee(employee.id)}
                         className="text-red-600 focus:text-red-600"
