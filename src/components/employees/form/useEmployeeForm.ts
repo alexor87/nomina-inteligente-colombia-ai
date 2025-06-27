@@ -133,26 +133,58 @@ export const useEmployeeForm = (employee?: Employee) => {
     if (employee) {
       console.log('🔄 useEmployeeForm: Setting form values from employee:', employee);
       
+      // Información Personal
       setValue('cedula', employee.cedula || '');
       setValue('tipoDocumento', employee.tipoDocumento || 'CC');
       setValue('nombre', employee.nombre || '');
-      setValue('segundoNombre', '');
+      setValue('segundoNombre', employee.segundoNombre || '');
       setValue('apellido', employee.apellido || '');
       setValue('email', employee.email || '');
       setValue('telefono', employee.telefono || '');
+      setValue('sexo', (employee as any).sexo || 'M');
+      setValue('fechaNacimiento', (employee as any).fechaNacimiento || '');
+      setValue('direccion', (employee as any).direccion || '');
+      setValue('ciudad', (employee as any).ciudad || '');
+      setValue('departamento', (employee as any).departamento || '');
+      
+      // Información Laboral
       setValue('salarioBase', employee.salarioBase || SALARIO_MINIMO_2025);
       setValue('tipoContrato', employee.tipoContrato || 'indefinido');
       setValue('fechaIngreso', employee.fechaIngreso || new Date().toISOString().split('T')[0]);
+      setValue('periodicidadPago', (employee as any).periodicidadPago || 'mensual');
       setValue('cargo', employee.cargo || '');
+      setValue('codigoCIIU', (employee as any).codigoCIIU || '');
       setValue('nivelRiesgoARL', employee.nivelRiesgoARL || 'I');
       setValue('estado', employee.estado || 'activo');
+      setValue('centroCostos', (employee as any).centroCostos || '');
+      
+      // Detalles del Contrato
+      setValue('fechaFirmaContrato', (employee as any).fechaFirmaContrato || '');
+      setValue('fechaFinalizacionContrato', (employee as any).fechaFinalizacionContrato || '');
+      setValue('tipoJornada', (employee as any).tipoJornada || 'completa');
+      setValue('diasTrabajo', (employee as any).diasTrabajo || 30);
+      setValue('horasTrabajo', (employee as any).horasTrabajo || 8);
+      setValue('beneficiosExtralegales', (employee as any).beneficiosExtralegales || false);
+      setValue('clausulasEspeciales', (employee as any).clausulasEspeciales || '');
+      
+      // Información Bancaria
+      setValue('banco', employee.banco || '');
+      setValue('tipoCuenta', employee.tipoCuenta || 'ahorros');
+      setValue('numeroCuenta', employee.numeroCuenta || '');
+      setValue('titularCuenta', employee.titularCuenta || '');
+      setValue('formaPago', (employee as any).formaPago || 'dispersion');
+      
+      // Afiliaciones
       setValue('eps', employee.eps || '');
       setValue('afp', employee.afp || '');
       setValue('arl', employee.arl || '');
       setValue('cajaCompensacion', employee.cajaCompensacion || '');
       setValue('tipoCotizanteId', employee.tipoCotizanteId || '');
       setValue('subtipoCotizanteId', employee.subtipoCotizanteId || '');
+      setValue('regimenSalud', (employee as any).regimenSalud || 'contributivo');
       setValue('estadoAfiliacion', employee.estadoAfiliacion || 'pendiente');
+      
+      console.log('✅ useEmployeeForm: All form values set from employee data');
     }
   }, [employee, setValue]);
 
