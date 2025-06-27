@@ -7,9 +7,19 @@ import { useAffiliationEntities } from '@/hooks/useAffiliationEntities';
 interface AffiliationsSectionProps {
   control: Control<EmployeeFormData>;
   errors: FieldErrors<EmployeeFormData>;
+  watchedValues: EmployeeFormData;
+  setValue: (name: keyof EmployeeFormData, value: any) => void;
 }
 
-export const AffiliationsSection = ({ control, errors }: AffiliationsSectionProps) => {
+export const AffiliationsSection = ({ 
+  control, 
+  errors, 
+  watchedValues, 
+  setValue 
+}: AffiliationsSectionProps) => {
+  // Get the selected tipo cotizante to filter subtipos
+  const selectedTipoCotizanteId = watchedValues.tipoCotizanteId;
+  
   const {
     epsOptions,
     afpOptions,
@@ -18,7 +28,7 @@ export const AffiliationsSection = ({ control, errors }: AffiliationsSectionProp
     tipoCotizanteOptions,
     subtipoCotizanteOptions,
     isLoading
-  } = useAffiliationEntities();
+  } = useAffiliationEntities(selectedTipoCotizanteId);
 
   const regimenSaludOptions = [
     { value: 'contributivo', label: 'Contributivo' },
@@ -30,6 +40,13 @@ export const AffiliationsSection = ({ control, errors }: AffiliationsSectionProp
     { value: 'pendiente', label: 'Pendiente' },
     { value: 'inconsistente', label: 'Inconsistente' }
   ];
+
+  // Handle tipo cotizante change to reset subtipo
+  const handleTipoCotizanteChange = (value: string) => {
+    setValue('tipoCotizanteId', value);
+    // Clear subtipo when tipo changes
+    setValue('subtipoCotizanteId', '');
+  };
 
   if (isLoading) {
     return (
@@ -114,26 +131,36 @@ export const AffiliationsSection = ({ control, errors }: AffiliationsSectionProp
         />
 
         {/* Tipo Cotizante */}
-        <FormField
-          name="tipoCotizanteId"
-          label="Tipo de Cotizante"
-          type="select"
-          control={control}
-          errors={errors}
-          options={tipoCotizanteOptions}
-          placeholder="Seleccionar Tipo de Cotizante"
-        />
+        <div className="space-y-1.5">
+          <FormField
+            name="tipoCotizanteId"
+            label="Tipo de Cotizante"
+            type="select"
+            control={control}
+            errors={errors}
+            options={tipoCotizanteOptions}
+            placeholder="Seleccionar Tipo de Cotizante"
+            onValueChange={handleTipoCotizanteChange}
+          />
+        </div>
 
-        {/* Subtipo Cotizante */}
-        <FormField
-          name="subtipoCotizanteId"
-          label="Subtipo de Cotizante"
-          type="select"
-          control={control}
-          errors={errors}
-          options={subtipoCotizanteOptions}
-          placeholder="Seleccionar Subtipo de Cotizante"
-        />
+        {/* Subtipo Cotizante - Solo se muestra si hay un tipo seleccionado */}
+        <div className="space-y-1.5">
+          <FormField
+            name="subtipoCotizanteId"
+            label="Subtipo de Cotizante"
+            type="select"
+            control={control}
+            errors={errors}
+            options={subtipoCotizanteOptions}
+            placeholder={
+              selectedTipoCotizanteId 
+                ? "Seleccionar Subtipo de Cotizante" 
+                : "Primero seleccione un Tipo de Cotizante"
+            }
+            disabled={!selectedTipoCotizanteId}
+          />
+        </div>
       </div>
 
       <div className="mt-6 p-4 bg-blue-50 rounded-lg">

@@ -14,6 +14,8 @@ interface FormFieldProps {
   options?: { value: string; label: string }[];
   required?: boolean;
   placeholder?: string;
+  disabled?: boolean;
+  onValueChange?: (value: string) => void;
 }
 
 export const FormField = ({
@@ -24,7 +26,9 @@ export const FormField = ({
   errors,
   options,
   required = false,
-  placeholder
+  placeholder,
+  disabled = false,
+  onValueChange
 }: FormFieldProps) => {
   return (
     <div className="space-y-1.5">
@@ -41,13 +45,17 @@ export const FormField = ({
           if (type === 'select' && options) {
             return (
               <Select 
-                onValueChange={field.onChange}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  onValueChange?.(value);
+                }}
                 value={field.value?.toString() || ''}
+                disabled={disabled}
               >
-                <SelectTrigger className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md">
+                <SelectTrigger className={`h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <SelectValue placeholder={placeholder || `Seleccionar ${label.toLowerCase()}`} />
                 </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectContent className="bg-white border-gray-200 shadow-lg z-50">
                   {options.map((option) => (
                     <SelectItem 
                       key={option.value} 
@@ -69,6 +77,7 @@ export const FormField = ({
               className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md"
               placeholder={placeholder || `Ingresa ${label.toLowerCase()}`}
               value={field.value?.toString() || ''}
+              disabled={disabled}
               onChange={(e) => {
                 const value = type === 'number' ? Number(e.target.value) || 0 : e.target.value;
                 field.onChange(value);

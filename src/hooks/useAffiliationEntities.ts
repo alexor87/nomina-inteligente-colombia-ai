@@ -18,7 +18,7 @@ interface SubtipoCotizante {
   tipo_cotizante_id: string;
 }
 
-export const useAffiliationEntities = () => {
+export const useAffiliationEntities = (selectedTipoCotizanteId?: string) => {
   const [epsEntities, setEpsEntities] = useState<Entity[]>([]);
   const [afpEntities, setAfpEntities] = useState<Entity[]>([]);
   const [arlEntities, setArlEntities] = useState<Entity[]>([]);
@@ -42,8 +42,8 @@ export const useAffiliationEntities = () => {
           supabase.from('afp_entities').select('code, name').eq('status', 'active'),
           supabase.from('arl_entities').select('code, name').eq('status', 'active'),
           supabase.from('compensation_funds').select('code, name').eq('status', 'active'),
-          supabase.from('tipos_cotizante').select('id, nombre'),
-          supabase.from('subtipos_cotizante').select('id, nombre, tipo_cotizante_id')
+          supabase.from('tipos_cotizante').select('id, nombre').eq('activo', true),
+          supabase.from('subtipos_cotizante').select('id, nombre, tipo_cotizante_id').eq('activo', true)
         ]);
 
         if (epsResponse.data) setEpsEntities(epsResponse.data);
@@ -88,7 +88,12 @@ export const useAffiliationEntities = () => {
     label: tipo.nombre
   }));
 
-  const subtipoCotizanteOptions = subtiposCotizante.map(subtipo => ({
+  // Filter subtipos based on selected tipo cotizante
+  const filteredSubtipos = selectedTipoCotizanteId 
+    ? subtiposCotizante.filter(subtipo => subtipo.tipo_cotizante_id === selectedTipoCotizanteId)
+    : [];
+
+  const subtipoCotizanteOptions = filteredSubtipos.map(subtipo => ({
     value: subtipo.id,
     label: subtipo.nombre
   }));

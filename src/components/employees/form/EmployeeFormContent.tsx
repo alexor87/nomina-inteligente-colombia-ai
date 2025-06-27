@@ -58,6 +58,8 @@ export const EmployeeFormContent = ({
           <AffiliationsSection
             control={control}
             errors={errors}
+            watchedValues={watchedValues}
+            setValue={setValue}
           />
         </div>
 
