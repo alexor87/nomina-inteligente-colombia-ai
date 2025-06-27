@@ -1,4 +1,3 @@
-
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -44,7 +43,7 @@ export const PayrollHistoryTable = ({
     const month = monthNames[start.getMonth()];
     const year = start.getFullYear();
     
-    return `${startDay}-${endDay}/${month}/${year}`;
+    return `${startDay} - ${endDay} /${month}/ ${year}`;
   };
 
   const getStatusBadge = (status: PayrollHistoryPeriod['status']) => {
