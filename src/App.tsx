@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionProvider';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Layout } from '@/components/layout/Layout';
 import { useRealtimeCleanup } from '@/hooks/useRealtimeCleanup';
@@ -18,6 +18,7 @@ import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import VerifyEmailPage from '@/pages/VerifyEmailPage';
 import LogoutPage from '@/pages/LogoutPage';
+import NotFound from '@/pages/NotFound';
 
 // Protected pages
 import DashboardPage from '@/pages/DashboardPage';
@@ -60,6 +61,9 @@ function AppContent() {
         <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
         <Route path="/logout" element={<LogoutPage />} />
         
+        {/* Error page */}
+        <Route path="/error" element={<NotFound />} />
+        
         {/* Protected routes - Main app */}
         <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/app/dashboard" replace />} />
@@ -99,6 +103,9 @@ function AppContent() {
         <Route path="/subscription" element={<Navigate to="/app/subscription" replace />} />
         <Route path="/billing-history" element={<Navigate to="/app/billing-history" replace />} />
         <Route path="/reports" element={<Navigate to="/app/reports" replace />} />
+        
+        {/* Catch all route - 404 */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <Toaster />
     </Router>

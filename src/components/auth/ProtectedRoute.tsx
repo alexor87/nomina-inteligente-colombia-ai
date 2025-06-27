@@ -2,7 +2,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
@@ -36,9 +36,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (loading) {
     console.log('⏳ ProtectedRoute: Still loading...');
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
+      <LoadingWithTimeout 
+        message="Verificando permisos..."
+        timeout={7}
+        redirectTo="/error"
+      />
     );
   }
 
@@ -57,9 +59,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (user && roles.length === 0 && !isSuperAdmin) {
     console.log('⏳ ProtectedRoute: Waiting for roles to load...');
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
+      <LoadingWithTimeout 
+        message="Cargando roles de usuario..."
+        timeout={5}
+        redirectTo="/error"
+      />
     );
   }
 

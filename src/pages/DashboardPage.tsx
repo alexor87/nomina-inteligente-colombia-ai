@@ -2,7 +2,7 @@
 import React from 'react';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
@@ -10,15 +10,14 @@ import { RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 const DashboardPage = () => {
   const { subscription, loading, error, refreshSubscription } = useSubscription();
 
-  // Show loading state while subscription is loading
+  // Show loading state with timeout while subscription is loading
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <LoadingSpinner />
-          <p className="mt-4 text-gray-600">Cargando configuración de suscripción...</p>
-        </div>
-      </div>
+      <LoadingWithTimeout 
+        message="Cargando configuración de suscripción..."
+        timeout={7}
+        redirectTo="/error"
+      />
     );
   }
 

@@ -287,7 +287,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Timeout de seguridad para evitar loading infinito
+    const loadingTimeout = setTimeout(() => {
+      console.warn('⚠️ Auth loading timeout reached, setting loading to false');
+      setLoading(false);
+    }, 6000); // 6 segundos de timeout
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(loadingTimeout);
+    };
   }, []);
 
   return (
