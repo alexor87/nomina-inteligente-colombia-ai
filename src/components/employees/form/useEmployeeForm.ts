@@ -10,6 +10,15 @@ import { useEmployeeDataPopulation } from './useEmployeeDataPopulation';
 import { useEmployeeFormEffects } from './useEmployeeFormEffects';
 
 export const useEmployeeForm = (employee?: Employee) => {
+  console.log('🔄 useEmployeeForm: Hook called with employee:', employee?.id);
+  console.log('📊 useEmployeeForm: Employee affiliations:', {
+    eps: employee?.eps,
+    afp: employee?.afp,
+    arl: employee?.arl,
+    cajaCompensacion: employee?.cajaCompensacion,
+    updatedAt: employee?.updatedAt
+  });
+  
   // Initialize form state
   const {
     companyId,
@@ -25,7 +34,8 @@ export const useEmployeeForm = (employee?: Employee) => {
 
   // Initialize form with defaults
   const { register, handleSubmit, formState: { errors }, setValue, watch, trigger, reset, control } = useForm<EmployeeFormData>({
-    defaultValues: getEmployeeFormDefaults()
+    defaultValues: getEmployeeFormDefaults(),
+    mode: 'onChange' // Enable real-time validation
   });
 
   const watchedValues = watch();
@@ -36,11 +46,14 @@ export const useEmployeeForm = (employee?: Employee) => {
   // Load company ID
   useCompanyId(setCompanyId);
 
-  // Populate form when employee data is available
+  // Populate form when employee data is available - CRITICAL SECTION
+  console.log('🔄 useEmployeeForm: About to call useEmployeeDataPopulation with employee:', employee?.id);
   useEmployeeDataPopulation(employee, setValue, trigger);
 
   // Handle form effects (auto-fill, completion calculation)
   useEmployeeFormEffects(watchedValues, setValue, setCompletionPercentage);
+
+  console.log('✅ useEmployeeForm: Hook completed, returning form methods');
 
   return {
     // Form methods

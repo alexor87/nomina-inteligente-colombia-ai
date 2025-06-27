@@ -17,12 +17,22 @@ interface EmployeeFormModernProps {
   employee?: Employee;
   onSuccess: () => void;
   onCancel: () => void;
+  onDataRefresh?: (updatedEmployee: Employee) => void;
 }
 
-export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFormModernProps) => {
+export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefresh }: EmployeeFormModernProps) => {
+  console.log('🔄 EmployeeFormModern: Component rendered/re-rendered');
   console.log('🔄 EmployeeFormModern: Received employee prop:', employee);
+  console.log('📊 EmployeeFormModern: Employee affiliations from props:', {
+    eps: employee?.eps,
+    afp: employee?.afp,
+    arl: employee?.arl,
+    cajaCompensacion: employee?.cajaCompensacion,
+    tipoCotizanteId: employee?.tipoCotizanteId,
+    subtipoCotizanteId: employee?.subtipoCotizanteId
+  });
   
-  // NEW: Local state to handle employee data updates
+  // Local state to handle employee data updates
   const [currentEmployee, setCurrentEmployee] = useState<Employee | undefined>(employee);
   
   const { configuration } = useEmployeeGlobalConfiguration();
@@ -46,24 +56,31 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     setActiveSection,
     setIsDraft,
     scrollToSection
-  } = useEmployeeForm(currentEmployee); // Use currentEmployee instead of employee
+  } = useEmployeeForm(currentEmployee);
 
-  // NEW: Handle data refresh callback
+  // Handle data refresh callback
   const handleDataRefresh = (updatedEmployee: Employee) => {
-    console.log('🔄 EmployeeFormModern: Received updated employee data:', updatedEmployee);
-    console.log('📊 Updated affiliations:', {
+    console.log('🔄 EmployeeFormModern: Received updated employee data from submission:', updatedEmployee);
+    console.log('📊 Updated affiliations in form component:', {
       eps: updatedEmployee.eps,
       afp: updatedEmployee.afp,
       arl: updatedEmployee.arl,
-      cajaCompensacion: updatedEmployee.cajaCompensacion
+      cajaCompensacion: updatedEmployee.cajaCompensacion,
+      tipoCotizanteId: updatedEmployee.tipoCotizanteId,
+      subtipoCotizanteId: updatedEmployee.subtipoCotizanteId
     });
+    
+    // Update local state
     setCurrentEmployee(updatedEmployee);
+    
+    // Notify parent component
+    onDataRefresh?.(updatedEmployee);
   };
 
   const { handleSubmit: handleFormSubmission, isLoading } = useEmployeeFormSubmission(
     currentEmployee, 
     onSuccess, 
-    handleDataRefresh // Pass the refresh callback
+    handleDataRefresh
   );
   
   const {
@@ -73,13 +90,23 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     isLoadingSubtipos,
     tiposError,
     handleTipoCotizanteChange
-  } = useTipoCotizanteManager(currentEmployee, setValue); // Use currentEmployee
+  } = useTipoCotizanteManager(currentEmployee, setValue);
 
-  // Update currentEmployee when employee prop changes
+  // Update currentEmployee when employee prop changes (including on initial load)
   useEffect(() => {
     console.log('🔄 EmployeeFormModern: Employee prop changed:', employee);
+    console.log('📊 EmployeeFormModern: New employee affiliations:', {
+      eps: employee?.eps,
+      afp: employee?.afp,
+      arl: employee?.arl,
+      cajaCompensacion: employee?.cajaCompensacion,
+      tipoCotizanteId: employee?.tipoCotizanteId,
+      subtipoCotizanteId: employee?.subtipoCotizanteId,
+      updatedAt: employee?.updatedAt
+    });
+    
     if (employee) {
-      console.log('📋 Employee data for form:', {
+      console.log('📋 Employee data for form (COMPLETE):', {
         id: employee.id,
         nombre: employee.nombre,
         apellido: employee.apellido,
@@ -91,21 +118,43 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
         afp: employee.afp,
         arl: employee.arl,
         cajaCompensacion: employee.cajaCompensacion,
+        tipoCotizanteId: employee.tipoCotizanteId,
+        subtipoCotizanteId: employee.subtipoCotizanteId,
+        updatedAt: employee.updatedAt,
         // Log all available fields
         ...employee
       });
       setCurrentEmployee(employee);
     }
-  }, [employee]);
+  }, [employee?.id, employee?.updatedAt, employee]); // Added updatedAt to trigger re-population on data changes
 
   const onSubmit = async (data: any) => {
     if (!companyId) return;
+    console.log('🚀 EmployeeFormModern: Form submission triggered with data:', data);
+    console.log('📊 Affiliations being submitted:', {
+      eps: data.eps,
+      afp: data.afp,
+      arl: data.arl,
+      cajaCompensacion: data.cajaCompensacion,
+      tipoCotizanteId: data.tipoCotizanteId,
+      subtipoCotizanteId: data.subtipoCotizanteId
+    });
     await handleFormSubmission(data, companyId, subtiposCotizante);
   };
 
   const handleDuplicate = () => {
     console.log('Duplicating employee...');
   };
+
+  console.log('🎯 EmployeeFormModern: Rendering form with currentEmployee:', {
+    id: currentEmployee?.id,
+    affiliations: {
+      eps: currentEmployee?.eps,
+      afp: currentEmployee?.afp,
+      arl: currentEmployee?.arl,
+      cajaCompensacion: currentEmployee?.cajaCompensacion
+    }
+  });
 
   return (
     <div className="flex min-h-screen bg-white">
