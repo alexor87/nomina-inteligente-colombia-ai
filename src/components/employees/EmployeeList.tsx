@@ -7,7 +7,6 @@ import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
-import { EmployeeDetailsModal } from './EmployeeDetailsModal';
 import { EmployeeExcelExportService } from '@/services/EmployeeExcelExportService';
 import { useToast } from '@/hooks/use-toast';
 import { PaginationControls } from '@/components/ui/PaginationControls';
@@ -28,15 +27,11 @@ export const EmployeeList = () => {
     filters,
     selectedEmployees,
     isLoading,
-    selectedEmployee,
-    isEmployeeProfileOpen,
     pagination,
     updateFilters,
     clearFilters,
     toggleEmployeeSelection,
     toggleAllEmployees,
-    openEmployeeProfile,
-    closeEmployeeProfile,
     totalEmployees,
     filteredCount,
     refreshEmployees,
@@ -242,7 +237,6 @@ export const EmployeeList = () => {
                   allCurrentPageSelected={allCurrentPageSelected}
                   onToggleEmployeeSelection={toggleEmployeeSelection}
                   onToggleAllEmployees={toggleAllEmployees}
-                  onOpenEmployeeProfile={openEmployeeProfile}
                   onEditEmployee={handleEditEmployee}
                   onDeleteEmployee={handleDeleteEmployee}
                   onStatusChange={handleStatusChange}
@@ -262,12 +256,6 @@ export const EmployeeList = () => {
             )}
           </CardContent>
         </Card>
-
-        <EmployeeDetailsModal
-          isOpen={isEmployeeProfileOpen}
-          onClose={closeEmployeeProfile}
-          employee={selectedEmployee}
-        />
 
         <ImportEmployeesDrawer
           isOpen={isImportDrawerOpen}
