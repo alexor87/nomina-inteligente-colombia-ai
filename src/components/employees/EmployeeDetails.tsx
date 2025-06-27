@@ -31,7 +31,7 @@ export const EmployeeDetails = ({ employee, onEdit, onClose }: EmployeeDetailsPr
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Avatar className="h-16 w-16">
-            <AvatarImage src={employee.avatar} alt={`${employee.nombre} ${employee.apellido}`} />
+            <AvatarImage src={employee.avatar || ''} alt={`${employee.nombre} ${employee.apellido}`} />
             <AvatarFallback className="bg-blue-600 text-white text-xl">
               {employee.nombre[0]}{employee.apellido[0]}
             </AvatarFallback>

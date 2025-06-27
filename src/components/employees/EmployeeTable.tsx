@@ -94,7 +94,7 @@ export const EmployeeTable = ({
               <TableCell>
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={employee.avatar} />
+                    <AvatarImage src={employee.avatar || ''} />
                     <AvatarFallback className="bg-blue-600 text-white">
                       {employee.nombre[0]}{employee.apellido[0]}
                     </AvatarFallback>

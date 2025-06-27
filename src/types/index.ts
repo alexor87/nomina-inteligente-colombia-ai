@@ -1,9 +1,29 @@
-// Tipos principales de la aplicación
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  avatar?: string;
+  companyId?: string;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  industry?: string;
+  employees?: Employee[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Employee {
   id: string;
   cedula: string;
   tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
+  segundoNombre?: string;
   apellido: string;
   email: string;
   telefono?: string;
@@ -19,90 +39,20 @@ export interface Employee {
   empresaId: string;
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
+  createdAt: string;
+  updatedAt: string;
+  // Banking information
+  banco?: string;
+  tipoCuenta?: 'ahorros' | 'corriente';
+  numeroCuenta?: string;
+  titularCuenta?: string;
+  // Additional fields for compatibility
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface Company {
-  id: string;
-  nit: string;
-  razonSocial: string;
-  email: string;
-  telefono?: string;
-  direccion?: string;
-  ciudad?: string;
-  representanteLegal?: string;
-  actividadEconomica?: string;
-  empleadosCount: number;
-  plan: 'basico' | 'profesional' | 'empresarial';
-  estado: 'activa' | 'suspendida' | 'inactiva';
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Payroll {
-  id: string;
-  empleadoId: string;
-  empresaId: string;
-  periodo: string; // YYYY-MM
-  salarioBase: number;
-  diasTrabajados: number;
-  horasExtra: number;
-  recargoNocturno: number;
-  recargoDominical: number;
-  auxilioTransporte: number;
-  bonificaciones: number;
-  cesantias: number;
-  interesesCesantias: number;
-  prima: number;
-  vacaciones: number;
-  // Deducciones
-  saludEmpleado: number;
-  pensionEmpleado: number;
-  retencionFuente: number;
-  otrasDeduciones: number;
-  // Totales
-  totalDevengado: number;
-  totalDeducciones: number;
-  netoPagado: number;
-  estado: 'borrador' | 'procesada' | 'pagada';
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface PayrollCalculation {
-  salarioBase: number;
-  diasTrabajados: number;
-  horasExtra?: number;
-  recargoNocturno?: number;
-  recargoDominical?: number;
-  bonificaciones?: number;
-}
-
-export interface LegalValidation {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}
-
-export interface DashboardMetrics {
-  totalEmpleados: number;
-  nominasProcesadas: number;
-  alertasLegales: number;
-  gastosNomina: number;
-  tendenciaMensual: number;
-}
-
-export interface User {
-  id: string;
-  email: string;
-  role: 'admin' | 'company' | 'employee';
-  companyId?: string;
-  profile?: {
-    firstName: string;
-    lastName: string;
-    avatar?: string;
-  };
+export interface ApiResponse<T> {
+  data: T | null;
+  error: string | null;
+  success: boolean;
 }
