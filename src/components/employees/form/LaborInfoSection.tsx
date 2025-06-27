@@ -1,14 +1,9 @@
 
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Briefcase, DollarSign, Calendar, Building, Clock } from 'lucide-react';
-import { EmployeeFormData } from './types';
+import { Briefcase, DollarSign, Calendar, Shield, Building, Hash } from 'lucide-react';
 import { FormField } from './FormField';
-import { CONTRACT_TYPES } from '@/types/employee-config';
-import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
+import { EmployeeFormData } from './types';
 
 interface LaborInfoSectionProps {
   control: Control<EmployeeFormData>;
@@ -20,46 +15,64 @@ interface LaborInfoSectionProps {
   register: any;
 }
 
-const SALARIO_MINIMO_2025 = 1300000;
-
 export const LaborInfoSection = ({ 
   control, 
   errors, 
   watchedValues, 
   setValue, 
-  watch,
+  watch, 
   arlRiskLevels,
-  register
+  register 
 }: LaborInfoSectionProps) => {
+  const tipoContratoOptions = [
+    { value: 'indefinido', label: 'Término Indefinido' },
+    { value: 'fijo', label: 'Término Fijo' },
+    { value: 'obra', label: 'Obra o Labor' },
+    { value: 'aprendizaje', label: 'Aprendizaje' },
+    { value: 'practicas', label: 'Prácticas' }
+  ];
+
+  const periodicidadPagoOptions = [
+    { value: 'mensual', label: 'Mensual' },
+    { value: 'quincenal', label: 'Quincenal' },
+    { value: 'semanal', label: 'Semanal' }
+  ];
+
+  const estadoOptions = [
+    { value: 'activo', label: 'Activo' },
+    { value: 'inactivo', label: 'Inactivo' },
+    { value: 'vacaciones', label: 'Vacaciones' },
+    { value: 'incapacidad', label: 'Incapacidad' },
+    { value: 'licencia', label: 'Licencia' }
+  ];
+
+  const tipoJornadaOptions = [
+    { value: 'completa', label: 'Tiempo Completo' },
+    { value: 'parcial', label: 'Tiempo Parcial' },
+    { value: 'flexible', label: 'Horario Flexible' }
+  ];
+
   return (
-    <Card className="mb-6 border-gray-200">
-      <CardHeader>
-        <div className="flex items-center gap-3">
+    <Card className="border-l-4 border-l-green-500">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2">
           <Briefcase className="w-5 h-5 text-green-600" />
-          <CardTitle className="text-lg font-semibold">Información Laboral</CardTitle>
+          <CardTitle className="text-lg text-gray-800">Información Laboral</CardTitle>
         </div>
       </CardHeader>
-      
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="group">
-            <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="w-4 h-4 text-gray-500" />
-              <Label className="text-sm font-medium text-gray-700">
-                Salario Base <span className="text-red-500">*</span>
-              </Label>
-            </div>
-            <Input
-              {...register('salarioBase', { required: 'Salario base es requerido' })}
-              type="number"
-              className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-              placeholder={`Mínimo: ${SALARIO_MINIMO_2025.toLocaleString()}`}
-            />
-            <p className="text-xs text-gray-500 mt-1">Salario mínimo 2025: ${SALARIO_MINIMO_2025.toLocaleString()}</p>
-            {errors.salarioBase && (
-              <p className="text-red-500 text-xs mt-1">{errors.salarioBase?.message}</p>
-            )}
-          </div>
+        {/* Salario y Contrato */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField
+            name="salarioBase"
+            label="Salario Base"
+            type="number"
+            control={control}
+            errors={errors}
+            required
+            icon={<DollarSign className="w-4 h-4 text-gray-500" />}
+            helpText="Salario base mensual"
+          />
           
           <FormField
             name="tipoContrato"
@@ -67,12 +80,24 @@ export const LaborInfoSection = ({
             type="select"
             control={control}
             errors={errors}
-            value={watchedValues.tipoContrato}
-            setValue={setValue}
-            options={CONTRACT_TYPES.map(type => ({ value: type.value, label: type.label }))}
+            options={tipoContratoOptions}
             required
+            icon={<Briefcase className="w-4 h-4 text-gray-500" />}
           />
           
+          <FormField
+            name="periodicidadPago"
+            label="Periodicidad de Pago"
+            type="select"
+            control={control}
+            errors={errors}
+            options={periodicidadPagoOptions}
+            icon={<Calendar className="w-4 h-4 text-gray-500" />}
+          />
+        </div>
+
+        {/* Fechas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             name="fechaIngreso"
             label="Fecha de Ingreso"
@@ -84,61 +109,25 @@ export const LaborInfoSection = ({
           />
           
           <FormField
-            name="periodicidadPago"
-            label="Periodicidad de Pago"
-            type="select"
+            name="fechaFirmaContrato"
+            label="Fecha Firma Contrato"
+            type="date"
             control={control}
             errors={errors}
-            value={watchedValues.periodicidadPago}
-            setValue={setValue}
-            options={[
-              { value: 'quincenal', label: 'Quincenal' },
-              { value: 'mensual', label: 'Mensual' }
-            ]}
+            icon={<Calendar className="w-4 h-4 text-gray-500" />}
           />
-          
+        </div>
+
+        {/* Cargo y Centro de Costos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             name="cargo"
             label="Cargo"
             type="text"
             control={control}
             errors={errors}
-            icon={<Building className="w-4 h-4 text-gray-500" />}
-          />
-          
-          <FormField
-            name="codigoCIIU"
-            label="Código CIIU"
-            type="text"
-            control={control}
-            errors={errors}
-            required
-          />
-          
-          <FormField
-            name="nivelRiesgoARL"
-            label="Nivel de Riesgo ARL"
-            type="select"
-            control={control}
-            errors={errors}
-            value={watchedValues.nivelRiesgoARL}
-            setValue={setValue}
-            options={arlRiskLevels.map(level => ({
-              value: level.value,
-              label: `${level.label} - ${level.percentage}`
-            }))}
-            required
-          />
-          
-          <FormField
-            name="estado"
-            label="Estado"
-            type="select"
-            control={control}
-            errors={errors}
-            value={watchedValues.estado}
-            setValue={setValue}
-            options={ESTADOS_EMPLEADO.map(estado => ({ value: estado.value, label: estado.label }))}
+            icon={<Briefcase className="w-4 h-4 text-gray-500" />}
+            helpText="Posición o cargo del empleado"
           />
           
           <FormField
@@ -147,6 +136,74 @@ export const LaborInfoSection = ({
             type="text"
             control={control}
             errors={errors}
+            icon={<Building className="w-4 h-4 text-gray-500" />}
+          />
+        </div>
+
+        {/* Código CIIU y Nivel de Riesgo ARL */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            name="codigoCIIU"
+            label="Código CIIU"
+            type="text"
+            control={control}
+            errors={errors}
+            icon={<Hash className="w-4 h-4 text-gray-500" />}
+            helpText="Clasificación Industrial Internacional Uniforme"
+          />
+          
+          <FormField
+            name="nivelRiesgoARL"
+            label="Nivel de Riesgo ARL"
+            type="select"
+            control={control}
+            errors={errors}
+            options={arlRiskLevels}
+            icon={<Shield className="w-4 h-4 text-gray-500" />}
+          />
+        </div>
+
+        {/* Jornada Laboral */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField
+            name="tipoJornada"
+            label="Tipo de Jornada"
+            type="select"
+            control={control}
+            errors={errors}
+            options={tipoJornadaOptions}
+            icon={<Briefcase className="w-4 h-4 text-gray-500" />}
+          />
+          
+          <FormField
+            name="diasTrabajo"
+            label="Días de Trabajo"
+            type="number"
+            control={control}
+            errors={errors}
+            icon={<Calendar className="w-4 h-4 text-gray-500" />}
+          />
+          
+          <FormField
+            name="horasTrabajo"
+            label="Horas de Trabajo"
+            type="number"
+            control={control}
+            errors={errors}
+            icon={<Calendar className="w-4 h-4 text-gray-500" />}
+          />
+        </div>
+
+        {/* Estado */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            name="estado"
+            label="Estado"
+            type="select"
+            control={control}
+            errors={errors}
+            options={estadoOptions}
+            icon={<Shield className="w-4 h-4 text-gray-500" />}
           />
         </div>
       </CardContent>

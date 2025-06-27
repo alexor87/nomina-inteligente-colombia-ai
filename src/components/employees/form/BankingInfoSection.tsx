@@ -1,11 +1,9 @@
 
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { CreditCard } from 'lucide-react';
-import { EmployeeFormData } from './types';
+import { CreditCard, Building, Hash, User } from 'lucide-react';
 import { FormField } from './FormField';
+import { EmployeeFormData } from './types';
 
 interface BankingInfoSectionProps {
   control: Control<EmployeeFormData>;
@@ -16,41 +14,77 @@ interface BankingInfoSectionProps {
   register: any;
 }
 
-const BANCOS_COLOMBIA = [
-  'Bancolombia', 'Banco de Bogotá', 'Davivienda', 'BBVA Colombia',
-  'Banco Popular', 'Banco de Occidente', 'Banco AV Villas', 'Bancoomeva',
-  'Banco Falabella', 'Banco Pichincha', 'Banco Caja Social', 'Nequi', 'Daviplata'
-];
-
 export const BankingInfoSection = ({ 
   control, 
   errors, 
   watchedValues, 
   setValue, 
   watch,
-  register
+  register 
 }: BankingInfoSectionProps) => {
+  const tipoCuentaOptions = [
+    { value: 'ahorros', label: 'Ahorros' },
+    { value: 'corriente', label: 'Corriente' }
+  ];
+
+  const formaPagoOptions = [
+    { value: 'dispersion', label: 'Dispersión Bancaria' },
+    { value: 'efectivo', label: 'Efectivo' },
+    { value: 'cheque', label: 'Cheque' }
+  ];
+
+  const bancoOptions = [
+    { value: 'bancolombia', label: 'Bancolombia' },
+    { value: 'banco_bogota', label: 'Banco de Bogotá' },
+    { value: 'banco_popular', label: 'Banco Popular' },
+    { value: 'bbva', label: 'BBVA Colombia' },
+    { value: 'banco_occidente', label: 'Banco de Occidente' },
+    { value: 'banco_santander', label: 'Banco Santander' },
+    { value: 'banco_caja_social', label: 'Banco Caja Social' },
+    { value: 'banco_av_villas', label: 'Banco AV Villas' },
+    { value: 'banco_davivienda', label: 'Banco Davivienda' },
+    { value: 'banco_falabella', label: 'Banco Falabella' },
+    { value: 'banco_pichincha', label: 'Banco Pichincha' },
+    { value: 'banco_gnb_sudameris', label: 'Banco GNB Sudameris' },
+    { value: 'banco_itau', label: 'Banco Itaú' },
+    { value: 'banco_agrario', label: 'Banco Agrario' },
+    { value: 'nequi', label: 'Nequi' },
+    { value: 'daviplata', label: 'DaviPlata' },
+    { value: 'otro', label: 'Otro' }
+  ];
+
   return (
-    <Card className="mb-6 border-gray-200">
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <CreditCard className="w-5 h-5 text-orange-600" />
-          <CardTitle className="text-lg font-semibold">Información Bancaria</CardTitle>
+    <Card className="border-l-4 border-l-purple-500">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2">
+          <CreditCard className="w-5 h-5 text-purple-600" />
+          <CardTitle className="text-lg text-gray-800">Información Bancaria</CardTitle>
         </div>
       </CardHeader>
-      
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Forma de Pago */}
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <FormField
+            name="formaPago"
+            label="Forma de Pago"
+            type="select"
+            control={control}
+            errors={errors}
+            options={formaPagoOptions}
+            icon={<CreditCard className="w-4 h-4 text-gray-500" />}
+          />
+        </div>
+
+        {/* Información Bancaria */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             name="banco"
             label="Banco"
             type="select"
             control={control}
             errors={errors}
-            value={watchedValues.banco}
-            setValue={setValue}
-            options={BANCOS_COLOMBIA.map(banco => ({ value: banco, label: banco }))}
-            required
+            options={bancoOptions}
+            icon={<Building className="w-4 h-4 text-gray-500" />}
           />
           
           <FormField
@@ -59,54 +93,31 @@ export const BankingInfoSection = ({
             type="select"
             control={control}
             errors={errors}
-            value={watchedValues.tipoCuenta}
-            setValue={setValue}
-            options={[
-              { value: 'ahorros', label: 'Ahorros' },
-              { value: 'corriente', label: 'Corriente' }
-            ]}
-            required
+            options={tipoCuentaOptions}
+            icon={<CreditCard className="w-4 h-4 text-gray-500" />}
           />
-          
+        </div>
+
+        {/* Número de Cuenta y Titular */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             name="numeroCuenta"
             label="Número de Cuenta"
             type="text"
             control={control}
             errors={errors}
-            required
+            icon={<Hash className="w-4 h-4 text-gray-500" />}
+            helpText="Número de cuenta bancaria"
           />
           
-          <div className="group">
-            <div className="flex items-center gap-2 mb-1">
-              <Label className="text-sm font-medium text-gray-700">
-                Titular de la Cuenta <span className="text-red-500">*</span>
-              </Label>
-            </div>
-            <Input
-              {...register('titularCuenta', { required: 'Titular de la cuenta es requerido' })}
-              className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-              placeholder="Nombre completo del titular"
-            />
-            <p className="text-xs text-gray-500 mt-1">Se completa automáticamente con nombre y apellidos</p>
-            {errors.titularCuenta && (
-              <p className="text-red-500 text-xs mt-1">{errors.titularCuenta?.message}</p>
-            )}
-          </div>
-          
           <FormField
-            name="formaPago"
-            label="Forma de Pago"
-            type="select"
+            name="titularCuenta"
+            label="Titular de la Cuenta"
+            type="text"
             control={control}
             errors={errors}
-            value={watchedValues.formaPago}
-            setValue={setValue}
-            options={[
-              { value: 'dispersion', label: 'Dispersión Bancaria' },
-              { value: 'manual', label: 'Pago Manual' }
-            ]}
-            required
+            icon={<User className="w-4 h-4 text-gray-500" />}
+            helpText="Nombre completo del titular"
           />
         </div>
       </CardContent>

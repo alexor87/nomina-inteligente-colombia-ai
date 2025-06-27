@@ -1,5 +1,5 @@
 
-import { Control, FieldErrors, UseFormSetValue } from 'react-hook-form';
+import { Control, FieldErrors, Controller } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,13 +12,10 @@ interface FormFieldProps {
   type: 'text' | 'number' | 'email' | 'date' | 'select';
   control: Control<EmployeeFormData>;
   errors: FieldErrors<EmployeeFormData>;
-  value?: any;
-  setValue?: UseFormSetValue<EmployeeFormData>;
   options?: { value: string; label: string }[];
   required?: boolean;
   icon?: React.ReactNode;
   helpText?: string;
-  register?: any;
 }
 
 export const FormField = ({
@@ -27,13 +24,10 @@ export const FormField = ({
   type,
   control,
   errors,
-  value,
-  setValue,
   options,
   required = false,
   icon,
-  helpText,
-  register
+  helpText
 }: FormFieldProps) => {
   return (
     <div className="group">
@@ -52,36 +46,42 @@ export const FormField = ({
         )}
       </div>
       
-      {type === 'select' && options && setValue ? (
-        <Select 
-          onValueChange={(selectedValue) => setValue(name, selectedValue as any)}
-          value={value as string}
-        >
-          <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-            <SelectValue placeholder={`Seleccionar ${label.toLowerCase()}`} />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : register ? (
-        <Input
-          {...register(name, { required: required ? `${label} es requerido` : false })}
-          type={type}
-          className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-          placeholder={`Ingresa ${label.toLowerCase()}`}
-        />
-      ) : (
-        <Input
-          type={type}
-          className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-          placeholder={`Ingresa ${label.toLowerCase()}`}
-        />
-      )}
+      <Controller
+        name={name}
+        control={control}
+        rules={{ required: required ? `${label} es requerido` : false }}
+        render={({ field }) => {
+          if (type === 'select' && options) {
+            return (
+              <Select 
+                onValueChange={field.onChange}
+                value={field.value as string || ''}
+              >
+                <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                  <SelectValue placeholder={`Seleccionar ${label.toLowerCase()}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          }
+
+          return (
+            <Input
+              {...field}
+              type={type}
+              className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+              placeholder={`Ingresa ${label.toLowerCase()}`}
+              value={field.value || ''}
+            />
+          );
+        }}
+      />
       
       {errors[name] && (
         <p className="text-red-500 text-xs mt-1">{errors[name]?.message}</p>
