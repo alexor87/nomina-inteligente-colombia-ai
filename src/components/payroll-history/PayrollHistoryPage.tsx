@@ -68,26 +68,29 @@ export const PayrollHistoryPage = () => {
       const data = await PayrollHistoryService.getPayrollPeriods();
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
-        // Fix the status mapping logic to handle all possible estados
+        // Fix the status mapping logic to handle all possible estados and reopened status
         let mappedStatus: 'cerrado' | 'con_errores' | 'revision' | 'editado' | 'reabierto' = 'revision';
         
-        switch (record.estado) {
-          case 'cerrada':
-          case 'procesada':
-          case 'pagada':
-            mappedStatus = 'cerrado';
-            break;
-          case 'reabierto':
-            mappedStatus = 'reabierto';
-            break;
-          case 'borrador':
-            mappedStatus = 'revision';
-            break;
-          default:
-            // Only mark as 'con_errores' if there's an actual error status
-            // or if we detect data inconsistencies
-            mappedStatus = 'con_errores';
-            break;
+        // First check if the period was reopened (has reabierto_por field)
+        if (record.reabierto_por) {
+          mappedStatus = 'reabierto';
+        } else {
+          // Then check the regular estado
+          switch (record.estado) {
+            case 'cerrada':
+            case 'procesada':
+            case 'pagada':
+              mappedStatus = 'cerrado';
+              break;
+            case 'borrador':
+              mappedStatus = 'revision';
+              break;
+            default:
+              // Only mark as 'con_errores' if there's an actual error status
+              // or if we detect data inconsistencies
+              mappedStatus = 'con_errores';
+              break;
+          }
         }
 
         return {
@@ -107,8 +110,9 @@ export const PayrollHistoryPage = () => {
           version: 1,
           createdAt: record.fechaCreacion || new Date().toISOString(),
           updatedAt: record.fechaCreacion || new Date().toISOString(),
-          editable: true, // Default to true, will be updated from DB
-          reportedToDian: false // Default to false
+          editable: record.editable !== false, // Default to true if not specified
+          reportedToDian: record.reportado_dian || false, // Default to false
+          reopenedBy: record.reabierto_por ? 'usuario@empresa.com' : undefined // You might want to get actual user email
         };
       });
       setPeriods(convertedPeriods);
