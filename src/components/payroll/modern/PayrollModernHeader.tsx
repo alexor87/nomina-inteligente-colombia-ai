@@ -1,23 +1,17 @@
 
 import { Button } from '@/components/ui/button';
 import { PayrollPeriod } from '@/services/PayrollPeriodService';
+import { PayrollSummary } from '@/types/payroll';
+import { formatCurrency } from '@/lib/utils';
 
 interface PayrollModernHeaderProps {
   period: PayrollPeriod | null;
-  isValid: boolean;
-  canEdit: boolean;
-  onApprove: () => void;
-  onRefresh: () => void;
-  isLoading: boolean;
+  summary: PayrollSummary;
 }
 
 export const PayrollModernHeader = ({
   period,
-  isValid,
-  canEdit,
-  onApprove,
-  onRefresh,
-  isLoading
+  summary
 }: PayrollModernHeaderProps) => {
   if (!period) return null;
 
@@ -33,31 +27,32 @@ export const PayrollModernHeader = ({
     return `${startDay}-${endDay} /${month}/ ${year}`;
   };
 
-  const getStatusEmoji = () => {
-    switch (period.estado) {
-      case 'borrador': return '🟡';
-      case 'aprobado': return '🟢';
-      case 'cerrado': return '🔒';
-      default: return '⚪';
-    }
-  };
-
   return (
-    <div className="bg-white px-6 py-4 mb-6">
-      <div className="flex items-center justify-between max-w-7xl mx-auto">
-        <div className="text-gray-700 text-lg">
-          {formatPeriod()} {getStatusEmoji()}
-        </div>
+    <div className="bg-white border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Nómina del período {formatPeriod()}
+            </h1>
+            <div className="mt-2 text-sm text-gray-500 space-x-4">
+              <span>{summary.validEmployees} empleados válidos</span>
+              <span>•</span>
+              <span>{formatCurrency(summary.totalGrossPay)} devengado</span>
+              <span>•</span>
+              <span>{formatCurrency(summary.totalDeductions)} deducciones</span>
+              <span>•</span>
+              <span className="font-medium">{formatCurrency(summary.totalNetPay)} neto</span>
+            </div>
+          </div>
 
-        {isValid && canEdit && period.estado === 'borrador' && (
           <Button
-            onClick={onApprove}
-            disabled={isLoading}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            variant="outline"
+            onClick={() => window.location.href = '/app/payroll-history'}
           >
-            Aprobar período
+            Historial de períodos
           </Button>
-        )}
+        </div>
       </div>
     </div>
   );

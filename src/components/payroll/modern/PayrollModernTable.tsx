@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
-import { User, Edit } from 'lucide-react';
+import { Edit, UserPlus } from 'lucide-react';
 import { NovedadDrawer } from '../novedades/NovedadDrawer';
 import { useNovedades } from '@/hooks/useNovedades';
 import { NovedadFormData, CreateNovedadData } from '@/types/novedades';
@@ -69,35 +69,27 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     await deleteNovedad(id, selectedEmployee.id, true);
   };
 
-  const getEmployeeNameStyle = (status: string) => {
-    switch (status) {
-      case 'valid':
-        return 'text-green-800';
-      case 'error':
-        return 'text-red-600';
-      case 'warning':
-        return 'text-amber-600';
-      default:
-        return 'text-gray-800';
-    }
-  };
-
+  // Estado vacío mejorado siguiendo el ejemplo de Aleluya
   if (employees.length === 0) {
     return (
-      <div className="text-center py-20">
-        <div className="text-6xl mb-4">😕</div>
-        <h3 className="text-lg text-gray-600 mb-2">
-          Aún no has agregado personas para liquidar
-        </h3>
-        <p className="text-gray-500 mb-6">
-          Necesitas empleados activos para comenzar.
-        </p>
-        <Button 
-          onClick={() => window.location.href = '/app/employees'}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          Ir a Empleados
-        </Button>
+      <div className="bg-white min-h-96">
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+            <UserPlus className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-xl font-medium text-gray-900 mb-2">
+            No has agregado personas
+          </h3>
+          <p className="text-gray-500 mb-8 text-center max-w-md">
+            Para liquidar tu primera nómina debes agregar al menos una persona
+          </p>
+          <Button 
+            onClick={() => window.location.href = '/app/employees'}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            Agregar persona
+          </Button>
+        </div>
       </div>
     );
   }
@@ -106,65 +98,63 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     <>
       <div className="bg-white">
         <table className="w-full">
-          <thead>
-            <tr className="text-left text-sm text-gray-500">
-              <th className="py-3 px-4 font-medium">Empleado</th>
-              <th className="py-3 px-4 font-medium text-right">Salario</th>
-              <th className="py-3 px-4 font-medium text-right">Neto</th>
-              <th className="py-3 px-4 font-medium text-center">Acción</th>
+          <thead className="border-b border-gray-200">
+            <tr>
+              <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">
+                Personas
+              </th>
+              <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">
+                Salario base
+              </th>
+              <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">
+                Novedades
+              </th>
+              <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">
+                Total pago empleado
+              </th>
+              <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody>
-            {employees.map((employee) => (
-              <tr key={employee.id} className="hover:bg-gray-25">
-                <td className="py-3 px-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-gray-500" />
+            {employees.map((employee, index) => (
+              <tr key={employee.id} className={index !== employees.length - 1 ? "border-b border-gray-100" : ""}>
+                <td className="py-4 px-6">
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      {employee.name}
                     </div>
-                    <div>
-                      <div className={`font-medium ${getEmployeeNameStyle(employee.status)}`}>
-                        {employee.name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {employee.position}
-                      </div>
+                    <div className="text-sm text-gray-500">
+                      {employee.position}
                     </div>
                   </div>
                 </td>
-                <td className="py-3 px-4 text-right font-medium">
+                <td className="py-4 px-6 text-right font-medium text-gray-900">
                   {formatCurrency(employee.baseSalary)}
                 </td>
-                <td className="py-3 px-4 text-right font-semibold">
+                <td className="py-4 px-6 text-center">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Ver novedades
+                  </span>
+                </td>
+                <td className="py-4 px-6 text-right font-semibold text-gray-900">
                   {formatCurrency(employee.netPay)}
                 </td>
-                <td className="py-3 px-4 text-center">
+                <td className="py-4 px-6 text-center">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleOpenNovedades(employee)}
                     className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                   >
-                    <Edit className="w-4 h-4 mr-1" />
-                    Editar
+                    <Edit className="w-4 h-4" />
                   </Button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Main Action Button */}
-      <div className="text-center py-8">
-        <Button
-          onClick={onRecalculate}
-          disabled={isLoading}
-          size="lg"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-        >
-          Liquidar período
-        </Button>
       </div>
 
       {/* Novedad Drawer */}

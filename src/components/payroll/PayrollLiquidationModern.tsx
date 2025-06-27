@@ -1,6 +1,6 @@
 
 import { PayrollModernHeader } from './modern/PayrollModernHeader';
-import { PayrollModernSummary } from './modern/PayrollModernSummary';
+import { PayrollInlineFilters } from './modern/PayrollInlineFilters';
 import { PayrollModernTable } from './modern/PayrollModernTable';
 import { usePayrollLiquidationIntelligentEnhanced } from '@/hooks/usePayrollLiquidationIntelligentEnhanced';
 
@@ -43,14 +43,15 @@ export const PayrollLiquidationModern = () => {
     <div className="min-h-screen bg-gray-50">
       <PayrollModernHeader
         period={currentPeriod}
-        isValid={isValid}
-        canEdit={canEdit}
-        onApprove={approvePeriod}
-        onRefresh={refreshEmployees}
+        summary={summary}
+      />
+
+      <PayrollInlineFilters
+        onLiquidate={recalculateAll}
         isLoading={isLoading}
       />
 
-      <div className="max-w-6xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto">
         <PayrollModernTable
           employees={employees}
           onUpdateEmployee={handleUpdateEmployee}
