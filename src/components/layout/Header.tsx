@@ -8,26 +8,12 @@ import { UserMenu } from './UserMenu';
 import { CompanySelector } from './CompanySelector';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useCompanyName } from '@/hooks/useCompanyName';
 
 export const Header = () => {
   const { user, profile, isSuperAdmin, roles } = useAuth();
   const { subscription, isTrialExpired } = useSubscription();
-
-  const getCompanyDisplayName = () => {
-    if (isSuperAdmin) return 'Super Admin Panel';
-    
-    // Para empresas múltiples, mostrar un nombre genérico ya que el selector está visible
-    if (roles.length > 1) return 'Nómina Inteligente';
-    
-    // Para una sola empresa, intentar obtener el nombre de la empresa
-    if (profile?.company_id) {
-      // Aquí podrías obtener el nombre real de la empresa desde el contexto o estado
-      // Por ahora usaremos un nombre genérico
-      return 'Mi Empresa';
-    }
-    
-    return 'Nómina Inteligente';
-  };
+  const { companyName } = useCompanyName();
 
   const getSubscriptionBadge = () => {
     if (isSuperAdmin) {
@@ -78,8 +64,6 @@ export const Header = () => {
     );
   };
 
-  const companyDisplayName = getCompanyDisplayName();
-
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -87,7 +71,7 @@ export const Header = () => {
           <div className="flex items-center space-x-2">
             <Building2 className="h-6 w-6 text-blue-600" />
             <h1 className="text-xl font-semibold text-gray-900">
-              {companyDisplayName}
+              {companyName}
             </h1>
           </div>
           
