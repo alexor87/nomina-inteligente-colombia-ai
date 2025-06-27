@@ -32,18 +32,9 @@ export const PayrollModernHeader = ({
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+            <h1 className="text-2xl font-semibold text-gray-900">
               Nómina del período {formatPeriod()}
             </h1>
-            <div className="text-sm text-gray-500 space-x-4">
-              <span>{summary.validEmployees} empleados válidos</span>
-              <span>•</span>
-              <span>{formatCurrency(summary.totalGrossPay)} devengado</span>
-              <span>•</span>
-              <span>{formatCurrency(summary.totalDeductions)} deducciones</span>
-              <span>•</span>
-              <span className="font-medium">{formatCurrency(summary.totalNetPay)} neto</span>
-            </div>
           </div>
 
           <Button
