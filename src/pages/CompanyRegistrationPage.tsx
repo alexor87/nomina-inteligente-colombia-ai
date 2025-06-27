@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CompanyRegistrationWizard } from '@/components/auth/CompanyRegistrationWizard';
@@ -27,7 +26,7 @@ export const CompanyRegistrationPage = () => {
         email: data.invitedMember?.email || 'contacto@empresa.com',
         telefono: '',
         ciudad: 'Bogotá',
-        plan: 'profesional',
+        plan: 'profesional' as const,
         // Additional data that we'll store in company settings
         actividad_economica: data.industry,
         codigo_ciiu: data.ciiuCode,
