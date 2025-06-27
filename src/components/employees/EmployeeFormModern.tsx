@@ -30,6 +30,8 @@ interface EmployeeFormModernProps {
 }
 
 export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFormModernProps) => {
+  console.log('🔄 EmployeeFormModern: Received employee prop:', employee);
+  
   const { configuration } = useEmployeeGlobalConfiguration();
   const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUD();
   const { epsEntities, afpEntities, arlEntities, compensationFunds, isLoading: entitiesLoading } = useSecurityEntities();
@@ -63,8 +65,26 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     scrollToSection
   } = useEmployeeForm(employee);
 
+  // Debug: Log when employee prop changes
+  useEffect(() => {
+    console.log('🔄 EmployeeFormModern: Employee prop changed:', employee);
+    if (employee) {
+      console.log('📋 Employee data for form:', {
+        id: employee.id,
+        nombre: employee.nombre,
+        apellido: employee.apellido,
+        cedula: employee.cedula,
+        email: employee.email,
+        salarioBase: employee.salarioBase,
+        // Log all available fields
+        ...employee
+      });
+    }
+  }, [employee]);
+
   // Handle tipo cotizante change
   const handleTipoCotizanteChange = async (tipoCotizanteId: string) => {
+    console.log('🔄 Changing tipo cotizante to:', tipoCotizanteId);
     setValue('tipoCotizanteId', tipoCotizanteId);
     setValue('subtipoCotizanteId', ''); // Clear subtipo when changing tipo
     
@@ -78,6 +98,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
   // Load subtipos when employee has tipoCotizanteId
   useEffect(() => {
     if (employee?.tipoCotizanteId) {
+      console.log('🔄 Loading subtipos for tipoCotizanteId:', employee.tipoCotizanteId);
       fetchSubtipos(employee.tipoCotizanteId);
     }
   }, [employee?.tipoCotizanteId, fetchSubtipos]);
@@ -139,7 +160,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
                 {employee ? 'Editar Empleado' : 'Nuevo Empleado'}
               </h1>
               <p className="text-gray-600 mt-1">
-                {employee ? 'Actualiza la información del empleado' : 'Completa la información para crear un nuevo empleado'}
+                {employee ? `Actualiza la información de ${employee.nombre} ${employee.apellido}` : 'Completa la información para crear un nuevo empleado'}
               </p>
             </div>
             

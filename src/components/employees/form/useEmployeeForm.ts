@@ -128,19 +128,43 @@ export const useEmployeeForm = (employee?: Employee) => {
     loadCompanyId();
   }, []);
 
-  // Update form when employee changes
+  // Update form when employee changes - CRÍTICO PARA EDICIÓN
   useEffect(() => {
     if (employee) {
       console.log('🔄 useEmployeeForm: Setting form values from employee:', employee);
+      console.log('📋 Employee fields available:', Object.keys(employee));
       
-      // Información Personal
-      setValue('cedula', employee.cedula || '');
-      setValue('tipoDocumento', employee.tipoDocumento || 'CC');
-      setValue('nombre', employee.nombre || '');
-      setValue('segundoNombre', employee.segundoNombre || '');
-      setValue('apellido', employee.apellido || '');
-      setValue('email', employee.email || '');
-      setValue('telefono', employee.telefono || '');
+      // Información Personal - Verificación detallada
+      if (employee.cedula) {
+        console.log('Setting cedula:', employee.cedula);
+        setValue('cedula', employee.cedula);
+      }
+      if (employee.tipoDocumento) {
+        console.log('Setting tipoDocumento:', employee.tipoDocumento);
+        setValue('tipoDocumento', employee.tipoDocumento);
+      }
+      if (employee.nombre) {
+        console.log('Setting nombre:', employee.nombre);
+        setValue('nombre', employee.nombre);
+      }
+      if ((employee as any).segundoNombre) {
+        console.log('Setting segundoNombre:', (employee as any).segundoNombre);
+        setValue('segundoNombre', (employee as any).segundoNombre);
+      }
+      if (employee.apellido) {
+        console.log('Setting apellido:', employee.apellido);
+        setValue('apellido', employee.apellido);
+      }
+      if (employee.email) {
+        console.log('Setting email:', employee.email);
+        setValue('email', employee.email);
+      }
+      if (employee.telefono) {
+        console.log('Setting telefono:', employee.telefono);
+        setValue('telefono', employee.telefono);
+      }
+      
+      // Campos extendidos de información personal
       setValue('sexo', (employee as any).sexo || 'M');
       setValue('fechaNacimiento', (employee as any).fechaNacimiento || '');
       setValue('direccion', (employee as any).direccion || '');
@@ -148,9 +172,19 @@ export const useEmployeeForm = (employee?: Employee) => {
       setValue('departamento', (employee as any).departamento || '');
       
       // Información Laboral
-      setValue('salarioBase', employee.salarioBase || SALARIO_MINIMO_2025);
-      setValue('tipoContrato', employee.tipoContrato || 'indefinido');
-      setValue('fechaIngreso', employee.fechaIngreso || new Date().toISOString().split('T')[0]);
+      if (employee.salarioBase) {
+        console.log('Setting salarioBase:', employee.salarioBase);
+        setValue('salarioBase', employee.salarioBase);
+      }
+      if (employee.tipoContrato) {
+        console.log('Setting tipoContrato:', employee.tipoContrato);
+        setValue('tipoContrato', employee.tipoContrato);
+      }
+      if (employee.fechaIngreso) {
+        console.log('Setting fechaIngreso:', employee.fechaIngreso);
+        setValue('fechaIngreso', employee.fechaIngreso);
+      }
+      
       setValue('periodicidadPago', (employee as any).periodicidadPago || 'mensual');
       setValue('cargo', employee.cargo || '');
       setValue('codigoCIIU', (employee as any).codigoCIIU || '');
@@ -168,25 +202,52 @@ export const useEmployeeForm = (employee?: Employee) => {
       setValue('clausulasEspeciales', (employee as any).clausulasEspeciales || '');
       
       // Información Bancaria
-      setValue('banco', employee.banco || '');
+      if (employee.banco) {
+        console.log('Setting banco:', employee.banco);
+        setValue('banco', employee.banco);
+      }
       setValue('tipoCuenta', employee.tipoCuenta || 'ahorros');
-      setValue('numeroCuenta', employee.numeroCuenta || '');
-      setValue('titularCuenta', employee.titularCuenta || '');
+      if (employee.numeroCuenta) {
+        console.log('Setting numeroCuenta:', employee.numeroCuenta);
+        setValue('numeroCuenta', employee.numeroCuenta);
+      }
+      if (employee.titularCuenta) {
+        console.log('Setting titularCuenta:', employee.titularCuenta);
+        setValue('titularCuenta', employee.titularCuenta);
+      }
       setValue('formaPago', (employee as any).formaPago || 'dispersion');
       
       // Afiliaciones
-      setValue('eps', employee.eps || '');
-      setValue('afp', employee.afp || '');
-      setValue('arl', employee.arl || '');
-      setValue('cajaCompensacion', employee.cajaCompensacion || '');
+      if (employee.eps) {
+        console.log('Setting eps:', employee.eps);
+        setValue('eps', employee.eps);
+      }
+      if (employee.afp) {
+        console.log('Setting afp:', employee.afp);
+        setValue('afp', employee.afp);
+      }
+      if (employee.arl) {
+        console.log('Setting arl:', employee.arl);
+        setValue('arl', employee.arl);
+      }
+      if (employee.cajaCompensacion) {
+        console.log('Setting cajaCompensacion:', employee.cajaCompensacion);
+        setValue('cajaCompensacion', employee.cajaCompensacion);
+      }
+      
       setValue('tipoCotizanteId', employee.tipoCotizanteId || '');
       setValue('subtipoCotizanteId', employee.subtipoCotizanteId || '');
       setValue('regimenSalud', (employee as any).regimenSalud || 'contributivo');
       setValue('estadoAfiliacion', employee.estadoAfiliacion || 'pendiente');
       
       console.log('✅ useEmployeeForm: All form values set from employee data');
+      
+      // Force trigger validation after setting values
+      setTimeout(() => {
+        trigger();
+      }, 100);
     }
-  }, [employee, setValue]);
+  }, [employee, setValue, trigger]);
 
   // Auto-fill titular cuenta
   useEffect(() => {
