@@ -25,9 +25,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   // Local state to handle employee data updates
   const [currentEmployee, setCurrentEmployee] = useState<Employee | undefined>(employee);
   
-  // Sidebar state - collapsed by default
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const sidebarRef = useRef<HTMLDivElement>(null);
+  // Sidebar state - expanded by default
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   const { configuration } = useEmployeeGlobalConfiguration();
   
@@ -50,24 +49,6 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     setIsDraft,
     scrollToSection
   } = useEmployeeForm(currentEmployee);
-
-  // Handle click outside sidebar to close it
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        sidebarRef.current &&
-        !sidebarRef.current.contains(event.target as Node) &&
-        !sidebarCollapsed
-      ) {
-        setSidebarCollapsed(true);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [sidebarCollapsed]);
 
   // Handle data refresh callback
   const handleDataRefresh = (updatedEmployee: Employee) => {
@@ -135,16 +116,14 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   return (
     <div className="flex min-h-screen bg-white">
-      {/* Sidebar with ref for click outside detection */}
-      <div ref={sidebarRef}>
-        <NavigationSidebar 
-          activeSection={activeSection}
-          completionPercentage={completionPercentage}
-          scrollToSection={scrollToSection}
-          collapsed={sidebarCollapsed}
-          onToggle={toggleSidebar}
-        />
-      </div>
+      {/* Sidebar */}
+      <NavigationSidebar 
+        activeSection={activeSection}
+        completionPercentage={completionPercentage}
+        scrollToSection={scrollToSection}
+        collapsed={sidebarCollapsed}
+        onToggle={toggleSidebar}
+      />
       
       {/* Main content with dynamic margin based on sidebar state */}
       <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-72'}`}>
