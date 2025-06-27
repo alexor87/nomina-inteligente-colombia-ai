@@ -202,13 +202,14 @@ export class PayrollPeriodService {
     }
   }
 
-  // Obtener período actual activo (borrador)
+  // Obtener período actual activo (borrador) - mejorado para detectar períodos reabiertos
   static async getCurrentActivePeriod(): Promise<PayrollPeriod | null> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) return null;
 
-      const { data, error } = await supabase
+      // Primero buscar período activo en payroll_periods
+      const { data: activePeriod, error } = await supabase
         .from('payroll_periods')
         .select('*')
         .eq('company_id', companyId)
@@ -218,7 +219,63 @@ export class PayrollPeriodService {
         .maybeSingle();
 
       if (error) throw error;
-      return data as PayrollPeriod | null;
+
+      // Si encontramos un período activo, devolverlo
+      if (activePeriod) {
+        return activePeriod as PayrollPeriod;
+      }
+
+      // Si no hay período activo, verificar si hay períodos reabiertos en payrolls
+      const { data: reopenedPayrolls, error: reopenedError } = await supabase
+        .from('payrolls')
+        .select('periodo, reabierto_por, fecha_reapertura, created_at')
+        .eq('company_id', companyId)
+        .eq('estado', 'borrador')
+        .not('reabierto_por', 'is', null)
+        .order('fecha_reapertura', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (reopenedError) {
+        console.error('Error checking reopened periods:', reopenedError);
+        return null;
+      }
+
+      // Si encontramos un período reabierto, crear el payroll_period correspondiente
+      if (reopenedPayrolls) {
+        console.log('Período reabierto detectado, creando payroll_period:', reopenedPayrolls.periodo);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        const userId = user?.id;
+        
+        // Generar fechas basadas en el período
+        const periodDate = new Date(reopenedPayrolls.periodo + '-01');
+        const startDate = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
+        const endDate = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0);
+
+        const { data: newPeriod, error: createError } = await supabase
+          .from('payroll_periods')
+          .insert({
+            company_id: companyId,
+            fecha_inicio: startDate.toISOString().split('T')[0],
+            fecha_fin: endDate.toISOString().split('T')[0],
+            tipo_periodo: 'mensual',
+            estado: 'borrador',
+            modificado_por: userId
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating period for reopened payroll:', createError);
+          return null;
+        }
+
+        console.log('Período creado automáticamente para período reabierto:', newPeriod);
+        return newPeriod as PayrollPeriod;
+      }
+
+      return null;
     } catch (error) {
       console.error('Error getting current active period:', error);
       return null;

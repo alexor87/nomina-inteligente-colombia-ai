@@ -200,22 +200,25 @@ export const PayrollHistoryPage = () => {
       setShowReopenModal(false);
       setSelectedPeriod(null);
       
-      // Mostrar botón para ir a liquidar
+      // Mostrar toast con opción mejorada para ir a liquidar
       toast({
-        title: "¿Quieres ir a liquidar?",
-        description: (
-          <div className="flex items-center gap-2 mt-2">
-            <span>El período fue reabierto correctamente.</span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => navigate('/app/payroll')}
-              className="ml-2"
-            >
-              <ArrowRight className="h-3 w-3 mr-1" />
-              Ir a liquidar
-            </Button>
-          </div>
+        title: "Período reabierto exitosamente",
+        description: "El período está ahora disponible para edición en el módulo de liquidación.",
+        action: (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              // Pequeña espera para asegurar que el período se sincronizó
+              setTimeout(() => {
+                navigate('/app/payroll');
+              }, 500);
+            }}
+            className="ml-2"
+          >
+            <ArrowRight className="h-3 w-3 mr-1" />
+            Ir a liquidar
+          </Button>
         ),
       });
       

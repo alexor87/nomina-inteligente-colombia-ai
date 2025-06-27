@@ -141,8 +141,8 @@ export class PayrollReopenService {
         throw new Error(reason || 'No se puede reabrir este período');
       }
 
-      // Actualizar el estado del período
-      const { error: updateError } = await supabase
+      // Actualizar el estado del período en payrolls
+      const { error: updatePayrollError } = await supabase
         .from('payrolls')
         .update({
           estado: 'borrador',
@@ -154,9 +154,12 @@ export class PayrollReopenService {
         .eq('company_id', request.companyId)
         .eq('periodo', request.periodo);
 
-      if (updateError) {
-        throw new Error('Error actualizando el período: ' + updateError.message);
+      if (updatePayrollError) {
+        throw new Error('Error actualizando el período: ' + updatePayrollError.message);
       }
+
+      // Sincronizar con payroll_periods - crear o actualizar período activo
+      await this.syncPayrollPeriod(request.periodo, request.companyId, request.userId);
 
       // Registrar log de auditoría
       await this.createAuditLog(request.companyId, {
@@ -171,6 +174,76 @@ export class PayrollReopenService {
     } catch (error) {
       console.error('Error reopening period:', error);
       throw error;
+    }
+  }
+
+  // Sincronizar período reabierto con payroll_periods
+  private static async syncPayrollPeriod(periodo: string, companyId: string, userId: string): Promise<void> {
+    try {
+      // Obtener datos básicos del período desde payrolls
+      const { data: payrollData } = await supabase
+        .from('payrolls')
+        .select('created_at')
+        .eq('company_id', companyId)
+        .eq('periodo', periodo)
+        .limit(1)
+        .single();
+
+      if (!payrollData) {
+        console.warn('No se encontraron datos del período en payrolls');
+        return;
+      }
+
+      // Generar fechas basadas en el período (formato típico: "2024-01", "2024-02", etc.)
+      const periodDate = new Date(periodo + '-01'); // Asumir primer día del mes
+      const startDate = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
+      const endDate = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0);
+
+      // Verificar si ya existe un período activo en payroll_periods
+      const { data: existingPeriod } = await supabase
+        .from('payroll_periods')
+        .select('id, estado')
+        .eq('company_id', companyId)
+        .eq('estado', 'borrador')
+        .maybeSingle();
+
+      if (existingPeriod) {
+        // Actualizar el período existente
+        const { error: updateError } = await supabase
+          .from('payroll_periods')
+          .update({
+            fecha_inicio: startDate.toISOString().split('T')[0],
+            fecha_fin: endDate.toISOString().split('T')[0],
+            modificado_por: userId,
+            modificado_en: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingPeriod.id);
+
+        if (updateError) {
+          console.error('Error actualizando payroll_period:', updateError);
+        }
+      } else {
+        // Crear nuevo período activo
+        const { error: insertError } = await supabase
+          .from('payroll_periods')
+          .insert({
+            company_id: companyId,
+            fecha_inicio: startDate.toISOString().split('T')[0],
+            fecha_fin: endDate.toISOString().split('T')[0],
+            tipo_periodo: 'mensual',
+            estado: 'borrador',
+            modificado_por: userId
+          });
+
+        if (insertError) {
+          console.error('Error creando payroll_period:', insertError);
+        }
+      }
+
+      console.log('Período sincronizado correctamente para edición');
+    } catch (error) {
+      console.error('Error sincronizando payroll_period:', error);
     }
   }
 
