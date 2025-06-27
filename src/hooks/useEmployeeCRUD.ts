@@ -44,17 +44,29 @@ export const useEmployeeCRUD = () => {
   const updateEmployee = async (id: string, updates: Partial<Employee>) => {
     setIsLoading(true);
     try {
-      console.log('🔄 Updating employee with data:', updates);
-      await EmployeeService.update(id, updates);
+      console.log('🔄 useEmployeeCRUD: Updating employee with data:', { id, updates });
+      
+      if (!id) {
+        throw new Error('ID de empleado es requerido para actualizar');
+      }
+
+      const result = await EmployeeService.update(id, updates);
+      console.log('🔄 useEmployeeCRUD: Update result from service:', result);
+      
+      // Verificar que la actualización fue exitosa
+      if (!result || (Array.isArray(result) && result.length === 0)) {
+        throw new Error('No se pudo confirmar que la actualización se guardó correctamente');
+      }
       
       toast({
         title: "Empleado actualizado",
         description: "Los datos del empleado han sido actualizados correctamente.",
       });
 
-      return { success: true };
+      console.log('✅ useEmployeeCRUD: Employee updated successfully');
+      return { success: true, data: result };
     } catch (error: any) {
-      console.error('❌ Error updating employee:', error);
+      console.error('❌ useEmployeeCRUD: Error updating employee:', error);
       
       const errorMessage = error.message || "No se pudo actualizar el empleado.";
       

@@ -179,7 +179,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     }
   }, []);
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch, trigger } = useForm<EmployeeFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch, trigger, reset } = useForm<EmployeeFormData>({
     defaultValues: {
       // Información Personal
       cedula: employee?.cedula || '',
@@ -259,6 +259,72 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
 
     loadCompanyId();
   }, []);
+
+  // NUEVO: Actualizar formulario cuando cambie el empleado
+  useEffect(() => {
+    if (employee) {
+      console.log('🔄 EmployeeFormModern: Setting form values from employee:', employee);
+      
+      // Resetear el formulario con los valores del empleado
+      reset({
+        // Información Personal
+        cedula: employee.cedula || '',
+        tipoDocumento: employee.tipoDocumento || 'CC',
+        nombre: employee.nombre || '',
+        segundoNombre: '',
+        apellido: employee.apellido || '',
+        email: employee.email || '',
+        telefono: employee.telefono || '',
+        sexo: 'M',
+        fechaNacimiento: '',
+        direccion: '',
+        ciudad: '',
+        departamento: '',
+        
+        // Información Laboral
+        salarioBase: employee.salarioBase || SALARIO_MINIMO_2025,
+        tipoContrato: employee.tipoContrato || 'indefinido',
+        fechaIngreso: employee.fechaIngreso || new Date().toISOString().split('T')[0],
+        periodicidadPago: 'mensual',
+        cargo: employee.cargo || '',
+        codigoCIIU: '',
+        nivelRiesgoARL: employee.nivelRiesgoARL || 'I',
+        estado: employee.estado || 'activo',
+        centroCostos: '',
+        
+        // Detalles del Contrato
+        fechaFirmaContrato: '',
+        fechaFinalizacionContrato: '',
+        tipoJornada: 'completa',
+        diasTrabajo: 30,
+        horasTrabajo: 8,
+        beneficiosExtralegales: false,
+        clausulasEspeciales: '',
+        
+        // Información Bancaria
+        banco: '',
+        tipoCuenta: 'ahorros',
+        numeroCuenta: '',
+        titularCuenta: '',
+        formaPago: 'dispersion',
+        
+        // Afiliaciones
+        eps: employee.eps || '',
+        afp: employee.afp || '',
+        arl: employee.arl || '',
+        cajaCompensacion: employee.cajaCompensacion || '',
+        tipoCotizanteId: employee.tipoCotizanteId || '',
+        subtipoCotizanteId: employee.subtipoCotizanteId || '',
+        regimenSalud: 'contributivo',
+        estadoAfiliacion: employee.estadoAfiliacion || 'pendiente'
+      });
+
+      // Si hay tipoCotizanteId, cargar los subtipos
+      if (employee.tipoCotizanteId) {
+        fetchSubtipos(employee.tipoCotizanteId);
+      }
+    }
+  }, [employee, reset, fetchSubtipos]);
 
   // Auto-fill titular cuenta based on nombres y apellidos
   useEffect(() => {
@@ -366,7 +432,10 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel }: EmployeeFo
     console.log('✅ Operation result:', result);
 
     if (result.success) {
+      console.log('🎉 EmployeeFormModern: Operation successful, calling onSuccess');
       onSuccess();
+    } else {
+      console.error('❌ EmployeeFormModern: Operation failed:', result.error);
     }
   };
 

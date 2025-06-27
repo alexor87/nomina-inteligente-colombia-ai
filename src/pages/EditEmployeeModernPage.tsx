@@ -6,11 +6,17 @@ import { useEmployeeList } from '@/hooks/useEmployeeList';
 const EditEmployeeModernPage = () => {
   const navigate = useNavigate();
   const { employeeId } = useParams();
-  const { employees } = useEmployeeList();
+  const { employees, refreshEmployees } = useEmployeeList();
   
   const employee = employees.find(emp => emp.id === employeeId);
 
-  const handleSuccess = () => {
+  const handleSuccess = async () => {
+    console.log('🔄 EditEmployeeModernPage: handleSuccess called, refreshing employees...');
+    
+    // Refrescar la lista de empleados después de la actualización
+    await refreshEmployees();
+    
+    console.log('✅ EditEmployeeModernPage: employees refreshed, navigating back');
     navigate('/employees');
   };
 
