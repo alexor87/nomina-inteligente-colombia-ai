@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -137,7 +138,7 @@ export const EmployeeList = () => {
         description: EmployeeExcelExportService.getExportSummary(totalEmployees, filteredCount),
       });
 
-      const result = await EmployeeExcelExportService.exportToExcel(employees, 'empleados');
+      const result = await EmployeeExcelExportService.exportToExcel(allEmployees, 'empleados');
       
       toast({
         title: "Archivo exportado exitosamente",

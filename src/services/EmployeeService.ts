@@ -1,44 +1,150 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types';
-import { EmployeeCRUDService } from './EmployeeCRUDService';
-import { EmployeeStatusService } from './EmployeeStatusService';
-
-interface EmployeeDataWithBanking extends Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> {
-  segundoNombre?: string;
-  banco?: string;
-  tipoCuenta?: 'ahorros' | 'corriente';
-  numeroCuenta?: string;
-  titularCuenta?: string;
-  tipoCotizanteId?: string;
-  subtipoCotizanteId?: string;
-}
+import { CompanyConfigurationService } from '@/services/CompanyConfigurationService';
 
 export class EmployeeService {
-  static async create(employeeData: EmployeeDataWithBanking) {
-    return EmployeeCRUDService.create(employeeData);
+  static async getAllEmployees(): Promise<Employee[]> {
+    try {
+      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!companyId) {
+        console.warn('No company ID found for current user');
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching employees:', error);
+        throw new Error(`Error al obtener empleados: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getAllEmployees:', error);
+      throw error;
+    }
   }
 
-  static async update(id: string, updates: Partial<Employee & { segundoNombre?: string; tipoCotizanteId?: string; subtipoCotizanteId?: string }>) {
-    return EmployeeCRUDService.update(id, updates);
+  static async getEmployees(): Promise<Employee[]> {
+    return this.getAllEmployees();
   }
 
-  static async checkEmployeeHasPayrolls(employeeId: string): Promise<boolean> {
-    return EmployeeCRUDService.checkEmployeeHasPayrolls(employeeId);
+  static async getEmployeeById(id: string): Promise<Employee | null> {
+    try {
+      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!companyId) {
+        console.warn('No company ID found for current user');
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching employee:', error);
+        throw new Error(`Error al obtener empleado: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getEmployeeById:', error);
+      throw error;
+    }
   }
 
-  static async delete(id: string) {
-    return EmployeeCRUDService.delete(id);
+  static async createEmployee(employeeData: Partial<Employee>): Promise<Employee> {
+    try {
+      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener el ID de la empresa');
+      }
+
+      const { data, error } = await supabase
+        .from('employees')
+        .insert({
+          ...employeeData,
+          company_id: companyId
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating employee:', error);
+        throw new Error(`Error al crear empleado: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createEmployee:', error);
+      throw error;
+    }
   }
 
-  static async changeStatus(id: string, newStatus: string) {
-    return EmployeeStatusService.changeStatus(id, newStatus);
+  static async updateEmployee(id: string, employeeData: Partial<Employee>): Promise<Employee> {
+    try {
+      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener el ID de la empresa');
+      }
+
+      const { data, error } = await supabase
+        .from('employees')
+        .update(employeeData)
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating employee:', error);
+        throw new Error(`Error al actualizar empleado: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in updateEmployee:', error);
+      throw error;
+    }
   }
 
-  static async updateCentroCosto(id: string, centroCosto: string) {
-    return EmployeeStatusService.updateCentroCosto(id, centroCosto);
+  static async deleteEmployee(id: string): Promise<void> {
+    try {
+      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener el ID de la empresa');
+      }
+
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', id)
+        .eq('company_id', companyId);
+
+      if (error) {
+        console.error('Error deleting employee:', error);
+        throw new Error(`Error al eliminar empleado: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error in deleteEmployee:', error);
+      throw error;
+    }
   }
 
-  static async updateNivelRiesgoARL(id: string, nivelRiesgo: 'I' | 'II' | 'III' | 'IV' | 'V') {
-    return EmployeeStatusService.updateNivelRiesgoARL(id, nivelRiesgo);
+  static async changeEmployeeStatus(id: string, newStatus: string): Promise<Employee> {
+    try {
+      return await this.updateEmployee(id, { estado: newStatus });
+    } catch (error) {
+      console.error('Error changing employee status:', error);
+      throw error;
+    }
   }
 }

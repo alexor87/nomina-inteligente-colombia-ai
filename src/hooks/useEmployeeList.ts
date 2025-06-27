@@ -4,19 +4,66 @@ import { useToast } from '@/hooks/use-toast';
 import { useRealtimeEmployees } from '@/hooks/useRealtimeEmployees';
 import { EmployeeService } from '@/services/EmployeeService';
 import { Employee } from '@/types';
+import { EmployeeWithStatus } from '@/types/employee-extended';
+import { usePagination } from '@/hooks/usePagination';
+import { useEmployeeFiltering } from '@/hooks/useEmployeeFiltering';
+import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
+import { useEmployeeModal } from '@/hooks/useEmployeeModal';
+import { useEmployeeCompliance } from '@/hooks/useEmployeeCompliance';
 
 export const useEmployeeList = () => {
   const { toast } = useToast();
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Filtros y paginación
+  const {
+    filters,
+    filteredEmployees,
+    updateFilters,
+    clearFilters,
+    totalEmployees,
+    filteredCount
+  } = useEmployeeFiltering(allEmployees);
+
+  // Paginación
+  const pagination = usePagination({
+    totalItems: filteredEmployees.length,
+    itemsPerPage: 10
+  });
+
+  // Selección de empleados
+  const {
+    selectedEmployees,
+    toggleEmployeeSelection,
+    toggleAllEmployees,
+    clearSelection
+  } = useEmployeeSelection();
+
+  // Modal de empleado
+  const {
+    selectedEmployee,
+    isEmployeeProfileOpen,
+    openEmployeeProfile,
+    closeEmployeeProfile
+  } = useEmployeeModal();
+
+  // Compliance indicators
+  const { getComplianceIndicators } = useEmployeeCompliance();
+
+  // Obtener empleados paginados
+  const employees = filteredEmployees.slice(
+    pagination.offset,
+    pagination.offset + pagination.itemsPerPage
+  ) as EmployeeWithStatus[];
 
   const loadEmployees = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await EmployeeService.getEmployees();
-      setEmployees(data);
+      const data = await EmployeeService.getAllEmployees();
+      setAllEmployees(data);
       console.log('👥 Empleados cargados:', data.length);
     } catch (err) {
       console.error('Error loading employees:', err);
@@ -48,9 +95,38 @@ export const useEmployeeList = () => {
   }, [loadEmployees]);
 
   return {
+    // Datos de empleados
     employees,
+    allEmployees,
     isLoading,
     error,
+    
+    // Filtros
+    filters,
+    updateFilters,
+    clearFilters,
+    totalEmployees,
+    filteredCount,
+    
+    // Paginación
+    pagination,
+    
+    // Selección
+    selectedEmployees,
+    toggleEmployeeSelection,
+    toggleAllEmployees,
+    clearSelection,
+    
+    // Modal
+    selectedEmployee,
+    isEmployeeProfileOpen,
+    openEmployeeProfile,
+    closeEmployeeProfile,
+    
+    // Compliance
+    getComplianceIndicators,
+    
+    // Acciones
     refreshEmployees
   };
 };
