@@ -1,9 +1,7 @@
-
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { PersonalInfoSection } from './PersonalInfoSection';
 import { LaborInfoSection } from './LaborInfoSection';
 import { BankingInfoSection } from './BankingInfoSection';
-import { AffiliationsSection } from './AffiliationsSection';
 import { EmployeeFormData } from './types';
 
 interface EmployeeFormContentProps {
@@ -14,16 +12,6 @@ interface EmployeeFormContentProps {
   watch: UseFormWatch<EmployeeFormData>;
   arlRiskLevels: { value: string; label: string; percentage: string }[];
   register: any;
-  epsEntities: any[];
-  afpEntities: any[];
-  arlEntities: any[];
-  compensationFunds: any[];
-  tiposCotizante: any[];
-  subtiposCotizante: any[];
-  isLoadingTipos: boolean;
-  isLoadingSubtipos: boolean;
-  tiposError: any;
-  handleTipoCotizanteChange: (tipoCotizanteId: string) => Promise<void>;
   configuration: any;
 }
 
@@ -35,16 +23,6 @@ export const EmployeeFormContent = ({
   watch,
   arlRiskLevels,
   register,
-  epsEntities,
-  afpEntities,
-  arlEntities,
-  compensationFunds,
-  tiposCotizante,
-  subtiposCotizante,
-  isLoadingTipos,
-  isLoadingSubtipos,
-  tiposError,
-  handleTipoCotizanteChange,
   configuration
 }: EmployeeFormContentProps) => {
   return (
@@ -82,27 +60,6 @@ export const EmployeeFormContent = ({
             setValue={setValue}
             watch={watch}
             register={register}
-          />
-        </div>
-
-        {/* Affiliations Section */}
-        <div id="section-afiliaciones">
-          <AffiliationsSection
-            control={control}
-            errors={errors}
-            watchedValues={watchedValues}
-            setValue={setValue}
-            watch={watch}
-            epsEntities={epsEntities}
-            afpEntities={afpEntities}
-            arlEntities={arlEntities}
-            compensationFunds={compensationFunds}
-            tiposCotizante={tiposCotizante}
-            subtiposCotizante={subtiposCotizante}
-            isLoadingTipos={isLoadingTipos}
-            isLoadingSubtipos={isLoadingSubtipos}
-            tiposError={tiposError}
-            handleTipoCotizanteChange={handleTipoCotizanteChange}
           />
         </div>
 

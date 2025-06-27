@@ -11,13 +11,6 @@ import { useEmployeeFormEffects } from './useEmployeeFormEffects';
 
 export const useEmployeeForm = (employee?: Employee) => {
   console.log('🔄 useEmployeeForm: Hook called with employee:', employee?.id);
-  console.log('📊 useEmployeeForm: Employee affiliations:', {
-    eps: employee?.eps,
-    afp: employee?.afp,
-    arl: employee?.arl,
-    cajaCompensacion: employee?.cajaCompensacion,
-    updatedAt: employee?.updatedAt
-  });
   
   // Initialize form state
   const {
@@ -46,7 +39,7 @@ export const useEmployeeForm = (employee?: Employee) => {
   // Load company ID
   useCompanyId(setCompanyId);
 
-  // Populate form when employee data is available - CRITICAL SECTION
+  // Populate form when employee data is available
   console.log('🔄 useEmployeeForm: About to call useEmployeeDataPopulation with employee:', employee?.id);
   useEmployeeDataPopulation(employee, setValue, trigger);
 
