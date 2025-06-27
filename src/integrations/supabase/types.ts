@@ -370,27 +370,45 @@ export type Database = {
           apellido: string
           arl: string | null
           banco: string | null
+          beneficios_extralegales: boolean | null
           caja_compensacion: string | null
           cargo: string | null
           cedula: string
+          centro_costos: string | null
+          ciudad: string | null
+          clausulas_especiales: string | null
+          codigo_ciiu: string | null
           company_id: string
           created_at: string
+          departamento: string | null
+          dias_trabajo: number | null
+          direccion: string | null
           email: string | null
           eps: string | null
           estado: string | null
           estado_afiliacion: string | null
+          fecha_finalizacion_contrato: string | null
+          fecha_firma_contrato: string | null
           fecha_ingreso: string
+          fecha_nacimiento: string | null
+          forma_pago: string | null
+          horas_trabajo: number | null
           id: string
+          nivel_riesgo_arl: string | null
           nombre: string
           numero_cuenta: string | null
+          periodicidad_pago: string | null
+          regimen_salud: string | null
           salario_base: number
           segundo_nombre: string | null
+          sexo: string | null
           subtipo_cotizante_id: string | null
           telefono: string | null
           tipo_contrato: string | null
           tipo_cotizante_id: string | null
           tipo_cuenta: string | null
           tipo_documento: string | null
+          tipo_jornada: string | null
           titular_cuenta: string | null
           updated_at: string
         }
@@ -399,27 +417,45 @@ export type Database = {
           apellido: string
           arl?: string | null
           banco?: string | null
+          beneficios_extralegales?: boolean | null
           caja_compensacion?: string | null
           cargo?: string | null
           cedula: string
+          centro_costos?: string | null
+          ciudad?: string | null
+          clausulas_especiales?: string | null
+          codigo_ciiu?: string | null
           company_id: string
           created_at?: string
+          departamento?: string | null
+          dias_trabajo?: number | null
+          direccion?: string | null
           email?: string | null
           eps?: string | null
           estado?: string | null
           estado_afiliacion?: string | null
+          fecha_finalizacion_contrato?: string | null
+          fecha_firma_contrato?: string | null
           fecha_ingreso?: string
+          fecha_nacimiento?: string | null
+          forma_pago?: string | null
+          horas_trabajo?: number | null
           id?: string
+          nivel_riesgo_arl?: string | null
           nombre: string
           numero_cuenta?: string | null
+          periodicidad_pago?: string | null
+          regimen_salud?: string | null
           salario_base?: number
           segundo_nombre?: string | null
+          sexo?: string | null
           subtipo_cotizante_id?: string | null
           telefono?: string | null
           tipo_contrato?: string | null
           tipo_cotizante_id?: string | null
           tipo_cuenta?: string | null
           tipo_documento?: string | null
+          tipo_jornada?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
@@ -428,27 +464,45 @@ export type Database = {
           apellido?: string
           arl?: string | null
           banco?: string | null
+          beneficios_extralegales?: boolean | null
           caja_compensacion?: string | null
           cargo?: string | null
           cedula?: string
+          centro_costos?: string | null
+          ciudad?: string | null
+          clausulas_especiales?: string | null
+          codigo_ciiu?: string | null
           company_id?: string
           created_at?: string
+          departamento?: string | null
+          dias_trabajo?: number | null
+          direccion?: string | null
           email?: string | null
           eps?: string | null
           estado?: string | null
           estado_afiliacion?: string | null
+          fecha_finalizacion_contrato?: string | null
+          fecha_firma_contrato?: string | null
           fecha_ingreso?: string
+          fecha_nacimiento?: string | null
+          forma_pago?: string | null
+          horas_trabajo?: number | null
           id?: string
+          nivel_riesgo_arl?: string | null
           nombre?: string
           numero_cuenta?: string | null
+          periodicidad_pago?: string | null
+          regimen_salud?: string | null
           salario_base?: number
           segundo_nombre?: string | null
+          sexo?: string | null
           subtipo_cotizante_id?: string | null
           telefono?: string | null
           tipo_contrato?: string | null
           tipo_cotizante_id?: string | null
           tipo_cuenta?: string | null
           tipo_documento?: string | null
+          tipo_jornada?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }

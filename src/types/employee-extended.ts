@@ -65,11 +65,32 @@ export interface EmployeeWithStatus {
   tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
-  // Additional fields
+  // Extended personal information - NOW COMPATIBLE WITH ALL FORM FIELDS
+  sexo?: 'M' | 'F' | 'O';
+  fechaNacimiento?: string;
+  direccion?: string;
+  ciudad?: string;
+  departamento?: string;
+  // Extended labor information
+  periodicidadPago?: 'quincenal' | 'mensual';
+  codigoCIIU?: string;
+  centroCostos?: string;
+  // Contract details
+  fechaFirmaContrato?: string;
+  fechaFinalizacionContrato?: string;
+  tipoJornada?: 'completa' | 'parcial' | 'horas';
+  diasTrabajo?: number;
+  horasTrabajo?: number;
+  beneficiosExtralegales?: boolean;
+  clausulasEspeciales?: string;
+  formaPago?: 'dispersion' | 'manual';
+  regimenSalud?: 'contributivo' | 'subsidiado';
+  // Types de cotizante
+  tipoCotizanteId?: string;
+  subtipoCotizanteId?: string;
+  // Legacy fields for backward compatibility
   avatar?: string;
   centrosocial?: string;
   ultimaLiquidacion?: string;
   contratoVencimiento?: string;
-  tipoCotizanteId?: string;
-  subtipoCotizanteId?: string;
 }

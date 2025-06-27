@@ -25,7 +25,7 @@ export class EmployeeValidationService {
       ? employeeData.estadoAfiliacion
       : 'pendiente';
 
-    // Limpiar y validar datos antes de insertar INCLUYENDO SEGUNDO NOMBRE, CAMPOS BANCARIOS Y TIPOS DE COTIZANTE
+    // Limpiar y validar datos antes de insertar INCLUYENDO TODOS LOS CAMPOS NUEVOS
     const cleanedData = {
       company_id: companyId,
       cedula: String(employeeData.cedula || '').trim(),
@@ -45,14 +45,35 @@ export class EmployeeValidationService {
       caja_compensacion: employeeData.cajaCompensacion ? String(employeeData.cajaCompensacion).trim() : null,
       cargo: employeeData.cargo ? String(employeeData.cargo).trim() : null,
       estado_afiliacion: estadoAfiliacionLimpio,
-      // AGREGAR CAMPOS BANCARIOS
+      nivel_riesgo_arl: employeeData.nivelRiesgoARL || null,
+      // Campos bancarios
       banco: employeeData.banco ? String(employeeData.banco).trim() : null,
       tipo_cuenta: employeeData.tipoCuenta || 'ahorros',
       numero_cuenta: employeeData.numeroCuenta ? String(employeeData.numeroCuenta).trim() : null,
       titular_cuenta: employeeData.titularCuenta ? String(employeeData.titularCuenta).trim() : null,
-      // AGREGAR CAMPOS DE TIPOS DE COTIZANTE
+      // Campos de tipos de cotizante
       tipo_cotizante_id: employeeData.tipoCotizanteId || null,
-      subtipo_cotizante_id: employeeData.subtipoCotizanteId || null
+      subtipo_cotizante_id: employeeData.subtipoCotizanteId || null,
+      // Campos de información personal extendida
+      sexo: employeeData.sexo || null,
+      fecha_nacimiento: employeeData.fechaNacimiento || null,
+      direccion: employeeData.direccion ? String(employeeData.direccion).trim() : null,
+      ciudad: employeeData.ciudad ? String(employeeData.ciudad).trim() : null,
+      departamento: employeeData.departamento ? String(employeeData.departamento).trim() : null,
+      // Campos laborales extendidos
+      periodicidad_pago: employeeData.periodicidadPago || 'mensual',
+      codigo_ciiu: employeeData.codigoCIIU ? String(employeeData.codigoCIIU).trim() : null,
+      centro_costos: employeeData.centroCostos ? String(employeeData.centroCostos).trim() : null,
+      // Detalles del contrato
+      fecha_firma_contrato: employeeData.fechaFirmaContrato || null,
+      fecha_finalizacion_contrato: employeeData.fechaFinalizacionContrato || null,
+      tipo_jornada: employeeData.tipoJornada || 'completa',
+      dias_trabajo: Number(employeeData.diasTrabajo) || 30,
+      horas_trabajo: Number(employeeData.horasTrabajo) || 8,
+      beneficios_extralegales: Boolean(employeeData.beneficiosExtralegales),
+      clausulas_especiales: employeeData.clausulasEspeciales ? String(employeeData.clausulasEspeciales).trim() : null,
+      forma_pago: employeeData.formaPago || 'dispersion',
+      regimen_salud: employeeData.regimenSalud || 'contributivo'
     };
 
     return cleanedData;
@@ -76,7 +97,7 @@ export class EmployeeValidationService {
     
     const supabaseData: any = {};
     
-    // Mapear empresaId a company_id para actualizaciones
+    // Mapear TODOS los campos posibles para updates
     if (updates.empresaId !== undefined) supabaseData.company_id = updates.empresaId;
     if (updates.cedula !== undefined) supabaseData.cedula = updates.cedula;
     if (updates.tipoDocumento !== undefined) supabaseData.tipo_documento = updates.tipoDocumento;
@@ -95,16 +116,40 @@ export class EmployeeValidationService {
     if (updates.cajaCompensacion !== undefined) supabaseData.caja_compensacion = updates.cajaCompensacion;
     if (updates.cargo !== undefined) supabaseData.cargo = updates.cargo;
     if (updates.estadoAfiliacion !== undefined) supabaseData.estado_afiliacion = updates.estadoAfiliacion;
+    if (updates.nivelRiesgoARL !== undefined) supabaseData.nivel_riesgo_arl = updates.nivelRiesgoARL;
 
-    // Manejar campos bancarios en updates también
+    // Campos bancarios
     if (updates.banco !== undefined) supabaseData.banco = updates.banco;
     if (updates.tipoCuenta !== undefined) supabaseData.tipo_cuenta = updates.tipoCuenta;
     if (updates.numeroCuenta !== undefined) supabaseData.numero_cuenta = updates.numeroCuenta;
     if (updates.titularCuenta !== undefined) supabaseData.titular_cuenta = updates.titularCuenta;
 
-    // Manejar campos de tipos de cotizante
+    // Campos de tipos de cotizante
     if (updates.tipoCotizanteId !== undefined) supabaseData.tipo_cotizante_id = updates.tipoCotizanteId;
     if (updates.subtipoCotizanteId !== undefined) supabaseData.subtipo_cotizante_id = updates.subtipoCotizanteId;
+
+    // Campos de información personal extendida
+    if (updates.sexo !== undefined) supabaseData.sexo = updates.sexo;
+    if (updates.fechaNacimiento !== undefined) supabaseData.fecha_nacimiento = updates.fechaNacimiento;
+    if (updates.direccion !== undefined) supabaseData.direccion = updates.direccion;
+    if (updates.ciudad !== undefined) supabaseData.ciudad = updates.ciudad;
+    if (updates.departamento !== undefined) supabaseData.departamento = updates.departamento;
+
+    // Campos laborales extendidos
+    if (updates.periodicidadPago !== undefined) supabaseData.periodicidad_pago = updates.periodicidadPago;
+    if (updates.codigoCIIU !== undefined) supabaseData.codigo_ciiu = updates.codigoCIIU;
+    if (updates.centroCostos !== undefined) supabaseData.centro_costos = updates.centroCostos;
+
+    // Detalles del contrato
+    if (updates.fechaFirmaContrato !== undefined) supabaseData.fecha_firma_contrato = updates.fechaFirmaContrato;
+    if (updates.fechaFinalizacionContrato !== undefined) supabaseData.fecha_finalizacion_contrato = updates.fechaFinalizacionContrato;
+    if (updates.tipoJornada !== undefined) supabaseData.tipo_jornada = updates.tipoJornada;
+    if (updates.diasTrabajo !== undefined) supabaseData.dias_trabajo = updates.diasTrabajo;
+    if (updates.horasTrabajo !== undefined) supabaseData.horas_trabajo = updates.horasTrabajo;
+    if (updates.beneficiosExtralegales !== undefined) supabaseData.beneficios_extralegales = updates.beneficiosExtralegales;
+    if (updates.clausulasEspeciales !== undefined) supabaseData.clausulas_especiales = updates.clausulasEspeciales;
+    if (updates.formaPago !== undefined) supabaseData.forma_pago = updates.formaPago;
+    if (updates.regimenSalud !== undefined) supabaseData.regimen_salud = updates.regimenSalud;
 
     console.log('✅ Mapped update data to:', supabaseData);
     return supabaseData;
