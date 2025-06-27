@@ -55,7 +55,7 @@ export const FormField = ({
             return (
               <Select 
                 onValueChange={field.onChange}
-                value={field.value as string || ''}
+                value={field.value?.toString() || ''}
               >
                 <SelectTrigger className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                   <SelectValue placeholder={`Seleccionar ${label.toLowerCase()}`} />
@@ -77,7 +77,11 @@ export const FormField = ({
               type={type}
               className="h-10 border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
               placeholder={`Ingresa ${label.toLowerCase()}`}
-              value={field.value || ''}
+              value={field.value?.toString() || ''}
+              onChange={(e) => {
+                const value = type === 'number' ? Number(e.target.value) || 0 : e.target.value;
+                field.onChange(value);
+              }}
             />
           );
         }}

@@ -1,4 +1,3 @@
-
 import { Control, FieldErrors, UseFormWatch } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User, Mail, Phone, Calendar, MapPin, Users } from 'lucide-react';
@@ -18,6 +17,8 @@ export const PersonalInfoSection = ({
   watchedValues, 
   watch 
 }: PersonalInfoSectionProps) => {
+  
+
   const tipoDocumentoOptions = [
     { value: 'CC', label: 'Cédula de Ciudadanía' },
     { value: 'CE', label: 'Cédula de Extranjería' },

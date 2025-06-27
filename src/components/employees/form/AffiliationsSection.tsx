@@ -1,4 +1,3 @@
-
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -227,8 +226,6 @@ export const AffiliationsSection = ({
             type="select"
             control={control}
             errors={errors}
-            value={watchedValues.regimenSalud}
-            setValue={setValue}
             options={[
               { value: 'contributivo', label: 'Contributivo' },
               { value: 'subsidiado', label: 'Subsidiado' }
@@ -241,8 +238,6 @@ export const AffiliationsSection = ({
             type="select"
             control={control}
             errors={errors}
-            value={watchedValues.estadoAfiliacion}
-            setValue={setValue}
             options={[
               { value: 'completa', label: 'Completa' },
               { value: 'pendiente', label: 'Pendiente' },

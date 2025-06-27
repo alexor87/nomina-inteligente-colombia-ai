@@ -1,4 +1,3 @@
-
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { PersonalInfoSection } from './PersonalInfoSection';
 import { LaborInfoSection } from './LaborInfoSection';
@@ -56,7 +55,6 @@ export const EmployeeFormContent = ({
             control={control}
             errors={errors}
             watchedValues={watchedValues}
-            setValue={setValue}
             watch={watch}
           />
         </div>
