@@ -11,6 +11,8 @@ import { useRealtimeCleanup } from '@/hooks/useRealtimeCleanup';
 // Public pages
 import { Index } from '@/pages/Index';
 import AuthPage from '@/pages/AuthPage';
+import RegisterPage from '@/pages/RegisterPage';
+import CompanyRegisterPage from '@/pages/CompanyRegisterPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import VerifyEmailPage from '@/pages/VerifyEmailPage';
@@ -47,7 +49,8 @@ function AppContent() {
         {/* Auth routes - Public */}
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/login" element={<Navigate to="/auth" replace />} />
-        <Route path="/register" element={<Navigate to="/auth" replace />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register/company" element={<CompanyRegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/verify-email/:token" element={<VerifyEmailPage />} />

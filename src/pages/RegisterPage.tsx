@@ -1,8 +1,8 @@
 
-import { CompanyRegistrationPage } from './CompanyRegistrationPage';
+import { UserRegistrationForm } from '@/components/auth/UserRegistrationForm';
 
 const RegisterPage = () => {
-  return <CompanyRegistrationPage />;
+  return <UserRegistrationForm />;
 };
 
 export default RegisterPage;
