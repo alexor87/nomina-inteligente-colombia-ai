@@ -28,7 +28,7 @@ interface PeriodData {
   fecha_inicio: string;
   fecha_fin: string;
   estado: string;
-  payroll_ids: string[]; // Store all payroll IDs for this period
+  payroll_ids: string[];
 }
 
 export const PeriodEditPage = () => {
@@ -130,18 +130,16 @@ export const PeriodEditPage = () => {
 
       console.log('🔍 Loading period data for periodId:', periodId);
 
-      // First, try to find the period by extracting the period name from the URL
-      // If periodId is "period-0", we need to find the actual period from the payrolls
+      // For artificial IDs like "period-0", get the most recent period
       let targetPeriod: string | null = null;
 
       if (periodId.startsWith('period-')) {
-        // Get the most recent period to work with
+        // Get available periods to find the target one
         const { data: periodsData, error: periodsError } = await supabase
           .from('payrolls')
           .select('periodo')
           .eq('company_id', companyId)
-          .order('created_at', { ascending: false })
-          .limit(1);
+          .order('created_at', { ascending: false });
 
         if (periodsError || !periodsData || periodsData.length === 0) {
           console.error('Error loading periods:', periodsError);
@@ -153,10 +151,24 @@ export const PeriodEditPage = () => {
           return;
         }
 
-        targetPeriod = periodsData[0].periodo;
+        // Get unique periods and select the first one (most recent)
+        const uniquePeriods = [...new Set(periodsData.map(p => p.periodo))];
+        
+        // Extract the index from periodId (e.g., "period-0" -> 0)
+        const periodIndex = parseInt(periodId.split('-')[1]) || 0;
+        targetPeriod = uniquePeriods[periodIndex] || uniquePeriods[0];
       } else {
         // Assume periodId is the actual period name
         targetPeriod = periodId;
+      }
+
+      if (!targetPeriod) {
+        toast({
+          title: "Error",
+          description: "No se encontró el período solicitado",
+          variant: "destructive"
+        });
+        return;
       }
 
       console.log('🎯 Target period:', targetPeriod);

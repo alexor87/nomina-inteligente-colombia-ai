@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -30,7 +29,7 @@ interface DevengoModalProps {
   employeeId: string;
   employeeName: string;
   employeeSalary: number;
-  periodId: string;
+  periodId: string; // This should now be the real payroll UUID
   onNovedadCreated: (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => void;
 }
 
@@ -40,7 +39,7 @@ export const DevengoModal = ({
   employeeId, 
   employeeName, 
   employeeSalary,
-  periodId,
+  periodId, // This is now the real payroll UUID
   onNovedadCreated
 }: DevengoModalProps) => {
   const { toast } = useToast();
@@ -63,12 +62,12 @@ export const DevengoModal = ({
     return uuidRegex.test(uuid);
   };
 
-  // Use the real novedades hook with recalculation callback
+  // Use the real novedades hook with the payroll UUID
   const { createNovedad, isLoading } = useNovedades(periodId, () => {
     console.log('Novedad created, triggering parent refresh');
   });
 
-  console.log('DevengoModal render - isOpen:', isOpen, 'isLoading:', isLoading, 'periodId:', periodId);
+  console.log('DevengoModal render - periodId:', periodId, 'isValidUUID:', isValidUUID(periodId));
 
   // Obtener solo los tipos de devengados
   const tiposDevengado = Object.entries(NOVEDAD_CATEGORIES.devengados.types).map(([key, config]) => ({
@@ -161,7 +160,7 @@ export const DevengoModal = ({
     }
 
     try {
-      console.log('🔄 Creating real novedad with validated data:', {
+      console.log('🔄 Creating novedad with validated payroll UUID:', {
         employeeId,
         periodId,
         tipoNovedad: formData.tipoNovedad,
@@ -172,7 +171,7 @@ export const DevengoModal = ({
       // Prepare the complete novedad data with validated UUID
       const novedadData: CreateNovedadData = {
         empleado_id: employeeId,
-        periodo_id: periodId, // This should now be a real UUID
+        periodo_id: periodId, // This is now the real payroll UUID
         tipo_novedad: formData.tipoNovedad as NovedadType,
         subtipo: formData.subtipo || undefined,
         fecha_inicio: formData.fechaInicio || undefined,
@@ -275,7 +274,7 @@ export const DevengoModal = ({
             {/* Debug info - remove in production */}
             {process.env.NODE_ENV === 'development' && (
               <div className="text-xs text-gray-500 mt-1">
-                Period ID: {periodId} | Valid UUID: {isValidUUID(periodId) ? '✓' : '✗'}
+                Payroll ID: {periodId} | Valid UUID: {isValidUUID(periodId) ? '✓' : '✗'}
               </div>
             )}
           </DialogDescription>
