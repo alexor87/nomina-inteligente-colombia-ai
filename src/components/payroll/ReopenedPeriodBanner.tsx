@@ -36,6 +36,13 @@ export const ReopenedPeriodBanner = ({
     return email.split('@')[0];
   };
 
+  console.log('🎯 ReopenedPeriodBanner rendering with:', {
+    periodName,
+    reopenedBy,
+    reopenedAt,
+    isLoading
+  });
+
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-500 to-orange-600 shadow-lg">
       <Card className="mx-4 mt-4 mb-2 bg-white/95 backdrop-blur-sm border-0 shadow-xl">
@@ -52,13 +59,13 @@ export const ReopenedPeriodBanner = ({
             </Button>
             
             <div className="flex items-center space-x-3">
-              <Badge className="bg-amber-100 text-amber-800">
+              <Badge className="bg-amber-100 text-amber-800 font-medium">
                 🔓 Período Reabierto
               </Badge>
               <div>
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-gray-600" />
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-gray-900 text-lg">
                     {periodName}
                   </h3>
                 </div>
@@ -77,8 +84,8 @@ export const ReopenedPeriodBanner = ({
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="text-sm text-gray-600 flex items-center">
-              💡 <span className="ml-1">Puedes hacer cambios y se guardarán automáticamente</span>
+            <div className="text-sm text-gray-600 flex items-center bg-blue-50 px-3 py-2 rounded-lg">
+              💡 <span className="ml-1 font-medium">Editando período específico - Los cambios se guardan automáticamente</span>
             </div>
 
             <Button 

@@ -93,12 +93,23 @@ export const PayrollHistoryTable = ({
 
   // FUNCIÓN MEJORADA: Navegar al módulo de liquidación para continuar editando
   const handleContinueEditing = (period: PayrollHistoryPeriod) => {
-    // Guardar información completa del período en sessionStorage
+    // Guardar información completa del período en sessionStorage con propiedades correctas
+    console.log('🔄 Preparing to continue editing period:', {
+      id: period.id,
+      period: period.period,
+      startDate: period.startDate,
+      endDate: period.endDate,
+      type: period.type,
+      status: period.status,
+      reopenedBy: period.reopenedBy,
+      reopenedAt: period.reopenedAt
+    });
+
     sessionStorage.setItem('continueEditingPeriod', JSON.stringify({
       id: period.id,
       periodo: period.period,
-      startDate: period.startDate,
-      endDate: period.endDate,
+      startDate: period.startDate, // Usar startDate directamente
+      endDate: period.endDate,     // Usar endDate directamente
       type: period.type,
       status: period.status,
       reopenedBy: period.reopenedBy,
@@ -106,10 +117,10 @@ export const PayrollHistoryTable = ({
       employeesCount: period.employeesCount
     }));
     
-    console.log('Navigating to payroll liquidation with period:', {
+    console.log('📦 Stored period data in sessionStorage:', {
       id: period.id,
-      period: period.period,
-      dates: `${period.startDate} - ${period.endDate}`
+      dates: `${period.startDate} - ${period.endDate}`,
+      reopenedInfo: period.reopenedBy ? `by ${period.reopenedBy} at ${period.reopenedAt}` : 'not reopened'
     });
     
     // Navegar al módulo de liquidación
