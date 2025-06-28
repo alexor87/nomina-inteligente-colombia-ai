@@ -60,6 +60,20 @@ export const NovedadModal = ({
     { value: 'bonificacion', label: 'Bonificación' }
   ];
 
+  const resetForm = () => {
+    setFormData({
+      tipoNovedad: '',
+      subtipo: '',
+      valor: '',
+      observacion: '',
+      fechaInicio: '',
+      fechaFin: '',
+      dias: '',
+      horas: ''
+    });
+    setIsLoading(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -92,17 +106,7 @@ export const NovedadModal = ({
         description: "La novedad se ha registrado correctamente"
       });
       
-      onClose();
-      setFormData({
-        tipoNovedad: '',
-        subtipo: '',
-        valor: '',
-        observacion: '',
-        fechaInicio: '',
-        fechaFin: '',
-        dias: '',
-        horas: ''
-      });
+      handleClose();
     } catch (error) {
       console.error('Error creating novedad:', error);
       toast({
@@ -116,13 +120,18 @@ export const NovedadModal = ({
   };
 
   const handleClose = () => {
-    if (!isLoading) {
-      onClose();
+    resetForm();
+    onClose();
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open && !isLoading) {
+      handleClose();
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Agregar Novedad</DialogTitle>
@@ -138,6 +147,7 @@ export const NovedadModal = ({
               <Select
                 value={formData.tipoNovedad}
                 onValueChange={(value) => setFormData({ ...formData, tipoNovedad: value })}
+                disabled={isLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
@@ -162,6 +172,7 @@ export const NovedadModal = ({
                 onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
                 min="0"
                 step="0.01"
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -174,6 +185,7 @@ export const NovedadModal = ({
                 type="date"
                 value={formData.fechaInicio}
                 onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
+                disabled={isLoading}
               />
             </div>
 
@@ -184,6 +196,7 @@ export const NovedadModal = ({
                 type="date"
                 value={formData.fechaFin}
                 onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -198,6 +211,7 @@ export const NovedadModal = ({
                 value={formData.dias}
                 onChange={(e) => setFormData({ ...formData, dias: e.target.value })}
                 min="0"
+                disabled={isLoading}
               />
             </div>
 
@@ -211,6 +225,7 @@ export const NovedadModal = ({
                 onChange={(e) => setFormData({ ...formData, horas: e.target.value })}
                 min="0"
                 step="0.1"
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -223,11 +238,17 @@ export const NovedadModal = ({
               value={formData.observacion}
               onChange={(e) => setFormData({ ...formData, observacion: e.target.value })}
               rows={3}
+              disabled={isLoading}
             />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleClose} 
+              disabled={isLoading}
+            >
               Cancelar
             </Button>
             <Button type="submit" disabled={isLoading}>

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -137,6 +136,14 @@ export const EditableEmployeeTable = ({
       isOpen: true,
       employeeId,
       employeeName
+    });
+  };
+
+  const handleCloseNovedadModal = () => {
+    setNovedadModal({
+      isOpen: false,
+      employeeId: '',
+      employeeName: ''
     });
   };
 
@@ -281,7 +288,7 @@ export const EditableEmployeeTable = ({
       {/* Novedad Modal */}
       <NovedadModal
         isOpen={novedadModal.isOpen}
-        onClose={() => setNovedadModal({ isOpen: false, employeeId: '', employeeName: '' })}
+        onClose={handleCloseNovedadModal}
         employeeId={novedadModal.employeeId}
         employeeName={novedadModal.employeeName}
         periodId={periodId}
