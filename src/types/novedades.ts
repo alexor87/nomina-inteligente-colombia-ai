@@ -1,4 +1,3 @@
-
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -85,7 +84,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: true,
         requiere_dias: false,
         auto_calculo: true,
-        subtipos: ['diurnas', 'nocturnas', 'dominicales', 'festivas']
+        subtipos: ['diurnas', 'nocturnas', 'dominicales_diurnas', 'dominicales_nocturnas', 'festivas_diurnas', 'festivas_nocturnas']
       },
       recargo_nocturno: {
         label: 'Recargo Nocturno',
@@ -195,11 +194,14 @@ export const NOVEDAD_CATEGORIES = {
   }
 } as const;
 
+// Factores corregidos según legislación colombiana (Art. 168 CST)
 export const HORAS_EXTRA_FACTORS = {
-  diurnas: 1.25,      // 25% de recargo
-  nocturnas: 1.75,    // 75% de recargo
-  dominicales: 1.75,  // 75% de recargo
-  festivas: 1.75      // 75% de recargo
+  diurnas: 1.25,                    // 25% de recargo (Art. 168 CST)
+  nocturnas: 1.75,                  // 75% de recargo (Art. 168 CST)
+  dominicales_diurnas: 2.0,         // 100% de recargo para trabajo dominical diurno
+  dominicales_nocturnas: 2.5,       // 150% de recargo para trabajo dominical nocturno
+  festivas_diurnas: 2.0,            // 100% de recargo para días festivos diurnos
+  festivas_nocturnas: 2.5           // 150% de recargo para días festivos nocturnos
 } as const;
 
 // Función para calcular automáticamente el valor de una novedad
@@ -236,7 +238,33 @@ export const calcularValorNovedad = (
           const tarifaHora = salarioBase / 240; // 30 días × 8 horas
           valor = Math.round(tarifaHora * factor * horas);
           factorCalculo = factor;
-          detalleCalculo = `(${salarioBase.toLocaleString()} / 240) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
+          
+          // Mejorar detalle del cálculo según el tipo
+          let tipoDescripcion = '';
+          switch (subtipo) {
+            case 'diurnas':
+              tipoDescripcion = 'Horas extra diurnas (25% recargo)';
+              break;
+            case 'nocturnas':
+              tipoDescripcion = 'Horas extra nocturnas (75% recargo)';
+              break;
+            case 'dominicales_diurnas':
+              tipoDescripcion = 'Horas dominicales diurnas (100% recargo)';
+              break;
+            case 'dominicales_nocturnas':
+              tipoDescripcion = 'Horas dominicales nocturnas (150% recargo)';
+              break;
+            case 'festivas_diurnas':
+              tipoDescripcion = 'Horas festivas diurnas (100% recargo)';
+              break;
+            case 'festivas_nocturnas':
+              tipoDescripción = 'Horas festivas nocturnas (150% recargo)';
+              break;
+            default:
+              tipoDescripcion = `Horas extra ${subtipo}`;
+          }
+          
+          detalleCalculo = `${tipoDescripcion}: (${salarioBase.toLocaleString()} ÷ 240) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
           console.log('Resultado horas extra:', { tarifaHora, factor, horas, valor });
         } else {
           console.log('❌ Factor no encontrado para subtipo:', subtipo);
@@ -251,9 +279,11 @@ export const calcularValorNovedad = (
     case 'recargo_nocturno':
       if (horas && horas > 0) {
         const tarifaHora = salarioBase / 240;
-        valor = Math.round(tarifaHora * 0.35 * horas); // 35% de recargo
-        factorCalculo = 0.35;
-        detalleCalculo = `(${salarioBase.toLocaleString()} / 240) × 0.35 × ${horas} horas = ${valor.toLocaleString()}`;
+        // Corregido: recargo nocturno es 35% ADICIONAL al valor hora normal
+        // Valor total = Valor hora normal + 35% de recargo = 1.35 × Valor hora normal
+        valor = Math.round(tarifaHora * 1.35 * horas);
+        factorCalculo = 1.35;
+        detalleCalculo = `Recargo nocturno (35% adicional): (${salarioBase.toLocaleString()} ÷ 240) × 1.35 × ${horas} horas = ${valor.toLocaleString()}`;
         console.log('Resultado recargo nocturno:', { tarifaHora, valor });
       } else {
         detalleCalculo = 'Ingrese las horas de recargo nocturno';

@@ -188,6 +188,19 @@ export const DevengoModal = ({
   const selectedTipo = tiposDevengado.find(t => t.value === formData.tipoNovedad);
   const isValueAutoCalculated = selectedTipo?.auto_calculo && calculatedValue > 0;
 
+  // Función para formatear los nombres de subtipos
+  const formatSubtipoLabel = (subtipo: string) => {
+    const labels: Record<string, string> = {
+      'diurnas': 'Diurnas (25% recargo)',
+      'nocturnas': 'Nocturnas (75% recargo)', 
+      'dominicales_diurnas': 'Dominicales Diurnas (100% recargo)',
+      'dominicales_nocturnas': 'Dominicales Nocturnas (150% recargo)',
+      'festivas_diurnas': 'Festivas Diurnas (100% recargo)',
+      'festivas_nocturnas': 'Festivas Nocturnas (150% recargo)'
+    };
+    return labels[subtipo] || subtipo.charAt(0).toUpperCase() + subtipo.slice(1);
+  };
+
   return (
     <Dialog 
       open={isOpen} 
@@ -235,7 +248,7 @@ export const DevengoModal = ({
 
             {selectedTipo?.subtipos && selectedTipo.subtipos.length > 0 && (
               <div className="space-y-2">
-                <Label htmlFor="subtipo">Subtipo</Label>
+                <Label htmlFor="subtipo">Subtipo *</Label>
                 <Select
                   value={formData.subtipo}
                   onValueChange={(value) => setFormData({ ...formData, subtipo: value })}
@@ -247,7 +260,7 @@ export const DevengoModal = ({
                   <SelectContent className="z-50">
                     {selectedTipo.subtipos.map((subtipo) => (
                       <SelectItem key={subtipo} value={subtipo}>
-                        {subtipo.charAt(0).toUpperCase() + subtipo.slice(1)}
+                        {formatSubtipoLabel(subtipo)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -286,42 +299,48 @@ export const DevengoModal = ({
                       value={formData.horas}
                       onChange={(e) => setFormData({ ...formData, horas: e.target.value })}
                       min="0"
+                      max="24"
                       step="0.1"
                       disabled={isLoading}
                     />
+                    <p className="text-xs text-gray-500">
+                      Máximo 2 horas diarias, 12 semanales según ley
+                    </p>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Sección Fechas */}
-          <div className="space-y-4">
-            <h4 className="font-medium text-gray-900">Período de Aplicación</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fechaInicio">Fecha Inicio</Label>
-                <Input
-                  id="fechaInicio"
-                  type="date"
-                  value={formData.fechaInicio}
-                  onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
-                  disabled={isLoading}
-                />
-              </div>
+          {/* Sección Fechas - Solo para tipos que las requieran */}
+          {(formData.tipoNovedad === 'incapacidad' || formData.tipoNovedad === 'vacaciones' || formData.tipoNovedad === 'licencia_remunerada') && (
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900">Período de Aplicación</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fechaInicio">Fecha Inicio</Label>
+                  <Input
+                    id="fechaInicio"
+                    type="date"
+                    value={formData.fechaInicio}
+                    onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
+                    disabled={isLoading}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="fechaFin">Fecha Fin</Label>
-                <Input
-                  id="fechaFin"
-                  type="date"
-                  value={formData.fechaFin}
-                  onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
-                  disabled={isLoading}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="fechaFin">Fecha Fin</Label>
+                  <Input
+                    id="fechaFin"
+                    type="date"
+                    value={formData.fechaFin}
+                    onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Sección Valor */}
           <div className="space-y-4">
