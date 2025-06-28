@@ -1,3 +1,4 @@
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -90,15 +91,26 @@ export const PayrollHistoryTable = ({
            !period.reportedToDian;
   };
 
-  // NUEVA FUNCIÓN: Navegar al módulo de liquidación para continuar editando
+  // FUNCIÓN MEJORADA: Navegar al módulo de liquidación para continuar editando
   const handleContinueEditing = (period: PayrollHistoryPeriod) => {
-    // Guardar información del período en sessionStorage para que usePayrollLiquidation lo detecte
+    // Guardar información completa del período en sessionStorage
     sessionStorage.setItem('continueEditingPeriod', JSON.stringify({
       id: period.id,
       periodo: period.period,
       startDate: period.startDate,
-      endDate: period.endDate
+      endDate: period.endDate,
+      type: period.type,
+      status: period.status,
+      reopenedBy: period.reopenedBy,
+      reopenedAt: period.reopenedAt,
+      employeesCount: period.employeesCount
     }));
+    
+    console.log('Navigating to payroll liquidation with period:', {
+      id: period.id,
+      period: period.period,
+      dates: `${period.startDate} - ${period.endDate}`
+    });
     
     // Navegar al módulo de liquidación
     window.location.href = '/app/payroll';
@@ -202,14 +214,14 @@ export const PayrollHistoryTable = ({
                       <Eye className="h-4 w-4" />
                     </Button>
                     
-                    {/* NUEVO: Botón Continuar Editando para períodos reabiertos */}
+                    {/* MEJORADO: Botón Continuar Editando para períodos reabiertos */}
                     {isReopenedPeriod(period) && (
                       <Button 
                         variant="ghost" 
                         size="sm"
                         onClick={() => handleContinueEditing(period)}
                         className="text-green-600 hover:text-green-800 flex-shrink-0 hover:bg-green-50 transition-all duration-200"
-                        title="Continuar editando este período"
+                        title={`Continuar editando período ${formatPeriodDate(period.startDate, period.endDate)}`}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>

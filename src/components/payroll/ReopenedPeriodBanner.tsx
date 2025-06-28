@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Clock, User } from 'lucide-react';
+import { ArrowLeft, Save, Clock, User, Calendar } from 'lucide-react';
 
 interface ReopenedPeriodBannerProps {
   periodName: string;
@@ -56,10 +56,13 @@ export const ReopenedPeriodBanner = ({
                 🔓 Período Reabierto
               </Badge>
               <div>
-                <h3 className="font-semibold text-gray-900">
-                  {periodName}
-                </h3>
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-gray-600" />
+                  <h3 className="font-semibold text-gray-900">
+                    {periodName}
+                  </h3>
+                </div>
+                <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
                   <div className="flex items-center">
                     <User className="h-3 w-3 mr-1" />
                     Reabierto por {getUserName(reopenedBy)}
@@ -74,8 +77,8 @@ export const ReopenedPeriodBanner = ({
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="text-sm text-gray-600">
-              💡 Puedes hacer cambios y se guardarán automáticamente
+            <div className="text-sm text-gray-600 flex items-center">
+              💡 <span className="ml-1">Puedes hacer cambios y se guardarán automáticamente</span>
             </div>
 
             <Button 
