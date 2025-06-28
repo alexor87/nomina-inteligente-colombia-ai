@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText } from 'lucide-react';
+import { Eye, Download, FileText, Lock, LockOpen } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { formatPeriodDateRange } from '@/utils/periodDateUtils';
 import { PeriodContextMenu } from './PeriodContextMenu';
@@ -12,6 +12,7 @@ interface PayrollHistoryTableProps {
   onViewDetails: (period: PayrollHistoryPeriod) => void;
   onReopenPeriod?: (period: PayrollHistoryPeriod) => void;
   onDownloadFile?: (fileUrl: string, fileName: string) => void;
+  onTogglePeriodStatus?: (period: PayrollHistoryPeriod) => void;
   canUserReopenPeriods?: boolean;
 }
 
@@ -20,6 +21,7 @@ export const PayrollHistoryTable = ({
   onViewDetails,
   onReopenPeriod,
   onDownloadFile,
+  onTogglePeriodStatus,
   canUserReopenPeriods = false
 }: PayrollHistoryTableProps) => {
   const formatCurrency = (amount: number) => {
@@ -74,6 +76,12 @@ export const PayrollHistoryTable = ({
     }
   };
 
+  const handleToggleStatus = (period: PayrollHistoryPeriod) => {
+    if (onTogglePeriodStatus) {
+      onTogglePeriodStatus(period);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
@@ -87,7 +95,7 @@ export const PayrollHistoryTable = ({
               <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
               <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
-              <TableHead className="font-semibold text-center min-w-[140px]">Acciones</TableHead>
+              <TableHead className="font-semibold text-center min-w-[160px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,7 +164,7 @@ export const PayrollHistoryTable = ({
                 <TableCell className="min-w-[120px]">
                   {getPaymentStatusBadge(period.paymentStatus)}
                 </TableCell>
-                <TableCell className="min-w-[140px]">
+                <TableCell className="min-w-[160px]">
                   <div className="flex items-center justify-center space-x-1">
                     <Button 
                       variant="ghost" 
@@ -177,6 +185,27 @@ export const PayrollHistoryTable = ({
                     >
                       <Download className="h-4 w-4" />
                     </Button>
+
+                    {/* Main Lock/Unlock Button */}
+                    {onTogglePeriodStatus && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleToggleStatus(period)}
+                        className={`flex-shrink-0 ${
+                          period.status === 'cerrado' 
+                            ? 'text-green-600 hover:text-green-800' 
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                        title={period.status === 'cerrado' ? 'Período cerrado' : 'Período abierto'}
+                      >
+                        {period.status === 'cerrado' ? (
+                          <Lock className="h-4 w-4" />
+                        ) : (
+                          <LockOpen className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
 
                     {/* Context Menu for Reopen Period */}
                     {onReopenPeriod && (

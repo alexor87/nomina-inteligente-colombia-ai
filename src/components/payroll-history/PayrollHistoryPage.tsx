@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
@@ -186,6 +185,14 @@ export const PayrollHistoryPage = () => {
 
   const handleViewDetails = (period: PayrollHistoryPeriod) => {
     navigate(`/app/payroll-history/${period.id}`);
+  };
+
+  const handleTogglePeriodStatus = (period: PayrollHistoryPeriod) => {
+    // This is the main lock/unlock functionality
+    toast({
+      title: "Funcionalidad en desarrollo",
+      description: `Estado actual: ${period.status}. Funcionalidad de abrir/cerrar período en desarrollo.`,
+    });
   };
 
   const handleReopenPeriod = async (period: PayrollHistoryPeriod) => {
@@ -412,6 +419,7 @@ export const PayrollHistoryPage = () => {
             onViewDetails={handleViewDetails}
             onReopenPeriod={handleReopenPeriod}
             onDownloadFile={downloadFile}
+            onTogglePeriodStatus={handleTogglePeriodStatus}
             canUserReopenPeriods={canUserReopenPeriods}
           />
           
