@@ -26,7 +26,7 @@ import PayrollIntelligentPage from '@/pages/PayrollIntelligentPage';
 import PayrollIntelligentSilentPage from '@/pages/PayrollIntelligentSilentPage';
 import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
 import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
-import { PeriodEditPage } from '@/pages/PeriodEditPage';
+import PeriodEditPage from '@/pages/PeriodEditPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import CompanySettingsPage from '@/pages/CompanySettingsPage';

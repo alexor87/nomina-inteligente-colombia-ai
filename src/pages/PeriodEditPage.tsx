@@ -1,15 +1,14 @@
+
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/router';
-import { useQuery, useMutation } from 'react-query';
+import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { EmployeeService } from '@/services/EmployeeService';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
-import { Employee } from '@/types/employee';
 import { Button } from '@/components/ui/button';
-import { CalendarIcon } from '@radix-ui/react-icons';
-import { DatePicker } from '@/components/ui/date-picker';
+import { CalendarIcon } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -30,9 +29,8 @@ interface DevengoModalState {
 }
 
 const PeriodEditPage = () => {
-  const router = useRouter();
+  const { periodId } = useParams<{ periodId: string }>();
   const { toast } = useToast();
-  const { periodId } = router.query;
 
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [isEditMode, setIsEditMode] = useState(false);
@@ -51,37 +49,33 @@ const PeriodEditPage = () => {
     isLoading,
     isError,
     refetch
-  } = useQuery(
-    ['payrollPeriodDetails', periodId],
-    () => PayrollHistoryService.getPeriodDetails(periodId as string),
-    {
-      enabled: !!periodId,
-      onSuccess: (data) => {
-        setEmployees(data.employees);
-      },
-      onError: (error) => {
-        toast({
-          title: "Error al cargar el período",
-          description: "No se pudieron cargar los detalles del período seleccionado.",
-          variant: "destructive"
-        });
-      }
+  } = useQuery({
+    queryKey: ['payrollPeriodDetails', periodId],
+    queryFn: () => PayrollHistoryService.getPeriodDetails(periodId as string),
+    enabled: !!periodId,
+    onSuccess: (data) => {
+      setEmployees(data.employees);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error al cargar el período",
+        description: "No se pudieron cargar los detalles del período seleccionado.",
+        variant: "destructive"
+      });
     }
-  );
+  });
 
-  const { data: allEmployees, isLoading: isEmployeesLoading } = useQuery(
-    'employees',
-    EmployeeService.getEmployees,
-    {
-      onError: (error) => {
-        toast({
-          title: "Error al cargar empleados",
-          description: "No se pudieron cargar los empleados.",
-          variant: "destructive"
-        });
-      }
+  const { data: allEmployees, isLoading: isEmployeesLoading } = useQuery({
+    queryKey: ['employees'],
+    queryFn: EmployeeService.getEmployees,
+    onError: (error) => {
+      toast({
+        title: "Error al cargar empleados",
+        description: "No se pudieron cargar los empleados.",
+        variant: "destructive"
+      });
     }
-  );
+  });
 
   useEffect(() => {
     if (periodDetails) {
@@ -271,12 +265,11 @@ const PeriodEditPage = () => {
           </p>
         </div>
         <div className="flex items-center space-x-4">
-          <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
+          <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
             <CalendarIcon className="mr-2 h-4 w-4" />
             Anterior
           </Button>
-          <DatePicker date={date} onDateChange={handleDateChange} />
-          <Button variant="outline" size="icon" onClick={handleNextMonth}>
+          <Button variant="outline" size="sm" onClick={handleNextMonth}>
             <CalendarIcon className="mr-2 h-4 w-4" />
             Siguiente
           </Button>
@@ -288,12 +281,13 @@ const PeriodEditPage = () => {
           <Label htmlFor="edit">Modo Edición</Label>
           <Switch id="edit" checked={isEditMode} onCheckedChange={handleEditModeToggle} />
         </div>
-        <div className="space-x-2">
+        <div className="space-x-2 flex items-center">
           <Input
             type="search"
             placeholder="Buscar empleado..."
             value={searchTerm}
             onChange={handleSearchChange}
+            className="w-64"
           />
           <Button onClick={handleRecalculateTotals}>Recalcular Totales</Button>
         </div>
@@ -351,7 +345,7 @@ const PeriodEditPage = () => {
         employeeName={devengoModal.employeeName}
         employeeSalary={devengoModal.employeeSalary}
         payrollId={devengoModal.payrollId}
-        periodId={periodId as string} // Add the missing periodId prop
+        periodId={periodId as string}
         onNovedadCreated={handleNovedadCreated}
       />
     </div>
