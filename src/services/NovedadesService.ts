@@ -50,7 +50,7 @@ export class NovedadesService {
       const insertData = {
         company_id: companyId,
         empleado_id: novedadData.empleado_id,
-        periodo_id: novedadData.periodo_id, // Keep using periodo_id as expected by the database
+        periodo_id: novedadData.periodo_id,
         tipo_novedad: novedadData.tipo_novedad,
         valor: novedadData.valor,
         horas: novedadData.horas,

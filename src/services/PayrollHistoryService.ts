@@ -75,13 +75,13 @@ export class PayrollHistoryService {
 
       console.log('🔄 Recalculating totals for employee:', employeeId, 'period:', periodId);
 
-      // Get all novedades for this employee in this period - using periodo_real_id
+      // Get all novedades for this employee in this period - now using periodo_id directly
       const { data: novedades, error: novedadesError } = await supabase
         .from('payroll_novedades')
         .select('tipo_novedad, valor')
         .eq('company_id', companyId)
         .eq('empleado_id', employeeId)
-        .eq('periodo_real_id', periodId); // Using the new column
+        .eq('periodo_id', periodId);
 
       if (novedadesError) {
         console.error('Error loading novedades for recalculation:', novedadesError);

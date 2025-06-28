@@ -666,7 +666,6 @@ export type Database = {
           id: string
           observacion: string | null
           periodo_id: string
-          periodo_real_id: string | null
           subtipo: string | null
           tipo_novedad: Database["public"]["Enums"]["novedad_type"]
           updated_at: string
@@ -686,7 +685,6 @@ export type Database = {
           id?: string
           observacion?: string | null
           periodo_id: string
-          periodo_real_id?: string | null
           subtipo?: string | null
           tipo_novedad: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
@@ -706,7 +704,6 @@ export type Database = {
           id?: string
           observacion?: string | null
           periodo_id?: string
-          periodo_real_id?: string | null
           subtipo?: string | null
           tipo_novedad?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
@@ -715,7 +712,7 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_payroll_novedades_periodo_real"
-            columns: ["periodo_real_id"]
+            columns: ["periodo_id"]
             isOneToOne: false
             referencedRelation: "payroll_periods_real"
             referencedColumns: ["id"]
@@ -731,7 +728,7 @@ export type Database = {
             foreignKeyName: "payroll_novedades_periodo_id_fkey"
             columns: ["periodo_id"]
             isOneToOne: false
-            referencedRelation: "payroll_periods"
+            referencedRelation: "payroll_periods_real"
             referencedColumns: ["id"]
           },
         ]
