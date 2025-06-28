@@ -452,13 +452,11 @@ export const PayrollHistoryPage = () => {
             onFiltersChange={setFilters}
           />
 
-          {/* Table with Pagination */}
+          {/* Table with Pagination - Simplified props */}
           <div className="bg-white rounded-lg shadow">
             <PayrollHistoryTable
               periods={pagination.paginatedItems}
               onViewDetails={handleViewDetails}
-              onReopenPeriod={handleReopenPeriod}
-              onClosePeriod={handleClosePeriod}
               onDownloadFile={downloadFile}
               canUserReopenPeriods={canUserReopenPeriods}
             />
