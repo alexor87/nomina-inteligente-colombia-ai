@@ -1,3 +1,4 @@
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -86,129 +87,138 @@ export const PayrollHistoryTable = ({
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-gray-50">
-            <TableHead className="font-semibold">Período</TableHead>
-            <TableHead className="font-semibold text-center">Empleados</TableHead>
-            <TableHead className="font-semibold">Estado</TableHead>
-            <TableHead className="font-semibold">Total Devengado</TableHead>
-            <TableHead className="font-semibold">Neto Pagado</TableHead>
-            <TableHead className="font-semibold">Archivo PILA</TableHead>
-            <TableHead className="font-semibold">Estado Pagos</TableHead>
-            <TableHead className="font-semibold text-center">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {periods.map((period) => (
-            <TableRow key={period.id} className="hover:bg-gray-50">
-              <TableCell className="font-medium">
-                <div>
-                  <button
-                    onClick={() => onViewDetails(period)}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                  >
-                    {formatPeriodDate(period.startDate, period.endDate)}
-                  </button>
-                  <div className="text-xs text-gray-500 capitalize">{period.type}</div>
-                  {period.version > 1 && (
-                    <div className="text-xs text-blue-600 font-medium">v{period.version}</div>
-                  )}
-                  {period.editedBy && (
-                    <div className="text-xs text-gray-400">
-                      Editado por {period.editedBy.split('@')[0]}
-                    </div>
-                  )}
-                  {period.reopenedBy && (
-                    <div className="text-xs text-amber-600">
-                      Reabierto por {period.reopenedBy.split('@')[0]}
-                    </div>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="text-center">
-                  <span className="text-lg font-semibold text-gray-900">{period.employeesCount}</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                {getStatusBadge(period.status)}
-              </TableCell>
-              <TableCell className="font-medium text-green-600">
-                {formatCurrency(period.totalGrossPay)}
-              </TableCell>
-              <TableCell className="font-medium text-blue-600">
-                {formatCurrency(period.totalNetPay)}
-              </TableCell>
-              <TableCell>
-                {period.pilaFileUrl ? (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-blue-600 hover:text-blue-800"
-                    onClick={() => handleDownloadPila(period)}
-                  >
-                    <FileText className="h-4 w-4 mr-1" />
-                    Descargar
-                  </Button>
-                ) : (
-                  <span className="text-gray-400 text-sm">No disponible</span>
-                )}
-              </TableCell>
-              <TableCell>
-                {getPaymentStatusBadge(period.paymentStatus)}
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center justify-center space-x-1">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => onViewDetails(period)}
-                    className="text-blue-600 hover:text-blue-800"
-                    title="Ver detalles"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  
-                  {canReopenPeriod(period) && onReopenPeriod && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => onReopenPeriod(period)}
-                      className="text-amber-600 hover:text-amber-800"
-                      title="Reabrir período"
-                    >
-                      <Unlock className="h-4 w-4" />
-                    </Button>
-                  )}
-
-                  {canClosePeriod(period) && onClosePeriod && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => onClosePeriod(period)}
-                      className="text-green-600 hover:text-green-800"
-                      title="Cerrar nuevamente"
-                    >
-                      <Lock className="h-4 w-4" />
-                    </Button>
-                  )}
-                  
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="text-green-600 hover:text-green-800"
-                    onClick={() => handleDownloadPila(period)}
-                    title="Descargar archivos"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-50">
+              <TableHead className="font-semibold min-w-[180px] w-[180px]">Período</TableHead>
+              <TableHead className="font-semibold text-center min-w-[100px]">Empleados</TableHead>
+              <TableHead className="font-semibold min-w-[120px]">Estado</TableHead>
+              <TableHead className="font-semibold min-w-[140px]">Total Devengado</TableHead>
+              <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
+              <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
+              <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
+              <TableHead className="font-semibold text-center min-w-[120px]">Acciones</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {periods.map((period) => (
+              <TableRow key={period.id} className="hover:bg-gray-50">
+                <TableCell className="font-medium min-w-[180px] w-[180px]">
+                  <div className="min-w-0">
+                    <button
+                      onClick={() => onViewDetails(period)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block truncate"
+                      title={formatPeriodDate(period.startDate, period.endDate)}
+                    >
+                      <span className="whitespace-nowrap">
+                        {formatPeriodDate(period.startDate, period.endDate)}
+                      </span>
+                    </button>
+                    <div className="text-xs text-gray-500 capitalize">{period.type}</div>
+                    {period.version > 1 && (
+                      <div className="text-xs text-blue-600 font-medium">v{period.version}</div>
+                    )}
+                    {period.editedBy && (
+                      <div className="text-xs text-gray-400 truncate">
+                        Editado por {period.editedBy.split('@')[0]}
+                      </div>
+                    )}
+                    {period.reopenedBy && (
+                      <div className="text-xs text-amber-600 truncate">
+                        Reabierto por {period.reopenedBy.split('@')[0]}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="min-w-[100px]">
+                  <div className="text-center">
+                    <span className="text-lg font-semibold text-gray-900">{period.employeesCount}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="min-w-[120px]">
+                  {getStatusBadge(period.status)}
+                </TableCell>
+                <TableCell className="font-medium text-green-600 min-w-[140px]">
+                  <span className="whitespace-nowrap">
+                    {formatCurrency(period.totalGrossPay)}
+                  </span>
+                </TableCell>
+                <TableCell className="font-medium text-blue-600 min-w-[140px]">
+                  <span className="whitespace-nowrap">
+                    {formatCurrency(period.totalNetPay)}
+                  </span>
+                </TableCell>
+                <TableCell className="min-w-[130px]">
+                  {period.pilaFileUrl ? (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                      onClick={() => handleDownloadPila(period)}
+                    >
+                      <FileText className="h-4 w-4 mr-1" />
+                      Descargar
+                    </Button>
+                  ) : (
+                    <span className="text-gray-400 text-sm">No disponible</span>
+                  )}
+                </TableCell>
+                <TableCell className="min-w-[120px]">
+                  {getPaymentStatusBadge(period.paymentStatus)}
+                </TableCell>
+                <TableCell className="min-w-[120px]">
+                  <div className="flex items-center justify-center space-x-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onViewDetails(period)}
+                      className="text-blue-600 hover:text-blue-800 flex-shrink-0"
+                      title="Ver detalles"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    
+                    {canReopenPeriod(period) && onReopenPeriod && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => onReopenPeriod(period)}
+                        className="text-amber-600 hover:text-amber-800 flex-shrink-0"
+                        title="Reabrir período"
+                      >
+                        <Unlock className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {canClosePeriod(period) && onClosePeriod && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => onClosePeriod(period)}
+                        className="text-green-600 hover:text-green-800 flex-shrink-0"
+                        title="Cerrar nuevamente"
+                      >
+                        <Lock className="h-4 w-4" />
+                      </Button>
+                    )}
+                    
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="text-green-600 hover:text-green-800 flex-shrink-0"
+                      onClick={() => handleDownloadPila(period)}
+                      title="Descargar archivos"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
       
       {periods.length === 0 && (
         <div className="text-center py-12">
