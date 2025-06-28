@@ -1,22 +1,17 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { parsePeriodToDateRange } from '@/utils/periodDateUtils';
+import { PayrollHistoryPeriod, PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 
 export interface PayrollHistoryRecord {
   id: string;
   periodo: string;
+  fecha_inicio: string;
+  fecha_fin: string;
   fechaCreacion: string;
+  estado: string;
   empleados: number;
   totalNomina: number;
-  estado: 'borrador' | 'procesada' | 'pagada' | 'cerrada';
-  companyId: string;
-  editable?: boolean;
-  reabierto_por?: string;
-  fecha_reapertura?: string;
-  reportado_dian?: boolean;
-  // Add actual period dates
-  fecha_inicio?: string;
-  fecha_fin?: string;
+  editable: boolean;
+  reportado_dian: boolean;
 }
 
 export class PayrollHistoryService {
@@ -25,185 +20,224 @@ export class PayrollHistoryService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
-      
-      return profile?.company_id || null;
+
+      if (error || !profile?.company_id) return null;
+      return profile.company_id;
     } catch (error) {
       console.error('Error getting company ID:', error);
       return null;
     }
   }
 
-  // Obtener resumen de períodos de nómina reales con fechas correctas
   static async getPayrollPeriods(): Promise<PayrollHistoryRecord[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) return [];
 
-      console.log('Loading payroll history for company:', companyId);
-
-      // First try to get data from payroll_periods table if it exists and has data
-      const { data: periodsData, error: periodsError } = await supabase
+      const { data, error } = await supabase
         .from('payroll_periods')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('fecha_inicio', { ascending: false });
-
-      // Get payroll summary data
-      const { data: payrollData, error: payrollError } = await supabase
-        .from('payrolls')
         .select('*')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
 
-      if (payrollError) {
-        console.error('Error loading payroll history:', payrollError);
-        throw payrollError;
-      }
-
-      console.log('Raw payroll history data:', payrollData?.length || 0);
-      console.log('Period data available:', periodsData?.length || 0);
-
-      if (!payrollData || payrollData.length === 0) {
-        console.log('No payroll records found');
-        return [];
-      }
-
-      // Group payroll data by period
-      const grouped: { [key: string]: any[] } = {};
-      payrollData.forEach(record => {
-        if (!grouped[record.periodo]) {
-          grouped[record.periodo] = [];
-        }
-        grouped[record.periodo].push(record);
-      });
-
-      // Create period summaries with correct dates
-      const periods = Object.entries(grouped).map(([periodo, records]) => {
-        console.log(`Processing period: "${periodo}"`);
-        
-        // Try to find matching period data from payroll_periods table
-        const periodData = periodsData?.find(p => {
-          // Try exact match first
-          if (periodo === p.fecha_inicio + ' - ' + p.fecha_fin) return true;
-          
-          // Try month-year matching
-          const periodLower = periodo.toLowerCase();
-          const startDate = new Date(p.fecha_inicio);
-          const monthYear = `${startDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`.toLowerCase();
-          
-          return periodLower.includes(monthYear) || monthYear.includes(periodLower);
-        });
-
-        let startDate: string;
-        let endDate: string;
-
-        if (periodData) {
-          // Use actual period dates from payroll_periods table
-          startDate = periodData.fecha_inicio;
-          endDate = periodData.fecha_fin;
-          console.log(`Using period data for ${periodo}:`, { startDate, endDate });
-        } else {
-          // Parse period name to get date range
-          const dateRange = parsePeriodToDateRange(periodo);
-          startDate = dateRange.startDate;
-          endDate = dateRange.endDate;
-          console.log(`Parsed period "${periodo}" to date range:`, { startDate, endDate });
-        }
-
-        // Check if the period matches any reopened periods (with reabierto_por field)
-        const reopenedRecord = records.find(r => r.reabierto_por);
-        
-        return {
-          id: `${periodo}-${records[0].created_at}`,
-          periodo,
-          fechaCreacion: records[0].created_at,
-          empleados: records.length,
-          totalNomina: records.reduce((sum, r) => sum + Number(r.neto_pagado || 0), 0),
-          estado: records[0].estado,
-          companyId,
-          editable: records[0].editable,
-          reabierto_por: reopenedRecord?.reabierto_por,
-          fecha_reapertura: reopenedRecord?.fecha_reapertura,
-          reportado_dian: records[0].reportado_dian,
-          fecha_inicio: startDate,
-          fecha_fin: endDate
-        };
-      });
-
-      console.log('Processed payroll periods with correct dates:', periods.length);
-      periods.forEach(p => {
-        console.log(`Period: ${p.periodo} -> ${p.fecha_inicio} to ${p.fecha_fin}`);
-      });
+      if (error) throw error;
       
-      return periods;
+      return (data || []).map(period => ({
+        id: period.id,
+        periodo: period.periodo || 'Sin período',
+        fecha_inicio: period.fecha_inicio,
+        fecha_fin: period.fecha_fin,
+        fechaCreacion: period.created_at,
+        estado: period.estado || 'borrador',
+        empleados: period.empleados_count || 0,
+        totalNomina: Number(period.total_nomina || 0),
+        editable: period.editable !== false,
+        reportado_dian: period.reportado_dian || false
+      }));
     } catch (error) {
       console.error('Error loading payroll periods:', error);
       return [];
     }
   }
 
-  // Reabrir un período de nómina
-  static async reopenPeriod(periodo: string): Promise<void> {
+  static async getPeriodDetails(periodId: string): Promise<PayrollHistoryDetails> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) throw new Error('No se encontró la empresa del usuario');
+      if (!companyId) throw new Error('No company ID found');
 
-      const { error } = await supabase
-        .from('payrolls')
-        .update({ estado: 'borrador' })
+      // Get period info
+      const { data: periodData, error: periodError } = await supabase
+        .from('payroll_periods')
+        .select('*')
+        .eq('id', periodId)
         .eq('company_id', companyId)
-        .eq('periodo', periodo);
+        .single();
 
-      if (error) throw error;
+      if (periodError) throw periodError;
 
-      // También actualizar comprobantes asociados
-      await supabase
-        .from('payroll_vouchers')
-        .update({ voucher_status: 'pendiente' })
-        .eq('company_id', companyId)
-        .eq('periodo', periodo);
+      // Get employees for this period
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('payroll_employees')
+        .select(`
+          *,
+          employees!inner(
+            nombres,
+            apellidos,
+            cargo
+          )
+        `)
+        .eq('period_id', periodId);
 
+      if (employeesError) throw employeesError;
+
+      // Transform data to match expected format
+      const period: PayrollHistoryPeriod = {
+        id: periodData.id,
+        period: periodData.periodo || 'Sin período',
+        startDate: periodData.fecha_inicio,
+        endDate: periodData.fecha_fin,
+        type: 'mensual',
+        employeesCount: employeesData?.length || 0,
+        status: this.mapStatus(periodData.estado),
+        totalGrossPay: Number(periodData.total_devengado || 0),
+        totalNetPay: Number(periodData.total_neto || 0),
+        totalDeductions: Number(periodData.total_deducciones || 0),
+        totalCost: Number(periodData.total_nomina || 0),
+        employerContributions: Number(periodData.aportes_empleador || 0),
+        paymentStatus: periodData.estado === 'pagada' ? 'pagado' : 'pendiente',
+        version: 1,
+        createdAt: periodData.created_at,
+        updatedAt: periodData.updated_at,
+        editable: periodData.editable !== false,
+        reportedToDian: periodData.reportado_dian || false
+      };
+
+      const employees: PayrollHistoryEmployee[] = (employeesData || []).map(emp => ({
+        id: emp.id,
+        periodId: emp.period_id,
+        name: `${emp.employees.nombres} ${emp.employees.apellidos}`,
+        position: emp.employees.cargo || 'Sin cargo',
+        grossPay: Number(emp.devengado || 0),
+        deductions: Number(emp.deducciones || 0),
+        netPay: Number(emp.neto || 0),
+        paymentStatus: emp.estado_pago || 'pendiente'
+      }));
+
+      const summary = {
+        totalDevengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
+        totalDeducciones: employees.reduce((sum, emp) => sum + emp.deductions, 0),
+        totalNeto: employees.reduce((sum, emp) => sum + emp.netPay, 0),
+        costoTotal: Number(periodData.total_nomina || 0),
+        aportesEmpleador: Number(periodData.aportes_empleador || 0)
+      };
+
+      return {
+        period,
+        summary,
+        employees,
+        files: {
+          desprendibles: [],
+          certificates: [],
+          reports: []
+        }
+      };
     } catch (error) {
-      console.error('Error reopening period:', error);
-      throw new Error('Error al reabrir el período');
+      console.error('Error loading period details:', error);
+      throw error;
     }
   }
 
-  static async generateBankDispersion(periodo: string): Promise<void> {
+  static async updateEmployeeValues(
+    periodId: string, 
+    employeeId: string, 
+    updates: Partial<PayrollHistoryEmployee>
+  ): Promise<void> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) throw new Error('No se encontró la empresa del usuario');
+      if (!companyId) throw new Error('No company ID found');
 
-      const { data, error } = await supabase
-        .from('payrolls')
-        .select(`
-          *,
-          employees (
-            nombre,
-            apellido,
-            cedula
-          )
-        `)
-        .eq('company_id', companyId)
-        .eq('periodo', periodo)
-        .eq('estado', 'procesada');
+      const updateData: any = {};
+      
+      if (updates.grossPay !== undefined) {
+        updateData.devengado = updates.grossPay;
+      }
+      if (updates.deductions !== undefined) {
+        updateData.deducciones = updates.deductions;
+      }
+      if (updates.netPay !== undefined) {
+        updateData.neto = updates.netPay;
+      }
+
+      const { error } = await supabase
+        .from('payroll_employees')
+        .update(updateData)
+        .eq('id', employeeId)
+        .eq('period_id', periodId);
 
       if (error) throw error;
 
-      // Aquí se generaría el archivo de dispersión bancaria
-      console.log('Generating bank dispersion for:', data);
-      
-      // Simular generación de archivo
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Update period totals
+      await this.recalculatePeriodTotals(periodId);
     } catch (error) {
-      console.error('Error generating bank dispersion:', error);
-      throw new Error('Error al generar la dispersión bancaria');
+      console.error('Error updating employee values:', error);
+      throw error;
+    }
+  }
+
+  static async recalculatePeriodTotals(periodId: string): Promise<void> {
+    try {
+      const { data: employees, error } = await supabase
+        .from('payroll_employees')
+        .select('devengado, deducciones, neto')
+        .eq('period_id', periodId);
+
+      if (error) throw error;
+
+      const totals = (employees || []).reduce(
+        (acc, emp) => ({
+          totalDevengado: acc.totalDevengado + Number(emp.devengado || 0),
+          totalDeducciones: acc.totalDeducciones + Number(emp.deducciones || 0),
+          totalNeto: acc.totalNeto + Number(emp.neto || 0)
+        }),
+        { totalDevengado: 0, totalDeducciones: 0, totalNeto: 0 }
+      );
+
+      const { error: updateError } = await supabase
+        .from('payroll_periods')
+        .update({
+          total_devengado: totals.totalDevengado,
+          total_deducciones: totals.totalDeducciones,
+          total_neto: totals.totalNeto,
+          total_nomina: totals.totalDevengado + totals.totalDeducciones
+        })
+        .eq('id', periodId);
+
+      if (updateError) throw updateError;
+    } catch (error) {
+      console.error('Error recalculating period totals:', error);
+      throw error;
+    }
+  }
+
+  private static mapStatus(estado: string): 'cerrado' | 'con_errores' | 'revision' | 'editado' | 'reabierto' {
+    switch (estado) {
+      case 'cerrada':
+      case 'procesada':
+      case 'pagada':
+        return 'cerrado';
+      case 'borrador':
+        return 'revision';
+      case 'editado':
+        return 'editado';
+      case 'reabierto':
+        return 'reabierto';
+      default:
+        return 'con_errores';
     }
   }
 }
