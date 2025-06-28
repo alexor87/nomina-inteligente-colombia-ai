@@ -10,7 +10,19 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
   const [novedades, setNovedades] = useState<Record<string, PayrollNovedad[]>>({});
   const [isLoading, setIsLoading] = useState(false);
 
+  // Validate UUID format
+  const isValidUUID = (uuid: string): boolean => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  };
+
   const loadNovedadesForEmployee = useCallback(async (empleadoId: string) => {
+    // Don't load if we don't have a valid UUID
+    if (!periodoId || !isValidUUID(periodoId)) {
+      console.log('Skipping novedades load - invalid or missing periodo ID:', periodoId);
+      return;
+    }
+
     try {
       setIsLoading(true);
       console.log('Loading novedades for employee:', empleadoId, 'periodo:', periodoId);
@@ -31,7 +43,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     } finally {
       setIsLoading(false);
     }
-  }, [periodoId, toast]);
+  }, [periodoId, toast, isValidUUID]);
 
   const createNovedad = useCallback(async (novedadData: CreateNovedadData, skipRecalculation = false) => {
     try {
@@ -42,8 +54,11 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
       if (!novedadData.empleado_id) {
         throw new Error('ID del empleado es requerido');
       }
-      if (!periodoId) {
+      if (!novedadData.periodo_id) {
         throw new Error('ID del período es requerido');
+      }
+      if (!isValidUUID(novedadData.periodo_id)) {
+        throw new Error(`ID del período debe ser un UUID válido. Recibido: ${novedadData.periodo_id}`);
       }
       if (!novedadData.tipo_novedad) {
         throw new Error('Tipo de novedad es requerido');
@@ -52,15 +67,9 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
         throw new Error('El valor debe ser mayor a 0');
       }
 
-      // Agregar periodo_id a los datos
-      const completeData = {
-        ...novedadData,
-        periodo_id: periodoId
-      };
-
-      console.log('📤 Datos completos para envío:', completeData);
+      console.log('📤 Datos validados para envío:', novedadData);
       
-      const newNovedad = await NovedadesService.createNovedad(completeData);
+      const newNovedad = await NovedadesService.createNovedad(novedadData);
       console.log('✅ Novedad creada exitosamente:', newNovedad);
       
       if (newNovedad) {
@@ -73,13 +82,13 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
           ]
         }));
 
-        // 🔄 NEW: Recalculate payroll totals after creating novedad
+        // 🔄 Recalculate payroll totals after creating novedad
         if (!skipRecalculation) {
           console.log('🔄 Recalculating payroll totals for employee:', novedadData.empleado_id);
           try {
             await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(
               novedadData.empleado_id, 
-              periodoId
+              novedadData.periodo_id
             );
             console.log('✅ Payroll totals recalculated successfully');
           } catch (recalcError) {
@@ -113,7 +122,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     } finally {
       setIsLoading(false);
     }
-  }, [toast, onNovedadChange, periodoId]);
+  }, [toast, onNovedadChange, isValidUUID]);
 
   const updateNovedad = useCallback(async (id: string, updates: Partial<CreateNovedadData>, empleadoId: string, skipRecalculation = false) => {
     try {
@@ -132,8 +141,8 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
           )
         }));
 
-        // 🔄 NEW: Recalculate payroll totals after updating novedad
-        if (!skipRecalculation) {
+        // 🔄 Recalculate payroll totals after updating novedad
+        if (!skipRecalculation && periodoId && isValidUUID(periodoId)) {
           console.log('🔄 Recalculating payroll totals after novedad update');
           try {
             await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(empleadoId, periodoId);
@@ -165,7 +174,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     } finally {
       setIsLoading(false);
     }
-  }, [toast, onNovedadChange, periodoId]);
+  }, [toast, onNovedadChange, periodoId, isValidUUID]);
 
   const deleteNovedad = useCallback(async (id: string, empleadoId: string, skipRecalculation = false) => {
     try {
@@ -180,8 +189,8 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
         [empleadoId]: (prev[empleadoId] || []).filter(novedad => novedad.id !== id)
       }));
 
-      // 🔄 NEW: Recalculate payroll totals after deleting novedad
-      if (!skipRecalculation) {
+      // 🔄 Recalculate payroll totals after deleting novedad
+      if (!skipRecalculation && periodoId && isValidUUID(periodoId)) {
         console.log('🔄 Recalculating payroll totals after novedad deletion');
         try {
           await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(empleadoId, periodoId);
@@ -212,7 +221,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     } finally {
       setIsLoading(false);
     }
-  }, [toast, onNovedadChange, periodoId]);
+  }, [toast, onNovedadChange, periodoId, isValidUUID]);
 
   const getEmployeeNovedadesCount = useCallback((empleadoId: string): number => {
     const count = novedades[empleadoId]?.length || 0;

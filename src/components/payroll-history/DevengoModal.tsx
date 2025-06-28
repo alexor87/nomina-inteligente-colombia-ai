@@ -57,13 +57,18 @@ export const DevengoModal = ({
   const [calculatedValue, setCalculatedValue] = useState<number>(0);
   const [calculationDetail, setCalculationDetail] = useState<string>('');
 
+  // Validate UUID format
+  const isValidUUID = (uuid: string): boolean => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  };
+
   // Use the real novedades hook with recalculation callback
   const { createNovedad, isLoading } = useNovedades(periodId, () => {
     console.log('Novedad created, triggering parent refresh');
-    // This callback will be called after the novedad is created
   });
 
-  console.log('DevengoModal render - isOpen:', isOpen, 'isLoading:', isLoading);
+  console.log('DevengoModal render - isOpen:', isOpen, 'isLoading:', isLoading, 'periodId:', periodId);
 
   // Obtener solo los tipos de devengados
   const tiposDevengado = Object.entries(NOVEDAD_CATEGORIES.devengados.types).map(([key, config]) => ({
@@ -134,6 +139,17 @@ export const DevengoModal = ({
       return;
     }
 
+    // Validate periodId is a proper UUID
+    if (!periodId || !isValidUUID(periodId)) {
+      toast({
+        title: "Error de configuración",
+        description: `ID del período inválido. Se esperaba un UUID válido, se recibió: ${periodId}`,
+        variant: "destructive"
+      });
+      console.error('Invalid periodId for novedad creation:', periodId);
+      return;
+    }
+
     const valor = parseFloat(formData.valor);
     if (isNaN(valor) || valor <= 0) {
       toast({
@@ -145,17 +161,18 @@ export const DevengoModal = ({
     }
 
     try {
-      console.log('🔄 Creating real novedad with data:', {
+      console.log('🔄 Creating real novedad with validated data:', {
         employeeId,
         periodId,
         tipoNovedad: formData.tipoNovedad,
-        valor
+        valor,
+        isValidUUID: isValidUUID(periodId)
       });
 
-      // Prepare the complete novedad data
+      // Prepare the complete novedad data with validated UUID
       const novedadData: CreateNovedadData = {
         empleado_id: employeeId,
-        periodo_id: periodId,
+        periodo_id: periodId, // This should now be a real UUID
         tipo_novedad: formData.tipoNovedad as NovedadType,
         subtipo: formData.subtipo || undefined,
         fecha_inicio: formData.fechaInicio || undefined,
@@ -172,7 +189,7 @@ export const DevengoModal = ({
         } : undefined
       };
 
-      console.log('📤 Complete novedad data:', novedadData);
+      console.log('📤 Complete validated novedad data:', novedadData);
 
       // Create the novedad using the real service
       await createNovedad(novedadData);
@@ -255,6 +272,12 @@ export const DevengoModal = ({
           <DialogDescription>
             Empleado: <span className="font-medium">{employeeName}</span> • 
             Salario base: <span className="font-medium text-green-600">{formatCurrency(employeeSalary)}</span>
+            {/* Debug info - remove in production */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 mt-1">
+                Period ID: {periodId} | Valid UUID: {isValidUUID(periodId) ? '✓' : '✗'}
+              </div>
+            )}
           </DialogDescription>
         </DialogHeader>
         
