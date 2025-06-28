@@ -5,6 +5,8 @@ import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/servic
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const usePayrollLiquidation = () => {
   const { toast } = useToast();
@@ -12,6 +14,7 @@ export const usePayrollLiquidation = () => {
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingPeriod, setIsEditingPeriod] = useState(false);
+  const [isReopenedPeriod, setIsReopenedPeriod] = useState(false);
   const [summary, setSummary] = useState<PayrollSummary>({
     totalEmployees: 0,
     validEmployees: 0,
@@ -28,7 +31,59 @@ export const usePayrollLiquidation = () => {
     try {
       console.log('Initializing payroll period...');
       
-      // Buscar período activo existente
+      // Check if there's a reopened period from sessionStorage
+      const reopenedPeriodData = sessionStorage.getItem('reopenedPeriod');
+      if (reopenedPeriodData) {
+        const reopenedInfo = JSON.parse(reopenedPeriodData);
+        console.log('Found reopened period:', reopenedInfo);
+        
+        // Create a period record for the reopened period
+        const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
+        if (companyId) {
+          // Check if period already exists in payroll_periods
+          let { data: existingPeriod } = await supabase
+            .from('payroll_periods')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('estado', 'borrador')
+            .single();
+
+          if (!existingPeriod) {
+            // Create the period
+            const { data: newPeriod, error } = await supabase
+              .from('payroll_periods')
+              .insert({
+                company_id: companyId,
+                fecha_inicio: reopenedInfo.startDate,
+                fecha_fin: reopenedInfo.endDate,
+                tipo_periodo: 'mensual',
+                estado: 'borrador'
+              })
+              .select()
+              .single();
+
+            if (!error && newPeriod) {
+              existingPeriod = newPeriod;
+            }
+          }
+
+          if (existingPeriod) {
+            setCurrentPeriod(existingPeriod);
+            setIsReopenedPeriod(true);
+            
+            toast({
+              title: "Período reabierto cargado",
+              description: `Editando período ${reopenedInfo.periodo}`,
+            });
+            
+            // Clear the sessionStorage after successful load
+            sessionStorage.removeItem('reopenedPeriod');
+            return;
+          }
+        }
+      }
+      
+      // Buscar período activo existente (normal flow)
       let activePeriod = await PayrollPeriodService.getCurrentActivePeriod();
       
       if (!activePeriod) {
@@ -61,6 +116,7 @@ export const usePayrollLiquidation = () => {
       
       if (activePeriod) {
         setCurrentPeriod(activePeriod);
+        setIsReopenedPeriod(false);
         console.log('Active period loaded:', activePeriod);
       }
     } catch (error) {
@@ -268,8 +324,8 @@ export const usePayrollLiquidation = () => {
 
     setIsLoading(true);
     toast({
-      title: "Aprobando período",
-      description: "Guardando nómina y generando comprobantes..."
+      title: isReopenedPeriod ? "Cerrando período reabierto" : "Aprobando período",
+      description: isReopenedPeriod ? "Finalizando edición y generando nuevos comprobantes..." : "Guardando nómina y generando comprobantes..."
     });
 
     try {
@@ -294,9 +350,33 @@ export const usePayrollLiquidation = () => {
       if (updatedPeriod) {
         setCurrentPeriod(updatedPeriod);
       }
+
+      // If this was a reopened period, create audit log for closure
+      if (isReopenedPeriod) {
+        const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (companyId && user) {
+          await supabase
+            .from('payroll_reopen_audit')
+            .insert({
+              company_id: companyId,
+              periodo: `${currentPeriod.fecha_inicio} - ${currentPeriod.fecha_fin}`,
+              user_id: user.id,
+              user_email: user.email || '',
+              action: 'cerrado_nuevamente',
+              previous_state: 'reabierto',
+              new_state: 'cerrado',
+              has_vouchers: true,
+              notes: `Período cerrado nuevamente desde liquidación de nómina`
+            });
+        }
+        
+        setIsReopenedPeriod(false);
+      }
       
       toast({
-        title: "¡Período aprobado!",
+        title: isReopenedPeriod ? "¡Período cerrado nuevamente!" : "¡Período aprobado!",
         description: message
       });
     } catch (error) {
@@ -309,7 +389,15 @@ export const usePayrollLiquidation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, employees, currentPeriod]);
+  }, [toast, employees, currentPeriod, isReopenedPeriod]);
+
+  const handleFinishEditing = useCallback(async () => {
+    await approvePeriod();
+  }, [approvePeriod]);
+
+  const handleDismissBanner = useCallback(() => {
+    setIsReopenedPeriod(false);
+  }, []);
 
   const isValid = employees.every(emp => emp.status === 'valid') && employees.length > 0;
   const canEdit = currentPeriod?.estado === 'borrador';
@@ -322,11 +410,14 @@ export const usePayrollLiquidation = () => {
     isLoading,
     canEdit,
     isEditingPeriod,
+    isReopenedPeriod,
     setIsEditingPeriod,
     updateEmployee,
     updatePeriod,
     recalculateAll,
     approvePeriod,
-    refreshEmployees: loadEmployees
+    refreshEmployees: loadEmployees,
+    handleFinishEditing,
+    handleDismissBanner
   };
 };

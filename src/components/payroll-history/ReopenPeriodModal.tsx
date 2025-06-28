@@ -1,18 +1,23 @@
 
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, Clock, FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
+import { formatPeriodDateRange } from '@/utils/periodDateUtils';
 
 interface ReopenPeriodModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void>;
-  period: PayrollHistoryPeriod;
+  period: PayrollHistoryPeriod | null;
   isProcessing: boolean;
-  hasVouchers?: boolean;
 }
 
 export const ReopenPeriodModal = ({
@@ -20,86 +25,109 @@ export const ReopenPeriodModal = ({
   onClose,
   onConfirm,
   period,
-  isProcessing,
-  hasVouchers = false
+  isProcessing
 }: ReopenPeriodModalProps) => {
-  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmationText, setConfirmationText] = useState('');
+  
+  if (!period) return null;
+
+  const periodName = formatPeriodDateRange(period.startDate, period.endDate);
+  const isConfirmationValid = confirmationText.toLowerCase() === periodName.toLowerCase();
 
   const handleConfirm = async () => {
-    setIsConfirming(true);
+    if (!isConfirmationValid) return;
+    
     try {
       await onConfirm();
+      setConfirmationText('');
       onClose();
     } catch (error) {
-      console.error('Error reopening period:', error);
-    } finally {
-      setIsConfirming(false);
+      // Error handling is done in the parent component
     }
   };
 
+  const handleClose = () => {
+    setConfirmationText('');
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Reabrir período cerrado
-          </DialogTitle>
-          <DialogDescription className="text-sm text-gray-600 mt-2">
-            Período: <span className="font-medium text-gray-900">{period.period}</span>
-          </DialogDescription>
+          <div className="flex items-center space-x-3 mb-2">
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            </div>
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              ¿Deseas reabrir este periodo?
+            </DialogTitle>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <Alert className="border-amber-200 bg-amber-50">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800">
-              Este período ya fue cerrado y sus comprobantes fueron emitidos. 
-              Si lo reabres, podrás editar los datos, recalcular nómina y generar nuevos comprobantes.
-            </AlertDescription>
-          </Alert>
-
-          {hasVouchers && (
-            <Alert className="border-blue-200 bg-blue-50">
-              <FileText className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <strong>Atención:</strong> Este período tenía comprobantes emitidos. 
-                Si realizas cambios y vuelves a cerrar, se emitirán nuevos comprobantes 
-                y los anteriores se marcarán como anulados automáticamente.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <div className="flex items-center gap-2 text-sm text-gray-700 mb-2">
-              <Clock className="h-4 w-4" />
-              <span className="font-medium">¿Qué sucederá al reabrir?</span>
+        <div className="space-y-4">
+          {/* Period Info */}
+          <div className="bg-gray-50 rounded-lg p-3 border-l-4 border-amber-400">
+            <div className="font-medium text-gray-900">{periodName}</div>
+            <div className="text-sm text-gray-600 mt-1">
+              {period.employeesCount} empleados • ${new Intl.NumberFormat('es-CO').format(period.totalNetPay)}
             </div>
-            <ul className="text-sm text-gray-600 space-y-1 ml-6">
-              <li>• El período cambiará al estado "Reabierto"</li>
-              <li>• Podrás editar empleados y recalcular la nómina</li>
-              <li>• Se registrará un log de auditoría con tu usuario</li>
-              <li>• Tendrás la opción de ir directamente a liquidar</li>
-            </ul>
+          </div>
+
+          {/* Warning Text */}
+          <div className="text-sm text-gray-700 leading-relaxed space-y-2">
+            <p>
+              Esto permitirá modificar datos del periodo cerrado. Se invalidarán los comprobantes actuales 
+              y será necesario volver a cerrarlo manualmente.
+            </p>
+            <p className="font-medium text-amber-700">
+              Esta acción se registra y no se puede deshacer.
+            </p>
+          </div>
+
+          {/* Confirmation Input */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Para confirmar, escribe el nombre del periodo:
+            </label>
+            <Input
+              value={confirmationText}
+              onChange={(e) => setConfirmationText(e.target.value)}
+              placeholder={periodName}
+              className="font-mono text-sm"
+              disabled={isProcessing}
+            />
+            <div className="text-xs text-gray-500">
+              Debe coincidir exactamente: <span className="font-medium">{periodName}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={handleClose}
+              disabled={isProcessing}
+              className="px-4"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={!isConfirmationValid || isProcessing}
+              className="px-4 bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Reabriendo...
+                </>
+              ) : (
+                'Sí, reabrir periodo'
+              )}
+            </Button>
           </div>
         </div>
-
-        <DialogFooter className="gap-2">
-          <Button 
-            variant="outline" 
-            onClick={onClose}
-            disabled={isConfirming || isProcessing}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleConfirm}
-            disabled={isConfirming || isProcessing}
-            className="bg-amber-600 hover:bg-amber-700 text-white"
-          >
-            {isConfirming || isProcessing ? 'Reabriendo...' : 'Reabrir período'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

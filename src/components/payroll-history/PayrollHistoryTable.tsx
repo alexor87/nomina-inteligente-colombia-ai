@@ -2,15 +2,15 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText, Unlock, Lock } from 'lucide-react';
+import { Eye, Download, FileText } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { formatPeriodDateRange } from '@/utils/periodDateUtils';
+import { PeriodContextMenu } from './PeriodContextMenu';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
   onViewDetails: (period: PayrollHistoryPeriod) => void;
   onReopenPeriod?: (period: PayrollHistoryPeriod) => void;
-  onClosePeriod?: (period: PayrollHistoryPeriod) => void;
   onDownloadFile?: (fileUrl: string, fileName: string) => void;
   canUserReopenPeriods?: boolean;
 }
@@ -19,7 +19,6 @@ export const PayrollHistoryTable = ({
   periods, 
   onViewDetails,
   onReopenPeriod,
-  onClosePeriod,
   onDownloadFile,
   canUserReopenPeriods = false
 }: PayrollHistoryTableProps) => {
@@ -41,7 +40,7 @@ export const PayrollHistoryTable = ({
       con_errores: { color: 'bg-red-100 text-red-800', text: 'Con errores', icon: '✗' },
       revision: { color: 'bg-yellow-100 text-yellow-800', text: 'En revisión', icon: '⚠' },
       editado: { color: 'bg-blue-100 text-blue-800', text: 'Editado', icon: '✏' },
-      reabierto: { color: 'bg-amber-100 text-amber-800', text: 'Reabierto', icon: '🟡' }
+      reabierto: { color: 'bg-amber-100 text-amber-800', text: 'Reabierto', icon: '🔓' }
     };
     
     const config = statusConfig[status];
@@ -75,16 +74,6 @@ export const PayrollHistoryTable = ({
     }
   };
 
-  const canReopenPeriod = (period: PayrollHistoryPeriod) => {
-    return canUserReopenPeriods && 
-           (period.status === 'cerrado' || period.status === 'con_errores') && 
-           !period.reportedToDian;
-  };
-
-  const canClosePeriod = (period: PayrollHistoryPeriod) => {
-    return canUserReopenPeriods && period.status === 'reabierto';
-  };
-
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
@@ -98,7 +87,7 @@ export const PayrollHistoryTable = ({
               <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
               <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
-              <TableHead className="font-semibold text-center min-w-[120px]">Acciones</TableHead>
+              <TableHead className="font-semibold text-center min-w-[140px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -167,7 +156,7 @@ export const PayrollHistoryTable = ({
                 <TableCell className="min-w-[120px]">
                   {getPaymentStatusBadge(period.paymentStatus)}
                 </TableCell>
-                <TableCell className="min-w-[120px]">
+                <TableCell className="min-w-[140px]">
                   <div className="flex items-center justify-center space-x-1">
                     <Button 
                       variant="ghost" 
@@ -179,30 +168,6 @@ export const PayrollHistoryTable = ({
                       <Eye className="h-4 w-4" />
                     </Button>
                     
-                    {canReopenPeriod(period) && onReopenPeriod && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => onReopenPeriod(period)}
-                        className="text-amber-600 hover:text-amber-800 flex-shrink-0"
-                        title="Reabrir período"
-                      >
-                        <Unlock className="h-4 w-4" />
-                      </Button>
-                    )}
-
-                    {canClosePeriod(period) && onClosePeriod && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => onClosePeriod(period)}
-                        className="text-green-600 hover:text-green-800 flex-shrink-0"
-                        title="Cerrar nuevamente"
-                      >
-                        <Lock className="h-4 w-4" />
-                      </Button>
-                    )}
-                    
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -212,6 +177,15 @@ export const PayrollHistoryTable = ({
                     >
                       <Download className="h-4 w-4" />
                     </Button>
+
+                    {/* Context Menu for Reopen Period */}
+                    {onReopenPeriod && (
+                      <PeriodContextMenu
+                        period={period}
+                        canUserReopenPeriods={canUserReopenPeriods}
+                        onReopenPeriod={onReopenPeriod}
+                      />
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

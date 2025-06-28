@@ -3,6 +3,7 @@ import { PayrollLiquidationHeader } from './PayrollLiquidationHeader';
 import { PayrollPeriodCard } from './PayrollPeriodCard';
 import { PayrollSummaryCards } from './liquidation/PayrollSummaryCards';
 import { PayrollTable } from './liquidation/PayrollTable';
+import { ReopenedPeriodBanner } from './ReopenedPeriodBanner';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 
 export const PayrollLiquidation = () => {
@@ -13,13 +14,16 @@ export const PayrollLiquidation = () => {
     isValid,
     canEdit,
     isEditingPeriod,
+    isReopenedPeriod,
     setIsEditingPeriod,
     updateEmployee,
     updatePeriod,
     recalculateAll,
     approvePeriod,
     refreshEmployees,
-    isLoading
+    isLoading,
+    handleFinishEditing,
+    handleDismissBanner
   } = usePayrollLiquidation();
 
   const validEmployeeCount = employees.filter(emp => emp.status === 'valid').length;
@@ -59,6 +63,17 @@ export const PayrollLiquidation = () => {
           onRefresh={refreshEmployees}
           isLoading={isLoading}
         />
+
+        {/* Reopened Period Banner */}
+        {isReopenedPeriod && currentPeriod && (
+          <ReopenedPeriodBanner
+            periodName={`${currentPeriod.fecha_inicio} - ${currentPeriod.fecha_fin}`}
+            startDate={currentPeriod.fecha_inicio}
+            endDate={currentPeriod.fecha_fin}
+            onFinishEditing={handleFinishEditing}
+            onDismiss={handleDismissBanner}
+          />
+        )}
 
         {/* Period Card */}
         <PayrollPeriodCard
