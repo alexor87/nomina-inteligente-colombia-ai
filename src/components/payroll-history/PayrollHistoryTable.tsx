@@ -1,8 +1,7 @@
-
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText, Unlock, Lock } from 'lucide-react';
+import { Eye, Download, FileText, Unlock, Lock, Sparkles } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { formatPeriodDateRange } from '@/utils/periodDateUtils';
 
@@ -85,6 +84,12 @@ export const PayrollHistoryTable = ({
     return canUserReopenPeriods && period.status === 'reabierto';
   };
 
+  const canMagicEdit = (period: PayrollHistoryPeriod) => {
+    return canUserReopenPeriods && 
+           (period.status === 'cerrado' || period.status === 'con_errores') && 
+           !period.reportedToDian;
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
@@ -98,7 +103,7 @@ export const PayrollHistoryTable = ({
               <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
               <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
-              <TableHead className="font-semibold text-center min-w-[120px]">Acciones</TableHead>
+              <TableHead className="font-semibold text-center min-w-[160px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -167,7 +172,7 @@ export const PayrollHistoryTable = ({
                 <TableCell className="min-w-[120px]">
                   {getPaymentStatusBadge(period.paymentStatus)}
                 </TableCell>
-                <TableCell className="min-w-[120px]">
+                <TableCell className="min-w-[160px]">
                   <div className="flex items-center justify-center space-x-1">
                     <Button 
                       variant="ghost" 
@@ -179,6 +184,19 @@ export const PayrollHistoryTable = ({
                       <Eye className="h-4 w-4" />
                     </Button>
                     
+                    {/* Magic Edit Button - The WOW Feature */}
+                    {canMagicEdit(period) && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => window.dispatchEvent(new CustomEvent('magic-edit', { detail: period }))}
+                        className="text-purple-600 hover:text-purple-800 flex-shrink-0 hover:bg-purple-50 transition-all duration-200"
+                        title="Edición Mágica - Abrir y editar en un clic"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                      </Button>
+                    )}
+
                     {canReopenPeriod(period) && onReopenPeriod && (
                       <Button 
                         variant="ghost" 

@@ -4,16 +4,18 @@ import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { ReopenPeriodModal } from './ReopenPeriodModal';
 import { EditWizard } from './EditWizard';
+import { MagicEditTransition } from './MagicEditTransition';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Clock, AlertCircle, ArrowRight } from 'lucide-react';
+import { FileText, Download, Clock, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryFilters as FiltersType } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 import { toast } from '@/hooks/use-toast';
+import { formatPeriodDateRange } from '@/utils/periodDateUtils';
 
 export const PayrollHistoryPage = () => {
   const navigate = useNavigate();
@@ -24,6 +26,11 @@ export const PayrollHistoryPage = () => {
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showEditWizard, setShowEditWizard] = useState(false);
   const [hasVouchers, setHasVouchers] = useState(false);
+  
+  // Magic Edit State
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [transitionPeriod, setTransitionPeriod] = useState<PayrollHistoryPeriod | null>(null);
+  
   const [filters, setFilters] = useState<FiltersType>({
     dateRange: {},
     status: '',
@@ -61,6 +68,17 @@ export const PayrollHistoryPage = () => {
   useEffect(() => {
     applyFilters();
   }, [periods, filters]);
+
+  // Magic Edit Event Listener
+  useEffect(() => {
+    const handleMagicEdit = (event: CustomEvent) => {
+      const period = event.detail as PayrollHistoryPeriod;
+      startMagicEdit(period);
+    };
+
+    window.addEventListener('magic-edit', handleMagicEdit as EventListener);
+    return () => window.removeEventListener('magic-edit', handleMagicEdit as EventListener);
+  }, []);
 
   const loadPayrollHistory = async () => {
     try {
@@ -150,6 +168,50 @@ export const PayrollHistoryPage = () => {
     }
 
     setFilteredPeriods(filtered);
+  };
+
+  // Magic Edit Functions
+  const startMagicEdit = async (period: PayrollHistoryPeriod) => {
+    try {
+      // Verificar si se puede reabrir
+      const { canReopen, reason } = await canReopenPeriod(period.period);
+      
+      if (!canReopen) {
+        toast({
+          title: "No se puede editar",
+          description: reason || "Este período no puede ser editado",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setTransitionPeriod(period);
+      setIsTransitioning(true);
+      
+      // Reabrir automáticamente el período
+      await reopenPeriod(period.period);
+      
+    } catch (error) {
+      console.error('Error starting magic edit:', error);
+      setIsTransitioning(false);
+      toast({
+        title: "Error",
+        description: "No se pudo iniciar la edición mágica",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleMagicEditComplete = () => {
+    if (transitionPeriod) {
+      // Store the period info for the magic edit session
+      sessionStorage.setItem('magicEditPeriod', JSON.stringify(transitionPeriod));
+      
+      // Navigate to payroll with magic edit mode
+      navigate('/app/payroll?magicEdit=true');
+    }
+    setIsTransitioning(false);
+    setTransitionPeriod(null);
   };
 
   const handleViewDetails = (period: PayrollHistoryPeriod) => {
@@ -274,147 +336,169 @@ export const PayrollHistoryPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Historial de Nómina</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Gestiona y consulta el historial de períodos de nómina procesados
-              </p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button 
-                onClick={handleExportToExcel}
-                disabled={isExporting}
-                variant="outline"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {isExporting ? 'Exportando...' : 'Exportar Excel'}
-              </Button>
+    <>
+      {/* Magic Edit Transition */}
+      <MagicEditTransition
+        isTransitioning={isTransitioning}
+        periodName={transitionPeriod ? formatPeriodDateRange(transitionPeriod.startDate, transitionPeriod.endDate) : ''}
+        onComplete={handleMagicEditComplete}
+      />
+
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-2xl font-semibold text-gray-900">Historial de Nómina</h1>
+                  {canUserReopenPeriods && (
+                    <Badge className="bg-purple-100 text-purple-800 animate-pulse">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Edición Mágica Activa
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 mt-1">
+                  Gestiona y consulta el historial de períodos de nómina procesados
+                  {canUserReopenPeriods && (
+                    <span className="ml-2 text-purple-600 font-medium">
+                      • Haz clic en ✨ para editar en un solo clic
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Button 
+                  onClick={handleExportToExcel}
+                  disabled={isExporting}
+                  variant="outline"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {isExporting ? 'Exportando...' : 'Exportar Excel'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="p-6 space-y-6">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Períodos</p>
-                  <p className="text-2xl font-bold text-gray-900">{statusSummary.total}</p>
+        <div className="p-6 space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Períodos</p>
+                    <p className="text-2xl font-bold text-gray-900">{statusSummary.total}</p>
+                  </div>
+                  <FileText className="h-8 w-8 text-blue-600" />
                 </div>
-                <FileText className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Cerrados</p>
-                  <p className="text-2xl font-bold text-green-600">{statusSummary.cerrados}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Cerrados</p>
+                    <p className="text-2xl font-bold text-green-600">{statusSummary.cerrados}</p>
+                  </div>
+                  <Badge className="bg-green-100 text-green-800">✓</Badge>
                 </div>
-                <Badge className="bg-green-100 text-green-800">✓</Badge>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Reabiertos</p>
-                  <p className="text-2xl font-bold text-amber-600">{statusSummary.reabiertos}</p>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Reabiertos</p>
+                    <p className="text-2xl font-bold text-amber-600">{statusSummary.reabiertos}</p>
+                  </div>
+                  <Badge className="bg-amber-100 text-amber-800">🟡</Badge>
                 </div>
-                <Badge className="bg-amber-100 text-amber-800">🟡</Badge>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Con Errores</p>
-                  <p className="text-2xl font-bold text-red-600">{statusSummary.conErrores}</p>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Con Errores</p>
+                    <p className="text-2xl font-bold text-red-600">{statusSummary.conErrores}</p>
+                  </div>
+                  <AlertCircle className="h-8 w-8 text-red-600" />
                 </div>
-                <AlertCircle className="h-8 w-8 text-red-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">En Revisión</p>
-                  <p className="text-2xl font-bold text-yellow-600">{statusSummary.enRevision}</p>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">En Revisión</p>
+                    <p className="text-2xl font-bold text-yellow-600">{statusSummary.enRevision}</p>
+                  </div>
+                  <Clock className="h-8 w-8 text-yellow-600" />
                 </div>
-                <Clock className="h-8 w-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <PayrollHistoryFilters
+            filters={filters}
+            onFiltersChange={setFilters}
+          />
+
+          {/* Table with Pagination */}
+          <div className="bg-white rounded-lg shadow">
+            <PayrollHistoryTable
+              periods={pagination.paginatedItems}
+              onViewDetails={handleViewDetails}
+              onReopenPeriod={handleReopenPeriod}
+              onClosePeriod={handleClosePeriod}
+              onDownloadFile={downloadFile}
+              canUserReopenPeriods={canUserReopenPeriods}
+            />
+            
+            <PaginationControls 
+              pagination={pagination} 
+              itemName="períodos"
+            />
+          </div>
         </div>
 
-        {/* Filters */}
-        <PayrollHistoryFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
+        {/* Reopen Period Modal */}
+        {showReopenModal && selectedPeriod && (
+          <ReopenPeriodModal
+            isOpen={showReopenModal}
+            onClose={() => {
+              setShowReopenModal(false);
+              setSelectedPeriod(null);
+              setHasVouchers(false);
+            }}
+            onConfirm={handleReopenConfirm}
+            period={selectedPeriod}
+            isProcessing={isReopening}
+            hasVouchers={hasVouchers}
+          />
+        )}
 
-        {/* Table with Pagination */}
-        <div className="bg-white rounded-lg shadow">
-          <PayrollHistoryTable
-            periods={pagination.paginatedItems}
-            onViewDetails={handleViewDetails}
-            onReopenPeriod={handleReopenPeriod}
-            onClosePeriod={handleClosePeriod}
-            onDownloadFile={downloadFile}
-            canUserReopenPeriods={canUserReopenPeriods}
+        {/* Edit Wizard Modal */}
+        {showEditWizard && (
+          <EditWizard
+            isOpen={showEditWizard}
+            onClose={() => {
+              setShowEditWizard(false);
+              setSelectedPeriod(null);
+            }}
+            onConfirm={handleEditWizardComplete}
+            isProcessing={isProcessing}
           />
-          
-          <PaginationControls 
-            pagination={pagination} 
-            itemName="períodos"
-          />
-        </div>
+        )}
       </div>
-
-      {/* Reopen Period Modal */}
-      {showReopenModal && selectedPeriod && (
-        <ReopenPeriodModal
-          isOpen={showReopenModal}
-          onClose={() => {
-            setShowReopenModal(false);
-            setSelectedPeriod(null);
-            setHasVouchers(false);
-          }}
-          onConfirm={handleReopenConfirm}
-          period={selectedPeriod}
-          isProcessing={isReopening}
-          hasVouchers={hasVouchers}
-        />
-      )}
-
-      {/* Edit Wizard Modal */}
-      {showEditWizard && (
-        <EditWizard
-          isOpen={showEditWizard}
-          onClose={() => {
-            setShowEditWizard(false);
-            setSelectedPeriod(null);
-          }}
-          onConfirm={handleEditWizardComplete}
-          isProcessing={isProcessing}
-        />
-      )}
-    </div>
+    </>
   );
 };
