@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import RealtimeService from '@/components/RealtimeService';
@@ -55,6 +55,28 @@ function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/logout" element={<LogoutPage />} />
+              
+              {/* Legacy route redirects - redirect old URLs to new /app prefixed ones */}
+              <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
+              <Route path="/employees" element={<Navigate to="/app/employees" replace />} />
+              <Route path="/employees/create" element={<Navigate to="/app/employees/create" replace />} />
+              <Route path="/employees/create-modern" element={<Navigate to="/app/employees/create-modern" replace />} />
+              <Route path="/employees/:id" element={<Navigate to="/app/employees/:id" replace />} />
+              <Route path="/employees/:id/edit" element={<Navigate to="/app/employees/:id/edit" replace />} />
+              <Route path="/payroll" element={<Navigate to="/app/payroll" replace />} />
+              <Route path="/payroll-modern" element={<Navigate to="/app/payroll-modern" replace />} />
+              <Route path="/payroll-intelligent" element={<Navigate to="/app/payroll-intelligent" replace />} />
+              <Route path="/payroll-intelligent-silent" element={<Navigate to="/app/payroll-intelligent-silent" replace />} />
+              <Route path="/payroll-history" element={<Navigate to="/app/payroll-history" replace />} />
+              <Route path="/payroll-history/:periodId" element={<Navigate to="/app/payroll-history/:periodId" replace />} />
+              <Route path="/payroll-history/:periodId/edit" element={<Navigate to="/app/payroll-history/:periodId/edit" replace />} />
+              <Route path="/reports" element={<Navigate to="/app/reports" replace />} />
+              <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+              <Route path="/company-settings" element={<Navigate to="/app/company-settings" replace />} />
+              <Route path="/subscription" element={<Navigate to="/app/subscription" replace />} />
+              <Route path="/billing-history" element={<Navigate to="/app/billing-history" replace />} />
+              <Route path="/support-backoffice" element={<Navigate to="/app/support-backoffice" replace />} />
+              <Route path="/superadmin" element={<Navigate to="/app/superadmin" replace />} />
               
               <Route path="/app" element={
                 <ProtectedRoute>
