@@ -2,15 +2,14 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText, Unlock, Lock, Sparkles, Edit } from 'lucide-react';
+import { Eye, Download, FileText } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { formatPeriodDateRange } from '@/utils/periodDateUtils';
+import { SmartEditButton } from './SmartEditButton';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
   onViewDetails: (period: PayrollHistoryPeriod) => void;
-  onReopenPeriod?: (period: PayrollHistoryPeriod) => void;
-  onClosePeriod?: (period: PayrollHistoryPeriod) => void;
   onDownloadFile?: (fileUrl: string, fileName: string) => void;
   canUserReopenPeriods?: boolean;
 }
@@ -18,8 +17,6 @@ interface PayrollHistoryTableProps {
 export const PayrollHistoryTable = ({ 
   periods, 
   onViewDetails,
-  onReopenPeriod,
-  onClosePeriod,
   onDownloadFile,
   canUserReopenPeriods = false
 }: PayrollHistoryTableProps) => {
@@ -75,58 +72,6 @@ export const PayrollHistoryTable = ({
     }
   };
 
-  const canReopenPeriod = (period: PayrollHistoryPeriod) => {
-    return canUserReopenPeriods && 
-           (period.status === 'cerrado' || period.status === 'con_errores') && 
-           !period.reportedToDian;
-  };
-
-  const canClosePeriod = (period: PayrollHistoryPeriod) => {
-    return canUserReopenPeriods && period.status === 'reabierto';
-  };
-
-  const canMagicEdit = (period: PayrollHistoryPeriod) => {
-    return canUserReopenPeriods && 
-           (period.status === 'cerrado' || period.status === 'con_errores') && 
-           !period.reportedToDian;
-  };
-
-  // FUNCIÓN MEJORADA: Navegar al módulo de liquidación para continuar editando
-  const handleContinueEditing = (period: PayrollHistoryPeriod) => {
-    // Guardar información completa del período en sessionStorage con propiedades correctas
-    console.log('🔄 Preparing to continue editing period:', {
-      id: period.id,
-      period: period.period,
-      startDate: period.startDate,
-      endDate: period.endDate,
-      type: period.type,
-      status: period.status,
-      reopenedBy: period.reopenedBy,
-      reopenedAt: period.reopenedAt
-    });
-
-    sessionStorage.setItem('continueEditingPeriod', JSON.stringify({
-      id: period.id,
-      periodo: period.period,
-      startDate: period.startDate, // Usar startDate directamente
-      endDate: period.endDate,     // Usar endDate directamente
-      type: period.type,
-      status: period.status,
-      reopenedBy: period.reopenedBy,
-      reopenedAt: period.reopenedAt,
-      employeesCount: period.employeesCount
-    }));
-    
-    console.log('📦 Stored period data in sessionStorage:', {
-      id: period.id,
-      dates: `${period.startDate} - ${period.endDate}`,
-      reopenedInfo: period.reopenedBy ? `by ${period.reopenedBy} at ${period.reopenedAt}` : 'not reopened'
-    });
-    
-    // Navegar al módulo de liquidación
-    window.location.href = '/app/payroll';
-  };
-
   const isReopenedPeriod = (period: PayrollHistoryPeriod) => {
     return period.reopenedBy !== null && period.reopenedBy !== undefined;
   };
@@ -144,7 +89,7 @@ export const PayrollHistoryTable = ({
               <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
               <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
-              <TableHead className="font-semibold text-center min-w-[180px]">Acciones</TableHead>
+              <TableHead className="font-semibold text-center min-w-[200px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -213,8 +158,8 @@ export const PayrollHistoryTable = ({
                 <TableCell className="min-w-[120px]">
                   {getPaymentStatusBadge(period.paymentStatus)}
                 </TableCell>
-                <TableCell className="min-w-[180px]">
-                  <div className="flex items-center justify-center space-x-1">
+                <TableCell className="min-w-[200px]">
+                  <div className="flex items-center justify-center space-x-2">
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -225,60 +170,15 @@ export const PayrollHistoryTable = ({
                       <Eye className="h-4 w-4" />
                     </Button>
                     
-                    {/* MEJORADO: Botón Continuar Editando para períodos reabiertos */}
-                    {isReopenedPeriod(period) && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleContinueEditing(period)}
-                        className="text-green-600 hover:text-green-800 flex-shrink-0 hover:bg-green-50 transition-all duration-200"
-                        title={`Continuar editando período ${formatPeriodDate(period.startDate, period.endDate)}`}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
-                    
-                    {/* Magic Edit Button - The WOW Feature */}
-                    {canMagicEdit(period) && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => window.dispatchEvent(new CustomEvent('magic-edit', { detail: period }))}
-                        className="text-purple-600 hover:text-purple-800 flex-shrink-0 hover:bg-purple-50 transition-all duration-200"
-                        title="Edición Mágica - Abrir y editar en un clic"
-                      >
-                        <Sparkles className="h-4 w-4" />
-                      </Button>
-                    )}
-
-                    {canReopenPeriod(period) && onReopenPeriod && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => onReopenPeriod(period)}
-                        className="text-amber-600 hover:text-amber-800 flex-shrink-0"
-                        title="Reabrir período"
-                      >
-                        <Unlock className="h-4 w-4" />
-                      </Button>
-                    )}
-
-                    {canClosePeriod(period) && onClosePeriod && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => onClosePeriod(period)}
-                        className="text-green-600 hover:text-green-800 flex-shrink-0"
-                        title="Cerrar nuevamente"
-                      >
-                        <Lock className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <SmartEditButton 
+                      period={period} 
+                      canUserEdit={canUserReopenPeriods} 
+                    />
                     
                     <Button 
                       variant="ghost" 
                       size="sm"
-                      className="text-green-600 hover:text-green-800 flex-shrink-0"
+                      className="text-gray-600 hover:text-gray-800 flex-shrink-0"
                       onClick={() => handleDownloadPila(period)}
                       title="Descargar archivos"
                     >

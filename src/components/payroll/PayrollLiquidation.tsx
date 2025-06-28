@@ -5,19 +5,13 @@ import { PayrollLiquidationHeader } from './PayrollLiquidationHeader';
 import { PayrollPeriodCard } from './PayrollPeriodCard';
 import { PayrollSummaryCards } from './liquidation/PayrollSummaryCards';
 import { PayrollTable } from './liquidation/PayrollTable';
-import { MagicEditBanner } from '../payroll-history/MagicEditBanner';
-import { ReopenedPeriodBanner } from './ReopenedPeriodBanner';
+import { SimpleReopenedBanner } from './SimpleReopenedBanner';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
-import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { toast } from '@/hooks/use-toast';
 
 export const PayrollLiquidation = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [magicEditPeriod, setMagicEditPeriod] = useState<PayrollHistoryPeriod | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const {
     currentPeriod,
@@ -39,45 +33,6 @@ export const PayrollLiquidation = () => {
     isLoading
   } = usePayrollLiquidation();
 
-  // Check for Magic Edit mode
-  useEffect(() => {
-    const isMagicEdit = searchParams.get('magicEdit') === 'true';
-    if (isMagicEdit) {
-      const storedPeriod = sessionStorage.getItem('magicEditPeriod');
-      if (storedPeriod) {
-        try {
-          const period = JSON.parse(storedPeriod) as PayrollHistoryPeriod;
-          setMagicEditPeriod(period);
-          sessionStorage.removeItem('magicEditPeriod');
-          
-          toast({
-            title: "🎉 ¡Modo Edición Mágico Activado!",
-            description: "Ahora puedes editar este período directamente. Los cambios se guardan automáticamente.",
-            duration: 5000,
-          });
-        } catch (error) {
-          console.error('Error parsing magic edit period:', error);
-        }
-      }
-    }
-  }, [searchParams]);
-
-  // Auto-save functionality
-  useEffect(() => {
-    if ((magicEditPeriod || isReopenedPeriod) && hasUnsavedChanges) {
-      const autoSaveTimer = setTimeout(async () => {
-        setIsAutoSaving(true);
-        // Simulate auto-save
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setIsAutoSaving(false);
-        setHasUnsavedChanges(false);
-        setLastSaved(new Date());
-      }, 2000);
-
-      return () => clearTimeout(autoSaveTimer);
-    }
-  }, [hasUnsavedChanges, magicEditPeriod, isReopenedPeriod]);
-
   const validEmployeeCount = employees.filter(emp => emp.status === 'valid').length;
 
   const handleUpdateEmployee = (id: string, updates: Partial<any>) => {
@@ -85,9 +40,6 @@ export const PayrollLiquidation = () => {
     const value = updates[field];
     if (field && typeof value === 'number') {
       updateEmployee(id, field, value);
-      if (magicEditPeriod || isReopenedPeriod) {
-        setHasUnsavedChanges(true);
-      }
     }
   };
 
@@ -96,26 +48,8 @@ export const PayrollLiquidation = () => {
   };
 
   const handleFinishEditing = async () => {
-    if (hasUnsavedChanges) {
-      setIsAutoSaving(true);
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setIsAutoSaving(false);
-    }
-
     if (isReopenedPeriod) {
-      // Usar la función específica para períodos reabiertos
       await finishReopenedPeriodEditing();
-    } else {
-      // Close the period (Magic Edit)
-      toast({
-        title: "Período cerrado exitosamente",
-        description: "Los cambios han sido guardados y el período está nuevamente cerrado.",
-      });
-
-      // Navigate back to history
-      setTimeout(() => {
-        navigate('/app/payroll-history');
-      }, 1000);
     }
   };
 
@@ -147,31 +81,17 @@ export const PayrollLiquidation = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Magic Edit Banner */}
-      {magicEditPeriod && (
-        <MagicEditBanner
-          period={magicEditPeriod}
-          onBackToHistory={handleBackToHistory}
-          onFinishEditing={handleFinishEditing}
-          hasUnsavedChanges={hasUnsavedChanges}
-          isAutoSaving={isAutoSaving}
-          lastSaved={lastSaved}
-        />
-      )}
-
-      {/* Reopened Period Banner */}
-      {isReopenedPeriod && reopenedBy && reopenedAt && (
-        <ReopenedPeriodBanner
+      {/* Simple Reopened Period Banner */}
+      {isReopenedPeriod && (
+        <SimpleReopenedBanner
           periodName={formatPeriodName()}
-          reopenedBy={reopenedBy}
-          reopenedAt={reopenedAt}
           onBackToHistory={handleBackToHistory}
           onFinishEditing={handleFinishEditing}
           isLoading={isLoading}
         />
       )}
 
-      <div className={`p-6 space-y-6 ${(magicEditPeriod || isReopenedPeriod) ? 'pt-32' : ''}`}>
+      <div className={`p-6 space-y-6 ${isReopenedPeriod ? 'pt-6' : ''}`}>
         {/* Header */}
         <PayrollLiquidationHeader 
           onRefresh={refreshEmployees}
