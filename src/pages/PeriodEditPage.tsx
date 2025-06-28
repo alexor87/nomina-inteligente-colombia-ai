@@ -288,15 +288,37 @@ export const PeriodEditPage = () => {
       return;
     }
 
-    console.log('🔄 Adding novedad for employee:', {
+    // Validar que el payroll_id sea un UUID válido
+    const isValidUUID = (uuid: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(uuid);
+    };
+
+    if (!employee.payroll_id || !isValidUUID(employee.payroll_id)) {
+      console.error('❌ Invalid payroll_id for employee:', {
+        employeeId,
+        payrollId: employee.payroll_id,
+        employee
+      });
+      
+      toast({
+        title: "Error de configuración",
+        description: `No se encontró un ID de nómina válido para el empleado ${employee.nombre} ${employee.apellido}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('✅ Valid payroll_id found for employee:', {
       employeeId,
       payrollId: employee.payroll_id,
-      employeeName: `${employee.nombre} ${employee.apellido}`
+      employeeName: `${employee.nombre} ${employee.apellido}`,
+      isValidUUID: isValidUUID(employee.payroll_id)
     });
 
     setSelectedEmployeeData({
       employeeId: employeeId,
-      payrollId: employee.payroll_id,
+      payrollId: employee.payroll_id, // Este es el UUID real del payroll del empleado
       name: `${employee.nombre} ${employee.apellido}`,
       salary: employee.salario_base
     });
@@ -487,7 +509,7 @@ export const PeriodEditPage = () => {
           employeeId={selectedEmployeeData.employeeId}
           employeeName={selectedEmployeeData.name}
           employeeSalary={selectedEmployeeData.salary}
-          periodId={selectedEmployeeData.payrollId} // Pass the real payroll UUID here
+          payrollId={selectedEmployeeData.payrollId} // Pasando el UUID real del payroll
           onNovedadCreated={handleCreateNovedadFromModal}
         />
       )}

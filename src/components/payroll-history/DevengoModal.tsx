@@ -29,7 +29,7 @@ interface DevengoModalProps {
   employeeId: string;
   employeeName: string;
   employeeSalary: number;
-  periodId: string; // This should now be the real payroll UUID
+  payrollId: string; // Cambiado de periodId a payrollId para mayor claridad
   onNovedadCreated: (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => void;
 }
 
@@ -39,7 +39,7 @@ export const DevengoModal = ({
   employeeId, 
   employeeName, 
   employeeSalary,
-  periodId, // This is now the real payroll UUID
+  payrollId, // Este debe ser el UUID real del payroll del empleado
   onNovedadCreated
 }: DevengoModalProps) => {
   const { toast } = useToast();
@@ -63,7 +63,7 @@ export const DevengoModal = ({
   };
 
   // Use the novedades hook internally with the real payroll UUID
-  const { createNovedad, isLoading } = useNovedades(periodId, () => {
+  const { createNovedad, isLoading } = useNovedades(payrollId, () => {
     console.log('✅ Novedad created successfully, triggering parent refresh');
     // Call the parent callback to refresh data
     if (formData.valor) {
@@ -73,8 +73,8 @@ export const DevengoModal = ({
   });
 
   console.log('🔧 DevengoModal initialized with:', {
-    periodId,
-    isValidUUID: isValidUUID(periodId),
+    payrollId,
+    isValidUUID: isValidUUID(payrollId),
     employeeId,
     employeeName
   });
@@ -147,14 +147,14 @@ export const DevengoModal = ({
       return;
     }
 
-    // Validate periodId is a proper UUID
-    if (!periodId || !isValidUUID(periodId)) {
+    // Validate payrollId is a proper UUID
+    if (!payrollId || !isValidUUID(payrollId)) {
       toast({
         title: "Error de configuración",
-        description: `ID del período inválido. Se esperaba un UUID válido, se recibió: ${periodId}`,
+        description: `ID del payroll inválido. Se esperaba un UUID válido, se recibió: ${payrollId}`,
         variant: "destructive"
       });
-      console.error('❌ Invalid periodId for novedad creation:', periodId);
+      console.error('❌ Invalid payrollId for novedad creation:', payrollId);
       return;
     }
 
@@ -171,16 +171,16 @@ export const DevengoModal = ({
     try {
       console.log('🚀 Creating novedad with validated data:', {
         empleado_id: employeeId,
-        periodo_id: periodId,
+        periodo_id: payrollId, // Usando el UUID real del payroll
         tipo_novedad: formData.tipoNovedad,
         valor,
-        isValidUUID: isValidUUID(periodId)
+        isValidUUID: isValidUUID(payrollId)
       });
 
       // Prepare the complete novedad data with validated UUID
       const novedadData: CreateNovedadData = {
         empleado_id: employeeId,
-        periodo_id: periodId, // This is now the real payroll UUID
+        periodo_id: payrollId, // Este es el UUID real del payroll del empleado
         tipo_novedad: formData.tipoNovedad as NovedadType,
         subtipo: formData.subtipo || undefined,
         fecha_inicio: formData.fechaInicio || undefined,
@@ -280,7 +280,7 @@ export const DevengoModal = ({
             {/* Debug info - remove in production */}
             {process.env.NODE_ENV === 'development' && (
               <div className="text-xs text-gray-500 mt-1">
-                Payroll ID: {periodId} | Valid UUID: {isValidUUID(periodId) ? '✅' : '❌'}
+                Payroll ID: {payrollId} | Valid UUID: {isValidUUID(payrollId) ? '✅' : '❌'}
               </div>
             )}
           </DialogDescription>
