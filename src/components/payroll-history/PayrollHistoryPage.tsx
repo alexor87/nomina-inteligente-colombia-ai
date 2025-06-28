@@ -96,8 +96,9 @@ export const PayrollHistoryPage = () => {
         return {
           id: record.id,
           period: record.periodo || 'Sin período',
-          startDate: record.fechaCreacion || new Date().toISOString().split('T')[0],
-          endDate: record.fechaCreacion || new Date().toISOString().split('T')[0],
+          // Use the correct date range from the service
+          startDate: record.fecha_inicio || record.fechaCreacion,
+          endDate: record.fecha_fin || record.fechaCreacion,
           type: 'mensual' as const,
           employeesCount: record.empleados || 0,
           status: mappedStatus,

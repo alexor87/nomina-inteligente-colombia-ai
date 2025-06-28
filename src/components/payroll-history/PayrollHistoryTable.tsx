@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Eye, Download, FileText, Unlock, Lock } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
+import { formatPeriodDateRange } from '@/utils/periodDateUtils';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
@@ -30,20 +31,7 @@ export const PayrollHistoryTable = ({
   };
 
   const formatPeriodDate = (startDate: string, endDate: string) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    const monthNames = [
-      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
-    ];
-    
-    const startDay = start.getDate();
-    const endDay = end.getDate();
-    const month = monthNames[start.getMonth()];
-    const year = start.getFullYear();
-    
-    return `${startDay} - ${endDay} /${month}/ ${year}`;
+    return formatPeriodDateRange(startDate, endDate);
   };
 
   const getStatusBadge = (status: PayrollHistoryPeriod['status']) => {

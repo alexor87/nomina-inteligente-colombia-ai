@@ -37,8 +37,9 @@ export const PayrollHistoryDetails = () => {
         const convertedPeriod: PayrollHistoryPeriod = {
           id: foundPeriod.id,
           period: foundPeriod.periodo || 'Sin período',
-          startDate: foundPeriod.fechaCreacion || new Date().toISOString().split('T')[0],
-          endDate: foundPeriod.fechaCreacion || new Date().toISOString().split('T')[0],
+          // Use correct date range from the service
+          startDate: foundPeriod.fecha_inicio || foundPeriod.fechaCreacion,
+          endDate: foundPeriod.fecha_fin || foundPeriod.fechaCreacion,
           type: 'mensual' as const,
           employeesCount: foundPeriod.empleados || 0,
           status: foundPeriod.estado === 'cerrada' || foundPeriod.estado === 'procesada' || foundPeriod.estado === 'pagada' ? 'cerrado' : 

@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { parsePeriodToDateRange } from '@/utils/periodDateUtils';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -13,6 +14,9 @@ export interface PayrollHistoryRecord {
   reabierto_por?: string;
   fecha_reapertura?: string;
   reportado_dian?: boolean;
+  // Add actual period dates
+  fecha_inicio?: string;
+  fecha_fin?: string;
 }
 
 export class PayrollHistoryService {
@@ -34,7 +38,7 @@ export class PayrollHistoryService {
     }
   }
 
-  // Obtener resumen de períodos de nómina reales
+  // Obtener resumen de períodos de nómina reales con fechas correctas
   static async getPayrollPeriods(): Promise<PayrollHistoryRecord[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -42,48 +46,86 @@ export class PayrollHistoryService {
 
       console.log('Loading payroll history for company:', companyId);
 
-      const { data, error } = await supabase
+      // First try to get data from payroll_periods table if it exists and has data
+      const { data: periodsData, error: periodsError } = await supabase
+        .from('payroll_periods')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('fecha_inicio', { ascending: false });
+
+      // Get payroll summary data
+      const { data: payrollData, error: payrollError } = await supabase
         .from('payrolls')
         .select('*')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error loading payroll history:', error);
-        throw error;
+      if (payrollError) {
+        console.error('Error loading payroll history:', payrollError);
+        throw payrollError;
       }
 
-      console.log('Raw payroll history data:', data?.length || 0);
+      console.log('Raw payroll history data:', payrollData?.length || 0);
+      console.log('Period data available:', periodsData?.length || 0);
 
-      if (!data || data.length === 0) {
+      if (!payrollData || payrollData.length === 0) {
         console.log('No payroll records found');
         return [];
       }
 
-      // Agrupar por período
+      // Group payroll data by period
       const grouped: { [key: string]: any[] } = {};
-      data.forEach(record => {
+      payrollData.forEach(record => {
         if (!grouped[record.periodo]) {
           grouped[record.periodo] = [];
         }
         grouped[record.periodo].push(record);
       });
 
-      const periods = Object.entries(grouped).map(([periodo, records]) => ({
-        id: `${periodo}-${records[0].created_at}`,
-        periodo,
-        fechaCreacion: records[0].created_at,
-        empleados: records.length,
-        totalNomina: records.reduce((sum, r) => sum + Number(r.neto_pagado || 0), 0),
-        estado: records[0].estado,
-        companyId,
-        editable: records[0].editable,
-        reabierto_por: records[0].reabierto_por,
-        fecha_reapertura: records[0].fecha_reapertura,
-        reportado_dian: records[0].reportado_dian
-      }));
+      // Create period summaries with correct dates
+      const periods = Object.entries(grouped).map(([periodo, records]) => {
+        // Try to find matching period data
+        const periodData = periodsData?.find(p => {
+          // Try different matching strategies
+          const periodLower = periodo.toLowerCase();
+          const pDataPeriod = `${new Date(p.fecha_inicio).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`.toLowerCase();
+          return periodLower.includes(pDataPeriod) || pDataPeriod.includes(periodLower);
+        });
 
-      console.log('Processed payroll periods:', periods.length);
+        let startDate: string;
+        let endDate: string;
+
+        if (periodData) {
+          // Use actual period dates from payroll_periods table
+          startDate = periodData.fecha_inicio;
+          endDate = periodData.fecha_fin;
+          console.log(`Using period data for ${periodo}:`, { startDate, endDate });
+        } else {
+          // Parse period name to get date range
+          const dateRange = parsePeriodToDateRange(periodo);
+          startDate = dateRange.startDate;
+          endDate = dateRange.endDate;
+          console.log(`Parsed period ${periodo} to date range:`, { startDate, endDate });
+        }
+
+        return {
+          id: `${periodo}-${records[0].created_at}`,
+          periodo,
+          fechaCreacion: records[0].created_at,
+          empleados: records.length,
+          totalNomina: records.reduce((sum, r) => sum + Number(r.neto_pagado || 0), 0),
+          estado: records[0].estado,
+          companyId,
+          editable: records[0].editable,
+          reabierto_por: records[0].reabierto_por,
+          fecha_reapertura: records[0].fecha_reapertura,
+          reportado_dian: records[0].reportado_dian,
+          fecha_inicio: startDate,
+          fecha_fin: endDate
+        };
+      });
+
+      console.log('Processed payroll periods with correct dates:', periods.length);
       return periods;
     } catch (error) {
       console.error('Error loading payroll periods:', error);
@@ -118,7 +160,6 @@ export class PayrollHistoryService {
     }
   }
 
-  // Generar dispersión bancaria para un período
   static async generateBankDispersion(periodo: string): Promise<void> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
