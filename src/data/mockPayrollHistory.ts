@@ -91,6 +91,7 @@ export const mockPayrollHistoryEmployees: PayrollHistoryEmployee[] = [
     grossPay: 4800000,
     deductions: 720000,
     netPay: 4080000,
+    baseSalary: 5200000, // Salario base mensual completo
     paymentStatus: 'pagado',
     payslipUrl: '/payslips/ana-rodriguez-mayo-15.pdf'
   },
@@ -102,6 +103,7 @@ export const mockPayrollHistoryEmployees: PayrollHistoryEmployee[] = [
     grossPay: 4200000,
     deductions: 630000,
     netPay: 3570000,
+    baseSalary: 4500000, // Salario base mensual completo
     paymentStatus: 'pagado',
     payslipUrl: '/payslips/carlos-mendoza-mayo-15.pdf'
   }
