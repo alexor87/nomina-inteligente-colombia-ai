@@ -25,7 +25,7 @@ interface EditableEmployeeTableProps {
   employees: PayrollHistoryEmployee[];
   isEditMode: boolean;
   onEmployeeUpdate: (employeeId: string, updates: Partial<PayrollHistoryEmployee>) => void;
-  periodId: string;
+  periodId: string; // This is now the real period UUID
   onNovedadChange?: () => void;
 }
 
@@ -39,7 +39,7 @@ export const EditableEmployeeTable = ({
   employees, 
   isEditMode, 
   onEmployeeUpdate,
-  periodId,
+  periodId, // Real period UUID
   onNovedadChange
 }: EditableEmployeeTableProps) => {
   const { toast } = useToast();
@@ -50,7 +50,7 @@ export const EditableEmployeeTable = ({
     employeeId: string;
     employeeName: string;
     employeeSalary: number;
-    payrollId: string; // Now using real payroll UUID
+    payrollId: string;
   }>({
     isOpen: false,
     employeeId: '',
@@ -59,11 +59,7 @@ export const EditableEmployeeTable = ({
     payrollId: ''
   });
 
-  console.log('EditableEmployeeTable render - employees with payrollIds:', employees.map(emp => ({
-    name: emp.name,
-    employeeId: emp.id,
-    payrollId: emp.payrollId
-  })));
+  console.log('EditableEmployeeTable render - using real period ID:', periodId);
 
   const handleCellClick = (employeeId: string, field: 'grossPay' | 'deductions' | 'netPay', currentValue: number) => {
     if (!isEditMode) return;
@@ -171,6 +167,17 @@ export const EditableEmployeeTable = ({
       return;
     }
 
+    // Validate that periodId is also a proper UUID
+    if (!isValidUUID(periodId)) {
+      toast({
+        title: "Error",
+        description: "ID de período inválido",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('✅ Using real period UUID for novedades:', periodId);
     console.log('✅ Using real payroll UUID:', employee.payrollId, 'for employee:', employeeName);
     
     setDevengoModal({
@@ -178,7 +185,7 @@ export const EditableEmployeeTable = ({
       employeeId,
       employeeName,
       employeeSalary: employeeBaseSalary,
-      payrollId: employee.payrollId // Using the REAL UUID from the payroll table
+      payrollId: employee.payrollId // Real payroll UUID
     });
   };
 
@@ -294,7 +301,7 @@ export const EditableEmployeeTable = ({
             onClick={() => handleOpenDevengoModal(
               employee.id, 
               employee.name, 
-              employee.baseSalary // Usar el salario base real del empleado
+              employee.baseSalary
             )}
             title="Agregar devengado"
           >
@@ -364,7 +371,8 @@ export const EditableEmployeeTable = ({
         employeeId={devengoModal.employeeId}
         employeeName={devengoModal.employeeName}
         employeeSalary={devengoModal.employeeSalary}
-        payrollId={devengoModal.payrollId} // Now passing the REAL UUID
+        payrollId={devengoModal.payrollId} // Real payroll UUID
+        periodId={periodId} // Real period UUID for novedades
         onNovedadCreated={handleNovedadCreated}
       />
     </>

@@ -666,6 +666,7 @@ export type Database = {
           id: string
           observacion: string | null
           periodo_id: string
+          periodo_real_id: string | null
           subtipo: string | null
           tipo_novedad: Database["public"]["Enums"]["novedad_type"]
           updated_at: string
@@ -685,6 +686,7 @@ export type Database = {
           id?: string
           observacion?: string | null
           periodo_id: string
+          periodo_real_id?: string | null
           subtipo?: string | null
           tipo_novedad: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
@@ -704,12 +706,20 @@ export type Database = {
           id?: string
           observacion?: string | null
           periodo_id?: string
+          periodo_real_id?: string | null
           subtipo?: string | null
           tipo_novedad?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
           valor?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_payroll_novedades_periodo_real"
+            columns: ["periodo_real_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_periods_real"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payroll_novedades_empleado_id_fkey"
             columns: ["empleado_id"]
@@ -805,6 +815,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payroll_periods_real: {
+        Row: {
+          company_id: string
+          created_at: string
+          empleados_count: number | null
+          estado: string
+          fecha_fin: string
+          fecha_inicio: string
+          id: string
+          periodo: string
+          tipo_periodo: string
+          total_deducciones: number | null
+          total_devengado: number | null
+          total_neto: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          empleados_count?: number | null
+          estado?: string
+          fecha_fin: string
+          fecha_inicio: string
+          id?: string
+          periodo: string
+          tipo_periodo?: string
+          total_deducciones?: number | null
+          total_devengado?: number | null
+          total_neto?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          empleados_count?: number | null
+          estado?: string
+          fecha_fin?: string
+          fecha_inicio?: string
+          id?: string
+          periodo?: string
+          tipo_periodo?: string
+          total_deducciones?: number | null
+          total_devengado?: number | null
+          total_neto?: number | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       payroll_reopen_audit: {
         Row: {

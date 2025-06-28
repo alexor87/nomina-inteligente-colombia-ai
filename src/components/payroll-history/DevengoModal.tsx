@@ -1,27 +1,15 @@
-import { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { NovedadesService } from '@/services/NovedadesService';
 import { formatCurrency } from '@/lib/utils';
-import { NOVEDAD_CATEGORIES, calcularValorNovedad, NovedadType, CreateNovedadData } from '@/types/novedades';
-import { useNovedades } from '@/hooks/useNovedades';
+import { Calculator, Plus, X } from 'lucide-react';
 
 interface DevengoModalProps {
   isOpen: boolean;
@@ -29,8 +17,16 @@ interface DevengoModalProps {
   employeeId: string;
   employeeName: string;
   employeeSalary: number;
-  payrollId: string; // Cambiado de periodId a payrollId para mayor claridad
-  onNovedadCreated: (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => void;
+  payrollId: string; // This is the payroll UUID (not used for novedades)
+  periodId: string; // This should be the real period UUID for novedades
+  onNovedadCreated?: (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => void;
+}
+
+interface DevengoFormData {
+  tipo_novedad: string;
+  valor: number;
+  horas: number;
+  observacion: string;
 }
 
 export const DevengoModal = ({ 
@@ -39,426 +35,276 @@ export const DevengoModal = ({
   employeeId, 
   employeeName, 
   employeeSalary,
-  payrollId, // Este debe ser el UUID real del payroll del empleado
-  onNovedadCreated
+  payrollId,
+  periodId, // Real period UUID for novedades
+  onNovedadCreated 
 }: DevengoModalProps) => {
   const { toast } = useToast();
-  const [formData, setFormData] = useState({
-    tipoNovedad: '',
-    subtipo: '',
-    valor: '',
-    observacion: '',
-    fechaInicio: '',
-    fechaFin: '',
-    dias: '',
-    horas: ''
-  });
-  const [calculatedValue, setCalculatedValue] = useState<number>(0);
-  const [calculationDetail, setCalculationDetail] = useState<string>('');
-
-  // Validate UUID format
-  const isValidUUID = (uuid: string): boolean => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
-  };
-
-  // Use the novedades hook internally with the real payroll UUID
-  const { createNovedad, isLoading } = useNovedades(payrollId, () => {
-    console.log('✅ Novedad created successfully, triggering parent refresh');
-    // Call the parent callback to refresh data
-    if (formData.valor) {
-      const valor = parseFloat(formData.valor);
-      onNovedadCreated(employeeId, valor, 'devengado');
-    }
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<DevengoFormData>({
+    tipo_novedad: '',
+    valor: 0,
+    horas: 0,
+    observacion: ''
   });
 
-  console.log('🔧 DevengoModal initialized with:', {
-    payrollId,
-    isValidUUID: isValidUUID(payrollId),
+  console.log('DevengoModal props:', {
     employeeId,
-    employeeName
+    employeeName,
+    payrollId,
+    periodId, // This should be the real period UUID
+    employeeSalary
   });
 
-  const tiposDevengado = Object.entries(NOVEDAD_CATEGORIES.devengados.types).map(([key, config]) => ({
-    value: key as NovedadType,
-    label: config.label,
-    requiere_horas: config.requiere_horas,
-    requiere_dias: config.requiere_dias,
-    auto_calculo: config.auto_calculo,
-    subtipos: config.subtipos
-  }));
+  const tiposDevengado = [
+    { value: 'horas_extra', label: 'Horas Extra', requiresHours: true },
+    { value: 'recargo_nocturno', label: 'Recargo Nocturno', requiresHours: true },
+    { value: 'bonificacion', label: 'Bonificación', requiresHours: false },
+    { value: 'comision', label: 'Comisión', requiresHours: false },
+    { value: 'otros_ingresos', label: 'Otros Ingresos', requiresHours: false }
+  ];
 
-  const resetForm = () => {
-    console.log('🔄 Resetting devengado form data');
-    setFormData({
-      tipoNovedad: '',
-      subtipo: '',
-      valor: '',
-      observacion: '',
-      fechaInicio: '',
-      fechaFin: '',
-      dias: '',
-      horas: ''
-    });
-    setCalculatedValue(0);
-    setCalculationDetail('');
+  const selectedTipo = tiposDevengado.find(tipo => tipo.value === formData.tipo_novedad);
+  const requiresHours = selectedTipo?.requiresHours || false;
+
+  const calculateValue = () => {
+    if (!formData.tipo_novedad || !formData.horas) return 0;
+
+    const salarioHora = employeeSalary / 240; // Aproximadamente 30 días * 8 horas
+    
+    switch (formData.tipo_novedad) {
+      case 'horas_extra':
+        return salarioHora * formData.horas * 1.25; // 25% adicional
+      case 'recargo_nocturno':
+        return salarioHora * formData.horas * 1.35; // 35% adicional
+      default:
+        return formData.valor;
+    }
   };
 
-  // Reset form when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      console.log('📖 Modal opened, resetting form');
-      resetForm();
-    }
-  }, [isOpen]);
+  const handleCalculate = () => {
+    const calculatedValue = calculateValue();
+    setFormData(prev => ({
+      ...prev,
+      valor: calculatedValue
+    }));
+  };
 
-  // Auto-calculate value when relevant data changes
-  useEffect(() => {
-    if (formData.tipoNovedad && employeeSalary > 0) {
-      const tipoConfig = tiposDevengado.find(t => t.value === formData.tipoNovedad);
-      if (tipoConfig?.auto_calculo) {
-        const dias = formData.dias ? parseInt(formData.dias) : undefined;
-        const horas = formData.horas ? parseFloat(formData.horas) : undefined;
-        
-        const { valor, baseCalculo } = calcularValorNovedad(
-          formData.tipoNovedad as NovedadType,
-          formData.subtipo,
-          employeeSalary,
-          dias,
-          horas
-        );
-        
-        setCalculatedValue(valor);
-        setCalculationDetail(baseCalculo.detalle_calculo);
-        setFormData(prev => ({ ...prev, valor: valor.toString() }));
-      }
-    }
-  }, [formData.tipoNovedad, formData.subtipo, formData.dias, formData.horas, employeeSalary, tiposDevengado]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.tipoNovedad || !formData.valor) {
-      toast({
-        title: "Campos requeridos",
-        description: "Por favor complete el tipo de novedad y el valor",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate payrollId is a proper UUID
-    if (!payrollId || !isValidUUID(payrollId)) {
-      toast({
-        title: "Error de configuración",
-        description: `ID del payroll inválido. Se esperaba un UUID válido, se recibió: ${payrollId}`,
-        variant: "destructive"
-      });
-      console.error('❌ Invalid payrollId for novedad creation:', payrollId);
-      return;
-    }
-
-    const valor = parseFloat(formData.valor);
-    if (isNaN(valor) || valor <= 0) {
-      toast({
-        title: "Valor inválido",
-        description: "El valor debe ser un número mayor a 0",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleSubmit = async () => {
     try {
-      console.log('🚀 Creating novedad with validated data:', {
-        empleado_id: employeeId,
-        periodo_id: payrollId, // Usando el UUID real del payroll
-        tipo_novedad: formData.tipoNovedad,
-        valor,
-        isValidUUID: isValidUUID(payrollId)
-      });
+      if (!formData.tipo_novedad) {
+        toast({
+          title: "Error",
+          description: "Debe seleccionar un tipo de devengado",
+          variant: "destructive"
+        });
+        return;
+      }
 
-      // Prepare the complete novedad data with validated UUID
-      const novedadData: CreateNovedadData = {
-        empleado_id: employeeId,
-        periodo_id: payrollId, // Este es el UUID real del payroll del empleado
-        tipo_novedad: formData.tipoNovedad as NovedadType,
-        subtipo: formData.subtipo || undefined,
-        fecha_inicio: formData.fechaInicio || undefined,
-        fecha_fin: formData.fechaFin || undefined,
-        dias: formData.dias ? parseInt(formData.dias) : undefined,
-        horas: formData.horas ? parseFloat(formData.horas) : undefined,
-        valor: valor,
-        observacion: formData.observacion || undefined,
-        // Include base_calculo if it was auto-calculated
-        base_calculo: calculatedValue > 0 ? {
-          salario_base: employeeSalary,
-          factor_calculo: calculatedValue / employeeSalary,
-          detalle_calculo: calculationDetail
-        } : undefined
+      if (!formData.valor || formData.valor <= 0) {
+        toast({
+          title: "Error", 
+          description: "El valor debe ser mayor a 0",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validate that periodId is a proper UUID
+      const isValidUUID = (uuid: string): boolean => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(uuid);
       };
 
-      console.log('📤 Sending validated novedad data:', novedadData);
+      if (!periodId || !isValidUUID(periodId)) {
+        console.error('❌ Invalid period ID for novedad:', periodId);
+        toast({
+          title: "Error de configuración",
+          description: "ID de período inválido. No se puede crear la novedad.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-      // Create the novedad using the hook (which has the callback)
-      await createNovedad(novedadData);
-      
-      console.log('✅ Novedad created successfully through hook');
+      console.log('✅ Creating novedad with valid period UUID:', periodId);
 
-      toast({
-        title: "✅ Devengado agregado exitosamente",
-        description: `Se ha agregado ${formatCurrency(valor)} al empleado ${employeeName}`,
-        variant: "default"
-      });
+      setIsLoading(true);
+
+      const novedadData = {
+        empleado_id: employeeId,
+        periodo_id: periodId, // Using the real period UUID
+        tipo_novedad: formData.tipo_novedad,
+        valor: formData.valor,
+        horas: requiresHours ? formData.horas : undefined,
+        observacion: formData.observacion || undefined
+      };
+
+      console.log('📤 Submitting novedad data:', novedadData);
+
+      const newNovedad = await NovedadesService.createNovedad(novedadData);
       
-      handleClose();
+      if (newNovedad) {
+        console.log('✅ Novedad created successfully:', newNovedad);
+        
+        toast({
+          title: "Devengado agregado",
+          description: `Se agregó ${formatCurrency(formData.valor)} al empleado ${employeeName}`,
+        });
+
+        // Notify parent component
+        if (onNovedadCreated) {
+          onNovedadCreated(employeeId, formData.valor, 'devengado');
+        }
+
+        // Reset form and close
+        setFormData({
+          tipo_novedad: '',
+          valor: 0,
+          horas: 0,
+          observacion: ''
+        });
+        
+        onClose();
+      }
     } catch (error) {
-      console.error('❌ Error creating devengado:', error);
+      console.error('❌ Error creating novedad:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       toast({
         title: "Error al crear devengado",
-        description: error instanceof Error ? error.message : "No se pudo crear el devengado",
+        description: errorMessage,
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleClose = () => {
-    console.log('🚪 Closing modal');
-    if (!isLoading) {
-      resetForm();
-      onClose();
-    }
-  };
-
-  const handleOpenChange = (open: boolean) => {
-    console.log('🔄 Modal open change requested:', open, 'current isLoading:', isLoading);
-    if (!open && !isLoading) {
-      handleClose();
-    }
-  };
-
-  const handleInteractOutside = (e: Event) => {
-    if (isLoading) {
-      e.preventDefault();
-    }
-  };
-
-  const selectedTipo = tiposDevengado.find(t => t.value === formData.tipoNovedad);
-  const isValueAutoCalculated = selectedTipo?.auto_calculo && calculatedValue > 0;
-
-  // Function to format subtipo labels
-  const formatSubtipoLabel = (subtipo: string) => {
-    const labels: Record<string, string> = {
-      'diurnas': 'Diurnas (25% recargo)',
-      'nocturnas': 'Nocturnas (75% recargo)', 
-      'dominicales_diurnas': 'Dominicales Diurnas (100% recargo)',
-      'dominicales_nocturnas': 'Dominicales Nocturnas (150% recargo)',
-      'festivas_diurnas': 'Festivas Diurnas (100% recargo)',
-      'festivas_nocturnas': 'Festivas Nocturnas (150% recargo)'
-    };
-    return labels[subtipo] || subtipo.charAt(0).toUpperCase() + subtipo.slice(1);
+    setFormData({
+      tipo_novedad: '',
+      valor: 0,
+      horas: 0,
+      observacion: ''
+    });
+    onClose();
   };
 
   return (
-    <Dialog 
-      open={isOpen} 
-      onOpenChange={handleOpenChange}
-    >
-      <DialogContent 
-        className="sm:max-w-[600px] z-50 max-h-[90vh] overflow-y-auto"
-        onInteractOutside={handleInteractOutside}
-        onEscapeKeyDown={(e) => {
-          if (isLoading) {
-            e.preventDefault();
-          }
-        }}
-      >
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Agregar Devengado</DialogTitle>
-          <DialogDescription>
-            Empleado: <span className="font-medium">{employeeName}</span> • 
-            Salario base: <span className="font-medium text-green-600">{formatCurrency(employeeSalary)}</span>
-            {/* Debug info - remove in production */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="text-xs text-gray-500 mt-1">
-                Payroll ID: {payrollId} | Valid UUID: {isValidUUID(payrollId) ? '✅' : '❌'}
-              </div>
-            )}
-          </DialogDescription>
+          <DialogTitle className="flex items-center space-x-2">
+            <Plus className="h-5 w-5 text-green-600" />
+            <span>Agregar Devengado</span>
+          </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Main Section: Devengado Type */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tipoNovedad" className="text-base font-medium">Tipo de Devengado *</Label>
-              <Select
-                value={formData.tipoNovedad}
-                onValueChange={(value) => setFormData({ ...formData, tipoNovedad: value, subtipo: '', valor: '' })}
-                disabled={isLoading}
-              >
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Seleccionar tipo de devengado" />
-                </SelectTrigger>
-                <SelectContent className="z-50">
-                  {tiposDevengado.map((tipo) => (
-                    <SelectItem key={tipo.value} value={tipo.value}>
-                      {tipo.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedTipo?.subtipos && selectedTipo.subtipos.length > 0 && (
-              <div className="space-y-2">
-                <Label htmlFor="subtipo">Subtipo *</Label>
-                <Select
-                  value={formData.subtipo}
-                  onValueChange={(value) => setFormData({ ...formData, subtipo: value })}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar subtipo" />
-                  </SelectTrigger>
-                  <SelectContent className="z-50">
-                    {selectedTipo.subtipos.map((subtipo) => (
-                      <SelectItem key={subtipo} value={subtipo}>
-                        {formatSubtipoLabel(subtipo)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+        <div className="space-y-4">
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <p className="text-sm font-medium text-blue-900">{employeeName}</p>
+            <p className="text-xs text-blue-700">
+              Salario base: {formatCurrency(employeeSalary)}
+            </p>
           </div>
 
-          {/* Parameters Section: Days and Hours */}
-          {(selectedTipo?.requiere_dias || selectedTipo?.requiere_horas) && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-gray-900">Parámetros de Cálculo</h4>
-              <div className="grid grid-cols-2 gap-4">
-                {selectedTipo.requiere_dias && (
-                  <div className="space-y-2">
-                    <Label htmlFor="dias">Días *</Label>
-                    <Input
-                      id="dias"
-                      type="number"
-                      placeholder="0"
-                      value={formData.dias}
-                      onChange={(e) => setFormData({ ...formData, dias: e.target.value })}
-                      min="0"
-                      disabled={isLoading}
-                    />
-                  </div>
-                )}
-
-                {selectedTipo.requiere_horas && (
-                  <div className="space-y-2">
-                    <Label htmlFor="horas">Horas *</Label>
-                    <Input
-                      id="horas"
-                      type="number"
-                      placeholder="0"
-                      value={formData.horas}
-                      onChange={(e) => setFormData({ ...formData, horas: e.target.value })}
-                      min="0"
-                      max="24"
-                      step="0.1"
-                      disabled={isLoading}
-                    />
-                    <p className="text-xs text-gray-500">
-                      Máximo 2 horas diarias, 12 semanales según ley
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Dates Section - Only for types that require them */}
-          {(formData.tipoNovedad === 'incapacidad' || formData.tipoNovedad === 'vacaciones' || formData.tipoNovedad === 'licencia_remunerada') && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-gray-900">Período de Aplicación</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fechaInicio">Fecha Inicio</Label>
-                  <Input
-                    id="fechaInicio"
-                    type="date"
-                    value={formData.fechaInicio}
-                    onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="fechaFin">Fecha Fin</Label>
-                  <Input
-                    id="fechaFin"
-                    type="date"
-                    value={formData.fechaFin}
-                    onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Value Section */}
-          <div className="space-y-4">
-            <h4 className="font-medium text-gray-900">Valor del Devengado</h4>
-            <div className="space-y-2">
-              <Label htmlFor="valor">Valor *</Label>
-              <Input
-                id="valor"
-                type="number"
-                placeholder="0"
-                value={formData.valor}
-                onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
-                min="0"
-                step="0.01"
-                disabled={isLoading || isValueAutoCalculated}
-                className={isValueAutoCalculated ? 'bg-gray-100 cursor-not-allowed' : ''}
-              />
-              {isValueAutoCalculated && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-sm text-green-800 font-medium">
-                    💡 Valor calculado automáticamente: {formatCurrency(calculatedValue)}
-                  </p>
-                  <p className="text-xs text-green-700 mt-1">{calculationDetail}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Observation Section */}
           <div className="space-y-2">
-            <Label htmlFor="observacion">Observación</Label>
-            <Textarea
-              id="observacion"
-              placeholder="Descripción adicional del devengado..."
-              value={formData.observacion}
-              onChange={(e) => setFormData({ ...formData, observacion: e.target.value })}
-              rows={3}
-              disabled={isLoading}
+            <Label htmlFor="tipo">Tipo de Devengado</Label>
+            <Select 
+              value={formData.tipo_novedad} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, tipo_novedad: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione el tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {tiposDevengado.map(tipo => (
+                  <SelectItem key={tipo.value} value={tipo.value}>
+                    {tipo.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {requiresHours && (
+            <div className="space-y-2">
+              <Label htmlFor="horas">Horas</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="horas"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={formData.horas}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    horas: Number(e.target.value) 
+                  }))}
+                  placeholder="0"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCalculate}
+                  className="flex items-center space-x-1"
+                >
+                  <Calculator className="h-4 w-4" />
+                  <span>Calcular</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="valor">Valor</Label>
+            <Input
+              id="valor"
+              type="number"
+              min="0"
+              step="1000"
+              value={formData.valor}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                valor: Number(e.target.value) 
+              }))}
+              placeholder="0"
             />
           </div>
 
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleClose} 
+          <div className="space-y-2">
+            <Label htmlFor="observacion">Observación (Opcional)</Label>
+            <Textarea
+              id="observacion"
+              value={formData.observacion}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                observacion: e.target.value 
+              }))}
+              placeholder="Información adicional sobre el devengado..."
+              rows={2}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={handleClose}
               disabled={isLoading}
             >
+              <X className="h-4 w-4 mr-2" />
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Agregando...' : 'Agregar Devengado'}
+            <Button
+              onClick={handleSubmit}
+              disabled={isLoading || !formData.tipo_novedad || !formData.valor}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {isLoading ? 'Guardando...' : 'Agregar Devengado'}
             </Button>
-          </DialogFooter>
-        </form>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

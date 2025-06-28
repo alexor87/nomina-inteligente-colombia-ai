@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod, PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 
@@ -39,60 +40,26 @@ export class PayrollHistoryService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) return [];
 
-      // Get unique periods from payrolls table
+      // Get periods from the new payroll_periods_real table
       const { data, error } = await supabase
-        .from('payrolls')
-        .select('periodo, estado, created_at, reportado_dian, employee_id, total_devengado, total_deducciones, neto_pagado')
+        .from('payroll_periods_real')
+        .select('*')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
-      // Group by period and calculate aggregates
-      const periodMap = new Map<string, {
-        periodo: string;
-        estado: string;
-        created_at: string;
-        reportado_dian: boolean;
-        employees: Set<string>;
-        totalDevengado: number;
-        totalDeducciones: number;
-        totalNeto: number;
-      }>();
-
-      (data || []).forEach(payroll => {
-        const key = payroll.periodo;
-        if (!periodMap.has(key)) {
-          periodMap.set(key, {
-            periodo: payroll.periodo,
-            estado: payroll.estado || 'borrador',
-            created_at: payroll.created_at,
-            reportado_dian: payroll.reportado_dian || false,
-            employees: new Set(),
-            totalDevengado: 0,
-            totalDeducciones: 0,
-            totalNeto: 0
-          });
-        }
-        
-        const period = periodMap.get(key)!;
-        period.employees.add(payroll.employee_id);
-        period.totalDevengado += Number(payroll.total_devengado || 0);
-        period.totalDeducciones += Number(payroll.total_deducciones || 0);
-        period.totalNeto += Number(payroll.neto_pagado || 0);
-      });
-
-      return Array.from(periodMap.values()).map((period, index) => ({
-        id: `period-${index}`,
+      return (data || []).map(period => ({
+        id: period.id, // Now using real UUID
         periodo: period.periodo,
-        fecha_inicio: period.created_at.split('T')[0],
-        fecha_fin: period.created_at.split('T')[0],
+        fecha_inicio: period.fecha_inicio,
+        fecha_fin: period.fecha_fin,
         fechaCreacion: period.created_at,
         estado: period.estado,
-        empleados: period.employees.size,
-        totalNomina: period.totalDevengado + period.totalDeducciones,
-        editable: period.estado !== 'pagada',
-        reportado_dian: period.reportado_dian
+        empleados: period.empleados_count || 0,
+        totalNomina: Number(period.total_devengado || 0) + Number(period.total_deducciones || 0),
+        editable: period.estado !== 'cerrado',
+        reportado_dian: false // TODO: Add this field to the table if needed
       }));
     } catch (error) {
       console.error('Error loading payroll periods:', error);
@@ -108,13 +75,13 @@ export class PayrollHistoryService {
 
       console.log('🔄 Recalculating totals for employee:', employeeId, 'period:', periodId);
 
-      // Get all novedades for this employee in this period
+      // Get all novedades for this employee in this period - using periodo_real_id
       const { data: novedades, error: novedadesError } = await supabase
         .from('payroll_novedades')
         .select('tipo_novedad, valor')
         .eq('company_id', companyId)
         .eq('empleado_id', employeeId)
-        .eq('periodo_id', periodId);
+        .eq('periodo_real_id', periodId); // Using the new column
 
       if (novedadesError) {
         console.error('Error loading novedades for recalculation:', novedadesError);
@@ -147,18 +114,30 @@ export class PayrollHistoryService {
         deducciones: totalDeduccionesNovedades
       });
 
+      // Get the period to find the periodo string
+      const { data: periodData, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('periodo')
+        .eq('id', periodId)
+        .single();
+
+      if (periodError) {
+        console.error('Error loading period data:', periodError);
+        return;
+      }
+
       // Get current payroll record to add to base values
       const { data: payrollData, error: payrollError } = await supabase
         .from('payrolls')
         .select('salario_base, total_devengado, total_deducciones')
         .eq('employee_id', employeeId)
-        .eq('periodo', periodId) // Assuming we're using the period string
+        .eq('periodo', periodData.periodo)
         .eq('company_id', companyId)
         .single();
 
       if (payrollError) {
         console.error('Error loading payroll data:', payrollError);
-        return; // Don't throw here, just log and return
+        return;
       }
 
       const salarioBase = Number(payrollData?.salario_base || 0);
@@ -183,7 +162,7 @@ export class PayrollHistoryService {
           updated_at: new Date().toISOString()
         })
         .eq('employee_id', employeeId)
-        .eq('periodo', periodId)
+        .eq('periodo', periodData.periodo)
         .eq('company_id', companyId);
 
       if (updateError) {
@@ -204,13 +183,22 @@ export class PayrollHistoryService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('No company ID found');
 
-      // Since periodId might be a generated ID, we need to find the actual period
-      const periods = await this.getPayrollPeriods();
-      const targetPeriod = periods.find(p => p.id === periodId) || periods[0];
-      
-      if (!targetPeriod) {
+      console.log('🔍 Loading period details for real period ID:', periodId);
+
+      // Get the actual period from payroll_periods_real using the real UUID
+      const { data: periodData, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (periodError) {
+        console.error('Error loading period:', periodError);
         throw new Error('Period not found');
       }
+
+      console.log('📊 Real period data loaded:', periodData);
 
       // Get payrolls for this period with employee salary data AND the payroll UUID
       const { data: payrollsData, error: payrollsError } = await supabase
@@ -233,68 +221,51 @@ export class PayrollHistoryService {
           )
         `)
         .eq('company_id', companyId)
-        .eq('periodo', targetPeriod.periodo);
+        .eq('periodo', periodData.periodo);
 
       if (payrollsError) throw payrollsError;
 
       console.log('📊 Payrolls data with IDs loaded:', payrollsData);
 
-      // Also get novedades count for each employee to show activity
-      const employeeIds = payrollsData?.map(p => p.employee_id) || [];
-      let novedadesCounts: Record<string, number> = {};
-
-      if (employeeIds.length > 0) {
-        const { data: novedadesData } = await supabase
-          .from('payroll_novedades')
-          .select('empleado_id')
-          .eq('company_id', companyId)
-          .eq('periodo_id', targetPeriod.id)
-          .in('empleado_id', employeeIds);
-
-        // Count novedades per employee
-        (novedadesData || []).forEach(nov => {
-          novedadesCounts[nov.empleado_id] = (novedadesCounts[nov.empleado_id] || 0) + 1;
-        });
-      }
-
       // Transform data to match expected format with real payroll IDs
       const period: PayrollHistoryPeriod = {
-        id: targetPeriod.id,
-        period: targetPeriod.periodo,
-        startDate: targetPeriod.fecha_inicio,
-        endDate: targetPeriod.fecha_fin,
+        id: periodData.id, // Real UUID
+        period: periodData.periodo,
+        startDate: periodData.fecha_inicio,
+        endDate: periodData.fecha_fin,
         type: 'mensual',
         employeesCount: payrollsData?.length || 0,
-        status: this.mapStatus(targetPeriod.estado),
-        totalGrossPay: Number(targetPeriod.totalNomina || 0),
-        totalNetPay: targetPeriod.empleados * 1000000, // Mock calculation
-        totalDeductions: targetPeriod.empleados * 200000, // Mock calculation
-        totalCost: Number(targetPeriod.totalNomina || 0),
-        employerContributions: targetPeriod.empleados * 100000, // Mock calculation
-        paymentStatus: targetPeriod.estado === 'pagada' ? 'pagado' : 'pendiente',
+        status: this.mapStatus(periodData.estado),
+        totalGrossPay: Number(periodData.total_devengado || 0),
+        totalNetPay: Number(periodData.total_neto || 0),
+        totalDeductions: Number(periodData.total_deducciones || 0),
+        totalCost: Number(periodData.total_devengado || 0) + Number(periodData.total_deducciones || 0),
+        employerContributions: (payrollsData?.length || 0) * 100000, // Mock calculation
+        paymentStatus: periodData.estado === 'cerrado' ? 'pagado' : 'pendiente',
         version: 1,
-        createdAt: targetPeriod.fechaCreacion,
-        updatedAt: targetPeriod.fechaCreacion,
-        editable: targetPeriod.editable,
-        reportedToDian: targetPeriod.reportado_dian
+        createdAt: periodData.created_at,
+        updatedAt: periodData.updated_at,
+        editable: periodData.estado !== 'cerrado',
+        reportedToDian: false // TODO: Add this field if needed
       };
 
       const employees: PayrollHistoryEmployee[] = (payrollsData || []).map(payroll => ({
         id: payroll.employee_id, // Employee ID
-        periodId: targetPeriod.id, // Artificial period ID for navigation
-        payrollId: payroll.id, // REAL UUID del registro de payroll - ¡Esta es la clave!
+        periodId: periodData.id, // Real period UUID
+        payrollId: payroll.id, // REAL UUID del registro de payroll
         name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
         position: payroll.employees.cargo || 'Sin cargo',
         grossPay: Number(payroll.total_devengado || 0),
         deductions: Number(payroll.total_deducciones || 0),
         netPay: Number(payroll.neto_pagado || 0),
-        baseSalary: Number(payroll.employees.salario_base || 0), // Salario base real del empleado
+        baseSalary: Number(payroll.employees.salario_base || 0),
         paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente'
       }));
 
-      console.log('👥 Employees with real payroll UUIDs:', employees.map(emp => ({
+      console.log('👥 Employees with real period UUID:', employees.map(emp => ({
         name: emp.name,
         employeeId: emp.id,
+        periodId: emp.periodId, // Now real UUID
         payrollId: emp.payrollId
       })));
 
@@ -363,8 +334,7 @@ export class PayrollHistoryService {
 
   private static mapStatus(estado: string): 'cerrado' | 'con_errores' | 'revision' | 'editado' | 'reabierto' {
     switch (estado) {
-      case 'pagada':
-      case 'procesada':
+      case 'cerrado':
         return 'cerrado';
       case 'borrador':
         return 'revision';
