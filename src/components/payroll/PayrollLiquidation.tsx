@@ -1,18 +1,11 @@
 
-import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PayrollLiquidationHeader } from './PayrollLiquidationHeader';
 import { PayrollPeriodCard } from './PayrollPeriodCard';
 import { PayrollSummaryCards } from './liquidation/PayrollSummaryCards';
 import { PayrollTable } from './liquidation/PayrollTable';
-import { SimpleReopenedBanner } from './SimpleReopenedBanner';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
-import { toast } from '@/hooks/use-toast';
 
 export const PayrollLiquidation = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
   const {
     currentPeriod,
     employees,
@@ -21,14 +14,10 @@ export const PayrollLiquidation = () => {
     canEdit,
     isEditingPeriod,
     setIsEditingPeriod,
-    isReopenedPeriod,
-    reopenedBy,
-    reopenedAt,
     updateEmployee,
     updatePeriod,
     recalculateAll,
     approvePeriod,
-    finishReopenedPeriodEditing,
     refreshEmployees,
     isLoading
   } = usePayrollLiquidation();
@@ -40,16 +29,6 @@ export const PayrollLiquidation = () => {
     const value = updates[field];
     if (field && typeof value === 'number') {
       updateEmployee(id, field, value);
-    }
-  };
-
-  const handleBackToHistory = () => {
-    navigate('/app/payroll-history');
-  };
-
-  const handleFinishEditing = async () => {
-    if (isReopenedPeriod) {
-      await finishReopenedPeriodEditing();
     }
   };
 
@@ -72,26 +51,9 @@ export const PayrollLiquidation = () => {
     );
   }
 
-  const formatPeriodName = () => {
-    if (!currentPeriod) return '';
-    const startDate = new Date(currentPeriod.fecha_inicio);
-    const endDate = new Date(currentPeriod.fecha_fin);
-    return `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Simple Reopened Period Banner */}
-      {isReopenedPeriod && (
-        <SimpleReopenedBanner
-          periodName={formatPeriodName()}
-          onBackToHistory={handleBackToHistory}
-          onFinishEditing={handleFinishEditing}
-          isLoading={isLoading}
-        />
-      )}
-
-      <div className={`p-6 space-y-6 ${isReopenedPeriod ? 'pt-6' : ''}`}>
+      <div className="p-6 space-y-6">
         {/* Header */}
         <PayrollLiquidationHeader 
           onRefresh={refreshEmployees}

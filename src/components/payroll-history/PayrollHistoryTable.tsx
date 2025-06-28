@@ -2,14 +2,15 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText } from 'lucide-react';
+import { Eye, Download, FileText, Unlock, Lock } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { formatPeriodDateRange } from '@/utils/periodDateUtils';
-import { SmartEditButton } from './SmartEditButton';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
   onViewDetails: (period: PayrollHistoryPeriod) => void;
+  onReopenPeriod?: (period: PayrollHistoryPeriod) => void;
+  onClosePeriod?: (period: PayrollHistoryPeriod) => void;
   onDownloadFile?: (fileUrl: string, fileName: string) => void;
   canUserReopenPeriods?: boolean;
 }
@@ -17,6 +18,8 @@ interface PayrollHistoryTableProps {
 export const PayrollHistoryTable = ({ 
   periods, 
   onViewDetails,
+  onReopenPeriod,
+  onClosePeriod,
   onDownloadFile,
   canUserReopenPeriods = false
 }: PayrollHistoryTableProps) => {
@@ -72,8 +75,14 @@ export const PayrollHistoryTable = ({
     }
   };
 
-  const isReopenedPeriod = (period: PayrollHistoryPeriod) => {
-    return period.reopenedBy !== null && period.reopenedBy !== undefined;
+  const canReopenPeriod = (period: PayrollHistoryPeriod) => {
+    return canUserReopenPeriods && 
+           (period.status === 'cerrado' || period.status === 'con_errores') && 
+           !period.reportedToDian;
+  };
+
+  const canClosePeriod = (period: PayrollHistoryPeriod) => {
+    return canUserReopenPeriods && period.status === 'reabierto';
   };
 
   return (
@@ -89,7 +98,7 @@ export const PayrollHistoryTable = ({
               <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
               <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
-              <TableHead className="font-semibold text-center min-w-[200px]">Acciones</TableHead>
+              <TableHead className="font-semibold text-center min-w-[120px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -158,8 +167,8 @@ export const PayrollHistoryTable = ({
                 <TableCell className="min-w-[120px]">
                   {getPaymentStatusBadge(period.paymentStatus)}
                 </TableCell>
-                <TableCell className="min-w-[200px]">
-                  <div className="flex items-center justify-center space-x-2">
+                <TableCell className="min-w-[120px]">
+                  <div className="flex items-center justify-center space-x-1">
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -170,15 +179,34 @@ export const PayrollHistoryTable = ({
                       <Eye className="h-4 w-4" />
                     </Button>
                     
-                    <SmartEditButton 
-                      period={period} 
-                      canUserEdit={canUserReopenPeriods} 
-                    />
+                    {canReopenPeriod(period) && onReopenPeriod && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => onReopenPeriod(period)}
+                        className="text-amber-600 hover:text-amber-800 flex-shrink-0"
+                        title="Reabrir período"
+                      >
+                        <Unlock className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {canClosePeriod(period) && onClosePeriod && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => onClosePeriod(period)}
+                        className="text-green-600 hover:text-green-800 flex-shrink-0"
+                        title="Cerrar nuevamente"
+                      >
+                        <Lock className="h-4 w-4" />
+                      </Button>
+                    )}
                     
                     <Button 
                       variant="ghost" 
                       size="sm"
-                      className="text-gray-600 hover:text-gray-800 flex-shrink-0"
+                      className="text-green-600 hover:text-green-800 flex-shrink-0"
                       onClick={() => handleDownloadPila(period)}
                       title="Descargar archivos"
                     >
