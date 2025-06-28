@@ -19,6 +19,7 @@ interface Employee {
   apellido: string;
   salario_base: number;
   neto_pagado: number;
+  payroll_id: string; // Add this to track the actual payroll ID
 }
 
 interface PeriodData {
@@ -43,6 +44,9 @@ export const PeriodEditPage = () => {
   const [showNovedadDrawer, setShowNovedadDrawer] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
 
+  // Use the actual payroll ID for novedades instead of the artificial period ID
+  const actualPayrollId = employees.find(emp => emp.id === selectedEmployeeId)?.payroll_id || periodId || '';
+
   const {
     novedades,
     createNovedad,
@@ -50,7 +54,7 @@ export const PeriodEditPage = () => {
     deleteNovedad,
     loadNovedadesForEmployee,
     getEmployeeNovedadesCount
-  } = useNovedades(periodId || '', () => {
+  } = useNovedades(actualPayrollId, () => {
     // Trigger recalculation when novedades change
     loadPeriodData();
   });
@@ -123,77 +127,91 @@ export const PeriodEditPage = () => {
       const companyId = await getCurrentUserCompanyId();
       if (!companyId || !periodId) return;
 
-      // Load period info from payrolls table
-      const { data: payrollData, error: payrollError } = await supabase
-        .from('payrolls')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('id', periodId)
-        .single();
+      console.log('🔍 Loading period data for periodId:', periodId);
 
-      if (payrollError) {
-        console.error('Error loading period:', payrollError);
-        toast({
-          title: "Error",
-          description: "No se pudo cargar el período",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Set period data
-      const periodData: PeriodData = {
-        id: payrollData.id,
-        periodo: payrollData.periodo,
-        fecha_inicio: payrollData.created_at.split('T')[0], // Fallback
-        fecha_fin: payrollData.created_at.split('T')[0], // Fallback  
-        estado: payrollData.estado
-      };
-      setPeriod(periodData);
-
-      // Load employees for this period
-      const { data: employeesData, error: employeesError } = await supabase
+      // First, try to load using the periodId as a payroll ID directly
+      const { data: singlePayroll, error: singlePayrollError } = await supabase
         .from('payrolls')
         .select(`
-          employee_id,
-          salario_base,
-          neto_pagado,
+          *,
           employees (
             nombre,
             apellido
           )
         `)
         .eq('company_id', companyId)
-        .eq('periodo', payrollData.periodo);
+        .eq('id', periodId)
+        .single();
 
-      if (employeesError) {
-        console.error('Error loading employees:', employeesError);
+      if (singlePayroll && !singlePayrollError) {
+        // If we found a single payroll, use it to determine the period
+        console.log('✅ Found single payroll:', singlePayroll);
+        
+        const periodData: PeriodData = {
+          id: singlePayroll.id,
+          periodo: singlePayroll.periodo,
+          fecha_inicio: singlePayroll.created_at.split('T')[0],
+          fecha_fin: singlePayroll.created_at.split('T')[0],
+          estado: singlePayroll.estado
+        };
+        setPeriod(periodData);
+
+        // Load all employees for this period
+        const { data: employeesData, error: employeesError } = await supabase
+          .from('payrolls')
+          .select(`
+            id,
+            employee_id,
+            salario_base,
+            neto_pagado,
+            employees (
+              nombre,
+              apellido
+            )
+          `)
+          .eq('company_id', companyId)
+          .eq('periodo', singlePayroll.periodo);
+
+        if (employeesError) {
+          console.error('Error loading employees:', employeesError);
+        } else {
+          const formattedEmployees: Employee[] = employeesData?.map(item => ({
+            id: item.employee_id,
+            nombre: item.employees?.nombre || '',
+            apellido: item.employees?.apellido || '',
+            salario_base: Number(item.salario_base || 0),
+            neto_pagado: Number(item.neto_pagado || 0),
+            payroll_id: item.id // Store the actual payroll ID
+          })) || [];
+          setEmployees(formattedEmployees);
+
+          console.log('👥 Loaded employees with payroll IDs:', formattedEmployees);
+
+          // Load novedades for all employees using their payroll IDs
+          formattedEmployees.forEach(emp => {
+            loadNovedadesForEmployee(emp.id);
+          });
+        }
+
+        // Check for existing vouchers
+        const { data: vouchersData } = await supabase
+          .from('payroll_vouchers')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('periodo', singlePayroll.periodo)
+          .eq('voucher_status', 'vigente')
+          .limit(1);
+
+        setHasVouchers((vouchersData?.length || 0) > 0);
       } else {
-        const formattedEmployees: Employee[] = employeesData?.map(item => ({
-          id: item.employee_id,
-          nombre: item.employees?.nombre || '',
-          apellido: item.employees?.apellido || '',
-          salario_base: Number(item.salario_base || 0),
-          neto_pagado: Number(item.neto_pagado || 0)
-        })) || [];
-        setEmployees(formattedEmployees);
-
-        // Load novedades for all employees
-        formattedEmployees.forEach(emp => {
-          loadNovedadesForEmployee(emp.id);
+        // If not found as single payroll, treat as period lookup (legacy)
+        console.log('⚠️ Period not found as single payroll, trying legacy lookup');
+        toast({
+          title: "Error",
+          description: "No se pudo cargar el período seleccionado",
+          variant: "destructive"
         });
       }
-
-      // Check for existing vouchers
-      const { data: vouchersData } = await supabase
-        .from('payroll_vouchers')
-        .select('id')
-        .eq('company_id', companyId)
-        .eq('periodo', payrollData.periodo)
-        .eq('voucher_status', 'vigente')
-        .limit(1);
-
-      setHasVouchers((vouchersData?.length || 0) > 0);
 
     } catch (error) {
       console.error('Error loading period data:', error);
@@ -220,13 +238,26 @@ export const PeriodEditPage = () => {
   };
 
   const handleCreateNovedad = async (data: NovedadFormData) => {
-    if (!selectedEmployeeId || !periodId) return;
+    if (!selectedEmployeeId) return;
+    
+    // Find the employee's payroll ID
+    const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
+    if (!selectedEmployee) {
+      toast({
+        title: "Error",
+        description: "No se pudo encontrar el empleado seleccionado",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
+      console.log('🔄 Creating novedad with payroll ID:', selectedEmployee.payroll_id);
+      
       const completeData = {
         ...data,
         empleado_id: selectedEmployeeId,
-        periodo_id: periodId
+        periodo_id: selectedEmployee.payroll_id // Use the actual payroll ID
       };
       
       await createNovedad(completeData);
