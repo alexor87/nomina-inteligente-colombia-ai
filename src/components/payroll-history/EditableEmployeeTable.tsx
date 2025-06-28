@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +52,7 @@ export const EditableEmployeeTable = ({
   const { toast } = useToast();
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const [novedadModal, setNovedadModal] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -61,6 +62,9 @@ export const EditableEmployeeTable = ({
     employeeId: '',
     employeeName: ''
   });
+
+  console.log('EditableEmployeeTable render - modal state:', novedadModal);
+  console.log('EditableEmployeeTable render - open dropdowns:', openDropdowns);
 
   const handleCellClick = (employeeId: string, field: 'grossPay' | 'deductions' | 'netPay', currentValue: number) => {
     if (!isEditMode) return;
@@ -89,7 +93,6 @@ export const EditableEmployeeTable = ({
     setSavingCells(prev => new Set(prev).add(cellKey));
 
     try {
-      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
       
       onEmployeeUpdate(employeeId, {
@@ -131,21 +134,51 @@ export const EditableEmployeeTable = ({
     }
   };
 
-  const handleAddNovedad = (employeeId: string, employeeName: string) => {
-    setNovedadModal({
-      isOpen: true,
-      employeeId,
-      employeeName
+  const handleDropdownOpenChange = useCallback((employeeId: string, open: boolean) => {
+    console.log('Dropdown state change:', employeeId, open);
+    setOpenDropdowns(prev => {
+      const newSet = new Set(prev);
+      if (open) {
+        newSet.add(employeeId);
+      } else {
+        newSet.delete(employeeId);
+      }
+      return newSet;
     });
-  };
+  }, []);
 
-  const handleCloseNovedadModal = () => {
+  const closeAllDropdowns = useCallback(() => {
+    console.log('Closing all dropdowns');
+    setOpenDropdowns(new Set());
+  }, []);
+
+  const handleAddNovedad = useCallback((employeeId: string, employeeName: string) => {
+    console.log('Opening novedad modal for:', employeeId, employeeName);
+    
+    // Cerrar todos los dropdowns primero
+    closeAllDropdowns();
+    
+    // Pequeño delay para asegurar que el dropdown se cierre completamente
+    setTimeout(() => {
+      setNovedadModal({
+        isOpen: true,
+        employeeId,
+        employeeName
+      });
+    }, 100);
+  }, [closeAllDropdowns]);
+
+  const handleCloseNovedadModal = useCallback(() => {
+    console.log('Closing novedad modal');
     setNovedadModal({
       isOpen: false,
       employeeId: '',
       employeeName: ''
     });
-  };
+    
+    // Asegurar que todos los dropdowns estén cerrados
+    closeAllDropdowns();
+  }, [closeAllDropdowns]);
 
   const renderEditableCell = (
     employee: PayrollHistoryEmployee, 
@@ -256,22 +289,32 @@ export const EditableEmployeeTable = ({
                 </TableCell>
                 {isEditMode && (
                   <TableCell className="text-center">
-                    <DropdownMenu>
+                    <DropdownMenu 
+                      open={openDropdowns.has(employee.id)}
+                      onOpenChange={(open) => handleDropdownOpenChange(employee.id, open)}
+                    >
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleAddNovedad(employee.id, employee.name)}>
+                      <DropdownMenuContent 
+                        align="end" 
+                        className="z-50 bg-white border shadow-md"
+                        onCloseAutoFocus={(e) => e.preventDefault()}
+                      >
+                        <DropdownMenuItem 
+                          onClick={() => handleAddNovedad(employee.id, employee.name)}
+                          className="cursor-pointer"
+                        >
                           <Plus className="h-4 w-4 mr-2" />
                           Agregar novedad
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer">
                           <Edit className="h-4 w-4 mr-2" />
                           Editar novedad
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">
+                        <DropdownMenuItem className="text-red-600 cursor-pointer">
                           <Trash className="h-4 w-4 mr-2" />
                           Eliminar novedad
                         </DropdownMenuItem>

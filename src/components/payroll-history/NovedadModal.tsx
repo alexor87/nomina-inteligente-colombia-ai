@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -50,6 +50,8 @@ export const NovedadModal = ({
     horas: ''
   });
 
+  console.log('NovedadModal render - isOpen:', isOpen, 'isLoading:', isLoading);
+
   const tiposNovedad = [
     { value: 'devengado', label: 'Devengado' },
     { value: 'deduccion', label: 'Deducción' },
@@ -61,6 +63,7 @@ export const NovedadModal = ({
   ];
 
   const resetForm = () => {
+    console.log('Resetting form data');
     setFormData({
       tipoNovedad: '',
       subtipo: '',
@@ -73,6 +76,14 @@ export const NovedadModal = ({
     });
     setIsLoading(false);
   };
+
+  // Resetear el formulario cuando se abre el modal
+  useEffect(() => {
+    if (isOpen) {
+      console.log('Modal opened, resetting form');
+      resetForm();
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +109,7 @@ export const NovedadModal = ({
 
     setIsLoading(true);
     try {
-      // Simulate API call
+      console.log('Submitting novedad form');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       toast({
@@ -114,25 +125,46 @@ export const NovedadModal = ({
         description: "No se pudo crear la novedad",
         variant: "destructive"
       });
-    } finally {
       setIsLoading(false);
     }
   };
 
   const handleClose = () => {
-    resetForm();
-    onClose();
+    console.log('Closing modal - handleClose called');
+    if (!isLoading) {
+      resetForm();
+      onClose();
+    }
   };
 
   const handleOpenChange = (open: boolean) => {
+    console.log('Modal open change requested:', open, 'current isLoading:', isLoading);
     if (!open && !isLoading) {
       handleClose();
     }
   };
 
+  // Prevenir el cierre accidental del modal
+  const handleInteractOutside = (e: Event) => {
+    if (isLoading) {
+      e.preventDefault();
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={handleOpenChange}
+    >
+      <DialogContent 
+        className="sm:max-w-[500px] z-50"
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={(e) => {
+          if (isLoading) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Agregar Novedad</DialogTitle>
           <DialogDescription>
@@ -152,7 +184,7 @@ export const NovedadModal = ({
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-50">
                   {tiposNovedad.map((tipo) => (
                     <SelectItem key={tipo.value} value={tipo.value}>
                       {tipo.label}
