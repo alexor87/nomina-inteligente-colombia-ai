@@ -92,6 +92,7 @@ export const PayrollHistoryPage = () => {
     try {
       setIsLoading(true);
       const data = await PayrollHistoryService.getPayrollPeriods();
+      
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
         // Fix the status mapping logic to handle all possible estados
@@ -136,6 +137,11 @@ export const PayrollHistoryPage = () => {
       setPeriods(convertedPeriods);
     } catch (error) {
       console.error('Error loading payroll history:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el historial de nómina",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
