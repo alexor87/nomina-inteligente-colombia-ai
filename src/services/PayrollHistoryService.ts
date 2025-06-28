@@ -115,7 +115,7 @@ export class PayrollHistoryService {
         throw new Error('Period not found');
       }
 
-      // Get payrolls for this period
+      // Get payrolls for this period with employee salary data
       const { data: payrollsData, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
@@ -123,13 +123,16 @@ export class PayrollHistoryService {
           employees!inner(
             nombre,
             apellido,
-            cargo
+            cargo,
+            salario_base
           )
         `)
         .eq('company_id', companyId)
         .eq('periodo', targetPeriod.periodo);
 
       if (payrollsError) throw payrollsError;
+
+      console.log('Payrolls data with salary:', payrollsData);
 
       // Transform data to match expected format
       const period: PayrollHistoryPeriod = {
@@ -161,8 +164,11 @@ export class PayrollHistoryService {
         grossPay: Number(payroll.total_devengado || 0),
         deductions: Number(payroll.total_deducciones || 0),
         netPay: Number(payroll.neto_pagado || 0),
+        baseSalary: Number(payroll.employees.salario_base || 0), // Salario base real del empleado
         paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente'
       }));
+
+      console.log('Employees with base salary:', employees);
 
       const summary = {
         totalDevengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),

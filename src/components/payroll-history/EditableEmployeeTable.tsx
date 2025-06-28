@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -128,13 +127,23 @@ export const EditableEmployeeTable = ({
     }
   };
 
-  const handleOpenDevengoModal = (employeeId: string, employeeName: string, employeeSalary: number) => {
-    console.log('Opening devengado modal for:', employeeId, employeeName, employeeSalary);
+  const handleOpenDevengoModal = (employeeId: string, employeeName: string, employeeBaseSalary: number) => {
+    console.log('Opening devengado modal for:', employeeId, employeeName, 'Base salary:', employeeBaseSalary);
+    
+    if (!employeeBaseSalary || employeeBaseSalary <= 0) {
+      toast({
+        title: "Error",
+        description: "No se encontró el salario base del empleado o es inválido",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setDevengoModal({
       isOpen: true,
       employeeId,
       employeeName,
-      employeeSalary
+      employeeSalary: employeeBaseSalary // Ahora usa el salario base real
     });
   };
 
@@ -249,7 +258,7 @@ export const EditableEmployeeTable = ({
             onClick={() => handleOpenDevengoModal(
               employee.id, 
               employee.name, 
-              employee.grossPay // Usar el valor actual como salario base aproximado
+              employee.baseSalary // Usar el salario base real del empleado
             )}
             title="Agregar devengado"
           >

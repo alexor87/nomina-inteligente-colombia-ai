@@ -32,9 +32,10 @@ export interface PayrollHistoryEmployee {
   periodId: string;
   name: string;
   position: string;
-  grossPay: number;
+  grossPay: number; // Devengado del período
   deductions: number;
   netPay: number;
+  baseSalary: number; // Salario base configurado del empleado
   paymentStatus: 'pagado' | 'pendiente';
   payslipUrl?: string;
 }
