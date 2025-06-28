@@ -21,22 +21,27 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { NOVEDAD_CATEGORIES, calcularValorNovedad, NovedadType } from '@/types/novedades';
 
-interface NovedadModalProps {
+interface DevengoModalProps {
   isOpen: boolean;
   onClose: () => void;
   employeeId: string;
   employeeName: string;
+  employeeSalary: number;
   periodId: string;
+  onNovedadCreated: (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => void;
 }
 
-export const NovedadModal = ({ 
+export const DevengoModal = ({ 
   isOpen, 
   onClose, 
   employeeId, 
   employeeName, 
-  periodId 
-}: NovedadModalProps) => {
+  employeeSalary,
+  periodId,
+  onNovedadCreated
+}: DevengoModalProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -49,21 +54,23 @@ export const NovedadModal = ({
     dias: '',
     horas: ''
   });
+  const [calculatedValue, setCalculatedValue] = useState<number>(0);
+  const [calculationDetail, setCalculationDetail] = useState<string>('');
 
-  console.log('NovedadModal render - isOpen:', isOpen, 'isLoading:', isLoading);
+  console.log('DevengoModal render - isOpen:', isOpen, 'isLoading:', isLoading);
 
-  const tiposNovedad = [
-    { value: 'devengado', label: 'Devengado' },
-    { value: 'deduccion', label: 'Deducción' },
-    { value: 'incapacidad', label: 'Incapacidad' },
-    { value: 'vacaciones', label: 'Vacaciones' },
-    { value: 'hora_extra', label: 'Hora Extra' },
-    { value: 'auxilio', label: 'Auxilio' },
-    { value: 'bonificacion', label: 'Bonificación' }
-  ];
+  // Obtener solo los tipos de devengados
+  const tiposDevengado = Object.entries(NOVEDAD_CATEGORIES.devengados.types).map(([key, config]) => ({
+    value: key as NovedadType,
+    label: config.label,
+    requiere_horas: config.requiere_horas,
+    requiere_dias: config.requiere_dias,
+    auto_calculo: config.auto_calculo,
+    subtipos: config.subtipos
+  }));
 
   const resetForm = () => {
-    console.log('Resetting form data');
+    console.log('Resetting devengado form data');
     setFormData({
       tipoNovedad: '',
       subtipo: '',
@@ -74,6 +81,8 @@ export const NovedadModal = ({
       dias: '',
       horas: ''
     });
+    setCalculatedValue(0);
+    setCalculationDetail('');
     setIsLoading(false);
   };
 
@@ -84,6 +93,29 @@ export const NovedadModal = ({
       resetForm();
     }
   }, [isOpen]);
+
+  // Calcular valor automáticamente cuando cambian los datos relevantes
+  useEffect(() => {
+    if (formData.tipoNovedad && employeeSalary > 0) {
+      const tipoConfig = tiposDevengado.find(t => t.value === formData.tipoNovedad);
+      if (tipoConfig?.auto_calculo) {
+        const dias = formData.dias ? parseInt(formData.dias) : undefined;
+        const horas = formData.horas ? parseFloat(formData.horas) : undefined;
+        
+        const { valor, baseCalculo } = calcularValorNovedad(
+          formData.tipoNovedad as NovedadType,
+          formData.subtipo,
+          employeeSalary,
+          dias,
+          horas
+        );
+        
+        setCalculatedValue(valor);
+        setCalculationDetail(baseCalculo.detalle_calculo);
+        setFormData(prev => ({ ...prev, valor: valor.toString() }));
+      }
+    }
+  }, [formData.tipoNovedad, formData.subtipo, formData.dias, formData.horas, employeeSalary, tiposDevengado]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,20 +141,23 @@ export const NovedadModal = ({
 
     setIsLoading(true);
     try {
-      console.log('Submitting novedad form');
+      console.log('Submitting devengado form');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       toast({
-        title: "Novedad creada",
-        description: "La novedad se ha registrado correctamente"
+        title: "Devengado agregado",
+        description: `Se ha agregado ${formatCurrency(valor)} al empleado`
       });
+      
+      // Notificar que se creó la novedad
+      onNovedadCreated(employeeId, valor, 'devengado');
       
       handleClose();
     } catch (error) {
-      console.error('Error creating novedad:', error);
+      console.error('Error creating devengado:', error);
       toast({
         title: "Error",
-        description: "No se pudo crear la novedad",
+        description: "No se pudo crear el devengado",
         variant: "destructive"
       });
       setIsLoading(false);
@@ -144,12 +179,13 @@ export const NovedadModal = ({
     }
   };
 
-  // Prevenir el cierre accidental del modal
   const handleInteractOutside = (e: Event) => {
     if (isLoading) {
       e.preventDefault();
     }
   };
+
+  const selectedTipo = tiposDevengado.find(t => t.value === formData.tipoNovedad);
 
   return (
     <Dialog 
@@ -166,26 +202,27 @@ export const NovedadModal = ({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Agregar Novedad</DialogTitle>
+          <DialogTitle>Agregar Devengado</DialogTitle>
           <DialogDescription>
-            Empleado: <span className="font-medium">{employeeName}</span>
+            Empleado: <span className="font-medium">{employeeName}</span> • 
+            Salario base: <span className="font-medium text-green-600">{formatCurrency(employeeSalary)}</span>
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="tipoNovedad">Tipo de Novedad *</Label>
+              <Label htmlFor="tipoNovedad">Tipo de Devengado *</Label>
               <Select
                 value={formData.tipoNovedad}
-                onValueChange={(value) => setFormData({ ...formData, tipoNovedad: value })}
+                onValueChange={(value) => setFormData({ ...formData, tipoNovedad: value, subtipo: '', valor: '' })}
                 disabled={isLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>
                 <SelectContent className="z-50">
-                  {tiposNovedad.map((tipo) => (
+                  {tiposDevengado.map((tipo) => (
                     <SelectItem key={tipo.value} value={tipo.value}>
                       {tipo.label}
                     </SelectItem>
@@ -204,10 +241,37 @@ export const NovedadModal = ({
                 onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
                 min="0"
                 step="0.01"
-                disabled={isLoading}
+                disabled={isLoading || (selectedTipo?.auto_calculo && calculatedValue > 0)}
               />
+              {calculatedValue > 0 && (
+                <p className="text-xs text-green-600">
+                  Valor calculado: {formatCurrency(calculatedValue)}
+                </p>
+              )}
             </div>
           </div>
+
+          {selectedTipo?.subtipos && selectedTipo.subtipos.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="subtipo">Subtipo</Label>
+              <Select
+                value={formData.subtipo}
+                onValueChange={(value) => setFormData({ ...formData, subtipo: value })}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar subtipo" />
+                </SelectTrigger>
+                <SelectContent className="z-50">
+                  {selectedTipo.subtipos.map((subtipo) => (
+                    <SelectItem key={subtipo} value={subtipo}>
+                      {subtipo.charAt(0).toUpperCase() + subtipo.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -233,40 +297,53 @@ export const NovedadModal = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="dias">Días</Label>
-              <Input
-                id="dias"
-                type="number"
-                placeholder="0"
-                value={formData.dias}
-                onChange={(e) => setFormData({ ...formData, dias: e.target.value })}
-                min="0"
-                disabled={isLoading}
-              />
-            </div>
+          {(selectedTipo?.requiere_dias || selectedTipo?.requiere_horas) && (
+            <div className="grid grid-cols-2 gap-4">
+              {selectedTipo.requiere_dias && (
+                <div className="space-y-2">
+                  <Label htmlFor="dias">Días *</Label>
+                  <Input
+                    id="dias"
+                    type="number"
+                    placeholder="0"
+                    value={formData.dias}
+                    onChange={(e) => setFormData({ ...formData, dias: e.target.value })}
+                    min="0"
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
 
-            <div className="space-y-2">
-              <Label htmlFor="horas">Horas</Label>
-              <Input
-                id="horas"
-                type="number"
-                placeholder="0"
-                value={formData.horas}
-                onChange={(e) => setFormData({ ...formData, horas: e.target.value })}
-                min="0"
-                step="0.1"
-                disabled={isLoading}
-              />
+              {selectedTipo.requiere_horas && (
+                <div className="space-y-2">
+                  <Label htmlFor="horas">Horas *</Label>
+                  <Input
+                    id="horas"
+                    type="number"
+                    placeholder="0"
+                    value={formData.horas}
+                    onChange={(e) => setFormData({ ...formData, horas: e.target.value })}
+                    min="0"
+                    step="0.1"
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
+          {calculationDetail && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-800 font-medium">Cálculo automático:</p>
+              <p className="text-xs text-green-700 mt-1">{calculationDetail}</p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="observacion">Observación</Label>
             <Textarea
               id="observacion"
-              placeholder="Descripción de la novedad..."
+              placeholder="Descripción del devengado..."
               value={formData.observacion}
               onChange={(e) => setFormData({ ...formData, observacion: e.target.value })}
               rows={3}
@@ -284,7 +361,7 @@ export const NovedadModal = ({
               Cancelar
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Guardando...' : 'Crear Novedad'}
+              {isLoading ? 'Agregando...' : 'Agregar Devengado'}
             </Button>
           </DialogFooter>
         </form>

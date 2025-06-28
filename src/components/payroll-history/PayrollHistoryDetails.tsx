@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +21,7 @@ import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PayrollHistoryDetails as PayrollDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNovedades } from '@/hooks/useNovedades';
 import { EditableEmployeeTable } from './EditableEmployeeTable';
 
 export const PayrollHistoryDetails = () => {
@@ -39,6 +39,15 @@ export const PayrollHistoryDetails = () => {
   // Check if user can edit periods
   const canEditPeriods = isSuperAdmin || hasModuleAccess('payroll-history');
 
+  // Hook para manejar novedades con callback de recalculación
+  const {
+    createNovedad,
+    loadNovedadesForEmployee
+  } = useNovedades(periodId || '', () => {
+    console.log('Novedad change detected, reloading period details');
+    loadPeriodDetails();
+  });
+
   useEffect(() => {
     if (periodId) {
       loadPeriodDetails();
@@ -52,6 +61,11 @@ export const PayrollHistoryDetails = () => {
       setIsLoading(true);
       const data = await PayrollHistoryService.getPeriodDetails(periodId);
       setDetails(data);
+      
+      // Cargar novedades para todos los empleados
+      data.employees.forEach(employee => {
+        loadNovedadesForEmployee(employee.id);
+      });
     } catch (error) {
       console.error('Error loading period details:', error);
       toast({
@@ -106,17 +120,34 @@ export const PayrollHistoryDetails = () => {
   const handleEmployeeUpdate = (employeeId: string, updates: Partial<PayrollHistoryEmployee>) => {
     if (!details) return;
     
+    console.log('Updating employee values:', employeeId, updates);
+    
     // Update local state
     const updatedEmployees = details.employees.map(emp => 
       emp.id === employeeId ? { ...emp, ...updates } : emp
     );
     
+    // Recalculate summary totals
+    const newSummary = {
+      totalDevengado: updatedEmployees.reduce((sum, emp) => sum + emp.grossPay, 0),
+      totalDeducciones: updatedEmployees.reduce((sum, emp) => sum + emp.deductions, 0),
+      totalNeto: updatedEmployees.reduce((sum, emp) => sum + emp.netPay, 0),
+      costoTotal: updatedEmployees.reduce((sum, emp) => sum + emp.grossPay + emp.deductions, 0),
+      aportesEmpleador: updatedEmployees.length * 100000 // Mock calculation
+    };
+    
     setDetails({
       ...details,
-      employees: updatedEmployees
+      employees: updatedEmployees,
+      summary: newSummary
     });
     
     setHasUnsavedChanges(true);
+  };
+
+  const handleNovedadChange = () => {
+    console.log('Novedad change callback triggered, reloading data');
+    loadPeriodDetails();
   };
 
   const getStatusColor = (status: string) => {
@@ -281,6 +312,7 @@ export const PayrollHistoryDetails = () => {
               isEditMode={isEditMode}
               onEmployeeUpdate={handleEmployeeUpdate}
               periodId={periodId!}
+              onNovedadChange={handleNovedadChange}
             />
           </CardContent>
         </Card>

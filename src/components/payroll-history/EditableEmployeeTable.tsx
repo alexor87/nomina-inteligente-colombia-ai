@@ -1,13 +1,8 @@
+
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { 
   Table,
   TableBody,
@@ -17,24 +12,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { 
-  MoreVertical, 
-  Edit, 
-  Plus, 
-  Trash,
   Loader2,
   Check,
-  X
+  X,
+  Plus
 } from 'lucide-react';
 import { PayrollHistoryEmployee } from '@/types/payroll-history';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { NovedadModal } from './NovedadModal';
+import { DevengoModal } from './DevengoModal';
 
 interface EditableEmployeeTableProps {
   employees: PayrollHistoryEmployee[];
   isEditMode: boolean;
   onEmployeeUpdate: (employeeId: string, updates: Partial<PayrollHistoryEmployee>) => void;
   periodId: string;
+  onNovedadChange?: () => void;
 }
 
 interface EditingCell {
@@ -47,24 +40,25 @@ export const EditableEmployeeTable = ({
   employees, 
   isEditMode, 
   onEmployeeUpdate,
-  periodId 
+  periodId,
+  onNovedadChange
 }: EditableEmployeeTableProps) => {
   const { toast } = useToast();
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
-  const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
-  const [novedadModal, setNovedadModal] = useState<{
+  const [devengoModal, setDevengoModal] = useState<{
     isOpen: boolean;
     employeeId: string;
     employeeName: string;
+    employeeSalary: number;
   }>({
     isOpen: false,
     employeeId: '',
-    employeeName: ''
+    employeeName: '',
+    employeeSalary: 0
   });
 
-  console.log('EditableEmployeeTable render - modal state:', novedadModal);
-  console.log('EditableEmployeeTable render - open dropdowns:', openDropdowns);
+  console.log('EditableEmployeeTable render - devengado modal state:', devengoModal);
 
   const handleCellClick = (employeeId: string, field: 'grossPay' | 'deductions' | 'netPay', currentValue: number) => {
     if (!isEditMode) return;
@@ -134,51 +128,59 @@ export const EditableEmployeeTable = ({
     }
   };
 
-  const handleDropdownOpenChange = useCallback((employeeId: string, open: boolean) => {
-    console.log('Dropdown state change:', employeeId, open);
-    setOpenDropdowns(prev => {
-      const newSet = new Set(prev);
-      if (open) {
-        newSet.add(employeeId);
-      } else {
-        newSet.delete(employeeId);
-      }
-      return newSet;
+  const handleOpenDevengoModal = (employeeId: string, employeeName: string, employeeSalary: number) => {
+    console.log('Opening devengado modal for:', employeeId, employeeName, employeeSalary);
+    setDevengoModal({
+      isOpen: true,
+      employeeId,
+      employeeName,
+      employeeSalary
     });
-  }, []);
+  };
 
-  const closeAllDropdowns = useCallback(() => {
-    console.log('Closing all dropdowns');
-    setOpenDropdowns(new Set());
-  }, []);
-
-  const handleAddNovedad = useCallback((employeeId: string, employeeName: string) => {
-    console.log('Opening novedad modal for:', employeeId, employeeName);
-    
-    // Cerrar todos los dropdowns primero
-    closeAllDropdowns();
-    
-    // Pequeño delay para asegurar que el dropdown se cierre completamente
-    setTimeout(() => {
-      setNovedadModal({
-        isOpen: true,
-        employeeId,
-        employeeName
-      });
-    }, 100);
-  }, [closeAllDropdowns]);
-
-  const handleCloseNovedadModal = useCallback(() => {
-    console.log('Closing novedad modal');
-    setNovedadModal({
+  const handleCloseDevengoModal = useCallback(() => {
+    console.log('Closing devengado modal');
+    setDevengoModal({
       isOpen: false,
       employeeId: '',
-      employeeName: ''
+      employeeName: '',
+      employeeSalary: 0
     });
+  }, []);
+
+  const handleNovedadCreated = useCallback((employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => {
+    console.log('Novedad created:', { employeeId, valor, tipo });
     
-    // Asegurar que todos los dropdowns estén cerrados
-    closeAllDropdowns();
-  }, [closeAllDropdowns]);
+    // Actualizar valores automáticamente
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) return;
+
+    let updates: Partial<PayrollHistoryEmployee> = {};
+    
+    if (tipo === 'devengado') {
+      updates.grossPay = employee.grossPay + valor;
+    } else if (tipo === 'deduccion') {
+      updates.deductions = employee.deductions + valor;
+    }
+    
+    // Recalcular neto
+    const newGrossPay = updates.grossPay || employee.grossPay;
+    const newDeductions = updates.deductions || employee.deductions;
+    updates.netPay = newGrossPay - newDeductions;
+
+    onEmployeeUpdate(employeeId, updates);
+    
+    // Notificar cambio para recálculo de totales
+    if (onNovedadChange) {
+      onNovedadChange();
+    }
+
+    toast({
+      title: "Novedad aplicada",
+      description: `Se ha ${tipo === 'devengado' ? 'sumado' : 'descontado'} ${formatCurrency(valor)} automáticamente`,
+      duration: 3000
+    });
+  }, [employees, onEmployeeUpdate, onNovedadChange, toast]);
 
   const renderEditableCell = (
     employee: PayrollHistoryEmployee, 
@@ -261,11 +263,35 @@ export const EditableEmployeeTable = ({
             <TableRow>
               <TableHead>Empleado</TableHead>
               <TableHead>Cargo</TableHead>
-              <TableHead className="text-right">Devengado</TableHead>
+              <TableHead className="text-right">
+                <div className="flex items-center justify-end space-x-2">
+                  <span>Devengado</span>
+                  {isEditMode && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                      onClick={() => {
+                        // Usar el primer empleado como ejemplo, en un caso real podrías necesitar un selector
+                        if (employees.length > 0) {
+                          const firstEmployee = employees[0];
+                          handleOpenDevengoModal(
+                            firstEmployee.id, 
+                            firstEmployee.name, 
+                            1300000 // Salario base por defecto, deberías obtenerlo de los datos reales
+                          );
+                        }
+                      }}
+                      title="Agregar devengado"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </TableHead>
               <TableHead className="text-right">Deducciones</TableHead>
               <TableHead className="text-right">Neto</TableHead>
               <TableHead className="text-center">Estado de Pago</TableHead>
-              {isEditMode && <TableHead className="text-center">Acciones</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -287,54 +313,21 @@ export const EditableEmployeeTable = ({
                     {employee.paymentStatus}
                   </Badge>
                 </TableCell>
-                {isEditMode && (
-                  <TableCell className="text-center">
-                    <DropdownMenu 
-                      open={openDropdowns.has(employee.id)}
-                      onOpenChange={(open) => handleDropdownOpenChange(employee.id, open)}
-                    >
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent 
-                        align="end" 
-                        className="z-50 bg-white border shadow-md"
-                        onCloseAutoFocus={(e) => e.preventDefault()}
-                      >
-                        <DropdownMenuItem 
-                          onClick={() => handleAddNovedad(employee.id, employee.name)}
-                          className="cursor-pointer"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Agregar novedad
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer">
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar novedad
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600 cursor-pointer">
-                          <Trash className="h-4 w-4 mr-2" />
-                          Eliminar novedad
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                )}
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
 
-      {/* Novedad Modal */}
-      <NovedadModal
-        isOpen={novedadModal.isOpen}
-        onClose={handleCloseNovedadModal}
-        employeeId={novedadModal.employeeId}
-        employeeName={novedadModal.employeeName}
+      {/* Devengado Modal */}
+      <DevengoModal
+        isOpen={devengoModal.isOpen}
+        onClose={handleCloseDevengoModal}
+        employeeId={devengoModal.employeeId}
+        employeeName={devengoModal.employeeName}
+        employeeSalary={devengoModal.employeeSalary}
         periodId={periodId}
+        onNovedadCreated={handleNovedadCreated}
       />
     </>
   );
