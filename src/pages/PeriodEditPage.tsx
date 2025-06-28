@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -244,11 +243,11 @@ export const PeriodEditPage = () => {
     }
   };
 
-  const handleUpdateNovedad = async (data: NovedadFormData) => {
-    if (!editingNovedad || !selectedEmployeeId) return;
+  const handleUpdateNovedad = async (id: string, data: NovedadFormData) => {
+    if (!selectedEmployeeId) return;
     
     try {
-      await updateNovedad(editingNovedad.id, data, selectedEmployeeId);
+      await updateNovedad(id, data, selectedEmployeeId);
       
       toast({
         title: "✅ Cambios guardados",
