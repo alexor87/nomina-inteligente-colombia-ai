@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -17,12 +18,12 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
-  { name: 'Empleados', href: '/employees', icon: Users, module: 'employees' },
-  { name: 'Liquidar Nómina', href: '/payroll', icon: Calculator, module: 'payroll' },
-  { name: 'Historial Nómina', href: '/payroll-history', icon: History, module: 'payroll-history' },
-  { name: 'Reportes', href: '/reports', icon: BarChart3, module: 'reports' },
-  { name: 'Configuración', href: '/settings', icon: Settings, module: 'settings' },
+  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, module: 'dashboard' },
+  { name: 'Empleados', href: '/app/employees', icon: Users, module: 'employees' },
+  { name: 'Liquidar Nómina', href: '/app/payroll', icon: Calculator, module: 'payroll' },
+  { name: 'Historial Nómina', href: '/app/payroll-history', icon: History, module: 'payroll-history' },
+  { name: 'Reportes', href: '/app/reports', icon: BarChart3, module: 'reports' },
+  { name: 'Configuración', href: '/app/settings', icon: Settings, module: 'settings' },
 ];
 
 interface SidebarProps {
