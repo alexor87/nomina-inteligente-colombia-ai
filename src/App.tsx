@@ -1,126 +1,94 @@
-
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/toaster';
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { Layout } from '@/components/layout/Layout';
-import { useRealtimeCleanup } from '@/hooks/useRealtimeCleanup';
-import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
-
-// Public pages
-import { Index } from '@/pages/Index';
+import RealtimeService from '@/components/RealtimeService';
+import Layout from '@/components/Layout';
+import Index from '@/pages/Index';
 import AuthPage from '@/pages/AuthPage';
+import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
-import CompanyRegisterPage from '@/pages/CompanyRegisterPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import VerifyEmailPage from '@/pages/VerifyEmailPage';
 import LogoutPage from '@/pages/LogoutPage';
-import NotFound from '@/pages/NotFound';
-
-// Protected pages
+import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardPage from '@/pages/DashboardPage';
-import PayrollIntelligentSilentPage from '@/pages/PayrollIntelligentSilentPage';
 import EmployeesPage from '@/pages/EmployeesPage';
-import SettingsPage from '@/pages/SettingsPage';
-import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
+import CreateEmployeePage from '@/pages/CreateEmployeePage';
+import CreateEmployeeModernPage from '@/pages/CreateEmployeeModernPage';
+import EmployeeDetailsPage from '@/pages/EmployeeDetailsPage';
+import EditEmployeePage from '@/pages/EditEmployeePage';
+import PayrollPage from '@/pages/PayrollPage';
+import PayrollModernPage from '@/pages/PayrollModernPage';
+import PayrollIntelligentPage from '@/pages/PayrollIntelligentPage';
+import PayrollIntelligentSilentPage from '@/pages/PayrollIntelligentSilentPage';
+import PayrollHistoryPage from '@/components/payroll-history/PayrollHistoryPage';
 import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
+import PeriodEditPage from '@/pages/PeriodEditPage';
+import ReportsPage from '@/pages/ReportsPage';
+import SettingsPage from '@/pages/SettingsPage';
 import CompanySettingsPage from '@/pages/CompanySettingsPage';
 import SubscriptionPage from '@/pages/SubscriptionPage';
 import BillingHistoryPage from '@/pages/BillingHistoryPage';
-import EmployeeDetailsPage from '@/pages/EmployeeDetailsPage';
-import CreateEmployeeModernPage from '@/pages/CreateEmployeeModernPage';
-import EditEmployeePage from '@/pages/EditEmployeePage';
-import PayrollPage from '@/pages/PayrollPage';
-import ReportsPage from '@/pages/ReportsPage';
-
-const queryClient = new QueryClient();
-
-function AppContent() {
-  // Hook para limpiar suscripciones realtime
-  useRealtimeCleanup();
-  
-  // Hook para cerrar sesión automáticamente por inactividad (10 minutos)
-  useInactivityTimeout(10);
-
-  return (
-    <Router>
-      <Routes>
-        {/* Public root page - Landing page */}
-        <Route path="/" element={<Index />} />
-        
-        {/* Auth routes - Public */}
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/login" element={<Navigate to="/auth" replace />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/register/company" element={<CompanyRegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-        <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
-        <Route path="/logout" element={<LogoutPage />} />
-        
-        {/* Error page */}
-        <Route path="/error" element={<NotFound />} />
-        
-        {/* Protected routes - Main app */}
-        <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route index element={<Navigate to="/app/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          
-          {/* Ruta actualizada para liquidación inteligente silenciosa */}
-          <Route path="payroll" element={<PayrollIntelligentSilentPage />} />
-          
-          <Route path="employees" element={<EmployeesPage />} />
-          <Route path="employees/create" element={<CreateEmployeeModernPage />} />
-          <Route path="employees/:employeeId" element={<EmployeeDetailsPage />} />
-          <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
-          
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="company-settings" element={<CompanySettingsPage />} />
-          
-          <Route path="payroll-history" element={<PayrollHistoryPage />} />
-          <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
-
-          <Route path="subscription" element={<SubscriptionPage />} />
-          <Route path="billing-history" element={<BillingHistoryPage />} />
-          
-          <Route path="reports" element={<ReportsPage />} />
-        </Route>
-
-        {/* Legacy redirects for backward compatibility */}
-        <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
-        <Route path="/payroll" element={<Navigate to="/app/payroll" replace />} />
-        <Route path="/employees" element={<Navigate to="/app/employees" replace />} />
-        <Route path="/employees/create" element={<Navigate to="/app/employees/create" replace />} />
-        <Route path="/employees/:employeeId" element={<Navigate to="/app/employees/:employeeId" replace />} />
-        <Route path="/employees/:employeeId/edit" element={<Navigate to="/app/employees/:employeeId/edit" replace />} />
-        <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
-        <Route path="/company-settings" element={<Navigate to="/app/company-settings" replace />} />
-        <Route path="/payroll-history" element={<Navigate to="/app/payroll-history" replace />} />
-        <Route path="/payroll-history/:periodId" element={<Navigate to="/app/payroll-history/:periodId" replace />} />
-        <Route path="/subscription" element={<Navigate to="/app/subscription" replace />} />
-        <Route path="/billing-history" element={<Navigate to="/app/billing-history" replace />} />
-        <Route path="/reports" element={<Navigate to="/app/reports" replace />} />
-        
-        {/* Catch all route - 404 */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      <Toaster />
-    </Router>
-  );
-}
+import SupportBackofficePage from '@/pages/SupportBackofficePage';
+import SuperAdminPage from '@/pages/SuperAdminPage';
+import CompanyRegisterPage from '@/pages/CompanyRegisterPage';
+import CompanyRegistrationPage from '@/pages/CompanyRegistrationPage';
+import NotFound from '@/pages/NotFound';
+import { Toaster } from '@/components/ui/toaster';
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
       <AuthProvider>
-        <SubscriptionProvider>
-          <AppContent />
-        </SubscriptionProvider>
+        <RealtimeService />
+        <div className="min-h-screen bg-gray-50">
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/logout" element={<LogoutPage />} />
+            
+            <Route path="/app" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<DashboardPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="employees" element={<EmployeesPage />} />
+              <Route path="employees/create" element={<CreateEmployeePage />} />
+              <Route path="employees/create-modern" element={<CreateEmployeeModernPage />} />
+              <Route path="employees/:id" element={<EmployeeDetailsPage />} />
+              <Route path="employees/:id/edit" element={<EditEmployeePage />} />
+              <Route path="payroll" element={<PayrollPage />} />
+              <Route path="payroll-modern" element={<PayrollModernPage />} />
+              <Route path="payroll-intelligent" element={<PayrollIntelligentPage />} />
+              <Route path="payroll-intelligent-silent" element={<PayrollIntelligentSilentPage />} />
+              <Route path="payroll-history" element={<PayrollHistoryPage />} />
+              <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
+              <Route path="payroll-history/:periodId/edit" element={<PeriodEditPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="company-settings" element={<CompanySettingsPage />} />
+              <Route path="subscription" element={<SubscriptionPage />} />
+              <Route path="billing-history" element={<BillingHistoryPage />} />
+              <Route path="support-backoffice" element={<SupportBackofficePage />} />
+              <Route path="superadmin" element={<SuperAdminPage />} />
+            </Route>
+            
+            <Route path="/company-register" element={<CompanyRegisterPage />} />
+            <Route path="/company-registration" element={<CompanyRegistrationPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+        </div>
       </AuthProvider>
-    </QueryClientProvider>
+    </BrowserRouter>
   );
 }
 

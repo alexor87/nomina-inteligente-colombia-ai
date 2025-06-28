@@ -122,19 +122,6 @@ export class NovedadesService {
       };
 
       console.log('📤 Datos preparados para inserción:', insertData);
-      console.log('📋 Tipos de datos después de conversión:', {
-        company_id: typeof insertData.company_id,
-        empleado_id: typeof insertData.empleado_id,
-        periodo_id: typeof insertData.periodo_id,
-        tipo_novedad: typeof insertData.tipo_novedad,
-        valor: typeof insertData.valor,
-        dias: typeof insertData.dias,
-        horas: typeof insertData.horas,
-        dias_valor: insertData.dias,
-        horas_valor: insertData.horas,
-        subtipo: typeof insertData.subtipo,
-        base_calculo: typeof insertData.base_calculo
-      });
 
       const { data, error } = await supabase
         .from('payroll_novedades')
@@ -151,9 +138,6 @@ export class NovedadesService {
           fullError: error
         });
         
-        // Log the complete error object
-        console.error('❌ Error completo Supabase:', JSON.stringify(error, null, 2));
-        
         throw new Error(`Database error: ${error.message} ${error.details ? '- ' + error.details : ''} ${error.hint ? '- Hint: ' + error.hint : ''}`);
       }
 
@@ -162,8 +146,8 @@ export class NovedadesService {
       // Convert the database row to proper PayrollNovedad format
       const convertedData = this.convertDatabaseRowToNovedad(data);
 
-      // Create audit log
-      await this.createAuditLog(convertedData.id, 'created', null, convertedData);
+      // Create enhanced audit log
+      await this.createAuditLog(convertedData.id, 'created', null, convertedData, novedadData.periodo_id, novedadData.empleado_id);
 
       return convertedData;
     } catch (error) {
@@ -203,8 +187,8 @@ export class NovedadesService {
       // Convert the database row to proper PayrollNovedad format
       const convertedData = this.convertDatabaseRowToNovedad(data);
 
-      // Create audit log
-      await this.createAuditLog(id, 'updated', oldData, convertedData);
+      // Create enhanced audit log
+      await this.createAuditLog(id, 'updated', oldData, convertedData, oldData?.periodo_id, oldData?.empleado_id);
 
       return convertedData;
     } catch (error) {
@@ -233,8 +217,8 @@ export class NovedadesService {
 
       if (error) throw error;
 
-      // Create audit log
-      await this.createAuditLog(id, 'deleted', oldData, null);
+      // Create enhanced audit log
+      await this.createAuditLog(id, 'deleted', oldData, null, oldData?.periodo_id, oldData?.empleado_id);
     } catch (error) {
       console.error('Error deleting novedad:', error);
       throw error;
@@ -245,7 +229,9 @@ export class NovedadesService {
     novedadId: string, 
     action: 'created' | 'updated' | 'deleted', 
     oldValues: any, 
-    newValues: any
+    newValues: any,
+    periodId?: string,
+    employeeId?: string
   ): Promise<void> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -254,18 +240,28 @@ export class NovedadesService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Enhanced audit log with additional context
+      const auditData = {
+        novedad_id: novedadId,
+        company_id: companyId,
+        action,
+        old_values: oldValues,
+        new_values: newValues,
+        user_id: user.id,
+        // Additional context fields
+        period_id: periodId,
+        employee_id: employeeId,
+        timestamp: new Date().toISOString(),
+        user_email: user.email
+      };
+
       await supabase
         .from('payroll_novedades_audit')
-        .insert({
-          novedad_id: novedadId,
-          company_id: companyId,
-          action,
-          old_values: oldValues,
-          new_values: newValues,
-          user_id: user.id
-        });
+        .insert(auditData);
+
+      console.log('✅ Audit log created:', auditData);
     } catch (error) {
-      console.error('Error creating audit log:', error);
+      console.error('Error creating enhanced audit log:', error);
     }
   }
 }

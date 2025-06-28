@@ -2,27 +2,24 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText, Lock, LockOpen } from 'lucide-react';
+import { Eye, Download, FileText, Edit2 } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { formatPeriodDateRange } from '@/utils/periodDateUtils';
-import { PeriodContextMenu } from './PeriodContextMenu';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
   onViewDetails: (period: PayrollHistoryPeriod) => void;
-  onReopenPeriod?: (period: PayrollHistoryPeriod) => void;
+  onEditPeriod?: (period: PayrollHistoryPeriod) => void;
   onDownloadFile?: (fileUrl: string, fileName: string) => void;
-  onTogglePeriodStatus?: (period: PayrollHistoryPeriod) => void;
-  canUserReopenPeriods?: boolean;
+  canUserEditPeriods?: boolean;
 }
 
 export const PayrollHistoryTable = ({ 
   periods, 
   onViewDetails,
-  onReopenPeriod,
+  onEditPeriod,
   onDownloadFile,
-  onTogglePeriodStatus,
-  canUserReopenPeriods = false
+  canUserEditPeriods = false
 }: PayrollHistoryTableProps) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -76,10 +73,15 @@ export const PayrollHistoryTable = ({
     }
   };
 
-  const handleToggleStatus = (period: PayrollHistoryPeriod) => {
-    if (onTogglePeriodStatus) {
-      onTogglePeriodStatus(period);
+  const handleEditPeriod = (period: PayrollHistoryPeriod) => {
+    if (onEditPeriod) {
+      onEditPeriod(period);
     }
+  };
+
+  // Check if period has vouchers (simplified check based on status)
+  const hasVouchers = (period: PayrollHistoryPeriod) => {
+    return period.status === 'cerrado' || period.pilaFileUrl;
   };
 
   return (
@@ -95,7 +97,7 @@ export const PayrollHistoryTable = ({
               <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
               <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
-              <TableHead className="font-semibold text-center min-w-[160px]">Acciones</TableHead>
+              <TableHead className="font-semibold text-center min-w-[140px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -119,11 +121,6 @@ export const PayrollHistoryTable = ({
                     {period.editedBy && (
                       <div className="text-xs text-gray-400 truncate">
                         Editado por {period.editedBy.split('@')[0]}
-                      </div>
-                    )}
-                    {period.reopenedBy && (
-                      <div className="text-xs text-amber-600 truncate">
-                        Reabierto por {period.reopenedBy.split('@')[0]}
                       </div>
                     )}
                   </div>
@@ -164,8 +161,9 @@ export const PayrollHistoryTable = ({
                 <TableCell className="min-w-[120px]">
                   {getPaymentStatusBadge(period.paymentStatus)}
                 </TableCell>
-                <TableCell className="min-w-[160px]">
+                <TableCell className="min-w-[140px]">
                   <div className="flex items-center justify-center space-x-1">
+                    {/* View Details Button */}
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -175,45 +173,31 @@ export const PayrollHistoryTable = ({
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="text-green-600 hover:text-green-800 flex-shrink-0"
-                      onClick={() => handleDownloadPila(period)}
-                      title="Descargar archivos"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
 
-                    {/* Main Lock/Unlock Button */}
-                    {onTogglePeriodStatus && (
+                    {/* Edit Period Button - Only show if user can edit and period is closed */}
+                    {canUserEditPeriods && period.status === 'cerrado' && (
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        onClick={() => handleToggleStatus(period)}
-                        className={`flex-shrink-0 ${
-                          period.status === 'cerrado' 
-                            ? 'text-green-600 hover:text-green-800' 
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                        title={period.status === 'cerrado' ? 'Período cerrado' : 'Período abierto'}
+                        onClick={() => handleEditPeriod(period)}
+                        className="text-amber-600 hover:text-amber-800 flex-shrink-0"
+                        title="Editar período"
                       >
-                        {period.status === 'cerrado' ? (
-                          <Lock className="h-4 w-4" />
-                        ) : (
-                          <LockOpen className="h-4 w-4" />
-                        )}
+                        <Edit2 className="h-4 w-4" />
                       </Button>
                     )}
-
-                    {/* Context Menu for Reopen Period */}
-                    {onReopenPeriod && (
-                      <PeriodContextMenu
-                        period={period}
-                        canUserReopenPeriods={canUserReopenPeriods}
-                        onReopenPeriod={onReopenPeriod}
-                      />
+                    
+                    {/* Download Button - Only show if has vouchers */}
+                    {hasVouchers(period) && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="text-green-600 hover:text-green-800 flex-shrink-0"
+                        onClick={() => handleDownloadPila(period)}
+                        title="Descargar archivos"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
                 </TableCell>

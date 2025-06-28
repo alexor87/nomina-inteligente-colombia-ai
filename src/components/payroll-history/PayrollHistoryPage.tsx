@@ -1,9 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
-import { ReopenPeriodModal } from './ReopenPeriodModal';
-import { AutoLiquidationModal } from './AutoLiquidationModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,11 +20,7 @@ export const PayrollHistoryPage = () => {
   const [periods, setPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState<PayrollHistoryPeriod | null>(null);
-  const [showReopenModal, setShowReopenModal] = useState(false);
-  const [showAutoLiquidationModal, setShowAutoLiquidationModal] = useState(false);
-  const [canUserReopenPeriods, setCanUserReopenPeriods] = useState(false);
-  const [isReopening, setIsReopening] = useState(false);
+  const [canUserEditPeriods, setCanUserEditPeriods] = useState(false);
   const [filters, setFilters] = useState<FiltersType>({
     dateRange: {},
     status: '',
@@ -60,13 +55,13 @@ export const PayrollHistoryPage = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setCanUserReopenPeriods(false);
+        setCanUserEditPeriods(false);
         return;
       }
 
       const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
       if (!companyId) {
-        setCanUserReopenPeriods(false);
+        setCanUserEditPeriods(false);
         return;
       }
 
@@ -74,7 +69,7 @@ export const PayrollHistoryPage = () => {
       const isSuperAdmin = user.email === 'alexor87@gmail.com';
       
       if (isSuperAdmin) {
-        setCanUserReopenPeriods(true);
+        setCanUserEditPeriods(true);
         return;
       }
 
@@ -84,12 +79,12 @@ export const PayrollHistoryPage = () => {
         .select('role')
         .eq('user_id', user.id)
         .eq('company_id', companyId)
-        .eq('role', 'administrador');
+        .in('role', ['administrador', 'rrhh']);
 
-      setCanUserReopenPeriods(userRoles && userRoles.length > 0);
+      setCanUserEditPeriods(userRoles && userRoles.length > 0);
     } catch (error) {
       console.error('Error checking user permissions:', error);
-      setCanUserReopenPeriods(false);
+      setCanUserEditPeriods(false);
     }
   };
 
@@ -99,29 +94,21 @@ export const PayrollHistoryPage = () => {
       const data = await PayrollHistoryService.getPayrollPeriods();
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
-        // Fix the status mapping logic to handle all possible estados and reopened status
+        // Fix the status mapping logic to handle all possible estados
         let mappedStatus: 'cerrado' | 'con_errores' | 'revision' | 'editado' | 'reabierto' = 'revision';
         
-        // First check if the period was reopened (has reabierto_por field)
-        if (record.reabierto_por) {
-          mappedStatus = 'reabierto';
-        } else {
-          // Then check the regular estado
-          switch (record.estado) {
-            case 'cerrada':
-            case 'procesada':
-            case 'pagada':
-              mappedStatus = 'cerrado';
-              break;
-            case 'borrador':
-              mappedStatus = 'revision';
-              break;
-            default:
-              // Only mark as 'con_errores' if there's an actual error status
-              // or if we detect data inconsistencies
-              mappedStatus = 'con_errores';
-              break;
-          }
+        switch (record.estado) {
+          case 'cerrada':
+          case 'procesada':
+          case 'pagada':
+            mappedStatus = 'cerrado';
+            break;
+          case 'borrador':
+            mappedStatus = 'revision';
+            break;
+          default:
+            mappedStatus = 'con_errores';
+            break;
         }
 
         return {
@@ -142,9 +129,8 @@ export const PayrollHistoryPage = () => {
           version: 1,
           createdAt: record.fechaCreacion || new Date().toISOString(),
           updatedAt: record.fechaCreacion || new Date().toISOString(),
-          editable: record.editable !== false, // Default to true if not specified
-          reportedToDian: record.reportado_dian || false, // Default to false
-          reopenedBy: record.reabierto_por ? 'usuario@empresa.com' : undefined // You might want to get actual user email
+          editable: record.editable !== false,
+          reportedToDian: record.reportado_dian || false
         };
       });
       setPeriods(convertedPeriods);
@@ -187,101 +173,8 @@ export const PayrollHistoryPage = () => {
     navigate(`/app/payroll-history/${period.id}`);
   };
 
-  const handleTogglePeriodStatus = (period: PayrollHistoryPeriod) => {
-    // This is the main lock/unlock functionality
-    toast({
-      title: "Funcionalidad en desarrollo",
-      description: `Estado actual: ${period.status}. Funcionalidad de abrir/cerrar período en desarrollo.`,
-    });
-  };
-
-  const handleReopenPeriod = async (period: PayrollHistoryPeriod) => {
-    setSelectedPeriod(period);
-    setShowReopenModal(true);
-  };
-
-  const handleReopenConfirm = async () => {
-    if (!selectedPeriod) return;
-    
-    setIsReopening(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('Usuario no autenticado');
-      }
-
-      const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se encontró la empresa del usuario');
-      }
-
-      // Update period status to reopened
-      const { error } = await supabase
-        .from('payrolls')
-        .update({
-          estado: 'borrador',
-          editable: true,
-          reabierto_por: user.id,
-          fecha_reapertura: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('company_id', companyId)
-        .eq('periodo', selectedPeriod.period);
-
-      if (error) {
-        throw new Error('Error actualizando el período: ' + error.message);
-      }
-
-      // Invalidate existing vouchers
-      await supabase
-        .from('payroll_vouchers')
-        .update({ 
-          voucher_status: 'anulado',
-          updated_at: new Date().toISOString()
-        })
-        .eq('company_id', companyId)
-        .eq('periodo', selectedPeriod.period);
-
-      // Create audit log
-      await supabase
-        .from('payroll_reopen_audit')
-        .insert({
-          company_id: companyId,
-          periodo: selectedPeriod.period,
-          user_id: user.id,
-          user_email: user.email || '',
-          action: 'reabierto',
-          previous_state: 'cerrado',
-          new_state: 'reabierto',
-          has_vouchers: true,
-          notes: `Período reabierto desde historial de nómina`
-        });
-
-      // Store the period info for liquidation module
-      sessionStorage.setItem('reopenedPeriod', JSON.stringify({
-        periodo: selectedPeriod.period,
-        startDate: selectedPeriod.startDate,
-        endDate: selectedPeriod.endDate
-      }));
-
-      await loadPayrollHistory(); // Reload to show updated status
-      setShowReopenModal(false);
-      setShowAutoLiquidationModal(true);
-      
-    } catch (error: any) {
-      console.error('Error reopening period:', error);
-      toast({
-        title: "Error al reabrir período",
-        description: error.message || "No se pudo reabrir el período. Intente nuevamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsReopening(false);
-    }
-  };
-
-  const handleGoToLiquidation = () => {
-    navigate('/app/payroll');
+  const handleEditPeriod = (period: PayrollHistoryPeriod) => {
+    navigate(`/app/payroll-history/${period.id}/edit`);
   };
 
   const handleExportToExcel = async () => {
@@ -294,7 +187,7 @@ export const PayrollHistoryPage = () => {
       cerrados: filteredPeriods.filter(p => p.status === 'cerrado').length,
       conErrores: filteredPeriods.filter(p => p.status === 'con_errores').length,
       enRevision: filteredPeriods.filter(p => p.status === 'revision').length,
-      reabiertos: filteredPeriods.filter(p => p.status === 'reabierto').length
+      editados: filteredPeriods.filter(p => p.status === 'editado').length
     };
     return summary;
   };
@@ -373,10 +266,10 @@ export const PayrollHistoryPage = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Reabiertos</p>
-                  <p className="text-2xl font-bold text-amber-600">{statusSummary.reabiertos}</p>
+                  <p className="text-sm font-medium text-gray-600">Editados</p>
+                  <p className="text-2xl font-bold text-blue-600">{statusSummary.editados}</p>
                 </div>
-                <Badge className="bg-amber-100 text-amber-800">🔓</Badge>
+                <Badge className="bg-blue-100 text-blue-800">✏</Badge>
               </div>
             </CardContent>
           </Card>
@@ -417,10 +310,9 @@ export const PayrollHistoryPage = () => {
           <PayrollHistoryTable
             periods={pagination.paginatedItems}
             onViewDetails={handleViewDetails}
-            onReopenPeriod={handleReopenPeriod}
+            onEditPeriod={handleEditPeriod}
             onDownloadFile={downloadFile}
-            onTogglePeriodStatus={handleTogglePeriodStatus}
-            canUserReopenPeriods={canUserReopenPeriods}
+            canUserEditPeriods={canUserEditPeriods}
           />
           
           <PaginationControls 
@@ -429,33 +321,6 @@ export const PayrollHistoryPage = () => {
           />
         </div>
       </div>
-
-      {/* Reopen Period Modal */}
-      {showReopenModal && selectedPeriod && (
-        <ReopenPeriodModal
-          isOpen={showReopenModal}
-          onClose={() => {
-            setShowReopenModal(false);
-            setSelectedPeriod(null);
-          }}
-          onConfirm={handleReopenConfirm}
-          period={selectedPeriod}
-          isProcessing={isReopening}
-        />
-      )}
-
-      {/* Auto Liquidation Modal */}
-      {showAutoLiquidationModal && selectedPeriod && (
-        <AutoLiquidationModal
-          isOpen={showAutoLiquidationModal}
-          onClose={() => {
-            setShowAutoLiquidationModal(false);
-            setSelectedPeriod(null);
-          }}
-          onGoToLiquidation={handleGoToLiquidation}
-          period={selectedPeriod}
-        />
-      )}
     </div>
   );
 };
