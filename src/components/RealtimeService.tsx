@@ -4,14 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RealtimeService } from '@/services/RealtimeService';
 
 const RealtimeServiceComponent = () => {
-  const { user, company } = useAuth();
+  const { user, profile } = useAuth();
 
   useEffect(() => {
-    if (!user || !company?.id) {
+    if (!user || !profile?.company_id) {
       return;
     }
 
-    console.log('🔔 Setting up realtime subscriptions for company:', company.id);
+    console.log('🔔 Setting up realtime subscriptions for company:', profile.company_id);
 
     // Subscribe to employees changes
     const employeesChannel = RealtimeService.subscribeToEmployees(
@@ -20,7 +20,7 @@ const RealtimeServiceComponent = () => {
         // You can dispatch custom events here if needed
         window.dispatchEvent(new CustomEvent('employeeUpdate', { detail: event }));
       },
-      company.id
+      profile.company_id
     );
 
     // Subscribe to payroll periods changes
@@ -29,7 +29,7 @@ const RealtimeServiceComponent = () => {
         console.log('💰 Payroll realtime event:', event);
         window.dispatchEvent(new CustomEvent('payrollUpdate', { detail: event }));
       },
-      company.id
+      profile.company_id
     );
 
     // Subscribe to company settings changes
@@ -38,7 +38,7 @@ const RealtimeServiceComponent = () => {
         console.log('⚙️ Settings realtime event:', event);
         window.dispatchEvent(new CustomEvent('settingsUpdate', { detail: event }));
       },
-      company.id
+      profile.company_id
     );
 
     // Subscribe to novedades changes
@@ -47,7 +47,7 @@ const RealtimeServiceComponent = () => {
         console.log('📝 Novedades realtime event:', event);
         window.dispatchEvent(new CustomEvent('novedadesUpdate', { detail: event }));
       },
-      company.id
+      profile.company_id
     );
 
     // Cleanup function
@@ -55,7 +55,7 @@ const RealtimeServiceComponent = () => {
       console.log('🔕 Cleaning up realtime subscriptions');
       RealtimeService.unsubscribeAll();
     };
-  }, [user, company?.id]);
+  }, [user, profile?.company_id]);
 
   return null; // This component doesn't render anything
 };
