@@ -48,40 +48,48 @@ const PeriodEditPage = () => {
     data: periodDetails,
     isLoading,
     isError,
-    refetch
+    refetch,
+    error: periodError
   } = useQuery({
     queryKey: ['payrollPeriodDetails', periodId],
     queryFn: () => PayrollHistoryService.getPeriodDetails(periodId as string),
-    enabled: !!periodId,
-    onSuccess: (data) => {
-      setEmployees(data.employees);
-    },
-    onError: (error) => {
+    enabled: !!periodId
+  });
+
+  const { data: allEmployees, isLoading: isEmployeesLoading, error: employeesError } = useQuery({
+    queryKey: ['employees'],
+    queryFn: EmployeeService.getEmployees
+  });
+
+  // Handle period details success
+  useEffect(() => {
+    if (periodDetails) {
+      setDate(new Date(periodDetails.period.startDate));
+      setEmployees(periodDetails.employees);
+    }
+  }, [periodDetails]);
+
+  // Handle period details error
+  useEffect(() => {
+    if (periodError) {
       toast({
         title: "Error al cargar el período",
         description: "No se pudieron cargar los detalles del período seleccionado.",
         variant: "destructive"
       });
     }
-  });
+  }, [periodError, toast]);
 
-  const { data: allEmployees, isLoading: isEmployeesLoading } = useQuery({
-    queryKey: ['employees'],
-    queryFn: EmployeeService.getEmployees,
-    onError: (error) => {
+  // Handle employees error
+  useEffect(() => {
+    if (employeesError) {
       toast({
         title: "Error al cargar empleados",
         description: "No se pudieron cargar los empleados.",
         variant: "destructive"
       });
     }
-  });
-
-  useEffect(() => {
-    if (periodDetails) {
-      setDate(new Date(periodDetails.period.startDate));
-    }
-  }, [periodDetails]);
+  }, [employeesError, toast]);
 
   const handleDateChange = (newDate: Date | undefined) => {
     setDate(newDate);
