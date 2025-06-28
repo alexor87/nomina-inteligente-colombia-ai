@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import RealtimeService from '@/components/RealtimeService';
 import { Layout } from '@/components/layout/Layout';
 import { Index } from '@/pages/Index';
@@ -42,52 +43,54 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <RealtimeService />
-        <div className="min-h-screen bg-gray-50">
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/logout" element={<LogoutPage />} />
-            
-            <Route path="/app" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<DashboardPage />} />
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="employees" element={<EmployeesPage />} />
-              <Route path="employees/create" element={<CreateEmployeePage />} />
-              <Route path="employees/create-modern" element={<CreateEmployeeModernPage />} />
-              <Route path="employees/:id" element={<EmployeeDetailsPage />} />
-              <Route path="employees/:id/edit" element={<EditEmployeePage />} />
-              <Route path="payroll" element={<PayrollPage />} />
-              <Route path="payroll-modern" element={<PayrollModernPage />} />
-              <Route path="payroll-intelligent" element={<PayrollIntelligentPage />} />
-              <Route path="payroll-intelligent-silent" element={<PayrollIntelligentSilentPage />} />
-              <Route path="payroll-history" element={<PayrollHistoryPage />} />
-              <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
-              <Route path="payroll-history/:periodId/edit" element={<PeriodEditPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="company-settings" element={<CompanySettingsPage />} />
-              <Route path="subscription" element={<SubscriptionPage />} />
-              <Route path="billing-history" element={<BillingHistoryPage />} />
-              <Route path="support-backoffice" element={<SupportBackofficePage />} />
-              <Route path="superadmin" element={<SuperAdminPage />} />
-            </Route>
-            
-            <Route path="/company-register" element={<CompanyRegisterPage />} />
-            <Route path="/company-registration" element={<CompanyRegistrationPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-        </div>
+        <SubscriptionProvider>
+          <RealtimeService />
+          <div className="min-h-screen bg-gray-50">
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/logout" element={<LogoutPage />} />
+              
+              <Route path="/app" element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<DashboardPage />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="employees/create" element={<CreateEmployeePage />} />
+                <Route path="employees/create-modern" element={<CreateEmployeeModernPage />} />
+                <Route path="employees/:id" element={<EmployeeDetailsPage />} />
+                <Route path="employees/:id/edit" element={<EditEmployeePage />} />
+                <Route path="payroll" element={<PayrollPage />} />
+                <Route path="payroll-modern" element={<PayrollModernPage />} />
+                <Route path="payroll-intelligent" element={<PayrollIntelligentPage />} />
+                <Route path="payroll-intelligent-silent" element={<PayrollIntelligentSilentPage />} />
+                <Route path="payroll-history" element={<PayrollHistoryPage />} />
+                <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
+                <Route path="payroll-history/:periodId/edit" element={<PeriodEditPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="company-settings" element={<CompanySettingsPage />} />
+                <Route path="subscription" element={<SubscriptionPage />} />
+                <Route path="billing-history" element={<BillingHistoryPage />} />
+                <Route path="support-backoffice" element={<SupportBackofficePage />} />
+                <Route path="superadmin" element={<SuperAdminPage />} />
+              </Route>
+              
+              <Route path="/company-register" element={<CompanyRegisterPage />} />
+              <Route path="/company-registration" element={<CompanyRegistrationPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+          </div>
+        </SubscriptionProvider>
       </AuthProvider>
     </BrowserRouter>
   );
