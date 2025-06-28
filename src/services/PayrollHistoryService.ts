@@ -84,12 +84,19 @@ export class PayrollHistoryService {
 
       // Create period summaries with correct dates
       const periods = Object.entries(grouped).map(([periodo, records]) => {
-        // Try to find matching period data
+        console.log(`Processing period: "${periodo}"`);
+        
+        // Try to find matching period data from payroll_periods table
         const periodData = periodsData?.find(p => {
-          // Try different matching strategies
+          // Try exact match first
+          if (periodo === p.fecha_inicio + ' - ' + p.fecha_fin) return true;
+          
+          // Try month-year matching
           const periodLower = periodo.toLowerCase();
-          const pDataPeriod = `${new Date(p.fecha_inicio).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`.toLowerCase();
-          return periodLower.includes(pDataPeriod) || pDataPeriod.includes(periodLower);
+          const startDate = new Date(p.fecha_inicio);
+          const monthYear = `${startDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`.toLowerCase();
+          
+          return periodLower.includes(monthYear) || monthYear.includes(periodLower);
         });
 
         let startDate: string;
@@ -105,9 +112,12 @@ export class PayrollHistoryService {
           const dateRange = parsePeriodToDateRange(periodo);
           startDate = dateRange.startDate;
           endDate = dateRange.endDate;
-          console.log(`Parsed period ${periodo} to date range:`, { startDate, endDate });
+          console.log(`Parsed period "${periodo}" to date range:`, { startDate, endDate });
         }
 
+        // Check if the period matches any reopened periods (with reabierto_por field)
+        const reopenedRecord = records.find(r => r.reabierto_por);
+        
         return {
           id: `${periodo}-${records[0].created_at}`,
           periodo,
@@ -117,8 +127,8 @@ export class PayrollHistoryService {
           estado: records[0].estado,
           companyId,
           editable: records[0].editable,
-          reabierto_por: records[0].reabierto_por,
-          fecha_reapertura: records[0].fecha_reapertura,
+          reabierto_por: reopenedRecord?.reabierto_por,
+          fecha_reapertura: reopenedRecord?.fecha_reapertura,
           reportado_dian: records[0].reportado_dian,
           fecha_inicio: startDate,
           fecha_fin: endDate
@@ -126,6 +136,10 @@ export class PayrollHistoryService {
       });
 
       console.log('Processed payroll periods with correct dates:', periods.length);
+      periods.forEach(p => {
+        console.log(`Period: ${p.periodo} -> ${p.fecha_inicio} to ${p.fecha_fin}`);
+      });
+      
       return periods;
     } catch (error) {
       console.error('Error loading payroll periods:', error);

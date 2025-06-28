@@ -10,13 +10,60 @@ export interface PeriodDateRange {
 
 /**
  * Parse a period string and return the actual date range
- * Examples: "Enero 2024", "2024-01", "Enero de 2024"
+ * Examples: "Enero 2024", "2024-01", "Enero de 2024", "16 Jul - 30 Jul 2025"
  */
 export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
   // Clean up the period string
-  const cleanPeriod = periodo.toLowerCase().trim();
+  const cleanPeriod = periodo.trim();
   
-  // Try to extract month and year
+  console.log('Parsing period:', cleanPeriod);
+  
+  // Pattern 1: Date range format like "16 Jul - 30 Jul 2025" or "16/06/2025 - 30/06/2025"
+  const dateRangeMatch = cleanPeriod.match(/(\d{1,2})[\s\/](\w{3}|\d{1,2})[\s\/]?(\d{4})?\s*-\s*(\d{1,2})[\s\/](\w{3}|\d{1,2})[\s\/](\d{4})/);
+  if (dateRangeMatch) {
+    const [, startDay, startMonth, startYear, endDay, endMonth, endYear] = dateRangeMatch;
+    
+    const monthMap: { [key: string]: string } = {
+      'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
+      'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
+    };
+    
+    let startMonthNum, endMonthNum;
+    
+    // Check if month is text (Jul) or number (07)
+    if (isNaN(parseInt(startMonth))) {
+      startMonthNum = monthMap[startMonth.toLowerCase()] || '01';
+    } else {
+      startMonthNum = startMonth.padStart(2, '0');
+    }
+    
+    if (isNaN(parseInt(endMonth))) {
+      endMonthNum = monthMap[endMonth.toLowerCase()] || '12';
+    } else {
+      endMonthNum = endMonth.padStart(2, '0');
+    }
+    
+    const year = startYear || endYear;
+    const startDateFormatted = `${year}-${startMonthNum}-${startDay.padStart(2, '0')}`;
+    const endDateFormatted = `${endYear}-${endMonthNum}-${endDay.padStart(2, '0')}`;
+    
+    console.log('Parsed date range:', { startDateFormatted, endDateFormatted });
+    
+    return {
+      startDate: startDateFormatted,
+      endDate: endDateFormatted
+    };
+  }
+  
+  // Pattern 2: ISO date range like "2025-07-16 - 2025-07-30"
+  const isoRangeMatch = cleanPeriod.match(/(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/);
+  if (isoRangeMatch) {
+    const [, startDate, endDate] = isoRangeMatch;
+    console.log('Parsed ISO date range:', { startDate, endDate });
+    return { startDate, endDate };
+  }
+  
+  // Try to extract month and year from traditional format
   const monthNames = {
     'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3,
     'mayo': 4, 'junio': 5, 'julio': 6, 'agosto': 7,
@@ -27,8 +74,8 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
   let year: number;
   let month: number;
   
-  // Pattern 1: "Enero 2024" or "Enero de 2024"
-  const monthYearMatch = cleanPeriod.match(/(\w+)\s+(?:de\s+)?(\d{4})/);
+  // Pattern 3: "Enero 2024" or "Enero de 2024"
+  const monthYearMatch = cleanPeriod.toLowerCase().match(/(\w+)\s+(?:de\s+)?(\d{4})/);
   if (monthYearMatch) {
     const monthName = monthYearMatch[1];
     year = parseInt(monthYearMatch[2]);
@@ -38,14 +85,17 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + 1, 0); // Last day of month
       
-      return {
+      const result = {
         startDate: startDate.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0]
       };
+      
+      console.log('Parsed month-year format:', result);
+      return result;
     }
   }
   
-  // Pattern 2: "2024-01" or "2024/01"
+  // Pattern 4: "2024-01" or "2024/01"
   const yearMonthMatch = cleanPeriod.match(/(\d{4})[-/](\d{1,2})/);
   if (yearMonthMatch) {
     year = parseInt(yearMonthMatch[1]);
@@ -54,20 +104,26 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
     const startDate = new Date(year, month, 1);
     const endDate = new Date(year, month + 1, 0);
     
-    return {
+    const result = {
       startDate: startDate.toISOString().split('T')[0],
       endDate: endDate.toISOString().split('T')[0]
     };
+    
+    console.log('Parsed year-month format:', result);
+    return result;
   }
   
-  // Pattern 3: Just year "2024"
+  // Pattern 5: Just year "2024"
   const yearMatch = cleanPeriod.match(/^(\d{4})$/);
   if (yearMatch) {
     year = parseInt(yearMatch[1]);
-    return {
+    const result = {
       startDate: `${year}-01-01`,
       endDate: `${year}-12-31`
     };
+    
+    console.log('Parsed year format:', result);
+    return result;
   }
   
   // Fallback: use current month
@@ -100,19 +156,18 @@ export const formatPeriodDateRange = (startDate: string, endDate: string): strin
   
   const startDay = start.getDate();
   const endDay = end.getDate();
-  const month = monthNames[start.getMonth()];
-  const year = start.getFullYear();
-  
-  // If same month, show "1 - 31 /Ene/ 2024"
-  if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
-    return `${startDay} - ${endDay} /${month}/ ${year}`;
-  }
-  
-  // If different months, show full range
+  const startMonth = monthNames[start.getMonth()];
   const endMonth = monthNames[end.getMonth()];
+  const startYear = start.getFullYear();
   const endYear = end.getFullYear();
   
-  return `${startDay}/${month}/${year} - ${endDay}/${endMonth}/${endYear}`;
+  // If same month and year, show "16 - 30 /Jun/ 2025"
+  if (start.getMonth() === end.getMonth() && startYear === endYear) {
+    return `${startDay} - ${endDay} /${startMonth}/ ${startYear}`;
+  }
+  
+  // If different months or years, show full range "16/Jun/2025 - 30/Jul/2025"
+  return `${startDay}/${startMonth}/${startYear} - ${endDay}/${endMonth}/${endYear}`;
 };
 
 /**
