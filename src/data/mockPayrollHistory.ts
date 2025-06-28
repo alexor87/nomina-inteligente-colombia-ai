@@ -86,6 +86,7 @@ export const mockPayrollHistoryEmployees: PayrollHistoryEmployee[] = [
   {
     id: '1',
     periodId: '1',
+    payrollId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', // Real UUID example
     name: 'Ana María Rodríguez',
     position: 'Desarrolladora Senior',
     grossPay: 4800000,
@@ -98,6 +99,7 @@ export const mockPayrollHistoryEmployees: PayrollHistoryEmployee[] = [
   {
     id: '2',
     periodId: '1',
+    payrollId: 'b2c3d4e5-f6g7-8901-bcde-f23456789012', // Real UUID example
     name: 'Carlos Mendoza',
     position: 'Diseñador UX',
     grossPay: 4200000,

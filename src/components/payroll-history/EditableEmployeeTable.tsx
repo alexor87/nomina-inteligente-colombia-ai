@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,16 +50,20 @@ export const EditableEmployeeTable = ({
     employeeId: string;
     employeeName: string;
     employeeSalary: number;
-    payrollId: string; // Changed from periodId to payrollId
+    payrollId: string; // Now using real payroll UUID
   }>({
     isOpen: false,
     employeeId: '',
     employeeName: '',
     employeeSalary: 0,
-    payrollId: '' // Initialize with empty string
+    payrollId: ''
   });
 
-  console.log('EditableEmployeeTable render - devengado modal state:', devengoModal);
+  console.log('EditableEmployeeTable render - employees with payrollIds:', employees.map(emp => ({
+    name: emp.name,
+    employeeId: emp.id,
+    payrollId: emp.payrollId
+  })));
 
   const handleCellClick = (employeeId: string, field: 'grossPay' | 'deductions' | 'netPay', currentValue: number) => {
     if (!isEditMode) return;
@@ -142,16 +145,40 @@ export const EditableEmployeeTable = ({
       return;
     }
 
-    // For this component, we'll use the periodId as payrollId 
-    // Note: This might need to be updated if this component needs real payroll UUIDs
-    const payrollId = periodId;
+    // Find the employee to get their real payrollId
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee || !employee.payrollId) {
+      toast({
+        title: "Error",
+        description: "No se encontró el ID de nómina del empleado",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate that payrollId is a proper UUID
+    const isValidUUID = (uuid: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(uuid);
+    };
+
+    if (!isValidUUID(employee.payrollId)) {
+      toast({
+        title: "Error",
+        description: `ID de nómina inválido para el empleado ${employeeName}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('✅ Using real payroll UUID:', employee.payrollId, 'for employee:', employeeName);
     
     setDevengoModal({
       isOpen: true,
       employeeId,
       employeeName,
       employeeSalary: employeeBaseSalary,
-      payrollId // Use the periodId as payrollId for now
+      payrollId: employee.payrollId // Using the REAL UUID from the payroll table
     });
   };
 
@@ -337,7 +364,7 @@ export const EditableEmployeeTable = ({
         employeeId={devengoModal.employeeId}
         employeeName={devengoModal.employeeName}
         employeeSalary={devengoModal.employeeSalary}
-        payrollId={devengoModal.payrollId} // Changed from periodId to payrollId
+        payrollId={devengoModal.payrollId} // Now passing the REAL UUID
         onNovedadCreated={handleNovedadCreated}
       />
     </>

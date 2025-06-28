@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod, PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 
@@ -206,7 +205,6 @@ export class PayrollHistoryService {
       if (!companyId) throw new Error('No company ID found');
 
       // Since periodId might be a generated ID, we need to find the actual period
-      // For now, let's try to extract the period name from the URL or use the first available period
       const periods = await this.getPayrollPeriods();
       const targetPeriod = periods.find(p => p.id === periodId) || periods[0];
       
@@ -214,11 +212,19 @@ export class PayrollHistoryService {
         throw new Error('Period not found');
       }
 
-      // Get payrolls for this period with employee salary data
+      // Get payrolls for this period with employee salary data AND the payroll UUID
       const { data: payrollsData, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
-          *,
+          id,
+          employee_id,
+          periodo,
+          estado,
+          salario_base,
+          total_devengado,
+          total_deducciones,
+          neto_pagado,
+          created_at,
           employees!inner(
             nombre,
             apellido,
@@ -231,7 +237,7 @@ export class PayrollHistoryService {
 
       if (payrollsError) throw payrollsError;
 
-      console.log('📊 Payrolls data loaded:', payrollsData);
+      console.log('📊 Payrolls data with IDs loaded:', payrollsData);
 
       // Also get novedades count for each employee to show activity
       const employeeIds = payrollsData?.map(p => p.employee_id) || [];
@@ -251,7 +257,7 @@ export class PayrollHistoryService {
         });
       }
 
-      // Transform data to match expected format
+      // Transform data to match expected format with real payroll IDs
       const period: PayrollHistoryPeriod = {
         id: targetPeriod.id,
         period: targetPeriod.periodo,
@@ -274,8 +280,9 @@ export class PayrollHistoryService {
       };
 
       const employees: PayrollHistoryEmployee[] = (payrollsData || []).map(payroll => ({
-        id: payroll.id,
-        periodId: targetPeriod.id,
+        id: payroll.employee_id, // Employee ID
+        periodId: targetPeriod.id, // Artificial period ID for navigation
+        payrollId: payroll.id, // REAL UUID del registro de payroll - ¡Esta es la clave!
         name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
         position: payroll.employees.cargo || 'Sin cargo',
         grossPay: Number(payroll.total_devengado || 0),
@@ -285,7 +292,11 @@ export class PayrollHistoryService {
         paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente'
       }));
 
-      console.log('👥 Employees with updated totals:', employees);
+      console.log('👥 Employees with real payroll UUIDs:', employees.map(emp => ({
+        name: emp.name,
+        employeeId: emp.id,
+        payrollId: emp.payrollId
+      })));
 
       const summary = {
         totalDevengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),

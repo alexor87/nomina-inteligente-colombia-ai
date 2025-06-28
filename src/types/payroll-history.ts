@@ -30,6 +30,7 @@ export interface PayrollHistoryPeriod {
 export interface PayrollHistoryEmployee {
   id: string;
   periodId: string;
+  payrollId: string; // UUID real del registro de payroll en la tabla payrolls
   name: string;
   position: string;
   grossPay: number; // Devengado del período
