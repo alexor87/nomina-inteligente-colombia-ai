@@ -101,6 +101,105 @@ export class PayrollHistoryService {
     }
   }
 
+  // Enhanced method to recalculate employee totals including novedades
+  static async recalculateEmployeeTotalsWithNovedades(employeeId: string, periodId: string): Promise<void> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) throw new Error('No company ID found');
+
+      console.log('🔄 Recalculating totals for employee:', employeeId, 'period:', periodId);
+
+      // Get all novedades for this employee in this period
+      const { data: novedades, error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .select('tipo_novedad, valor')
+        .eq('company_id', companyId)
+        .eq('empleado_id', employeeId)
+        .eq('periodo_id', periodId);
+
+      if (novedadesError) {
+        console.error('Error loading novedades for recalculation:', novedadesError);
+        throw novedadesError;
+      }
+
+      console.log('📊 Found novedades for recalculation:', novedades);
+
+      // Calculate totals from novedades
+      let totalDevengadosNovedades = 0;
+      let totalDeduccionesNovedades = 0;
+
+      // Define which novedad types are devengados vs deducciones
+      const tiposDevengados = [
+        'horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
+        'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'
+      ];
+
+      (novedades || []).forEach(novedad => {
+        const valor = Number(novedad.valor || 0);
+        if (tiposDevengados.includes(novedad.tipo_novedad)) {
+          totalDevengadosNovedades += valor;
+        } else {
+          totalDeduccionesNovedades += valor;
+        }
+      });
+
+      console.log('💰 Calculated totals from novedades:', {
+        devengados: totalDevengadosNovedades,
+        deducciones: totalDeduccionesNovedades
+      });
+
+      // Get current payroll record to add to base values
+      const { data: payrollData, error: payrollError } = await supabase
+        .from('payrolls')
+        .select('salario_base, total_devengado, total_deducciones')
+        .eq('employee_id', employeeId)
+        .eq('periodo', periodId) // Assuming we're using the period string
+        .eq('company_id', companyId)
+        .single();
+
+      if (payrollError) {
+        console.error('Error loading payroll data:', payrollError);
+        return; // Don't throw here, just log and return
+      }
+
+      const salarioBase = Number(payrollData?.salario_base || 0);
+      const newTotalDevengado = salarioBase + totalDevengadosNovedades;
+      const newTotalDeducciones = totalDeduccionesNovedades;
+      const newNetoPagado = newTotalDevengado - newTotalDeducciones;
+
+      console.log('📈 New calculated totals:', {
+        salarioBase,
+        totalDevengado: newTotalDevengado,
+        totalDeducciones: newTotalDeducciones,
+        netoPagado: newNetoPagado
+      });
+
+      // Update the payroll record with new totals
+      const { error: updateError } = await supabase
+        .from('payrolls')
+        .update({
+          total_devengado: newTotalDevengado,
+          total_deducciones: newTotalDeducciones,
+          neto_pagado: newNetoPagado,
+          updated_at: new Date().toISOString()
+        })
+        .eq('employee_id', employeeId)
+        .eq('periodo', periodId)
+        .eq('company_id', companyId);
+
+      if (updateError) {
+        console.error('Error updating payroll totals:', updateError);
+        throw updateError;
+      }
+
+      console.log('✅ Successfully updated payroll totals for employee:', employeeId);
+
+    } catch (error) {
+      console.error('Error in recalculateEmployeeTotalsWithNovedades:', error);
+      throw error;
+    }
+  }
+
   static async getPeriodDetails(periodId: string): Promise<PayrollHistoryDetails> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -132,7 +231,25 @@ export class PayrollHistoryService {
 
       if (payrollsError) throw payrollsError;
 
-      console.log('Payrolls data with salary:', payrollsData);
+      console.log('📊 Payrolls data loaded:', payrollsData);
+
+      // Also get novedades count for each employee to show activity
+      const employeeIds = payrollsData?.map(p => p.employee_id) || [];
+      let novedadesCounts: Record<string, number> = {};
+
+      if (employeeIds.length > 0) {
+        const { data: novedadesData } = await supabase
+          .from('payroll_novedades')
+          .select('empleado_id')
+          .eq('company_id', companyId)
+          .eq('periodo_id', targetPeriod.id)
+          .in('empleado_id', employeeIds);
+
+        // Count novedades per employee
+        (novedadesData || []).forEach(nov => {
+          novedadesCounts[nov.empleado_id] = (novedadesCounts[nov.empleado_id] || 0) + 1;
+        });
+      }
 
       // Transform data to match expected format
       const period: PayrollHistoryPeriod = {
@@ -168,7 +285,7 @@ export class PayrollHistoryService {
         paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente'
       }));
 
-      console.log('Employees with base salary:', employees);
+      console.log('👥 Employees with updated totals:', employees);
 
       const summary = {
         totalDevengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),

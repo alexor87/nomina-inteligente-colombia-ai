@@ -1,6 +1,8 @@
+
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesService } from '@/services/NovedadesService';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
 
 export const useNovedades = (periodoId: string, onNovedadChange?: () => void) => {
@@ -71,14 +73,29 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
           ]
         }));
 
+        // 🔄 NEW: Recalculate payroll totals after creating novedad
+        if (!skipRecalculation) {
+          console.log('🔄 Recalculating payroll totals for employee:', novedadData.empleado_id);
+          try {
+            await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(
+              novedadData.empleado_id, 
+              periodoId
+            );
+            console.log('✅ Payroll totals recalculated successfully');
+          } catch (recalcError) {
+            console.error('⚠️ Error recalculating payroll totals:', recalcError);
+            // Don't throw here, the novedad was created successfully
+          }
+        }
+
         toast({
           title: "Novedad registrada",
-          description: "La novedad se ha registrado correctamente"
+          description: "La novedad se ha registrado y los totales se han actualizado correctamente"
         });
 
-        // Only trigger recalculation if not skipped
-        if (!skipRecalculation && onNovedadChange) {
-          console.log('🔄 Activando recalculación de nómina');
+        // Trigger the callback to refresh parent component data
+        if (onNovedadChange) {
+          console.log('🔄 Activando callback de recarga de datos del componente padre');
           onNovedadChange();
         }
 
@@ -115,14 +132,25 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
           )
         }));
 
+        // 🔄 NEW: Recalculate payroll totals after updating novedad
+        if (!skipRecalculation) {
+          console.log('🔄 Recalculating payroll totals after novedad update');
+          try {
+            await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(empleadoId, periodoId);
+            console.log('✅ Payroll totals recalculated after update');
+          } catch (recalcError) {
+            console.error('⚠️ Error recalculating payroll totals after update:', recalcError);
+          }
+        }
+
         toast({
           title: "Novedad actualizada",
-          description: "La novedad se ha actualizado correctamente"
+          description: "La novedad se ha actualizado y los totales se han recalculado correctamente"
         });
 
-        // Only trigger recalculation if not skipped
-        if (!skipRecalculation && onNovedadChange) {
-          console.log('Triggering payroll recalculation after novedad update');
+        // Trigger the callback to refresh parent component data
+        if (onNovedadChange) {
+          console.log('🔄 Triggering payroll recalculation after novedad update');
           onNovedadChange();
         }
       }
@@ -137,7 +165,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     } finally {
       setIsLoading(false);
     }
-  }, [toast, onNovedadChange]);
+  }, [toast, onNovedadChange, periodoId]);
 
   const deleteNovedad = useCallback(async (id: string, empleadoId: string, skipRecalculation = false) => {
     try {
@@ -152,14 +180,25 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
         [empleadoId]: (prev[empleadoId] || []).filter(novedad => novedad.id !== id)
       }));
 
+      // 🔄 NEW: Recalculate payroll totals after deleting novedad
+      if (!skipRecalculation) {
+        console.log('🔄 Recalculating payroll totals after novedad deletion');
+        try {
+          await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(empleadoId, periodoId);
+          console.log('✅ Payroll totals recalculated after deletion');
+        } catch (recalcError) {
+          console.error('⚠️ Error recalculating payroll totals after deletion:', recalcError);
+        }
+      }
+
       toast({
         title: "Novedad eliminada",
-        description: "La novedad se ha eliminado correctamente"
+        description: "La novedad se ha eliminado y los totales se han recalculado correctamente"
       });
 
-      // Only trigger recalculation if not skipped
-      if (!skipRecalculation && onNovedadChange) {
-        console.log('Triggering payroll recalculation after novedad deletion');
+      // Trigger the callback to refresh parent component data
+      if (onNovedadChange) {
+        console.log('🔄 Triggering payroll recalculation after novedad deletion');
         onNovedadChange();
       }
     } catch (error) {
@@ -173,7 +212,7 @@ export const useNovedades = (periodoId: string, onNovedadChange?: () => void) =>
     } finally {
       setIsLoading(false);
     }
-  }, [toast, onNovedadChange]);
+  }, [toast, onNovedadChange, periodoId]);
 
   const getEmployeeNovedadesCount = useCallback((empleadoId: string): number => {
     const count = novedades[empleadoId]?.length || 0;

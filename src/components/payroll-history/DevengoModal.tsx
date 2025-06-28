@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { NOVEDAD_CATEGORIES, calcularValorNovedad, NovedadType } from '@/types/novedades';
+import { NOVEDAD_CATEGORIES, calcularValorNovedad, NovedadType, CreateNovedadData } from '@/types/novedades';
+import { useNovedades } from '@/hooks/useNovedades';
 
 interface DevengoModalProps {
   isOpen: boolean;
@@ -43,7 +44,6 @@ export const DevengoModal = ({
   onNovedadCreated
 }: DevengoModalProps) => {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     tipoNovedad: '',
     subtipo: '',
@@ -56,6 +56,12 @@ export const DevengoModal = ({
   });
   const [calculatedValue, setCalculatedValue] = useState<number>(0);
   const [calculationDetail, setCalculationDetail] = useState<string>('');
+
+  // Use the real novedades hook with recalculation callback
+  const { createNovedad, isLoading } = useNovedades(periodId, () => {
+    console.log('Novedad created, triggering parent refresh');
+    // This callback will be called after the novedad is created
+  });
 
   console.log('DevengoModal render - isOpen:', isOpen, 'isLoading:', isLoading);
 
@@ -83,7 +89,6 @@ export const DevengoModal = ({
     });
     setCalculatedValue(0);
     setCalculationDetail('');
-    setIsLoading(false);
   };
 
   // Resetear el formulario cuando se abre el modal
@@ -139,28 +144,58 @@ export const DevengoModal = ({
       return;
     }
 
-    setIsLoading(true);
     try {
-      console.log('Submitting devengado form');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('🔄 Creating real novedad with data:', {
+        employeeId,
+        periodId,
+        tipoNovedad: formData.tipoNovedad,
+        valor
+      });
+
+      // Prepare the complete novedad data
+      const novedadData: CreateNovedadData = {
+        empleado_id: employeeId,
+        periodo_id: periodId,
+        tipo_novedad: formData.tipoNovedad as NovedadType,
+        subtipo: formData.subtipo || undefined,
+        fecha_inicio: formData.fechaInicio || undefined,
+        fecha_fin: formData.fechaFin || undefined,
+        dias: formData.dias ? parseInt(formData.dias) : undefined,
+        horas: formData.horas ? parseFloat(formData.horas) : undefined,
+        valor: valor,
+        observacion: formData.observacion || undefined,
+        // Include base_calculo if it was auto-calculated
+        base_calculo: calculatedValue > 0 ? {
+          salario_base: employeeSalary,
+          factor_calculo: calculatedValue / employeeSalary,
+          detalle_calculo: calculationDetail
+        } : undefined
+      };
+
+      console.log('📤 Complete novedad data:', novedadData);
+
+      // Create the novedad using the real service
+      await createNovedad(novedadData);
+      
+      console.log('✅ Novedad created successfully');
+
+      // Notify parent component about the creation
+      onNovedadCreated(employeeId, valor, 'devengado');
       
       toast({
-        title: "Devengado agregado",
-        description: `Se ha agregado ${formatCurrency(valor)} al empleado`
+        title: "Devengado agregado exitosamente",
+        description: `Se ha agregado ${formatCurrency(valor)} al empleado ${employeeName}`,
+        variant: "default"
       });
-      
-      // Notificar que se creó la novedad
-      onNovedadCreated(employeeId, valor, 'devengado');
       
       handleClose();
     } catch (error) {
-      console.error('Error creating devengado:', error);
+      console.error('❌ Error creating devengado:', error);
       toast({
-        title: "Error",
-        description: "No se pudo crear el devengado",
+        title: "Error al crear devengado",
+        description: error instanceof Error ? error.message : "No se pudo crear el devengado",
         variant: "destructive"
       });
-      setIsLoading(false);
     }
   };
 
