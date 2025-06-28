@@ -186,6 +186,7 @@ export const DevengoModal = ({
   };
 
   const selectedTipo = tiposDevengado.find(t => t.value === formData.tipoNovedad);
+  const isValueAutoCalculated = selectedTipo?.auto_calculo && calculatedValue > 0;
 
   return (
     <Dialog 
@@ -193,7 +194,7 @@ export const DevengoModal = ({
       onOpenChange={handleOpenChange}
     >
       <DialogContent 
-        className="sm:max-w-[500px] z-50"
+        className="sm:max-w-[600px] z-50 max-h-[90vh] overflow-y-auto"
         onInteractOutside={handleInteractOutside}
         onEscapeKeyDown={(e) => {
           if (isLoading) {
@@ -209,17 +210,18 @@ export const DevengoModal = ({
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Sección Principal: Tipo de Devengado */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="tipoNovedad">Tipo de Devengado *</Label>
+              <Label htmlFor="tipoNovedad" className="text-base font-medium">Tipo de Devengado *</Label>
               <Select
                 value={formData.tipoNovedad}
                 onValueChange={(value) => setFormData({ ...formData, tipoNovedad: value, subtipo: '', valor: '' })}
                 disabled={isLoading}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar tipo" />
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Seleccionar tipo de devengado" />
                 </SelectTrigger>
                 <SelectContent className="z-50">
                   {tiposDevengado.map((tipo) => (
@@ -231,6 +233,99 @@ export const DevengoModal = ({
               </Select>
             </div>
 
+            {selectedTipo?.subtipos && selectedTipo.subtipos.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="subtipo">Subtipo</Label>
+                <Select
+                  value={formData.subtipo}
+                  onValueChange={(value) => setFormData({ ...formData, subtipo: value })}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar subtipo" />
+                  </SelectTrigger>
+                  <SelectContent className="z-50">
+                    {selectedTipo.subtipos.map((subtipo) => (
+                      <SelectItem key={subtipo} value={subtipo}>
+                        {subtipo.charAt(0).toUpperCase() + subtipo.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* Sección Parámetros: Días y Horas */}
+          {(selectedTipo?.requiere_dias || selectedTipo?.requiere_horas) && (
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900">Parámetros de Cálculo</h4>
+              <div className="grid grid-cols-2 gap-4">
+                {selectedTipo.requiere_dias && (
+                  <div className="space-y-2">
+                    <Label htmlFor="dias">Días *</Label>
+                    <Input
+                      id="dias"
+                      type="number"
+                      placeholder="0"
+                      value={formData.dias}
+                      onChange={(e) => setFormData({ ...formData, dias: e.target.value })}
+                      min="0"
+                      disabled={isLoading}
+                    />
+                  </div>
+                )}
+
+                {selectedTipo.requiere_horas && (
+                  <div className="space-y-2">
+                    <Label htmlFor="horas">Horas *</Label>
+                    <Input
+                      id="horas"
+                      type="number"
+                      placeholder="0"
+                      value={formData.horas}
+                      onChange={(e) => setFormData({ ...formData, horas: e.target.value })}
+                      min="0"
+                      step="0.1"
+                      disabled={isLoading}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Sección Fechas */}
+          <div className="space-y-4">
+            <h4 className="font-medium text-gray-900">Período de Aplicación</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fechaInicio">Fecha Inicio</Label>
+                <Input
+                  id="fechaInicio"
+                  type="date"
+                  value={formData.fechaInicio}
+                  onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fechaFin">Fecha Fin</Label>
+                <Input
+                  id="fechaFin"
+                  type="date"
+                  value={formData.fechaFin}
+                  onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sección Valor */}
+          <div className="space-y-4">
+            <h4 className="font-medium text-gray-900">Valor del Devengado</h4>
             <div className="space-y-2">
               <Label htmlFor="valor">Valor *</Label>
               <Input
@@ -241,109 +336,26 @@ export const DevengoModal = ({
                 onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
                 min="0"
                 step="0.01"
-                disabled={isLoading || (selectedTipo?.auto_calculo && calculatedValue > 0)}
+                disabled={isLoading || isValueAutoCalculated}
+                className={isValueAutoCalculated ? 'bg-gray-100 cursor-not-allowed' : ''}
               />
-              {calculatedValue > 0 && (
-                <p className="text-xs text-green-600">
-                  Valor calculado: {formatCurrency(calculatedValue)}
-                </p>
+              {isValueAutoCalculated && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-800 font-medium">
+                    💡 Valor calculado automáticamente: {formatCurrency(calculatedValue)}
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">{calculationDetail}</p>
+                </div>
               )}
             </div>
           </div>
 
-          {selectedTipo?.subtipos && selectedTipo.subtipos.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="subtipo">Subtipo</Label>
-              <Select
-                value={formData.subtipo}
-                onValueChange={(value) => setFormData({ ...formData, subtipo: value })}
-                disabled={isLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar subtipo" />
-                </SelectTrigger>
-                <SelectContent className="z-50">
-                  {selectedTipo.subtipos.map((subtipo) => (
-                    <SelectItem key={subtipo} value={subtipo}>
-                      {subtipo.charAt(0).toUpperCase() + subtipo.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="fechaInicio">Fecha Inicio</Label>
-              <Input
-                id="fechaInicio"
-                type="date"
-                value={formData.fechaInicio}
-                onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fechaFin">Fecha Fin</Label>
-              <Input
-                id="fechaFin"
-                type="date"
-                value={formData.fechaFin}
-                onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          {(selectedTipo?.requiere_dias || selectedTipo?.requiere_horas) && (
-            <div className="grid grid-cols-2 gap-4">
-              {selectedTipo.requiere_dias && (
-                <div className="space-y-2">
-                  <Label htmlFor="dias">Días *</Label>
-                  <Input
-                    id="dias"
-                    type="number"
-                    placeholder="0"
-                    value={formData.dias}
-                    onChange={(e) => setFormData({ ...formData, dias: e.target.value })}
-                    min="0"
-                    disabled={isLoading}
-                  />
-                </div>
-              )}
-
-              {selectedTipo.requiere_horas && (
-                <div className="space-y-2">
-                  <Label htmlFor="horas">Horas *</Label>
-                  <Input
-                    id="horas"
-                    type="number"
-                    placeholder="0"
-                    value={formData.horas}
-                    onChange={(e) => setFormData({ ...formData, horas: e.target.value })}
-                    min="0"
-                    step="0.1"
-                    disabled={isLoading}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {calculationDetail && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <p className="text-sm text-green-800 font-medium">Cálculo automático:</p>
-              <p className="text-xs text-green-700 mt-1">{calculationDetail}</p>
-            </div>
-          )}
-
+          {/* Sección Observación */}
           <div className="space-y-2">
             <Label htmlFor="observacion">Observación</Label>
             <Textarea
               id="observacion"
-              placeholder="Descripción del devengado..."
+              placeholder="Descripción adicional del devengado..."
               value={formData.observacion}
               onChange={(e) => setFormData({ ...formData, observacion: e.target.value })}
               rows={3}

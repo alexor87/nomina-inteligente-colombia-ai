@@ -226,7 +226,7 @@ export const EditableEmployeeTable = ({
     }
 
     return (
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center justify-between">
         <span
           className={`font-mono text-sm ${
             isEditMode ? 'cursor-pointer hover:bg-gray-100 px-2 py-1 rounded' : ''
@@ -239,7 +239,25 @@ export const EditableEmployeeTable = ({
         >
           {formatCurrency(value)}
         </span>
-        {isSaving && <Loader2 className="h-3 w-3 animate-spin text-blue-600" />}
+        
+        {/* Botón + solo para devengados y en modo edición */}
+        {field === 'grossPay' && isEditMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 ml-2"
+            onClick={() => handleOpenDevengoModal(
+              employee.id, 
+              employee.name, 
+              employee.grossPay // Usar el valor actual como salario base aproximado
+            )}
+            title="Agregar devengado"
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        )}
+        
+        {isSaving && <Loader2 className="h-3 w-3 animate-spin text-blue-600 ml-2" />}
       </div>
     );
   };
@@ -263,32 +281,7 @@ export const EditableEmployeeTable = ({
             <TableRow>
               <TableHead>Empleado</TableHead>
               <TableHead>Cargo</TableHead>
-              <TableHead className="text-right">
-                <div className="flex items-center justify-end space-x-2">
-                  <span>Devengado</span>
-                  {isEditMode && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                      onClick={() => {
-                        // Usar el primer empleado como ejemplo, en un caso real podrías necesitar un selector
-                        if (employees.length > 0) {
-                          const firstEmployee = employees[0];
-                          handleOpenDevengoModal(
-                            firstEmployee.id, 
-                            firstEmployee.name, 
-                            1300000 // Salario base por defecto, deberías obtenerlo de los datos reales
-                          );
-                        }
-                      }}
-                      title="Agregar devengado"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              </TableHead>
+              <TableHead className="text-right">Devengado</TableHead>
               <TableHead className="text-right">Deducciones</TableHead>
               <TableHead className="text-right">Neto</TableHead>
               <TableHead className="text-center">Estado de Pago</TableHead>
