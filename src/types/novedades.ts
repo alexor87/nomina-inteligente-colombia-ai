@@ -258,7 +258,7 @@ export const calcularValorNovedad = (
               tipoDescripcion = 'Horas festivas diurnas (100% recargo)';
               break;
             case 'festivas_nocturnas':
-              tipoDescripción = 'Horas festivas nocturnas (150% recargo)';
+              tipoDescripcion = 'Horas festivas nocturnas (150% recargo)';
               break;
             default:
               tipoDescripcion = `Horas extra ${subtipo}`;
