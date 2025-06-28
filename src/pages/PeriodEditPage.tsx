@@ -7,6 +7,7 @@ import { VoucherExistsBanner } from '@/components/payroll-history/VoucherExistsB
 import { NovedadCountBadge } from '@/components/payroll-history/NovedadCountBadge';
 import { PeriodEmployeesTable } from '@/components/payroll-history/PeriodEmployeesTable';
 import { NovedadDrawer } from '@/components/payroll/novedades/NovedadDrawer';
+import { DevengoModal } from '@/components/payroll-history/DevengoModal';
 import { useNovedades } from '@/hooks/useNovedades';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +32,13 @@ interface PeriodData {
   payroll_ids: string[];
 }
 
+interface SelectedEmployeeData {
+  employeeId: string;
+  payrollId: string;
+  name: string;
+  salary: number;
+}
+
 export const PeriodEditPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
@@ -40,13 +48,14 @@ export const PeriodEditPage = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [hasVouchers, setHasVouchers] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SelectedEmployeeData | null>(null);
   const [editingNovedad, setEditingNovedad] = useState<PayrollNovedad | null>(null);
   const [showNovedadDrawer, setShowNovedadDrawer] = useState(false);
+  const [showDevengoModal, setShowDevengoModal] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
 
-  // Get the actual payroll ID for the selected employee
-  const actualPayrollId = employees.find(emp => emp.id === selectedEmployeeId)?.payroll_id || null;
+  // Use the payroll ID from selected employee data
+  const actualPayrollId = selectedEmployeeData?.payrollId || null;
 
   const {
     novedades,
@@ -270,19 +279,76 @@ export const PeriodEditPage = () => {
   };
 
   const handleAddNovedad = (employeeId: string) => {
-    setSelectedEmployeeId(employeeId);
+    // Find the employee and get their real payroll_id
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) {
+      toast({
+        title: "Error",
+        description: "No se pudo encontrar el empleado seleccionado",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('🔄 Adding novedad for employee:', {
+      employeeId,
+      payrollId: employee.payroll_id,
+      employeeName: `${employee.nombre} ${employee.apellido}`
+    });
+
+    // Set the selected employee data with the real payroll_id
+    setSelectedEmployeeData({
+      employeeId: employeeId,
+      payrollId: employee.payroll_id, // This is the real UUID
+      name: `${employee.nombre} ${employee.apellido}`,
+      salary: employee.salario_base
+    });
+
     setEditingNovedad(null);
-    setShowNovedadDrawer(true);
+    setShowDevengoModal(true);
   };
 
   const handleEditNovedad = (novedad: PayrollNovedad) => {
-    setSelectedEmployeeId(novedad.empleado_id);
+    // Find the employee and get their real payroll_id
+    const employee = employees.find(emp => emp.id === novedad.empleado_id);
+    if (!employee) {
+      toast({
+        title: "Error",
+        description: "No se pudo encontrar el empleado de la novedad",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedEmployeeData({
+      employeeId: novedad.empleado_id,
+      payrollId: employee.payroll_id,
+      name: `${employee.nombre} ${employee.apellido}`,
+      salary: employee.salario_base
+    });
+
     setEditingNovedad(novedad);
     setShowNovedadDrawer(true);
   };
 
+  const handleCreateNovedadFromModal = async (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => {
+    console.log('✅ Novedad created successfully from modal:', { employeeId, valor, tipo });
+    
+    // Close the modal
+    setShowDevengoModal(false);
+    setSelectedEmployeeData(null);
+    
+    // Reload period data to refresh totals
+    await loadPeriodData();
+    
+    toast({
+      title: "✅ Novedad agregada",
+      description: `Se ha agregado correctamente la novedad de ${tipo}`,
+    });
+  };
+
   const handleCreateNovedad = async (data: NovedadFormData) => {
-    if (!selectedEmployeeId || !actualPayrollId) {
+    if (!selectedEmployeeData) {
       toast({
         title: "Error",
         description: "No se pudo identificar el empleado o período seleccionado",
@@ -292,12 +358,12 @@ export const PeriodEditPage = () => {
     }
     
     try {
-      console.log('🔄 Creating novedad with real payroll ID:', actualPayrollId);
+      console.log('🔄 Creating novedad with real payroll ID:', selectedEmployeeData.payrollId);
       
       const completeData = {
         ...data,
-        empleado_id: selectedEmployeeId,
-        periodo_id: actualPayrollId // Use the real UUID
+        empleado_id: selectedEmployeeData.employeeId,
+        periodo_id: selectedEmployeeData.payrollId // Use the real UUID
       };
       
       await createNovedad(completeData);
@@ -308,7 +374,7 @@ export const PeriodEditPage = () => {
       });
       
       setShowNovedadDrawer(false);
-      setSelectedEmployeeId(null);
+      setSelectedEmployeeData(null);
     } catch (error) {
       console.error('Error creating novedad:', error);
       toast({
@@ -320,10 +386,10 @@ export const PeriodEditPage = () => {
   };
 
   const handleUpdateNovedad = async (id: string, data: NovedadFormData) => {
-    if (!selectedEmployeeId) return;
+    if (!selectedEmployeeData) return;
     
     try {
-      await updateNovedad(id, data, selectedEmployeeId);
+      await updateNovedad(id, data, selectedEmployeeData.employeeId);
       
       toast({
         title: "✅ Cambios guardados",
@@ -332,17 +398,17 @@ export const PeriodEditPage = () => {
       
       setShowNovedadDrawer(false);
       setEditingNovedad(null);
-      setSelectedEmployeeId(null);
+      setSelectedEmployeeData(null);
     } catch (error) {
       console.error('Error updating novedad:', error);
     }
   };
 
   const handleDeleteNovedad = async (id: string) => {
-    if (!selectedEmployeeId) return;
+    if (!selectedEmployeeData) return;
     
     try {
-      await deleteNovedad(id, selectedEmployeeId);
+      await deleteNovedad(id, selectedEmployeeData.employeeId);
       
       toast({
         title: "✅ Cambios guardados",
@@ -355,10 +421,6 @@ export const PeriodEditPage = () => {
 
   const getTotalNovedadesCount = () => {
     return employees.reduce((total, emp) => total + getEmployeeNovedadesCount(emp.id), 0);
-  };
-
-  const getSelectedEmployee = () => {
-    return employees.find(emp => emp.id === selectedEmployeeId);
   };
 
   if (isLoading) {
@@ -389,8 +451,6 @@ export const PeriodEditPage = () => {
       </div>
     );
   }
-
-  const selectedEmployee = getSelectedEmployee();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -468,22 +528,38 @@ export const PeriodEditPage = () => {
       </div>
 
       {/* Novedad Drawer */}
-      {showNovedadDrawer && selectedEmployee && actualPayrollId && (
+      {showNovedadDrawer && selectedEmployeeData && (
         <NovedadDrawer
           isOpen={showNovedadDrawer}
           onClose={() => {
             setShowNovedadDrawer(false);
-            setSelectedEmployeeId(null);
+            setSelectedEmployeeData(null);
             setEditingNovedad(null);
           }}
-          employeeName={`${selectedEmployee.nombre} ${selectedEmployee.apellido}`}
-          employeeId={selectedEmployee.id}
-          employeeSalary={selectedEmployee.salario_base}
-          novedades={novedades[selectedEmployee.id] || []}
+          employeeName={selectedEmployeeData.name}
+          employeeId={selectedEmployeeData.employeeId}
+          employeeSalary={selectedEmployeeData.salary}
+          novedades={novedades[selectedEmployeeData.employeeId] || []}
           onCreateNovedad={handleCreateNovedad}
           onUpdateNovedad={handleUpdateNovedad}
           onDeleteNovedad={handleDeleteNovedad}
           canEdit={canEdit}
+        />
+      )}
+
+      {/* Devengo Modal */}
+      {showDevengoModal && selectedEmployeeData && (
+        <DevengoModal
+          isOpen={showDevengoModal}
+          onClose={() => {
+            setShowDevengoModal(false);
+            setSelectedEmployeeData(null);
+          }}
+          employeeId={selectedEmployeeData.employeeId}
+          employeeName={selectedEmployeeData.name}
+          employeeSalary={selectedEmployeeData.salary}
+          periodId={selectedEmployeeData.payrollId} // Pass the real payroll UUID here
+          onNovedadCreated={handleCreateNovedadFromModal}
         />
       )}
     </div>
