@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,11 +51,13 @@ export const EditableEmployeeTable = ({
     employeeId: string;
     employeeName: string;
     employeeSalary: number;
+    payrollId: string; // Changed from periodId to payrollId
   }>({
     isOpen: false,
     employeeId: '',
     employeeName: '',
-    employeeSalary: 0
+    employeeSalary: 0,
+    payrollId: '' // Initialize with empty string
   });
 
   console.log('EditableEmployeeTable render - devengado modal state:', devengoModal);
@@ -138,12 +141,17 @@ export const EditableEmployeeTable = ({
       });
       return;
     }
+
+    // For this component, we'll use the periodId as payrollId 
+    // Note: This might need to be updated if this component needs real payroll UUIDs
+    const payrollId = periodId;
     
     setDevengoModal({
       isOpen: true,
       employeeId,
       employeeName,
-      employeeSalary: employeeBaseSalary // Ahora usa el salario base real
+      employeeSalary: employeeBaseSalary,
+      payrollId // Use the periodId as payrollId for now
     });
   };
 
@@ -153,7 +161,8 @@ export const EditableEmployeeTable = ({
       isOpen: false,
       employeeId: '',
       employeeName: '',
-      employeeSalary: 0
+      employeeSalary: 0,
+      payrollId: ''
     });
   }, []);
 
@@ -328,7 +337,7 @@ export const EditableEmployeeTable = ({
         employeeId={devengoModal.employeeId}
         employeeName={devengoModal.employeeName}
         employeeSalary={devengoModal.employeeSalary}
-        periodId={periodId}
+        payrollId={devengoModal.payrollId} // Changed from periodId to payrollId
         onNovedadCreated={handleNovedadCreated}
       />
     </>
