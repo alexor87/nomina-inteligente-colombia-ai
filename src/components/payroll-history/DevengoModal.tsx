@@ -62,14 +62,23 @@ export const DevengoModal = ({
     return uuidRegex.test(uuid);
   };
 
-  // Use the real novedades hook with the payroll UUID
+  // Use the novedades hook internally with the real payroll UUID
   const { createNovedad, isLoading } = useNovedades(periodId, () => {
-    console.log('Novedad created, triggering parent refresh');
+    console.log('✅ Novedad created successfully, triggering parent refresh');
+    // Call the parent callback to refresh data
+    if (formData.valor) {
+      const valor = parseFloat(formData.valor);
+      onNovedadCreated(employeeId, valor, 'devengado');
+    }
   });
 
-  console.log('DevengoModal render - periodId:', periodId, 'isValidUUID:', isValidUUID(periodId));
+  console.log('🔧 DevengoModal initialized with:', {
+    periodId,
+    isValidUUID: isValidUUID(periodId),
+    employeeId,
+    employeeName
+  });
 
-  // Obtener solo los tipos de devengados
   const tiposDevengado = Object.entries(NOVEDAD_CATEGORIES.devengados.types).map(([key, config]) => ({
     value: key as NovedadType,
     label: config.label,
@@ -80,7 +89,7 @@ export const DevengoModal = ({
   }));
 
   const resetForm = () => {
-    console.log('Resetting devengado form data');
+    console.log('🔄 Resetting devengado form data');
     setFormData({
       tipoNovedad: '',
       subtipo: '',
@@ -95,15 +104,15 @@ export const DevengoModal = ({
     setCalculationDetail('');
   };
 
-  // Resetear el formulario cuando se abre el modal
+  // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      console.log('Modal opened, resetting form');
+      console.log('📖 Modal opened, resetting form');
       resetForm();
     }
   }, [isOpen]);
 
-  // Calcular valor automáticamente cuando cambian los datos relevantes
+  // Auto-calculate value when relevant data changes
   useEffect(() => {
     if (formData.tipoNovedad && employeeSalary > 0) {
       const tipoConfig = tiposDevengado.find(t => t.value === formData.tipoNovedad);
@@ -145,7 +154,7 @@ export const DevengoModal = ({
         description: `ID del período inválido. Se esperaba un UUID válido, se recibió: ${periodId}`,
         variant: "destructive"
       });
-      console.error('Invalid periodId for novedad creation:', periodId);
+      console.error('❌ Invalid periodId for novedad creation:', periodId);
       return;
     }
 
@@ -160,10 +169,10 @@ export const DevengoModal = ({
     }
 
     try {
-      console.log('🔄 Creating novedad with validated payroll UUID:', {
-        employeeId,
-        periodId,
-        tipoNovedad: formData.tipoNovedad,
+      console.log('🚀 Creating novedad with validated data:', {
+        empleado_id: employeeId,
+        periodo_id: periodId,
+        tipo_novedad: formData.tipoNovedad,
         valor,
         isValidUUID: isValidUUID(periodId)
       });
@@ -188,18 +197,15 @@ export const DevengoModal = ({
         } : undefined
       };
 
-      console.log('📤 Complete validated novedad data:', novedadData);
+      console.log('📤 Sending validated novedad data:', novedadData);
 
-      // Create the novedad using the real service
+      // Create the novedad using the hook (which has the callback)
       await createNovedad(novedadData);
       
-      console.log('✅ Novedad created successfully');
+      console.log('✅ Novedad created successfully through hook');
 
-      // Notify parent component about the creation
-      onNovedadCreated(employeeId, valor, 'devengado');
-      
       toast({
-        title: "Devengado agregado exitosamente",
+        title: "✅ Devengado agregado exitosamente",
         description: `Se ha agregado ${formatCurrency(valor)} al empleado ${employeeName}`,
         variant: "default"
       });
@@ -216,7 +222,7 @@ export const DevengoModal = ({
   };
 
   const handleClose = () => {
-    console.log('Closing modal - handleClose called');
+    console.log('🚪 Closing modal');
     if (!isLoading) {
       resetForm();
       onClose();
@@ -224,7 +230,7 @@ export const DevengoModal = ({
   };
 
   const handleOpenChange = (open: boolean) => {
-    console.log('Modal open change requested:', open, 'current isLoading:', isLoading);
+    console.log('🔄 Modal open change requested:', open, 'current isLoading:', isLoading);
     if (!open && !isLoading) {
       handleClose();
     }
@@ -239,7 +245,7 @@ export const DevengoModal = ({
   const selectedTipo = tiposDevengado.find(t => t.value === formData.tipoNovedad);
   const isValueAutoCalculated = selectedTipo?.auto_calculo && calculatedValue > 0;
 
-  // Función para formatear los nombres de subtipos
+  // Function to format subtipo labels
   const formatSubtipoLabel = (subtipo: string) => {
     const labels: Record<string, string> = {
       'diurnas': 'Diurnas (25% recargo)',
@@ -274,14 +280,14 @@ export const DevengoModal = ({
             {/* Debug info - remove in production */}
             {process.env.NODE_ENV === 'development' && (
               <div className="text-xs text-gray-500 mt-1">
-                Payroll ID: {periodId} | Valid UUID: {isValidUUID(periodId) ? '✓' : '✗'}
+                Payroll ID: {periodId} | Valid UUID: {isValidUUID(periodId) ? '✅' : '❌'}
               </div>
             )}
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Sección Principal: Tipo de Devengado */}
+          {/* Main Section: Devengado Type */}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="tipoNovedad" className="text-base font-medium">Tipo de Devengado *</Label>
@@ -326,7 +332,7 @@ export const DevengoModal = ({
             )}
           </div>
 
-          {/* Sección Parámetros: Días y Horas */}
+          {/* Parameters Section: Days and Hours */}
           {(selectedTipo?.requiere_dias || selectedTipo?.requiere_horas) && (
             <div className="space-y-4">
               <h4 className="font-medium text-gray-900">Parámetros de Cálculo</h4>
@@ -369,7 +375,7 @@ export const DevengoModal = ({
             </div>
           )}
 
-          {/* Sección Fechas - Solo para tipos que las requieran */}
+          {/* Dates Section - Only for types that require them */}
           {(formData.tipoNovedad === 'incapacidad' || formData.tipoNovedad === 'vacaciones' || formData.tipoNovedad === 'licencia_remunerada') && (
             <div className="space-y-4">
               <h4 className="font-medium text-gray-900">Período de Aplicación</h4>
@@ -399,7 +405,7 @@ export const DevengoModal = ({
             </div>
           )}
 
-          {/* Sección Valor */}
+          {/* Value Section */}
           <div className="space-y-4">
             <h4 className="font-medium text-gray-900">Valor del Devengado</h4>
             <div className="space-y-2">
@@ -426,7 +432,7 @@ export const DevengoModal = ({
             </div>
           </div>
 
-          {/* Sección Observación */}
+          {/* Observation Section */}
           <div className="space-y-2">
             <Label htmlFor="observacion">Observación</Label>
             <Textarea

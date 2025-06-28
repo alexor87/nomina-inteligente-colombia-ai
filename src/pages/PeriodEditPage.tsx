@@ -8,7 +8,6 @@ import { NovedadCountBadge } from '@/components/payroll-history/NovedadCountBadg
 import { PeriodEmployeesTable } from '@/components/payroll-history/PeriodEmployeesTable';
 import { NovedadDrawer } from '@/components/payroll/novedades/NovedadDrawer';
 import { DevengoModal } from '@/components/payroll-history/DevengoModal';
-import { useNovedades } from '@/hooks/useNovedades';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, NovedadFormData } from '@/types/novedades';
@@ -53,21 +52,7 @@ export const PeriodEditPage = () => {
   const [showNovedadDrawer, setShowNovedadDrawer] = useState(false);
   const [showDevengoModal, setShowDevengoModal] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
-
-  // Use the payroll ID from selected employee data
-  const actualPayrollId = selectedEmployeeData?.payrollId || null;
-
-  const {
-    novedades,
-    createNovedad,
-    updateNovedad,
-    deleteNovedad,
-    loadNovedadesForEmployee,
-    getEmployeeNovedadesCount
-  } = useNovedades(actualPayrollId || '', () => {
-    // Trigger recalculation when novedades change
-    loadPeriodData();
-  });
+  const [novedadesCounts, setNovedadesCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (periodId) {
@@ -128,6 +113,25 @@ export const PeriodEditPage = () => {
     } catch (error) {
       console.error('Error getting company ID:', error);
       return null;
+    }
+  };
+
+  const loadNovedadesCounts = async (employeeIds: string[], companyId: string) => {
+    try {
+      const { data: novedadesData } = await supabase
+        .from('payroll_novedades')
+        .select('empleado_id')
+        .eq('company_id', companyId)
+        .in('empleado_id', employeeIds);
+
+      const counts: Record<string, number> = {};
+      (novedadesData || []).forEach(nov => {
+        counts[nov.empleado_id] = (counts[nov.empleado_id] || 0) + 1;
+      });
+
+      setNovedadesCounts(counts);
+    } catch (error) {
+      console.error('Error loading novedades counts:', error);
     }
   };
 
@@ -247,13 +251,8 @@ export const PeriodEditPage = () => {
       setEmployees(formattedEmployees);
       console.log('👥 Employees with real payroll IDs:', formattedEmployees);
 
-      // Load novedades for each employee using their real payroll IDs
-      formattedEmployees.forEach(emp => {
-        if (emp.payroll_id) {
-          console.log('📋 Loading novedades for employee:', emp.id, 'payroll ID:', emp.payroll_id);
-          loadNovedadesForEmployee(emp.id);
-        }
-      });
+      // Load novedades counts for employees
+      await loadNovedadesCounts(formattedEmployees.map(emp => emp.id), companyId);
 
       // Check for existing vouchers
       const { data: vouchersData } = await supabase
@@ -279,7 +278,6 @@ export const PeriodEditPage = () => {
   };
 
   const handleAddNovedad = (employeeId: string) => {
-    // Find the employee and get their real payroll_id
     const employee = employees.find(emp => emp.id === employeeId);
     if (!employee) {
       toast({
@@ -296,10 +294,9 @@ export const PeriodEditPage = () => {
       employeeName: `${employee.nombre} ${employee.apellido}`
     });
 
-    // Set the selected employee data with the real payroll_id
     setSelectedEmployeeData({
       employeeId: employeeId,
-      payrollId: employee.payroll_id, // This is the real UUID
+      payrollId: employee.payroll_id,
       name: `${employee.nombre} ${employee.apellido}`,
       salary: employee.salario_base
     });
@@ -309,7 +306,6 @@ export const PeriodEditPage = () => {
   };
 
   const handleEditNovedad = (novedad: PayrollNovedad) => {
-    // Find the employee and get their real payroll_id
     const employee = employees.find(emp => emp.id === novedad.empleado_id);
     if (!employee) {
       toast({
@@ -338,7 +334,7 @@ export const PeriodEditPage = () => {
     setShowDevengoModal(false);
     setSelectedEmployeeData(null);
     
-    // Reload period data to refresh totals
+    // Reload period data to refresh totals and counts
     await loadPeriodData();
     
     toast({
@@ -347,80 +343,12 @@ export const PeriodEditPage = () => {
     });
   };
 
-  const handleCreateNovedad = async (data: NovedadFormData) => {
-    if (!selectedEmployeeData) {
-      toast({
-        title: "Error",
-        description: "No se pudo identificar el empleado o período seleccionado",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      console.log('🔄 Creating novedad with real payroll ID:', selectedEmployeeData.payrollId);
-      
-      const completeData = {
-        ...data,
-        empleado_id: selectedEmployeeData.employeeId,
-        periodo_id: selectedEmployeeData.payrollId // Use the real UUID
-      };
-      
-      await createNovedad(completeData);
-      
-      toast({
-        title: "✅ Cambios guardados",
-        description: "La novedad se ha registrado correctamente"
-      });
-      
-      setShowNovedadDrawer(false);
-      setSelectedEmployeeData(null);
-    } catch (error) {
-      console.error('Error creating novedad:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear la novedad",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleUpdateNovedad = async (id: string, data: NovedadFormData) => {
-    if (!selectedEmployeeData) return;
-    
-    try {
-      await updateNovedad(id, data, selectedEmployeeData.employeeId);
-      
-      toast({
-        title: "✅ Cambios guardados",
-        description: "La novedad se ha actualizado correctamente"
-      });
-      
-      setShowNovedadDrawer(false);
-      setEditingNovedad(null);
-      setSelectedEmployeeData(null);
-    } catch (error) {
-      console.error('Error updating novedad:', error);
-    }
-  };
-
-  const handleDeleteNovedad = async (id: string) => {
-    if (!selectedEmployeeData) return;
-    
-    try {
-      await deleteNovedad(id, selectedEmployeeData.employeeId);
-      
-      toast({
-        title: "✅ Cambios guardados",
-        description: "La novedad se ha eliminado correctamente"
-      });
-    } catch (error) {
-      console.error('Error deleting novedad:', error);
-    }
-  };
-
   const getTotalNovedadesCount = () => {
-    return employees.reduce((total, emp) => total + getEmployeeNovedadesCount(emp.id), 0);
+    return Object.values(novedadesCounts).reduce((total, count) => total + count, 0);
+  };
+
+  const getEmployeeNovedadesCount = (employeeId: string): number => {
+    return novedadesCounts[employeeId] || 0;
   };
 
   if (isLoading) {
@@ -507,10 +435,11 @@ export const PeriodEditPage = () => {
           <CardContent className="p-0">
             <PeriodEmployeesTable
               employees={employees}
-              novedades={novedades}
+              novedades={{}} // Empty since we're not using the hook here anymore
               onAddNovedad={handleAddNovedad}
               onEditNovedad={handleEditNovedad}
               canEdit={canEdit}
+              getEmployeeNovedadesCount={getEmployeeNovedadesCount}
             />
           </CardContent>
         </Card>
@@ -539,10 +468,10 @@ export const PeriodEditPage = () => {
           employeeName={selectedEmployeeData.name}
           employeeId={selectedEmployeeData.employeeId}
           employeeSalary={selectedEmployeeData.salary}
-          novedades={novedades[selectedEmployeeData.employeeId] || []}
-          onCreateNovedad={handleCreateNovedad}
-          onUpdateNovedad={handleUpdateNovedad}
-          onDeleteNovedad={handleDeleteNovedad}
+          novedades={[]} // Empty since we're managing this differently now
+          onCreateNovedad={async () => {}} // Will be handled by the drawer internally
+          onUpdateNovedad={async () => {}} // Will be handled by the drawer internally
+          onDeleteNovedad={async () => {}} // Will be handled by the drawer internally
           canEdit={canEdit}
         />
       )}

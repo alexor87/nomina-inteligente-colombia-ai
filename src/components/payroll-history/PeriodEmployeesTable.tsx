@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit2, Plus } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 import { PayrollNovedad } from '@/types/novedades';
 
 interface Employee {
@@ -12,6 +12,7 @@ interface Employee {
   apellido: string;
   salario_base: number;
   neto_pagado: number;
+  payroll_id: string;
 }
 
 interface PeriodEmployeesTableProps {
@@ -20,6 +21,7 @@ interface PeriodEmployeesTableProps {
   onAddNovedad: (employeeId: string) => void;
   onEditNovedad: (novedad: PayrollNovedad) => void;
   canEdit: boolean;
+  getEmployeeNovedadesCount?: (employeeId: string) => number;
 }
 
 export const PeriodEmployeesTable = ({
@@ -27,118 +29,108 @@ export const PeriodEmployeesTable = ({
   novedades,
   onAddNovedad,
   onEditNovedad,
-  canEdit
+  canEdit,
+  getEmployeeNovedadesCount
 }: PeriodEmployeesTableProps) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(amount);
+  
+  const getNovedadesCount = (employeeId: string): number => {
+    if (getEmployeeNovedadesCount) {
+      return getEmployeeNovedadesCount(employeeId);
+    }
+    return novedades[employeeId]?.length || 0;
   };
 
-  const getEmployeeNovedades = (employeeId: string) => {
+  const getEmployeeNovedades = (employeeId: string): PayrollNovedad[] => {
     return novedades[employeeId] || [];
   };
 
-  const getTotalNovedadesImpact = (employeeId: string) => {
-    const employeeNovedades = getEmployeeNovedades(employeeId);
-    return employeeNovedades.reduce((total, novedad) => {
-      // Determine if it's a deduction or earning based on type
-      const isDeduction = ['descuento_salud', 'descuento_pension', 'retencion_fuente', 'prestamo'].includes(novedad.tipo_novedad);
-      return total + (isDeduction ? -novedad.valor : novedad.valor);
-    }, 0);
-  };
-
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50">
-              <TableHead className="font-semibold min-w-[200px]">Empleado</TableHead>
-              <TableHead className="font-semibold min-w-[120px]">Salario Base</TableHead>
-              <TableHead className="font-semibold min-w-[150px]">Novedades</TableHead>
-              <TableHead className="font-semibold min-w-[120px]">Total Neto</TableHead>
-              {canEdit && <TableHead className="font-semibold text-center min-w-[120px]">Acciones</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {employees.map((employee) => {
-              const employeeNovedades = getEmployeeNovedades(employee.id);
-              const novedadesImpact = getTotalNovedadesImpact(employee.id);
-              const adjustedTotal = employee.neto_pagado + novedadesImpact;
-
-              return (
-                <TableRow key={employee.id} className="hover:bg-gray-50">
-                  <TableCell className="min-w-[200px]">
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {employee.nombre} {employee.apellido}
-                      </div>
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b bg-gray-50">
+            <th className="text-left p-4 font-medium text-gray-900">Empleado</th>
+            <th className="text-right p-4 font-medium text-gray-900">Salario Base</th>
+            <th className="text-right p-4 font-medium text-gray-900">Neto Pagado</th>
+            <th className="text-center p-4 font-medium text-gray-900">Novedades</th>
+            {canEdit && (
+              <th className="text-center p-4 font-medium text-gray-900">Acciones</th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {employees.map((employee) => {
+            const novedadesCount = getNovedadesCount(employee.id);
+            const employeeNovedades = getEmployeeNovedades(employee.id);
+            
+            return (
+              <tr key={employee.id} className="border-b hover:bg-gray-50">
+                <td className="p-4">
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      {employee.nombre} {employee.apellido}
                     </div>
-                  </TableCell>
-                  <TableCell className="min-w-[120px]">
-                    <span className="font-medium text-green-600">
-                      {formatCurrency(employee.salario_base)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="min-w-[150px]">
-                    <div className="flex flex-wrap gap-1">
-                      {employeeNovedades.length > 0 ? (
-                        employeeNovedades.map((novedad) => (
-                          <div key={novedad.id} className="flex items-center space-x-1">
-                            <Badge 
-                              variant="outline" 
-                              className="text-xs cursor-pointer hover:bg-gray-100"
-                              onClick={() => canEdit && onEditNovedad(novedad)}
-                            >
-                              {novedad.tipo_novedad}
-                              {canEdit && <Edit2 className="h-3 w-3 ml-1" />}
-                            </Badge>
-                          </div>
-                        ))
-                      ) : (
-                        <span className="text-gray-400 text-sm">Sin novedades</span>
-                      )}
-                      {canEdit && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onAddNovedad(employee.id)}
-                          className="h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Agregar
-                        </Button>
-                      )}
+                    <div className="text-sm text-gray-500">
+                      ID: {employee.id.slice(0, 8)}...
                     </div>
-                  </TableCell>
-                  <TableCell className="min-w-[120px]">
-                    <span className={`font-medium ${adjustedTotal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      {formatCurrency(adjustedTotal)}
-                    </span>
-                  </TableCell>
-                  {canEdit && (
-                    <TableCell className="min-w-[120px]">
-                      <div className="flex items-center justify-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onAddNovedad(employee.id)}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                  </div>
+                </td>
+                <td className="p-4 text-right">
+                  <span className="font-medium text-gray-900">
+                    {formatCurrency(employee.salario_base)}
+                  </span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className="font-medium text-green-600">
+                    {formatCurrency(employee.neto_pagado)}
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <div className="flex items-center justify-center space-x-2">
+                    <Badge variant={novedadesCount > 0 ? "default" : "outline"}>
+                      {novedadesCount} {novedadesCount === 1 ? 'novedad' : 'novedades'}
+                    </Badge>
+                    {employeeNovedades.length > 0 && canEdit && (
+                      <div className="flex flex-wrap gap-1">
+                        {employeeNovedades.slice(0, 3).map((novedad) => (
+                          <Button
+                            key={novedad.id}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEditNovedad(novedad)}
+                            className="text-xs p-1 h-6"
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            {novedad.tipo_novedad}
+                          </Button>
+                        ))}
+                        {employeeNovedades.length > 3 && (
+                          <span className="text-xs text-gray-500">
+                            +{employeeNovedades.length - 3} más
+                          </span>
+                        )}
                       </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+                    )}
+                  </div>
+                </td>
+                {canEdit && (
+                  <td className="p-4 text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onAddNovedad(employee.id)}
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Agregar
+                    </Button>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 };
