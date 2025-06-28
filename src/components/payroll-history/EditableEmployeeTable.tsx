@@ -141,7 +141,6 @@ export const EditableEmployeeTable = ({
       return;
     }
 
-    // Find the employee to get their real payrollId
     const employee = employees.find(emp => emp.id === employeeId);
     if (!employee || !employee.payrollId) {
       toast({
@@ -152,7 +151,6 @@ export const EditableEmployeeTable = ({
       return;
     }
 
-    // Validate that payrollId is a proper UUID
     const isValidUUID = (uuid: string): boolean => {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       return uuidRegex.test(uuid);
@@ -167,7 +165,6 @@ export const EditableEmployeeTable = ({
       return;
     }
 
-    // Validate that periodId is also a proper UUID
     if (!isValidUUID(periodId)) {
       toast({
         title: "Error",
@@ -185,7 +182,7 @@ export const EditableEmployeeTable = ({
       employeeId,
       employeeName,
       employeeSalary: employeeBaseSalary,
-      payrollId: employee.payrollId // Real payroll UUID
+      payrollId: employee.payrollId
     });
   };
 
@@ -200,39 +197,35 @@ export const EditableEmployeeTable = ({
     });
   }, []);
 
-  const handleNovedadCreated = useCallback((employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => {
-    console.log('Novedad created:', { employeeId, valor, tipo });
+  const handleNovedadCreated = useCallback(async (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => {
+    console.log('🔄 Novedad created callback triggered:', { employeeId, valor, tipo });
     
-    // Actualizar valores automáticamente
-    const employee = employees.find(emp => emp.id === employeeId);
-    if (!employee) return;
+    try {
+      // Force a recalculation and refresh of the employee data
+      console.log('🔄 Triggering employee totals recalculation');
+      await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(employeeId, periodId);
+      
+      // Notify parent component to refresh the data
+      if (onNovedadChange) {
+        console.log('🔄 Calling parent refresh callback');
+        onNovedadChange();
+      }
 
-    let updates: Partial<PayrollHistoryEmployee> = {};
-    
-    if (tipo === 'devengado') {
-      updates.grossPay = employee.grossPay + valor;
-    } else if (tipo === 'deduccion') {
-      updates.deductions = employee.deductions + valor;
+      toast({
+        title: "Totales actualizados",
+        description: "Los valores del empleado se han actualizado automáticamente",
+        duration: 2000
+      });
+
+    } catch (error) {
+      console.error('❌ Error in novedad created callback:', error);
+      toast({
+        title: "Error al actualizar totales",
+        description: "La novedad se creó pero no se pudieron actualizar los totales automáticamente",
+        variant: "destructive"
+      });
     }
-    
-    // Recalcular neto
-    const newGrossPay = updates.grossPay || employee.grossPay;
-    const newDeductions = updates.deductions || employee.deductions;
-    updates.netPay = newGrossPay - newDeductions;
-
-    onEmployeeUpdate(employeeId, updates);
-    
-    // Notificar cambio para recálculo de totales
-    if (onNovedadChange) {
-      onNovedadChange();
-    }
-
-    toast({
-      title: "Novedad aplicada",
-      description: `Se ha ${tipo === 'devengado' ? 'sumado' : 'descontado'} ${formatCurrency(valor)} automáticamente`,
-      duration: 3000
-    });
-  }, [employees, onEmployeeUpdate, onNovedadChange, toast]);
+  }, [periodId, onNovedadChange, toast]);
 
   const renderEditableCell = (
     employee: PayrollHistoryEmployee, 
@@ -371,8 +364,8 @@ export const EditableEmployeeTable = ({
         employeeId={devengoModal.employeeId}
         employeeName={devengoModal.employeeName}
         employeeSalary={devengoModal.employeeSalary}
-        payrollId={devengoModal.payrollId} // Real payroll UUID
-        periodId={periodId} // Real period UUID for novedades
+        payrollId={devengoModal.payrollId}
+        periodId={periodId}
         onNovedadCreated={handleNovedadCreated}
       />
     </>
