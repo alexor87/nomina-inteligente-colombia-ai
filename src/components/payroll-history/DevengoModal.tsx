@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { NovedadesService } from '@/services/NovedadesService';
 import { formatCurrency } from '@/lib/utils';
 import { Calculator, Plus, X } from 'lucide-react';
+import { NovedadType } from '@/types/novedades';
 
 interface DevengoModalProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ interface DevengoModalProps {
 }
 
 interface DevengoFormData {
-  tipo_novedad: string;
+  tipo_novedad: NovedadType;
   valor: number;
   horas: number;
   observacion: string;
@@ -42,7 +43,7 @@ export const DevengoModal = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<DevengoFormData>({
-    tipo_novedad: '',
+    tipo_novedad: 'horas_extra',
     valor: 0,
     horas: 0,
     observacion: ''
@@ -57,11 +58,11 @@ export const DevengoModal = ({
   });
 
   const tiposDevengado = [
-    { value: 'horas_extra', label: 'Horas Extra', requiresHours: true },
-    { value: 'recargo_nocturno', label: 'Recargo Nocturno', requiresHours: true },
-    { value: 'bonificacion', label: 'Bonificación', requiresHours: false },
-    { value: 'comision', label: 'Comisión', requiresHours: false },
-    { value: 'otros_ingresos', label: 'Otros Ingresos', requiresHours: false }
+    { value: 'horas_extra' as NovedadType, label: 'Horas Extra', requiresHours: true },
+    { value: 'recargo_nocturno' as NovedadType, label: 'Recargo Nocturno', requiresHours: true },
+    { value: 'bonificacion' as NovedadType, label: 'Bonificación', requiresHours: false },
+    { value: 'comision' as NovedadType, label: 'Comisión', requiresHours: false },
+    { value: 'otros_ingresos' as NovedadType, label: 'Otros Ingresos', requiresHours: false }
   ];
 
   const selectedTipo = tiposDevengado.find(tipo => tipo.value === formData.tipo_novedad);
@@ -158,7 +159,7 @@ export const DevengoModal = ({
 
         // Reset form and close
         setFormData({
-          tipo_novedad: '',
+          tipo_novedad: 'horas_extra',
           valor: 0,
           horas: 0,
           observacion: ''
@@ -181,7 +182,7 @@ export const DevengoModal = ({
 
   const handleClose = () => {
     setFormData({
-      tipo_novedad: '',
+      tipo_novedad: 'horas_extra',
       valor: 0,
       horas: 0,
       observacion: ''
@@ -211,7 +212,7 @@ export const DevengoModal = ({
             <Label htmlFor="tipo">Tipo de Devengado</Label>
             <Select 
               value={formData.tipo_novedad} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, tipo_novedad: value }))}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, tipo_novedad: value as NovedadType }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccione el tipo" />

@@ -58,6 +58,7 @@ export class NovedadesService {
         observacion: novedadData.observacion,
         fecha_inicio: novedadData.fecha_inicio,
         fecha_fin: novedadData.fecha_fin,
+        base_calculo: novedadData.base_calculo ? JSON.stringify(novedadData.base_calculo) : undefined,
         creado_por: user.id
       };
 
@@ -68,6 +69,7 @@ export class NovedadesService {
         .insert(insertData)
         .select(`
           id,
+          company_id,
           empleado_id,
           periodo_real_id,
           tipo_novedad,
@@ -77,6 +79,7 @@ export class NovedadesService {
           observacion,
           fecha_inicio,
           fecha_fin,
+          base_calculo,
           created_at,
           updated_at
         `)
@@ -91,6 +94,7 @@ export class NovedadesService {
       
       return {
         id: data.id,
+        company_id: data.company_id,
         empleado_id: data.empleado_id,
         periodo_id: data.periodo_real_id, // Map back to the expected field name
         tipo_novedad: data.tipo_novedad,
@@ -100,6 +104,7 @@ export class NovedadesService {
         observacion: data.observacion || '',
         fecha_inicio: data.fecha_inicio || '',
         fecha_fin: data.fecha_fin || '',
+        base_calculo: data.base_calculo ? JSON.parse(data.base_calculo) : undefined,
         created_at: data.created_at,
         updated_at: data.updated_at
       };
@@ -120,6 +125,7 @@ export class NovedadesService {
         .from('payroll_novedades')
         .select(`
           id,
+          company_id,
           empleado_id,
           periodo_real_id,
           tipo_novedad,
@@ -129,6 +135,7 @@ export class NovedadesService {
           observacion,
           fecha_inicio,
           fecha_fin,
+          base_calculo,
           created_at,
           updated_at
         `)
@@ -146,6 +153,7 @@ export class NovedadesService {
 
       return (data || []).map(novedad => ({
         id: novedad.id,
+        company_id: novedad.company_id,
         empleado_id: novedad.empleado_id,
         periodo_id: novedad.periodo_real_id, // Map back to expected field name
         tipo_novedad: novedad.tipo_novedad,
@@ -155,6 +163,7 @@ export class NovedadesService {
         observacion: novedad.observacion || '',
         fecha_inicio: novedad.fecha_inicio || '',
         fecha_fin: novedad.fecha_fin || '',
+        base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
         created_at: novedad.created_at,
         updated_at: novedad.updated_at
       }));
@@ -171,13 +180,20 @@ export class NovedadesService {
 
       console.log('📝 Updating novedad:', id, 'with updates:', updates);
 
+      // Transform updates to match database schema
+      const dbUpdates: any = { ...updates };
+      if (updates.base_calculo) {
+        dbUpdates.base_calculo = JSON.stringify(updates.base_calculo);
+      }
+
       const { data, error } = await supabase
         .from('payroll_novedades')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .eq('company_id', companyId)
         .select(`
           id,
+          company_id,
           empleado_id,
           periodo_real_id,
           tipo_novedad,
@@ -187,6 +203,7 @@ export class NovedadesService {
           observacion,
           fecha_inicio,
           fecha_fin,
+          base_calculo,
           created_at,
           updated_at
         `)
@@ -201,6 +218,7 @@ export class NovedadesService {
 
       return {
         id: data.id,
+        company_id: data.company_id,
         empleado_id: data.empleado_id,
         periodo_id: data.periodo_real_id,
         tipo_novedad: data.tipo_novedad,
@@ -210,6 +228,7 @@ export class NovedadesService {
         observacion: data.observacion || '',
         fecha_inicio: data.fecha_inicio || '',
         fecha_fin: data.fecha_fin || '',
+        base_calculo: data.base_calculo ? JSON.parse(data.base_calculo) : undefined,
         created_at: data.created_at,
         updated_at: data.updated_at
       };
