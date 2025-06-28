@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText, Unlock, Lock, Sparkles } from 'lucide-react';
+import { Eye, Download, FileText, Unlock, Lock, Sparkles, Edit } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { formatPeriodDateRange } from '@/utils/periodDateUtils';
 
@@ -90,6 +90,24 @@ export const PayrollHistoryTable = ({
            !period.reportedToDian;
   };
 
+  // NUEVA FUNCIÓN: Navegar al módulo de liquidación para continuar editando
+  const handleContinueEditing = (period: PayrollHistoryPeriod) => {
+    // Guardar información del período en sessionStorage para que usePayrollLiquidation lo detecte
+    sessionStorage.setItem('continueEditingPeriod', JSON.stringify({
+      id: period.id,
+      periodo: period.period,
+      startDate: period.startDate,
+      endDate: period.endDate
+    }));
+    
+    // Navegar al módulo de liquidación
+    window.location.href = '/app/payroll';
+  };
+
+  const isReopenedPeriod = (period: PayrollHistoryPeriod) => {
+    return period.reopenedBy !== null && period.reopenedBy !== undefined;
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
@@ -103,7 +121,7 @@ export const PayrollHistoryTable = ({
               <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
               <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
-              <TableHead className="font-semibold text-center min-w-[160px]">Acciones</TableHead>
+              <TableHead className="font-semibold text-center min-w-[180px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -172,7 +190,7 @@ export const PayrollHistoryTable = ({
                 <TableCell className="min-w-[120px]">
                   {getPaymentStatusBadge(period.paymentStatus)}
                 </TableCell>
-                <TableCell className="min-w-[160px]">
+                <TableCell className="min-w-[180px]">
                   <div className="flex items-center justify-center space-x-1">
                     <Button 
                       variant="ghost" 
@@ -183,6 +201,19 @@ export const PayrollHistoryTable = ({
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
+                    
+                    {/* NUEVO: Botón Continuar Editando para períodos reabiertos */}
+                    {isReopenedPeriod(period) && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleContinueEditing(period)}
+                        className="text-green-600 hover:text-green-800 flex-shrink-0 hover:bg-green-50 transition-all duration-200"
+                        title="Continuar editando este período"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                     
                     {/* Magic Edit Button - The WOW Feature */}
                     {canMagicEdit(period) && (

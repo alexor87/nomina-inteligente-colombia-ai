@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/services/PayrollPeriodService';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 
@@ -12,6 +13,9 @@ export const usePayrollLiquidation = () => {
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingPeriod, setIsEditingPeriod] = useState(false);
+  const [isReopenedPeriod, setIsReopenedPeriod] = useState(false);
+  const [reopenedBy, setReopenedBy] = useState<string | null>(null);
+  const [reopenedAt, setReopenedAt] = useState<string | null>(null);
   const [summary, setSummary] = useState<PayrollSummary>({
     totalEmployees: 0,
     validEmployees: 0,
@@ -22,13 +26,51 @@ export const usePayrollLiquidation = () => {
     totalPayrollCost: 0
   });
 
-  // Inicializar período al cargar
+  // Inicializar período al cargar - PRIORIZAR PERÍODOS REABIERTOS
   const initializePeriod = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log('Initializing payroll period...');
+      console.log('Initializing payroll period - checking for reopened periods first...');
       
-      // Buscar período activo existente
+      // PASO 1: Buscar períodos reabiertos primero
+      const payrollHistory = await PayrollHistoryService.getPayrollPeriods();
+      const reopenedPeriods = payrollHistory.filter(p => p.reabierto_por);
+      
+      if (reopenedPeriods.length > 0) {
+        console.log('Found reopened periods:', reopenedPeriods.length);
+        
+        // Tomar el más reciente
+        const latestReopened = reopenedPeriods[0];
+        
+        // Crear un período compatible para trabajar
+        const reopenedPeriod: DBPayrollPeriod = {
+          id: latestReopened.id,
+          company_id: latestReopened.companyId,
+          fecha_inicio: latestReopened.fecha_inicio!,
+          fecha_fin: latestReopened.fecha_fin!,
+          tipo_periodo: 'mensual', // Asumir mensual por defecto
+          estado: 'borrador', // Siempre borrador si está reabierto
+          created_at: latestReopened.fechaCreacion,
+          updated_at: new Date().toISOString(),
+          modificado_por: latestReopened.reabierto_por || null,
+          modificado_en: latestReopened.fecha_reapertura || null
+        };
+        
+        setCurrentPeriod(reopenedPeriod);
+        setIsReopenedPeriod(true);
+        setReopenedBy(latestReopened.reabierto_por || null);
+        setReopenedAt(latestReopened.fecha_reapertura || null);
+        
+        toast({
+          title: "Período reabierto cargado",
+          description: `Continuando edición del período ${latestReopened.periodo}`,
+          duration: 4000,
+        });
+        
+        return; // Salir temprano, no crear nuevo período
+      }
+      
+      // PASO 2: Buscar período activo existente (solo si no hay reabiertos)
       let activePeriod = await PayrollPeriodService.getCurrentActivePeriod();
       
       if (!activePeriod) {
@@ -61,6 +103,9 @@ export const usePayrollLiquidation = () => {
       
       if (activePeriod) {
         setCurrentPeriod(activePeriod);
+        setIsReopenedPeriod(false);
+        setReopenedBy(null);
+        setReopenedAt(null);
         console.log('Active period loaded:', activePeriod);
       }
     } catch (error) {
@@ -311,6 +356,37 @@ export const usePayrollLiquidation = () => {
     }
   }, [toast, employees, currentPeriod]);
 
+  // NUEVA FUNCIÓN: Finalizar edición de período reabierto
+  const finishReopenedPeriodEditing = useCallback(async () => {
+    if (!currentPeriod || !isReopenedPeriod) return;
+
+    setIsLoading(true);
+    try {
+      // Cerrar el período nuevamente
+      await PayrollHistoryService.reopenPeriod(currentPeriod.fecha_inicio + ' - ' + currentPeriod.fecha_fin);
+      
+      toast({
+        title: "Período cerrado exitosamente",
+        description: "El período ha sido cerrado y guardado correctamente.",
+      });
+
+      // Reinicializar para buscar el siguiente período disponible
+      setTimeout(() => {
+        initializePeriod();
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error finishing reopened period editing:', error);
+      toast({
+        title: "Error al cerrar período",
+        description: "No se pudo cerrar el período correctamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPeriod, isReopenedPeriod, toast, initializePeriod]);
+
   const isValid = employees.every(emp => emp.status === 'valid') && employees.length > 0;
   const canEdit = currentPeriod?.estado === 'borrador';
 
@@ -323,10 +399,14 @@ export const usePayrollLiquidation = () => {
     canEdit,
     isEditingPeriod,
     setIsEditingPeriod,
+    isReopenedPeriod,
+    reopenedBy,
+    reopenedAt,
     updateEmployee,
     updatePeriod,
     recalculateAll,
     approvePeriod,
+    finishReopenedPeriodEditing,
     refreshEmployees: loadEmployees
   };
 };

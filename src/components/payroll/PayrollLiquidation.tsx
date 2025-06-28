@@ -6,6 +6,7 @@ import { PayrollPeriodCard } from './PayrollPeriodCard';
 import { PayrollSummaryCards } from './liquidation/PayrollSummaryCards';
 import { PayrollTable } from './liquidation/PayrollTable';
 import { MagicEditBanner } from '../payroll-history/MagicEditBanner';
+import { ReopenedPeriodBanner } from './ReopenedPeriodBanner';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { toast } from '@/hooks/use-toast';
@@ -26,10 +27,14 @@ export const PayrollLiquidation = () => {
     canEdit,
     isEditingPeriod,
     setIsEditingPeriod,
+    isReopenedPeriod,
+    reopenedBy,
+    reopenedAt,
     updateEmployee,
     updatePeriod,
     recalculateAll,
     approvePeriod,
+    finishReopenedPeriodEditing,
     refreshEmployees,
     isLoading
   } = usePayrollLiquidation();
@@ -59,7 +64,7 @@ export const PayrollLiquidation = () => {
 
   // Auto-save functionality
   useEffect(() => {
-    if (magicEditPeriod && hasUnsavedChanges) {
+    if ((magicEditPeriod || isReopenedPeriod) && hasUnsavedChanges) {
       const autoSaveTimer = setTimeout(async () => {
         setIsAutoSaving(true);
         // Simulate auto-save
@@ -71,7 +76,7 @@ export const PayrollLiquidation = () => {
 
       return () => clearTimeout(autoSaveTimer);
     }
-  }, [hasUnsavedChanges, magicEditPeriod]);
+  }, [hasUnsavedChanges, magicEditPeriod, isReopenedPeriod]);
 
   const validEmployeeCount = employees.filter(emp => emp.status === 'valid').length;
 
@@ -80,7 +85,7 @@ export const PayrollLiquidation = () => {
     const value = updates[field];
     if (field && typeof value === 'number') {
       updateEmployee(id, field, value);
-      if (magicEditPeriod) {
+      if (magicEditPeriod || isReopenedPeriod) {
         setHasUnsavedChanges(true);
       }
     }
@@ -97,16 +102,21 @@ export const PayrollLiquidation = () => {
       setIsAutoSaving(false);
     }
 
-    // Close the period
-    toast({
-      title: "Período cerrado exitosamente",
-      description: "Los cambios han sido guardados y el período está nuevamente cerrado.",
-    });
+    if (isReopenedPeriod) {
+      // Usar la función específica para períodos reabiertos
+      await finishReopenedPeriodEditing();
+    } else {
+      // Close the period (Magic Edit)
+      toast({
+        title: "Período cerrado exitosamente",
+        description: "Los cambios han sido guardados y el período está nuevamente cerrado.",
+      });
 
-    // Navigate back to history
-    setTimeout(() => {
-      navigate('/app/payroll-history');
-    }, 1000);
+      // Navigate back to history
+      setTimeout(() => {
+        navigate('/app/payroll-history');
+      }, 1000);
+    }
   };
 
   // Loading state
@@ -128,6 +138,13 @@ export const PayrollLiquidation = () => {
     );
   }
 
+  const formatPeriodName = () => {
+    if (!currentPeriod) return '';
+    const startDate = new Date(currentPeriod.fecha_inicio);
+    const endDate = new Date(currentPeriod.fecha_fin);
+    return `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Magic Edit Banner */}
@@ -142,7 +159,19 @@ export const PayrollLiquidation = () => {
         />
       )}
 
-      <div className={`p-6 space-y-6 ${magicEditPeriod ? 'pt-32' : ''}`}>
+      {/* Reopened Period Banner */}
+      {isReopenedPeriod && reopenedBy && reopenedAt && (
+        <ReopenedPeriodBanner
+          periodName={formatPeriodName()}
+          reopenedBy={reopenedBy}
+          reopenedAt={reopenedAt}
+          onBackToHistory={handleBackToHistory}
+          onFinishEditing={handleFinishEditing}
+          isLoading={isLoading}
+        />
+      )}
+
+      <div className={`p-6 space-y-6 ${(magicEditPeriod || isReopenedPeriod) ? 'pt-32' : ''}`}>
         {/* Header */}
         <PayrollLiquidationHeader 
           onRefresh={refreshEmployees}
