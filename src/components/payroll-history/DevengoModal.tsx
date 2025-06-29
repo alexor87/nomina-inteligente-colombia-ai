@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -592,6 +593,7 @@ export const DevengoModal = ({
   };
 
   const renderBasicConcepts = () => {
+    // Only show basic concepts for devengado type and when there are values
     if (modalType !== 'devengado' || (basicConcepts.salarioBase === 0 && basicConcepts.auxilioTransporte === 0)) {
       return null;
     }
