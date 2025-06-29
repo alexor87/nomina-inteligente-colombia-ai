@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -699,7 +698,7 @@ export const DevengoModal = ({
                 <div className="text-sm text-gray-600">
                   {modalType === 'devengado' 
                     ? `${totalBasicConcepts > 0 ? 'Conceptos básicos + ' : ''}${novedades.length} novedades adicionales`
-                    : `${novedades.length} ${modalType === 'devengado' ? 'devengados' : 'deducciones'} registradas`
+                    : `${novedades.length} deducciones registradas`
                   }
                 </div>
                 <Button 
