@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { Calculator, Loader2, Clock, Info } from 'lucide-react';
 import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
@@ -309,250 +309,257 @@ export const NovedadForm = ({
   }, [validationErrors, formData.valor]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Category Selection */}
-      <div className="flex space-x-2">
-        <Button
-          type="button"
-          variant={selectedCategory === 'devengados' ? 'default' : 'outline'}
-          onClick={() => setSelectedCategory('devengados')}
-          className="flex-1"
-          disabled={modalType !== undefined}
-        >
-          Devengados
-        </Button>
-        <Button
-          type="button"
-          variant={selectedCategory === 'deducciones' ? 'default' : 'outline'}
-          onClick={() => setSelectedCategory('deducciones')}
-          className="flex-1"
-          disabled={modalType !== undefined}
-        >
-          Deducciones
-        </Button>
-      </div>
+    <div className="flex flex-col h-full max-h-[80vh]">
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 space-y-4 p-1">
+        {/* Category Selection - Only show if modalType is not defined */}
+        {!modalType && (
+          <div className="flex space-x-2">
+            <Button
+              type="button"
+              variant={selectedCategory === 'devengados' ? 'default' : 'outline'}
+              onClick={() => setSelectedCategory('devengados')}
+              className="flex-1"
+              size="sm"
+            >
+              Devengados
+            </Button>
+            <Button
+              type="button"
+              variant={selectedCategory === 'deducciones' ? 'default' : 'outline'}
+              onClick={() => setSelectedCategory('deducciones')}
+              className="flex-1"
+              size="sm"
+            >
+              Deducciones
+            </Button>
+          </div>
+        )}
 
-      {/* Novedad Type Selection */}
-      <div className="space-y-2">
-        <Label htmlFor="tipo_novedad">Tipo de Novedad</Label>
-        <Select
-          value={formData.tipo_novedad}
-          onValueChange={(value) => {
-            const newTipoNovedad = value as NovedadType;
-            setFormData(prev => ({
-              ...prev,
-              tipo_novedad: newTipoNovedad,
-              subtipo: newTipoNovedad === 'horas_extra' ? 'diurnas' : 
-                       newTipoNovedad === 'incapacidad' ? 'comun' : '',
-              horas: null,
-              dias: null,
-              fecha_inicio: '',
-              fecha_fin: '',
-              valor: 0
-            }));
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecciona el tipo de novedad" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(NOVEDAD_CATEGORIES_ENHANCED[selectedCategory].types).map(([key, config]) => (
-              <SelectItem key={key} value={key}>
-                <div className="flex items-center space-x-2">
-                  <span>{config.icon}</span>
-                  <span>{config.label}</span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Help Text */}
-      {fieldConfig.helpText && (
-        <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded-lg">
-          <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-blue-800">{fieldConfig.helpText}</p>
-        </div>
-      )}
-
-      {/* Subtipo Selection */}
-      {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
+        {/* Novedad Type Selection */}
         <div className="space-y-2">
-          <Label htmlFor="subtipo">
-            {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
-          </Label>
+          <Label htmlFor="tipo_novedad" className="text-sm font-medium">Tipo de Novedad</Label>
           <Select
-            value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
-            onValueChange={(value) => handleInputChange('subtipo', value)}
+            value={formData.tipo_novedad}
+            onValueChange={(value) => {
+              const newTipoNovedad = value as NovedadType;
+              setFormData(prev => ({
+                ...prev,
+                tipo_novedad: newTipoNovedad,
+                subtipo: newTipoNovedad === 'horas_extra' ? 'diurnas' : 
+                         newTipoNovedad === 'incapacidad' ? 'comun' : '',
+                horas: null,
+                dias: null,
+                fecha_inicio: '',
+                fecha_fin: '',
+                valor: 0
+              }));
+            }}
           >
-            <SelectTrigger>
-              <SelectValue />
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecciona el tipo de novedad" />
             </SelectTrigger>
             <SelectContent>
-              {fieldConfig.subtipoOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+              {Object.entries(NOVEDAD_CATEGORIES_ENHANCED[selectedCategory].types).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  <div className="flex items-center space-x-2">
+                    <span>{config.icon}</span>
+                    <span>{config.label}</span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-      )}
 
-      {/* Dynamic Fields Section */}
-      <div className="space-y-4">
-        {/* Date Fields */}
-        {fieldConfig.showDates && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="fecha_inicio">
-                Fecha Inicio {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
-              </Label>
-              <Input
-                id="fecha_inicio"
-                type="date"
-                value={formData.fecha_inicio || ''}
-                onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
-              />
-              {validationErrors.fecha_inicio && (
-                <p className="text-sm text-red-600">{validationErrors.fecha_inicio}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fecha_fin">
-                Fecha Fin {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
-              </Label>
-              <Input
-                id="fecha_fin"
-                type="date"
-                value={formData.fecha_fin || ''}
-                onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
-              />
-              {validationErrors.fecha_fin && (
-                <p className="text-sm text-red-600">{validationErrors.fecha_fin}</p>
-              )}
-            </div>
+        {/* Help Text */}
+        {fieldConfig.helpText && (
+          <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded-lg border">
+            <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-blue-800">{fieldConfig.helpText}</p>
           </div>
         )}
-
-        {/* Quantity Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {fieldConfig.showDays && (
-            <div className="space-y-2">
-              <Label htmlFor="dias">
-                Días {fieldConfig.requiresDays && <span className="text-red-500">*</span>}
-                {!fieldConfig.requiresDays && <span className="text-gray-500 text-xs"> (opcional)</span>}
-              </Label>
-              <Input
-                id="dias"
-                type="number"
-                min="0"
-                value={formData.dias || ''}
-                onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
-              />
-              {validationErrors.dias && (
-                <p className="text-sm text-red-600">{validationErrors.dias}</p>
-              )}
-            </div>
-          )}
-
-          {fieldConfig.showHours && (
-            <div className="space-y-2">
-              <Label htmlFor="horas">
-                Horas {fieldConfig.requiresHours && <span className="text-red-500">*</span>}
-                {!fieldConfig.requiresHours && <span className="text-gray-500 text-xs"> (opcional)</span>}
-              </Label>
-              <Input
-                id="horas"
-                type="number"
-                min="0"
-                max="24"
-                step="0.5"
-                value={formData.horas || ''}
-                onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
-              />
-              {validationErrors.horas && (
-                <p className="text-sm text-red-600">{validationErrors.horas}</p>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Value Field with Enhanced Suggested Value */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="valor">Valor <span className="text-red-500">*</span></Label>
-          <div className="flex items-center space-x-2">
-            <JornadaLegalTooltip fecha={currentPeriodDate} showBadge={false} />
-            {suggestedValue && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleInputChange('valor', suggestedValue)}
-                className="text-xs flex items-center space-x-1"
+      {/* Scrollable Content */}
+      <ScrollArea className="flex-1 px-1">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Subtipo Selection */}
+          {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="subtipo" className="text-sm font-medium">
+                {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
+              </Label>
+              <Select
+                value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
+                onValueChange={(value) => handleInputChange('subtipo', value)}
               >
-                <Calculator className="h-3 w-3" />
-                <span>Usar: ${suggestedValue.toLocaleString()}</span>
-              </Button>
-            )}
-          </div>
-        </div>
-        <Input
-          id="valor"
-          type="number"
-          min="0"
-          step="1000"
-          value={formData.valor}
-          onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
-          placeholder="Ingresa el valor"
-        />
-        {validationErrors.valor && (
-          <p className="text-sm text-red-600">{validationErrors.valor}</p>
-        )}
-      </div>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {fieldConfig.subtipoOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-      {/* Observaciones */}
-      <div className="space-y-2">
-        <Label htmlFor="observacion">Observaciones</Label>
-        <Textarea
-          id="observacion"
-          value={formData.observacion || ''}
-          onChange={(e) => handleInputChange('observacion', e.target.value)}
-          placeholder="Agrega cualquier observación adicional"
-          rows={3}
-        />
-      </div>
+          {/* Date Fields */}
+          {fieldConfig.showDates && (
+            <div className="grid grid-cols-1 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="fecha_inicio" className="text-sm font-medium">
+                  Fecha Inicio {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
+                </Label>
+                <Input
+                  id="fecha_inicio"
+                  type="date"
+                  value={formData.fecha_inicio || ''}
+                  onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
+                />
+                {validationErrors.fecha_inicio && (
+                  <p className="text-sm text-red-600">{validationErrors.fecha_inicio}</p>
+                )}
+              </div>
 
-      {/* Preview Card */}
-      <Card className="bg-gray-50">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Vista previa</p>
-              <p className="text-xs text-gray-600">
-                {formData.tipo_novedad} • {formData.valor.toLocaleString()} COP
-              </p>
-              <div className="flex items-center space-x-2 text-xs text-gray-500">
-                <Clock className="h-3 w-3" />
-                <span>
-                  {fieldConfig.isAutoCalculated ? 'Cálculo automático' : 'Valor manual'}
-                  {fieldConfig.isAutoCalculated && ' con jornada legal dinámica'}
-                </span>
+              <div className="space-y-2">
+                <Label htmlFor="fecha_fin" className="text-sm font-medium">
+                  Fecha Fin {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
+                </Label>
+                <Input
+                  id="fecha_fin"
+                  type="date"
+                  value={formData.fecha_fin || ''}
+                  onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
+                />
+                {validationErrors.fecha_fin && (
+                  <p className="text-sm text-red-600">{validationErrors.fecha_fin}</p>
+                )}
               </div>
             </div>
-            <Badge variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}>
-              {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
+          )}
 
-      {/* Form Actions */}
-      <div className="flex justify-end space-x-3 pt-4 border-t">
+          {/* Quantity Fields */}
+          <div className="grid grid-cols-1 gap-3">
+            {fieldConfig.showDays && (
+              <div className="space-y-2">
+                <Label htmlFor="dias" className="text-sm font-medium">
+                  Días {fieldConfig.requiresDays && <span className="text-red-500">*</span>}
+                  {!fieldConfig.requiresDays && <span className="text-gray-500 text-xs"> (opcional)</span>}
+                </Label>
+                <Input
+                  id="dias"
+                  type="number"
+                  min="0"
+                  value={formData.dias || ''}
+                  onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
+                />
+                {validationErrors.dias && (
+                  <p className="text-sm text-red-600">{validationErrors.dias}</p>
+                )}
+              </div>
+            )}
+
+            {fieldConfig.showHours && (
+              <div className="space-y-2">
+                <Label htmlFor="horas" className="text-sm font-medium">
+                  Horas {fieldConfig.requiresHours && <span className="text-red-500">*</span>}
+                  {!fieldConfig.requiresHours && <span className="text-gray-500 text-xs"> (opcional)</span>}
+                </Label>
+                <Input
+                  id="horas"
+                  type="number"
+                  min="0"
+                  max="24"
+                  step="0.5"
+                  value={formData.horas || ''}
+                  onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
+                />
+                {validationErrors.horas && (
+                  <p className="text-sm text-red-600">{validationErrors.horas}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Value Field with Enhanced Suggested Value */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="valor" className="text-sm font-medium">Valor <span className="text-red-500">*</span></Label>
+              <div className="flex items-center space-x-2">
+                <JornadaLegalTooltip fecha={currentPeriodDate} showBadge={false} />
+                {suggestedValue && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleInputChange('valor', suggestedValue)}
+                    className="text-xs flex items-center space-x-1"
+                  >
+                    <Calculator className="h-3 w-3" />
+                    <span>Usar: ${suggestedValue.toLocaleString()}</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+            <Input
+              id="valor"
+              type="number"
+              min="0"
+              step="1000"
+              value={formData.valor}
+              onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
+              placeholder="Ingresa el valor"
+            />
+            {validationErrors.valor && (
+              <p className="text-sm text-red-600">{validationErrors.valor}</p>
+            )}
+          </div>
+
+          {/* Observaciones */}
+          <div className="space-y-2">
+            <Label htmlFor="observacion" className="text-sm font-medium">Observaciones</Label>
+            <Textarea
+              id="observacion"
+              value={formData.observacion || ''}
+              onChange={(e) => handleInputChange('observacion', e.target.value)}
+              placeholder="Agrega cualquier observación adicional"
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+
+          {/* Preview Card */}
+          <Card className="bg-gray-50 border">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Vista previa</p>
+                  <p className="text-xs text-gray-600">
+                    {formData.tipo_novedad} • {formData.valor.toLocaleString()} COP
+                  </p>
+                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                    <Clock className="h-3 w-3" />
+                    <span>
+                      {fieldConfig.isAutoCalculated ? 'Cálculo automático' : 'Valor manual'}
+                    </span>
+                  </div>
+                </div>
+                <Badge variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}>
+                  {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </form>
+      </ScrollArea>
+
+      {/* Fixed Footer */}
+      <div className="flex-shrink-0 flex justify-end space-x-3 pt-4 border-t mt-4">
         <Button
           type="button"
           variant="outline"
@@ -563,6 +570,7 @@ export const NovedadForm = ({
         </Button>
         <Button
           type="submit"
+          onClick={handleSubmit}
           disabled={!isFormValid || isSubmitting}
           className="min-w-[100px]"
         >
@@ -576,6 +584,6 @@ export const NovedadForm = ({
           )}
         </Button>
       </div>
-    </form>
+    </div>
   );
 };
