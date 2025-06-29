@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -17,15 +18,6 @@ import { Input } from '@/components/ui/input';
 import { EditableEmployeeTable } from '@/components/payroll-history/EditableEmployeeTable';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { DevengoModal } from '@/components/payroll-history/DevengoModal';
-
-interface DevengoModalState {
-  isOpen: boolean;
-  employeeId: string;
-  employeeName: string;
-  employeeSalary: number;
-  payrollId: string;
-}
 
 const PeriodEditPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
@@ -34,13 +26,6 @@ const PeriodEditPage = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [isEditMode, setIsEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [devengoModal, setDevengoModal] = useState<DevengoModalState>({
-    isOpen: false,
-    employeeId: '',
-    employeeName: '',
-    employeeSalary: 0,
-    payrollId: ''
-  });
   const [employees, setEmployees] = useState<PayrollHistoryEmployee[]>([]);
 
   const {
@@ -131,7 +116,7 @@ const PeriodEditPage = () => {
 
       toast({
         title: "Empleado actualizado",
-        description: `Se ha actualizado la información de ${employeeId}.`,
+        description: `Se ha actualizado la información del empleado.`,
       });
     } catch (error) {
       console.error("Error updating employee:", error);
@@ -160,49 +145,6 @@ const PeriodEditPage = () => {
       });
     }
   };
-
-  const handleOpenDevengoModal = (employeeId: string, employeeName: string, employeeSalary: number, payrollId: string) => {
-    setDevengoModal({
-      isOpen: true,
-      employeeId,
-      employeeName,
-      employeeSalary,
-      payrollId
-    });
-  };
-
-  const handleCloseDevengoModal = useCallback(() => {
-    setDevengoModal({
-      isOpen: false,
-      employeeId: '',
-      employeeName: '',
-      employeeSalary: 0,
-      payrollId: ''
-    });
-  }, []);
-
-  const handleNovedadCreated = useCallback((employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => {
-    // Find the employee to update
-    const employee = employees.find(emp => emp.id === employeeId);
-    if (!employee) return;
-
-    // Update values automatically
-    let updates: Partial<PayrollHistoryEmployee> = {};
-    
-    if (tipo === 'devengado') {
-      updates.grossPay = employee.grossPay + valor;
-    } else if (tipo === 'deduccion') {
-      updates.deductions = employee.deductions + valor;
-    }
-    
-    // Recalculate neto
-    const newGrossPay = updates.grossPay || employee.grossPay;
-    const newDeductions = updates.deductions || employee.deductions;
-    updates.netPay = newGrossPay - newDeductions;
-
-    handleEmployeeUpdate(employeeId, updates);
-    refetch();
-  }, [employees, handleEmployeeUpdate, refetch]);
 
   if (isLoading) {
     return (
@@ -342,19 +284,6 @@ const PeriodEditPage = () => {
         onEmployeeUpdate={handleEmployeeUpdate}
         periodId={periodId as string}
         onNovedadChange={refetch}
-      />
-      
-      {/* Devengado Modal */}
-      <DevengoModal
-        isOpen={devengoModal.isOpen}
-        onClose={handleCloseDevengoModal}
-        employeeId={devengoModal.employeeId}
-        employeeName={devengoModal.employeeName}
-        employeeSalary={devengoModal.employeeSalary}
-        payrollId={devengoModal.payrollId}
-        periodId={periodId as string}
-        onNovedadCreated={handleNovedadCreated}
-        modalType="devengado"
       />
     </div>
   );
