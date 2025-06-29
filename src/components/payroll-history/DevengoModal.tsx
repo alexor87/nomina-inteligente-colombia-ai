@@ -15,7 +15,8 @@ import {
   Calculator,
   Clock,
   AlertCircle,
-  Loader2
+  Loader2,
+  DollarSign
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
@@ -50,6 +51,11 @@ interface NovedadDisplay {
   base_calculo?: any;
 }
 
+interface BasicConcepts {
+  salarioBase: number;
+  auxilioTransporte: number;
+}
+
 export const DevengoModal = ({
   isOpen,
   onClose,
@@ -65,6 +71,10 @@ export const DevengoModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [novedades, setNovedades] = useState<NovedadDisplay[]>([]);
+  const [basicConcepts, setBasicConcepts] = useState<BasicConcepts>({
+    salarioBase: 0,
+    auxilioTransporte: 0
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingNovedad, setEditingNovedad] = useState<NovedadDisplay | null>(null);
   const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(new Date());
@@ -73,6 +83,7 @@ export const DevengoModal = ({
     foundPeriods: any[];
     novedadesFound: number;
     periodTextUsed?: string;
+    payrollData?: any;
   }>({
     receivedPeriodId: '',
     foundPeriods: [],
@@ -196,6 +207,41 @@ export const DevengoModal = ({
     }
   }, [isOpen, periodId]);
 
+  // Load basic payroll concepts (salary + transport aid)
+  const loadBasicConcepts = useCallback(async () => {
+    if (!isOpen || !payrollId) return;
+    
+    try {
+      console.log('🔍 Loading basic payroll concepts for payrollId:', payrollId);
+      
+      const { data: payrollData, error } = await supabase
+        .from('payrolls')
+        .select('salario_base, auxilio_transporte')
+        .eq('id', payrollId)
+        .single();
+
+      if (error) {
+        console.error('❌ Error loading payroll data:', error);
+        return;
+      }
+
+      console.log('📊 Payroll basic concepts loaded:', payrollData);
+      
+      setBasicConcepts({
+        salarioBase: Number(payrollData?.salario_base || 0),
+        auxilioTransporte: Number(payrollData?.auxilio_transporte || 0)
+      });
+
+      setDebugInfo(prev => ({
+        ...prev,
+        payrollData
+      }));
+      
+    } catch (error) {
+      console.error('❌ Error loading basic concepts:', error);
+    }
+  }, [isOpen, payrollId]);
+
   const loadNovedades = useCallback(async () => {
     if (!isOpen || !employeeId || !periodId) return;
     
@@ -284,8 +330,11 @@ export const DevengoModal = ({
   }, [isOpen, employeeId, periodId, modalType, payrollId, toast]);
 
   useEffect(() => {
-    loadNovedades();
-  }, [loadNovedades]);
+    if (isOpen) {
+      loadBasicConcepts();
+      loadNovedades();
+    }
+  }, [loadBasicConcepts, loadNovedades, isOpen]);
 
   const calculateSuggestedValue = useCallback((
     tipoNovedad: NovedadType,
@@ -509,7 +558,11 @@ export const DevengoModal = ({
     });
   };
 
-  const totalValue = novedades.reduce((sum, novedad) => sum + novedad.valor, 0);
+  const totalNovedades = novedades.reduce((sum, novedad) => sum + novedad.valor, 0);
+  const totalBasicConcepts = modalType === 'devengado' 
+    ? basicConcepts.salarioBase + basicConcepts.auxilioTransporte 
+    : 0;
+  const totalValue = totalBasicConcepts + totalNovedades;
 
   const getNovedadLabel = (tipo: NovedadType): string => {
     const labels: Record<NovedadType, string> = {
@@ -536,6 +589,56 @@ export const DevengoModal = ({
       sena: 'SENA'
     };
     return labels[tipo] || tipo;
+  };
+
+  const renderBasicConcepts = () => {
+    if (modalType !== 'devengado' || (basicConcepts.salarioBase === 0 && basicConcepts.auxilioTransporte === 0)) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="font-medium text-gray-900 flex items-center space-x-2">
+            <DollarSign className="h-4 w-4" />
+            <span>Conceptos Básicos</span>
+          </h4>
+          <Badge variant="default" className="text-sm">
+            {formatCurrency(totalBasicConcepts)}
+          </Badge>
+        </div>
+        
+        <div className="space-y-2">
+          {basicConcepts.salarioBase > 0 && (
+            <div className="border rounded-lg p-3 bg-blue-50">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="font-medium text-sm">Salario Base</span>
+                  <p className="text-xs text-gray-600">Salario mensual del empleado</p>
+                </div>
+                <div className="text-green-700 font-semibold">
+                  +{formatCurrency(basicConcepts.salarioBase)}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {basicConcepts.auxilioTransporte > 0 && (
+            <div className="border rounded-lg p-3 bg-blue-50">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="font-medium text-sm">Auxilio de Transporte</span>
+                  <p className="text-xs text-gray-600">Auxilio legal de transporte</p>
+                </div>
+                <div className="text-green-700 font-semibold">
+                  +{formatCurrency(basicConcepts.auxilioTransporte)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const isFormValid = formData.valor > 0 && formData.empleado_id && formData.periodo_id;
@@ -570,6 +673,9 @@ export const DevengoModal = ({
                   {debugInfo.periodTextUsed && (
                     <div>Período texto: {debugInfo.periodTextUsed}</div>
                   )}
+                  {debugInfo.payrollData && (
+                    <div>Payroll: Salario {formatCurrency(debugInfo.payrollData.salario_base || 0)}, Auxilio {formatCurrency(debugInfo.payrollData.auxilio_transporte || 0)}</div>
+                  )}
                 </div>
               </div>
               <Badge 
@@ -589,7 +695,10 @@ export const DevengoModal = ({
               {/* List header */}
               <div className="flex justify-between items-center px-6 pb-4">
                 <div className="text-sm text-gray-600">
-                  {novedades.length} {modalType === 'devengado' ? 'devengados' : 'deducciones'} registradas
+                  {modalType === 'devengado' 
+                    ? `${totalBasicConcepts > 0 ? 'Conceptos básicos + ' : ''}${novedades.length} novedades adicionales`
+                    : `${novedades.length} ${modalType === 'devengado' ? 'devengados' : 'deducciones'} registradas`
+                  }
                 </div>
                 <Button 
                   onClick={() => setShowForm(true)}
@@ -606,91 +715,111 @@ export const DevengoModal = ({
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                   </div>
-                ) : novedades.length === 0 ? (
-                  <div className="text-center py-8">
-                    <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      No hay {modalType === 'devengado' ? 'devengados' : 'deducciones'}
-                    </h3>
-                    <p className="text-gray-600">
-                      Haz clic en "Agregar {modalType}" para comenzar
-                    </p>
-                    {/* Show debug info when no data found */}
-                    <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-xs text-left">
-                      <strong>Debug Info:</strong><br/>
-                      Period ID recibido: {debugInfo.receivedPeriodId}<br/>
-                      Períodos en DB: {debugInfo.foundPeriods.length}<br/>
-                      Novedades encontradas: {debugInfo.novedadesFound}
-                    </div>
-                  </div>
                 ) : (
-                  <div className="space-y-3 pb-6">
-                    {novedades.map((novedad) => (
-                      <div key={novedad.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <h4 className="font-medium">{getNovedadLabel(novedad.tipo_novedad)}</h4>
-                              {(novedad.horas || novedad.dias) && (
-                                <div className="flex items-center space-x-1 text-xs text-gray-500">
-                                  <Clock className="h-3 w-3" />
-                                  <span>
-                                    {novedad.horas && `${novedad.horas}h`}
-                                    {novedad.horas && novedad.dias && ' - '}
-                                    {novedad.dias && `${novedad.dias}d`}
-                                  </span>
+                  <div className="space-y-4 pb-6">
+                    {/* Basic Concepts Section */}
+                    {renderBasicConcepts()}
+                    
+                    {/* Separator between basic and additional concepts */}
+                    {modalType === 'devengado' && totalBasicConcepts > 0 && novedades.length > 0 && (
+                      <Separator />
+                    )}
+                    
+                    {/* Additional Novedades Section */}
+                    <div className="space-y-3">
+                      {modalType === 'devengado' && totalBasicConcepts > 0 && (
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-gray-900">Novedades Adicionales</h4>
+                          <Badge variant="outline" className="text-sm">
+                            {formatCurrency(totalNovedades)}
+                          </Badge>
+                        </div>
+                      )}
+                      
+                      {novedades.length === 0 ? (
+                        <div className="text-center py-6">
+                          <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                          <h3 className="text-sm font-medium text-gray-900 mb-1">
+                            No hay novedades adicionales
+                          </h3>
+                          <p className="text-xs text-gray-600">
+                            {modalType === 'devengado' 
+                              ? 'Los conceptos básicos se muestran arriba. Agrega horas extra, bonificaciones, etc.'
+                              : 'Haz clic en "Agregar deducción" para comenzar'
+                            }
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {novedades.map((novedad) => (
+                            <div key={novedad.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <h4 className="font-medium">{getNovedadLabel(novedad.tipo_novedad)}</h4>
+                                    {(novedad.horas || novedad.dias) && (
+                                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                        <Clock className="h-3 w-3" />
+                                        <span>
+                                          {novedad.horas && `${novedad.horas}h`}
+                                          {novedad.horas && novedad.dias && ' - '}
+                                          {novedad.dias && `${novedad.dias}d`}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="text-sm text-gray-600 space-y-1">
+                                    {novedad.observacion && (
+                                      <div>
+                                        <strong>Observación:</strong> {novedad.observacion}
+                                      </div>
+                                    )}
+                                    {novedad.fecha_inicio && novedad.fecha_fin && (
+                                      <div>
+                                        <strong>Período:</strong> {novedad.fecha_inicio} a {novedad.fecha_fin}
+                                      </div>
+                                    )}
+                                    {novedad.base_calculo?.detalle_calculo && (
+                                      <div className="text-xs bg-gray-100 p-2 rounded">
+                                        <strong>Cálculo:</strong> {novedad.base_calculo.detalle_calculo}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                            
-                            <div className="text-sm text-gray-600 space-y-1">
-                              {novedad.observacion && (
-                                <div>
-                                  <strong>Observación:</strong> {novedad.observacion}
-                                </div>
-                              )}
-                              {novedad.fecha_inicio && novedad.fecha_fin && (
-                                <div>
-                                  <strong>Período:</strong> {novedad.fecha_inicio} a {novedad.fecha_fin}
-                                </div>
-                              )}
-                              {novedad.base_calculo?.detalle_calculo && (
-                                <div className="text-xs bg-gray-100 p-2 rounded">
-                                  <strong>Cálculo:</strong> {novedad.base_calculo.detalle_calculo}
-                                </div>
-                              )}
-                            </div>
-                          </div>
 
-                          <div className="flex items-center space-x-3 ml-4">
-                            <div className="text-right">
-                              <div className={`font-semibold ${
-                                modalType === 'devengado' ? 'text-green-700' : 'text-red-700'
-                              }`}>
-                                {modalType === 'devengado' ? '+' : '-'}{formatCurrency(novedad.valor)}
+                                <div className="flex items-center space-x-3 ml-4">
+                                  <div className="text-right">
+                                    <div className={`font-semibold ${
+                                      modalType === 'devengado' ? 'text-green-700' : 'text-red-700'
+                                    }`}>
+                                      {modalType === 'devengado' ? '+' : '-'}{formatCurrency(novedad.valor)}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditNovedad(novedad)}
+                                    >
+                                      Editar
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteNovedad(novedad.id)}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditNovedad(novedad)}
-                              >
-                                Editar
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteNovedad(novedad.id)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </div>
                 )}
               </ScrollArea>
@@ -762,7 +891,7 @@ export const DevengoModal = ({
                 <Calculator className="h-4 w-4" />
                 <span>
                   {modalType === 'devengado' 
-                    ? 'Cálculos actualizados con jornada legal dinámica'
+                    ? 'Incluye conceptos básicos + novedades adicionales con jornada legal dinámica'
                     : 'Deducciones calculadas con IBC correcto, tope 25 SMMLV y retención en la fuente'
                   }
                 </span>
