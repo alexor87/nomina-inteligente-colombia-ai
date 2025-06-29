@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
@@ -51,9 +50,9 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     if (!selectedEmployee) return;
     
     const createData: CreateNovedadData = {
-      ...data,
       empleado_id: selectedEmployee.id,
-      periodo_id: periodoId
+      periodo_id: periodoId,
+      ...data
     };
     
     await createNovedad(createData, true);

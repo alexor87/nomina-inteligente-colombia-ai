@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -161,11 +160,8 @@ export const DevengoModal = ({
 
       console.log('📝 Creating novedad with enhanced calculation system:', novedadData);
       
-      // Usar el servicio mejorado que ya incluye cálculos con jornada legal dinámica
-      const newNovedad = await NovedadesEnhancedService.createNovedadWithJornadaLegal(
-        novedadData,
-        currentPeriodDate
-      );
+      // Usar el servicio mejorado
+      const newNovedad = await NovedadesEnhancedService.createNovedad(novedadData);
 
       if (newNovedad) {
         await loadNovedades();
