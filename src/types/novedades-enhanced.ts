@@ -1,6 +1,6 @@
-
 import { getJornadaLegal, getHourlyDivisor } from '@/utils/jornadaLegal';
 
+// Enhanced NovedadType that includes all database types
 export type NovedadType =
   | 'horas_extra'
   | 'recargo_nocturno'
@@ -16,7 +16,13 @@ export type NovedadType =
   | 'ausencia'
   | 'descuento_voluntario'
   | 'retencion_fuente'
-  | 'fondo_solidaridad';
+  | 'fondo_solidaridad'
+  | 'salud'
+  | 'pension'
+  | 'arl'
+  | 'caja_compensacion'
+  | 'icbf'
+  | 'sena';
 
 export const NOVEDAD_CATEGORIES: Record<NovedadType, 'devengado' | 'deduccion'> = {
   horas_extra: 'devengado',
@@ -33,7 +39,13 @@ export const NOVEDAD_CATEGORIES: Record<NovedadType, 'devengado' | 'deduccion'> 
   ausencia: 'deduccion',
   descuento_voluntario: 'deduccion',
   retencion_fuente: 'deduccion',
-  fondo_solidaridad: 'deduccion'
+  fondo_solidaridad: 'deduccion',
+  salud: 'deduccion',
+  pension: 'deduccion',
+  arl: 'deduccion',
+  caja_compensacion: 'deduccion',
+  icbf: 'deduccion',
+  sena: 'deduccion'
 };
 
 export interface PayrollNovedad {
@@ -245,6 +257,12 @@ export const calcularValorNovedadEnhanced = (
       case 'descuento_voluntario':
       case 'retencion_fuente':
       case 'fondo_solidaridad':
+      case 'salud':
+      case 'pension':
+      case 'arl':
+      case 'caja_compensacion':
+      case 'icbf':
+      case 'sena':
         result.baseCalculo.detalle_calculo = 'Valor fijo de deducción';
         break;
 
