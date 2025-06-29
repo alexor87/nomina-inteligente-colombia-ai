@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/dialog';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadHorasExtraForm } from './forms/NovedadHorasExtraForm';
-import { NovedadRecargoNocturnoForm } from './forms/NovedadRecargoNocturnoForm';
+import { NovedadRecargoForm } from './forms/NovedadRecargoForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
 import { NovedadLicenciasForm } from './forms/NovedadLicenciasForm';
@@ -86,8 +86,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     switch (selectedCategory) {
       case 'horas_extra':
         return <NovedadHorasExtraForm {...commonProps} />;
-      case 'recargo_nocturno':
-        return <NovedadRecargoNocturnoForm {...commonProps} />;
+      case 'recargos':
+        return <NovedadRecargoForm {...commonProps} />;
       case 'vacaciones':
         return <NovedadVacacionesForm {...commonProps} />;
       case 'incapacidades':

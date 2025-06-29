@@ -161,7 +161,7 @@ export const NovedadRetefuenteForm: React.FC<NovedadRetefuenteFormProps> = ({
 
         <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
           <p className="text-sm text-yellow-700">
-            <strong>Nota:</strong> Los valores se basan en la tabla de retención vigente para 2024. 
+            <strong>Nota:</strong> Los valores se basan en la tabla de retención vigente para 2025. 
             Consulta con el área contable para casos especiales.
           </p>
         </div>

@@ -84,9 +84,16 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         };
         return Math.round(valorHora * factors[subtipo] * horas);
         
-      case 'recargo_nocturno':
-        if (!horas) return null;
-        return Math.round(valorHora * 1.35 * horas); // 35% adicional
+      case 'recargo':
+        if (!horas || !subtipo) return null;
+        const recargoFactors: Record<string, number> = {
+          'nocturno': 1.35, // 35% adicional
+          'dominical': 1.75, // 75% adicional
+          'nocturno_dominical': 2.10, // 110% adicional
+          'festivo': 1.75, // 75% adicional
+          'nocturno_festivo': 2.10 // 110% adicional
+        };
+        return Math.round(valorHora * recargoFactors[subtipo] * horas);
         
       case 'vacaciones':
         if (!dias) return null;
