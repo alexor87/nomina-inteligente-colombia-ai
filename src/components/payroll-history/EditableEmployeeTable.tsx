@@ -52,12 +52,14 @@ export const EditableEmployeeTable = ({
     employeeName: string;
     employeeSalary: number;
     payrollId: string;
+    modalType: 'devengado' | 'deduccion';
   }>({
     isOpen: false,
     employeeId: '',
     employeeName: '',
     employeeSalary: 0,
-    payrollId: ''
+    payrollId: '',
+    modalType: 'devengado'
   });
 
   console.log('EditableEmployeeTable render - using real period ID:', periodId);
@@ -130,8 +132,13 @@ export const EditableEmployeeTable = ({
     }
   };
 
-  const handleOpenDevengoModal = (employeeId: string, employeeName: string, employeeBaseSalary: number) => {
-    console.log('Opening devengado modal for:', employeeId, employeeName, 'Base salary:', employeeBaseSalary);
+  const handleOpenDevengoModal = (
+    employeeId: string, 
+    employeeName: string, 
+    employeeBaseSalary: number,
+    modalType: 'devengado' | 'deduccion' = 'devengado'
+  ) => {
+    console.log('Opening modal for:', employeeId, employeeName, 'Type:', modalType, 'Base salary:', employeeBaseSalary);
     
     if (!employeeBaseSalary || employeeBaseSalary <= 0) {
       toast({
@@ -183,7 +190,8 @@ export const EditableEmployeeTable = ({
       employeeId,
       employeeName,
       employeeSalary: employeeBaseSalary,
-      payrollId: employee.payrollId
+      payrollId: employee.payrollId,
+      modalType
     });
   };
 
@@ -194,7 +202,8 @@ export const EditableEmployeeTable = ({
       employeeId: '',
       employeeName: '',
       employeeSalary: 0,
-      payrollId: ''
+      payrollId: '',
+      modalType: 'devengado'
     });
   }, []);
 
@@ -286,21 +295,43 @@ export const EditableEmployeeTable = ({
           {formatCurrency(value)}
         </span>
         
-        {/* Botón + solo para devengados y en modo edición */}
-        {field === 'grossPay' && isEditMode && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 ml-2"
-            onClick={() => handleOpenDevengoModal(
-              employee.id, 
-              employee.name, 
-              employee.baseSalary
+        {/* Botones + para devengados y deducciones en modo edición */}
+        {isEditMode && (
+          <div className="flex items-center space-x-1 ml-2">
+            {field === 'grossPay' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                onClick={() => handleOpenDevengoModal(
+                  employee.id, 
+                  employee.name, 
+                  employee.baseSalary,
+                  'devengado'
+                )}
+                title="Agregar devengado"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
             )}
-            title="Agregar devengado"
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
+            
+            {field === 'deductions' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => handleOpenDevengoModal(
+                  employee.id, 
+                  employee.name, 
+                  employee.baseSalary,
+                  'deduccion'
+                )}
+                title="Agregar deducción"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
         )}
         
         {isSaving && <Loader2 className="h-3 w-3 animate-spin text-blue-600 ml-2" />}
@@ -358,7 +389,7 @@ export const EditableEmployeeTable = ({
         </Table>
       </div>
 
-      {/* Devengado Modal */}
+      {/* Modal de Devengos/Deducciones */}
       <DevengoModal
         isOpen={devengoModal.isOpen}
         onClose={handleCloseDevengoModal}
@@ -367,6 +398,7 @@ export const EditableEmployeeTable = ({
         employeeSalary={devengoModal.employeeSalary}
         payrollId={devengoModal.payrollId}
         periodId={periodId}
+        modalType={devengoModal.modalType}
         onNovedadCreated={handleNovedadCreated}
       />
     </>
