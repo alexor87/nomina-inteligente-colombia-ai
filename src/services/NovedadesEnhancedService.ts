@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
@@ -117,7 +118,7 @@ export class NovedadesEnhancedService {
         company_id: companyId,
         empleado_id: data.empleado_id,
         periodo_id: data.periodo_id,
-        tipo_novedad: data.tipo_novedad,
+        tipo_novedad: data.tipo_novedad as any, // Cast to any to avoid TypeScript error
         valor: Number(valorFinal),
         horas: data.horas ? Number(data.horas) : null,
         dias: data.dias ? Number(data.dias) : null,
