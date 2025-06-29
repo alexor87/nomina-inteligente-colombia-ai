@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
-import { Calculator, Loader2, Clock, Info } from 'lucide-react';
+import { Calculator, Loader2, Clock, Info, CheckCircle2 } from 'lucide-react';
 import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
 
 // Define the enhanced categories structure that matches the enhanced types
@@ -309,12 +309,12 @@ export const NovedadForm = ({
   }, [validationErrors, formData.valor]);
 
   return (
-    <div className="flex flex-col h-full max-h-[80vh]">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 space-y-4 p-1">
+    <div className="flex flex-col h-[600px]">
+      {/* Compact Header */}
+      <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-gray-50/50">
         {/* Category Selection - Only show if modalType is not defined */}
         {!modalType && (
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 mb-4">
             <Button
               type="button"
               variant={selectedCategory === 'devengados' ? 'default' : 'outline'}
@@ -337,8 +337,10 @@ export const NovedadForm = ({
         )}
 
         {/* Novedad Type Selection */}
-        <div className="space-y-2">
-          <Label htmlFor="tipo_novedad" className="text-sm font-medium">Tipo de Novedad</Label>
+        <div className="space-y-3">
+          <Label htmlFor="tipo_novedad" className="text-sm font-medium text-gray-900">
+            Tipo de Novedad
+          </Label>
           <Select
             value={formData.tipo_novedad}
             onValueChange={(value) => {
@@ -374,173 +376,231 @@ export const NovedadForm = ({
 
         {/* Help Text */}
         {fieldConfig.helpText && (
-          <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded-lg border">
-            <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-blue-800">{fieldConfig.helpText}</p>
+          <div className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200 mt-4">
+            <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-blue-800 leading-relaxed">{fieldConfig.helpText}</p>
           </div>
         )}
       </div>
 
       {/* Scrollable Content */}
-      <ScrollArea className="flex-1 px-1">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Subtipo Selection */}
-          {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="subtipo" className="text-sm font-medium">
-                {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
+      <ScrollArea className="flex-1 px-6">
+        <form onSubmit={handleSubmit} className="py-6 space-y-8">
+          {/* Configuration Section */}
+          {(fieldConfig.showSubtipo || fieldConfig.showDates) && (
+            <Card className="border-gray-200">
+              <CardContent className="p-6 space-y-6">
+                <h4 className="font-medium text-gray-900 flex items-center space-x-2">
+                  <Clock className="h-4 w-4" />
+                  <span>Configuración</span>
+                </h4>
+
+                {/* Subtipo Selection */}
+                {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
+                  <div className="space-y-3">
+                    <Label htmlFor="subtipo" className="text-sm font-medium text-gray-700">
+                      {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
+                    </Label>
+                    <Select
+                      value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
+                      onValueChange={(value) => handleInputChange('subtipo', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fieldConfig.subtipoOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Date Fields */}
+                {fieldConfig.showDates && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <Label htmlFor="fecha_inicio" className="text-sm font-medium text-gray-700">
+                        Fecha Inicio {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
+                      </Label>
+                      <Input
+                        id="fecha_inicio"
+                        type="date"
+                        value={formData.fecha_inicio || ''}
+                        onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
+                        className={validationErrors.fecha_inicio ? 'border-red-300 focus:border-red-500' : ''}
+                      />
+                      {validationErrors.fecha_inicio && (
+                        <p className="text-xs text-red-600 flex items-center space-x-1">
+                          <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                          <span>{validationErrors.fecha_inicio}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label htmlFor="fecha_fin" className="text-sm font-medium text-gray-700">
+                        Fecha Fin {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
+                      </Label>
+                      <Input
+                        id="fecha_fin"
+                        type="date"
+                        value={formData.fecha_fin || ''}
+                        onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
+                        className={validationErrors.fecha_fin ? 'border-red-300 focus:border-red-500' : ''}
+                      />
+                      {validationErrors.fecha_fin && (
+                        <p className="text-xs text-red-600 flex items-center space-x-1">
+                          <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                          <span>{validationErrors.fecha_fin}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Quantity Section */}
+          {(fieldConfig.showDays || fieldConfig.showHours) && (
+            <Card className="border-gray-200">
+              <CardContent className="p-6 space-y-6">
+                <h4 className="font-medium text-gray-900 flex items-center space-x-2">
+                  <Calculator className="h-4 w-4" />
+                  <span>Cantidades</span>
+                </h4>
+
+                <div className="grid grid-cols-2 gap-6">
+                  {fieldConfig.showDays && (
+                    <div className="space-y-3">
+                      <Label htmlFor="dias" className="text-sm font-medium text-gray-700">
+                        Días {fieldConfig.requiresDays && <span className="text-red-500">*</span>}
+                        {!fieldConfig.requiresDays && <span className="text-gray-400 text-xs ml-1">(opcional)</span>}
+                      </Label>
+                      <Input
+                        id="dias"
+                        type="number"
+                        min="0"
+                        value={formData.dias || ''}
+                        onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
+                        className={validationErrors.dias ? 'border-red-300 focus:border-red-500' : ''}
+                      />
+                      {validationErrors.dias && (
+                        <p className="text-xs text-red-600 flex items-center space-x-1">
+                          <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                          <span>{validationErrors.dias}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {fieldConfig.showHours && (
+                    <div className="space-y-3">
+                      <Label htmlFor="horas" className="text-sm font-medium text-gray-700">
+                        Horas {fieldConfig.requiresHours && <span className="text-red-500">*</span>}
+                        {!fieldConfig.requiresHours && <span className="text-gray-400 text-xs ml-1">(opcional)</span>}
+                      </Label>
+                      <Input
+                        id="horas"
+                        type="number"
+                        min="0"
+                        max="24"
+                        step="0.5"
+                        value={formData.horas || ''}
+                        onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
+                        className={validationErrors.horas ? 'border-red-300 focus:border-red-500' : ''}
+                      />
+                      {validationErrors.horas && (
+                        <p className="text-xs text-red-600 flex items-center space-x-1">
+                          <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                          <span>{validationErrors.horas}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Value Section */}
+          <Card className="border-gray-200">
+            <CardContent className="p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-gray-900 flex items-center space-x-2">
+                  <span className="text-lg">💰</span>
+                  <span>Valor</span>
+                  <span className="text-red-500">*</span>
+                </h4>
+                <div className="flex items-center space-x-3">
+                  <JornadaLegalTooltip fecha={currentPeriodDate} showBadge={false} />
+                  {suggestedValue && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleInputChange('valor', suggestedValue)}
+                      className="flex items-center space-x-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                    >
+                      <Calculator className="h-4 w-4" />
+                      <span className="font-medium">${suggestedValue.toLocaleString()}</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <Input
+                id="valor"
+                type="number"
+                min="0"
+                step="1000"
+                value={formData.valor}
+                onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
+                placeholder="Ingresa el valor"
+                className={`text-lg font-medium ${validationErrors.valor ? 'border-red-300 focus:border-red-500' : 'border-gray-300'}`}
+              />
+              
+              {validationErrors.valor && (
+                <p className="text-xs text-red-600 flex items-center space-x-1">
+                  <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                  <span>{validationErrors.valor}</span>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Observations Section */}
+          <Card className="border-gray-200">
+            <CardContent className="p-6 space-y-4">
+              <Label htmlFor="observacion" className="text-sm font-medium text-gray-700">
+                Observaciones
               </Label>
-              <Select
-                value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
-                onValueChange={(value) => handleInputChange('subtipo', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {fieldConfig.subtipoOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Date Fields */}
-          {fieldConfig.showDates && (
-            <div className="grid grid-cols-1 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="fecha_inicio" className="text-sm font-medium">
-                  Fecha Inicio {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
-                </Label>
-                <Input
-                  id="fecha_inicio"
-                  type="date"
-                  value={formData.fecha_inicio || ''}
-                  onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
-                />
-                {validationErrors.fecha_inicio && (
-                  <p className="text-sm text-red-600">{validationErrors.fecha_inicio}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="fecha_fin" className="text-sm font-medium">
-                  Fecha Fin {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
-                </Label>
-                <Input
-                  id="fecha_fin"
-                  type="date"
-                  value={formData.fecha_fin || ''}
-                  onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
-                />
-                {validationErrors.fecha_fin && (
-                  <p className="text-sm text-red-600">{validationErrors.fecha_fin}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Quantity Fields */}
-          <div className="grid grid-cols-1 gap-3">
-            {fieldConfig.showDays && (
-              <div className="space-y-2">
-                <Label htmlFor="dias" className="text-sm font-medium">
-                  Días {fieldConfig.requiresDays && <span className="text-red-500">*</span>}
-                  {!fieldConfig.requiresDays && <span className="text-gray-500 text-xs"> (opcional)</span>}
-                </Label>
-                <Input
-                  id="dias"
-                  type="number"
-                  min="0"
-                  value={formData.dias || ''}
-                  onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
-                />
-                {validationErrors.dias && (
-                  <p className="text-sm text-red-600">{validationErrors.dias}</p>
-                )}
-              </div>
-            )}
-
-            {fieldConfig.showHours && (
-              <div className="space-y-2">
-                <Label htmlFor="horas" className="text-sm font-medium">
-                  Horas {fieldConfig.requiresHours && <span className="text-red-500">*</span>}
-                  {!fieldConfig.requiresHours && <span className="text-gray-500 text-xs"> (opcional)</span>}
-                </Label>
-                <Input
-                  id="horas"
-                  type="number"
-                  min="0"
-                  max="24"
-                  step="0.5"
-                  value={formData.horas || ''}
-                  onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
-                />
-                {validationErrors.horas && (
-                  <p className="text-sm text-red-600">{validationErrors.horas}</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Value Field with Enhanced Suggested Value */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="valor" className="text-sm font-medium">Valor <span className="text-red-500">*</span></Label>
-              <div className="flex items-center space-x-2">
-                <JornadaLegalTooltip fecha={currentPeriodDate} showBadge={false} />
-                {suggestedValue && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleInputChange('valor', suggestedValue)}
-                    className="text-xs flex items-center space-x-1"
-                  >
-                    <Calculator className="h-3 w-3" />
-                    <span>Usar: ${suggestedValue.toLocaleString()}</span>
-                  </Button>
-                )}
-              </div>
-            </div>
-            <Input
-              id="valor"
-              type="number"
-              min="0"
-              step="1000"
-              value={formData.valor}
-              onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
-              placeholder="Ingresa el valor"
-            />
-            {validationErrors.valor && (
-              <p className="text-sm text-red-600">{validationErrors.valor}</p>
-            )}
-          </div>
-
-          {/* Observaciones */}
-          <div className="space-y-2">
-            <Label htmlFor="observacion" className="text-sm font-medium">Observaciones</Label>
-            <Textarea
-              id="observacion"
-              value={formData.observacion || ''}
-              onChange={(e) => handleInputChange('observacion', e.target.value)}
-              placeholder="Agrega cualquier observación adicional"
-              rows={3}
-              className="resize-none"
-            />
-          </div>
+              <Textarea
+                id="observacion"
+                value={formData.observacion || ''}
+                onChange={(e) => handleInputChange('observacion', e.target.value)}
+                placeholder="Agrega cualquier observación adicional"
+                rows={3}
+                className="resize-none"
+              />
+            </CardContent>
+          </Card>
 
           {/* Preview Card */}
-          <Card className="bg-gray-50 border">
-            <CardContent className="p-3">
+          <Card className="bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200">
+            <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Vista previa</p>
-                  <p className="text-xs text-gray-600">
-                    {formData.tipo_novedad} • {formData.valor.toLocaleString()} COP
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <p className="font-medium text-gray-900">Vista previa</p>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {formData.tipo_novedad.replace('_', ' ')} • {formData.valor.toLocaleString()} COP
                   </p>
                   <div className="flex items-center space-x-2 text-xs text-gray-500">
                     <Clock className="h-3 w-3" />
@@ -549,7 +609,10 @@ export const NovedadForm = ({
                     </span>
                   </div>
                 </div>
-                <Badge variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}>
+                <Badge 
+                  variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}
+                  className="text-lg px-4 py-2"
+                >
                   {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
                 </Badge>
               </div>
@@ -559,30 +622,32 @@ export const NovedadForm = ({
       </ScrollArea>
 
       {/* Fixed Footer */}
-      <div className="flex-shrink-0 flex justify-end space-x-3 pt-4 border-t mt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          onClick={handleSubmit}
-          disabled={!isFormValid || isSubmitting}
-          className="min-w-[100px]"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            'Guardar'
-          )}
-        </Button>
+      <div className="flex-shrink-0 px-6 py-4 border-t bg-gray-50/50">
+        <div className="flex justify-end space-x-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={!isFormValid || isSubmitting}
+            className="min-w-[120px]"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              'Guardar'
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
