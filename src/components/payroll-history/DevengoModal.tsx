@@ -12,7 +12,6 @@ import { CreateNovedadData } from '@/types/novedades';
 import { formatCurrency } from '@/lib/utils';
 import { X, Plus, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 
 interface DevengoModalProps {
   isOpen: boolean;
@@ -59,24 +58,14 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
     deleteNovedad,
     isLoading 
   } = useNovedades(periodId, async () => {
-    // Callback when novedad changes - recalculate employee totals
-    console.log('🔄 Novedad changed, recalculating employee totals');
-    try {
-      await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(employeeId, periodId);
-      console.log('✅ Employee totals recalculated successfully');
+    console.log('🔄 Novedad changed, triggering parent refresh');
+    if (onNovedadCreated) {
+      const novedades = getEmployeeNovedades(employeeId);
+      const totalDevengados = novedades
+        .filter(n => tiposNovedadDevengados.some(t => t.value === n.tipo_novedad))
+        .reduce((sum, n) => sum + n.valor, 0);
       
-      // Trigger parent component refresh
-      if (onNovedadCreated) {
-        // Get the updated totals to pass to parent
-        const novedades = getEmployeeNovedades(employeeId);
-        const totalDevengados = novedades
-          .filter(n => tiposNovedadDevengados.some(t => t.value === n.tipo_novedad))
-          .reduce((sum, n) => sum + n.valor, 0);
-        
-        onNovedadCreated(employeeId, totalDevengados, 'devengado');
-      }
-    } catch (error) {
-      console.error('❌ Error recalculating employee totals:', error);
+      onNovedadCreated(employeeId, totalDevengados, 'devengado');
     }
   });
 
@@ -90,6 +79,8 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
     fecha_fin: ''
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Load novedades when modal opens
   useEffect(() => {
     if (isOpen && employeeId && periodId) {
@@ -98,18 +89,44 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
     }
   }, [isOpen, employeeId, periodId, loadNovedadesForEmployee]);
 
+  const resetForm = () => {
+    setFormData({
+      tipo_novedad: '',
+      valor: '',
+      horas: '',
+      dias: '',
+      observacion: '',
+      fecha_inicio: '',
+      fecha_fin: ''
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.tipo_novedad || !formData.valor) {
+    console.log('📝 Form submission started with data:', formData);
+    
+    // Basic validation
+    if (!formData.tipo_novedad) {
       toast({
-        title: "Campos requeridos",
-        description: "Por favor completa tipo de novedad y valor",
+        title: "Error de validación",
+        description: "Debes seleccionar un tipo de novedad",
         variant: "destructive"
       });
       return;
     }
 
+    if (!formData.valor || parseFloat(formData.valor) <= 0) {
+      toast({
+        title: "Error de validación",
+        description: "El valor debe ser mayor a 0",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
     try {
       const novedadData: CreateNovedadData = {
         empleado_id: employeeId,
@@ -123,33 +140,28 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
         fecha_fin: formData.fecha_fin || undefined
       };
 
-      console.log('📝 Creating novedad with data:', novedadData);
+      console.log('📤 Creating novedad with processed data:', novedadData);
+      
       await createNovedad(novedadData);
       
-      // Reset form
-      setFormData({
-        tipo_novedad: '',
-        valor: '',
-        horas: '',
-        dias: '',
-        observacion: '',
-        fecha_inicio: '',
-        fecha_fin: ''
-      });
+      // Reset form on success
+      resetForm();
 
       toast({
-        title: "Novedad creada",
-        description: "La novedad se ha registrado correctamente y los totales se actualizarán automáticamente",
+        title: "¡Éxito!",
+        description: "La novedad se ha creado correctamente",
         duration: 3000
       });
 
     } catch (error) {
-      console.error('❌ Error creating novedad:', error);
+      console.error('❌ Error in form submission:', error);
       toast({
         title: "Error al crear novedad",
-        description: "No se pudo crear la novedad. Intenta nuevamente.",
+        description: error instanceof Error ? error.message : "Error desconocido",
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -171,7 +183,6 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
   };
 
   const novedades = getEmployeeNovedades(employeeId);
-  console.log('📊 Novedades for modal display:', novedades);
 
   const getTipoNovedadLabel = (tipo: string) => {
     const allTypes = [...tiposNovedadDevengados, ...tiposNovedadDeducciones];
@@ -181,6 +192,9 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
   const isDevengado = (tipo: string) => {
     return tiposNovedadDevengados.some(t => t.value === tipo);
   };
+
+  // Check if form is valid for submission
+  const isFormValid = formData.tipo_novedad && formData.valor && parseFloat(formData.valor) > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -245,9 +259,10 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
                   id="valor"
                   type="number"
                   step="0.01"
+                  min="0.01"
                   value={formData.valor}
                   onChange={(e) => setFormData(prev => ({ ...prev, valor: e.target.value }))}
-                  placeholder="0.00"
+                  placeholder="Ingresa el valor"
                 />
               </div>
 
@@ -258,6 +273,7 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
                     id="horas"
                     type="number"
                     step="0.1"
+                    min="0"
                     value={formData.horas}
                     onChange={(e) => setFormData(prev => ({ ...prev, horas: e.target.value }))}
                     placeholder="0"
@@ -268,6 +284,7 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
                   <Input
                     id="dias"
                     type="number"
+                    min="0"
                     value={formData.dias}
                     onChange={(e) => setFormData(prev => ({ ...prev, dias: e.target.value }))}
                     placeholder="0"
@@ -310,9 +327,9 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading}
+                disabled={!isFormValid || isSubmitting || isLoading}
               >
-                {isLoading ? 'Guardando...' : 'Guardar Novedad'}
+                {isSubmitting ? 'Guardando...' : 'Guardar Novedad'}
               </Button>
             </form>
           </div>
