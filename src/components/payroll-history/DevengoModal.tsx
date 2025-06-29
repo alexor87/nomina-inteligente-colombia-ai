@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -12,7 +13,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Plus, 
   Trash2, 
-  Calculator,
   Clock,
   AlertCircle,
   Loader2,
@@ -24,7 +24,6 @@ import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { NovedadForm } from '@/components/payroll/novedades/NovedadForm';
 import { formatCurrency } from '@/lib/utils';
-import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DevengoModalProps {
@@ -78,17 +77,6 @@ export const DevengoModal = ({
   const [showForm, setShowForm] = useState(false);
   const [editingNovedad, setEditingNovedad] = useState<NovedadDisplay | null>(null);
   const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(new Date());
-  const [debugInfo, setDebugInfo] = useState<{
-    receivedPeriodId: string;
-    foundPeriods: any[];
-    novedadesFound: number;
-    periodTextUsed?: string;
-    payrollData?: any;
-  }>({
-    receivedPeriodId: '',
-    foundPeriods: [],
-    novedadesFound: 0
-  });
 
   // Form state con valores por defecto mejorados
   const [formData, setFormData] = useState<CreateNovedadData>({
@@ -104,37 +92,9 @@ export const DevengoModal = ({
     observacion: ''
   });
 
-  // Debug logging for periodId investigation
-  useEffect(() => {
-    if (isOpen) {
-      console.log('🔍 DEBUG: Modal opened with props:', {
-        employeeId,
-        periodId,
-        payrollId,
-        modalType,
-        receivedProps: { employeeId, periodId, payrollId }
-      });
-      
-      setDebugInfo(prev => ({
-        ...prev,
-        receivedPeriodId: periodId
-      }));
-    }
-  }, [isOpen, employeeId, periodId, payrollId, modalType]);
-
   // Actualizar formData cuando cambien las props
   useEffect(() => {
     if (isOpen) {
-      console.log('🔄 Modal opened, updating form data with:', {
-        employeeId,
-        periodId,
-        modalType,
-        formDataUpdate: {
-          empleado_id: employeeId,
-          periodo_id: periodId
-        }
-      });
-      
       setFormData({
         empleado_id: employeeId,
         periodo_id: periodId,
@@ -150,36 +110,21 @@ export const DevengoModal = ({
     }
   }, [isOpen, employeeId, periodId, modalType]);
 
-  // Enhanced period date loading with debugging
+  // Enhanced period date loading
   useEffect(() => {
     const loadPeriodDate = async () => {
       try {
-        console.log('🔍 Loading period date for accurate calculations, periodId:', periodId);
-        
         // First check payroll_periods_real table
-        const { data: periodDataReal, error: errorReal } = await supabase
+        const { data: periodDataReal } = await supabase
           .from('payroll_periods_real')
           .select('*')
           .eq('id', periodId);
 
-        console.log('📊 Query payroll_periods_real result:', { periodDataReal, errorReal });
-
         // Then check payroll_periods table as fallback
-        const { data: periodDataRegular, error: errorRegular } = await supabase
+        const { data: periodDataRegular } = await supabase
           .from('payroll_periods')
           .select('*')
           .eq('id', periodId);
-
-        console.log('📊 Query payroll_periods result:', { periodDataRegular, errorRegular });
-
-        // Update debug info
-        setDebugInfo(prev => ({
-          ...prev,
-          foundPeriods: [
-            ...(periodDataReal || []),
-            ...(periodDataRegular || [])
-          ]
-        }));
 
         // Use the first period found
         const periodData = periodDataReal?.[0] || periodDataRegular?.[0];
@@ -187,13 +132,7 @@ export const DevengoModal = ({
         if (periodData?.fecha_inicio) {
           const fechaPeriodo = new Date(periodData.fecha_inicio);
           setCurrentPeriodDate(fechaPeriodo);
-          console.log('📅 Period date loaded successfully:', fechaPeriodo.toISOString().split('T')[0]);
         } else {
-          console.warn('⚠️ No period date found, using current date. Period search results:', {
-            periodDataReal,
-            periodDataRegular,
-            periodId
-          });
           setCurrentPeriodDate(new Date());
         }
       } catch (error) {
@@ -212,8 +151,6 @@ export const DevengoModal = ({
     if (!isOpen || !payrollId) return;
     
     try {
-      console.log('🔍 Loading basic payroll concepts for payrollId:', payrollId);
-      
       const { data: payrollData, error } = await supabase
         .from('payrolls')
         .select('salario_base, auxilio_transporte')
@@ -224,18 +161,11 @@ export const DevengoModal = ({
         console.error('❌ Error loading payroll data:', error);
         return;
       }
-
-      console.log('📊 Payroll basic concepts loaded:', payrollData);
       
       setBasicConcepts({
         salarioBase: Number(payrollData?.salario_base || 0),
         auxilioTransporte: Number(payrollData?.auxilio_transporte || 0)
       });
-
-      setDebugInfo(prev => ({
-        ...prev,
-        payrollData
-      }));
       
     } catch (error) {
       console.error('❌ Error loading basic concepts:', error);
@@ -247,63 +177,9 @@ export const DevengoModal = ({
     
     try {
       setIsLoading(true);
-      console.log('🔍 Loading novedades for employee in modal:', employeeId, 'period:', periodId);
       
       // Try direct service call first
       const data = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
-      console.log('📊 Direct service result:', data);
-      
-      // If no data found, try alternative queries for debugging
-      if (!data || data.length === 0) {
-        console.log('⚠️ No novedades found with direct query, trying debugging queries...');
-        
-        // Query 1: All novedades for this employee (any period)
-        const { data: allNovedadesForEmployee, error: error1 } = await supabase
-          .from('payroll_novedades')
-          .select('*')
-          .eq('empleado_id', employeeId);
-        
-        console.log('🔍 All novedades for employee:', allNovedadesForEmployee, 'Error:', error1);
-        
-        // Query 2: All novedades for this period (any employee)
-        const { data: allNovedadesForPeriod, error: error2 } = await supabase
-          .from('payroll_novedades')
-          .select('*')
-          .eq('periodo_id', periodId);
-        
-        console.log('🔍 All novedades for period:', allNovedadesForPeriod, 'Error:', error2);
-        
-        // Query 3: Check if there are novedades that match by periodo text instead of ID
-        const companyId = await NovedadesEnhancedService.getCurrentUserCompanyId();
-        if (companyId) {
-          // Get period text from payroll table
-          const { data: payrollData } = await supabase
-            .from('payrolls')
-            .select('periodo')
-            .eq('employee_id', employeeId)
-            .eq('id', payrollId)
-            .single();
-          
-          console.log('📊 Payroll period text:', payrollData?.periodo);
-          
-          if (payrollData?.periodo) {
-            // Try to find novedades by matching periodo text pattern
-            const { data: novedadesByText, error: error3 } = await supabase
-              .from('payroll_novedades')
-              .select('*')
-              .eq('company_id', companyId)
-              .eq('empleado_id', employeeId);
-            
-            console.log('🔍 Novedades search by company/employee:', novedadesByText, 'Error:', error3);
-            
-            setDebugInfo(prev => ({
-              ...prev,
-              periodTextUsed: payrollData.periodo,
-              novedadesFound: novedadesByText?.length || 0
-            }));
-          }
-        }
-      }
       
       // Filtrar por tipo de modal
       const filteredNovedades = (data || []).filter(novedad => {
@@ -314,9 +190,7 @@ export const DevengoModal = ({
       });
       
       setNovedades(filteredNovedades);
-      setDebugInfo(prev => ({ ...prev, novedadesFound: filteredNovedades.length }));
       
-      console.log('✅ Loaded and filtered novedades:', filteredNovedades);
     } catch (error) {
       console.error('❌ Error loading novedades:', error);
       toast({
@@ -327,7 +201,7 @@ export const DevengoModal = ({
     } finally {
       setIsLoading(false);
     }
-  }, [isOpen, employeeId, periodId, modalType, payrollId, toast]);
+  }, [isOpen, employeeId, periodId, modalType, toast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -345,11 +219,6 @@ export const DevengoModal = ({
     try {
       if (!employeeSalary || employeeSalary <= 0) return null;
       
-      console.log('🧮 Calculating with period-specific legal workday');
-      console.log('📅 Using period date:', currentPeriodDate.toISOString().split('T')[0]);
-      console.log('💰 Employee salary:', employeeSalary);
-      console.log('⏰ Hours:', horas, 'Days:', dias);
-      
       const resultado = calcularValorNovedadEnhanced(
         tipoNovedad,
         subtipo,
@@ -358,9 +227,6 @@ export const DevengoModal = ({
         horas,
         currentPeriodDate
       );
-      
-      console.log(`💰 Calculated value with period-specific legal workday for ${tipoNovedad}:`, resultado.valor);
-      console.log(`📊 Calculation details:`, resultado.baseCalculo.detalle_calculo);
       
       return resultado.valor > 0 ? resultado.valor : null;
     } catch (error) {
@@ -371,9 +237,7 @@ export const DevengoModal = ({
 
   const recalculateEmployeeTotals = async () => {
     try {
-      console.log('🔄 Triggering employee totals recalculation with correct deductions...');
       await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(employeeId, periodId);
-      console.log('✅ Employee totals recalculated successfully with correct deductions');
     } catch (error) {
       console.error('❌ Error recalculating employee totals:', error);
     }
@@ -401,18 +265,9 @@ export const DevengoModal = ({
     try {
       setIsSubmitting(true);
       
-      console.log('📝 Creating novedad with enhanced debugging:', {
-        ...formData,
-        employeeId: formData.empleado_id,
-        periodId: formData.periodo_id,
-        debugInfo: debugInfo
-      });
-      
       const newNovedad = await NovedadesEnhancedService.createNovedad(formData);
 
       if (newNovedad) {
-        console.log('✅ Novedad created successfully, recalculating totals...');
-        
         await recalculateEmployeeTotals();
         await loadNovedades();
         setShowForm(false);
@@ -438,7 +293,7 @@ export const DevengoModal = ({
 
         toast({
           title: "Novedad creada",
-          description: `Se ha creado la novedad de tipo ${formData.tipo_novedad} por ${formatCurrency(newNovedad.valor)}${modalType === 'deduccion' ? ' y se han recalculado las deducciones correctamente' : ''}`,
+          description: `Se ha creado la novedad de tipo ${formData.tipo_novedad} por ${formatCurrency(newNovedad.valor)}`,
           duration: 3000
         });
       }
@@ -466,8 +321,6 @@ export const DevengoModal = ({
       );
 
       if (updatedNovedad) {
-        console.log('✅ Novedad updated, now recalculating totals with correct deductions...');
-        
         await recalculateEmployeeTotals();
         await loadNovedades();
         setEditingNovedad(null);
@@ -479,7 +332,7 @@ export const DevengoModal = ({
 
         toast({
           title: "Novedad actualizada",
-          description: `La novedad se ha actualizado correctamente${modalType === 'deduccion' ? ' y se han recalculado las deducciones' : ''}`,
+          description: `La novedad se ha actualizado correctamente`,
         });
       }
     } catch (error) {
@@ -499,8 +352,6 @@ export const DevengoModal = ({
       setIsLoading(true);
       await NovedadesEnhancedService.deleteNovedad(novedadId);
       
-      console.log('✅ Novedad deleted, now recalculating totals with correct deductions...');
-      
       await recalculateEmployeeTotals();
       await loadNovedades();
 
@@ -510,7 +361,7 @@ export const DevengoModal = ({
 
       toast({
         title: "Novedad eliminada",
-        description: `La novedad se ha eliminado correctamente${modalType === 'deduccion' ? ' y se han recalculado las deducciones' : ''}`,
+        description: `La novedad se ha eliminado correctamente`,
       });
     } catch (error) {
       console.error('Error deleting novedad:', error);
@@ -598,7 +449,7 @@ export const DevengoModal = ({
     }
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h4 className="font-medium text-gray-900 flex items-center space-x-2">
             <DollarSign className="h-4 w-4" />
@@ -609,15 +460,12 @@ export const DevengoModal = ({
           </Badge>
         </div>
         
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
           {basicConcepts.salarioBase > 0 && (
-            <div className="border rounded-lg p-3 bg-blue-50">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="font-medium text-sm">Salario Base</span>
-                  <p className="text-xs text-gray-600">Salario mensual del empleado</p>
-                </div>
-                <div className="text-green-700 font-semibold">
+            <div className="border rounded-lg p-2 bg-blue-50">
+              <div className="text-center">
+                <span className="font-medium text-xs">Salario Base</span>
+                <div className="text-green-700 font-semibold text-sm">
                   +{formatCurrency(basicConcepts.salarioBase)}
                 </div>
               </div>
@@ -625,13 +473,10 @@ export const DevengoModal = ({
           )}
           
           {basicConcepts.auxilioTransporte > 0 && (
-            <div className="border rounded-lg p-3 bg-blue-50">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="font-medium text-sm">Auxilio de Transporte</span>
-                  <p className="text-xs text-gray-600">Auxilio legal de transporte</p>
-                </div>
-                <div className="text-green-700 font-semibold">
+            <div className="border rounded-lg p-2 bg-blue-50">
+              <div className="text-center">
+                <span className="font-medium text-xs">Auxilio Transporte</span>
+                <div className="text-green-700 font-semibold text-sm">
                   +{formatCurrency(basicConcepts.auxilioTransporte)}
                 </div>
               </div>
@@ -646,38 +491,15 @@ export const DevengoModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
-        {/* Header with debug info */}
-        <div className="p-6 pb-4">
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
+        {/* Simplified Header */}
+        <div className="p-4 pb-2">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div>
                 <span className="text-lg font-semibold">
                   {modalType === 'devengado' ? 'Devengados' : 'Deducciones'} - {employeeName}
                 </span>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant="outline" className="text-xs">
-                    Salario: {formatCurrency(employeeSalary)}
-                  </Badge>
-                  <JornadaLegalTooltip fecha={currentPeriodDate} />
-                  {modalType === 'deduccion' && (
-                    <Badge variant="secondary" className="text-xs">
-                      Con cálculo correcto de IBC y retención
-                    </Badge>
-                  )}
-                </div>
-                {/* Debug info display */}
-                <div className="text-xs text-gray-500 mt-2 space-y-1">
-                  <div>Debug: PeriodId = {debugInfo.receivedPeriodId}</div>
-                  <div>Períodos encontrados: {debugInfo.foundPeriods.length}</div>
-                  <div>Novedades encontradas: {debugInfo.novedadesFound}</div>
-                  {debugInfo.periodTextUsed && (
-                    <div>Período texto: {debugInfo.periodTextUsed}</div>
-                  )}
-                  {debugInfo.payrollData && (
-                    <div>Payroll: Salario {formatCurrency(debugInfo.payrollData.salario_base || 0)}, Auxilio {formatCurrency(debugInfo.payrollData.auxilio_transporte || 0)}</div>
-                  )}
-                </div>
               </div>
               <Badge 
                 variant={modalType === 'devengado' ? 'default' : 'destructive'}
@@ -694,30 +516,31 @@ export const DevengoModal = ({
           {!showForm ? (
             <>
               {/* List header */}
-              <div className="flex justify-between items-center px-6 pb-4">
+              <div className="flex justify-between items-center px-4 pb-2">
                 <div className="text-sm text-gray-600">
                   {modalType === 'devengado' 
-                    ? `${totalBasicConcepts > 0 ? 'Conceptos básicos + ' : ''}${novedades.length} novedades adicionales`
-                    : `${novedades.length} deducciones registradas`
+                    ? `${totalBasicConcepts > 0 ? 'Conceptos básicos + ' : ''}${novedades.length} novedades`
+                    : `${novedades.length} deducciones`
                   }
                 </div>
                 <Button 
                   onClick={() => setShowForm(true)}
+                  size="sm"
                   className="flex items-center space-x-2"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>Agregar {modalType}</span>
+                  <span>Agregar</span>
                 </Button>
               </div>
 
               {/* Scrollable list */}
-              <ScrollArea className="flex-1 px-6">
+              <ScrollArea className="flex-1 px-4">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                   </div>
                 ) : (
-                  <div className="space-y-4 pb-6">
+                  <div className="space-y-3 pb-4">
                     {/* Basic Concepts Section */}
                     {renderBasicConcepts()}
                     
@@ -727,8 +550,8 @@ export const DevengoModal = ({
                     )}
                     
                     {/* Additional Novedades Section */}
-                    <div className="space-y-3">
-                      {modalType === 'devengado' && totalBasicConcepts > 0 && (
+                    <div className="space-y-2">
+                      {modalType === 'devengado' && totalBasicConcepts > 0 && novedades.length > 0 && (
                         <div className="flex items-center justify-between">
                           <h4 className="font-medium text-gray-900">Novedades Adicionales</h4>
                           <Badge variant="outline" className="text-sm">
@@ -741,23 +564,20 @@ export const DevengoModal = ({
                         <div className="text-center py-6">
                           <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                           <h3 className="text-sm font-medium text-gray-900 mb-1">
-                            No hay novedades adicionales
+                            {modalType === 'devengado' ? 'No hay novedades adicionales' : 'No hay deducciones'}
                           </h3>
                           <p className="text-xs text-gray-600">
-                            {modalType === 'devengado' 
-                              ? 'Los conceptos básicos se muestran arriba. Agrega horas extra, bonificaciones, etc.'
-                              : 'Haz clic en "Agregar deducción" para comenzar'
-                            }
+                            Haz clic en "Agregar" para comenzar
                           </p>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           {novedades.map((novedad) => (
-                            <div key={novedad.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                            <div key={novedad.id} className="border rounded-lg p-3 hover:bg-gray-50">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <h4 className="font-medium">{getNovedadLabel(novedad.tipo_novedad)}</h4>
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <h4 className="font-medium text-sm">{getNovedadLabel(novedad.tipo_novedad)}</h4>
                                     {(novedad.horas || novedad.dias) && (
                                       <div className="flex items-center space-x-1 text-xs text-gray-500">
                                         <Clock className="h-3 w-3" />
@@ -770,28 +590,16 @@ export const DevengoModal = ({
                                     )}
                                   </div>
                                   
-                                  <div className="text-sm text-gray-600 space-y-1">
-                                    {novedad.observacion && (
-                                      <div>
-                                        <strong>Observación:</strong> {novedad.observacion}
-                                      </div>
-                                    )}
-                                    {novedad.fecha_inicio && novedad.fecha_fin && (
-                                      <div>
-                                        <strong>Período:</strong> {novedad.fecha_inicio} a {novedad.fecha_fin}
-                                      </div>
-                                    )}
-                                    {novedad.base_calculo?.detalle_calculo && (
-                                      <div className="text-xs bg-gray-100 p-2 rounded">
-                                        <strong>Cálculo:</strong> {novedad.base_calculo.detalle_calculo}
-                                      </div>
-                                    )}
-                                  </div>
+                                  {novedad.observacion && (
+                                    <div className="text-xs text-gray-600">
+                                      {novedad.observacion}
+                                    </div>
+                                  )}
                                 </div>
 
-                                <div className="flex items-center space-x-3 ml-4">
+                                <div className="flex items-center space-x-2 ml-4">
                                   <div className="text-right">
-                                    <div className={`font-semibold ${
+                                    <div className={`font-semibold text-sm ${
                                       modalType === 'devengado' ? 'text-green-700' : 'text-red-700'
                                     }`}>
                                       {modalType === 'devengado' ? '+' : '-'}{formatCurrency(novedad.valor)}
@@ -802,6 +610,7 @@ export const DevengoModal = ({
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => handleEditNovedad(novedad)}
+                                      className="h-8 px-2 text-xs"
                                     >
                                       Editar
                                     </Button>
@@ -809,9 +618,9 @@ export const DevengoModal = ({
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => handleDeleteNovedad(novedad.id)}
-                                      className="text-red-600 hover:text-red-700"
+                                      className="h-8 px-2 text-red-600 hover:text-red-700"
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      <Trash2 className="h-3 w-3" />
                                     </Button>
                                   </div>
                                 </div>
@@ -828,15 +637,15 @@ export const DevengoModal = ({
           ) : (
             <>
               {/* Form header */}
-              <div className="flex items-center justify-between px-6 pb-4">
+              <div className="flex items-center justify-between px-4 pb-2">
                 <h3 className="text-lg font-medium">
                   {editingNovedad ? 'Editar' : 'Agregar'} {modalType}
                 </h3>
               </div>
 
               {/* Scrollable form */}
-              <ScrollArea className="flex-1 px-6">
-                <div className="pb-6">
+              <ScrollArea className="flex-1 px-4">
+                <div className="pb-4">
                   <NovedadForm
                     formData={formData}
                     onFormDataChange={setFormData}
@@ -859,8 +668,8 @@ export const DevengoModal = ({
           )}
         </div>
 
-        {/* Fixed Footer */}
-        <div className="border-t bg-white p-6">
+        {/* Simplified Footer */}
+        <div className="border-t bg-white p-4">
           {showForm ? (
             <div className="flex justify-end space-x-3">
               <Button
@@ -887,16 +696,7 @@ export const DevengoModal = ({
               </Button>
             </div>
           ) : (
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <Calculator className="h-4 w-4" />
-                <span>
-                  {modalType === 'devengado' 
-                    ? 'Incluye conceptos básicos + novedades adicionales con jornada legal dinámica'
-                    : 'Deducciones calculadas con IBC correcto, tope 25 SMMLV y retención en la fuente'
-                  }
-                </span>
-              </div>
+            <div className="flex justify-end">
               <Button variant="outline" onClick={onClose}>
                 Cerrar
               </Button>
