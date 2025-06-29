@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -85,11 +85,10 @@ export const NovedadForm = ({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [selectedCategory, setSelectedCategory] = useState<'devengados' | 'deducciones'>(
     modalType === 'devengado' ? 'devengados' : 'deducciones'
   );
-  const [currentPeriodDate] = useState<Date>(new Date()); // En producción esto debería venir del período
+  const [currentPeriodDate] = useState<Date>(new Date());
 
   useEffect(() => {
     if (initialData?.tipo_novedad) {
@@ -99,7 +98,8 @@ export const NovedadForm = ({
     }
   }, [initialData]);
 
-  const validateForm = (): boolean => {
+  // Memoizar la validación para evitar cálculos innecesarios
+  const validationErrors = useMemo(() => {
     const errors: Record<string, string> = {};
 
     // Validate hours
@@ -122,14 +122,24 @@ export const NovedadForm = ({
       errors.valor = 'El valor debe ser mayor a 0';
     }
 
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+    return errors;
+  }, [formData.horas, formData.fecha_inicio, formData.fecha_fin, formData.valor]);
+
+  // Función memoizada para determinar si el tipo de novedad requiere horas o días
+  const requiresQuantity = useMemo(() => {
+    const typesRequiringHours = ['horas_extra', 'recargo_nocturno'];
+    const typesRequiringDays = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'ausencia'];
+    
+    return {
+      requiresHours: typesRequiringHours.includes(formData.tipo_novedad),
+      requiresDays: typesRequiringDays.includes(formData.tipo_novedad)
+    };
+  }, [formData.tipo_novedad]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (Object.keys(validationErrors).length > 0) {
       return;
     }
 
@@ -143,31 +153,33 @@ export const NovedadForm = ({
     }
   };
 
-  const handleInputChange = (field: keyof CreateNovedadData, value: any) => {
+  const handleInputChange = useCallback((field: keyof CreateNovedadData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear validation error for this field
-    if (validationErrors[field]) {
-      setValidationErrors(prev => {
-        const { [field]: _, ...rest } = prev;
-        return rest;
-      });
-    }
-  };
+  }, []);
 
-  // Función de cálculo mejorada usando el sistema enhanced - MEMOIZADA para evitar bucles
+  // Función de cálculo mejorada - completamente memoizada
   const suggestedValue = useMemo(() => {
+    // Solo calcular si realmente necesitamos un valor sugerido
+    if (!employeeSalary || employeeSalary <= 0) return null;
+    
+    // Verificar si el tipo de novedad requiere cantidades específicas
+    const needsHours = requiresQuantity.requiresHours && (!formData.horas || formData.horas <= 0);
+    const needsDays = requiresQuantity.requiresDays && (!formData.dias || formData.dias <= 0);
+    
+    // No calcular si falta información necesaria
+    if (needsHours || needsDays) {
+      return null;
+    }
+    
+    // Solo calcular si tenemos datos válidos para calcular
+    const hasValidHours = formData.horas && formData.horas > 0;
+    const hasValidDays = formData.dias && formData.dias > 0;
+    
+    if (!hasValidHours && !hasValidDays) {
+      return null;
+    }
+
     try {
-      if (!employeeSalary || employeeSalary <= 0) return null;
-      
-      // Solo calcular si tenemos horas o días válidos
-      const hasValidHours = formData.horas && formData.horas > 0;
-      const hasValidDays = formData.dias && formData.dias > 0;
-      
-      if (!hasValidHours && !hasValidDays) {
-        return null; // No calcular si no hay datos válidos
-      }
-      
       // Si tenemos función personalizada del modal, usarla
       if (calculateSuggestedValue) {
         return calculateSuggestedValue(
@@ -189,7 +201,6 @@ export const NovedadForm = ({
       );
       
       console.log(`💰 Enhanced calculation for ${formData.tipo_novedad}:`, resultado.valor);
-      console.log(`📊 Calculation details:`, resultado.baseCalculo.detalle_calculo);
       
       return resultado.valor > 0 ? resultado.valor : null;
     } catch (error) {
@@ -202,11 +213,16 @@ export const NovedadForm = ({
     formData.subtipo,
     formData.horas,
     formData.dias,
+    requiresQuantity.requiresHours,
+    requiresQuantity.requiresDays,
     currentPeriodDate,
     calculateSuggestedValue
   ]);
 
-  const isFormValid = validateForm() && formData.valor > 0;
+  // Memoizar isFormValid para evitar re-renders
+  const isFormValid = useMemo(() => {
+    return Object.keys(validationErrors).length === 0 && formData.valor > 0;
+  }, [validationErrors, formData.valor]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -217,7 +233,7 @@ export const NovedadForm = ({
           variant={selectedCategory === 'devengados' ? 'default' : 'outline'}
           onClick={() => setSelectedCategory('devengados')}
           className="flex-1"
-          disabled={modalType !== undefined} // Deshabilitar si viene del modal
+          disabled={modalType !== undefined}
         >
           Devengados
         </Button>
@@ -226,7 +242,7 @@ export const NovedadForm = ({
           variant={selectedCategory === 'deducciones' ? 'default' : 'outline'}
           onClick={() => setSelectedCategory('deducciones')}
           className="flex-1"
-          disabled={modalType !== undefined} // Deshabilitar si viene del modal
+          disabled={modalType !== undefined}
         >
           Deducciones
         </Button>
