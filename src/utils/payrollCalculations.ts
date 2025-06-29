@@ -2,10 +2,10 @@
 import { PayrollCalculationService, PayrollCalculationInput } from '@/services/PayrollCalculationService';
 import { PayrollEmployee, BaseEmployeeData, PayrollSummary } from '@/types/payroll';
 
-export const calculateEmployee = (
+export const calculateEmployee = async (
   baseEmployee: BaseEmployeeData, 
   periodType: 'quincenal' | 'mensual'
-): PayrollEmployee => {
+): Promise<PayrollEmployee> => {
   const input: PayrollCalculationInput = {
     baseSalary: baseEmployee.baseSalary,
     workedDays: baseEmployee.workedDays,
@@ -16,7 +16,7 @@ export const calculateEmployee = (
     periodType
   };
 
-  const calculation = PayrollCalculationService.calculatePayroll(input);
+  const calculation = await PayrollCalculationService.calculatePayroll(input);
   const validation = PayrollCalculationService.validateEmployee(input, baseEmployee.eps, baseEmployee.afp);
 
   return {

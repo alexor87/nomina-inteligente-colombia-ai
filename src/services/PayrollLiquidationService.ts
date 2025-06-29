@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollCalculationService } from './PayrollCalculationService';
@@ -169,7 +170,8 @@ export class PayrollLiquidationService {
 
       console.log(`Loaded ${data.length} active employees for payroll liquidation with ${periodType} periodicity`);
 
-      return data.map(emp => {
+      // Process each employee with async calculation
+      const employees = await Promise.all(data.map(async (emp) => {
         const baseEmployeeData = {
           id: emp.id,
           name: `${emp.nombre} ${emp.apellido}`,
@@ -185,7 +187,7 @@ export class PayrollLiquidationService {
         };
 
         // Calcular datos de nómina usando el servicio de cálculo con la periodicidad correcta
-        const calculation = PayrollCalculationService.calculatePayroll({
+        const calculation = await PayrollCalculationService.calculatePayroll({
           baseSalary: baseEmployeeData.baseSalary,
           workedDays: baseEmployeeData.workedDays,
           extraHours: baseEmployeeData.extraHours,
@@ -206,7 +208,9 @@ export class PayrollLiquidationService {
           status: 'valid' as PayrollEmployee['status'],
           errors: []
         };
-      });
+      }));
+
+      return employees;
     } catch (error) {
       console.error('Error loading employees:', error);
       return [];
