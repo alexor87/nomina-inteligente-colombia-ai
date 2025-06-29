@@ -7,15 +7,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { NovedadFormData, NOVEDAD_CATEGORIES, NovedadType } from '@/types/novedades';
-import { Calculator, Loader2 } from 'lucide-react';
+import { NovedadType, NOVEDAD_CATEGORIES, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { Calculator, Loader2, Clock } from 'lucide-react';
+import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
 
 interface NovedadFormProps {
-  onSubmit: (data: NovedadFormData) => Promise<void>;
+  onSubmit: (data: CreateNovedadData) => Promise<void>;
   onCancel: () => void;
-  initialData?: Partial<NovedadFormData>;
+  initialData?: Partial<CreateNovedadData>;
   isLoading?: boolean;
   employeeSalary?: number;
+  calculateSuggestedValue?: (
+    tipoNovedad: NovedadType,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ) => number | null;
+  modalType?: 'devengado' | 'deduccion';
 }
 
 export const NovedadForm = ({
@@ -23,9 +32,11 @@ export const NovedadForm = ({
   onCancel,
   initialData,
   isLoading = false,
-  employeeSalary = 1300000
+  employeeSalary = 1300000,
+  calculateSuggestedValue,
+  modalType = 'devengado'
 }: NovedadFormProps) => {
-  const [formData, setFormData] = useState<NovedadFormData>({
+  const [formData, setFormData] = useState<CreateNovedadData>({
     tipo_novedad: 'horas_extra' as NovedadType,
     subtipo: '',
     fecha_inicio: '',
@@ -39,7 +50,10 @@ export const NovedadForm = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [selectedCategory, setSelectedCategory] = useState<'devengados' | 'deducciones'>('devengados');
+  const [selectedCategory, setSelectedCategory] = useState<'devengados' | 'deducciones'>(
+    modalType === 'devengado' ? 'devengados' : 'deducciones'
+  );
+  const [currentPeriodDate] = useState<Date>(new Date()); // En producción esto debería venir del período
 
   useEffect(() => {
     if (initialData?.tipo_novedad) {
@@ -93,7 +107,7 @@ export const NovedadForm = ({
     }
   };
 
-  const handleInputChange = (field: keyof NovedadFormData, value: any) => {
+  const handleInputChange = (field: keyof CreateNovedadData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
     // Clear validation error for this field
@@ -105,16 +119,42 @@ export const NovedadForm = ({
     }
   };
 
-  const calculateSuggestedValue = () => {
-    if (formData.tipo_novedad === 'horas_extra' && formData.horas) {
-      const hourlyRate = employeeSalary / (30 * 8); // Assuming 30 days, 8 hours per day
-      const extraRate = hourlyRate * 1.25; // 25% extra for overtime
-      return Math.round(extraRate * formData.horas);
+  // Función de cálculo mejorada usando el sistema enhanced
+  const calculateSuggestedValueEnhanced = (): number | null => {
+    try {
+      if (!employeeSalary || employeeSalary <= 0) return null;
+      
+      // Si tenemos función personalizada del modal, usarla
+      if (calculateSuggestedValue) {
+        return calculateSuggestedValue(
+          formData.tipo_novedad,
+          formData.subtipo,
+          formData.horas || undefined,
+          formData.dias || undefined
+        );
+      }
+      
+      // Usar directamente el sistema de cálculo mejorado
+      const resultado = calcularValorNovedadEnhanced(
+        formData.tipo_novedad,
+        formData.subtipo,
+        employeeSalary,
+        formData.dias || undefined,
+        formData.horas || undefined,
+        currentPeriodDate
+      );
+      
+      console.log(`💰 Enhanced calculation for ${formData.tipo_novedad}:`, resultado.valor);
+      console.log(`📊 Calculation details:`, resultado.baseCalculo.detalle_calculo);
+      
+      return resultado.valor > 0 ? resultado.valor : null;
+    } catch (error) {
+      console.error('Error calculating suggested value:', error);
+      return null;
     }
-    return null;
   };
 
-  const suggestedValue = calculateSuggestedValue();
+  const suggestedValue = calculateSuggestedValueEnhanced();
   const isFormValid = validateForm() && formData.valor > 0;
 
   return (
@@ -126,6 +166,7 @@ export const NovedadForm = ({
           variant={selectedCategory === 'devengados' ? 'default' : 'outline'}
           onClick={() => setSelectedCategory('devengados')}
           className="flex-1"
+          disabled={modalType !== undefined} // Deshabilitar si viene del modal
         >
           Devengados
         </Button>
@@ -134,6 +175,7 @@ export const NovedadForm = ({
           variant={selectedCategory === 'deducciones' ? 'default' : 'outline'}
           onClick={() => setSelectedCategory('deducciones')}
           className="flex-1"
+          disabled={modalType !== undefined} // Deshabilitar si viene del modal
         >
           Deducciones
         </Button>
@@ -161,6 +203,29 @@ export const NovedadForm = ({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Subtipo especial para horas extra */}
+      {formData.tipo_novedad === 'horas_extra' && (
+        <div className="space-y-2">
+          <Label htmlFor="subtipo">Tipo de Horas Extra</Label>
+          <Select
+            value={formData.subtipo || ''}
+            onValueChange={(value) => handleInputChange('subtipo', value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecciona el tipo de horas extra" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Diurnas (25%)</SelectItem>
+              <SelectItem value="nocturnas">Nocturnas (75%)</SelectItem>
+              <SelectItem value="dominicales_diurnas">Dominicales Diurnas (100%)</SelectItem>
+              <SelectItem value="dominicales_nocturnas">Dominicales Nocturnas (150%)</SelectItem>
+              <SelectItem value="festivas_diurnas">Festivas Diurnas (100%)</SelectItem>
+              <SelectItem value="festivas_nocturnas">Festivas Nocturnas (150%)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Dynamic Fields based on novedad type */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -217,22 +282,25 @@ export const NovedadForm = ({
         </div>
       </div>
 
-      {/* Value Field with Suggested Value */}
+      {/* Value Field with Enhanced Suggested Value */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="valor">Valor</Label>
-          {suggestedValue && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleInputChange('valor', suggestedValue)}
-              className="text-xs"
-            >
-              <Calculator className="h-3 w-3 mr-1" />
-              Usar sugerido: ${suggestedValue.toLocaleString()}
-            </Button>
-          )}
+          <div className="flex items-center space-x-2">
+            <JornadaLegalTooltip fecha={currentPeriodDate} showBadge={false} />
+            {suggestedValue && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleInputChange('valor', suggestedValue)}
+                className="text-xs flex items-center space-x-1"
+              >
+                <Calculator className="h-3 w-3" />
+                <span>Usar: ${suggestedValue.toLocaleString()}</span>
+              </Button>
+            )}
+          </div>
         </div>
         <Input
           id="valor"
@@ -248,17 +316,6 @@ export const NovedadForm = ({
         )}
       </div>
 
-      {/* Subtipo Field */}
-      <div className="space-y-2">
-        <Label htmlFor="subtipo">Subtipo (Opcional)</Label>
-        <Input
-          id="subtipo"
-          value={formData.subtipo || ''}
-          onChange={(e) => handleInputChange('subtipo', e.target.value)}
-          placeholder="Especifica un subtipo si es necesario"
-        />
-      </div>
-
       {/* Observaciones */}
       <div className="space-y-2">
         <Label htmlFor="observacion">Observaciones</Label>
@@ -271,15 +328,19 @@ export const NovedadForm = ({
         />
       </div>
 
-      {/* Preview Card */}
+      {/* Preview Card con información de jornada */}
       <Card className="bg-gray-50">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="space-y-1">
               <p className="text-sm font-medium">Vista previa</p>
               <p className="text-xs text-gray-600">
                 {formData.tipo_novedad} • {formData.valor.toLocaleString()} COP
               </p>
+              <div className="flex items-center space-x-2 text-xs text-gray-500">
+                <Clock className="h-3 w-3" />
+                <span>Cálculo con jornada legal dinámica</span>
+              </div>
             </div>
             <Badge variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}>
               {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
