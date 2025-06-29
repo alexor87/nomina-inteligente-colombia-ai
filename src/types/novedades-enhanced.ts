@@ -1,4 +1,4 @@
-import { getJornadaLegal, getHourlyDivisor } from '@/utils/jornadaLegal';
+import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
 // Enhanced NovedadType that includes all database types
 export type NovedadType =
@@ -113,8 +113,10 @@ export const calcularValorNovedadEnhanced = (
   const valorHoraOrdinaria = salarioBase / hourlyDivisor;
   const valorDiario = salarioBase / 30;
 
+  // Para horas extra, usar la fórmula específica
+  const valorHoraExtra = calcularValorHoraExtra(salarioBase, fechaPeriodo);
+
   console.log(`💰 Calculando novedad ${tipoNovedad} con jornada de ${jornadaLegal.horasSemanales}h semanales`);
-  console.log(`📊 Valor hora ordinaria: ${valorHoraOrdinaria} (divisor: ${hourlyDivisor})`);
 
   const result: CalculationResult = {
     valor: 0,
@@ -168,10 +170,12 @@ export const calcularValorNovedadEnhanced = (
           }
         }
 
-        result.valor = horas * valorHoraOrdinaria * (1 + recargo);
+        // USAR LA FÓRMULA CORRECTA PARA HORAS EXTRA
+        result.valor = horas * valorHoraExtra * (1 + recargo);
         result.baseCalculo.factor_calculo = (1 + recargo);
         result.baseCalculo.detalle_calculo = 
-          `${horas} horas extra ${descripcionRecargo} × $${Math.round(valorHoraOrdinaria)} × ${(1 + recargo)} = $${Math.round(result.valor)}. ` +
+          `${horas} horas extra ${descripcionRecargo} × $${Math.round(valorHoraExtra)} × ${(1 + recargo)} = $${Math.round(result.valor)}. ` +
+          `Fórmula: (Salario ÷ 30) ÷ ${(jornadaLegal.horasSemanales / 6).toFixed(3)} horas/día. ` +
           `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
         break;
 
@@ -180,10 +184,12 @@ export const calcularValorNovedadEnhanced = (
           throw new Error('Las horas de recargo nocturno deben ser mayor a 0');
         }
         
-        result.valor = horas * valorHoraOrdinaria * 0.35; // 35% recargo nocturno
+        // Para recargo nocturno también usar la fórmula de horas extra
+        result.valor = horas * valorHoraExtra * 0.35; // 35% recargo nocturno
         result.baseCalculo.factor_calculo = 0.35;
         result.baseCalculo.detalle_calculo = 
-          `${horas} horas recargo nocturno × $${Math.round(valorHoraOrdinaria)} × 0.35 = $${Math.round(result.valor)}. ` +
+          `${horas} horas recargo nocturno × $${Math.round(valorHoraExtra)} × 0.35 = $${Math.round(result.valor)}. ` +
+          `Fórmula: (Salario ÷ 30) ÷ ${(jornadaLegal.horasSemanales / 6).toFixed(3)} horas/día. ` +
           `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
         break;
 
@@ -294,7 +300,7 @@ export const calcularValorNovedadEnhanced = (
       result.valor = 0;
     }
 
-    console.log(`✅ Cálculo completado: $${result.valor}`);
+    console.log(`✅ Cálculo completado: $${Math.round(result.valor).toLocaleString()}`);
     return result;
 
   } catch (error) {

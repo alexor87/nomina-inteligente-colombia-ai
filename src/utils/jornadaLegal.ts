@@ -1,4 +1,3 @@
-
 /**
  * Utilidad para manejar la jornada laboral legal según la Ley 2101 de 2021
  * que reduce progresivamente la jornada máxima semanal en Colombia
@@ -81,11 +80,47 @@ export const getHourlyDivisor = (fecha: Date = new Date()): number => {
 };
 
 /**
+ * Calcula las horas por día basado en la jornada legal vigente
+ * Esta función es específica para el cálculo de horas extra
+ * Fórmula: horasSemanales ÷ 6 días
+ */
+export const getDailyHours = (fecha: Date = new Date()): number => {
+  const jornadaInfo = getJornadaLegal(fecha);
+  const horasPorDia = jornadaInfo.horasSemanales / 6;
+  
+  console.log(`📅 Fecha del período: ${fecha.toISOString().split('T')[0]}`);
+  console.log(`⏰ Jornada legal vigente: ${jornadaInfo.horasSemanales} horas semanales`);
+  console.log(`📊 Horas por día calculadas: ${horasPorDia.toFixed(3)} (${jornadaInfo.horasSemanales} ÷ 6)`);
+  
+  return horasPorDia;
+};
+
+/**
  * Calcula el valor de la hora ordinaria basado en el salario y la jornada legal
+ * IMPORTANTE: Para horas extra usar la función calcularValorHoraExtra
  */
 export const calcularValorHoraOrdinaria = (salarioMensual: number, fecha: Date = new Date()): number => {
   const divisorHorario = getHourlyDivisor(fecha);
   return salarioMensual / divisorHorario;
+};
+
+/**
+ * Calcula el valor de la hora para horas extra con la fórmula correcta
+ * Fórmula: (Salario ÷ 30 días) ÷ horas por día
+ * Esta es la fórmula específica para horas extra según la legislación colombiana
+ */
+export const calcularValorHoraExtra = (salarioMensual: number, fecha: Date = new Date()): number => {
+  const horasPorDia = getDailyHours(fecha);
+  const valorDiario = salarioMensual / 30;
+  const valorHoraExtra = valorDiario / horasPorDia;
+  
+  console.log(`💰 Cálculo valor hora extra:`);
+  console.log(`   Salario mensual: $${salarioMensual.toLocaleString()}`);
+  console.log(`   Valor diario: $${Math.round(valorDiario).toLocaleString()} (salario ÷ 30)`);
+  console.log(`   Horas por día: ${horasPorDia.toFixed(3)}`);
+  console.log(`   Valor hora extra: $${Math.round(valorHoraExtra).toLocaleString()} (valor diario ÷ horas por día)`);
+  
+  return valorHoraExtra;
 };
 
 /**

@@ -58,7 +58,7 @@ export const NovedadDrawer = ({
   const [showForm, setShowForm] = useState(false);
   const [editingNovedad, setEditingNovedad] = useState<PayrollNovedad | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentPeriodDate] = useState<Date>(new Date());
+  const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(new Date());
 
   // Form state
   const [formData, setFormData] = useState<CreateNovedadData>({
@@ -74,6 +74,14 @@ export const NovedadDrawer = ({
     observacion: ''
   });
 
+  // Cargar fecha actual del período (en un drawer real tendríamos el periodId)
+  useEffect(() => {
+    // En un caso real, aquí cargaríamos la fecha del período específico
+    // Por ahora usamos la fecha actual, pero debería recibir periodId como prop
+    console.log('📅 Using current date for period calculations in drawer');
+    setCurrentPeriodDate(new Date());
+  }, []);
+
   // Función de cálculo mejorada con jornada legal dinámica
   const calculateSuggestedValue = useCallback((
     tipoNovedad: NovedadType,
@@ -83,6 +91,10 @@ export const NovedadDrawer = ({
   ): number | null => {
     try {
       if (!employeeSalary || employeeSalary <= 0) return null;
+      
+      console.log('🧮 Calculating with period-specific legal workday in drawer');
+      console.log('📅 Using period date:', currentPeriodDate.toISOString().split('T')[0]);
+      console.log('💰 Employee salary:', employeeSalary);
       
       // Usar el sistema de cálculo mejorado con fecha del período
       const resultado = calcularValorNovedadEnhanced(

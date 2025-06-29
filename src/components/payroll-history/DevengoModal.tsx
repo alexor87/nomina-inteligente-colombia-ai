@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -24,6 +23,7 @@ import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/
 import { NovedadForm } from '@/components/payroll/novedades/NovedadForm';
 import { formatCurrency } from '@/lib/utils';
 import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
+import { supabase } from '@/lib/supabase';
 
 interface DevengoModalProps {
   isOpen: boolean;
@@ -82,20 +82,39 @@ export const DevengoModal = ({
     observacion: ''
   });
 
-  // Cargar fecha del período para cálculos precisos
+  // Cargar fecha del período desde la base de datos para cálculos precisos
   useEffect(() => {
     const loadPeriodDate = async () => {
       try {
-        // Aquí deberías cargar la fecha real del período desde la base de datos
-        // Por ahora usamos la fecha actual, pero en producción esto debe venir del período
-        setCurrentPeriodDate(new Date());
+        console.log('🔍 Loading period date for accurate calculations, periodId:', periodId);
+        
+        const { data: periodData, error } = await supabase
+          .from('payroll_periods_real')
+          .select('fecha_inicio, fecha_fin')
+          .eq('id', periodId)
+          .single();
+
+        if (error) {
+          console.error('Error loading period date:', error);
+          setCurrentPeriodDate(new Date());
+          return;
+        }
+
+        if (periodData?.fecha_inicio) {
+          const fechaPeriodo = new Date(periodData.fecha_inicio);
+          setCurrentPeriodDate(fechaPeriodo);
+          console.log('📅 Period date loaded successfully:', fechaPeriodo.toISOString().split('T')[0]);
+        } else {
+          console.warn('No period date found, using current date');
+          setCurrentPeriodDate(new Date());
+        }
       } catch (error) {
         console.error('Error loading period date:', error);
         setCurrentPeriodDate(new Date());
       }
     };
 
-    if (isOpen) {
+    if (isOpen && periodId) {
       loadPeriodDate();
     }
   }, [isOpen, periodId]);
@@ -135,7 +154,7 @@ export const DevengoModal = ({
     loadNovedades();
   }, [loadNovedades]);
 
-  // Función de cálculo mejorada con jornada legal dinámica
+  // Función de cálculo mejorada con jornada legal dinámica y fecha correcta del período
   const calculateSuggestedValue = useCallback((
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
@@ -145,17 +164,22 @@ export const DevengoModal = ({
     try {
       if (!employeeSalary || employeeSalary <= 0) return null;
       
-      // Usar el sistema de cálculo mejorado con fecha del período
+      console.log('🧮 Calculating with period-specific legal workday');
+      console.log('📅 Using period date:', currentPeriodDate.toISOString().split('T')[0]);
+      console.log('💰 Employee salary:', employeeSalary);
+      console.log('⏰ Hours:', horas, 'Days:', dias);
+      
+      // Usar el sistema de cálculo mejorado con fecha exacta del período
       const resultado = calcularValorNovedadEnhanced(
         tipoNovedad,
         subtipo,
         employeeSalary,
         dias,
         horas,
-        currentPeriodDate // Usar fecha del período para cálculos históricos precisos
+        currentPeriodDate // Usar fecha exacta del período para cálculos históricos precisos
       );
       
-      console.log(`💰 Calculated value with enhanced system for ${tipoNovedad}:`, resultado.valor);
+      console.log(`💰 Calculated value with period-specific legal workday for ${tipoNovedad}:`, resultado.valor);
       console.log(`📊 Calculation details:`, resultado.baseCalculo.detalle_calculo);
       
       return resultado.valor > 0 ? resultado.valor : null;
