@@ -3,10 +3,10 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
-import { Edit, UserPlus } from 'lucide-react';
-import { NovedadDrawer } from '@/components/payroll/novedades/NovedadDrawer';
+import { Plus, UserPlus } from 'lucide-react';
+import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { useNovedades } from '@/hooks/useNovedades';
-import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface PayrollTableProps {
   employees: PayrollEmployee[];
@@ -31,21 +31,21 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
   onDeleteEmployee
 }) => {
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const {
-    loadNovedadesForEmployee,
     createNovedad,
-    updateNovedad,
-    deleteNovedad,
-    getEmployeeNovedades,
     isLoading: novedadesLoading
   } = useNovedades(periodoId);
 
-  const handleOpenNovedades = async (employee: PayrollEmployee) => {
+  const handleOpenNovedades = (employee: PayrollEmployee) => {
     setSelectedEmployee(employee);
-    await loadNovedadesForEmployee(employee.id);
-    setIsDrawerOpen(true);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedEmployee(null);
   };
 
   const handleCreateNovedad = async (data: CreateNovedadData) => {
@@ -58,19 +58,54 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     };
     
     await createNovedad(createData, true);
+    onRecalculate(); // Trigger recalculation after adding novedad
   };
 
-  const handleUpdateNovedad = async (id: string, data: CreateNovedadData) => {
-    if (!selectedEmployee) return;
-    await updateNovedad(id, data, selectedEmployee.id, true);
+  const calculateSuggestedValue = (
+    tipo: string,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ): number | null => {
+    if (!selectedEmployee) return null;
+    
+    // This is a simplified calculation - you might want to use your existing calculation logic
+    const salarioDiario = selectedEmployee.baseSalary / 30;
+    const valorHora = selectedEmployee.baseSalary / 240; // 30 days * 8 hours
+    
+    switch (tipo) {
+      case 'horas_extra':
+        if (!horas || !subtipo) return null;
+        const factors: Record<string, number> = {
+          'diurnas': 1.25,
+          'nocturnas': 1.75,
+          'dominicales_diurnas': 2.0,
+          'dominicales_nocturnas': 2.5,
+          'festivas_diurnas': 2.0,
+          'festivas_nocturnas': 2.5
+        };
+        return Math.round(valorHora * factors[subtipo] * horas);
+        
+      case 'vacaciones':
+        if (!dias) return null;
+        return Math.round(salarioDiario * dias);
+        
+      case 'incapacidad':
+        if (!dias || !subtipo) return null;
+        const percentages: Record<string, number> = {
+          'comun': 0.667,
+          'laboral': 1.0,
+          'maternidad': 1.0
+        };
+        const diasPagados = subtipo === 'comun' ? Math.max(0, dias - 3) : dias;
+        return Math.round(salarioDiario * percentages[subtipo] * diasPagados);
+        
+      default:
+        return null;
+    }
   };
 
-  const handleDeleteNovedad = async (id: string) => {
-    if (!selectedEmployee) return;
-    await deleteNovedad(id, selectedEmployee.id, true);
-  };
-
-  // Estado vacío siguiendo exactamente el ejemplo de Aleluya
+  // Estado vacío
   if (employees.length === 0) {
     return (
       <div className="bg-white min-h-96">
@@ -136,9 +171,15 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                     {formatCurrency(employee.baseSalary)}
                   </td>
                   <td className="py-4 px-6 text-center">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      Ver novedades
-                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenNovedades(employee)}
+                      className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                      disabled={!canEdit}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </td>
                   <td className="py-4 px-6 text-right font-semibold text-gray-900">
                     {formatCurrency(employee.netPay)}
@@ -149,8 +190,9 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                       size="sm"
                       onClick={() => handleOpenNovedades(employee)}
                       className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      disabled={!canEdit}
                     >
-                      <Edit className="w-4 h-4" />
+                      Editar
                     </Button>
                   </td>
                 </tr>
@@ -161,22 +203,14 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
       </div>
 
       {selectedEmployee && (
-        <NovedadDrawer
-          isOpen={isDrawerOpen}
-          onClose={() => {
-            setIsDrawerOpen(false);
-            setSelectedEmployee(null);
-          }}
+        <NovedadUnifiedModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
           employeeName={selectedEmployee.name}
           employeeId={selectedEmployee.id}
           employeeSalary={selectedEmployee.baseSalary}
-          novedades={getEmployeeNovedades(selectedEmployee.id)}
           onCreateNovedad={handleCreateNovedad}
-          onUpdateNovedad={handleUpdateNovedad}
-          onDeleteNovedad={handleDeleteNovedad}
-          isLoading={novedadesLoading}
-          canEdit={canEdit}
-          onRecalculatePayroll={onRecalculate}
+          calculateSuggestedValue={calculateSuggestedValue}
         />
       )}
     </>

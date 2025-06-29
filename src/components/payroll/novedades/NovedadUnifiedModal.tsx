@@ -1,0 +1,110 @@
+
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+} from '@/components/ui/dialog';
+import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
+import { NovedadHorasExtraForm } from './forms/NovedadHorasExtraForm';
+import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
+import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
+
+interface NovedadUnifiedModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  employeeName: string;
+  employeeId: string;
+  employeeSalary: number;
+  onCreateNovedad: (data: CreateNovedadData) => Promise<void>;
+  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number, dias?: number) => number | null;
+}
+
+type ModalView = 'selector' | 'form';
+
+export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
+  isOpen,
+  onClose,
+  employeeName,
+  employeeId,
+  employeeSalary,
+  onCreateNovedad,
+  calculateSuggestedValue
+}) => {
+  const [currentView, setCurrentView] = useState<ModalView>('selector');
+  const [selectedCategory, setSelectedCategory] = useState<NovedadCategory | null>(null);
+
+  const handleSelectCategory = (category: NovedadCategory) => {
+    setSelectedCategory(category);
+    setCurrentView('form');
+  };
+
+  const handleBackToSelector = () => {
+    setCurrentView('selector');
+    setSelectedCategory(null);
+  };
+
+  const handleClose = () => {
+    setCurrentView('selector');
+    setSelectedCategory(null);
+    onClose();
+  };
+
+  const handleSubmit = async (formData: any) => {
+    const novedadData: CreateNovedadData = {
+      empleado_id: employeeId,
+      periodo_id: '', // This will be set by the parent component
+      ...formData
+    };
+
+    await onCreateNovedad(novedadData);
+    handleClose();
+  };
+
+  const renderForm = () => {
+    if (!selectedCategory) return null;
+
+    const commonProps = {
+      onBack: handleBackToSelector,
+      onSubmit: handleSubmit,
+      employeeSalary,
+      calculateSuggestedValue
+    };
+
+    switch (selectedCategory) {
+      case 'horas_extra':
+        return <NovedadHorasExtraForm {...commonProps} />;
+      case 'vacaciones':
+        return <NovedadVacacionesForm {...commonProps} />;
+      case 'incapacidades':
+        return <NovedadIncapacidadForm {...commonProps} />;
+      // TODO: Add other form components as they are created
+      default:
+        return (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Formulario en desarrollo para {selectedCategory}</p>
+            <button onClick={handleBackToSelector} className="mt-4 text-blue-600 hover:underline">
+              Volver atrás
+            </button>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {currentView === 'selector' && (
+          <NovedadTypeSelector
+            isOpen={true}
+            onClose={handleClose}
+            onSelectCategory={handleSelectCategory}
+            employeeName={employeeName}
+          />
+        )}
+        
+        {currentView === 'form' && renderForm()}
+      </DialogContent>
+    </Dialog>
+  );
+};
