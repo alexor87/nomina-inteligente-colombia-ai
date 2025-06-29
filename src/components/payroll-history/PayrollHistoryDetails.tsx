@@ -39,14 +39,11 @@ export const PayrollHistoryDetails = () => {
   // Check if user can edit periods
   const canEditPeriods = isSuperAdmin || hasModuleAccess('payroll-history');
 
-  // Hook para manejar novedades con callback de recalculación
+  // Hook para manejar novedades - fix the argument count
   const {
     createNovedad,
     loadNovedadesForEmployee
-  } = useNovedades(periodId || '', () => {
-    console.log('Novedad change detected, reloading period details');
-    loadPeriodDetails();
-  });
+  } = useNovedades(periodId || '');
 
   useEffect(() => {
     if (periodId) {

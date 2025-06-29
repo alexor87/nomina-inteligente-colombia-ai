@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/services/PayrollPeriodService';
-import { PayrollCalculationService, PayrollCalculationEnhancedService } from '@/services/PayrollCalculationService';
+import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
@@ -283,9 +283,7 @@ export const usePayrollLiquidation = () => {
     });
 
     try {
-      // Forzar actualización de la configuración antes de recalcular
-      PayrollCalculationEnhancedService.getUserConfiguredPeriodicity();
-      
+      // Use regular PayrollCalculationService instead of the non-existent Enhanced version
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setEmployees(prev => prev.map(emp => {

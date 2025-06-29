@@ -6,7 +6,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Edit, UserPlus } from 'lucide-react';
 import { NovedadDrawer } from '../novedades/NovedadDrawer';
 import { useNovedades } from '@/hooks/useNovedades';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 
 interface PayrollModernTableProps {
   employees: PayrollEmployee[];

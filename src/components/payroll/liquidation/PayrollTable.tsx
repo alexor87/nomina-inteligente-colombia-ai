@@ -8,7 +8,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Edit, Calculator, FileText, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { NovedadDrawer } from '../novedades/NovedadDrawer';
 import { useNovedades } from '@/hooks/useNovedades';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { 
   AlertDialog, 
