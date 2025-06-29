@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
-import { Calculator, Loader2, Clock } from 'lucide-react';
+import { Calculator, Loader2, Clock, Info } from 'lucide-react';
 import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
 
 // Define the enhanced categories structure that matches the enhanced types
@@ -74,7 +74,7 @@ export const NovedadForm = ({
     empleado_id: initialData?.empleado_id || '',
     periodo_id: initialData?.periodo_id || '',
     tipo_novedad: 'horas_extra' as NovedadType,
-    subtipo: 'diurnas', // Cambio: valor inicial válido en lugar de cadena vacía
+    subtipo: 'diurnas',
     fecha_inicio: '',
     fecha_fin: '',
     dias: null,
@@ -92,19 +92,128 @@ export const NovedadForm = ({
 
   useEffect(() => {
     if (initialData?.tipo_novedad) {
-      // Determine category based on initial data
       const isInDevengados = Object.keys(NOVEDAD_CATEGORIES_ENHANCED.devengados.types).includes(initialData.tipo_novedad);
       setSelectedCategory(isInDevengados ? 'devengados' : 'deducciones');
     }
   }, [initialData]);
 
+  // Configuración de campos dinámicos basada en el tipo de novedad
+  const fieldConfig = useMemo(() => {
+    const config = {
+      showHours: false,
+      showDays: false,
+      showDates: false,
+      showSubtipo: false,
+      requiresHours: false,
+      requiresDays: false,
+      requiresDates: false,
+      isAutoCalculated: false,
+      helpText: '',
+      subtipoOptions: [] as Array<{value: string, label: string}>
+    };
+
+    switch (formData.tipo_novedad) {
+      case 'horas_extra':
+        config.showHours = true;
+        config.requiresHours = true;
+        config.showSubtipo = true;
+        config.isAutoCalculated = true;
+        config.helpText = 'Se calculará automáticamente según las horas y el tipo de recargo';
+        config.subtipoOptions = [
+          { value: 'diurnas', label: 'Diurnas (25%)' },
+          { value: 'nocturnas', label: 'Nocturnas (75%)' },
+          { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)' },
+          { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)' },
+          { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)' },
+          { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)' }
+        ];
+        break;
+
+      case 'recargo_nocturno':
+        config.showHours = true;
+        config.requiresHours = true;
+        config.isAutoCalculated = true;
+        config.helpText = 'Se calculará automáticamente con recargo del 35%';
+        break;
+
+      case 'vacaciones':
+      case 'licencia_remunerada':
+        config.showDays = true;
+        config.showDates = true;
+        config.requiresDays = true;
+        config.requiresDates = true;
+        config.isAutoCalculated = true;
+        config.helpText = 'Se calculará automáticamente según los días especificados';
+        break;
+
+      case 'incapacidad':
+        config.showDays = true;
+        config.showDates = true;
+        config.showSubtipo = true;
+        config.requiresDays = true;
+        config.requiresDates = true;
+        config.isAutoCalculated = true;
+        config.helpText = 'Se calculará automáticamente según el tipo de incapacidad';
+        config.subtipoOptions = [
+          { value: 'comun', label: 'Común - EPS (66.7%)' },
+          { value: 'laboral', label: 'Laboral - ARL (100%)' },
+          { value: 'maternidad', label: 'Maternidad - EPS (100%)' }
+        ];
+        break;
+
+      case 'ausencia':
+        config.showDays = true;
+        config.showDates = true;
+        config.requiresDays = true;
+        config.isAutoCalculated = true;
+        config.helpText = 'Se calculará automáticamente como deducción por días de ausencia';
+        break;
+
+      case 'bonificacion':
+      case 'comision':
+      case 'prima':
+      case 'otros_ingresos':
+        config.showHours = true;
+        config.showDays = true;
+        config.showDates = true;
+        config.helpText = 'Ingrese el valor manualmente o use días/horas para cálculo automático';
+        break;
+
+      default:
+        config.helpText = 'Ingrese el valor manualmente';
+        break;
+    }
+
+    return config;
+  }, [formData.tipo_novedad]);
+
   // Memoizar la validación para evitar cálculos innecesarios
   const validationErrors = useMemo(() => {
     const errors: Record<string, string> = {};
 
-    // Validate hours
+    // Validate required hours
+    if (fieldConfig.requiresHours && (!formData.horas || formData.horas <= 0)) {
+      errors.horas = 'Las horas son obligatorias para este tipo de novedad';
+    }
+
+    // Validate hours range
     if (formData.horas !== null && formData.horas > 24) {
       errors.horas = 'Las horas no pueden ser mayor a 24';
+    }
+
+    // Validate required days
+    if (fieldConfig.requiresDays && (!formData.dias || formData.dias <= 0)) {
+      errors.dias = 'Los días son obligatorios para este tipo de novedad';
+    }
+
+    // Validate required dates
+    if (fieldConfig.requiresDates) {
+      if (!formData.fecha_inicio) {
+        errors.fecha_inicio = 'La fecha de inicio es obligatoria';
+      }
+      if (!formData.fecha_fin) {
+        errors.fecha_fin = 'La fecha de fin es obligatoria';
+      }
     }
 
     // Validate dates
@@ -123,18 +232,7 @@ export const NovedadForm = ({
     }
 
     return errors;
-  }, [formData.horas, formData.fecha_inicio, formData.fecha_fin, formData.valor]);
-
-  // Función memoizada para determinar si el tipo de novedad requiere horas o días
-  const requiresQuantity = useMemo(() => {
-    const typesRequiringHours = ['horas_extra', 'recargo_nocturno'];
-    const typesRequiringDays = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'ausencia'];
-    
-    return {
-      requiresHours: typesRequiringHours.includes(formData.tipo_novedad),
-      requiresDays: typesRequiringDays.includes(formData.tipo_novedad)
-    };
-  }, [formData.tipo_novedad]);
+  }, [formData, fieldConfig]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,32 +257,17 @@ export const NovedadForm = ({
 
   // Función de cálculo mejorada - completamente memoizada y validada
   const suggestedValue = useMemo(() => {
-    // Solo calcular si realmente necesitamos un valor sugerido
     if (!employeeSalary || employeeSalary <= 0) return null;
+    if (!fieldConfig.isAutoCalculated) return null;
     
-    // Verificar si el tipo de novedad requiere cantidades específicas
-    const needsHours = requiresQuantity.requiresHours && (!formData.horas || formData.horas <= 0);
-    const needsDays = requiresQuantity.requiresDays && (!formData.dias || formData.dias <= 0);
+    const needsHours = fieldConfig.requiresHours && (!formData.horas || formData.horas <= 0);
+    const needsDays = fieldConfig.requiresDays && (!formData.dias || formData.dias <= 0);
     
-    // No calcular si falta información necesaria
     if (needsHours || needsDays) {
-      return null;
-    }
-    
-    // Solo calcular si tenemos datos válidos para calcular
-    const hasValidHours = formData.horas && formData.horas > 0;
-    const hasValidDays = formData.dias && formData.dias > 0;
-    
-    if (!hasValidHours && !hasValidDays && requiresQuantity.requiresHours) {
-      return null;
-    }
-
-    if (!hasValidHours && !hasValidDays && requiresQuantity.requiresDays) {
       return null;
     }
 
     try {
-      // Si tenemos función personalizada del modal, usarla
       if (calculateSuggestedValue) {
         return calculateSuggestedValue(
           formData.tipo_novedad,
@@ -194,7 +277,6 @@ export const NovedadForm = ({
         );
       }
       
-      // Usar directamente el sistema de cálculo mejorado
       const resultado = calcularValorNovedadEnhanced(
         formData.tipo_novedad,
         formData.subtipo,
@@ -203,8 +285,6 @@ export const NovedadForm = ({
         formData.horas || undefined,
         currentPeriodDate
       );
-      
-      console.log(`💰 Enhanced calculation for ${formData.tipo_novedad}:`, resultado.valor);
       
       return resultado.valor > 0 ? resultado.valor : null;
     } catch (error) {
@@ -217,13 +297,13 @@ export const NovedadForm = ({
     formData.subtipo,
     formData.horas,
     formData.dias,
-    requiresQuantity.requiresHours,
-    requiresQuantity.requiresDays,
+    fieldConfig.isAutoCalculated,
+    fieldConfig.requiresHours,
+    fieldConfig.requiresDays,
     currentPeriodDate,
     calculateSuggestedValue
   ]);
 
-  // Memoizar isFormValid para evitar re-renders
   const isFormValid = useMemo(() => {
     return Object.keys(validationErrors).length === 0 && formData.valor > 0;
   }, [validationErrors, formData.valor]);
@@ -257,7 +337,20 @@ export const NovedadForm = ({
         <Label htmlFor="tipo_novedad">Tipo de Novedad</Label>
         <Select
           value={formData.tipo_novedad}
-          onValueChange={(value) => handleInputChange('tipo_novedad', value as NovedadType)}
+          onValueChange={(value) => {
+            const newTipoNovedad = value as NovedadType;
+            setFormData(prev => ({
+              ...prev,
+              tipo_novedad: newTipoNovedad,
+              subtipo: newTipoNovedad === 'horas_extra' ? 'diurnas' : 
+                       newTipoNovedad === 'incapacidad' ? 'comun' : '',
+              horas: null,
+              dias: null,
+              fecha_inicio: '',
+              fecha_fin: '',
+              valor: 0
+            }));
+          }}
         >
           <SelectTrigger>
             <SelectValue placeholder="Selecciona el tipo de novedad" />
@@ -275,80 +368,115 @@ export const NovedadForm = ({
         </Select>
       </div>
 
-      {/* Subtipo especial para horas extra */}
-      {formData.tipo_novedad === 'horas_extra' && (
+      {/* Help Text */}
+      {fieldConfig.helpText && (
+        <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded-lg">
+          <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-blue-800">{fieldConfig.helpText}</p>
+        </div>
+      )}
+
+      {/* Subtipo Selection */}
+      {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
         <div className="space-y-2">
-          <Label htmlFor="subtipo">Tipo de Horas Extra</Label>
+          <Label htmlFor="subtipo">
+            {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
+          </Label>
           <Select
-            value={formData.subtipo || 'diurnas'}
+            value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
             onValueChange={(value) => handleInputChange('subtipo', value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Selecciona el tipo de horas extra" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="diurnas">Diurnas (25%)</SelectItem>
-              <SelectItem value="nocturnas">Nocturnas (75%)</SelectItem>
-              <SelectItem value="dominicales_diurnas">Dominicales Diurnas (100%)</SelectItem>
-              <SelectItem value="dominicales_nocturnas">Dominicales Nocturnas (150%)</SelectItem>
-              <SelectItem value="festivas_diurnas">Festivas Diurnas (100%)</SelectItem>
-              <SelectItem value="festivas_nocturnas">Festivas Nocturnas (150%)</SelectItem>
+              {fieldConfig.subtipoOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
       )}
 
-      {/* Dynamic Fields based on novedad type */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Dynamic Fields Section */}
+      <div className="space-y-4">
         {/* Date Fields */}
-        <div className="space-y-2">
-          <Label htmlFor="fecha_inicio">Fecha Inicio</Label>
-          <Input
-            id="fecha_inicio"
-            type="date"
-            value={formData.fecha_inicio || ''}
-            onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
-          />
-        </div>
+        {fieldConfig.showDates && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="fecha_inicio">
+                Fecha Inicio {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
+              </Label>
+              <Input
+                id="fecha_inicio"
+                type="date"
+                value={formData.fecha_inicio || ''}
+                onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
+              />
+              {validationErrors.fecha_inicio && (
+                <p className="text-sm text-red-600">{validationErrors.fecha_inicio}</p>
+              )}
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="fecha_fin">Fecha Fin</Label>
-          <Input
-            id="fecha_fin"
-            type="date"
-            value={formData.fecha_fin || ''}
-            onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
-          />
-          {validationErrors.fecha_fin && (
-            <p className="text-sm text-red-600">{validationErrors.fecha_fin}</p>
-          )}
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="fecha_fin">
+                Fecha Fin {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
+              </Label>
+              <Input
+                id="fecha_fin"
+                type="date"
+                value={formData.fecha_fin || ''}
+                onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
+              />
+              {validationErrors.fecha_fin && (
+                <p className="text-sm text-red-600">{validationErrors.fecha_fin}</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Quantity Fields */}
-        <div className="space-y-2">
-          <Label htmlFor="dias">Días</Label>
-          <Input
-            id="dias"
-            type="number"
-            min="0"
-            value={formData.dias || ''}
-            onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
-          />
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {fieldConfig.showDays && (
+            <div className="space-y-2">
+              <Label htmlFor="dias">
+                Días {fieldConfig.requiresDays && <span className="text-red-500">*</span>}
+                {!fieldConfig.requiresDays && <span className="text-gray-500 text-xs"> (opcional)</span>}
+              </Label>
+              <Input
+                id="dias"
+                type="number"
+                min="0"
+                value={formData.dias || ''}
+                onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
+              />
+              {validationErrors.dias && (
+                <p className="text-sm text-red-600">{validationErrors.dias}</p>
+              )}
+            </div>
+          )}
 
-        <div className="space-y-2">
-          <Label htmlFor="horas">Horas</Label>
-          <Input
-            id="horas"
-            type="number"
-            min="0"
-            max="24"
-            step="0.5"
-            value={formData.horas || ''}
-            onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
-          />
-          {validationErrors.horas && (
-            <p className="text-sm text-red-600">{validationErrors.horas}</p>
+          {fieldConfig.showHours && (
+            <div className="space-y-2">
+              <Label htmlFor="horas">
+                Horas {fieldConfig.requiresHours && <span className="text-red-500">*</span>}
+                {!fieldConfig.requiresHours && <span className="text-gray-500 text-xs"> (opcional)</span>}
+              </Label>
+              <Input
+                id="horas"
+                type="number"
+                min="0"
+                max="24"
+                step="0.5"
+                value={formData.horas || ''}
+                onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
+              />
+              {validationErrors.horas && (
+                <p className="text-sm text-red-600">{validationErrors.horas}</p>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -356,7 +484,7 @@ export const NovedadForm = ({
       {/* Value Field with Enhanced Suggested Value */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="valor">Valor</Label>
+          <Label htmlFor="valor">Valor <span className="text-red-500">*</span></Label>
           <div className="flex items-center space-x-2">
             <JornadaLegalTooltip fecha={currentPeriodDate} showBadge={false} />
             {suggestedValue && (
@@ -399,7 +527,7 @@ export const NovedadForm = ({
         />
       </div>
 
-      {/* Preview Card con información de jornada */}
+      {/* Preview Card */}
       <Card className="bg-gray-50">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -410,7 +538,10 @@ export const NovedadForm = ({
               </p>
               <div className="flex items-center space-x-2 text-xs text-gray-500">
                 <Clock className="h-3 w-3" />
-                <span>Cálculo con jornada legal dinámica</span>
+                <span>
+                  {fieldConfig.isAutoCalculated ? 'Cálculo automático' : 'Valor manual'}
+                  {fieldConfig.isAutoCalculated && ' con jornada legal dinámica'}
+                </span>
               </div>
             </div>
             <Badge variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}>

@@ -203,21 +203,28 @@ export const calcularValorNovedadEnhanced = (
           throw new Error('Los días de incapacidad deben ser mayor a 0');
         }
 
-        let porcentajeIncapacidad = 0.667; // 66.7% por defecto (EPS)
+        let porcentajeIncapacidad = 0.667; // 66.7% por defecto (EPS común)
         let entidadPagadora = 'EPS';
+        let tipoIncapacidad = 'común';
 
         if (subtipo === 'laboral') {
           porcentajeIncapacidad = 1.0; // 100% ARL
           entidadPagadora = 'ARL';
+          tipoIncapacidad = 'laboral';
         } else if (subtipo === 'maternidad') {
           porcentajeIncapacidad = 1.0; // 100% EPS
           entidadPagadora = 'EPS';
+          tipoIncapacidad = 'maternidad';
+        } else if (subtipo === 'comun') {
+          porcentajeIncapacidad = 0.667; // 66.7% EPS
+          entidadPagadora = 'EPS';
+          tipoIncapacidad = 'común';
         }
 
         result.valor = dias * valorDiario * porcentajeIncapacidad;
         result.baseCalculo.factor_calculo = porcentajeIncapacidad;
         result.baseCalculo.detalle_calculo = 
-          `${dias} días incapacidad × $${Math.round(valorDiario)} × ${porcentajeIncapacidad} (${entidadPagadora}) = $${Math.round(result.valor)}`;
+          `${dias} días incapacidad ${tipoIncapacidad} × $${Math.round(valorDiario)} × ${porcentajeIncapacidad} (${entidadPagadora}) = $${Math.round(result.valor)}`;
         break;
 
       case 'licencia_remunerada':
