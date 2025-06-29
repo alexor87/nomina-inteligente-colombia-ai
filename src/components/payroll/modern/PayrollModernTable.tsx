@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +23,10 @@ import {
   X
 } from 'lucide-react';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
+import { EmployeeLiquidationModal } from '@/components/payroll/modals/EmployeeLiquidationModal';
+import { EmployeeCalculationModal } from '@/components/payroll/modals/EmployeeCalculationModal';
+import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
+import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
 import { useNovedades } from '@/hooks/useNovedades';
 import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
@@ -52,7 +55,11 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   onDeleteMultipleEmployees
 }) => {
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
+  const [isLiquidationModalOpen, setIsLiquidationModalOpen] = useState(false);
+  const [isCalculationModalOpen, setIsCalculationModalOpen] = useState(false);
+  const [isVoucherPreviewOpen, setIsVoucherPreviewOpen] = useState(false);
+  const [isVoucherSendOpen, setIsVoucherSendOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
@@ -68,13 +75,38 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     isLoading: novedadesLoading
   } = useNovedades(periodoId);
 
+  // Modal handlers
   const handleOpenNovedades = (employee: PayrollEmployee) => {
     setSelectedEmployee(employee);
-    setIsModalOpen(true);
+    setIsNovedadModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleOpenLiquidation = (employee: PayrollEmployee) => {
+    setSelectedEmployee(employee);
+    setIsLiquidationModalOpen(true);
+  };
+
+  const handleOpenCalculation = (employee: PayrollEmployee) => {
+    setSelectedEmployee(employee);
+    setIsCalculationModalOpen(true);
+  };
+
+  const handleOpenVoucherPreview = (employee: PayrollEmployee) => {
+    setSelectedEmployee(employee);
+    setIsVoucherPreviewOpen(true);
+  };
+
+  const handleOpenVoucherSend = (employee: PayrollEmployee) => {
+    setSelectedEmployee(employee);
+    setIsVoucherSendOpen(true);
+  };
+
+  const handleCloseModals = () => {
+    setIsNovedadModalOpen(false);
+    setIsLiquidationModalOpen(false);
+    setIsCalculationModalOpen(false);
+    setIsVoucherPreviewOpen(false);
+    setIsVoucherSendOpen(false);
     setSelectedEmployee(null);
   };
 
@@ -196,6 +228,13 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     );
   }
 
+  // Get period info for modals
+  const periodInfo = {
+    startDate: new Date().toISOString().split('T')[0], // Default fallback
+    endDate: new Date().toISOString().split('T')[0],
+    type: 'mensual'
+  };
+
   return (
     <>
       <div className="bg-white">
@@ -308,7 +347,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={() => console.log('Liquidar empleado', employee.id)}>
+                        <DropdownMenuItem onClick={() => handleOpenLiquidation(employee)}>
                           <DollarSign className="h-4 w-4 mr-2" />
                           Liquidar empleado
                         </DropdownMenuItem>
@@ -316,15 +355,15 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
                           <StickyNote className="h-4 w-4 mr-2" />
                           Agregar nota
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => console.log('Ver cálculos', employee.id)}>
+                        <DropdownMenuItem onClick={() => handleOpenCalculation(employee)}>
                           <Calculator className="h-4 w-4 mr-2" />
                           Ver cálculos
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => console.log('Ver colilla', employee.id)}>
+                        <DropdownMenuItem onClick={() => handleOpenVoucherPreview(employee)}>
                           <FileText className="h-4 w-4 mr-2" />
                           Ver colilla de pago
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => console.log('Enviar colilla', employee.id)}>
+                        <DropdownMenuItem onClick={() => handleOpenVoucherSend(employee)}>
                           <Send className="h-4 w-4 mr-2" />
                           Enviar colilla de pago
                         </DropdownMenuItem>
@@ -402,17 +441,44 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         )}
       </div>
 
-      {selectedEmployee && (
-        <NovedadUnifiedModal
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          employeeName={selectedEmployee.name}
-          employeeId={selectedEmployee.id}
-          employeeSalary={selectedEmployee.baseSalary}
-          onCreateNovedad={handleCreateNovedad}
-          calculateSuggestedValue={calculateSuggestedValue}
-        />
-      )}
+      {/* All Modals */}
+      <NovedadUnifiedModal
+        isOpen={isNovedadModalOpen}
+        onClose={handleCloseModals}
+        employeeName={selectedEmployee?.name || ''}
+        employeeId={selectedEmployee?.id || ''}
+        employeeSalary={selectedEmployee?.baseSalary || 0}
+        onCreateNovedad={handleCreateNovedad}
+        calculateSuggestedValue={calculateSuggestedValue}
+      />
+
+      <EmployeeLiquidationModal
+        isOpen={isLiquidationModalOpen}
+        onClose={handleCloseModals}
+        employee={selectedEmployee}
+        onUpdateEmployee={onUpdateEmployee}
+        canEdit={canEdit}
+      />
+
+      <EmployeeCalculationModal
+        isOpen={isCalculationModalOpen}
+        onClose={handleCloseModals}
+        employee={selectedEmployee}
+      />
+
+      <VoucherPreviewModal
+        isOpen={isVoucherPreviewOpen}
+        onClose={handleCloseModals}
+        employee={selectedEmployee}
+        period={periodInfo}
+      />
+
+      <VoucherSendDialog
+        isOpen={isVoucherSendOpen}
+        onClose={handleCloseModals}
+        employee={selectedEmployee}
+        period={periodInfo}
+      />
     </>
   );
 };
