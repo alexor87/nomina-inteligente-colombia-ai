@@ -114,7 +114,7 @@ export const EditableEmployeeTable = ({
                 <td className="border border-gray-300 px-4 py-2">
                   <div>
                     <div className="font-medium">{employee.name}</div>
-                    <div className="text-sm text-gray-500">{employee.document}</div>
+                    <div className="text-sm text-gray-500">{employee.position}</div>
                   </div>
                 </td>
                 <td className="border border-gray-300 px-4 py-2 text-center">
