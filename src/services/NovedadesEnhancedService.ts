@@ -1,5 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
+import { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 
 export class NovedadesEnhancedService {
@@ -79,7 +80,10 @@ export class NovedadesEnhancedService {
 
             if (resultadoCalculo.valor > 0) {
               valorFinal = resultadoCalculo.valor;
-              baseCalculoMejorada = resultadoCalculo.baseCalculo;
+              baseCalculoMejorada = {
+                ...resultadoCalculo.baseCalculo,
+                factor_calculo: 1.0 // Add the required factor_calculo property
+              };
               console.log('💰 Auto-calculated value with legal workday:', valorFinal);
             }
           }

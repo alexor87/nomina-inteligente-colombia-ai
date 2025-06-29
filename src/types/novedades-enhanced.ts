@@ -1,3 +1,4 @@
+
 import { getJornadaLegal, getHourlyDivisor } from '@/utils/jornadaLegal';
 
 export type NovedadType =
@@ -63,99 +64,26 @@ export interface CreateNovedadData {
   fecha_inicio?: string;
   fecha_fin?: string;
   base_calculo?: any;
+  subtipo?: string;
+}
+
+export interface BaseCalculoData {
+  salario_base: number;
+  tipo_calculo: string;
+  detalle_calculo: string;
+  factor_calculo: number;
+  jornada_legal?: {
+    horas_semanales: number;
+    divisor_horario: number;
+    ley: string;
+    fecha_vigencia: string;
+  };
 }
 
 export interface CalculationResult {
   valor: number;
-  baseCalculo: {
-    salario_base: number;
-    tipo_calculo: string;
-    detalle_calculo: string;
-    jornada_legal?: {
-      horas_semanales: number;
-      divisor_horario: number;
-      ley: string;
-      fecha_vigencia: string;
-    };
-  };
+  baseCalculo: BaseCalculoData;
 }
-
-/**
- * Función para calcular el valor de una novedad
- */
-export const calcularValorNovedad = (
-  tipoNovedad: NovedadType,
-  subtipo: string | undefined,
-  salarioBase: number,
-  dias?: number,
-  horas?: number
-): CalculationResult => {
-  let valor = 0;
-  let detalleCalculo = '';
-
-  switch (tipoNovedad) {
-    case 'horas_extra':
-      if (horas) {
-        valor = horas * (salarioBase / 240) * 1.25; // Ejemplo: 25% recargo
-        detalleCalculo = `${horas} horas extra × (Salario / 240) × 1.25`;
-      }
-      break;
-    case 'recargo_nocturno':
-      if (horas) {
-        valor = horas * (salarioBase / 240) * 0.35; // Ejemplo: 35% recargo
-        detalleCalculo = `${horas} horas recargo nocturno × (Salario / 240) × 0.35`;
-      }
-      break;
-    case 'vacaciones':
-      if (dias) {
-        valor = dias * (salarioBase / 30);
-        detalleCalculo = `${dias} días de vacaciones × (Salario / 30)`;
-      }
-      break;
-    case 'licencia_remunerada':
-      if (dias) {
-        valor = dias * (salarioBase / 30);
-        detalleCalculo = `${dias} días de licencia × (Salario / 30)`;
-      }
-      break;
-    case 'incapacidad':
-      if (dias) {
-        valor = dias * (salarioBase / 30) * 0.667; // Ejemplo: 66.7%
-        detalleCalculo = `${dias} días de incapacidad × (Salario / 30) × 0.667`;
-      }
-      break;
-    case 'bonificacion':
-    case 'comision':
-    case 'prima':
-    case 'otros_ingresos':
-      // Para estos tipos, normalmente se ingresa el valor directamente
-      detalleCalculo = 'Valor a ingresar manualmente';
-      break;
-    // Deducciones
-    case 'libranza':
-    case 'multa':
-    case 'descuento_voluntario':
-    case 'retencion_fuente':
-    case 'fondo_solidaridad':
-      detalleCalculo = 'Valor fijo de deducción';
-      break;
-    case 'ausencia':
-      if (dias) {
-        valor = dias * (salarioBase / 30);
-        detalleCalculo = `${dias} días de ausencia × (Salario / 30)`;
-      }
-      break;
-  }
-
-  return {
-    valor: valor,
-    baseCalculo: {
-      salario_base: salarioBase,
-      tipo_calculo: tipoNovedad,
-      detalle_calculo: detalleCalculo
-    }
-  };
-};
 
 /**
  * Versión mejorada de calcularValorNovedad que considera la jornada legal dinámica
@@ -182,6 +110,7 @@ export const calcularValorNovedadEnhanced = (
       salario_base: salarioBase,
       tipo_calculo: tipoNovedad,
       detalle_calculo: '',
+      factor_calculo: 1.0,
       jornada_legal: {
         horas_semanales: jornadaLegal.horasSemanales,
         divisor_horario: hourlyDivisor,
@@ -227,6 +156,7 @@ export const calcularValorNovedadEnhanced = (
         }
 
         result.valor = horas * valorHoraOrdinaria * (1 + recargo);
+        result.baseCalculo.factor_calculo = (1 + recargo);
         result.baseCalculo.detalle_calculo = 
           `${horas} horas extra ${descripcionRecargo} × $${Math.round(valorHoraOrdinaria)} × ${(1 + recargo)} = $${Math.round(result.valor)}. ` +
           `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
@@ -238,6 +168,7 @@ export const calcularValorNovedadEnhanced = (
         }
         
         result.valor = horas * valorHoraOrdinaria * 0.35; // 35% recargo nocturno
+        result.baseCalculo.factor_calculo = 0.35;
         result.baseCalculo.detalle_calculo = 
           `${horas} horas recargo nocturno × $${Math.round(valorHoraOrdinaria)} × 0.35 = $${Math.round(result.valor)}. ` +
           `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
@@ -249,6 +180,7 @@ export const calcularValorNovedadEnhanced = (
         }
         
         result.valor = dias * valorDiario;
+        result.baseCalculo.factor_calculo = 1.0;
         result.baseCalculo.detalle_calculo = 
           `${dias} días de vacaciones × $${Math.round(valorDiario)} = $${Math.round(result.valor)}`;
         break;
@@ -270,6 +202,7 @@ export const calcularValorNovedadEnhanced = (
         }
 
         result.valor = dias * valorDiario * porcentajeIncapacidad;
+        result.baseCalculo.factor_calculo = porcentajeIncapacidad;
         result.baseCalculo.detalle_calculo = 
           `${dias} días incapacidad × $${Math.round(valorDiario)} × ${porcentajeIncapacidad} (${entidadPagadora}) = $${Math.round(result.valor)}`;
         break;
@@ -280,6 +213,7 @@ export const calcularValorNovedadEnhanced = (
         }
         
         result.valor = dias * valorDiario;
+        result.baseCalculo.factor_calculo = 1.0;
         result.baseCalculo.detalle_calculo = 
           `${dias} días licencia remunerada × $${Math.round(valorDiario)} = $${Math.round(result.valor)}`;
         break;
@@ -292,9 +226,11 @@ export const calcularValorNovedadEnhanced = (
         // pero si se especifican días u horas, se puede calcular
         if (dias && dias > 0) {
           result.valor = dias * valorDiario;
+          result.baseCalculo.factor_calculo = 1.0;
           result.baseCalculo.detalle_calculo = `${dias} días × $${Math.round(valorDiario)} = $${Math.round(result.valor)}`;
         } else if (horas && horas > 0) {
           result.valor = horas * valorHoraOrdinaria;
+          result.baseCalculo.factor_calculo = 1.0;
           result.baseCalculo.detalle_calculo = 
             `${horas} horas × $${Math.round(valorHoraOrdinaria)} = $${Math.round(result.valor)}. ` +
             `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
@@ -318,6 +254,7 @@ export const calcularValorNovedadEnhanced = (
         }
         
         result.valor = dias * valorDiario;
+        result.baseCalculo.factor_calculo = 1.0;
         result.baseCalculo.detalle_calculo = 
           `${dias} días ausencia × $${Math.round(valorDiario)} = $${Math.round(result.valor)} (deducción)`;
         break;
@@ -341,5 +278,5 @@ export const calcularValorNovedadEnhanced = (
   }
 };
 
-// Re-exportar la función original para compatibilidad
-export const calcularValorNovedad = calcularValorNovedadEnhanced;
+// Export the enhanced function as the main one
+export { calcularValorNovedadEnhanced as calcularValorNovedad };
