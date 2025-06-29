@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
@@ -31,65 +30,88 @@ export class NovedadesEnhancedService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      // Validación de datos requeridos
+      // Enhanced validation with debugging
       if (!data.empleado_id) {
+        console.error('❌ Missing empleado_id in createNovedad');
         throw new Error('empleado_id is required');
       }
       
       if (!data.periodo_id) {
+        console.error('❌ Missing periodo_id in createNovedad');
         throw new Error('periodo_id is required');
       }
 
       if (!data.tipo_novedad) {
+        console.error('❌ Missing tipo_novedad in createNovedad');
         throw new Error('tipo_novedad is required');
       }
 
-      console.log('📝 Creating novedad with enhanced service. Data validation passed:', {
+      console.log('📝 Creating novedad with enhanced debugging:', {
         empleado_id: data.empleado_id,
         periodo_id: data.periodo_id,
         tipo_novedad: data.tipo_novedad,
-        valor: data.valor
+        valor: data.valor,
+        company_id: companyId
       });
 
-      // Validar que el período existe
-      const { data: periodExists, error: periodError } = await supabase
+      // Enhanced period validation with multiple checks
+      console.log('🔍 Validating period with multiple table checks...');
+      
+      // Check payroll_periods_real first
+      const { data: periodExistsReal, error: periodErrorReal } = await supabase
         .from('payroll_periods_real')
-        .select('id, fecha_inicio, fecha_fin')
+        .select('id, fecha_inicio, fecha_fin, estado')
         .eq('id', data.periodo_id)
-        .eq('company_id', companyId)
-        .single();
+        .eq('company_id', companyId);
 
-      if (periodError || !periodExists) {
-        console.error('Period validation failed:', periodError);
-        throw new Error(`Invalid period ID: ${data.periodo_id}`);
+      console.log('📊 Period check in payroll_periods_real:', { periodExistsReal, periodErrorReal });
+
+      // Check payroll_periods as fallback
+      const { data: periodExistsRegular, error: periodErrorRegular } = await supabase
+        .from('payroll_periods')
+        .select('id, fecha_inicio, fecha_fin, estado')
+        .eq('id', data.periodo_id)
+        .eq('company_id', companyId);
+
+      console.log('📊 Period check in payroll_periods:', { periodExistsRegular, periodErrorRegular });
+
+      const periodExists = periodExistsReal?.[0] || periodExistsRegular?.[0];
+
+      if (!periodExists) {
+        console.error('❌ Period validation failed for period ID:', data.periodo_id);
+        console.error('Available periods in real table:', periodExistsReal);
+        console.error('Available periods in regular table:', periodExistsRegular);
+        throw new Error(`Invalid or non-existent period ID: ${data.periodo_id}`);
       }
 
-      console.log('✅ Period validated successfully:', periodExists.id);
+      console.log('✅ Period validated successfully:', periodExists);
       
-      // Validar que el empleado existe
+      // Enhanced employee validation
       const { data: employeeExists, error: employeeError } = await supabase
         .from('employees')
-        .select('id, salario_base')
+        .select('id, salario_base, nombre, apellido')
         .eq('id', data.empleado_id)
         .eq('company_id', companyId)
         .single();
 
       if (employeeError || !employeeExists) {
-        console.error('Employee validation failed:', employeeError);
+        console.error('❌ Employee validation failed:', { employeeError, data: data.empleado_id });
         throw new Error(`Invalid employee ID: ${data.empleado_id}`);
       }
 
-      console.log('✅ Employee validated successfully:', employeeExists.id);
+      console.log('✅ Employee validated successfully:', employeeExists);
       
-      // Usar la fecha del período para cálculos con jornada legal correcta
+      // Use period date for enhanced calculations
       const fechaPeriodoReal = new Date(periodExists.fecha_inicio);
 
-      // Si hay datos para auto-cálculo, usar la función mejorada
+      // Enhanced auto-calculation with period-specific legal workday
       let valorFinal = data.valor || 0;
       let baseCalculoMejorada = data.base_calculo;
 
       if ((data.horas || data.dias) && employeeExists.salario_base) {
         try {
+          console.log('🧮 Performing auto-calculation with period date:', fechaPeriodoReal.toISOString().split('T')[0]);
+          
           const resultadoCalculo = calcularValorNovedadEnhanced(
             data.tipo_novedad,
             data.subtipo,
@@ -102,15 +124,16 @@ export class NovedadesEnhancedService {
           if (resultadoCalculo.valor > 0) {
             valorFinal = resultadoCalculo.valor;
             baseCalculoMejorada = resultadoCalculo.baseCalculo;
-            console.log('💰 Auto-calculated value with legal workday:', valorFinal);
+            console.log('💰 Auto-calculated value with period-specific legal workday:', valorFinal);
           }
         } catch (calcError) {
-          console.warn('Could not auto-calculate, using provided value:', calcError);
+          console.warn('⚠️ Could not auto-calculate, using provided value:', calcError);
         }
       }
 
-      // Asegurar que tenemos un valor válido
+      // Final value validation
       if (!valorFinal || valorFinal <= 0) {
+        console.error('❌ Invalid final value:', valorFinal);
         throw new Error('Valor must be greater than 0');
       }
 
@@ -118,7 +141,7 @@ export class NovedadesEnhancedService {
         company_id: companyId,
         empleado_id: data.empleado_id,
         periodo_id: data.periodo_id,
-        tipo_novedad: data.tipo_novedad as any, // Cast to any to avoid TypeScript error
+        tipo_novedad: data.tipo_novedad as any,
         valor: Number(valorFinal),
         horas: data.horas ? Number(data.horas) : null,
         dias: data.dias ? Number(data.dias) : null,
@@ -129,7 +152,7 @@ export class NovedadesEnhancedService {
         creado_por: user.id
       };
 
-      console.log('📤 Inserting enhanced novedad with validated data:', insertData);
+      console.log('📤 Inserting enhanced novedad with complete validation:', insertData);
       
       const { data: result, error } = await supabase
         .from('payroll_novedades')
@@ -154,10 +177,11 @@ export class NovedadesEnhancedService {
 
       if (error) {
         console.error('❌ Error inserting enhanced novedad:', error);
+        console.error('Insert data that failed:', insertData);
         throw error;
       }
 
-      console.log('✅ Enhanced novedad created successfully:', result);
+      console.log('✅ Enhanced novedad created successfully with proper period association:', result);
       
       return {
         id: result.id,
@@ -177,6 +201,95 @@ export class NovedadesEnhancedService {
       };
     } catch (error) {
       console.error('❌ Error creating enhanced novedad:', error);
+      throw error;
+    }
+  }
+
+  static async getNovedadesByEmployee(empleadoId: string, periodId: string): Promise<PayrollNovedad[]> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        console.error('❌ No company ID found for getNovedadesByEmployee');
+        return [];
+      }
+
+      console.log('🔍 Enhanced loading novedades for employee:', empleadoId, 'period:', periodId, 'company:', companyId);
+
+      // Enhanced query with better error handling
+      const { data, error } = await supabase
+        .from('payroll_novedades')
+        .select(`
+          id,
+          company_id,
+          empleado_id,
+          periodo_id,
+          tipo_novedad,
+          valor,
+          horas,
+          dias,
+          observacion,
+          fecha_inicio,
+          fecha_fin,
+          base_calculo,
+          created_at,
+          updated_at
+        `)
+        .eq('company_id', companyId)
+        .eq('empleado_id', empleadoId)
+        .eq('periodo_id', periodId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error loading novedades with enhanced service:', error);
+        throw error;
+      }
+
+      console.log('📊 Enhanced novedades query result:', {
+        query_params: { companyId, empleadoId, periodId },
+        result_count: data?.length || 0,
+        data: data
+      });
+
+      if (!data || data.length === 0) {
+        console.log('⚠️ No novedades found, running additional diagnostic queries...');
+        
+        // Diagnostic query 1: Check all novedades for this employee
+        const { data: allForEmployee } = await supabase
+          .from('payroll_novedades')
+          .select('periodo_id, tipo_novedad, valor')
+          .eq('company_id', companyId)
+          .eq('empleado_id', empleadoId);
+        
+        console.log('🔍 All novedades for this employee:', allForEmployee);
+        
+        // Diagnostic query 2: Check all novedades for this period
+        const { data: allForPeriod } = await supabase
+          .from('payroll_novedades')
+          .select('empleado_id, tipo_novedad, valor')
+          .eq('company_id', companyId)
+          .eq('periodo_id', periodId);
+        
+        console.log('🔍 All novedades for this period:', allForPeriod);
+      }
+
+      return (data || []).map(novedad => ({
+        id: novedad.id,
+        company_id: novedad.company_id,
+        empleado_id: novedad.empleado_id,
+        periodo_id: novedad.periodo_id,
+        tipo_novedad: novedad.tipo_novedad as any,
+        valor: Number(novedad.valor || 0),
+        horas: Number(novedad.horas || 0),
+        dias: novedad.dias || 0,
+        observacion: novedad.observacion || '',
+        fecha_inicio: novedad.fecha_inicio || '',
+        fecha_fin: novedad.fecha_fin || '',
+        base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
+        created_at: novedad.created_at,
+        updated_at: novedad.updated_at
+      }));
+    } catch (error) {
+      console.error('❌ Error in enhanced getNovedadesByEmployee:', error);
       throw error;
     }
   }
@@ -216,65 +329,6 @@ export class NovedadesEnhancedService {
       }
 
       console.log('📊 Loaded novedades for period:', data);
-
-      return (data || []).map(novedad => ({
-        id: novedad.id,
-        company_id: novedad.company_id,
-        empleado_id: novedad.empleado_id,
-        periodo_id: novedad.periodo_id,
-        tipo_novedad: novedad.tipo_novedad as any,
-        valor: Number(novedad.valor || 0),
-        horas: Number(novedad.horas || 0),
-        dias: novedad.dias || 0,
-        observacion: novedad.observacion || '',
-        fecha_inicio: novedad.fecha_inicio || '',
-        fecha_fin: novedad.fecha_fin || '',
-        base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
-        created_at: novedad.created_at,
-        updated_at: novedad.updated_at
-      }));
-    } catch (error) {
-      console.error('Error loading novedades:', error);
-      throw error;
-    }
-  }
-
-  static async getNovedadesByEmployee(empleadoId: string, periodId: string): Promise<PayrollNovedad[]> {
-    try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) return [];
-
-      console.log('🔍 Loading novedades for employee:', empleadoId, 'period:', periodId);
-
-      const { data, error } = await supabase
-        .from('payroll_novedades')
-        .select(`
-          id,
-          company_id,
-          empleado_id,
-          periodo_id,
-          tipo_novedad,
-          valor,
-          horas,
-          dias,
-          observacion,
-          fecha_inicio,
-          fecha_fin,
-          base_calculo,
-          created_at,
-          updated_at
-        `)
-        .eq('company_id', companyId)
-        .eq('empleado_id', empleadoId)
-        .eq('periodo_id', periodId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading novedades:', error);
-        throw error;
-      }
-
-      console.log('📊 Loaded novedades:', data);
 
       return (data || []).map(novedad => ({
         id: novedad.id,

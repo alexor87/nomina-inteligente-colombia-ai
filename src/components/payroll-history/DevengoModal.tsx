@@ -68,6 +68,16 @@ export const DevengoModal = ({
   const [showForm, setShowForm] = useState(false);
   const [editingNovedad, setEditingNovedad] = useState<NovedadDisplay | null>(null);
   const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(new Date());
+  const [debugInfo, setDebugInfo] = useState<{
+    receivedPeriodId: string;
+    foundPeriods: any[];
+    novedadesFound: number;
+    periodTextUsed?: string;
+  }>({
+    receivedPeriodId: '',
+    foundPeriods: [],
+    novedadesFound: 0
+  });
 
   // Form state con valores por defecto mejorados
   const [formData, setFormData] = useState<CreateNovedadData>({
@@ -83,13 +93,35 @@ export const DevengoModal = ({
     observacion: ''
   });
 
+  // Debug logging for periodId investigation
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🔍 DEBUG: Modal opened with props:', {
+        employeeId,
+        periodId,
+        payrollId,
+        modalType,
+        receivedProps: { employeeId, periodId, payrollId }
+      });
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        receivedPeriodId: periodId
+      }));
+    }
+  }, [isOpen, employeeId, periodId, payrollId, modalType]);
+
   // Actualizar formData cuando cambien las props
   useEffect(() => {
     if (isOpen) {
       console.log('🔄 Modal opened, updating form data with:', {
         employeeId,
         periodId,
-        modalType
+        modalType,
+        formDataUpdate: {
+          empleado_id: employeeId,
+          periodo_id: periodId
+        }
       });
       
       setFormData({
@@ -107,34 +139,54 @@ export const DevengoModal = ({
     }
   }, [isOpen, employeeId, periodId, modalType]);
 
-  // Cargar fecha del período desde la base de datos para cálculos precisos
+  // Enhanced period date loading with debugging
   useEffect(() => {
     const loadPeriodDate = async () => {
       try {
         console.log('🔍 Loading period date for accurate calculations, periodId:', periodId);
         
-        const { data: periodData, error } = await supabase
+        // First check payroll_periods_real table
+        const { data: periodDataReal, error: errorReal } = await supabase
           .from('payroll_periods_real')
-          .select('fecha_inicio, fecha_fin')
-          .eq('id', periodId)
-          .single();
+          .select('*')
+          .eq('id', periodId);
 
-        if (error) {
-          console.error('Error loading period date:', error);
-          setCurrentPeriodDate(new Date());
-          return;
-        }
+        console.log('📊 Query payroll_periods_real result:', { periodDataReal, errorReal });
+
+        // Then check payroll_periods table as fallback
+        const { data: periodDataRegular, error: errorRegular } = await supabase
+          .from('payroll_periods')
+          .select('*')
+          .eq('id', periodId);
+
+        console.log('📊 Query payroll_periods result:', { periodDataRegular, errorRegular });
+
+        // Update debug info
+        setDebugInfo(prev => ({
+          ...prev,
+          foundPeriods: [
+            ...(periodDataReal || []),
+            ...(periodDataRegular || [])
+          ]
+        }));
+
+        // Use the first period found
+        const periodData = periodDataReal?.[0] || periodDataRegular?.[0];
 
         if (periodData?.fecha_inicio) {
           const fechaPeriodo = new Date(periodData.fecha_inicio);
           setCurrentPeriodDate(fechaPeriodo);
           console.log('📅 Period date loaded successfully:', fechaPeriodo.toISOString().split('T')[0]);
         } else {
-          console.warn('No period date found, using current date');
+          console.warn('⚠️ No period date found, using current date. Period search results:', {
+            periodDataReal,
+            periodDataRegular,
+            periodId
+          });
           setCurrentPeriodDate(new Date());
         }
       } catch (error) {
-        console.error('Error loading period date:', error);
+        console.error('❌ Error loading period date:', error);
         setCurrentPeriodDate(new Date());
       }
     };
@@ -151,10 +203,64 @@ export const DevengoModal = ({
       setIsLoading(true);
       console.log('🔍 Loading novedades for employee in modal:', employeeId, 'period:', periodId);
       
+      // Try direct service call first
       const data = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
+      console.log('📊 Direct service result:', data);
+      
+      // If no data found, try alternative queries for debugging
+      if (!data || data.length === 0) {
+        console.log('⚠️ No novedades found with direct query, trying debugging queries...');
+        
+        // Query 1: All novedades for this employee (any period)
+        const { data: allNovedadesForEmployee, error: error1 } = await supabase
+          .from('payroll_novedades')
+          .select('*')
+          .eq('empleado_id', employeeId);
+        
+        console.log('🔍 All novedades for employee:', allNovedadesForEmployee, 'Error:', error1);
+        
+        // Query 2: All novedades for this period (any employee)
+        const { data: allNovedadesForPeriod, error: error2 } = await supabase
+          .from('payroll_novedades')
+          .select('*')
+          .eq('periodo_id', periodId);
+        
+        console.log('🔍 All novedades for period:', allNovedadesForPeriod, 'Error:', error2);
+        
+        // Query 3: Check if there are novedades that match by periodo text instead of ID
+        const companyId = await NovedadesEnhancedService.getCurrentUserCompanyId();
+        if (companyId) {
+          // Get period text from payroll table
+          const { data: payrollData } = await supabase
+            .from('payrolls')
+            .select('periodo')
+            .eq('employee_id', employeeId)
+            .eq('id', payrollId)
+            .single();
+          
+          console.log('📊 Payroll period text:', payrollData?.periodo);
+          
+          if (payrollData?.periodo) {
+            // Try to find novedades by matching periodo text pattern
+            const { data: novedadesByText, error: error3 } = await supabase
+              .from('payroll_novedades')
+              .select('*')
+              .eq('company_id', companyId)
+              .eq('empleado_id', employeeId);
+            
+            console.log('🔍 Novedades search by company/employee:', novedadesByText, 'Error:', error3);
+            
+            setDebugInfo(prev => ({
+              ...prev,
+              periodTextUsed: payrollData.periodo,
+              novedadesFound: novedadesByText?.length || 0
+            }));
+          }
+        }
+      }
       
       // Filtrar por tipo de modal
-      const filteredNovedades = data.filter(novedad => {
+      const filteredNovedades = (data || []).filter(novedad => {
         const isDevengado = ['horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
                             'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(novedad.tipo_novedad);
         
@@ -162,9 +268,11 @@ export const DevengoModal = ({
       });
       
       setNovedades(filteredNovedades);
-      console.log('✅ Loaded novedades:', filteredNovedades);
+      setDebugInfo(prev => ({ ...prev, novedadesFound: filteredNovedades.length }));
+      
+      console.log('✅ Loaded and filtered novedades:', filteredNovedades);
     } catch (error) {
-      console.error('Error loading novedades:', error);
+      console.error('❌ Error loading novedades:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar las novedades",
@@ -173,13 +281,12 @@ export const DevengoModal = ({
     } finally {
       setIsLoading(false);
     }
-  }, [isOpen, employeeId, periodId, modalType, toast]);
+  }, [isOpen, employeeId, periodId, modalType, payrollId, toast]);
 
   useEffect(() => {
     loadNovedades();
   }, [loadNovedades]);
 
-  // Función de cálculo mejorada con jornada legal dinámica y fecha correcta del período
   const calculateSuggestedValue = useCallback((
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
@@ -194,14 +301,13 @@ export const DevengoModal = ({
       console.log('💰 Employee salary:', employeeSalary);
       console.log('⏰ Hours:', horas, 'Days:', dias);
       
-      // Usar el sistema de cálculo mejorado con fecha exacta del período
       const resultado = calcularValorNovedadEnhanced(
         tipoNovedad,
         subtipo,
         employeeSalary,
         dias,
         horas,
-        currentPeriodDate // Usar fecha exacta del período para cálculos históricos precisos
+        currentPeriodDate
       );
       
       console.log(`💰 Calculated value with period-specific legal workday for ${tipoNovedad}:`, resultado.valor);
@@ -246,22 +352,19 @@ export const DevengoModal = ({
     try {
       setIsSubmitting(true);
       
-      console.log('📝 Creating novedad with data:', {
+      console.log('📝 Creating novedad with enhanced debugging:', {
         ...formData,
         employeeId: formData.empleado_id,
-        periodId: formData.periodo_id
+        periodId: formData.periodo_id,
+        debugInfo: debugInfo
       });
       
-      // Usar el servicio mejorado
       const newNovedad = await NovedadesEnhancedService.createNovedad(formData);
 
       if (newNovedad) {
-        console.log('✅ Novedad created, now recalculating totals with correct deductions...');
+        console.log('✅ Novedad created successfully, recalculating totals...');
         
-        // CRITICAL: Recalcular totales del empleado después de crear la novedad
-        // Ahora incluye el cálculo correcto de deducciones
         await recalculateEmployeeTotals();
-        
         await loadNovedades();
         setShowForm(false);
         setEditingNovedad(null);
@@ -280,7 +383,6 @@ export const DevengoModal = ({
           observacion: ''
         });
         
-        // Notificar al componente padre para que refresque la vista
         if (onNovedadCreated) {
           onNovedadCreated(employeeId, newNovedad.valor, modalType);
         }
@@ -292,7 +394,7 @@ export const DevengoModal = ({
         });
       }
     } catch (error) {
-      console.error('Error creating novedad:', error);
+      console.error('❌ Error creating novedad:', error);
       toast({
         title: "Error",
         description: "No se pudo crear la novedad. Verifique los datos ingresados.",
@@ -317,10 +419,7 @@ export const DevengoModal = ({
       if (updatedNovedad) {
         console.log('✅ Novedad updated, now recalculating totals with correct deductions...');
         
-        // CRITICAL: Recalcular totales del empleado después de actualizar la novedad
-        // Ahora incluye el cálculo correcto de deducciones
         await recalculateEmployeeTotals();
-        
         await loadNovedades();
         setEditingNovedad(null);
         setShowForm(false);
@@ -353,10 +452,7 @@ export const DevengoModal = ({
       
       console.log('✅ Novedad deleted, now recalculating totals with correct deductions...');
       
-      // CRITICAL: Recalcular totales del empleado después de eliminar la novedad
-      // Ahora incluye el cálculo correcto de deducciones
       await recalculateEmployeeTotals();
-      
       await loadNovedades();
 
       if (onNovedadCreated) {
@@ -447,7 +543,7 @@ export const DevengoModal = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
-        {/* Header */}
+        {/* Header with debug info */}
         <div className="p-6 pb-4">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
@@ -464,6 +560,15 @@ export const DevengoModal = ({
                     <Badge variant="secondary" className="text-xs">
                       Con cálculo correcto de IBC y retención
                     </Badge>
+                  )}
+                </div>
+                {/* Debug info display */}
+                <div className="text-xs text-gray-500 mt-2 space-y-1">
+                  <div>Debug: PeriodId = {debugInfo.receivedPeriodId}</div>
+                  <div>Períodos encontrados: {debugInfo.foundPeriods.length}</div>
+                  <div>Novedades encontradas: {debugInfo.novedadesFound}</div>
+                  {debugInfo.periodTextUsed && (
+                    <div>Período texto: {debugInfo.periodTextUsed}</div>
                   )}
                 </div>
               </div>
@@ -510,6 +615,13 @@ export const DevengoModal = ({
                     <p className="text-gray-600">
                       Haz clic en "Agregar {modalType}" para comenzar
                     </p>
+                    {/* Show debug info when no data found */}
+                    <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-xs text-left">
+                      <strong>Debug Info:</strong><br/>
+                      Period ID recibido: {debugInfo.receivedPeriodId}<br/>
+                      Períodos en DB: {debugInfo.foundPeriods.length}<br/>
+                      Novedades encontradas: {debugInfo.novedadesFound}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3 pb-6">
