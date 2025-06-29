@@ -123,15 +123,19 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
     }
   };
 
-  const handleClose = () => {
-    setEmail('');
-    onClose();
+  // Handler controlado para evitar auto-cierre
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      console.log('🔒 Cerrando modal de envío via Dialog');
+      setEmail('');
+      onClose();
+    }
   };
 
   if (!employee) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -164,7 +168,7 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={handleClose} disabled={isSending}>
+          <Button variant="outline" onClick={() => handleDialogChange(false)} disabled={isSending}>
             <X className="h-4 w-4 mr-2" />
             Cancelar
           </Button>

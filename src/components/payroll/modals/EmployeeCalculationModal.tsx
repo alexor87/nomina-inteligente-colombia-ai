@@ -23,6 +23,14 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
   onClose,
   employee
 }) => {
+  // Handler controlado para evitar auto-cierre
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      console.log('🔒 Cerrando modal de cálculos via Dialog');
+      onClose();
+    }
+  };
+
   if (!employee) return null;
 
   const dailySalary = employee.baseSalary / 30;
@@ -79,7 +87,7 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
   ];
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

@@ -39,8 +39,10 @@ export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> =
     deductions: 0
   });
 
+  // useEffect optimizado para evitar loops infinitos
   useEffect(() => {
-    if (employee) {
+    if (employee && isOpen) {
+      console.log('📝 Inicializando formData para empleado:', employee.name);
       setFormData({
         baseSalary: employee.baseSalary,
         workedDays: employee.workedDays,
@@ -51,7 +53,7 @@ export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> =
         deductions: employee.deductions
       });
     }
-  }, [employee]);
+  }, [employee?.id, isOpen]); // Solo dependemos del ID del empleado y si el modal está abierto
 
   const handleInputChange = (field: string, value: number) => {
     setFormData(prev => ({
@@ -62,7 +64,16 @@ export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> =
 
   const handleSave = () => {
     if (employee) {
+      console.log('💾 Guardando cambios para empleado:', employee.name);
       onUpdateEmployee(employee.id, formData);
+      onClose();
+    }
+  };
+
+  // Handler controlado para evitar auto-cierre
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      console.log('🔒 Cerrando modal de liquidación via Dialog');
       onClose();
     }
   };
@@ -82,7 +93,7 @@ export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> =
   if (!employee) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
