@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -15,8 +14,7 @@ import {
   Trash2, 
   Clock,
   AlertCircle,
-  Loader2,
-  DollarSign
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
@@ -442,71 +440,57 @@ export const DevengoModal = ({
     return labels[tipo] || tipo;
   };
 
-  const renderBasicConcepts = () => {
-    // Only show basic concepts for devengado type and when there are values
-    if (modalType !== 'devengado' || (basicConcepts.salarioBase === 0 && basicConcepts.auxilioTransporte === 0)) {
-      return null;
+  const renderConceptsList = () => {
+    const concepts = [];
+    
+    // Add basic concepts for devengado
+    if (modalType === 'devengado') {
+      if (basicConcepts.salarioBase > 0) {
+        concepts.push({
+          id: 'salario-base',
+          label: 'Salario Base',
+          value: basicConcepts.salarioBase,
+          isBasic: true
+        });
+      }
+      
+      if (basicConcepts.auxilioTransporte > 0) {
+        concepts.push({
+          id: 'auxilio-transporte', 
+          label: 'Auxilio Transporte',
+          value: basicConcepts.auxilioTransporte,
+          isBasic: true
+        });
+      }
     }
-
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h4 className="font-medium text-gray-900 flex items-center space-x-2">
-            <DollarSign className="h-4 w-4" />
-            <span>Conceptos Básicos</span>
-          </h4>
-          <Badge variant="default" className="text-sm">
-            {formatCurrency(totalBasicConcepts)}
-          </Badge>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-2">
-          {basicConcepts.salarioBase > 0 && (
-            <div className="border rounded-lg p-2 bg-blue-50">
-              <div className="text-center">
-                <span className="font-medium text-xs">Salario Base</span>
-                <div className="text-green-700 font-semibold text-sm">
-                  +{formatCurrency(basicConcepts.salarioBase)}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {basicConcepts.auxilioTransporte > 0 && (
-            <div className="border rounded-lg p-2 bg-blue-50">
-              <div className="text-center">
-                <span className="font-medium text-xs">Auxilio Transporte</span>
-                <div className="text-green-700 font-semibold text-sm">
-                  +{formatCurrency(basicConcepts.auxilioTransporte)}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    
+    // Add novedades
+    novedades.forEach(novedad => {
+      concepts.push({
+        id: novedad.id,
+        label: getNovedadLabel(novedad.tipo_novedad),
+        value: novedad.valor,
+        isBasic: false,
+        novedad: novedad
+      });
+    });
+    
+    return concepts;
   };
 
   const isFormValid = formData.valor > 0 && formData.empleado_id && formData.periodo_id;
+  const conceptsList = renderConceptsList();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
         {/* Simplified Header */}
-        <div className="p-4 pb-2">
+        <div className="p-4 pb-3 border-b">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <div>
-                <span className="text-lg font-semibold">
-                  {modalType === 'devengado' ? 'Devengados' : 'Deducciones'} - {employeeName}
-                </span>
+              <div className="text-lg font-semibold">
+                {modalType === 'devengado' ? 'Devengados' : 'Deducciones'} - {employeeName}
               </div>
-              <Badge 
-                variant={modalType === 'devengado' ? 'default' : 'destructive'}
-                className="text-sm px-3 py-1"
-              >
-                Total: {formatCurrency(totalValue)}
-              </Badge>
             </DialogTitle>
           </DialogHeader>
         </div>
@@ -515,22 +499,21 @@ export const DevengoModal = ({
         <div className="flex-1 flex flex-col min-h-0">
           {!showForm ? (
             <>
-              {/* List header */}
-              <div className="flex justify-between items-center px-4 pb-2">
-                <div className="text-sm text-gray-600">
-                  {modalType === 'devengado' 
-                    ? `${totalBasicConcepts > 0 ? 'Conceptos básicos + ' : ''}${novedades.length} novedades`
-                    : `${novedades.length} deducciones`
-                  }
+              {/* Simplified summary header */}
+              <div className="px-4 py-3 bg-gray-50 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold text-gray-900">
+                    Total: {formatCurrency(totalValue)}
+                  </div>
+                  <Button 
+                    onClick={() => setShowForm(true)}
+                    size="sm"
+                    className="flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Agregar</span>
+                  </Button>
                 </div>
-                <Button 
-                  onClick={() => setShowForm(true)}
-                  size="sm"
-                  className="flex items-center space-x-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Agregar</span>
-                </Button>
               </div>
 
               {/* Scrollable list */}
@@ -540,96 +523,67 @@ export const DevengoModal = ({
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                   </div>
                 ) : (
-                  <div className="space-y-3 pb-4">
-                    {/* Basic Concepts Section */}
-                    {renderBasicConcepts()}
-                    
-                    {/* Separator between basic and additional concepts */}
-                    {modalType === 'devengado' && totalBasicConcepts > 0 && novedades.length > 0 && (
-                      <Separator />
-                    )}
-                    
-                    {/* Additional Novedades Section */}
-                    <div className="space-y-2">
-                      {modalType === 'devengado' && totalBasicConcepts > 0 && novedades.length > 0 && (
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium text-gray-900">Novedades Adicionales</h4>
-                          <Badge variant="outline" className="text-sm">
-                            {formatCurrency(totalNovedades)}
-                          </Badge>
-                        </div>
-                      )}
-                      
-                      {novedades.length === 0 ? (
-                        <div className="text-center py-6">
-                          <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                          <h3 className="text-sm font-medium text-gray-900 mb-1">
-                            {modalType === 'devengado' ? 'No hay novedades adicionales' : 'No hay deducciones'}
-                          </h3>
-                          <p className="text-xs text-gray-600">
-                            Haz clic en "Agregar" para comenzar
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {novedades.map((novedad) => (
-                            <div key={novedad.id} className="border rounded-lg p-3 hover:bg-gray-50">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2 mb-1">
-                                    <h4 className="font-medium text-sm">{getNovedadLabel(novedad.tipo_novedad)}</h4>
-                                    {(novedad.horas || novedad.dias) && (
-                                      <div className="flex items-center space-x-1 text-xs text-gray-500">
-                                        <Clock className="h-3 w-3" />
-                                        <span>
-                                          {novedad.horas && `${novedad.horas}h`}
-                                          {novedad.horas && novedad.dias && ' - '}
-                                          {novedad.dias && `${novedad.dias}d`}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                  
-                                  {novedad.observacion && (
-                                    <div className="text-xs text-gray-600">
-                                      {novedad.observacion}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="flex items-center space-x-2 ml-4">
-                                  <div className="text-right">
-                                    <div className={`font-semibold text-sm ${
-                                      modalType === 'devengado' ? 'text-green-700' : 'text-red-700'
-                                    }`}>
-                                      {modalType === 'devengado' ? '+' : '-'}{formatCurrency(novedad.valor)}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEditNovedad(novedad)}
-                                      className="h-8 px-2 text-xs"
-                                    >
-                                      Editar
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteNovedad(novedad.id)}
-                                      className="h-8 px-2 text-red-600 hover:text-red-700"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
+                  <div className="py-4">
+                    {conceptsList.length === 0 ? (
+                      <div className="text-center py-8">
+                        <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <h3 className="text-sm font-medium text-gray-900 mb-1">
+                          {modalType === 'devengado' ? 'No hay conceptos de devengo' : 'No hay deducciones'}
+                        </h3>
+                        <p className="text-xs text-gray-600">
+                          Haz clic en "Agregar" para comenzar
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {conceptsList.map((concept) => (
+                          <div key={concept.id} className="flex items-center justify-between py-3 px-3 rounded-lg border hover:bg-gray-50">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium text-sm">{concept.label}</span>
+                                {concept.isBasic && (
+                                  <Badge variant="outline" className="text-xs">Básico</Badge>
+                                )}
                               </div>
+                              {concept.novedad?.observacion && (
+                                <div className="text-xs text-gray-600 mt-1">
+                                  {concept.novedad.observacion}
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+
+                            <div className="flex items-center space-x-3">
+                              <div className={`font-semibold text-sm ${
+                                modalType === 'devengado' ? 'text-green-700' : 'text-red-700'
+                              }`}>
+                                {modalType === 'devengado' ? '+' : '-'}{formatCurrency(concept.value)}
+                              </div>
+                              
+                              {!concept.isBasic && concept.novedad && (
+                                <div className="flex items-center space-x-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditNovedad(concept.novedad!)}
+                                    className="h-8 px-2 text-xs"
+                                  >
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteNovedad(concept.novedad!.id)}
+                                    className="h-8 px-2 text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </ScrollArea>
@@ -637,7 +591,7 @@ export const DevengoModal = ({
           ) : (
             <>
               {/* Form header */}
-              <div className="flex items-center justify-between px-4 pb-2">
+              <div className="flex items-center justify-between px-4 py-3 border-b">
                 <h3 className="text-lg font-medium">
                   {editingNovedad ? 'Editar' : 'Agregar'} {modalType}
                 </h3>
@@ -645,7 +599,7 @@ export const DevengoModal = ({
 
               {/* Scrollable form */}
               <ScrollArea className="flex-1 px-4">
-                <div className="pb-4">
+                <div className="py-4">
                   <NovedadForm
                     formData={formData}
                     onFormDataChange={setFormData}
