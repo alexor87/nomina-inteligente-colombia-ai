@@ -16,7 +16,8 @@ import {
   Trash2, 
   Calculator,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollNovedad, CreateNovedadData, NovedadType, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
@@ -56,7 +57,22 @@ export const NovedadDrawer = ({
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingNovedad, setEditingNovedad] = useState<PayrollNovedad | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPeriodDate] = useState<Date>(new Date());
+
+  // Form state
+  const [formData, setFormData] = useState<CreateNovedadData>({
+    empleado_id: employeeId,
+    periodo_id: '',
+    tipo_novedad: 'horas_extra' as NovedadType,
+    subtipo: 'diurnas',
+    fecha_inicio: '',
+    fecha_fin: '',
+    dias: null,
+    horas: null,
+    valor: 0,
+    observacion: ''
+  });
 
   // Función de cálculo mejorada con jornada legal dinámica
   const calculateSuggestedValue = useCallback((
@@ -88,10 +104,25 @@ export const NovedadDrawer = ({
     }
   }, [employeeSalary, currentPeriodDate]);
 
-  const handleCreateNovedad = async (formData: CreateNovedadData) => {
+  const handleCreateNovedad = async () => {
+    if (formData.valor <= 0) return;
+
+    setIsSubmitting(true);
     try {
       await onCreateNovedad(formData);
       setShowForm(false);
+      setFormData({
+        empleado_id: employeeId,
+        periodo_id: '',
+        tipo_novedad: 'horas_extra' as NovedadType,
+        subtipo: 'diurnas',
+        fecha_inicio: '',
+        fecha_fin: '',
+        dias: null,
+        horas: null,
+        valor: 0,
+        observacion: ''
+      });
       
       if (onRecalculatePayroll) {
         onRecalculatePayroll();
@@ -109,12 +140,15 @@ export const NovedadDrawer = ({
         description: "No se pudo crear la novedad",
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleUpdateNovedad = async (formData: CreateNovedadData) => {
-    if (!editingNovedad) return;
+  const handleUpdateNovedad = async () => {
+    if (!editingNovedad || formData.valor <= 0) return;
 
+    setIsSubmitting(true);
     try {
       await onUpdateNovedad(editingNovedad.id, formData);
       setEditingNovedad(null);
@@ -135,6 +169,8 @@ export const NovedadDrawer = ({
         description: "No se pudo actualizar la novedad",
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -158,6 +194,40 @@ export const NovedadDrawer = ({
         variant: "destructive"
       });
     }
+  };
+
+  const handleEditNovedad = (novedad: PayrollNovedad) => {
+    setEditingNovedad(novedad);
+    setFormData({
+      empleado_id: novedad.empleado_id,
+      periodo_id: novedad.periodo_id,
+      tipo_novedad: novedad.tipo_novedad,
+      valor: novedad.valor,
+      horas: novedad.horas || null,
+      dias: novedad.dias || null,
+      observacion: novedad.observacion || '',
+      fecha_inicio: novedad.fecha_inicio || '',
+      fecha_fin: novedad.fecha_fin || '',
+      subtipo: (novedad as any).subtipo || ''
+    });
+    setShowForm(true);
+  };
+
+  const handleCancelForm = () => {
+    setShowForm(false);
+    setEditingNovedad(null);
+    setFormData({
+      empleado_id: employeeId,
+      periodo_id: '',
+      tipo_novedad: 'horas_extra' as NovedadType,
+      subtipo: 'diurnas',
+      fecha_inicio: '',
+      fecha_fin: '',
+      dias: null,
+      horas: null,
+      valor: 0,
+      observacion: ''
+    });
   };
 
   // Separar devengados y deducciones
@@ -265,11 +335,8 @@ export const NovedadDrawer = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          setEditingNovedad(novedad);
-                          setShowForm(true);
-                        }}
-                        className="h-8 w-8 p-0"
+                        onClick={() => handleEditNovedad(novedad)}
+                        className="h-8 px-2 text-xs"
                       >
                         Editar
                       </Button>
@@ -292,38 +359,45 @@ export const NovedadDrawer = ({
     </div>
   );
 
+  const isFormValid = formData.valor > 0;
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[600px] sm:w-[800px] flex flex-col">
-        <SheetHeader>
-          <SheetTitle className="flex items-center justify-between">
-            <div>
-              <span className="text-lg font-semibold">
-                Novedades - {employeeName}
-              </span>
-              <div className="flex items-center space-x-2 mt-1">
-                <Badge variant="outline" className="text-xs">
-                  Salario: {formatCurrency(employeeSalary)}
-                </Badge>
-                <JornadaLegalTooltip fecha={currentPeriodDate} />
+      <SheetContent className="w-[600px] sm:w-[800px] flex flex-col p-0">
+        {/* Header */}
+        <div className="p-6 pb-4">
+          <SheetHeader>
+            <SheetTitle className="flex items-center justify-between">
+              <div>
+                <span className="text-lg font-semibold">
+                  Novedades - {employeeName}
+                </span>
+                <div className="flex items-center space-x-2 mt-1">
+                  <Badge variant="outline" className="text-xs">
+                    Salario: {formatCurrency(employeeSalary)}
+                  </Badge>
+                  <JornadaLegalTooltip fecha={currentPeriodDate} />
+                </div>
               </div>
-            </div>
-            <Badge 
-              variant="secondary"
-              className="text-sm px-3 py-1"
-            >
-              {novedades.length} novedades
-            </Badge>
-          </SheetTitle>
-          <SheetDescription>
-            Gestiona las novedades del empleado para este período de nómina
-          </SheetDescription>
-        </SheetHeader>
+              <Badge 
+                variant="secondary"
+                className="text-sm px-3 py-1"
+              >
+                {novedades.length} novedades
+              </Badge>
+            </SheetTitle>
+            <SheetDescription>
+              Gestiona las novedades del empleado para este período de nómina
+            </SheetDescription>
+          </SheetHeader>
+        </div>
 
-        <div className="flex-1 flex flex-col min-h-0 mt-4">
+        {/* Content */}
+        <div className="flex-1 flex flex-col min-h-0">
           {!showForm ? (
-            <div className="flex-1 flex flex-col">
-              <div className="flex justify-between items-center mb-4">
+            <>
+              {/* List header */}
+              <div className="flex justify-between items-center px-6 pb-4">
                 <div className="text-sm text-gray-600">
                   Total: {devengados.length} devengados, {deducciones.length} deducciones
                 </div>
@@ -339,71 +413,92 @@ export const NovedadDrawer = ({
                 )}
               </div>
 
-              <ScrollArea className="flex-1">
+              {/* Scrollable list */}
+              <ScrollArea className="flex-1 px-6">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                   </div>
                 ) : (
-                  <div className="space-y-6">
+                  <div className="space-y-6 pb-6">
                     {renderNovedadList(devengados, 'Devengados', true)}
                     <Separator />
                     {renderNovedadList(deducciones, 'Deducciones', false)}
                   </div>
                 )}
               </ScrollArea>
-            </div>
+            </>
           ) : (
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
+            <>
+              {/* Form header */}
+              <div className="flex items-center justify-between px-6 pb-4">
                 <h3 className="text-lg font-medium">
                   {editingNovedad ? 'Editar' : 'Agregar'} novedad
                 </h3>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingNovedad(null);
-                  }}
-                >
-                  Cancelar
-                </Button>
               </div>
 
-              <ScrollArea className="flex-1">
-                <NovedadForm
-                  onSubmit={editingNovedad ? handleUpdateNovedad : handleCreateNovedad}
-                  onCancel={() => {
-                    setShowForm(false);
-                    setEditingNovedad(null);
-                  }}
-                  initialData={editingNovedad ? {
-                    tipo_novedad: editingNovedad.tipo_novedad,
-                    valor: editingNovedad.valor,
-                    horas: editingNovedad.horas || null,
-                    dias: editingNovedad.dias || null,
-                    observacion: editingNovedad.observacion || '',
-                    fecha_inicio: editingNovedad.fecha_inicio || '',
-                    fecha_fin: editingNovedad.fecha_fin || ''
-                  } : undefined}
-                  isLoading={isLoading}
-                  employeeSalary={employeeSalary}
-                  calculateSuggestedValue={calculateSuggestedValue}
-                />
+              {/* Scrollable form */}
+              <ScrollArea className="flex-1 px-6">
+                <div className="pb-6">
+                  <NovedadForm
+                    formData={formData}
+                    onFormDataChange={setFormData}
+                    initialData={editingNovedad ? {
+                      tipo_novedad: editingNovedad.tipo_novedad,
+                      valor: editingNovedad.valor,
+                      horas: editingNovedad.horas || null,
+                      dias: editingNovedad.dias || null,
+                      observacion: editingNovedad.observacion || '',
+                      fecha_inicio: editingNovedad.fecha_inicio || '',
+                      fecha_fin: editingNovedad.fecha_fin || ''
+                    } : undefined}
+                    employeeSalary={employeeSalary}
+                    calculateSuggestedValue={calculateSuggestedValue}
+                  />
+                </div>
               </ScrollArea>
-            </div>
+            </>
           )}
         </div>
 
-        <Separator />
-        <div className="flex justify-between items-center pt-4">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Calculator className="h-4 w-4" />
-            <span>Cálculos actualizados con jornada legal dinámica</span>
-          </div>
-          <Button variant="outline" onClick={onClose}>
-            Cerrar
-          </Button>
+        {/* Fixed Footer */}
+        <div className="border-t bg-white p-6">
+          {showForm ? (
+            <div className="flex justify-end space-x-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancelForm}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={editingNovedad ? handleUpdateNovedad : handleCreateNovedad}
+                disabled={!isFormValid || isSubmitting}
+                className="min-w-[120px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  'Guardar'
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <Calculator className="h-4 w-4" />
+                <span>Cálculos actualizados con jornada legal dinámica</span>
+              </div>
+              <Button variant="outline" onClick={onClose}>
+                Cerrar
+              </Button>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
-import { Calculator, Loader2 } from 'lucide-react';
+import { Calculator } from 'lucide-react';
 
 // Define the enhanced categories structure that matches the enhanced types
 const NOVEDAD_CATEGORIES_ENHANCED = {
@@ -45,10 +45,9 @@ const NOVEDAD_CATEGORIES_ENHANCED = {
 } as const;
 
 interface NovedadFormProps {
-  onSubmit: (data: CreateNovedadData) => Promise<void>;
-  onCancel: () => void;
+  formData: CreateNovedadData;
+  onFormDataChange: (data: CreateNovedadData) => void;
   initialData?: Partial<CreateNovedadData>;
-  isLoading?: boolean;
   employeeSalary?: number;
   calculateSuggestedValue?: (
     tipoNovedad: NovedadType,
@@ -60,29 +59,13 @@ interface NovedadFormProps {
 }
 
 export const NovedadForm = ({
-  onSubmit,
-  onCancel,
+  formData,
+  onFormDataChange,
   initialData,
-  isLoading = false,
   employeeSalary = 1300000,
   calculateSuggestedValue,
   modalType = 'devengado'
 }: NovedadFormProps) => {
-  const [formData, setFormData] = useState<CreateNovedadData>({
-    empleado_id: initialData?.empleado_id || '',
-    periodo_id: initialData?.periodo_id || '',
-    tipo_novedad: 'horas_extra' as NovedadType,
-    subtipo: 'diurnas',
-    fecha_inicio: '',
-    fecha_fin: '',
-    dias: null,
-    horas: null,
-    valor: 0,
-    observacion: '',
-    ...initialData
-  });
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<'devengados' | 'deducciones'>(
     modalType === 'devengado' ? 'devengados' : 'deducciones'
   );
@@ -226,253 +209,208 @@ export const NovedadForm = ({
   // Auto-apply suggested value when available
   useEffect(() => {
     if (suggestedValue && suggestedValue > 0 && formData.valor === 0) {
-      setFormData(prev => ({ ...prev, valor: suggestedValue }));
+      onFormDataChange({ ...formData, valor: suggestedValue });
     }
-  }, [suggestedValue, formData.valor]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (formData.valor <= 0) return;
-
-    setIsSubmitting(true);
-    try {
-      await onSubmit(formData);
-    } catch (error) {
-      console.error('Error submitting form:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  }, [suggestedValue, formData, onFormDataChange]);
 
   const handleInputChange = useCallback((field: keyof CreateNovedadData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }, []);
-
-  const isFormValid = formData.valor > 0;
+    onFormDataChange({ ...formData, [field]: value });
+  }, [formData, onFormDataChange]);
 
   return (
-    <div className="p-6 space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Category Selection - Only show if modalType is not defined */}
-        {!modalType && (
-          <div className="flex rounded-lg border p-1">
-            <Button
-              type="button"
-              variant={selectedCategory === 'devengados' ? 'default' : 'ghost'}
-              onClick={() => setSelectedCategory('devengados')}
-              className="flex-1"
-              size="sm"
-            >
-              Devengados
-            </Button>
-            <Button
-              type="button"
-              variant={selectedCategory === 'deducciones' ? 'default' : 'ghost'}
-              onClick={() => setSelectedCategory('deducciones')}
-              className="flex-1"
-              size="sm"
-            >
-              Deducciones
-            </Button>
-          </div>
-        )}
+    <div className="space-y-4">
+      {/* Category Selection - Only show if modalType is not defined */}
+      {!modalType && (
+        <div className="flex rounded-lg border p-1">
+          <Button
+            type="button"
+            variant={selectedCategory === 'devengados' ? 'default' : 'ghost'}
+            onClick={() => setSelectedCategory('devengados')}
+            className="flex-1"
+            size="sm"
+          >
+            Devengados
+          </Button>
+          <Button
+            type="button"
+            variant={selectedCategory === 'deducciones' ? 'default' : 'ghost'}
+            onClick={() => setSelectedCategory('deducciones')}
+            className="flex-1"
+            size="sm"
+          >
+            Deducciones
+          </Button>
+        </div>
+      )}
 
-        {/* Tipo de Novedad */}
+      {/* Tipo de Novedad */}
+      <div className="space-y-2">
+        <Label>Tipo de Novedad</Label>
+        <Select
+          value={formData.tipo_novedad}
+          onValueChange={(value) => {
+            const newTipoNovedad = value as NovedadType;
+            onFormDataChange({
+              ...formData,
+              tipo_novedad: newTipoNovedad,
+              subtipo: newTipoNovedad === 'horas_extra' ? 'diurnas' : 
+                       newTipoNovedad === 'incapacidad' ? 'comun' : '',
+              horas: null,
+              dias: null,
+              fecha_inicio: '',
+              fecha_fin: '',
+              valor: 0
+            });
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(NOVEDAD_CATEGORIES_ENHANCED[selectedCategory].types).map(([key, config]) => (
+              <SelectItem key={key} value={key}>
+                <div className="flex items-center space-x-2">
+                  <span>{config.icon}</span>
+                  <span>{config.label}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Subtipo Selection */}
+      {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
         <div className="space-y-2">
-          <Label>Tipo de Novedad</Label>
+          <Label>
+            {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
+          </Label>
           <Select
-            value={formData.tipo_novedad}
-            onValueChange={(value) => {
-              const newTipoNovedad = value as NovedadType;
-              setFormData(prev => ({
-                ...prev,
-                tipo_novedad: newTipoNovedad,
-                subtipo: newTipoNovedad === 'horas_extra' ? 'diurnas' : 
-                         newTipoNovedad === 'incapacidad' ? 'comun' : '',
-                horas: null,
-                dias: null,
-                fecha_inicio: '',
-                fecha_fin: '',
-                valor: 0
-              }));
-            }}
+            value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
+            onValueChange={(value) => handleInputChange('subtipo', value)}
           >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(NOVEDAD_CATEGORIES_ENHANCED[selectedCategory].types).map(([key, config]) => (
-                <SelectItem key={key} value={key}>
-                  <div className="flex items-center space-x-2">
-                    <span>{config.icon}</span>
-                    <span>{config.label}</span>
-                  </div>
+              {fieldConfig.subtipoOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+      )}
 
-        {/* Subtipo Selection */}
-        {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
+      {/* Campos dinámicos en una fila */}
+      {(fieldConfig.showHours || fieldConfig.showDays) && (
+        <div className="grid grid-cols-2 gap-4">
+          {fieldConfig.showHours && (
+            <div className="space-y-2">
+              <Label>Horas {fieldConfig.requiresHours && '*'}</Label>
+              <Input
+                type="number"
+                min="0"
+                max="24"
+                step="0.5"
+                value={formData.horas || ''}
+                onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
+                placeholder="0"
+              />
+            </div>
+          )}
+
+          {fieldConfig.showDays && (
+            <div className="space-y-2">
+              <Label>Días {fieldConfig.requiresDays && '*'}</Label>
+              <Input
+                type="number"
+                min="0"
+                value={formData.dias || ''}
+                onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
+                placeholder="0"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Date Fields */}
+      {fieldConfig.showDates && (
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>
-              {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
-            </Label>
-            <Select
-              value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
-              onValueChange={(value) => handleInputChange('subtipo', value)}
+            <Label>Fecha Inicio {fieldConfig.requiresDates && '*'}</Label>
+            <Input
+              type="date"
+              value={formData.fecha_inicio || ''}
+              onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Fecha Fin {fieldConfig.requiresDates && '*'}</Label>
+            <Input
+              type="date"
+              value={formData.fecha_fin || ''}
+              onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Valor */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Valor *</Label>
+          {suggestedValue && suggestedValue !== formData.valor && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleInputChange('valor', suggestedValue)}
+              className="text-xs h-7 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {fieldConfig.subtipoOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Campos dinámicos en una fila */}
-        {(fieldConfig.showHours || fieldConfig.showDays) && (
-          <div className="grid grid-cols-2 gap-4">
-            {fieldConfig.showHours && (
-              <div className="space-y-2">
-                <Label>Horas {fieldConfig.requiresHours && '*'}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="24"
-                  step="0.5"
-                  value={formData.horas || ''}
-                  onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
-                  placeholder="0"
-                />
-              </div>
-            )}
-
-            {fieldConfig.showDays && (
-              <div className="space-y-2">
-                <Label>Días {fieldConfig.requiresDays && '*'}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={formData.dias || ''}
-                  onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="0"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Date Fields */}
-        {fieldConfig.showDates && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Fecha Inicio {fieldConfig.requiresDates && '*'}</Label>
-              <Input
-                type="date"
-                value={formData.fecha_inicio || ''}
-                onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Fecha Fin {fieldConfig.requiresDates && '*'}</Label>
-              <Input
-                type="date"
-                value={formData.fecha_fin || ''}
-                onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Valor */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Valor *</Label>
-            {suggestedValue && suggestedValue !== formData.valor && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleInputChange('valor', suggestedValue)}
-                className="text-xs bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-              >
-                <Calculator className="h-3 w-3 mr-1" />
-                Usar ${suggestedValue.toLocaleString()}
-              </Button>
-            )}
-          </div>
-
-          <Input
-            type="number"
-            min="0"
-            step="1000"
-            value={formData.valor}
-            onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
-            placeholder="0"
-            className="text-lg font-medium"
-          />
+              <Calculator className="h-3 w-3 mr-1" />
+              ${suggestedValue.toLocaleString()}
+            </Button>
+          )}
         </div>
 
-        {/* Observaciones */}
-        <div className="space-y-2">
-          <Label>Observaciones</Label>
-          <Textarea
-            value={formData.observacion || ''}
-            onChange={(e) => handleInputChange('observacion', e.target.value)}
-            placeholder="Observaciones adicionales..."
-            rows={2}
-            className="resize-none"
-          />
-        </div>
+        <Input
+          type="number"
+          min="0"
+          step="1000"
+          value={formData.valor}
+          onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
+          placeholder="0"
+          className="text-lg font-medium"
+        />
+      </div>
 
-        {/* Preview simple */}
-        {formData.valor > 0 && (
-          <div className="p-3 bg-gray-50 rounded-lg text-center">
-            <Badge 
-              variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}
-              className="text-base px-4 py-2"
-            >
-              {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
-            </Badge>
-          </div>
-        )}
+      {/* Observaciones */}
+      <div className="space-y-2">
+        <Label>Observaciones</Label>
+        <Textarea
+          value={formData.observacion || ''}
+          onChange={(e) => handleInputChange('observacion', e.target.value)}
+          placeholder="Observaciones adicionales..."
+          rows={2}
+          className="resize-none"
+        />
+      </div>
 
-        {/* Actions */}
-        <div className="flex justify-end space-x-3 pt-4 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isSubmitting}
+      {/* Preview simple */}
+      {formData.valor > 0 && (
+        <div className="p-2 bg-gray-50 rounded text-center">
+          <Badge 
+            variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}
+            className="text-sm px-3 py-1"
           >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={!isFormValid || isSubmitting}
-            className="min-w-[120px]"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              'Guardar'
-            )}
-          </Button>
+            {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
+          </Badge>
         </div>
-      </form>
+      )}
     </div>
   );
 };
