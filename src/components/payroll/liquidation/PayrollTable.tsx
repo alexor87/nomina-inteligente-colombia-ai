@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Edit, Calculator, FileText, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { NovedadDrawer } from '../novedades/NovedadDrawer';
 import { useNovedades } from '@/hooks/useNovedades';
-import { NovedadFormData, CreateNovedadData } from '@/types/novedades';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { 
   AlertDialog, 
@@ -72,7 +71,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     setSelectedEmployee(null);
   };
 
-  const handleCreateNovedad = async (data: NovedadFormData) => {
+  const handleCreateNovedad = async (data: CreateNovedadData) => {
     if (!selectedEmployee) return;
     
     console.log('Creating novedad without auto-recalculation');
@@ -86,7 +85,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     await createNovedad(createData, true);
   };
 
-  const handleUpdateNovedad = async (id: string, data: NovedadFormData) => {
+  const handleUpdateNovedad = async (id: string, data: CreateNovedadData) => {
     if (!selectedEmployee) return;
     
     console.log('Updating novedad without auto-recalculation');

@@ -6,7 +6,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Edit, UserPlus } from 'lucide-react';
 import { NovedadDrawer } from '../novedades/NovedadDrawer';
 import { useNovedades } from '@/hooks/useNovedades';
-import { NovedadFormData, CreateNovedadData } from '@/types/novedades';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface PayrollModernTableProps {
   employees: PayrollEmployee[];
@@ -47,7 +47,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     setIsDrawerOpen(true);
   };
 
-  const handleCreateNovedad = async (data: NovedadFormData) => {
+  const handleCreateNovedad = async (data: CreateNovedadData) => {
     if (!selectedEmployee) return;
     
     const createData: CreateNovedadData = {
@@ -59,7 +59,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     await createNovedad(createData, true);
   };
 
-  const handleUpdateNovedad = async (id: string, data: NovedadFormData) => {
+  const handleUpdateNovedad = async (id: string, data: CreateNovedadData) => {
     if (!selectedEmployee) return;
     await updateNovedad(id, data, selectedEmployee.id, true);
   };
