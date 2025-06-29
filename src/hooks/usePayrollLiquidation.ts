@@ -198,15 +198,19 @@ export const usePayrollLiquidation = () => {
       return;
     }
 
-    setEmployees(prev => prev.map(emp => {
-      if (emp.id === id) {
-        const updated = convertToBaseEmployeeData(emp);
-        const updatedWithNewValue = { ...updated, [field]: value };
-        return calculateEmployee(updatedWithNewValue, currentPeriod.tipo_periodo as 'quincenal' | 'mensual');
-      }
-      return emp;
-    }));
-  }, [currentPeriod, toast]);
+    const updatedEmployees = await Promise.all(
+      employees.map(async (emp) => {
+        if (emp.id === id) {
+          const updated = convertToBaseEmployeeData(emp);
+          const updatedWithNewValue = { ...updated, [field]: value };
+          return await calculateEmployee(updatedWithNewValue, currentPeriod.tipo_periodo as 'quincenal' | 'mensual');
+        }
+        return emp;
+      })
+    );
+    
+    setEmployees(updatedEmployees);
+  }, [currentPeriod, toast, employees]);
 
   // Actualizar período
   const updatePeriod = useCallback(async (startDate: string, endDate: string) => {
@@ -255,10 +259,14 @@ export const usePayrollLiquidation = () => {
         }
 
         // Recalcular empleados con el nuevo período
-        setEmployees(prev => prev.map(emp => {
-          const baseData = convertToBaseEmployeeData(emp);
-          return calculateEmployee(baseData, updatedPeriod.tipo_periodo as 'quincenal' | 'mensual');
-        }));
+        const recalculatedEmployees = await Promise.all(
+          employees.map(async (emp) => {
+            const baseData = convertToBaseEmployeeData(emp);
+            return await calculateEmployee(baseData, updatedPeriod.tipo_periodo as 'quincenal' | 'mensual');
+          })
+        );
+        
+        setEmployees(recalculatedEmployees);
       }
     } catch (error) {
       console.error('Error updating period:', error);
@@ -270,7 +278,7 @@ export const usePayrollLiquidation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPeriod, toast]);
+  }, [currentPeriod, toast, employees]);
 
   // Recalcular todos los empleados con configuración actualizada
   const recalculateAll = useCallback(async () => {
@@ -286,10 +294,14 @@ export const usePayrollLiquidation = () => {
       // Use regular PayrollCalculationService instead of the non-existent Enhanced version
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      setEmployees(prev => prev.map(emp => {
-        const baseData = convertToBaseEmployeeData(emp);
-        return calculateEmployee(baseData, currentPeriod.tipo_periodo as 'quincenal' | 'mensual');
-      }));
+      const recalculatedEmployees = await Promise.all(
+        employees.map(async (emp) => {
+          const baseData = convertToBaseEmployeeData(emp);
+          return await calculateEmployee(baseData, currentPeriod.tipo_periodo as 'quincenal' | 'mensual');
+        })
+      );
+      
+      setEmployees(recalculatedEmployees);
 
       toast({
         title: "Recálculo completado",
@@ -304,7 +316,7 @@ export const usePayrollLiquidation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, currentPeriod]);
+  }, [toast, currentPeriod, employees]);
 
   // Aprobar período y guardar en base de datos
   const approvePeriod = useCallback(async () => {
