@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/services/PayrollPeriodService';
-import { PayrollCalculationService } from '@/services/PayrollCalculationService';
+import { PayrollCalculationService, PayrollCalculationEnhancedService } from '@/services/PayrollCalculationService';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
@@ -284,7 +284,7 @@ export const usePayrollLiquidation = () => {
 
     try {
       // Forzar actualización de la configuración antes de recalcular
-      PayrollCalculationService.updateConfiguration('2025');
+      PayrollCalculationEnhancedService.getUserConfiguredPeriodicity();
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       

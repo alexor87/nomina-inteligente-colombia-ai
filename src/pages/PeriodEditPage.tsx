@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -355,6 +354,7 @@ const PeriodEditPage = () => {
         payrollId={devengoModal.payrollId}
         periodId={periodId as string}
         onNovedadCreated={handleNovedadCreated}
+        modalType="devengado"
       />
     </div>
   );
