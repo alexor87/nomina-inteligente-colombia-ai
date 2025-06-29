@@ -23,7 +23,7 @@ import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/
 import { NovedadForm } from '@/components/payroll/novedades/NovedadForm';
 import { formatCurrency } from '@/lib/utils';
 import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DevengoModalProps {
   isOpen: boolean;
