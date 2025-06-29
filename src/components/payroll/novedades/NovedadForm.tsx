@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
-import { Calculator, Loader2, Info } from 'lucide-react';
+import { Calculator, Loader2 } from 'lucide-react';
 
 // Define the enhanced categories structure that matches the enhanced types
 const NOVEDAD_CATEGORIES_ENHANCED = {
@@ -106,7 +106,6 @@ export const NovedadForm = ({
       requiresDays: false,
       requiresDates: false,
       isAutoCalculated: false,
-      helpText: '',
       subtipoOptions: [] as Array<{value: string, label: string}>
     };
 
@@ -116,7 +115,6 @@ export const NovedadForm = ({
         config.requiresHours = true;
         config.showSubtipo = true;
         config.isAutoCalculated = true;
-        config.helpText = 'Se calculará automáticamente según las horas y el tipo de recargo';
         config.subtipoOptions = [
           { value: 'diurnas', label: 'Diurnas (25%)' },
           { value: 'nocturnas', label: 'Nocturnas (75%)' },
@@ -131,7 +129,6 @@ export const NovedadForm = ({
         config.showHours = true;
         config.requiresHours = true;
         config.isAutoCalculated = true;
-        config.helpText = 'Se calculará automáticamente con recargo del 35%';
         break;
 
       case 'vacaciones':
@@ -141,7 +138,6 @@ export const NovedadForm = ({
         config.requiresDays = true;
         config.requiresDates = true;
         config.isAutoCalculated = true;
-        config.helpText = 'Se calculará automáticamente según los días especificados';
         break;
 
       case 'incapacidad':
@@ -151,7 +147,6 @@ export const NovedadForm = ({
         config.requiresDays = true;
         config.requiresDates = true;
         config.isAutoCalculated = true;
-        config.helpText = 'Se calculará automáticamente según el tipo de incapacidad';
         config.subtipoOptions = [
           { value: 'comun', label: 'Común - EPS (66.7%)' },
           { value: 'laboral', label: 'Laboral - ARL (100%)' },
@@ -164,7 +159,6 @@ export const NovedadForm = ({
         config.showDates = true;
         config.requiresDays = true;
         config.isAutoCalculated = true;
-        config.helpText = 'Se calculará automáticamente como deducción por días de ausencia';
         break;
 
       case 'bonificacion':
@@ -174,65 +168,11 @@ export const NovedadForm = ({
         config.showHours = true;
         config.showDays = true;
         config.showDates = true;
-        config.helpText = 'Ingrese el valor manualmente o use días/horas para cálculo automático';
-        break;
-
-      default:
-        config.helpText = 'Ingrese el valor manualmente';
         break;
     }
 
     return config;
   }, [formData.tipo_novedad]);
-
-  // Validaciones simples
-  const validationErrors = useMemo(() => {
-    const errors: Record<string, string> = {};
-
-    if (fieldConfig.requiresHours && (!formData.horas || formData.horas <= 0)) {
-      errors.horas = 'Requerido';
-    }
-    if (formData.horas !== null && formData.horas > 24) {
-      errors.horas = 'Máximo 24 horas';
-    }
-    if (fieldConfig.requiresDays && (!formData.dias || formData.dias <= 0)) {
-      errors.dias = 'Requerido';
-    }
-    if (fieldConfig.requiresDates) {
-      if (!formData.fecha_inicio) errors.fecha_inicio = 'Requerido';
-      if (!formData.fecha_fin) errors.fecha_fin = 'Requerido';
-    }
-    if (formData.fecha_inicio && formData.fecha_fin && 
-        new Date(formData.fecha_fin) < new Date(formData.fecha_inicio)) {
-      errors.fecha_fin = 'Fecha fin debe ser posterior';
-    }
-    if (formData.valor <= 0) {
-      errors.valor = 'Debe ser mayor a 0';
-    }
-
-    return errors;
-  }, [formData, fieldConfig]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (Object.keys(validationErrors).length > 0) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await onSubmit(formData);
-    } catch (error) {
-      console.error('Error submitting form:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleInputChange = useCallback((field: keyof CreateNovedadData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }, []);
 
   // Función de cálculo mejorada
   const suggestedValue = useMemo(() => {
@@ -283,278 +223,256 @@ export const NovedadForm = ({
     calculateSuggestedValue
   ]);
 
-  const isFormValid = useMemo(() => {
-    return Object.keys(validationErrors).length === 0 && formData.valor > 0;
-  }, [validationErrors, formData.valor]);
+  // Auto-apply suggested value when available
+  useEffect(() => {
+    if (suggestedValue && suggestedValue > 0 && formData.valor === 0) {
+      setFormData(prev => ({ ...prev, valor: suggestedValue }));
+    }
+  }, [suggestedValue, formData.valor]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (formData.valor <= 0) return;
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleInputChange = useCallback((field: keyof CreateNovedadData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const isFormValid = formData.valor > 0;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 p-6">
-      {/* Category Selection - Only show if modalType is not defined */}
-      {!modalType && (
-        <div className="flex space-x-2">
-          <Button
-            type="button"
-            variant={selectedCategory === 'devengados' ? 'default' : 'outline'}
-            onClick={() => setSelectedCategory('devengados')}
-            className="flex-1"
-            size="sm"
-          >
-            Devengados
-          </Button>
-          <Button
-            type="button"
-            variant={selectedCategory === 'deducciones' ? 'default' : 'outline'}
-            onClick={() => setSelectedCategory('deducciones')}
-            className="flex-1"
-            size="sm"
-          >
-            Deducciones
-          </Button>
-        </div>
-      )}
+    <div className="p-6 space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Category Selection - Only show if modalType is not defined */}
+        {!modalType && (
+          <div className="flex rounded-lg border p-1">
+            <Button
+              type="button"
+              variant={selectedCategory === 'devengados' ? 'default' : 'ghost'}
+              onClick={() => setSelectedCategory('devengados')}
+              className="flex-1"
+              size="sm"
+            >
+              Devengados
+            </Button>
+            <Button
+              type="button"
+              variant={selectedCategory === 'deducciones' ? 'default' : 'ghost'}
+              onClick={() => setSelectedCategory('deducciones')}
+              className="flex-1"
+              size="sm"
+            >
+              Deducciones
+            </Button>
+          </div>
+        )}
 
-      {/* Tipo de Novedad */}
-      <div className="space-y-2">
-        <Label htmlFor="tipo_novedad">Tipo de Novedad</Label>
-        <Select
-          value={formData.tipo_novedad}
-          onValueChange={(value) => {
-            const newTipoNovedad = value as NovedadType;
-            setFormData(prev => ({
-              ...prev,
-              tipo_novedad: newTipoNovedad,
-              subtipo: newTipoNovedad === 'horas_extra' ? 'diurnas' : 
-                       newTipoNovedad === 'incapacidad' ? 'comun' : '',
-              horas: null,
-              dias: null,
-              fecha_inicio: '',
-              fecha_fin: '',
-              valor: 0
-            }));
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecciona el tipo de novedad" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(NOVEDAD_CATEGORIES_ENHANCED[selectedCategory].types).map(([key, config]) => (
-              <SelectItem key={key} value={key}>
-                <div className="flex items-center space-x-2">
-                  <span>{config.icon}</span>
-                  <span>{config.label}</span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Help Text */}
-      {fieldConfig.helpText && (
-        <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-blue-800">{fieldConfig.helpText}</p>
-        </div>
-      )}
-
-      {/* Subtipo Selection */}
-      {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
+        {/* Tipo de Novedad */}
         <div className="space-y-2">
-          <Label htmlFor="subtipo">
-            {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
-          </Label>
+          <Label>Tipo de Novedad</Label>
           <Select
-            value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
-            onValueChange={(value) => handleInputChange('subtipo', value)}
+            value={formData.tipo_novedad}
+            onValueChange={(value) => {
+              const newTipoNovedad = value as NovedadType;
+              setFormData(prev => ({
+                ...prev,
+                tipo_novedad: newTipoNovedad,
+                subtipo: newTipoNovedad === 'horas_extra' ? 'diurnas' : 
+                         newTipoNovedad === 'incapacidad' ? 'comun' : '',
+                horas: null,
+                dias: null,
+                fecha_inicio: '',
+                fecha_fin: '',
+                valor: 0
+              }));
+            }}
           >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {fieldConfig.subtipoOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+              {Object.entries(NOVEDAD_CATEGORIES_ENHANCED[selectedCategory].types).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  <div className="flex items-center space-x-2">
+                    <span>{config.icon}</span>
+                    <span>{config.label}</span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-      )}
 
-      {/* Date Fields */}
-      {fieldConfig.showDates && (
-        <div className="grid grid-cols-2 gap-4">
+        {/* Subtipo Selection */}
+        {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
           <div className="space-y-2">
-            <Label htmlFor="fecha_inicio">
-              Fecha Inicio {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
+            <Label>
+              {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
             </Label>
-            <Input
-              id="fecha_inicio"
-              type="date"
-              value={formData.fecha_inicio || ''}
-              onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
-              className={validationErrors.fecha_inicio ? 'border-red-300' : ''}
-            />
-            {validationErrors.fecha_inicio && (
-              <p className="text-xs text-red-600">{validationErrors.fecha_inicio}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="fecha_fin">
-              Fecha Fin {fieldConfig.requiresDates && <span className="text-red-500">*</span>}
-            </Label>
-            <Input
-              id="fecha_fin"
-              type="date"
-              value={formData.fecha_fin || ''}
-              onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
-              className={validationErrors.fecha_fin ? 'border-red-300' : ''}
-            />
-            {validationErrors.fecha_fin && (
-              <p className="text-xs text-red-600">{validationErrors.fecha_fin}</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Cantidad Fields */}
-      {(fieldConfig.showDays || fieldConfig.showHours) && (
-        <div className="grid grid-cols-2 gap-4">
-          {fieldConfig.showDays && (
-            <div className="space-y-2">
-              <Label htmlFor="dias">
-                Días {fieldConfig.requiresDays && <span className="text-red-500">*</span>}
-              </Label>
-              <Input
-                id="dias"
-                type="number"
-                min="0"
-                value={formData.dias || ''}
-                onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
-                className={validationErrors.dias ? 'border-red-300' : ''}
-              />
-              {validationErrors.dias && (
-                <p className="text-xs text-red-600">{validationErrors.dias}</p>
-              )}
-            </div>
-          )}
-
-          {fieldConfig.showHours && (
-            <div className="space-y-2">
-              <Label htmlFor="horas">
-                Horas {fieldConfig.requiresHours && <span className="text-red-500">*</span>}
-              </Label>
-              <Input
-                id="horas"
-                type="number"
-                min="0"
-                max="24"
-                step="0.5"
-                value={formData.horas || ''}
-                onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
-                className={validationErrors.horas ? 'border-red-300' : ''}
-              />
-              {validationErrors.horas && (
-                <p className="text-xs text-red-600">{validationErrors.horas}</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Valor */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="valor">Valor <span className="text-red-500">*</span></Label>
-          {suggestedValue && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleInputChange('valor', suggestedValue)}
-              className="flex items-center space-x-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+            <Select
+              value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
+              onValueChange={(value) => handleInputChange('subtipo', value)}
             >
-              <Calculator className="h-4 w-4" />
-              <span>Usar ${suggestedValue.toLocaleString()}</span>
-            </Button>
-          )}
-        </div>
-
-        <Input
-          id="valor"
-          type="number"
-          min="0"
-          step="1000"
-          value={formData.valor}
-          onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
-          placeholder="Ingresa el valor"
-          className={`text-lg ${validationErrors.valor ? 'border-red-300' : ''}`}
-        />
-        
-        {validationErrors.valor && (
-          <p className="text-xs text-red-600">{validationErrors.valor}</p>
-        )}
-      </div>
-
-      {/* Observaciones */}
-      <div className="space-y-2">
-        <Label htmlFor="observacion">Observaciones</Label>
-        <Textarea
-          id="observacion"
-          value={formData.observacion || ''}
-          onChange={(e) => handleInputChange('observacion', e.target.value)}
-          placeholder="Agrega cualquier observación adicional"
-          rows={3}
-          className="resize-none"
-        />
-      </div>
-
-      {/* Preview */}
-      <div className="p-4 bg-gray-50 rounded-lg border">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-gray-900">
-              {formData.tipo_novedad.replace('_', ' ')}
-            </p>
-            <p className="text-sm text-gray-600">
-              {fieldConfig.isAutoCalculated ? 'Cálculo automático' : 'Valor manual'}
-            </p>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {fieldConfig.subtipoOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Badge 
-            variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}
-            className="text-lg px-3 py-1"
-          >
-            {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
-          </Badge>
-        </div>
-      </div>
+        )}
 
-      {/* Actions */}
-      <div className="flex justify-end space-x-3 pt-4 border-t">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          disabled={!isFormValid || isSubmitting}
-          className="min-w-[120px]"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            'Guardar'
-          )}
-        </Button>
-      </div>
-    </form>
+        {/* Campos dinámicos en una fila */}
+        {(fieldConfig.showHours || fieldConfig.showDays) && (
+          <div className="grid grid-cols-2 gap-4">
+            {fieldConfig.showHours && (
+              <div className="space-y-2">
+                <Label>Horas {fieldConfig.requiresHours && '*'}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="24"
+                  step="0.5"
+                  value={formData.horas || ''}
+                  onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
+                  placeholder="0"
+                />
+              </div>
+            )}
+
+            {fieldConfig.showDays && (
+              <div className="space-y-2">
+                <Label>Días {fieldConfig.requiresDays && '*'}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.dias || ''}
+                  onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
+                  placeholder="0"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Date Fields */}
+        {fieldConfig.showDates && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Fecha Inicio {fieldConfig.requiresDates && '*'}</Label>
+              <Input
+                type="date"
+                value={formData.fecha_inicio || ''}
+                onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Fecha Fin {fieldConfig.requiresDates && '*'}</Label>
+              <Input
+                type="date"
+                value={formData.fecha_fin || ''}
+                onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Valor */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Valor *</Label>
+            {suggestedValue && suggestedValue !== formData.valor && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleInputChange('valor', suggestedValue)}
+                className="text-xs bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+              >
+                <Calculator className="h-3 w-3 mr-1" />
+                Usar ${suggestedValue.toLocaleString()}
+              </Button>
+            )}
+          </div>
+
+          <Input
+            type="number"
+            min="0"
+            step="1000"
+            value={formData.valor}
+            onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
+            placeholder="0"
+            className="text-lg font-medium"
+          />
+        </div>
+
+        {/* Observaciones */}
+        <div className="space-y-2">
+          <Label>Observaciones</Label>
+          <Textarea
+            value={formData.observacion || ''}
+            onChange={(e) => handleInputChange('observacion', e.target.value)}
+            placeholder="Observaciones adicionales..."
+            rows={2}
+            className="resize-none"
+          />
+        </div>
+
+        {/* Preview simple */}
+        {formData.valor > 0 && (
+          <div className="p-3 bg-gray-50 rounded-lg text-center">
+            <Badge 
+              variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}
+              className="text-base px-4 py-2"
+            >
+              {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
+            </Badge>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex justify-end space-x-3 pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={!isFormValid || isSubmitting}
+            className="min-w-[120px]"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              'Guardar'
+            )}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
