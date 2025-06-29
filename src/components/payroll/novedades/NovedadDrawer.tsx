@@ -1,58 +1,41 @@
-import React from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { NovedadForm } from './NovedadForm';
-import { CreateNovedadData, NovedadType } from '@/types/novedades-enhanced';
-import { PayrollNovedad } from '@/types/novedades';
-import { Trash2, Edit2, Calendar, DollarSign, Plus, FileText, User, Clock, Calculator, TrendingUp, TrendingDown } from 'lucide-react';
 
-// Legacy novedad categories for compatibility
-const NOVEDAD_CATEGORIES = {
-  devengados: {
-    types: {
-      horas_extra: { label: 'Horas Extra' },
-      recargo_nocturno: { label: 'Recargo Nocturno' },
-      bonificacion: { label: 'Bonificación' },
-      comision: { label: 'Comisión' },
-      prima: { label: 'Prima Extralegal' },
-      vacaciones: { label: 'Vacaciones' },
-      incapacidad: { label: 'Incapacidad' },
-      licencia_remunerada: { label: 'Licencia Remunerada' },
-      otros_ingresos: { label: 'Otros Ingresos' }
-    }
-  },
-  deducciones: {
-    types: {
-      libranza: { label: 'Libranza' },
-      multa: { label: 'Multa' },
-      ausencia: { label: 'Ausencia' },
-      descuento_voluntario: { label: 'Descuento Voluntario' },
-      retencion_fuente: { label: 'Retención en la Fuente' },
-      fondo_solidaridad: { label: 'Fondo de Solidaridad' },
-      salud: { label: 'Salud' },
-      pension: { label: 'Pensión' },
-      arl: { label: 'ARL' },
-      caja_compensacion: { label: 'Caja de Compensación' },
-      icbf: { label: 'ICBF' },
-      sena: { label: 'SENA' }
-    }
-  }
-} as const;
+import React, { useState, useCallback } from 'react';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  Plus, 
+  Trash2, 
+  Calculator,
+  Clock,
+  AlertCircle
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { PayrollNovedad, CreateNovedadData, NovedadType, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
+import { NovedadForm } from './NovedadForm';
+import { formatCurrency } from '@/lib/utils';
+import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
 
 interface NovedadDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   employeeName: string;
   employeeId: string;
-  employeeSalary?: number;
+  employeeSalary: number;
   novedades: PayrollNovedad[];
   onCreateNovedad: (data: CreateNovedadData) => Promise<void>;
   onUpdateNovedad: (id: string, data: CreateNovedadData) => Promise<void>;
   onDeleteNovedad: (id: string) => Promise<void>;
-  isLoading?: boolean;
-  canEdit?: boolean;
+  isLoading: boolean;
+  canEdit: boolean;
   onRecalculatePayroll?: () => void;
 }
 
@@ -61,484 +44,366 @@ export const NovedadDrawer = ({
   onClose,
   employeeName,
   employeeId,
-  employeeSalary = 1300000,
+  employeeSalary,
   novedades,
   onCreateNovedad,
   onUpdateNovedad,
   onDeleteNovedad,
-  isLoading = false,
-  canEdit = true,
+  isLoading,
+  canEdit,
   onRecalculatePayroll
 }: NovedadDrawerProps) => {
-  const [showForm, setShowForm] = React.useState(false);
-  const [editingNovedad, setEditingNovedad] = React.useState<PayrollNovedad | null>(null);
-  const [hasChanges, setHasChanges] = React.useState(false);
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [editingNovedad, setEditingNovedad] = useState<PayrollNovedad | null>(null);
+  const [currentPeriodDate] = useState<Date>(new Date());
 
-  const handleCreateNovedad = async (data: CreateNovedadData) => {
+  // Función de cálculo mejorada con jornada legal dinámica
+  const calculateSuggestedValue = useCallback((
+    tipoNovedad: NovedadType,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ): number | null => {
     try {
-      console.log('🎯 Creando novedad para empleado:', employeeId);
-      console.log('📋 Datos del formulario:', data);
+      if (!employeeSalary || employeeSalary <= 0) return null;
       
-      // Ensure empleado_id is set
-      const completeData: CreateNovedadData = {
-        ...data,
-        empleado_id: employeeId
-      };
+      // Usar el sistema de cálculo mejorado con fecha del período
+      const resultado = calcularValorNovedadEnhanced(
+        tipoNovedad,
+        subtipo,
+        employeeSalary,
+        dias,
+        horas,
+        currentPeriodDate
+      );
       
-      console.log('📤 Datos completos para crear novedad:', completeData);
-      await onCreateNovedad(completeData);
-      setShowForm(false);
-      setHasChanges(true);
+      console.log(`💰 Calculated value with enhanced system for ${tipoNovedad}:`, resultado.valor);
+      console.log(`📊 Calculation details:`, resultado.baseCalculo.detalle_calculo);
+      
+      return resultado.valor > 0 ? resultado.valor : null;
     } catch (error) {
-      console.error('❌ Error en handleCreateNovedad:', error);
+      console.error('Error calculating suggested value:', error);
+      return null;
+    }
+  }, [employeeSalary, currentPeriodDate]);
+
+  const handleCreateNovedad = async (formData: CreateNovedadData) => {
+    try {
+      await onCreateNovedad(formData);
+      setShowForm(false);
+      
+      if (onRecalculatePayroll) {
+        onRecalculatePayroll();
+      }
+
+      toast({
+        title: "Novedad creada",
+        description: `Se ha creado la novedad de tipo ${formData.tipo_novedad}`,
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('Error creating novedad:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la novedad",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleUpdateNovedad = async (data: CreateNovedadData) => {
-    if (editingNovedad) {
-      await onUpdateNovedad(editingNovedad.id, data);
+  const handleUpdateNovedad = async (formData: CreateNovedadData) => {
+    if (!editingNovedad) return;
+
+    try {
+      await onUpdateNovedad(editingNovedad.id, formData);
       setEditingNovedad(null);
-      setHasChanges(true);
+      setShowForm(false);
+
+      if (onRecalculatePayroll) {
+        onRecalculatePayroll();
+      }
+
+      toast({
+        title: "Novedad actualizada",
+        description: "La novedad se ha actualizado correctamente"
+      });
+    } catch (error) {
+      console.error('Error updating novedad:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la novedad",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleEditNovedad = (novedad: PayrollNovedad) => {
-    setEditingNovedad(novedad);
-    setShowForm(false);
-  };
+  const handleDeleteNovedad = async (novedadId: string) => {
+    try {
+      await onDeleteNovedad(novedadId);
 
-  const handleDeleteNovedad = async (id: string) => {
-    if (confirm('¿Estás seguro de que quieres eliminar esta novedad?')) {
-      await onDeleteNovedad(id);
-      setHasChanges(true);
+      if (onRecalculatePayroll) {
+        onRecalculatePayroll();
+      }
+
+      toast({
+        title: "Novedad eliminada",
+        description: "La novedad se ha eliminado correctamente"
+      });
+    } catch (error) {
+      console.error('Error deleting novedad:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la novedad",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleClose = () => {
-    if (hasChanges && onRecalculatePayroll) {
-      console.log('🔄 Recalculando nómina al cerrar drawer con cambios');
-      onRecalculatePayroll();
-    }
-    
-    setHasChanges(false);
-    setShowForm(false);
-    setEditingNovedad(null);
-    onClose();
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('es-CO');
-  };
-
-  // Separar novedades por categoría
-  const devengados = novedades.filter(n => {
-    return Object.keys(NOVEDAD_CATEGORIES.devengados.types).includes(n.tipo_novedad as string);
+  // Separar devengados y deducciones
+  const devengados = novedades.filter(novedad => {
+    return ['horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
+            'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(novedad.tipo_novedad);
   });
 
-  const deducciones = novedades.filter(n => {
-    return Object.keys(NOVEDAD_CATEGORIES.deducciones.types).includes(n.tipo_novedad as string);
+  const deducciones = novedades.filter(novedad => {
+    return !['horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
+             'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(novedad.tipo_novedad);
   });
 
-  const totalDevengados = devengados.reduce((sum, n) => sum + n.valor, 0);
-  const totalDeducciones = deducciones.reduce((sum, n) => sum + n.valor, 0);
-  const impactoNeto = totalDevengados - totalDeducciones;
+  const totalDevengados = devengados.reduce((sum, novedad) => sum + novedad.valor, 0);
+  const totalDeducciones = deducciones.reduce((sum, novedad) => sum + novedad.valor, 0);
 
-  const getNovedadTypeLabel = (tipoNovedad: NovedadType) => {
-    // Check in devengados first
-    if (tipoNovedad in NOVEDAD_CATEGORIES.devengados.types) {
-      const typeKey = tipoNovedad as keyof typeof NOVEDAD_CATEGORIES.devengados.types;
-      return NOVEDAD_CATEGORIES.devengados.types[typeKey].label;
-    }
-    
-    // Check in deducciones
-    if (tipoNovedad in NOVEDAD_CATEGORIES.deducciones.types) {
-      const typeKey = tipoNovedad as keyof typeof NOVEDAD_CATEGORIES.deducciones.types;
-      return NOVEDAD_CATEGORIES.deducciones.types[typeKey].label;
-    }
-    
-    return tipoNovedad;
+  const getNovedadLabel = (tipo: NovedadType): string => {
+    const labels: Record<NovedadType, string> = {
+      horas_extra: 'Horas Extra',
+      recargo_nocturno: 'Recargo Nocturno',
+      vacaciones: 'Vacaciones',
+      licencia_remunerada: 'Licencia Remunerada',
+      incapacidad: 'Incapacidad',
+      bonificacion: 'Bonificación',
+      comision: 'Comisión',
+      prima: 'Prima',
+      otros_ingresos: 'Otros Ingresos',
+      libranza: 'Libranza',
+      multa: 'Multa',
+      ausencia: 'Ausencia',
+      descuento_voluntario: 'Descuento Voluntario',
+      retencion_fuente: 'Retención en la Fuente',
+      fondo_solidaridad: 'Fondo de Solidaridad',
+      salud: 'Salud',
+      pension: 'Pensión',
+      arl: 'ARL',
+      caja_compensacion: 'Caja de Compensación',
+      icbf: 'ICBF',
+      sena: 'SENA'
+    };
+    return labels[tipo] || tipo;
   };
+
+  const renderNovedadList = (novedadesList: PayrollNovedad[], title: string, isDevengado: boolean) => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium text-gray-900">{title}</h4>
+        <Badge 
+          variant={isDevengado ? 'default' : 'destructive'}
+          className="text-sm"
+        >
+          {formatCurrency(isDevengado ? totalDevengados : totalDeducciones)}
+        </Badge>
+      </div>
+      
+      {novedadesList.length === 0 ? (
+        <div className="text-center py-6 text-gray-500">
+          <AlertCircle className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+          <p>No hay {title.toLowerCase()} registradas</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {novedadesList.map((novedad) => (
+            <div key={novedad.id} className="border rounded-lg p-3 hover:bg-gray-50">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="font-medium text-sm">{getNovedadLabel(novedad.tipo_novedad)}</span>
+                    {(novedad.horas || novedad.dias) && (
+                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {novedad.horas && `${novedad.horas}h`}
+                          {novedad.horas && novedad.dias && ' - '}
+                          {novedad.dias && `${novedad.dias}d`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {novedad.observacion && (
+                    <p className="text-xs text-gray-600 mb-1">
+                      <strong>Obs:</strong> {novedad.observacion}
+                    </p>
+                  )}
+                  
+                  {novedad.base_calculo?.detalle_calculo && (
+                    <div className="text-xs bg-gray-100 p-1 rounded mt-1">
+                      {novedad.base_calculo.detalle_calculo}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 ml-3">
+                  <div className="text-right">
+                    <div className={`font-semibold text-sm ${
+                      isDevengado ? 'text-green-700' : 'text-red-700'
+                    }`}>
+                      {isDevengado ? '+' : '-'}{formatCurrency(novedad.valor)}
+                    </div>
+                  </div>
+                  
+                  {canEdit && (
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingNovedad(novedad);
+                          setShowForm(true);
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteNovedad(novedad.id)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <Sheet open={isOpen} onOpenChange={handleClose}>
-      <SheetContent className="w-[98vw] max-w-[1400px] min-w-[1000px] h-full p-0 flex flex-col bg-white">
-        {/* Header fijo - más compacto */}
-        <SheetHeader className="px-6 py-3 border-b border-gray-100 shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <User className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <SheetTitle className="text-lg font-semibold text-gray-900">
-                  {employeeName}
-                </SheetTitle>
-                <SheetDescription className="text-sm text-gray-600">
-                  Salario base: {formatCurrency(employeeSalary)}
-                </SheetDescription>
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="w-[600px] sm:w-[800px] flex flex-col">
+        <SheetHeader>
+          <SheetTitle className="flex items-center justify-between">
+            <div>
+              <span className="text-lg font-semibold">
+                Novedades - {employeeName}
+              </span>
+              <div className="flex items-center space-x-2 mt-1">
+                <Badge variant="outline" className="text-xs">
+                  Salario: {formatCurrency(employeeSalary)}
+                </Badge>
+                <JornadaLegalTooltip fecha={currentPeriodDate} />
               </div>
             </div>
-            
-            <div className="flex items-center space-x-6">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center space-x-1 text-green-600">
-                    <TrendingUp className="h-3 w-3" />
-                    <span className="text-xs font-medium">Devengados</span>
-                  </div>
-                  <p className="text-sm font-bold text-gray-900">{formatCurrency(totalDevengados)}</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center space-x-1 text-red-600">
-                    <TrendingDown className="h-3 w-3" />
-                    <span className="text-xs font-medium">Deducciones</span>
-                  </div>
-                  <p className="text-sm font-bold text-gray-900">{formatCurrency(totalDeducciones)}</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center space-x-1 text-blue-600">
-                    <Calculator className="h-3 w-3" />
-                    <span className="text-xs font-medium">Impacto</span>
-                  </div>
-                  <p className={`text-sm font-bold ${impactoNeto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {impactoNeto >= 0 ? '+' : ''}{formatCurrency(impactoNeto)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                {hasChanges && (
-                  <Badge variant="outline" className="text-xs text-orange-600 border-orange-200">
-                    Cambios pendientes
-                  </Badge>
-                )}
-                {canEdit && (
-                  <Button
-                    onClick={() => {setShowForm(true); setEditingNovedad(null);}}
-                    disabled={isLoading || showForm || Boolean(editingNovedad)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva novedad
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
+            <Badge 
+              variant="secondary"
+              className="text-sm px-3 py-1"
+            >
+              {novedades.length} novedades
+            </Badge>
+          </SheetTitle>
+          <SheetDescription>
+            Gestiona las novedades del empleado para este período de nómina
+          </SheetDescription>
         </SheetHeader>
 
-        {/* Main Content - Diseño horizontal mejorado */}
-        <div className="flex-1 flex min-h-0 bg-gray-50">
-          {/* Panel izquierdo - Formulario - Fixed width */}
-          <div className="w-[500px] border-r border-gray-200 flex flex-col bg-white shrink-0">
-            {showForm && (
-              <div className="flex-1 flex flex-col h-full">
-                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
-                  <h3 className="text-base font-semibold text-gray-900">Nueva novedad</h3>
-                  <p className="text-xs text-gray-600 mt-1">Completa la información para {employeeName}</p>
+        <div className="flex-1 flex flex-col min-h-0 mt-4">
+          {!showForm ? (
+            <div className="flex-1 flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm text-gray-600">
+                  Total: {devengados.length} devengados, {deducciones.length} deducciones
                 </div>
-                <div className="flex-1 overflow-y-auto">
-                  <div className="p-4">
-                    <NovedadForm
-                      onSubmit={handleCreateNovedad}
-                      onCancel={() => setShowForm(false)}
-                      isLoading={isLoading}
-                      employeeSalary={employeeSalary}
-                      initialData={{ empleado_id: employeeId, periodo_id: '' }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {editingNovedad && (
-              <div className="flex-1 flex flex-col h-full">
-                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
-                  <h3 className="text-base font-semibold text-gray-900">Editar novedad</h3>
-                  <p className="text-xs text-gray-600 mt-1">Modifica la información</p>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                  <div className="p-4">
-                    <NovedadForm
-                      initialData={{
-                        empleado_id: editingNovedad.empleado_id,
-                        periodo_id: editingNovedad.periodo_id,
-                        tipo_novedad: editingNovedad.tipo_novedad as NovedadType,
-                        subtipo: editingNovedad.subtipo,
-                        fecha_inicio: editingNovedad.fecha_inicio,
-                        fecha_fin: editingNovedad.fecha_fin,
-                        dias: editingNovedad.dias,
-                        horas: editingNovedad.horas,
-                        valor: editingNovedad.valor,
-                        observacion: editingNovedad.observacion
-                      }}
-                      onSubmit={handleUpdateNovedad}
-                      onCancel={() => setEditingNovedad(null)}
-                      isLoading={isLoading}
-                      employeeSalary={employeeSalary}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {!showForm && !editingNovedad && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center px-6">
-                  <div className="p-4 bg-gray-50 rounded-lg mb-4 inline-block">
-                    <FileText className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-base font-semibold text-gray-900 mb-2">
-                    Administrar novedades
-                  </h3>
-                  <p className="text-gray-500 mb-6 text-sm leading-relaxed">
-                    Crea una nueva novedad o selecciona una existente para editarla.
-                  </p>
-                  {canEdit && (
-                    <Button
-                      onClick={() => setShowForm(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Crear novedad
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Panel derecho - Lista de novedades - Flexible width */}
-          <div className="flex-1 flex flex-col bg-white min-w-0">
-            <div className="px-4 py-3 border-b border-gray-100 shrink-0 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900">Novedades registradas</h3>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {novedades.length > 0 ? `${novedades.length} novedades activas` : 'No hay novedades'}
-                  </p>
-                </div>
-                {hasChanges && (
-                  <Button
-                    onClick={() => {
-                      if (onRecalculatePayroll) {
-                        console.log('🔄 Recalculando nómina manualmente');
-                        onRecalculatePayroll();
-                        setHasChanges(false);
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                {canEdit && (
+                  <Button 
+                    onClick={() => setShowForm(true)}
+                    className="flex items-center space-x-2"
+                    disabled={isLoading}
                   >
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Recalcular ahora
+                    <Plus className="h-4 w-4" />
+                    <span>Agregar novedad</span>
                   </Button>
                 )}
               </div>
-            </div>
 
-            <div className="flex-1 overflow-y-auto">
-              {novedades.length === 0 ? (
-                <div className="flex items-center justify-center h-full min-h-[300px]">
-                  <div className="text-center px-6">
-                    <div className="p-4 bg-gray-50 rounded-lg mb-4 inline-block">
-                      <Calendar className="h-8 w-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-base font-semibold text-gray-900 mb-2">
-                      Sin novedades
-                    </h3>
-                    <p className="text-gray-500 text-sm">
-                      Este empleado no tiene novedades registradas
-                    </p>
+              <ScrollArea className="flex-1">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                   </div>
-                </div>
-              ) : (
-                <div className="p-4 space-y-4">
-                  {/* Devengados */}
-                  {devengados.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        <h4 className="font-semibold text-green-800">Devengados</h4>
-                        <Badge className="bg-green-100 text-green-800 border-0 text-xs">
-                          {formatCurrency(totalDevengados)}
-                        </Badge>
-                      </div>
-                      
-                      {devengados.map((novedad) => (
-                        <div key={novedad.id} className="bg-green-50 border border-green-100 rounded-lg p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Badge className="bg-green-200 text-green-800 border-0 px-2 py-0.5 text-xs font-medium">
-                                  {getNovedadTypeLabel(novedad.tipo_novedad as NovedadType)}
-                                  {novedad.subtipo && ` - ${novedad.subtipo}`}
-                                </Badge>
-                                <div className="flex items-center text-green-700 text-sm font-semibold">
-                                  <DollarSign className="h-3 w-3 mr-1" />
-                                  {formatCurrency(novedad.valor)}
-                                </div>
-                              </div>
-                              
-                              {(novedad.fecha_inicio || novedad.fecha_fin || novedad.dias || novedad.horas) && (
-                                <div className="flex items-center text-xs text-green-700 space-x-3">
-                                  {(novedad.fecha_inicio || novedad.fecha_fin) && (
-                                    <div className="flex items-center">
-                                      <Clock className="h-3 w-3 mr-1" />
-                                      <span>
-                                        {novedad.fecha_inicio && formatDate(novedad.fecha_inicio)}
-                                        {novedad.fecha_inicio && novedad.fecha_fin && ' - '}
-                                        {novedad.fecha_fin && formatDate(novedad.fecha_fin)}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {novedad.dias && (
-                                    <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs">
-                                      {novedad.dias} días
-                                    </span>
-                                  )}
-                                  {novedad.horas && (
-                                    <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs">
-                                      {novedad.horas} horas
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              
-                              {novedad.observacion && (
-                                <div className="bg-green-100 border border-green-200 p-2 rounded">
-                                  <p className="text-xs text-green-800">{novedad.observacion}</p>
-                                </div>
-                              )}
-                            </div>
-
-                            {canEdit && (
-                              <div className="flex space-x-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleEditNovedad(novedad)}
-                                  className="h-7 w-7 p-0 hover:bg-green-100 text-green-600 hover:text-green-700"
-                                >
-                                  <Edit2 className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleDeleteNovedad(novedad.id)}
-                                  className="h-7 w-7 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Separador */}
-                  {devengados.length > 0 && deducciones.length > 0 && (
-                    <Separator className="my-4" />
-                  )}
-
-                  {/* Deducciones */}
-                  {deducciones.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                        <h4 className="font-semibold text-red-800">Deducciones</h4>
-                        <Badge className="bg-red-100 text-red-800 border-0 text-xs">
-                          {formatCurrency(totalDeducciones)}
-                        </Badge>
-                      </div>
-                      
-                      {deducciones.map((novedad) => (
-                        <div key={novedad.id} className="bg-red-50 border border-red-100 rounded-lg p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Badge className="bg-red-200 text-red-800 border-0 px-2 py-0.5 text-xs font-medium">
-                                  {getNovedadTypeLabel(novedad.tipo_novedad as NovedadType)}
-                                  {novedad.subtipo && ` - ${novedad.subtipo}`}
-                                </Badge>
-                                <div className="flex items-center text-red-700 text-sm font-semibold">
-                                  <DollarSign className="h-3 w-3 mr-1" />
-                                  {formatCurrency(novedad.valor)}
-                                </div>
-                              </div>
-                              
-                              {(novedad.fecha_inicio || novedad.fecha_fin || novedad.dias || novedad.horas) && (
-                                <div className="flex items-center text-xs text-red-700 space-x-3">
-                                  {(novedad.fecha_inicio || novedad.fecha_fin) && (
-                                    <div className="flex items-center">
-                                      <Clock className="h-3 w-3 mr-1" />
-                                      <span>
-                                        {novedad.fecha_inicio && formatDate(novedad.fecha_inicio)}
-                                        {novedad.fecha_inicio && novedad.fecha_fin && ' - '}
-                                        {novedad.fecha_fin && formatDate(novedad.fecha_fin)}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {novedad.dias && (
-                                    <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">
-                                      {novedad.dias} días
-                                    </span>
-                                  )}
-                                  {novedad.horas && (
-                                    <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">
-                                      {novedad.horas} horas
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              
-                              {novedad.observacion && (
-                                <div className="bg-red-100 border border-red-200 p-2 rounded">
-                                  <p className="text-xs text-red-800">{novedad.observacion}</p>
-                                </div>
-                              )}
-                            </div>
-
-                            {canEdit && (
-                              <div className="flex space-x-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleEditNovedad(novedad)}
-                                  className="h-7 w-7 p-0 hover:bg-red-100 text-red-600 hover:text-red-700"
-                                >
-                                  <Edit2 className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleDeleteNovedad(novedad.id)}
-                                  className="h-7 w-7 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                ) : (
+                  <div className="space-y-6">
+                    {renderNovedadList(devengados, 'Devengados', true)}
+                    <Separator />
+                    {renderNovedadList(deducciones, 'Deducciones', false)}
+                  </div>
+                )}
+              </ScrollArea>
             </div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium">
+                  {editingNovedad ? 'Editar' : 'Agregar'} novedad
+                </h3>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingNovedad(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+
+              <ScrollArea className="flex-1">
+                <NovedadForm
+                  onSubmit={editingNovedad ? handleUpdateNovedad : handleCreateNovedad}
+                  onCancel={() => {
+                    setShowForm(false);
+                    setEditingNovedad(null);
+                  }}
+                  initialData={editingNovedad ? {
+                    tipo_novedad: editingNovedad.tipo_novedad,
+                    valor: editingNovedad.valor,
+                    horas: editingNovedad.horas || null,
+                    dias: editingNovedad.dias || null,
+                    observacion: editingNovedad.observacion || '',
+                    fecha_inicio: editingNovedad.fecha_inicio || '',
+                    fecha_fin: editingNovedad.fecha_fin || ''
+                  } : undefined}
+                  isLoading={isLoading}
+                  employeeSalary={employeeSalary}
+                  calculateSuggestedValue={calculateSuggestedValue}
+                />
+              </ScrollArea>
+            </div>
+          )}
+        </div>
+
+        <Separator />
+        <div className="flex justify-between items-center pt-4">
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <Calculator className="h-4 w-4" />
+            <span>Cálculos actualizados con jornada legal dinámica</span>
           </div>
+          <Button variant="outline" onClick={onClose}>
+            Cerrar
+          </Button>
         </div>
       </SheetContent>
     </Sheet>
