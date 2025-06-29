@@ -1,4 +1,3 @@
-
 import { PayrollLiquidationHeader } from './PayrollLiquidationHeader';
 import { PayrollPeriodCard } from './PayrollPeriodCard';
 import { PayrollSummaryCards } from './liquidation/PayrollSummaryCards';
@@ -88,7 +87,6 @@ export const PayrollLiquidationIntelligentEnhanced = () => {
             periodoId={currentPeriod?.id || ''}
             onRefreshEmployees={refreshEmployees}
             onDeleteEmployee={deleteEmployee}
-            onDeleteMultipleEmployees={deleteMultipleEmployees}
           />
         </div>
       </div>

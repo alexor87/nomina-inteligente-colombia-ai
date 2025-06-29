@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
@@ -16,6 +17,7 @@ interface PayrollModernTableProps {
   periodoId: string;
   onRefreshEmployees?: () => void;
   onDeleteEmployee?: (id: string) => void;
+  onDeleteMultipleEmployees?: (employeeIds: string[]) => Promise<void>;
 }
 
 export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
