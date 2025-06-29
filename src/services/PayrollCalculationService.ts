@@ -76,6 +76,14 @@ export class PayrollCalculationService {
     console.warn('⚠️ PayrollCalculationService.getConfigurationInfo is deprecated. Use PayrollCalculationEnhancedService.getConfigurationInfo instead');
     return PayrollCalculationEnhancedService.getConfigurationInfo(fecha);
   }
+
+  /**
+   * @deprecated This method has been removed. Configuration updates should be done through PayrollCalculationEnhancedService
+   */
+  static updateConfiguration() {
+    console.error('❌ PayrollCalculationService.updateConfiguration has been removed. Use PayrollCalculationEnhancedService for configuration management.');
+    throw new Error('Method removed. Use PayrollCalculationEnhancedService instead.');
+  }
 }
 
 // Re-exportar tipos del servicio mejorado para mantener compatibilidad

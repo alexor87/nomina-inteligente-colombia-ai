@@ -7,10 +7,44 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { NovedadType, NOVEDAD_CATEGORIES, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { Calculator, Loader2, Clock } from 'lucide-react';
 import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
+
+// Define the enhanced categories structure that matches the enhanced types
+const NOVEDAD_CATEGORIES_ENHANCED = {
+  devengados: {
+    label: 'Devengados',
+    types: {
+      horas_extra: { label: 'Horas Extra', icon: '⏰' },
+      recargo_nocturno: { label: 'Recargo Nocturno', icon: '🌙' },
+      vacaciones: { label: 'Vacaciones', icon: '🏖️' },
+      licencia_remunerada: { label: 'Licencia Remunerada', icon: '📋' },
+      incapacidad: { label: 'Incapacidad', icon: '🏥' },
+      bonificacion: { label: 'Bonificación', icon: '🎁' },
+      comision: { label: 'Comisión', icon: '💰' },
+      prima: { label: 'Prima', icon: '⭐' },
+      otros_ingresos: { label: 'Otros Ingresos', icon: '💵' }
+    }
+  },
+  deducciones: {
+    label: 'Deducciones',
+    types: {
+      libranza: { label: 'Libranza', icon: '🏦' },
+      multa: { label: 'Multa', icon: '⚠️' },
+      ausencia: { label: 'Ausencia', icon: '❌' },
+      descuento_voluntario: { label: 'Descuento Voluntario', icon: '📝' },
+      retencion_fuente: { label: 'Retención en la Fuente', icon: '📊' },
+      fondo_solidaridad: { label: 'Fondo de Solidaridad', icon: '🤝' },
+      salud: { label: 'Salud', icon: '🏥' },
+      pension: { label: 'Pensión', icon: '👴' },
+      arl: { label: 'ARL', icon: '🛡️' },
+      caja_compensacion: { label: 'Caja de Compensación', icon: '👨‍👩‍👧‍👦' },
+      icbf: { label: 'ICBF', icon: '👶' },
+      sena: { label: 'SENA', icon: '🎓' }
+    }
+  }
+} as const;
 
 interface NovedadFormProps {
   onSubmit: (data: CreateNovedadData) => Promise<void>;
@@ -37,6 +71,8 @@ export const NovedadForm = ({
   modalType = 'devengado'
 }: NovedadFormProps) => {
   const [formData, setFormData] = useState<CreateNovedadData>({
+    empleado_id: initialData?.empleado_id || '',
+    periodo_id: initialData?.periodo_id || '',
     tipo_novedad: 'horas_extra' as NovedadType,
     subtipo: '',
     fecha_inicio: '',
@@ -58,7 +94,7 @@ export const NovedadForm = ({
   useEffect(() => {
     if (initialData?.tipo_novedad) {
       // Determine category based on initial data
-      const isInDevengados = Object.keys(NOVEDAD_CATEGORIES.devengados.types).includes(initialData.tipo_novedad);
+      const isInDevengados = Object.keys(NOVEDAD_CATEGORIES_ENHANCED.devengados.types).includes(initialData.tipo_novedad);
       setSelectedCategory(isInDevengados ? 'devengados' : 'deducciones');
     }
   }, [initialData]);
@@ -192,7 +228,7 @@ export const NovedadForm = ({
             <SelectValue placeholder="Selecciona el tipo de novedad" />
           </SelectTrigger>
           <SelectContent>
-            {Object.entries(NOVEDAD_CATEGORIES[selectedCategory].types).map(([key, config]) => (
+            {Object.entries(NOVEDAD_CATEGORIES_ENHANCED[selectedCategory].types).map(([key, config]) => (
               <SelectItem key={key} value={key}>
                 <div className="flex items-center space-x-2">
                   <span>{config.icon}</span>

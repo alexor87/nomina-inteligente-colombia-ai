@@ -4,8 +4,42 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { NovedadForm } from './NovedadForm';
-import { PayrollNovedad, NovedadFormData, NOVEDAD_CATEGORIES, NovedadType } from '@/types/novedades';
+import { CreateNovedadData, NovedadType } from '@/types/novedades-enhanced';
+import { PayrollNovedad } from '@/types/novedades';
 import { Trash2, Edit2, Calendar, DollarSign, Plus, FileText, User, Clock, Calculator, TrendingUp, TrendingDown } from 'lucide-react';
+
+// Legacy novedad categories for compatibility
+const NOVEDAD_CATEGORIES = {
+  devengados: {
+    types: {
+      horas_extra: { label: 'Horas Extra' },
+      recargo_nocturno: { label: 'Recargo Nocturno' },
+      bonificacion: { label: 'Bonificación' },
+      comision: { label: 'Comisión' },
+      prima: { label: 'Prima Extralegal' },
+      vacaciones: { label: 'Vacaciones' },
+      incapacidad: { label: 'Incapacidad' },
+      licencia_remunerada: { label: 'Licencia Remunerada' },
+      otros_ingresos: { label: 'Otros Ingresos' }
+    }
+  },
+  deducciones: {
+    types: {
+      libranza: { label: 'Libranza' },
+      multa: { label: 'Multa' },
+      ausencia: { label: 'Ausencia' },
+      descuento_voluntario: { label: 'Descuento Voluntario' },
+      retencion_fuente: { label: 'Retención en la Fuente' },
+      fondo_solidaridad: { label: 'Fondo de Solidaridad' },
+      salud: { label: 'Salud' },
+      pension: { label: 'Pensión' },
+      arl: { label: 'ARL' },
+      caja_compensacion: { label: 'Caja de Compensación' },
+      icbf: { label: 'ICBF' },
+      sena: { label: 'SENA' }
+    }
+  }
+} as const;
 
 interface NovedadDrawerProps {
   isOpen: boolean;
@@ -14,12 +48,12 @@ interface NovedadDrawerProps {
   employeeId: string;
   employeeSalary?: number;
   novedades: PayrollNovedad[];
-  onCreateNovedad: (data: NovedadFormData) => Promise<void>;
-  onUpdateNovedad: (id: string, data: NovedadFormData) => Promise<void>;
+  onCreateNovedad: (data: CreateNovedadData) => Promise<void>;
+  onUpdateNovedad: (id: string, data: CreateNovedadData) => Promise<void>;
   onDeleteNovedad: (id: string) => Promise<void>;
   isLoading?: boolean;
   canEdit?: boolean;
-  onRecalculatePayroll?: () => void; // New prop to trigger payroll recalculation
+  onRecalculatePayroll?: () => void;
 }
 
 export const NovedadDrawer = ({
@@ -40,13 +74,13 @@ export const NovedadDrawer = ({
   const [editingNovedad, setEditingNovedad] = React.useState<PayrollNovedad | null>(null);
   const [hasChanges, setHasChanges] = React.useState(false);
 
-  const handleCreateNovedad = async (data: NovedadFormData) => {
+  const handleCreateNovedad = async (data: CreateNovedadData) => {
     try {
       console.log('🎯 Creando novedad para empleado:', employeeId);
       console.log('📋 Datos del formulario:', data);
       
-      // Agregar empleado_id a los datos antes de enviar
-      const completeData = {
+      // Ensure empleado_id is set
+      const completeData: CreateNovedadData = {
         ...data,
         empleado_id: employeeId
       };
@@ -54,18 +88,17 @@ export const NovedadDrawer = ({
       console.log('📤 Datos completos para crear novedad:', completeData);
       await onCreateNovedad(completeData);
       setShowForm(false);
-      setHasChanges(true); // Mark that changes were made
+      setHasChanges(true);
     } catch (error) {
       console.error('❌ Error en handleCreateNovedad:', error);
-      // El error ya se maneja en el hook useNovedades
     }
   };
 
-  const handleUpdateNovedad = async (data: NovedadFormData) => {
+  const handleUpdateNovedad = async (data: CreateNovedadData) => {
     if (editingNovedad) {
       await onUpdateNovedad(editingNovedad.id, data);
       setEditingNovedad(null);
-      setHasChanges(true); // Mark that changes were made
+      setHasChanges(true);
     }
   };
 
@@ -77,18 +110,16 @@ export const NovedadDrawer = ({
   const handleDeleteNovedad = async (id: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar esta novedad?')) {
       await onDeleteNovedad(id);
-      setHasChanges(true); // Mark that changes were made
+      setHasChanges(true);
     }
   };
 
   const handleClose = () => {
-    // If there were changes and we have a recalculation callback, trigger it
     if (hasChanges && onRecalculatePayroll) {
       console.log('🔄 Recalculando nómina al cerrar drawer con cambios');
       onRecalculatePayroll();
     }
     
-    // Reset state and close
     setHasChanges(false);
     setShowForm(false);
     setEditingNovedad(null);
@@ -109,11 +140,11 @@ export const NovedadDrawer = ({
 
   // Separar novedades por categoría
   const devengados = novedades.filter(n => {
-    return Object.keys(NOVEDAD_CATEGORIES.devengados.types).includes(n.tipo_novedad);
+    return Object.keys(NOVEDAD_CATEGORIES.devengados.types).includes(n.tipo_novedad as string);
   });
 
   const deducciones = novedades.filter(n => {
-    return Object.keys(NOVEDAD_CATEGORIES.deducciones.types).includes(n.tipo_novedad);
+    return Object.keys(NOVEDAD_CATEGORIES.deducciones.types).includes(n.tipo_novedad as string);
   });
 
   const totalDevengados = devengados.reduce((sum, n) => sum + n.valor, 0);
@@ -221,6 +252,7 @@ export const NovedadDrawer = ({
                       onCancel={() => setShowForm(false)}
                       isLoading={isLoading}
                       employeeSalary={employeeSalary}
+                      initialData={{ empleado_id: employeeId, periodo_id: '' }}
                     />
                   </div>
                 </div>
@@ -237,7 +269,9 @@ export const NovedadDrawer = ({
                   <div className="p-4">
                     <NovedadForm
                       initialData={{
-                        tipo_novedad: editingNovedad.tipo_novedad,
+                        empleado_id: editingNovedad.empleado_id,
+                        periodo_id: editingNovedad.periodo_id,
+                        tipo_novedad: editingNovedad.tipo_novedad as NovedadType,
                         subtipo: editingNovedad.subtipo,
                         fecha_inicio: editingNovedad.fecha_inicio,
                         fecha_fin: editingNovedad.fecha_fin,
@@ -346,7 +380,7 @@ export const NovedadDrawer = ({
                             <div className="flex-1 space-y-2">
                               <div className="flex items-center justify-between">
                                 <Badge className="bg-green-200 text-green-800 border-0 px-2 py-0.5 text-xs font-medium">
-                                  {getNovedadTypeLabel(novedad.tipo_novedad)}
+                                  {getNovedadTypeLabel(novedad.tipo_novedad as NovedadType)}
                                   {novedad.subtipo && ` - ${novedad.subtipo}`}
                                 </Badge>
                                 <div className="flex items-center text-green-700 text-sm font-semibold">
@@ -435,7 +469,7 @@ export const NovedadDrawer = ({
                             <div className="flex-1 space-y-2">
                               <div className="flex items-center justify-between">
                                 <Badge className="bg-red-200 text-red-800 border-0 px-2 py-0.5 text-xs font-medium">
-                                  {getNovedadTypeLabel(novedad.tipo_novedad)}
+                                  {getNovedadTypeLabel(novedad.tipo_novedad as NovedadType)}
                                   {novedad.subtipo && ` - ${novedad.subtipo}`}
                                 </Badge>
                                 <div className="flex items-center text-red-700 text-sm font-semibold">
