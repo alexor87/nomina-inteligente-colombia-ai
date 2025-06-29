@@ -44,7 +44,7 @@ interface PayrollModernTableProps {
   onDeleteMultipleEmployees?: (employeeIds: string[]) => Promise<void>;
 }
 
-type ModalType = 'novedades' | 'liquidation' | 'calculation' | 'voucherPreview' | 'voucherSend' | null;
+type ActiveModal = 'novedades' | 'liquidation' | 'calculation' | 'voucherPreview' | 'voucherSend' | null;
 
 export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   employees,
@@ -57,14 +57,9 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   onDeleteEmployee,
   onDeleteMultipleEmployees
 }) => {
-  // Estados simplificados para modales
-  const [modalState, setModalState] = useState<{
-    type: ModalType;
-    employee: PayrollEmployee | null;
-  }>({
-    type: null,
-    employee: null
-  });
+  // Estado simplificado para modales
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -81,30 +76,26 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     isLoading: novedadesLoading
   } = useNovedades(periodoId);
 
-  // Handler único para abrir modales con logging
-  const handleOpenModal = (modalType: ModalType, employee: PayrollEmployee) => {
+  // Handler único para abrir modales
+  const handleOpenModal = (modalType: ActiveModal, employee: PayrollEmployee) => {
     console.log('🔓 Abriendo modal:', modalType, 'para empleado:', employee.name);
-    setModalState({
-      type: modalType,
-      employee: employee
-    });
+    setActiveModal(modalType);
+    setSelectedEmployee(employee);
   };
 
-  // Handler único para cerrar modales con logging y limpieza completa
+  // Handler único para cerrar modales
   const handleCloseModal = () => {
-    console.log('🔒 Cerrando modal:', modalState.type);
-    setModalState({
-      type: null,
-      employee: null
-    });
-    console.log('✅ Modal cerrado completamente');
+    console.log('🔒 Cerrando modal:', activeModal);
+    setActiveModal(null);
+    setSelectedEmployee(null);
+    console.log('✅ Modal cerrado completamente - Estado limpio');
   };
 
   const handleCreateNovedad = async (data: CreateNovedadData) => {
-    if (!modalState.employee) return;
+    if (!selectedEmployee) return;
     
     const createData: CreateNovedadData = {
-      empleado_id: modalState.employee.id,
+      empleado_id: selectedEmployee.id,
       periodo_id: periodoId,
       ...data
     };
@@ -134,10 +125,10 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     horas?: number,
     dias?: number
   ): number | null => {
-    if (!modalState.employee) return null;
+    if (!selectedEmployee) return null;
     
-    const salarioDiario = modalState.employee.baseSalary / 30;
-    const valorHora = modalState.employee.baseSalary / 240;
+    const salarioDiario = selectedEmployee.baseSalary / 30;
+    const valorHora = selectedEmployee.baseSalary / 240;
     
     switch (tipo) {
       case 'horas_extra':
@@ -431,42 +422,42 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         )}
       </div>
 
-      {/* Todos los modales usando el estado unificado */}
+      {/* Todos los modales usando el estado unificado - SIN onOpenChange */}
       <NovedadUnifiedModal
-        isOpen={modalState.type === 'novedades'}
+        isOpen={activeModal === 'novedades'}
         onClose={handleCloseModal}
-        employeeName={modalState.employee?.name || ''}
-        employeeId={modalState.employee?.id || ''}
-        employeeSalary={modalState.employee?.baseSalary || 0}
+        employeeName={selectedEmployee?.name || ''}
+        employeeId={selectedEmployee?.id || ''}
+        employeeSalary={selectedEmployee?.baseSalary || 0}
         onCreateNovedad={handleCreateNovedad}
         calculateSuggestedValue={calculateSuggestedValue}
       />
 
       <EmployeeLiquidationModal
-        isOpen={modalState.type === 'liquidation'}
+        isOpen={activeModal === 'liquidation'}
         onClose={handleCloseModal}
-        employee={modalState.employee}
+        employee={selectedEmployee}
         onUpdateEmployee={onUpdateEmployee}
         canEdit={canEdit}
       />
 
       <EmployeeCalculationModal
-        isOpen={modalState.type === 'calculation'}
+        isOpen={activeModal === 'calculation'}
         onClose={handleCloseModal}
-        employee={modalState.employee}
+        employee={selectedEmployee}
       />
 
       <VoucherPreviewModal
-        isOpen={modalState.type === 'voucherPreview'}
+        isOpen={activeModal === 'voucherPreview'}
         onClose={handleCloseModal}
-        employee={modalState.employee}
+        employee={selectedEmployee}
         period={periodInfo}
       />
 
       <VoucherSendDialog
-        isOpen={modalState.type === 'voucherSend'}
+        isOpen={activeModal === 'voucherSend'}
         onClose={handleCloseModal}
-        employee={modalState.employee}
+        employee={selectedEmployee}
         period={periodInfo}
       />
     </>

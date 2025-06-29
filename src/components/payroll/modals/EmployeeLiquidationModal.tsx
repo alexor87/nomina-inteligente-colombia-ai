@@ -70,14 +70,6 @@ export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> =
     }
   };
 
-  // Handler controlado para evitar auto-cierre
-  const handleDialogChange = (open: boolean) => {
-    if (!open) {
-      console.log('🔒 Cerrando modal de liquidación via Dialog');
-      onClose();
-    }
-  };
-
   const calculateGrossPay = () => {
     const dailySalary = formData.baseSalary / 30;
     const workedSalary = dailySalary * formData.workedDays;
@@ -93,7 +85,7 @@ export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> =
   if (!employee) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleDialogChange}>
+    <Dialog open={isOpen}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
