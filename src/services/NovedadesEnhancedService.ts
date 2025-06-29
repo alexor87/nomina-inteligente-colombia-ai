@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
@@ -82,7 +81,7 @@ export class NovedadesEnhancedService {
               valorFinal = resultadoCalculo.valor;
               baseCalculoMejorada = {
                 ...resultadoCalculo.baseCalculo,
-                factor_calculo: 1.0 // Add the required factor_calculo property
+                factor_calculo: 1.0
               };
               console.log('💰 Auto-calculated value with legal workday:', valorFinal);
             }
@@ -96,7 +95,7 @@ export class NovedadesEnhancedService {
         company_id: companyId,
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
-        tipo_novedad: novedadData.tipo_novedad,
+        tipo_novedad: novedadData.tipo_novedad as any, // Type assertion to handle database type mismatch
         valor: valorFinal,
         horas: novedadData.horas,
         dias: novedadData.dias,
@@ -142,7 +141,7 @@ export class NovedadesEnhancedService {
         company_id: data.company_id,
         empleado_id: data.empleado_id,
         periodo_id: data.periodo_id,
-        tipo_novedad: data.tipo_novedad,
+        tipo_novedad: data.tipo_novedad as any, // Type assertion for return type
         valor: Number(data.valor || 0),
         horas: Number(data.horas || 0),
         dias: data.dias || 0,
@@ -201,7 +200,7 @@ export class NovedadesEnhancedService {
         company_id: novedad.company_id,
         empleado_id: novedad.empleado_id,
         periodo_id: novedad.periodo_id,
-        tipo_novedad: novedad.tipo_novedad,
+        tipo_novedad: novedad.tipo_novedad as any, // Type assertion
         valor: Number(novedad.valor || 0),
         horas: Number(novedad.horas || 0),
         dias: novedad.dias || 0,
@@ -229,6 +228,11 @@ export class NovedadesEnhancedService {
       const dbUpdates: any = { ...updates };
       if (updates.base_calculo) {
         dbUpdates.base_calculo = JSON.stringify(updates.base_calculo);
+      }
+      
+      // Add type assertion for tipo_novedad if present
+      if (updates.tipo_novedad) {
+        dbUpdates.tipo_novedad = updates.tipo_novedad as any;
       }
 
       const { data, error } = await supabase
@@ -266,7 +270,7 @@ export class NovedadesEnhancedService {
         company_id: data.company_id,
         empleado_id: data.empleado_id,
         periodo_id: data.periodo_id,
-        tipo_novedad: data.tipo_novedad,
+        tipo_novedad: data.tipo_novedad as any, // Type assertion
         valor: Number(data.valor || 0),
         horas: Number(data.horas || 0),
         dias: data.dias || 0,
