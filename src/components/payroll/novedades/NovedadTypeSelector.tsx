@@ -47,8 +47,8 @@ const novedadCategories = [
   },
   {
     id: 'recargo_nocturno' as NovedadCategory,
-    title: 'Horas con Recargo',
-    description: 'Recargo nocturno',
+    title: 'Recargos',
+    description: 'Nocturno, dominical, festivo y sus combinaciones',
     icon: Moon,
     color: 'bg-purple-50 text-purple-700 border-purple-200'
   },

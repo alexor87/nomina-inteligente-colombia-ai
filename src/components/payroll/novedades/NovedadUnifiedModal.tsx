@@ -86,7 +86,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     switch (selectedCategory) {
       case 'horas_extra':
         return <NovedadHorasExtraForm {...commonProps} />;
-      case 'recargo':
+      case 'recargo_nocturno':
         return <NovedadRecargoForm {...commonProps} />;
       case 'vacaciones':
         return <NovedadVacacionesForm {...commonProps} />;
