@@ -1,4 +1,5 @@
 
+
 /**
  * Servicio de cálculo de nómina con jornada legal dinámica según Ley 2101 de 2021
  * DEPRECATED: Usar PayrollCalculationEnhancedService en su lugar
@@ -35,7 +36,7 @@ export class PayrollCalculationService {
   /**
    * @deprecated Usar PayrollCalculationEnhancedService.calculatePayroll en su lugar
    */
-  static calculatePayroll(input: PayrollCalculationInput): PayrollCalculationResult {
+  static async calculatePayroll(input: PayrollCalculationInput): Promise<PayrollCalculationResult> {
     console.warn('⚠️ PayrollCalculationService.calculatePayroll is deprecated. Use PayrollCalculationEnhancedService.calculatePayroll instead');
     
     // Asegurar que se incluya la fecha del período para cálculos precisos
@@ -44,13 +45,13 @@ export class PayrollCalculationService {
       periodDate: input.periodDate || new Date()
     };
     
-    return PayrollCalculationEnhancedService.calculatePayroll(enhancedInput);
+    return await PayrollCalculationEnhancedService.calculatePayroll(enhancedInput);
   }
 
   /**
    * @deprecated Usar PayrollCalculationEnhancedService.calculateBatch en su lugar
    */
-  static calculateBatch(inputs: PayrollCalculationInput[]): PayrollCalculationResult[] {
+  static async calculateBatch(inputs: PayrollCalculationInput[]): Promise<PayrollCalculationResult[]> {
     console.warn('⚠️ PayrollCalculationService.calculateBatch is deprecated. Use PayrollCalculationEnhancedService.calculateBatch instead');
     
     const enhancedInputs = inputs.map(input => ({
@@ -58,7 +59,7 @@ export class PayrollCalculationService {
       periodDate: input.periodDate || new Date()
     }));
     
-    return PayrollCalculationEnhancedService.calculateBatch(enhancedInputs);
+    return await PayrollCalculationEnhancedService.calculateBatch(enhancedInputs);
   }
 
   /**
@@ -92,3 +93,4 @@ export type {
   PayrollCalculationResultEnhanced,
   ValidationResultEnhanced
 } from './PayrollCalculationEnhancedService';
+
