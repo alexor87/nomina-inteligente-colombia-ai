@@ -1,11 +1,12 @@
 
 /**
  * Servicio de cálculo de nómina mejorado con soporte para jornada legal dinámica
- * según la Ley 2101 de 2021
+ * según la Ley 2101 de 2021 y cálculo correcto de deducciones
  */
 
 import { ConfigurationService, PayrollConfiguration } from './ConfigurationService';
 import { PayrollPeriodService } from './PayrollPeriodService';
+import { DeductionCalculationService } from './DeductionCalculationService';
 import { getJornadaLegal, getHourlyDivisor, getJornadaTooltip } from '@/utils/jornadaLegal';
 
 export interface PayrollCalculationInputEnhanced {
@@ -17,6 +18,8 @@ export interface PayrollCalculationInputEnhanced {
   absences: number;
   periodType: 'quincenal' | 'mensual';
   periodDate?: Date; // Nueva propiedad para cálculos históricos
+  empleadoId?: string; // Para incluir novedades en el cálculo
+  periodoId?: string; // Para incluir novedades en el cálculo
 }
 
 export interface PayrollCalculationResultEnhanced {
@@ -26,6 +29,8 @@ export interface PayrollCalculationResultEnhanced {
   grossPay: number;
   healthDeduction: number;
   pensionDeduction: number;
+  retencionFuente: number;
+  novedadesDeducciones: number;
   totalDeductions: number;
   netPay: number;
   employerHealth: number;
@@ -36,7 +41,7 @@ export interface PayrollCalculationResultEnhanced {
   employerSena: number;
   employerContributions: number;
   totalPayrollCost: number;
-  // Nuevas propiedades para información de jornada
+  // Información de jornada y cálculos
   jornadaInfo: {
     horasSemanales: number;
     horasMensuales: number;
@@ -44,6 +49,17 @@ export interface PayrollCalculationResultEnhanced {
     valorHoraOrdinaria: number;
     tooltip: string;
     ley: string;
+  };
+  // Información detallada de deducciones
+  deductionDetails: {
+    ibcSalud: number;
+    ibcPension: number;
+    baseRetencion: number;
+    novedadesDetalle: Array<{
+      tipo: string;
+      valor: number;
+      descripcion: string;
+    }>;
   };
 }
 
@@ -138,7 +154,7 @@ export class PayrollCalculationEnhancedService {
     };
   }
 
-  static calculatePayroll(input: PayrollCalculationInputEnhanced): PayrollCalculationResultEnhanced {
+  static async calculatePayroll(input: PayrollCalculationInputEnhanced): Promise<PayrollCalculationResultEnhanced> {
     const config = this.getCurrentConfig();
     const periodDate = input.periodDate || new Date();
     const jornadaLegal = getJornadaLegal(periodDate);
@@ -182,17 +198,24 @@ export class PayrollCalculationEnhancedService {
       }
     }
 
-    // Base para aportes
-    const payrollBase = regularPay + extraPay + input.bonuses;
-
-    // Deducciones del empleado
-    const healthDeduction = payrollBase * config.porcentajes.saludEmpleado;
-    const pensionDeduction = payrollBase * config.porcentajes.pensionEmpleado;
-    const totalDeductions = healthDeduction + pensionDeduction;
-
     // Total devengado
-    const grossPay = payrollBase + transportAllowance;
-    const netPay = grossPay - totalDeductions;
+    const grossPay = regularPay + extraPay + input.bonuses + transportAllowance;
+
+    // Calcular deducciones correctamente usando el nuevo servicio
+    const deductionResult = await DeductionCalculationService.calculateDeductions({
+      salarioBase: input.baseSalary,
+      totalDevengado: grossPay,
+      auxilioTransporte: transportAllowance,
+      periodType: input.periodType,
+      empleadoId: input.empleadoId,
+      periodoId: input.periodoId
+    });
+
+    // Neto pagado
+    const netPay = grossPay - deductionResult.totalDeducciones;
+
+    // Base para aportes patronales (sin auxilio de transporte)
+    const payrollBase = regularPay + extraPay + input.bonuses;
 
     // Aportes del empleador
     const employerHealth = payrollBase * config.porcentajes.saludEmpleador;
@@ -211,9 +234,11 @@ export class PayrollCalculationEnhancedService {
       extraPay: Math.round(extraPay),
       transportAllowance: Math.round(transportAllowance),
       grossPay: Math.round(grossPay),
-      healthDeduction: Math.round(healthDeduction),
-      pensionDeduction: Math.round(pensionDeduction),
-      totalDeductions: Math.round(totalDeductions),
+      healthDeduction: Math.round(deductionResult.saludEmpleado),
+      pensionDeduction: Math.round(deductionResult.pensionEmpleado),
+      retencionFuente: Math.round(deductionResult.retencionFuente),
+      novedadesDeducciones: Math.round(deductionResult.novedadesDeducciones),
+      totalDeductions: Math.round(deductionResult.totalDeducciones),
       netPay: Math.round(netPay),
       employerHealth: Math.round(employerHealth),
       employerPension: Math.round(employerPension),
@@ -230,12 +255,19 @@ export class PayrollCalculationEnhancedService {
         valorHoraOrdinaria: Math.round(valorHoraOrdinaria),
         tooltip: getJornadaTooltip(periodDate),
         ley: jornadaLegal.ley
+      },
+      deductionDetails: {
+        ibcSalud: deductionResult.ibcSalud,
+        ibcPension: deductionResult.ibcPension,
+        baseRetencion: deductionResult.detalleCalculo.baseRetencion,
+        novedadesDetalle: deductionResult.detalleCalculo.novedadesDetalle
       }
     };
   }
 
-  static calculateBatch(inputs: PayrollCalculationInputEnhanced[]): PayrollCalculationResultEnhanced[] {
-    return inputs.map(input => this.calculatePayroll(input));
+  static async calculateBatch(inputs: PayrollCalculationInputEnhanced[]): Promise<PayrollCalculationResultEnhanced[]> {
+    const results = await Promise.all(inputs.map(input => this.calculatePayroll(input)));
+    return results;
   }
 
   private static formatCurrency(amount: number): string {
@@ -257,9 +289,17 @@ export class PayrollCalculationEnhancedService {
       ley: string;
       tooltip: string;
     };
+    deductionInfo: {
+      topeIbc: number;
+      porcentajes: {
+        saludEmpleado: number;
+        pensionEmpleado: number;
+      };
+    };
   } {
     const config = this.getCurrentConfig();
     const jornadaLegal = getJornadaLegal(fecha);
+    const deductionInfo = DeductionCalculationService.getConfigurationInfo();
     
     return {
       salarioMinimo: config.salarioMinimo,
@@ -271,6 +311,10 @@ export class PayrollCalculationEnhancedService {
         divisorHorario: getHourlyDivisor(fecha),
         ley: jornadaLegal.ley,
         tooltip: getJornadaTooltip(fecha)
+      },
+      deductionInfo: {
+        topeIbc: deductionInfo.topeIbc,
+        porcentajes: deductionInfo.porcentajes
       }
     };
   }

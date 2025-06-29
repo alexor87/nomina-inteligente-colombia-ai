@@ -216,9 +216,9 @@ export const DevengoModal = ({
 
   const recalculateEmployeeTotals = async () => {
     try {
-      console.log('🔄 Triggering employee totals recalculation...');
+      console.log('🔄 Triggering employee totals recalculation with correct deductions...');
       await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(employeeId, periodId);
-      console.log('✅ Employee totals recalculated successfully');
+      console.log('✅ Employee totals recalculated successfully with correct deductions');
     } catch (error) {
       console.error('❌ Error recalculating employee totals:', error);
     }
@@ -256,9 +256,10 @@ export const DevengoModal = ({
       const newNovedad = await NovedadesEnhancedService.createNovedad(formData);
 
       if (newNovedad) {
-        console.log('✅ Novedad created, now recalculating totals...');
+        console.log('✅ Novedad created, now recalculating totals with correct deductions...');
         
         // CRITICAL: Recalcular totales del empleado después de crear la novedad
+        // Ahora incluye el cálculo correcto de deducciones
         await recalculateEmployeeTotals();
         
         await loadNovedades();
@@ -286,7 +287,7 @@ export const DevengoModal = ({
 
         toast({
           title: "Novedad creada",
-          description: `Se ha creado la novedad de tipo ${formData.tipo_novedad} por ${formatCurrency(newNovedad.valor)}`,
+          description: `Se ha creado la novedad de tipo ${formData.tipo_novedad} por ${formatCurrency(newNovedad.valor)}${modalType === 'deduccion' ? ' y se han recalculado las deducciones correctamente' : ''}`,
           duration: 3000
         });
       }
@@ -314,9 +315,10 @@ export const DevengoModal = ({
       );
 
       if (updatedNovedad) {
-        console.log('✅ Novedad updated, now recalculating totals...');
+        console.log('✅ Novedad updated, now recalculating totals with correct deductions...');
         
         // CRITICAL: Recalcular totales del empleado después de actualizar la novedad
+        // Ahora incluye el cálculo correcto de deducciones
         await recalculateEmployeeTotals();
         
         await loadNovedades();
@@ -329,7 +331,7 @@ export const DevengoModal = ({
 
         toast({
           title: "Novedad actualizada",
-          description: "La novedad se ha actualizado correctamente"
+          description: `La novedad se ha actualizado correctamente${modalType === 'deduccion' ? ' y se han recalculado las deducciones' : ''}`,
         });
       }
     } catch (error) {
@@ -349,9 +351,10 @@ export const DevengoModal = ({
       setIsLoading(true);
       await NovedadesEnhancedService.deleteNovedad(novedadId);
       
-      console.log('✅ Novedad deleted, now recalculating totals...');
+      console.log('✅ Novedad deleted, now recalculating totals with correct deductions...');
       
       // CRITICAL: Recalcular totales del empleado después de eliminar la novedad
+      // Ahora incluye el cálculo correcto de deducciones
       await recalculateEmployeeTotals();
       
       await loadNovedades();
@@ -362,7 +365,7 @@ export const DevengoModal = ({
 
       toast({
         title: "Novedad eliminada",
-        description: "La novedad se ha eliminado correctamente"
+        description: `La novedad se ha eliminado correctamente${modalType === 'deduccion' ? ' y se han recalculado las deducciones' : ''}`,
       });
     } catch (error) {
       console.error('Error deleting novedad:', error);
@@ -457,6 +460,11 @@ export const DevengoModal = ({
                     Salario: {formatCurrency(employeeSalary)}
                   </Badge>
                   <JornadaLegalTooltip fecha={currentPeriodDate} />
+                  {modalType === 'deduccion' && (
+                    <Badge variant="secondary" className="text-xs">
+                      Con cálculo correcto de IBC y retención
+                    </Badge>
+                  )}
                 </div>
               </div>
               <Badge 
@@ -640,7 +648,12 @@ export const DevengoModal = ({
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Calculator className="h-4 w-4" />
-                <span>Cálculos actualizados con jornada legal dinámica</span>
+                <span>
+                  {modalType === 'devengado' 
+                    ? 'Cálculos actualizados con jornada legal dinámica'
+                    : 'Deducciones calculadas con IBC correcto, tope 25 SMMLV y retención en la fuente'
+                  }
+                </span>
               </div>
               <Button variant="outline" onClick={onClose}>
                 Cerrar

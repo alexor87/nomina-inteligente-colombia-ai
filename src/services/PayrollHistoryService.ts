@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod, PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
+import { DeductionCalculationService } from './DeductionCalculationService';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -66,15 +67,15 @@ export class PayrollHistoryService {
     }
   }
 
-  // Enhanced method to recalculate employee totals including novedades
+  // Enhanced method to recalculate employee totals including novedades with correct deductions
   static async recalculateEmployeeTotalsWithNovedades(employeeId: string, periodId: string): Promise<void> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('No company ID found');
 
-      console.log('🔄 Recalculating totals for employee:', employeeId, 'period:', periodId);
+      console.log('🔄 Recalculating totals with correct deductions for employee:', employeeId, 'period:', periodId);
 
-      // Get all novedades for this employee in this period - now using periodo_id directly
+      // Get all novedades for this employee in this period
       const { data: novedades, error: novedadesError } = await supabase
         .from('payroll_novedades')
         .select('tipo_novedad, valor')
@@ -125,10 +126,10 @@ export class PayrollHistoryService {
         return;
       }
 
-      // Get current payroll record to add to base values
+      // Get current payroll record
       const { data: payrollData, error: payrollError } = await supabase
         .from('payrolls')
-        .select('salario_base, total_devengado, total_deducciones')
+        .select('salario_base, total_devengado, auxilio_transporte')
         .eq('employee_id', employeeId)
         .eq('periodo', periodData.periodo)
         .eq('company_id', companyId)
@@ -140,15 +141,29 @@ export class PayrollHistoryService {
       }
 
       const salarioBase = Number(payrollData?.salario_base || 0);
-      const newTotalDevengado = salarioBase + totalDevengadosNovedades;
-      const newTotalDeducciones = totalDeduccionesNovedades;
-      const newNetoPagado = newTotalDevengado - newTotalDeducciones;
+      const auxilioTransporte = Number(payrollData?.auxilio_transporte || 0);
+      const newTotalDevengado = salarioBase + auxilioTransporte + totalDevengadosNovedades;
 
-      console.log('📈 New calculated totals:', {
+      // Calculate correct deductions using the new service
+      const deductionResult = await DeductionCalculationService.calculateDeductions({
         salarioBase,
         totalDevengado: newTotalDevengado,
+        auxilioTransporte,
+        periodType: 'mensual', // TODO: Get from period configuration
+        empleadoId: employeeId,
+        periodoId: periodId
+      });
+
+      const newTotalDeducciones = deductionResult.totalDeducciones;
+      const newNetoPagado = newTotalDevengado - newTotalDeducciones;
+
+      console.log('📈 New calculated totals with correct deductions:', {
+        salarioBase,
+        auxilioTransporte,
+        totalDevengado: newTotalDevengado,
         totalDeducciones: newTotalDeducciones,
-        netoPagado: newNetoPagado
+        netoPagado: newNetoPagado,
+        deductionDetails: deductionResult.detalleCalculo
       });
 
       // Update the payroll record with new totals
@@ -158,6 +173,9 @@ export class PayrollHistoryService {
           total_devengado: newTotalDevengado,
           total_deducciones: newTotalDeducciones,
           neto_pagado: newNetoPagado,
+          salud_empleado: deductionResult.saludEmpleado,
+          pension_empleado: deductionResult.pensionEmpleado,
+          retencion_fuente: deductionResult.retencionFuente,
           updated_at: new Date().toISOString()
         })
         .eq('employee_id', employeeId)
@@ -169,7 +187,7 @@ export class PayrollHistoryService {
         throw updateError;
       }
 
-      console.log('✅ Successfully updated payroll totals for employee:', employeeId);
+      console.log('✅ Successfully updated payroll totals with correct deductions for employee:', employeeId);
 
     } catch (error) {
       console.error('Error in recalculateEmployeeTotalsWithNovedades:', error);
@@ -182,7 +200,7 @@ export class PayrollHistoryService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('No company ID found');
 
-      console.log('🔍 Loading period details for real period ID:', periodId);
+      console.log('🔍 Loading period details with correct deductions for period ID:', periodId);
 
       // Get the actual period from payroll_periods_real using the real UUID
       const { data: periodData, error: periodError } = await supabase
@@ -208,6 +226,7 @@ export class PayrollHistoryService {
           periodo,
           estado,
           salario_base,
+          auxilio_transporte,
           total_devengado,
           total_deducciones,
           neto_pagado,
@@ -264,7 +283,7 @@ export class PayrollHistoryService {
 
       console.log('💰 Novedades grouped by employee:', novedadesByEmployee);
 
-      // Transform data to match expected format with real payroll IDs INCLUDING NOVEDADES
+      // Transform data to match expected format with real payroll IDs INCLUDING CORRECT DEDUCTIONS
       const period: PayrollHistoryPeriod = {
         id: periodData.id, // Real UUID
         period: periodData.periodo,
@@ -286,33 +305,47 @@ export class PayrollHistoryService {
         reportedToDian: false // TODO: Add this field if needed
       };
 
-      const employees: PayrollHistoryEmployee[] = (payrollsData || []).map(payroll => {
-        const empleadoId = payroll.employee_id;
-        const novedadesEmpleado = novedadesByEmployee[empleadoId] || { devengados: 0, deducciones: 0 };
-        
-        // Calculate totals INCLUDING novedades
-        const baseGrossPay = Number(payroll.total_devengado || payroll.employees.salario_base || 0);
-        const baseDeductions = Number(payroll.total_deducciones || 0);
-        
-        const finalGrossPay = baseGrossPay + novedadesEmpleado.devengados;
-        const finalDeductions = baseDeductions + novedadesEmpleado.deducciones;
-        const finalNetPay = finalGrossPay - finalDeductions;
+      // Calculate employees with correct deductions
+      const employees: PayrollHistoryEmployee[] = await Promise.all(
+        (payrollsData || []).map(async (payroll) => {
+          const empleadoId = payroll.employee_id;
+          const novedadesEmpleado = novedadesByEmployee[empleadoId] || { devengados: 0, deducciones: 0 };
+          
+          // Calculate base totals
+          const salarioBase = Number(payroll.employees.salario_base || 0);
+          const auxilioTransporte = Number(payroll.auxilio_transporte || 0);
+          const baseGrossPay = salarioBase + auxilioTransporte;
+          const finalGrossPay = baseGrossPay + novedadesEmpleado.devengados;
 
-        return {
-          id: payroll.employee_id, // Employee ID
-          periodId: periodData.id, // Real period UUID
-          payrollId: payroll.id, // REAL UUID del registro de payroll
-          name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
-          position: payroll.employees.cargo || 'Sin cargo',
-          grossPay: finalGrossPay, // NOW INCLUDES NOVEDADES!
-          deductions: finalDeductions, // NOW INCLUDES NOVEDADES!
-          netPay: finalNetPay, // RECALCULATED WITH NOVEDADES!
-          baseSalary: Number(payroll.employees.salario_base || 0),
-          paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente'
-        };
-      });
+          // Calculate correct deductions using the new service
+          const deductionResult = await DeductionCalculationService.calculateDeductions({
+            salarioBase,
+            totalDevengado: finalGrossPay,
+            auxilioTransporte,
+            periodType: 'mensual', // TODO: Get from period configuration
+            empleadoId: empleadoId,
+            periodoId: periodId
+          });
 
-      console.log('👥 Employees with novedades included:', employees.map(emp => ({
+          const finalDeductions = deductionResult.totalDeducciones;
+          const finalNetPay = finalGrossPay - finalDeductions;
+
+          return {
+            id: payroll.employee_id, // Employee ID
+            periodId: periodData.id, // Real period UUID
+            payrollId: payroll.id, // REAL UUID del registro de payroll
+            name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
+            position: payroll.employees.cargo || 'Sin cargo',
+            grossPay: finalGrossPay, // INCLUDES NOVEDADES
+            deductions: finalDeductions, // CORRECTLY CALCULATED INCLUDING NOVEDADES
+            netPay: finalNetPay, // CORRECTLY CALCULATED
+            baseSalary: Number(payroll.employees.salario_base || 0),
+            paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente'
+          };
+        })
+      );
+
+      console.log('👥 Employees with correct deductions included:', employees.map(emp => ({
         name: emp.name,
         employeeId: emp.id,
         baseSalary: emp.baseSalary,
@@ -329,7 +362,7 @@ export class PayrollHistoryService {
         aportesEmpleador: employees.length * 100000 // Mock calculation
       };
 
-      console.log('📈 Final summary with novedades:', summary);
+      console.log('📈 Final summary with correct deductions:', summary);
 
       return {
         period,
