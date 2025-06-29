@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -68,12 +69,12 @@ export const DevengoModal = ({
   const [editingNovedad, setEditingNovedad] = useState<NovedadDisplay | null>(null);
   const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(new Date());
 
-  // Form state
+  // Form state con valores por defecto mejorados
   const [formData, setFormData] = useState<CreateNovedadData>({
     empleado_id: employeeId,
     periodo_id: periodId,
-    tipo_novedad: 'horas_extra' as NovedadType,
-    subtipo: 'diurnas',
+    tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
+    subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
     fecha_inicio: '',
     fecha_fin: '',
     dias: null,
@@ -81,6 +82,30 @@ export const DevengoModal = ({
     valor: 0,
     observacion: ''
   });
+
+  // Actualizar formData cuando cambien las props
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🔄 Modal opened, updating form data with:', {
+        employeeId,
+        periodId,
+        modalType
+      });
+      
+      setFormData({
+        empleado_id: employeeId,
+        periodo_id: periodId,
+        tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
+        subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
+        fecha_inicio: '',
+        fecha_fin: '',
+        dias: null,
+        horas: null,
+        valor: 0,
+        observacion: ''
+      });
+    }
+  }, [isOpen, employeeId, periodId, modalType]);
 
   // Cargar fecha del período desde la base de datos para cálculos precisos
   useEffect(() => {
@@ -120,7 +145,7 @@ export const DevengoModal = ({
   }, [isOpen, periodId]);
 
   const loadNovedades = useCallback(async () => {
-    if (!isOpen) return;
+    if (!isOpen || !employeeId || !periodId) return;
     
     try {
       setIsLoading(true);
@@ -137,7 +162,7 @@ export const DevengoModal = ({
       });
       
       setNovedades(filteredNovedades);
-      console.log('Loaded novedades:', filteredNovedades);
+      console.log('✅ Loaded novedades:', filteredNovedades);
     } catch (error) {
       console.error('Error loading novedades:', error);
       toast({
@@ -190,21 +215,35 @@ export const DevengoModal = ({
   }, [employeeSalary, currentPeriodDate]);
 
   const handleCreateNovedad = async () => {
-    if (formData.valor <= 0) return;
+    if (formData.valor <= 0) {
+      toast({
+        title: "Error",
+        description: "El valor debe ser mayor a 0",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.empleado_id || !formData.periodo_id) {
+      toast({
+        title: "Error",
+        description: "Faltan datos requeridos (empleado o período)",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       
-      const novedadData: CreateNovedadData = {
-        empleado_id: employeeId,
-        periodo_id: periodId,
-        ...formData
-      };
-
-      console.log('📝 Creating novedad with enhanced calculation system:', novedadData);
+      console.log('📝 Creating novedad with data:', {
+        ...formData,
+        employeeId: formData.empleado_id,
+        periodId: formData.periodo_id
+      });
       
       // Usar el servicio mejorado
-      const newNovedad = await NovedadesEnhancedService.createNovedad(novedadData);
+      const newNovedad = await NovedadesEnhancedService.createNovedad(formData);
 
       if (newNovedad) {
         await loadNovedades();
@@ -215,8 +254,8 @@ export const DevengoModal = ({
         setFormData({
           empleado_id: employeeId,
           periodo_id: periodId,
-          tipo_novedad: 'horas_extra' as NovedadType,
-          subtipo: 'diurnas',
+          tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
+          subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
           fecha_inicio: '',
           fecha_fin: '',
           dias: null,
@@ -240,7 +279,7 @@ export const DevengoModal = ({
       console.error('Error creating novedad:', error);
       toast({
         title: "Error",
-        description: "No se pudo crear la novedad",
+        description: "No se pudo crear la novedad. Verifique los datos ingresados.",
         variant: "destructive"
       });
     } finally {
@@ -334,8 +373,8 @@ export const DevengoModal = ({
     setFormData({
       empleado_id: employeeId,
       periodo_id: periodId,
-      tipo_novedad: 'horas_extra' as NovedadType,
-      subtipo: 'diurnas',
+      tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
+      subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
       fecha_inicio: '',
       fecha_fin: '',
       dias: null,
@@ -374,7 +413,7 @@ export const DevengoModal = ({
     return labels[tipo] || tipo;
   };
 
-  const isFormValid = formData.valor > 0;
+  const isFormValid = formData.valor > 0 && formData.empleado_id && formData.periodo_id;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

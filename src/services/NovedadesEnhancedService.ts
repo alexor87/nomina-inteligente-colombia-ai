@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
@@ -31,7 +30,25 @@ export class NovedadesEnhancedService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      console.log('📝 Creating novedad with enhanced service:', data);
+      // Validación de datos requeridos
+      if (!data.empleado_id) {
+        throw new Error('empleado_id is required');
+      }
+      
+      if (!data.periodo_id) {
+        throw new Error('periodo_id is required');
+      }
+
+      if (!data.tipo_novedad) {
+        throw new Error('tipo_novedad is required');
+      }
+
+      console.log('📝 Creating novedad with enhanced service. Data validation passed:', {
+        empleado_id: data.empleado_id,
+        periodo_id: data.periodo_id,
+        tipo_novedad: data.tipo_novedad,
+        valor: data.valor
+      });
 
       // Validar que el período existe
       const { data: periodExists, error: periodError } = await supabase
@@ -48,63 +65,70 @@ export class NovedadesEnhancedService {
 
       console.log('✅ Period validated successfully:', periodExists.id);
       
+      // Validar que el empleado existe
+      const { data: employeeExists, error: employeeError } = await supabase
+        .from('employees')
+        .select('id, salario_base')
+        .eq('id', data.empleado_id)
+        .eq('company_id', companyId)
+        .single();
+
+      if (employeeError || !employeeExists) {
+        console.error('Employee validation failed:', employeeError);
+        throw new Error(`Invalid employee ID: ${data.empleado_id}`);
+      }
+
+      console.log('✅ Employee validated successfully:', employeeExists.id);
+      
       // Usar la fecha del período para cálculos con jornada legal correcta
       const fechaPeriodoReal = new Date(periodExists.fecha_inicio);
 
       // Si hay datos para auto-cálculo, usar la función mejorada
-      let valorFinal = data.valor;
+      let valorFinal = data.valor || 0;
       let baseCalculoMejorada = data.base_calculo;
 
-      if (data.horas || data.dias) {
+      if ((data.horas || data.dias) && employeeExists.salario_base) {
         try {
-          // Necesitamos el salario base del empleado para el cálculo
-          const { data: empleadoData, error: empleadoError } = await supabase
-            .from('employees')
-            .select('salario_base')
-            .eq('id', data.empleado_id)
-            .eq('company_id', companyId)
-            .single();
+          const resultadoCalculo = calcularValorNovedadEnhanced(
+            data.tipo_novedad,
+            data.subtipo,
+            Number(employeeExists.salario_base),
+            data.dias,
+            data.horas,
+            fechaPeriodoReal
+          );
 
-          if (!empleadoError && empleadoData) {
-            const resultadoCalculo = calcularValorNovedadEnhanced(
-              data.tipo_novedad,
-              data.subtipo,
-              Number(empleadoData.salario_base),
-              data.dias,
-              data.horas,
-              fechaPeriodoReal
-            );
-
-            if (resultadoCalculo.valor > 0) {
-              valorFinal = resultadoCalculo.valor;
-              baseCalculoMejorada = {
-                ...resultadoCalculo.baseCalculo,
-                factor_calculo: 1.0
-              };
-              console.log('💰 Auto-calculated value with legal workday:', valorFinal);
-            }
+          if (resultadoCalculo.valor > 0) {
+            valorFinal = resultadoCalculo.valor;
+            baseCalculoMejorada = resultadoCalculo.baseCalculo;
+            console.log('💰 Auto-calculated value with legal workday:', valorFinal);
           }
         } catch (calcError) {
           console.warn('Could not auto-calculate, using provided value:', calcError);
         }
       }
 
+      // Asegurar que tenemos un valor válido
+      if (!valorFinal || valorFinal <= 0) {
+        throw new Error('Valor must be greater than 0');
+      }
+
       const insertData = {
         company_id: companyId,
         empleado_id: data.empleado_id,
         periodo_id: data.periodo_id,
-        tipo_novedad: data.tipo_novedad as any,
-        valor: valorFinal,
-        horas: data.horas,
-        dias: data.dias,
-        observacion: data.observacion,
-        fecha_inicio: data.fecha_inicio,
-        fecha_fin: data.fecha_fin,
-        base_calculo: baseCalculoMejorada ? JSON.stringify(baseCalculoMejorada) : undefined,
+        tipo_novedad: data.tipo_novedad,
+        valor: Number(valorFinal),
+        horas: data.horas ? Number(data.horas) : null,
+        dias: data.dias ? Number(data.dias) : null,
+        observacion: data.observacion || null,
+        fecha_inicio: data.fecha_inicio || null,
+        fecha_fin: data.fecha_fin || null,
+        base_calculo: baseCalculoMejorada ? JSON.stringify(baseCalculoMejorada) : null,
         creado_por: user.id
       };
 
-      console.log('📤 Inserting enhanced novedad with data:', insertData);
+      console.log('📤 Inserting enhanced novedad with validated data:', insertData);
       
       const { data: result, error } = await supabase
         .from('payroll_novedades')
@@ -141,7 +165,7 @@ export class NovedadesEnhancedService {
         periodo_id: result.periodo_id,
         tipo_novedad: result.tipo_novedad as any,
         valor: Number(result.valor || 0),
-        horas: Number(result.horas || 0),
+        horas: result.horas ? Number(result.horas) : 0,
         dias: result.dias || 0,
         observacion: result.observacion || '',
         fecha_inicio: result.fecha_inicio || '',
