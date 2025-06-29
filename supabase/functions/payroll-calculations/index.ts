@@ -15,6 +15,7 @@ interface PayrollCalculationInput {
   bonuses: number;
   absences: number;
   periodType: 'quincenal' | 'mensual';
+  periodDate?: string; // Nueva propiedad para jornada legal dinámica
 }
 
 interface PayrollConfiguration {
@@ -37,6 +38,14 @@ interface PayrollConfiguration {
   };
 }
 
+interface JornadaLegalInfo {
+  horasSemanales: number;
+  horasMensuales: number;
+  fechaVigencia: Date;
+  descripcion: string;
+  ley: string;
+}
+
 const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   salarioMinimo: 1300000,
   auxilioTransporte: 200000,
@@ -57,8 +66,69 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
+// Jornadas legales según Ley 2101 de 2021
+const JORNADAS_LEGALES = [
+  {
+    fechaInicio: new Date('2026-07-15'),
+    horasSemanales: 42,
+    descripcion: 'Jornada final según Ley 2101 de 2021'
+  },
+  {
+    fechaInicio: new Date('2025-07-15'),
+    horasSemanales: 44,
+    descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
+  },
+  {
+    fechaInicio: new Date('2024-07-15'),
+    horasSemanales: 46,
+    descripcion: 'Tercera fase de reducción - Ley 2101 de 2021'
+  },
+  {
+    fechaInicio: new Date('2023-07-15'),
+    horasSemanales: 47,
+    descripcion: 'Segunda fase de reducción - Ley 2101 de 2021'
+  },
+  {
+    fechaInicio: new Date('1950-01-01'),
+    horasSemanales: 48,
+    descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo'
+  }
+];
+
+function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
+  const jornadaVigente = JORNADAS_LEGALES
+    .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
+    .find(jornada => fecha >= jornada.fechaInicio);
+
+  if (!jornadaVigente) {
+    const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
+    return {
+      horasSemanales: jornadaTradicional.horasSemanales,
+      horasMensuales: (jornadaTradicional.horasSemanales * 52) / 12,
+      fechaVigencia: jornadaTradicional.fechaInicio,
+      descripcion: jornadaTradicional.descripcion,
+      ley: 'Código Sustantivo del Trabajo'
+    };
+  }
+
+  return {
+    horasSemanales: jornadaVigente.horasSemanales,
+    horasMensuales: (jornadaVigente.horasSemanales * 52) / 12,
+    fechaVigencia: jornadaVigente.fechaInicio,
+    descripcion: jornadaVigente.descripcion,
+    ley: 'Ley 2101 de 2021'
+  };
+}
+
+function getHourlyDivisor(fecha: Date = new Date()): number {
+  const jornadaInfo = getJornadaLegal(fecha);
+  return Math.round(jornadaInfo.horasMensuales);
+}
+
 function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: string) {
   const config = DEFAULT_CONFIG_2025;
+  const periodDate = input.periodDate ? new Date(input.periodDate) : new Date();
+  const jornadaLegal = getJornadaLegal(periodDate);
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -84,8 +154,12 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
     errors.push('Los días trabajados no pueden ser negativos');
   }
 
-  if (input.extraHours > 60) {
-    warnings.push('Horas extra excesivas (más de 60 horas)');
+  // Validación mejorada de horas extra con jornada legal dinámica
+  const maxHorasExtraSemanales = jornadaLegal.horasSemanales * 0.25;
+  const horasExtraSemanalesEstimadas = input.extraHours / (input.periodType === 'quincenal' ? 2 : 4);
+  
+  if (horasExtraSemanalesEstimadas > maxHorasExtraSemanales) {
+    warnings.push(`Horas extra excesivas para jornada de ${jornadaLegal.horasSemanales}h semanales (máximo recomendado: ${maxHorasExtraSemanales}h/semana)`);
   }
   if (input.extraHours < 0) {
     errors.push('Las horas extra no pueden ser negativas');
@@ -109,38 +183,43 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
   return {
     isValid: errors.length === 0,
     errors,
-    warnings
+    warnings,
+    jornadaInfo: {
+      horasSemanales: jornadaLegal.horasSemanales,
+      ley: jornadaLegal.ley,
+      descripcion: jornadaLegal.descripcion
+    }
   };
 }
 
 function calculatePayroll(input: PayrollCalculationInput) {
   const config = DEFAULT_CONFIG_2025;
+  const periodDate = input.periodDate ? new Date(input.periodDate) : new Date();
+  const jornadaLegal = getJornadaLegal(periodDate);
+  const hourlyDivisor = getHourlyDivisor(periodDate);
   
   let periodDays: number;
   let monthlyDivisor: number;
-  let hourlyDivisor: number;
   
   switch (input.periodType) {
     case 'quincenal':
       periodDays = 15;
       monthlyDivisor = 30;
-      hourlyDivisor = 240;
       break;
     case 'mensual':
       periodDays = 30;
       monthlyDivisor = 30;
-      hourlyDivisor = 240;
       break;
     default:
       periodDays = 30;
       monthlyDivisor = 30;
-      hourlyDivisor = 240;
   }
   
   const dailySalary = input.baseSalary / monthlyDivisor;
   const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
   const regularPay = effectiveWorkedDays * dailySalary;
 
+  // Usar divisor horario dinámico basado en jornada legal
   const hourlyRate = input.baseSalary / hourlyDivisor;
   const extraPay = input.extraHours * hourlyRate * 1.25;
 
@@ -190,7 +269,16 @@ function calculatePayroll(input: PayrollCalculationInput) {
     employerIcbf: Math.round(employerIcbf),
     employerSena: Math.round(employerSena),
     employerContributions: Math.round(employerContributions),
-    totalPayrollCost: Math.round(totalPayrollCost)
+    totalPayrollCost: Math.round(totalPayrollCost),
+    // Información adicional sobre jornada legal
+    jornadaInfo: {
+      horasSemanales: jornadaLegal.horasSemanales,
+      horasMensuales: Math.round(jornadaLegal.horasMensuales),
+      divisorHorario: hourlyDivisor,
+      valorHoraOrdinaria: Math.round(hourlyRate),
+      ley: jornadaLegal.ley,
+      descripcion: jornadaLegal.descripcion
+    }
   };
 }
 
@@ -218,6 +306,19 @@ serve(async (req) => {
       case 'batch-calculate':
         const batchResults = data.inputs.map((input: PayrollCalculationInput) => calculatePayroll(input));
         return new Response(JSON.stringify({ success: true, data: batchResults }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      case 'get-jornada-legal':
+        const fecha = data.fecha ? new Date(data.fecha) : new Date();
+        const jornadaInfo = getJornadaLegal(fecha);
+        return new Response(JSON.stringify({ 
+          success: true, 
+          data: {
+            ...jornadaInfo,
+            divisorHorario: getHourlyDivisor(fecha)
+          }
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
