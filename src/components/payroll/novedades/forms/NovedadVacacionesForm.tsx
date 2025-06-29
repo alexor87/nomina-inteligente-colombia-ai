@@ -55,6 +55,10 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
     });
   };
 
+  const handlePagoAnticipadoChange = (checked: boolean | "indeterminate") => {
+    setPagoAnticipado(checked === true);
+  };
+
   const isValid = tipoVacaciones && dias && parseFloat(dias) > 0 && valorCalculado > 0;
 
   return (
@@ -105,7 +109,7 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
           <Checkbox 
             id="pago-anticipado" 
             checked={pagoAnticipado}
-            onCheckedChange={setPagoAnticipado}
+            onCheckedChange={handlePagoAnticipadoChange}
           />
           <Label htmlFor="pago-anticipado" className="text-sm">
             ¿Pago anticipado?
