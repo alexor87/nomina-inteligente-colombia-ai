@@ -20,6 +20,7 @@ import { PayrollHistoryEmployee } from '@/types/payroll-history';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DevengoModal } from './DevengoModal';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 
 interface EditableEmployeeTableProps {
   employees: PayrollHistoryEmployee[];
