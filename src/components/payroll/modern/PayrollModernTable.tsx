@@ -84,6 +84,10 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         };
         return Math.round(valorHora * factors[subtipo] * horas);
         
+      case 'recargo_nocturno':
+        if (!horas) return null;
+        return Math.round(valorHora * 1.35 * horas); // 35% adicional
+        
       case 'vacaciones':
         if (!dias) return null;
         return Math.round(salarioDiario * dias);
@@ -97,6 +101,14 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         };
         const diasPagados = subtipo === 'comun' ? Math.max(0, dias - 3) : dias;
         return Math.round(salarioDiario * percentages[subtipo] * diasPagados);
+        
+      case 'licencia_remunerada':
+        if (!dias) return null;
+        return Math.round(salarioDiario * dias);
+        
+      case 'ausencia':
+        if (!dias) return null;
+        return Math.round(salarioDiario * dias);
         
       default:
         return null;

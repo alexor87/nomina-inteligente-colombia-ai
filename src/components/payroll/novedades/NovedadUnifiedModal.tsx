@@ -6,8 +6,14 @@ import {
 } from '@/components/ui/dialog';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadHorasExtraForm } from './forms/NovedadHorasExtraForm';
+import { NovedadRecargoNocturnoForm } from './forms/NovedadRecargoNocturnoForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
+import { NovedadLicenciasForm } from './forms/NovedadLicenciasForm';
+import { NovedadIngresosAdicionalesForm } from './forms/NovedadIngresosAdicionalesForm';
+import { NovedadDeduccionesForm } from './forms/NovedadDeduccionesForm';
+import { NovedadPrestamosForm } from './forms/NovedadPrestamosForm';
+import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface NovedadUnifiedModalProps {
@@ -71,14 +77,31 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       calculateSuggestedValue
     };
 
+    const commonPropsWithoutCalculation = {
+      onBack: handleBackToSelector,
+      onSubmit: handleSubmit,
+      employeeSalary
+    };
+
     switch (selectedCategory) {
       case 'horas_extra':
         return <NovedadHorasExtraForm {...commonProps} />;
+      case 'recargo_nocturno':
+        return <NovedadRecargoNocturnoForm {...commonProps} />;
       case 'vacaciones':
         return <NovedadVacacionesForm {...commonProps} />;
       case 'incapacidades':
         return <NovedadIncapacidadForm {...commonProps} />;
-      // TODO: Add other form components as they are created
+      case 'licencias':
+        return <NovedadLicenciasForm {...commonProps} />;
+      case 'ingresos_adicionales':
+        return <NovedadIngresosAdicionalesForm {...commonPropsWithoutCalculation} />;
+      case 'deducciones':
+        return <NovedadDeduccionesForm {...commonPropsWithoutCalculation} />;
+      case 'prestamos':
+        return <NovedadPrestamosForm {...commonPropsWithoutCalculation} />;
+      case 'retefuente':
+        return <NovedadRetefuenteForm {...commonPropsWithoutCalculation} />;
       default:
         return (
           <div className="text-center py-8">
