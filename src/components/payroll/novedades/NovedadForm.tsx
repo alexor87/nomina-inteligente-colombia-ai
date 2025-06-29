@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -155,10 +155,18 @@ export const NovedadForm = ({
     }
   };
 
-  // Función de cálculo mejorada usando el sistema enhanced
-  const calculateSuggestedValueEnhanced = (): number | null => {
+  // Función de cálculo mejorada usando el sistema enhanced - MEMOIZADA para evitar bucles
+  const suggestedValue = useMemo(() => {
     try {
       if (!employeeSalary || employeeSalary <= 0) return null;
+      
+      // Solo calcular si tenemos horas o días válidos
+      const hasValidHours = formData.horas && formData.horas > 0;
+      const hasValidDays = formData.dias && formData.dias > 0;
+      
+      if (!hasValidHours && !hasValidDays) {
+        return null; // No calcular si no hay datos válidos
+      }
       
       // Si tenemos función personalizada del modal, usarla
       if (calculateSuggestedValue) {
@@ -188,9 +196,16 @@ export const NovedadForm = ({
       console.error('Error calculating suggested value:', error);
       return null;
     }
-  };
+  }, [
+    employeeSalary,
+    formData.tipo_novedad,
+    formData.subtipo,
+    formData.horas,
+    formData.dias,
+    currentPeriodDate,
+    calculateSuggestedValue
+  ]);
 
-  const suggestedValue = calculateSuggestedValueEnhanced();
   const isFormValid = validateForm() && formData.valor > 0;
 
   return (
