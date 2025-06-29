@@ -71,26 +71,10 @@ export const EditableEmployeeTable = ({
   };
 
   const handleNovedadCreated = (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => {
-    console.log('💰 Novedad created callback:', { employeeId, valor, tipo });
+    console.log('💰 Novedad created callback triggered, refreshing full period data');
     
-    // Actualizar los valores del empleado
-    const employee = employees.find(emp => emp.id === employeeId);
-    if (!employee) return;
-
-    let updates: Partial<PayrollHistoryEmployee> = {};
-    
-    if (tipo === 'devengado') {
-      updates.grossPay = employee.grossPay + valor;
-    } else if (tipo === 'deduccion') {
-      updates.deductions = employee.deductions + valor;
-    }
-    
-    // Recalcular neto
-    const newGrossPay = updates.grossPay || employee.grossPay;
-    const newDeductions = updates.deductions || employee.deductions;
-    updates.netPay = newGrossPay - newDeductions;
-
-    onEmployeeUpdate(employeeId, updates);
+    // En lugar de actualizar solo valores locales, disparar un refresh completo
+    // que incluirá el recálculo automático de novedades en PayrollHistoryService.getPeriodDetails()
     onNovedadChange();
   };
 

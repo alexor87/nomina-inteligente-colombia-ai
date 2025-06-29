@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { NovedadForm } from '@/components/payroll/novedades/NovedadForm';
 import { formatCurrency } from '@/lib/utils';
@@ -214,6 +214,16 @@ export const DevengoModal = ({
     }
   }, [employeeSalary, currentPeriodDate]);
 
+  const recalculateEmployeeTotals = async () => {
+    try {
+      console.log('🔄 Triggering employee totals recalculation...');
+      await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(employeeId, periodId);
+      console.log('✅ Employee totals recalculated successfully');
+    } catch (error) {
+      console.error('❌ Error recalculating employee totals:', error);
+    }
+  };
+
   const handleCreateNovedad = async () => {
     if (formData.valor <= 0) {
       toast({
@@ -246,6 +256,11 @@ export const DevengoModal = ({
       const newNovedad = await NovedadesEnhancedService.createNovedad(formData);
 
       if (newNovedad) {
+        console.log('✅ Novedad created, now recalculating totals...');
+        
+        // CRITICAL: Recalcular totales del empleado después de crear la novedad
+        await recalculateEmployeeTotals();
+        
         await loadNovedades();
         setShowForm(false);
         setEditingNovedad(null);
@@ -264,7 +279,7 @@ export const DevengoModal = ({
           observacion: ''
         });
         
-        // Notificar al componente padre
+        // Notificar al componente padre para que refresque la vista
         if (onNovedadCreated) {
           onNovedadCreated(employeeId, newNovedad.valor, modalType);
         }
@@ -299,6 +314,11 @@ export const DevengoModal = ({
       );
 
       if (updatedNovedad) {
+        console.log('✅ Novedad updated, now recalculating totals...');
+        
+        // CRITICAL: Recalcular totales del empleado después de actualizar la novedad
+        await recalculateEmployeeTotals();
+        
         await loadNovedades();
         setEditingNovedad(null);
         setShowForm(false);
@@ -328,6 +348,12 @@ export const DevengoModal = ({
     try {
       setIsLoading(true);
       await NovedadesEnhancedService.deleteNovedad(novedadId);
+      
+      console.log('✅ Novedad deleted, now recalculating totals...');
+      
+      // CRITICAL: Recalcular totales del empleado después de eliminar la novedad
+      await recalculateEmployeeTotals();
+      
       await loadNovedades();
 
       if (onNovedadCreated) {

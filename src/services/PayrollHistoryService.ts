@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod, PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 
@@ -227,7 +226,45 @@ export class PayrollHistoryService {
 
       console.log('📊 Payrolls data with IDs loaded:', payrollsData);
 
-      // Transform data to match expected format with real payroll IDs
+      // Now get ALL novedades for this period to calculate totals including novedades
+      const { data: novedadesData, error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .select('empleado_id, tipo_novedad, valor')
+        .eq('company_id', companyId)
+        .eq('periodo_id', periodId);
+
+      if (novedadesError) {
+        console.warn('Error loading novedades, continuing without them:', novedadesError);
+      }
+
+      console.log('📊 Novedades data loaded:', novedadesData);
+
+      // Group novedades by employee
+      const novedadesByEmployee: Record<string, { devengados: number; deducciones: number }> = {};
+      
+      const tiposDevengados = [
+        'horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
+        'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'
+      ];
+
+      (novedadesData || []).forEach(novedad => {
+        const empleadoId = novedad.empleado_id;
+        const valor = Number(novedad.valor || 0);
+        
+        if (!novedadesByEmployee[empleadoId]) {
+          novedadesByEmployee[empleadoId] = { devengados: 0, deducciones: 0 };
+        }
+
+        if (tiposDevengados.includes(novedad.tipo_novedad)) {
+          novedadesByEmployee[empleadoId].devengados += valor;
+        } else {
+          novedadesByEmployee[empleadoId].deducciones += valor;
+        }
+      });
+
+      console.log('💰 Novedades grouped by employee:', novedadesByEmployee);
+
+      // Transform data to match expected format with real payroll IDs INCLUDING NOVEDADES
       const period: PayrollHistoryPeriod = {
         id: periodData.id, // Real UUID
         period: periodData.periodo,
@@ -249,24 +286,39 @@ export class PayrollHistoryService {
         reportedToDian: false // TODO: Add this field if needed
       };
 
-      const employees: PayrollHistoryEmployee[] = (payrollsData || []).map(payroll => ({
-        id: payroll.employee_id, // Employee ID
-        periodId: periodData.id, // Real period UUID
-        payrollId: payroll.id, // REAL UUID del registro de payroll
-        name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
-        position: payroll.employees.cargo || 'Sin cargo',
-        grossPay: Number(payroll.total_devengado || 0),
-        deductions: Number(payroll.total_deducciones || 0),
-        netPay: Number(payroll.neto_pagado || 0),
-        baseSalary: Number(payroll.employees.salario_base || 0),
-        paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente'
-      }));
+      const employees: PayrollHistoryEmployee[] = (payrollsData || []).map(payroll => {
+        const empleadoId = payroll.employee_id;
+        const novedadesEmpleado = novedadesByEmployee[empleadoId] || { devengados: 0, deducciones: 0 };
+        
+        // Calculate totals INCLUDING novedades
+        const baseGrossPay = Number(payroll.total_devengado || payroll.employees.salario_base || 0);
+        const baseDeductions = Number(payroll.total_deducciones || 0);
+        
+        const finalGrossPay = baseGrossPay + novedadesEmpleado.devengados;
+        const finalDeductions = baseDeductions + novedadesEmpleado.deducciones;
+        const finalNetPay = finalGrossPay - finalDeductions;
 
-      console.log('👥 Employees with real period UUID:', employees.map(emp => ({
+        return {
+          id: payroll.employee_id, // Employee ID
+          periodId: periodData.id, // Real period UUID
+          payrollId: payroll.id, // REAL UUID del registro de payroll
+          name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
+          position: payroll.employees.cargo || 'Sin cargo',
+          grossPay: finalGrossPay, // NOW INCLUDES NOVEDADES!
+          deductions: finalDeductions, // NOW INCLUDES NOVEDADES!
+          netPay: finalNetPay, // RECALCULATED WITH NOVEDADES!
+          baseSalary: Number(payroll.employees.salario_base || 0),
+          paymentStatus: payroll.estado === 'pagada' ? 'pagado' : 'pendiente'
+        };
+      });
+
+      console.log('👥 Employees with novedades included:', employees.map(emp => ({
         name: emp.name,
         employeeId: emp.id,
-        periodId: emp.periodId, // Now real UUID
-        payrollId: emp.payrollId
+        baseSalary: emp.baseSalary,
+        grossPay: emp.grossPay,
+        deductions: emp.deductions,
+        netPay: emp.netPay
       })));
 
       const summary = {
@@ -276,6 +328,8 @@ export class PayrollHistoryService {
         costoTotal: employees.reduce((sum, emp) => sum + emp.grossPay + emp.deductions, 0),
         aportesEmpleador: employees.length * 100000 // Mock calculation
       };
+
+      console.log('📈 Final summary with novedades:', summary);
 
       return {
         period,
