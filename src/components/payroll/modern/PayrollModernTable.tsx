@@ -1,10 +1,31 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, UserPlus } from 'lucide-react';
+import { 
+  Plus, 
+  UserPlus, 
+  MoreHorizontal, 
+  Calculator, 
+  FileText, 
+  Send, 
+  Trash2, 
+  DollarSign,
+  StickyNote,
+  X
+} from 'lucide-react';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { useNovedades } from '@/hooks/useNovedades';
+import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface PayrollModernTableProps {
@@ -27,10 +48,20 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   canEdit,
   periodoId,
   onRefreshEmployees,
-  onDeleteEmployee
+  onDeleteEmployee,
+  onDeleteMultipleEmployees
 }) => {
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  const {
+    selectedEmployees,
+    toggleEmployeeSelection,
+    toggleAllEmployees,
+    clearSelection
+  } = useEmployeeSelection();
 
   const {
     createNovedad,
@@ -60,6 +91,21 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     onRecalculate();
   };
 
+  const handleDeleteEmployee = async (employeeId: string) => {
+    if (onDeleteEmployee) {
+      await onDeleteEmployee(employeeId);
+      setShowDeleteConfirm(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (onDeleteMultipleEmployees && selectedEmployees.length > 0) {
+      await onDeleteMultipleEmployees(selectedEmployees);
+      clearSelection();
+      setShowBulkDeleteConfirm(false);
+    }
+  };
+
   const calculateSuggestedValue = (
     tipo: string,
     subtipo: string | undefined,
@@ -87,11 +133,11 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
       case 'recargo':
         if (!horas || !subtipo) return null;
         const recargoFactors: Record<string, number> = {
-          'nocturno': 1.35, // 35% adicional
-          'dominical': 1.75, // 75% adicional
-          'nocturno_dominical': 2.10, // 110% adicional
-          'festivo': 1.75, // 75% adicional
-          'nocturno_festivo': 2.10 // 110% adicional
+          'nocturno': 1.35,
+          'dominical': 1.75,
+          'nocturno_dominical': 2.10,
+          'festivo': 1.75,
+          'nocturno_festivo': 2.10
         };
         return Math.round(valorHora * recargoFactors[subtipo] * horas);
         
@@ -122,7 +168,10 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     }
   };
 
-  // Estado vacío siguiendo exactamente el ejemplo de Aleluya
+  const allSelected = employees.length > 0 && employees.every(emp => selectedEmployees.includes(emp.id));
+  const someSelected = selectedEmployees.length > 0;
+
+  // Estado vacío
   if (employees.length === 0) {
     return (
       <div className="bg-white min-h-96">
@@ -150,10 +199,48 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   return (
     <>
       <div className="bg-white">
+        {/* Bulk Actions Bar */}
+        {someSelected && (
+          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-blue-700">
+                {selectedEmployees.length} empleado{selectedEmployees.length !== 1 ? 's' : ''} seleccionado{selectedEmployees.length !== 1 ? 's' : ''}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearSelection}
+                className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                disabled={!canEdit}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Eliminar seleccionados
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="max-w-7xl mx-auto">
           <table className="w-full">
             <thead className="border-b border-gray-200">
               <tr>
+                <th className="text-left py-4 px-3 w-8">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={() => toggleAllEmployees(employees.map(emp => emp.id))}
+                    disabled={!canEdit}
+                  />
+                </th>
                 <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">
                   Personas
                 </th>
@@ -174,6 +261,13 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
             <tbody>
               {employees.map((employee, index) => (
                 <tr key={employee.id} className={index !== employees.length - 1 ? "border-b border-gray-100" : ""}>
+                  <td className="py-4 px-3">
+                    <Checkbox
+                      checked={selectedEmployees.includes(employee.id)}
+                      onCheckedChange={() => toggleEmployeeSelection(employee.id)}
+                      disabled={!canEdit}
+                    />
+                  </td>
                   <td className="py-4 px-6">
                     <div>
                       <div className="font-medium text-gray-900">
@@ -202,21 +296,110 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
                     {formatCurrency(employee.netPay)}
                   </td>
                   <td className="py-4 px-6 text-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenNovedades(employee)}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      disabled={!canEdit}
-                    >
-                      Editar
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          disabled={!canEdit}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => console.log('Liquidar empleado', employee.id)}>
+                          <DollarSign className="h-4 w-4 mr-2" />
+                          Liquidar empleado
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenNovedades(employee)}>
+                          <StickyNote className="h-4 w-4 mr-2" />
+                          Agregar nota
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => console.log('Ver cálculos', employee.id)}>
+                          <Calculator className="h-4 w-4 mr-2" />
+                          Ver cálculos
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => console.log('Ver colilla', employee.id)}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Ver colilla de pago
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => console.log('Enviar colilla', employee.id)}>
+                          <Send className="h-4 w-4 mr-2" />
+                          Enviar colilla de pago
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => setShowDeleteConfirm(employee.id)}
+                          className="text-red-600 focus:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Confirmar eliminación
+              </h3>
+              <p className="text-gray-600 mb-4">
+                ¿Estás seguro de que deseas eliminar este empleado? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeleteConfirm(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleDeleteEmployee(showDeleteConfirm)}
+                >
+                  Eliminar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Delete Confirmation Dialog */}
+        {showBulkDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Confirmar eliminación múltiple
+              </h3>
+              <p className="text-gray-600 mb-4">
+                ¿Estás seguro de que deseas eliminar {selectedEmployees.length} empleado{selectedEmployees.length !== 1 ? 's' : ''}? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleBulkDelete}
+                >
+                  Eliminar todos
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedEmployee && (
