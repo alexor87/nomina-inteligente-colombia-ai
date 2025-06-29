@@ -142,7 +142,8 @@ export const calcularValorNovedadEnhanced = (
         let recargo = 0.25; // 25% por defecto
         let descripcionRecargo = 'diurnas (25%)';
 
-        if (subtipo) {
+        // Manejar tanto undefined como "diurnas" como el caso por defecto
+        if (subtipo && subtipo !== 'diurnas') {
           switch (subtipo) {
             case 'nocturnas':
               recargo = 0.75;

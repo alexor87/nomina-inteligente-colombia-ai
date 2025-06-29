@@ -74,7 +74,7 @@ export const NovedadForm = ({
     empleado_id: initialData?.empleado_id || '',
     periodo_id: initialData?.periodo_id || '',
     tipo_novedad: 'horas_extra' as NovedadType,
-    subtipo: '',
+    subtipo: 'diurnas', // Cambio: valor inicial válido en lugar de cadena vacía
     fecha_inicio: '',
     fecha_fin: '',
     dias: null,
@@ -157,7 +157,7 @@ export const NovedadForm = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
-  // Función de cálculo mejorada - completamente memoizada
+  // Función de cálculo mejorada - completamente memoizada y validada
   const suggestedValue = useMemo(() => {
     // Solo calcular si realmente necesitamos un valor sugerido
     if (!employeeSalary || employeeSalary <= 0) return null;
@@ -175,7 +175,11 @@ export const NovedadForm = ({
     const hasValidHours = formData.horas && formData.horas > 0;
     const hasValidDays = formData.dias && formData.dias > 0;
     
-    if (!hasValidHours && !hasValidDays) {
+    if (!hasValidHours && !hasValidDays && requiresQuantity.requiresHours) {
+      return null;
+    }
+
+    if (!hasValidHours && !hasValidDays && requiresQuantity.requiresDays) {
       return null;
     }
 
@@ -276,14 +280,14 @@ export const NovedadForm = ({
         <div className="space-y-2">
           <Label htmlFor="subtipo">Tipo de Horas Extra</Label>
           <Select
-            value={formData.subtipo || ''}
+            value={formData.subtipo || 'diurnas'}
             onValueChange={(value) => handleInputChange('subtipo', value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona el tipo de horas extra" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Diurnas (25%)</SelectItem>
+              <SelectItem value="diurnas">Diurnas (25%)</SelectItem>
               <SelectItem value="nocturnas">Nocturnas (75%)</SelectItem>
               <SelectItem value="dominicales_diurnas">Dominicales Diurnas (100%)</SelectItem>
               <SelectItem value="dominicales_nocturnas">Dominicales Nocturnas (150%)</SelectItem>
