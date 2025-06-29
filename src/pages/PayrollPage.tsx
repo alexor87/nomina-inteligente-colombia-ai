@@ -1,8 +1,9 @@
 
-import { PayrollLiquidationIntelligentEnhanced } from '@/components/payroll/PayrollLiquidationIntelligentEnhanced';
+import React from 'react';
+import { PayrollLiquidationModern } from '@/components/payroll/PayrollLiquidationModern';
 
 const PayrollPage = () => {
-  return <PayrollLiquidationIntelligentEnhanced />;
+  return <PayrollLiquidationModern />;
 };
 
 export default PayrollPage;

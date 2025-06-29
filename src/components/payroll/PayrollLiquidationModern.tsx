@@ -27,6 +27,20 @@ export const PayrollLiquidationModern = () => {
     }
   };
 
+  const handleDeleteMultipleEmployees = async (employeeIds: string[]) => {
+    try {
+      // Delete each employee individually using the existing deleteEmployee function
+      for (const employeeId of employeeIds) {
+        await deleteEmployee(employeeId);
+      }
+      // Refresh the employees list after bulk deletion
+      refreshEmployees();
+    } catch (error) {
+      console.error('Error deleting multiple employees:', error);
+      throw error;
+    }
+  };
+
   // Loading state
   if (!currentPeriod) {
     return (
@@ -60,6 +74,7 @@ export const PayrollLiquidationModern = () => {
         periodoId={currentPeriod?.id || ''}
         onRefreshEmployees={refreshEmployees}
         onDeleteEmployee={deleteEmployee}
+        onDeleteMultipleEmployees={handleDeleteMultipleEmployees}
       />
     </div>
   );
