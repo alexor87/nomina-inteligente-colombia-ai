@@ -42,8 +42,8 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
   const [showNovedadesModal, setShowNovedadesModal] = useState(false);
 
   const handleCreateNovedad = async (novedadData: any) => {
-    // Aquí implementarías la lógica para crear la novedad
     console.log('Creando novedad:', novedadData);
+    // TODO: Implementar lógica para crear la novedad
   };
 
   return (
@@ -108,13 +108,14 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         )}
       </div>
 
-      {/* Modales */}
+      {/* Modal de Cálculos */}
       <EmployeeCalculationModal
         isOpen={showCalculationModal}
         onClose={() => setShowCalculationModal(false)}
         employee={employee}
       />
 
+      {/* Modal de Vista Previa del Comprobante */}
       <VoucherPreviewModal
         isOpen={showVoucherPreview}
         onClose={() => setShowVoucherPreview(false)}
@@ -122,6 +123,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         period={period}
       />
 
+      {/* Dialog de Envío del Comprobante */}
       <VoucherSendDialog
         isOpen={showVoucherSend}
         onClose={() => setShowVoucherSend(false)}
@@ -129,15 +131,17 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         period={period}
       />
 
+      {/* Modal de Notas del Empleado */}
       <EmployeeNotesModal
         isOpen={showNotesModal}
         onClose={() => setShowNotesModal(false)}
         employeeId={employee.id}
-        employeeName={`${employee.name}`}
-        periodId={period.startDate} // Aquí necesitarías el ID real del período
+        employeeName={employee.name}
+        periodId={period.startDate} // TODO: Usar el ID real del período
         periodName={`${period.startDate} - ${period.endDate}`}
       />
 
+      {/* Modal de Novedades */}
       <NovedadUnifiedModal
         isOpen={showNovedadesModal}
         onClose={() => setShowNovedadesModal(false)}
@@ -147,6 +151,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         onCreateNovedad={handleCreateNovedad}
       />
 
+      {/* Modal de Edición de Liquidación */}
       {canEdit && onUpdateEmployee && (
         <EmployeeLiquidationModal
           isOpen={showLiquidationModal}

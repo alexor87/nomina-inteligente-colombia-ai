@@ -115,9 +115,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     <CustomModal 
       isOpen={isOpen} 
       onClose={handleClose}
-      className="max-w-2xl max-h-[90vh] overflow-y-auto"
-      closeOnEscape={false}
-      closeOnBackdrop={false}
+      className="max-w-2xl"
+      closeOnEscape={true}
+      closeOnBackdrop={true}
     >
       {currentView === 'selector' && (
         <NovedadTypeSelector
