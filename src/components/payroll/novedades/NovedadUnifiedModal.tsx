@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { CustomModal } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
-import { NovedadHorasExtraForm } from './forms/NovedadHorasExtraForm';
+import { NovedadHorasExtraConsolidatedForm } from './forms/NovedadHorasExtraConsolidatedForm';
 import { NovedadRecargoForm } from './forms/NovedadRecargoForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
@@ -97,6 +97,41 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   };
 
+  const handleSubmitMultiple = async (formDataArray: any[]) => {
+    console.log('📝 NovedadUnifiedModal - Submitting multiple novedades:', formDataArray);
+    
+    try {
+      setIsSubmitting(true);
+      
+      const newNovedades: AddedNovedad[] = [];
+      
+      // Create each novedad
+      for (const formData of formDataArray) {
+        const novedadData: CreateNovedadData = {
+          empleado_id: employeeId,
+          ...formData
+        };
+        
+        await onCreateNovedad(novedadData);
+        
+        newNovedades.push({
+          id: `${Date.now()}-${Math.random()}`,
+          ...formData
+        });
+      }
+      
+      // Add all to added novedades list
+      setAddedNovedades(prev => [...prev, ...newNovedades]);
+      
+      // Show summary view
+      setCurrentView('summary');
+    } catch (error) {
+      console.error('❌ Error creating novedades:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleAddAnother = () => {
     setCurrentView('selector');
     setSelectedCategory(null);
@@ -115,6 +150,18 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       'retefuente': 'Retención en la Fuente'
     };
     return labels[tipo] || tipo;
+  };
+
+  const getSubtipoLabel = (subtipo: string): string => {
+    const labels: Record<string, string> = {
+      'diurnas': 'Diurnas',
+      'nocturnas': 'Nocturnas',
+      'dominicales_diurnas': 'Dom. Diurnas',
+      'dominicales_nocturnas': 'Dom. Nocturnas',
+      'festivas_diurnas': 'Fest. Diurnas',
+      'festivas_nocturnas': 'Fest. Nocturnas'
+    };
+    return labels[subtipo] || subtipo;
   };
 
   const getTotalDevengos = () => {
@@ -149,7 +196,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     switch (selectedCategory) {
       case 'horas_extra':
-        return <NovedadHorasExtraForm {...commonProps} />;
+        return (
+          <NovedadHorasExtraConsolidatedForm 
+            onBack={handleBackToSelector}
+            onSubmit={handleSubmitMultiple}
+            employeeSalary={employeeSalary}
+            calculateSuggestedValue={calculateSuggestedValue}
+          />
+        );
       case 'recargo_nocturno':
         return <NovedadRecargoForm {...commonProps} />;
       case 'vacaciones':
@@ -183,6 +237,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     const totalDeducciones = getTotalDeducciones();
     const totalNeto = totalDevengos - totalDeducciones;
 
+    // Group novedades by type for better display
+    const groupedNovedades = addedNovedades.reduce((acc, novedad) => {
+      const key = novedad.tipo_novedad;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(novedad);
+      return acc;
+    }, {} as Record<string, AddedNovedad[]>);
+
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3 pb-4 border-b">
@@ -195,22 +259,34 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             Se han agregado las siguientes novedades para <strong>{employeeName}</strong>:
           </p>
 
-          {addedNovedades.map((novedad) => (
-            <div key={novedad.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <div>
-                <div className="font-medium">{getTipoLabel(novedad.tipo_novedad)}</div>
-                {novedad.subtipo && (
-                  <div className="text-sm text-gray-500">{novedad.subtipo}</div>
-                )}
-                {novedad.horas && (
-                  <div className="text-sm text-gray-500">{novedad.horas} horas</div>
-                )}
-                {novedad.dias && (
-                  <div className="text-sm text-gray-500">{novedad.dias} días</div>
-                )}
+          {Object.entries(groupedNovedades).map(([tipo, novedades]) => (
+            <div key={tipo} className="border rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2 border-b">
+                <h4 className="font-medium text-gray-900">{getTipoLabel(tipo)}</h4>
               </div>
-              <div className="font-semibold">
-                {formatCurrency(novedad.valor)}
+              <div className="p-3 space-y-2">
+                {novedades.map((novedad) => (
+                  <div key={novedad.id} className="flex justify-between items-center">
+                    <div className="flex-1">
+                      {novedad.subtipo && (
+                        <div className="text-sm text-gray-600">{getSubtipoLabel(novedad.subtipo)}</div>
+                      )}
+                      <div className="text-xs text-gray-500">
+                        {novedad.horas && `${novedad.horas} horas`}
+                        {novedad.dias && `${novedad.dias} días`}
+                      </div>
+                    </div>
+                    <div className="font-semibold text-right">
+                      {formatCurrency(novedad.valor)}
+                    </div>
+                  </div>
+                ))}
+                <div className="border-t pt-2 mt-2">
+                  <div className="flex justify-between font-medium">
+                    <span>Subtotal {getTipoLabel(tipo)}:</span>
+                    <span>{formatCurrency(novedades.reduce((sum, n) => sum + n.valor, 0))}</span>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
@@ -256,7 +332,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     <CustomModal 
       isOpen={isOpen} 
       onClose={handleClose}
-      className="max-w-2xl"
+      className="max-w-4xl"
       closeOnEscape={true}
       closeOnBackdrop={true}
     >
@@ -278,7 +354,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           <div className="bg-white p-4 rounded-lg shadow-lg">
             <div className="flex items-center gap-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <span>Guardando novedad...</span>
+              <span>Guardando novedades...</span>
             </div>
           </div>
         </div>

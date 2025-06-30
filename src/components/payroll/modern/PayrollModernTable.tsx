@@ -303,11 +303,17 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center space-x-2">
                       {hasNovedades && (
-                        <span className={`text-sm font-medium ${
-                          novedadesValue >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {formatCurrency(novedadesValue)}
-                        </span>
+                        <div className="text-center">
+                          <div className={`text-sm font-medium ${
+                            novedadesValue >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {formatCurrency(novedadesValue)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {novedades.totalDevengos > 0 && `+${formatCurrency(novedades.totalDevengos)}`}
+                            {novedades.totalDeducciones > 0 && ` -${formatCurrency(novedades.totalDeducciones)}`}
+                          </div>
+                        </div>
                       )}
                       <Button
                         variant="outline"
