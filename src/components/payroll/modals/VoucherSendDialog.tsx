@@ -124,7 +124,7 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
     <CustomModal 
       isOpen={isOpen} 
       onClose={onClose}
-      className="max-w-md"
+      className="max-w-lg"
       closeOnEscape={!isSending}
       closeOnBackdrop={!isSending}
     >
