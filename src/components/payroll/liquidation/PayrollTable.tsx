@@ -14,7 +14,15 @@ import { PayrollEmployee } from '@/types/payroll';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface PayrollTableProps {
-  period: {
+  employees: PayrollEmployee[];
+  onUpdateEmployee: (id: string, updates: Partial<PayrollEmployee>) => void;
+  onRecalculate: () => Promise<void>;
+  isLoading: boolean;
+  canEdit: boolean;
+  periodoId: string;
+  onRefreshEmployees?: () => Promise<void>;
+  onDeleteEmployee?: (employeeId: string) => Promise<void>;
+  period?: {
     id: string;
     fecha_inicio: string;
     fecha_fin: string;
@@ -24,22 +32,23 @@ interface PayrollTableProps {
 }
 
 export const PayrollTable: React.FC<PayrollTableProps> = ({
+  employees,
+  onUpdateEmployee,
+  onRecalculate,
+  isLoading,
+  canEdit,
+  periodoId,
+  onRefreshEmployees,
+  onDeleteEmployee,
   period,
   calculateSuggestedValue
 }) => {
-  const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [search, setSearch] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
 
-  const { createNovedad } = useNovedades(period.id);
-  const { refreshEmployeeNovedades } = usePayrollNovedades(period.id);
-
-  // Mock employees data for now - in real app this would come from props or API
-  useEffect(() => {
-    // This should be replaced with actual employee data from the parent component
-    setEmployees([]);
-  }, []);
+  const { createNovedad } = useNovedades(periodoId);
+  const { refreshEmployeeNovedades } = usePayrollNovedades(periodoId);
 
   const handleCreateNovedad = async (data: CreateNovedadData) => {
     if (!selectedEmployee) return;
@@ -48,7 +57,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     
     const novedadData: CreateNovedadData = {
       empleado_id: selectedEmployee.id,
-      periodo_id: period.id,
+      periodo_id: periodoId,
       ...data
     };
     
@@ -195,7 +204,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
           employeeName={selectedEmployee.name}
           employeeId={selectedEmployee.id}
           employeeSalary={selectedEmployee.baseSalary}
-          periodId={period.id}
+          periodId={periodoId}
           onCreateNovedad={handleCreateNovedad}
           calculateSuggestedValue={calculateSuggestedValue}
         />
