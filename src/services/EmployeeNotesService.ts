@@ -9,10 +9,10 @@ export class EmployeeNotesService {
       .select(`
         *,
         employee:employees(nombre, apellido, cargo),
-        creator:profiles!employee_notes_created_by_fkey(first_name, last_name),
+        creator:profiles!created_by(first_name, last_name),
         mentions:employee_note_mentions(
           *,
-          mentioned_user:profiles!employee_note_mentions_mentioned_user_id_fkey(first_name, last_name)
+          mentioned_user:profiles!mentioned_user_id(first_name, last_name)
         )
       `)
       .eq('employee_id', employeeId)
@@ -54,7 +54,7 @@ export class EmployeeNotesService {
       .select(`
         *,
         employee:employees(nombre, apellido, cargo),
-        creator:profiles!employee_notes_created_by_fkey(first_name, last_name)
+        creator:profiles!created_by(first_name, last_name)
       `)
       .single();
 
