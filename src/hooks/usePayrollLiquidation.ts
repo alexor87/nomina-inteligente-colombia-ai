@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -23,7 +24,7 @@ const convertToPayrollPeriod = (dbPeriod: any): PayrollPeriod => {
     total_deducciones: dbPeriod.total_deducciones || 0,
     total_neto: dbPeriod.total_neto || 0,
     created_at: dbPeriod.created_at,
-    updated_at: dbPeriod.updated_at || dbPeriod.created_at,
+    updated_at: dbPeriod.updated_at || dbPeriod.created_at, // Provide default value if undefined
     modificado_por: dbPeriod.modificado_por,
     modificado_en: dbPeriod.modificado_en
   };

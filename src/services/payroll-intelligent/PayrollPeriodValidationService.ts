@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollPeriodService, PayrollPeriod } from '../PayrollPeriodService';
+import { PayrollPeriodService } from '../PayrollPeriodService';
+import { PayrollPeriod } from '@/types/payroll';
 
 export class PayrollPeriodValidationService {
   // Validar que no haya periodos superpuestos - VERSIÓN MEJORADA

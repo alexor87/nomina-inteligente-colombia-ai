@@ -1,5 +1,5 @@
-
-import { PayrollPeriodService, PayrollPeriod } from '../PayrollPeriodService';
+import { PayrollPeriodService } from '../PayrollPeriodService';
+import { PayrollPeriod } from '@/types/payroll';
 
 export class PayrollPeriodCalculationService {
   // Calcular siguiente periodo basado en el último cerrado

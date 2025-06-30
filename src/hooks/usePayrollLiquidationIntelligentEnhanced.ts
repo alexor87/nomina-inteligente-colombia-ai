@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimePayroll } from '@/hooks/useRealtimePayroll';
 import { PayrollLiquidationBackendService, PayrollCalculationBackendService } from '@/services/PayrollLiquidationBackendService';
-import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/services/PayrollPeriodService';
+import { PayrollPeriodService } from '@/services/PayrollPeriodService';
+import { PayrollPeriod } from '@/types/payroll';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { calculateEmployeeBackend, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculationsBackend';
 
 export const usePayrollLiquidationIntelligentEnhanced = () => {
   const { toast } = useToast();
-  const [currentPeriod, setCurrentPeriod] = useState<DBPayrollPeriod | null>(null);
+  const [currentPeriod, setCurrentPeriod] = useState<PayrollPeriod | null>(null);
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingPeriod, setIsEditingPeriod] = useState(false);

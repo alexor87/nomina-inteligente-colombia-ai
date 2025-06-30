@@ -1,4 +1,5 @@
-import { PayrollPeriodService, PayrollPeriod } from '../PayrollPeriodService';
+import { PayrollPeriod } from '@/types/payroll';
+import { PayrollPeriodService } from '../PayrollPeriodService';
 import { PayrollConfigurationService } from './PayrollConfigurationService';
 import { PayrollHistoryService } from '../PayrollHistoryService';
 import { supabase } from '@/integrations/supabase/client';
