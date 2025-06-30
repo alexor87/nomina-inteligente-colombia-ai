@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
@@ -137,7 +136,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         onClose={() => setShowNotesModal(false)}
         employeeId={employee.id}
         employeeName={employee.name}
-        periodId={period.startDate} // TODO: Usar el ID real del período
+        periodId={period.startDate}
         periodName={`${period.startDate} - ${period.endDate}`}
       />
 
@@ -157,6 +156,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
           isOpen={showLiquidationModal}
           onClose={() => setShowLiquidationModal(false)}
           employee={employee}
+          periodId={period.startDate}
           onUpdateEmployee={onUpdateEmployee}
           canEdit={canEdit}
         />
