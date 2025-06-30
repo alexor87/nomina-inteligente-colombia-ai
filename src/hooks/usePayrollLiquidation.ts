@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
-import { PayrollPeriodService, PayrollPeriod as DBPayrollPeriod } from '@/services/PayrollPeriodService';
+import { PayrollPeriodService } from '@/services/PayrollPeriodService';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
-import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
+import { PayrollEmployee, PayrollSummary, PayrollPeriod } from '@/types/payroll';
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { supabase } from '@/integrations/supabase/client';
 
 export const usePayrollLiquidation = () => {
   const { toast } = useToast();
-  const [currentPeriod, setCurrentPeriod] = useState<DBPayrollPeriod | null>(null);
+  const [currentPeriod, setCurrentPeriod] = useState<PayrollPeriod | null>(null);
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingPeriod, setIsEditingPeriod] = useState(false);
@@ -24,6 +24,27 @@ export const usePayrollLiquidation = () => {
     employerContributions: 0,
     totalPayrollCost: 0
   });
+
+  // Helper function to convert database period to PayrollPeriod interface
+  const convertToPayrollPeriod = (dbPeriod: any): PayrollPeriod => {
+    return {
+      id: dbPeriod.id,
+      company_id: dbPeriod.company_id,
+      fecha_inicio: dbPeriod.fecha_inicio,
+      fecha_fin: dbPeriod.fecha_fin,
+      estado: dbPeriod.estado,
+      tipo_periodo: dbPeriod.tipo_periodo,
+      periodo: dbPeriod.periodo || `${dbPeriod.fecha_inicio} - ${dbPeriod.fecha_fin}`,
+      empleados_count: dbPeriod.empleados_count || 0,
+      total_devengado: dbPeriod.total_devengado || 0,
+      total_deducciones: dbPeriod.total_deducciones || 0,
+      total_neto: dbPeriod.total_neto || 0,
+      created_at: dbPeriod.created_at,
+      updated_at: dbPeriod.updated_at,
+      modificado_por: dbPeriod.modificado_por,
+      modificado_en: dbPeriod.modificado_en
+    };
+  };
 
   // Inicializar período al cargar
   const initializePeriod = useCallback(async () => {
@@ -40,35 +61,29 @@ export const usePayrollLiquidation = () => {
         // Create a period record for the reopened period
         const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
         if (companyId) {
-          // Check if period already exists in payroll_periods
+          // Check if period already exists in payroll_periods_real
           let { data: existingPeriod } = await supabase
-            .from('payroll_periods')
+            .from('payroll_periods_real')
             .select('*')
             .eq('company_id', companyId)
             .eq('estado', 'borrador')
             .single();
 
           if (!existingPeriod) {
-            // Create the period
-            const { data: newPeriod, error } = await supabase
-              .from('payroll_periods')
-              .insert({
-                company_id: companyId,
-                fecha_inicio: reopenedInfo.startDate,
-                fecha_fin: reopenedInfo.endDate,
-                tipo_periodo: 'mensual',
-                estado: 'borrador'
-              })
-              .select()
-              .single();
-
-            if (!error && newPeriod) {
+            // Create the period using PayrollPeriodService
+            const newPeriod = await PayrollPeriodService.createPayrollPeriod(
+              reopenedInfo.startDate,
+              reopenedInfo.endDate,
+              'mensual'
+            );
+            
+            if (newPeriod) {
               existingPeriod = newPeriod;
             }
           }
 
           if (existingPeriod) {
-            setCurrentPeriod(existingPeriod);
+            setCurrentPeriod(convertToPayrollPeriod(existingPeriod));
             setIsReopenedPeriod(true);
             
             toast({
@@ -115,7 +130,7 @@ export const usePayrollLiquidation = () => {
       }
       
       if (activePeriod) {
-        setCurrentPeriod(activePeriod);
+        setCurrentPeriod(convertToPayrollPeriod(activePeriod));
         setIsReopenedPeriod(false);
         console.log('Active period loaded:', activePeriod);
       }
@@ -242,7 +257,7 @@ export const usePayrollLiquidation = () => {
       });
 
       if (updatedPeriod) {
-        setCurrentPeriod(updatedPeriod);
+        setCurrentPeriod(convertToPayrollPeriod(updatedPeriod));
         
         // Mostrar advertencias si las hay
         if (validation.warnings.length > 0) {
@@ -358,7 +373,7 @@ export const usePayrollLiquidation = () => {
       });
 
       if (updatedPeriod) {
-        setCurrentPeriod(updatedPeriod);
+        setCurrentPeriod(convertToPayrollPeriod(updatedPeriod));
       }
 
       // If this was a reopened period, create audit log for closure
