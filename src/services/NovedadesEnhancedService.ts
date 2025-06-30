@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
+import { PayrollPeriodService } from './PayrollPeriodService';
 
 export class NovedadesEnhancedService {
   static async getCurrentUserCompanyId(): Promise<string | null> {
@@ -54,54 +55,20 @@ export class NovedadesEnhancedService {
         company_id: companyId
       });
 
-      // Enhanced period validation - check for the current active period
-      console.log('🔍 Validating period with multiple table checks...');
+      // Get the current active period using the updated service
+      console.log('🔍 Validating period using PayrollPeriodService...');
+      const activePeriod = await PayrollPeriodService.getCurrentActivePeriod();
       
-      // First, get the current active period from payroll_periods
-      const { data: activePeriod, error: activePeriodError } = await supabase
-        .from('payroll_periods')
-        .select('id, fecha_inicio, fecha_fin, estado')
-        .eq('company_id', companyId)
-        .eq('estado', 'borrador')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (activePeriodError) {
-        console.error('❌ Error getting active period:', activePeriodError);
-        throw new Error('Error validating active period');
-      }
-
-      console.log('📊 Active period found:', activePeriod);
-
-      // If no active period in payroll_periods, check payroll_periods_real
-      let validPeriodId = activePeriod?.id;
-      
-      if (!validPeriodId) {
-        const { data: realPeriod, error: realPeriodError } = await supabase
-          .from('payroll_periods_real')
-          .select('id, fecha_inicio, fecha_fin, estado')
-          .eq('company_id', companyId)
-          .eq('estado', 'borrador')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (realPeriodError) {
-          console.error('❌ Error getting real period:', realPeriodError);
-          throw new Error('Error validating period');
-        }
-
-        validPeriodId = realPeriod?.id;
-        console.log('📊 Real period found:', realPeriod);
-      }
-
-      if (!validPeriodId) {
+      if (!activePeriod) {
         console.error('❌ No active period found for company:', companyId);
         throw new Error('No active period found. Please create a payroll period first.');
       }
 
-      // If the provided periodo_id is different from the active one, use the active one
+      console.log('✅ Active period found:', activePeriod);
+
+      // Use the active period ID if the provided one is different or invalid
+      let validPeriodId = activePeriod.id;
+      
       if (data.periodo_id !== validPeriodId) {
         console.warn('⚠️ Using active period instead of provided period:', {
           provided: data.periodo_id,
@@ -177,7 +144,7 @@ export class NovedadesEnhancedService {
         creado_por: user.id
       };
 
-      console.log('📤 Inserting enhanced novedad with validated period:', insertData);
+      console.log('📤 Inserting enhanced novedad with validated period from payroll_periods_real:', insertData);
       
       const { data: result, error } = await supabase
         .from('payroll_novedades')

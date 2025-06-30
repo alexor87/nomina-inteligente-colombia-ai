@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CompanySettings {
@@ -15,6 +16,11 @@ export interface PayrollPeriod {
   fecha_fin: string;
   tipo_periodo: string;
   estado: string;
+  periodo: string;
+  empleados_count: number;
+  total_devengado: number;
+  total_deducciones: number;
+  total_neto: number;
   created_at: string;
   updated_at?: string;
   modificado_por?: string;
@@ -141,7 +147,7 @@ export class PayrollPeriodService {
     }
   }
 
-  // Crear un nuevo período de nómina
+  // Crear un nuevo período de nómina usando payroll_periods_real
   static async createPayrollPeriod(startDate: string, endDate: string, periodType: string): Promise<PayrollPeriod | null> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -152,15 +158,23 @@ export class PayrollPeriodService {
 
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Generate period string (e.g., "2025-01")
+      const startDateObj = new Date(startDate);
+      const periodo = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}`;
+
       const { data, error } = await supabase
-        .from('payroll_periods')
+        .from('payroll_periods_real')
         .insert({
           company_id: companyId,
           fecha_inicio: startDate,
           fecha_fin: endDate,
           tipo_periodo: periodType,
+          periodo: periodo,
           estado: 'borrador',
-          modificado_por: user?.id
+          empleados_count: 0,
+          total_devengado: 0,
+          total_deducciones: 0,
+          total_neto: 0
         })
         .select()
         .single();
@@ -170,7 +184,7 @@ export class PayrollPeriodService {
         return null;
       }
       
-      console.log('Payroll period created successfully:', data);
+      console.log('Payroll period created successfully in payroll_periods_real:', data);
       return data as PayrollPeriod;
     } catch (error) {
       console.error('Error creating payroll period:', error);
@@ -178,17 +192,14 @@ export class PayrollPeriodService {
     }
   }
 
-  // Actualizar período de nómina
+  // Actualizar período de nómina usando payroll_periods_real
   static async updatePayrollPeriod(periodId: string, updates: Partial<PayrollPeriod>): Promise<PayrollPeriod | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const { data, error } = await supabase
-        .from('payroll_periods')
+        .from('payroll_periods_real')
         .update({
           ...updates,
-          modificado_por: user?.id,
-          modificado_en: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', periodId)
         .select()
@@ -202,15 +213,17 @@ export class PayrollPeriodService {
     }
   }
 
-  // Obtener período actual activo (borrador) - mejorado para detectar períodos reabiertos
+  // Obtener período actual activo (borrador) usando payroll_periods_real
   static async getCurrentActivePeriod(): Promise<PayrollPeriod | null> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) return null;
 
-      // Primero buscar período activo en payroll_periods
+      console.log('🔍 Buscando período activo en payroll_periods_real para company:', companyId);
+
+      // Buscar período activo en payroll_periods_real
       const { data: activePeriod, error } = await supabase
-        .from('payroll_periods')
+        .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
         .eq('estado', 'borrador')
@@ -218,12 +231,18 @@ export class PayrollPeriodService {
         .limit(1)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error buscando período activo:', error);
+        throw error;
+      }
 
       // Si encontramos un período activo, devolverlo
       if (activePeriod) {
+        console.log('✅ Período activo encontrado en payroll_periods_real:', activePeriod);
         return activePeriod as PayrollPeriod;
       }
+
+      console.log('ℹ️ No se encontró período activo en payroll_periods_real');
 
       // Si no hay período activo, verificar si hay períodos reabiertos en payrolls
       const { data: reopenedPayrolls, error: reopenedError } = await supabase
@@ -241,12 +260,9 @@ export class PayrollPeriodService {
         return null;
       }
 
-      // Si encontramos un período reabierto, crear el payroll_period correspondiente
+      // Si encontramos un período reabierto, crear el período correspondiente en payroll_periods_real
       if (reopenedPayrolls) {
-        console.log('Período reabierto detectado, creando payroll_period:', reopenedPayrolls.periodo);
-        
-        const { data: { user } } = await supabase.auth.getUser();
-        const userId = user?.id;
+        console.log('🔄 Período reabierto detectado, creando período en payroll_periods_real:', reopenedPayrolls.periodo);
         
         // Generar fechas basadas en el período
         const periodDate = new Date(reopenedPayrolls.periodo + '-01');
@@ -254,14 +270,18 @@ export class PayrollPeriodService {
         const endDate = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0);
 
         const { data: newPeriod, error: createError } = await supabase
-          .from('payroll_periods')
+          .from('payroll_periods_real')
           .insert({
             company_id: companyId,
             fecha_inicio: startDate.toISOString().split('T')[0],
             fecha_fin: endDate.toISOString().split('T')[0],
             tipo_periodo: 'mensual',
+            periodo: reopenedPayrolls.periodo,
             estado: 'borrador',
-            modificado_por: userId
+            empleados_count: 0,
+            total_devengado: 0,
+            total_deducciones: 0,
+            total_neto: 0
           })
           .select()
           .single();
@@ -271,7 +291,7 @@ export class PayrollPeriodService {
           return null;
         }
 
-        console.log('Período creado automáticamente para período reabierto:', newPeriod);
+        console.log('✅ Período creado automáticamente en payroll_periods_real para período reabierto:', newPeriod);
         return newPeriod as PayrollPeriod;
       }
 
@@ -323,13 +343,13 @@ export class PayrollPeriodService {
     };
   }
 
-  // Obtener un período específico por ID
+  // Obtener un período específico por ID usando payroll_periods_real
   static async getPayrollPeriodById(periodId: string): Promise<PayrollPeriod | null> {
     try {
-      console.log('🔍 Buscando período por ID:', periodId);
+      console.log('🔍 Buscando período por ID en payroll_periods_real:', periodId);
       
       const { data, error } = await supabase
-        .from('payroll_periods')
+        .from('payroll_periods_real')
         .select('*')
         .eq('id', periodId)
         .maybeSingle();
@@ -344,7 +364,7 @@ export class PayrollPeriodService {
         return null;
       }
 
-      console.log('✅ Período encontrado:', data);
+      console.log('✅ Período encontrado en payroll_periods_real:', data);
       return data as PayrollPeriod;
     } catch (error) {
       console.error('❌ Error en getPayrollPeriodById:', error);

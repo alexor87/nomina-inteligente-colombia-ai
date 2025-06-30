@@ -1,3 +1,4 @@
+
 export interface PayrollPeriod {
   id: string;
   startDate: string;
@@ -68,6 +69,11 @@ export interface DBPayrollPeriod {
   fecha_fin: string;
   estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
   tipo_periodo: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
+  periodo: string;
+  empleados_count: number;
+  total_devengado: number;
+  total_deducciones: number;
+  total_neto: number;
   modificado_por?: string;
   modificado_en?: string;
   created_at: string;
