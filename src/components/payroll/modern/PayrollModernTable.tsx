@@ -180,6 +180,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         return result;
         
       case 'recargo':
+      case 'recargo_nocturno':
         if (!horas || !subtipo) return null;
         const recargoFactors: Record<string, number> = {
           'nocturno': 1.35,
@@ -374,7 +375,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
             employeeId={selectedEmployee.id}
             employeeSalary={selectedEmployee.baseSalary}
             onCreateNovedad={handleCreateNovedad}
-            calculateSuggestedValue={(tipo, subtipo, horas, dias) => null}
+            calculateSuggestedValue={calculateSuggestedValue}
           />
           
           <EmployeeLiquidationModal

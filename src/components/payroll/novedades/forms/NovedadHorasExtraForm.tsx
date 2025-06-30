@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,8 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   const [subtipo, setSubtipo] = useState<string>('');
   const [horas, setHoras] = useState<string>('');
   const [valorCalculado, setValorCalculado] = useState<number>(0);
+  const [valorManual, setValorManual] = useState<string>('');
+  const [useManualValue, setUseManualValue] = useState(false);
   const [observacion, setObservacion] = useState<string>('');
 
   // Get current legal workday info for display
@@ -42,25 +45,32 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   useEffect(() => {
     if (subtipo && horas && parseFloat(horas) > 0 && calculateSuggestedValue) {
       const calculatedValue = calculateSuggestedValue('horas_extra', subtipo, parseFloat(horas));
-      if (calculatedValue) {
+      if (calculatedValue && calculatedValue > 0) {
         setValorCalculado(calculatedValue);
+        setUseManualValue(false);
       }
     }
   }, [subtipo, horas, calculateSuggestedValue]);
 
   const handleSubmit = () => {
-    if (!subtipo || !horas || parseFloat(horas) <= 0) return;
+    const finalValue = useManualValue && valorManual ? parseFloat(valorManual) : valorCalculado;
 
     onSubmit({
       tipo_novedad: 'horas_extra',
       subtipo,
       horas: parseFloat(horas),
-      valor: valorCalculado,
+      valor: finalValue,
       observacion
     });
   };
 
-  const isValid = subtipo && horas && parseFloat(horas) > 0 && valorCalculado > 0;
+  // More flexible validation - button enabled when basic fields are filled
+  const isValid = subtipo && horas && parseFloat(horas) > 0 && (
+    (valorCalculado > 0) || 
+    (useManualValue && valorManual && parseFloat(valorManual) > 0)
+  );
+
+  const finalValue = useManualValue && valorManual ? parseFloat(valorManual) : valorCalculado;
 
   return (
     <div className="space-y-6">
@@ -117,14 +127,52 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           />
         </div>
 
-        {valorCalculado > 0 && (
-          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-            <div className="flex items-center gap-2 text-green-700">
-              <Calculator className="h-4 w-4" />
-              <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
+        {/* Value calculation section */}
+        <div className="space-y-3">
+          {valorCalculado > 0 && (
+            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center gap-2 text-green-700">
+                <Calculator className="h-4 w-4" />
+                <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
+              </div>
             </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="useManualValue"
+              checked={useManualValue}
+              onChange={(e) => setUseManualValue(e.target.checked)}
+              className="rounded"
+            />
+            <Label htmlFor="useManualValue" className="text-sm">
+              Usar valor manual
+            </Label>
           </div>
-        )}
+
+          {useManualValue && (
+            <div>
+              <Label htmlFor="valorManual">Valor Manual</Label>
+              <Input
+                id="valorManual"
+                type="number"
+                placeholder="0"
+                value={valorManual}
+                onChange={(e) => setValorManual(e.target.value)}
+                min="0"
+              />
+            </div>
+          )}
+
+          {finalValue > 0 && (
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-2 text-blue-700">
+                <span className="font-medium">Valor Final: {formatCurrency(finalValue)}</span>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div>
           <Label htmlFor="observacion">Observaciones (Opcional)</Label>
