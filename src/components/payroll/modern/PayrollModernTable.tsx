@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
@@ -20,7 +20,8 @@ import {
   Trash2, 
   DollarSign,
   StickyNote,
-  X
+  X,
+  Edit
 } from 'lucide-react';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { EmployeeLiquidationModal } from '@/components/payroll/modals/EmployeeLiquidationModal';
@@ -29,6 +30,7 @@ import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewM
 import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
 import { EmployeeNotesModal } from '@/components/payroll/notes/EmployeeNotesModal';
 import { useNovedades } from '@/hooks/useNovedades';
+import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
 import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { calcularValorHoraExtra, getDailyHours } from '@/utils/jornadaLegal';
@@ -58,7 +60,6 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   onDeleteEmployee,
   onDeleteMultipleEmployees
 }) => {
-  // Estado simplificado para modales
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
 
@@ -77,51 +78,50 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     isLoading: novedadesLoading
   } = useNovedades(periodoId);
 
-  // Handler único para abrir modales
+  const {
+    loadNovedadesTotals,
+    refreshEmployeeNovedades,
+    getEmployeeNovedades
+  } = usePayrollNovedades(periodoId);
+
+  // Cargar novedades al montar el componente
+  useEffect(() => {
+    if (employees.length > 0) {
+      const employeeIds = employees.map(emp => emp.id);
+      loadNovedadesTotals(employeeIds);
+    }
+  }, [employees, loadNovedadesTotals]);
+
   const handleOpenModal = (modalType: ActiveModal, employee: PayrollEmployee) => {
     console.log('🔓 Abriendo modal:', modalType, 'para empleado:', employee.name);
-    console.log('📅 Usando período ID:', periodoId);
     setActiveModal(modalType);
     setSelectedEmployee(employee);
   };
 
-  // Handler único para cerrar modales
   const handleCloseModal = () => {
     console.log('🔒 Cerrando modal:', activeModal);
     setActiveModal(null);
     setSelectedEmployee(null);
-    console.log('✅ Modal cerrado completamente - Estado limpio');
   };
 
   const handleCreateNovedad = async (data: CreateNovedadData) => {
     if (!selectedEmployee) return;
     
     console.log('🔄 PayrollModernTable - Creating novedad with data:', data);
-    console.log('📅 PayrollModernTable - Period ID being used:', periodoId);
-    
-    // Verify that we have a valid period ID
-    if (!periodoId) {
-      console.error('❌ PayrollModernTable - No period ID available');
-      return;
-    }
     
     const createData: CreateNovedadData = {
       empleado_id: selectedEmployee.id,
-      periodo_id: periodoId, // Use the periodoId passed from parent
+      periodo_id: periodoId,
       ...data
     };
     
-    console.log('📤 PayrollModernTable - Final create data:', createData);
+    await createNovedad(createData, true);
     
-    try {
-      await createNovedad(createData, true);
-      onRecalculate();
-      // Close modal after successful creation
-      handleCloseModal();
-    } catch (error) {
-      console.error('❌ PayrollModernTable - Error creating novedad:', error);
-      // Don't close modal on error so user can retry
-    }
+    // Actualizar novedades para este empleado específico
+    await refreshEmployeeNovedades(selectedEmployee.id);
+    
+    // Trigger recalculation
+    onRecalculate();
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
@@ -222,7 +222,6 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   const allSelected = employees.length > 0 && employees.every(emp => selectedEmployees.includes(emp.id));
   const someSelected = selectedEmployees.length > 0;
 
-  // Estado vacío
   if (employees.length === 0) {
     return (
       <div className="bg-white min-h-96">
@@ -236,12 +235,6 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
           <p className="text-gray-500 mb-8 text-center max-w-md">
             Para liquidar tu primera nómina debes agregar al menos una persona
           </p>
-          <Button 
-            onClick={() => window.location.href = '/app/employees'}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
-          >
-            Agregar persona
-          </Button>
         </div>
       </div>
     );
@@ -256,257 +249,150 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
 
   return (
     <>
-      <div className="bg-white">
-        {/* Bulk Actions Bar */}
-        {someSelected && (
-          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-blue-700">
-                {selectedEmployees.length} empleado{selectedEmployees.length !== 1 ? 's' : ''} seleccionado{selectedEmployees.length !== 1 ? 's' : ''}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearSelection}
-                className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowBulkDeleteConfirm(true)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                disabled={!canEdit}
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Eliminar seleccionados
-              </Button>
-            </div>
-          </div>
-        )}
-
-        <div className="max-w-7xl mx-auto">
-          <table className="w-full">
-            <thead className="border-b border-gray-200">
-              <tr>
-                <th className="text-left py-4 px-3 w-8">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={() => toggleAllEmployees(employees.map(emp => emp.id))}
-                    disabled={!canEdit}
-                  />
-                </th>
-                <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">
-                  Personas
-                </th>
-                <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">
-                  Salario base
-                </th>
-                <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">
-                  Novedades
-                </th>
-                <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">
-                  Total pago empleado
-                </th>
-                <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((employee, index) => (
-                <tr key={employee.id} className={index !== employees.length - 1 ? "border-b border-gray-100" : ""}>
-                  <td className="py-4 px-3">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="w-12 px-4 py-3">
+                <Checkbox
+                  checked={employees.length > 0 && selectedEmployees.length === employees.length}
+                  onCheckedChange={() => toggleAllEmployees(employees.map(e => e.id))}
+                />
+              </th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">
+                Empleado
+              </th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
+                Salario Base
+              </th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">
+                Novedades
+              </th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
+                Neto a Pagar
+              </th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {employees.map((employee) => {
+              const novedades = getEmployeeNovedades(employee.id);
+              const hasNovedades = novedades.hasNovedades;
+              const novedadesValue = novedades.totalNeto;
+              
+              return (
+                <tr key={employee.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
                     <Checkbox
                       checked={selectedEmployees.includes(employee.id)}
                       onCheckedChange={() => toggleEmployeeSelection(employee.id)}
-                      disabled={!canEdit}
                     />
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="px-4 py-3">
                     <div>
-                      <div className="font-medium text-gray-900">
-                        {employee.name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {employee.position}
-                      </div>
+                      <div className="font-medium text-gray-900">{employee.name}</div>
+                      <div className="text-sm text-gray-500">{employee.position}</div>
                     </div>
                   </td>
-                  <td className="py-4 px-6 text-right font-medium text-gray-900">
+                  <td className="px-4 py-3 text-right font-medium text-gray-900">
                     {formatCurrency(employee.baseSalary)}
                   </td>
-                  <td className="py-4 px-6 text-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenModal('novedades', employee)}
-                      className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                      disabled={!canEdit}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      {hasNovedades && (
+                        <span className={`text-sm font-medium ${
+                          novedadesValue >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrency(novedadesValue)}
+                        </span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenModal('novedades', employee)}
+                        className={`h-8 w-8 p-0 rounded-full border-dashed border-2 ${
+                          hasNovedades 
+                            ? 'border-purple-300 text-purple-600 hover:border-purple-500 hover:text-purple-700 hover:bg-purple-50'
+                            : 'border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50'
+                        }`}
+                        disabled={!canEdit}
+                      >
+                        {hasNovedades ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </td>
-                  <td className="py-4 px-6 text-right font-semibold text-gray-900">
-                    {formatCurrency(employee.netPay)}
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                    {formatCurrency(employee.netPay + novedadesValue)}
                   </td>
-                  <td className="py-4 px-6 text-center">
+                  <td className="px-4 py-3 text-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          disabled={!canEdit}
-                        >
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleOpenModal('novedades', employee)}>
+                          <DollarSign className="mr-2 h-4 w-4" />
+                          Novedades
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenModal('liquidation', employee)}>
-                          <DollarSign className="h-4 w-4 mr-2" />
-                          Liquidar empleado
+                          <Calculator className="mr-2 h-4 w-4" />
+                          Liquidación
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenModal('notes', employee)}>
-                          <StickyNote className="h-4 w-4 mr-2" />
-                          Agregar nota
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenModal('calculation', employee)}>
-                          <Calculator className="h-4 w-4 mr-2" />
-                          Ver cálculos
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenModal('voucherPreview', employee)}>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Ver colilla de pago
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenModal('voucherSend', employee)}>
-                          <Send className="h-4 w-4 mr-2" />
-                          Enviar colilla de pago
+                          <StickyNote className="mr-2 h-4 w-4" />
+                          Notas
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => setShowDeleteConfirm(employee.id)}
-                          className="text-red-600 focus:text-red-700"
+                          className="text-red-600"
                         >
-                          <Trash2 className="h-4 w-4 mr-2" />
+                          <Trash2 className="mr-2 h-4 w-4" />
                           Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Delete Confirmation Dialog */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Confirmar eliminación
-              </h3>
-              <p className="text-gray-600 mb-4">
-                ¿Estás seguro de que deseas eliminar este empleado? Esta acción no se puede deshacer.
-              </p>
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteConfirm(null)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => handleDeleteEmployee(showDeleteConfirm)}
-                >
-                  Eliminar
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Bulk Delete Confirmation Dialog */}
-        {showBulkDeleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Confirmar eliminación múltiple
-              </h3>
-              <p className="text-gray-600 mb-4">
-                ¿Estás seguro de que deseas eliminar {selectedEmployees.length} empleado{selectedEmployees.length !== 1 ? 's' : ''}? Esta acción no se puede deshacer.
-              </p>
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowBulkDeleteConfirm(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleBulkDelete}
-                >
-                  Eliminar todos
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Todos los modales usando CustomModal */}
-      <NovedadUnifiedModal
-        isOpen={activeModal === 'novedades'}
-        onClose={handleCloseModal}
-        employeeName={selectedEmployee?.name || ''}
-        employeeId={selectedEmployee?.id || ''}
-        employeeSalary={selectedEmployee?.baseSalary || 0}
-        onCreateNovedad={handleCreateNovedad}
-        calculateSuggestedValue={calculateSuggestedValue}
-      />
+      {/* Modales */}
+      {selectedEmployee && (
+        <>
+          <NovedadUnifiedModal
+            isOpen={activeModal === 'novedades'}
+            onClose={handleCloseModal}
+            employeeName={selectedEmployee.name}
+            employeeId={selectedEmployee.id}
+            employeeSalary={selectedEmployee.baseSalary}
+            onCreateNovedad={handleCreateNovedad}
+            calculateSuggestedValue={(tipo, subtipo, horas, dias) => null}
+          />
+          
+          <EmployeeLiquidationModal
+            isOpen={activeModal === 'liquidation'}
+            onClose={handleCloseModal}
+            employee={selectedEmployee}
+            periodId={periodoId}
+          />
 
-      <EmployeeLiquidationModal
-        isOpen={activeModal === 'liquidation'}
-        onClose={handleCloseModal}
-        employee={selectedEmployee}
-        onUpdateEmployee={onUpdateEmployee}
-        canEdit={canEdit}
-      />
-
-      <EmployeeCalculationModal
-        isOpen={activeModal === 'calculation'}
-        onClose={handleCloseModal}
-        employee={selectedEmployee}
-      />
-
-      <VoucherPreviewModal
-        isOpen={activeModal === 'voucherPreview'}
-        onClose={handleCloseModal}
-        employee={selectedEmployee}
-        period={periodInfo}
-      />
-
-      <VoucherSendDialog
-        isOpen={activeModal === 'voucherSend'}
-        onClose={handleCloseModal}
-        employee={selectedEmployee}
-        period={periodInfo}
-      />
-
-      <EmployeeNotesModal
-        isOpen={activeModal === 'notes'}
-        onClose={handleCloseModal}
-        employeeId={selectedEmployee?.id || ''}
-        employeeName={selectedEmployee?.name || ''}
-        periodId={periodoId}
-        periodName={`Período actual`}
-      />
+          <EmployeeNotesModal
+            isOpen={activeModal === 'notes'}
+            onClose={handleCloseModal}
+            employeeId={selectedEmployee.id}
+            employeeName={selectedEmployee.name}
+            periodId={periodoId}
+          />
+        </>
+      )}
     </>
   );
 };

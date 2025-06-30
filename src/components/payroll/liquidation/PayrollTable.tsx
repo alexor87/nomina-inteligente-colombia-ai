@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, UserPlus } from 'lucide-react';
+import { Plus, UserPlus, Edit } from 'lucide-react';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { useNovedades } from '@/hooks/useNovedades';
+import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface PayrollTableProps {
@@ -38,6 +39,20 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     isLoading: novedadesLoading
   } = useNovedades(periodoId);
 
+  const {
+    loadNovedadesTotals,
+    refreshEmployeeNovedades,
+    getEmployeeNovedades
+  } = usePayrollNovedades(periodoId);
+
+  // Cargar novedades al montar el componente y cuando cambien los empleados
+  useEffect(() => {
+    if (employees.length > 0) {
+      const employeeIds = employees.map(emp => emp.id);
+      loadNovedadesTotals(employeeIds);
+    }
+  }, [employees, loadNovedadesTotals]);
+
   const handleOpenNovedades = (employee: PayrollEmployee) => {
     setSelectedEmployee(employee);
     setIsModalOpen(true);
@@ -58,7 +73,12 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     };
     
     await createNovedad(createData, true);
-    onRecalculate(); // Trigger recalculation after adding novedad
+    
+    // Actualizar novedades para este empleado específico
+    await refreshEmployeeNovedades(selectedEmployee.id);
+    
+    // Trigger recalculation
+    onRecalculate();
   };
 
   const calculateSuggestedValue = (
@@ -71,7 +91,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     
     // This is a simplified calculation - you might want to use your existing calculation logic
     const salarioDiario = selectedEmployee.baseSalary / 30;
-    const valorHora = selectedEmployee.baseSalary / 240; // 30 days * 8 hours
+    const valorHora = selectedEmployee.baseSalary / 240;
     
     switch (tipo) {
       case 'horas_extra':
@@ -155,48 +175,67 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
               </tr>
             </thead>
             <tbody>
-              {employees.map((employee, index) => (
-                <tr key={employee.id} className={index !== employees.length - 1 ? "border-b border-gray-100" : ""}>
-                  <td className="py-4 px-6">
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {employee.name}
+              {employees.map((employee, index) => {
+                const novedades = getEmployeeNovedades(employee.id);
+                const hasNovedades = novedades.hasNovedades;
+                const novedadesValue = novedades.totalNeto;
+                
+                return (
+                  <tr key={employee.id} className={index !== employees.length - 1 ? "border-b border-gray-100" : ""}>
+                    <td className="py-4 px-6">
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {employee.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {employee.position}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {employee.position}
+                    </td>
+                    <td className="py-4 px-6 text-right font-medium text-gray-900">
+                      {formatCurrency(employee.baseSalary)}
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <div className="flex items-center justify-center space-x-2">
+                        {hasNovedades && (
+                          <span className={`text-sm font-medium ${
+                            novedadesValue >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {formatCurrency(novedadesValue)}
+                          </span>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenNovedades(employee)}
+                          className={`h-8 w-8 p-0 rounded-full border-dashed border-2 ${
+                            hasNovedades 
+                              ? 'border-purple-300 text-purple-600 hover:border-purple-500 hover:text-purple-700 hover:bg-purple-50'
+                              : 'border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50'
+                          }`}
+                          disabled={!canEdit}
+                        >
+                          {hasNovedades ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                        </Button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-right font-medium text-gray-900">
-                    {formatCurrency(employee.baseSalary)}
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenNovedades(employee)}
-                      className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                      disabled={!canEdit}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </td>
-                  <td className="py-4 px-6 text-right font-semibold text-gray-900">
-                    {formatCurrency(employee.netPay)}
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenNovedades(employee)}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      disabled={!canEdit}
-                    >
-                      Editar
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-4 px-6 text-right font-semibold text-gray-900">
+                      {formatCurrency(employee.netPay + novedadesValue)}
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenNovedades(employee)}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        disabled={!canEdit}
+                      >
+                        Editar
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

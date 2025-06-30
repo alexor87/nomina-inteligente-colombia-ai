@@ -7,6 +7,7 @@ import { PayrollEmployee, PayrollSummary, PayrollPeriod } from '@/types/payroll'
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { supabase } from '@/integrations/supabase/client';
+import { usePayrollNovedades } from './usePayrollNovedades';
 
 // Helper function to convert database period to PayrollPeriod interface
 const convertToPayrollPeriod = (dbPeriod: any): PayrollPeriod => {
@@ -45,6 +46,14 @@ export const usePayrollLiquidation = () => {
     employerContributions: 0,
     totalPayrollCost: 0
   });
+
+  // Integrar hook de novedades
+  const {
+    novedadesTotals,
+    loadNovedadesTotals,
+    refreshEmployeeNovedades,
+    getEmployeeNovedades
+  } = usePayrollNovedades(currentPeriod?.id || '');
 
   // Inicializar período al cargar
   const initializePeriod = useCallback(async () => {
@@ -162,7 +171,11 @@ export const usePayrollLiquidation = () => {
       
       setEmployees(loadedEmployees);
       
+      // Cargar novedades para los empleados cargados
       if (loadedEmployees.length > 0) {
+        const employeeIds = loadedEmployees.map(emp => emp.id);
+        await loadNovedadesTotals(employeeIds);
+        
         toast({
           title: "Empleados cargados",
           description: `Se cargaron ${loadedEmployees.length} empleados activos para liquidación`
@@ -184,7 +197,7 @@ export const usePayrollLiquidation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, currentPeriod]);
+  }, [toast, currentPeriod, loadNovedadesTotals]);
 
   // Cargar período y empleados al montar el componente
   useEffect(() => {
@@ -197,10 +210,22 @@ export const usePayrollLiquidation = () => {
     }
   }, [loadEmployees, currentPeriod]);
 
-  // Actualizar resumen cuando cambien los empleados
+  // Actualizar resumen cuando cambien los empleados o novedades
   useEffect(() => {
-    setSummary(calculatePayrollSummary(employees));
-  }, [employees]);
+    const updatedSummary = calculatePayrollSummary(employees);
+    
+    // Agregar novedades al resumen
+    let totalNovedadesNetas = 0;
+    employees.forEach(emp => {
+      const novedades = getEmployeeNovedades(emp.id);
+      totalNovedadesNetas += novedades.totalNeto;
+    });
+    
+    setSummary({
+      ...updatedSummary,
+      totalNetPay: updatedSummary.totalNetPay + totalNovedadesNetas
+    });
+  }, [employees, novedadesTotals, getEmployeeNovedades]);
 
   // Actualizar empleado
   const updateEmployee = useCallback(async (id: string, field: string, value: number) => {
@@ -259,7 +284,6 @@ export const usePayrollLiquidation = () => {
       if (updatedPeriod) {
         setCurrentPeriod(updatedPeriod);
         
-        // Mostrar advertencias si las hay
         if (validation.warnings.length > 0) {
           toast({
             title: "Período actualizado con advertencias",
@@ -273,7 +297,6 @@ export const usePayrollLiquidation = () => {
           });
         }
 
-        // Recalcular empleados con el nuevo período
         const recalculatedEmployees = await Promise.all(
           employees.map(async (emp) => {
             const baseData = convertToBaseEmployeeData(emp);
@@ -306,7 +329,6 @@ export const usePayrollLiquidation = () => {
     });
 
     try {
-      // Use regular PayrollCalculationService instead of the non-existent Enhanced version
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const recalculatedEmployees = await Promise.all(
@@ -317,6 +339,12 @@ export const usePayrollLiquidation = () => {
       );
       
       setEmployees(recalculatedEmployees);
+
+      // Recargar novedades después del recálculo
+      if (recalculatedEmployees.length > 0) {
+        const employeeIds = recalculatedEmployees.map(emp => emp.id);
+        await loadNovedadesTotals(employeeIds);
+      }
 
       toast({
         title: "Recálculo completado",
@@ -331,7 +359,7 @@ export const usePayrollLiquidation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, currentPeriod, employees]);
+  }, [toast, currentPeriod, employees, loadNovedadesTotals]);
 
   // Aprobar período y guardar en base de datos
   const approvePeriod = useCallback(async () => {
@@ -437,6 +465,10 @@ export const usePayrollLiquidation = () => {
     approvePeriod,
     refreshEmployees: loadEmployees,
     handleFinishEditing,
-    handleDismissBanner
+    handleDismissBanner,
+    // Exportar funciones de novedades
+    novedadesTotals,
+    refreshEmployeeNovedades,
+    getEmployeeNovedades
   };
 };
