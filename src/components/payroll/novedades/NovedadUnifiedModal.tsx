@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { CustomModal } from '@/components/ui/custom-modal';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
@@ -37,7 +38,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<NovedadCategory | null>(null);
 
   const handleSelectCategory = (category: NovedadCategory) => {
-    console.log('📝 Selected category:', category);
     setSelectedCategory(category);
     setCurrentView('form');
   };
@@ -54,24 +54,19 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleSubmit = async (formData: any) => {
-    try {
-      console.log('📝 NovedadUnifiedModal - Submitting form data:', formData);
-      console.log('👤 Employee ID:', employeeId);
-      
-      // Ensure empleado_id is included
-      const novedadData: CreateNovedadData = {
-        empleado_id: employeeId,
-        ...formData
-      };
+    console.log('📝 NovedadUnifiedModal - Submitting form data:', formData);
+    console.log('👤 Employee ID:', employeeId);
+    
+    // DO NOT override periodo_id - let the parent component handle it
+    const novedadData: CreateNovedadData = {
+      empleado_id: employeeId,
+      ...formData
+    };
 
-      console.log('📤 NovedadUnifiedModal - Final data being sent:', novedadData);
-      
-      await onCreateNovedad(novedadData);
-      handleClose();
-    } catch (error) {
-      console.error('❌ Error creating novedad:', error);
-      // Keep modal open on error so user can retry
-    }
+    console.log('📤 NovedadUnifiedModal - Final data being sent:', novedadData);
+    
+    await onCreateNovedad(novedadData);
+    handleClose();
   };
 
   const renderForm = () => {
