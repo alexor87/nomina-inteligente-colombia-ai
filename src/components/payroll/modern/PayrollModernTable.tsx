@@ -382,6 +382,8 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
             onClose={handleCloseModal}
             employee={selectedEmployee}
             periodId={periodoId}
+            onUpdateEmployee={onUpdateEmployee}
+            canEdit={canEdit}
           />
 
           <EmployeeNotesModal
@@ -390,6 +392,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
             employeeId={selectedEmployee.id}
             employeeName={selectedEmployee.name}
             periodId={periodoId}
+            periodName={`Período ${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`}
           />
         </>
       )}

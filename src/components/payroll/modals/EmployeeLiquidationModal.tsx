@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
@@ -13,16 +12,18 @@ interface EmployeeLiquidationModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: PayrollEmployee | null;
-  onUpdateEmployee: (id: string, updates: Partial<PayrollEmployee>) => void;
-  canEdit: boolean;
+  periodId: string;
+  onUpdateEmployee?: (id: string, updates: Partial<PayrollEmployee>) => void;
+  canEdit?: boolean;
 }
 
 export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> = ({
   isOpen,
   onClose,
   employee,
+  periodId,
   onUpdateEmployee,
-  canEdit
+  canEdit = true
 }) => {
   const [formData, setFormData] = useState({
     baseSalary: 0,
@@ -58,7 +59,7 @@ export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> =
   };
 
   const handleSave = () => {
-    if (employee) {
+    if (employee && onUpdateEmployee) {
       console.log('💾 Guardando cambios para empleado:', employee.name);
       onUpdateEmployee(employee.id, formData);
       onClose();
