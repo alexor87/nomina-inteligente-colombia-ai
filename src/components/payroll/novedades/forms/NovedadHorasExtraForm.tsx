@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calculator } from 'lucide-react';
+import { ArrowLeft, Calculator, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { getJornadaLegal, getDailyHours } from '@/utils/jornadaLegal';
 
 interface NovedadHorasExtraFormProps {
   onBack: () => void;
@@ -34,6 +34,10 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   const [horas, setHoras] = useState<string>('');
   const [valorCalculado, setValorCalculado] = useState<number>(0);
   const [observacion, setObservacion] = useState<string>('');
+
+  // Get current legal workday info for display
+  const jornadaLegal = getJornadaLegal();
+  const horasPorDia = getDailyHours();
 
   useEffect(() => {
     if (subtipo && horas && parseFloat(horas) > 0 && calculateSuggestedValue) {
@@ -66,6 +70,17 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h3 className="text-lg font-semibold">Horas Extra</h3>
+      </div>
+
+      {/* Legal workday info */}
+      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="flex items-start gap-2 text-blue-700">
+          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium">Jornada legal vigente: {jornadaLegal.horasSemanales} horas semanales</p>
+            <p>Horas por día: {horasPorDia.toFixed(2)} según {jornadaLegal.ley}</p>
+          </div>
+        </div>
       </div>
 
       {/* Form */}

@@ -31,6 +31,7 @@ import { EmployeeNotesModal } from '@/components/payroll/notes/EmployeeNotesModa
 import { useNovedades } from '@/hooks/useNovedades';
 import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { calcularValorHoraExtra, getDailyHours } from '@/utils/jornadaLegal';
 
 interface PayrollModernTableProps {
   employees: PayrollEmployee[];
@@ -140,8 +141,12 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
       employeeSalary: selectedEmployee.baseSalary
     });
     
+    // Use current date as period date (in a real scenario, this should come from the period)
+    const fechaPeriodo = new Date();
+    
     const salarioDiario = selectedEmployee.baseSalary / 30;
-    const valorHora = selectedEmployee.baseSalary / 240;
+    // Use the dynamic legal workday calculation instead of fixed 240
+    const valorHoraExtra = calcularValorHoraExtra(selectedEmployee.baseSalary, fechaPeriodo);
     
     switch (tipo) {
       case 'horas_extra':
@@ -154,8 +159,9 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
           'festivas_diurnas': 2.0,
           'festivas_nocturnas': 2.5
         };
-        const result = Math.round(valorHora * factors[subtipo] * horas);
-        console.log('💰 Overtime calculation result:', result);
+        // Use the dynamic hora extra value with the overtime factors
+        const result = Math.round(valorHoraExtra * factors[subtipo] * horas);
+        console.log(`💰 Overtime calculation: $${Math.round(valorHoraExtra)} × ${factors[subtipo]} × ${horas}h = $${result}`);
         return result;
         
       case 'recargo':
@@ -167,7 +173,9 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
           'festivo': 1.75,
           'nocturno_festivo': 2.10
         };
-        return Math.round(valorHora * recargoFactors[subtipo] * horas);
+        const recargoResult = Math.round(valorHoraExtra * recargoFactors[subtipo] * horas);
+        console.log(`💰 Night shift calculation: $${Math.round(valorHoraExtra)} × ${recargoFactors[subtipo]} × ${horas}h = $${recargoResult}`);
+        return recargoResult;
         
       case 'vacaciones':
         if (!dias) return null;
