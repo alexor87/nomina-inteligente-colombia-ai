@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { CustomModal } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
@@ -11,9 +12,10 @@ import { NovedadIngresosAdicionalesForm } from './forms/NovedadIngresosAdicional
 import { NovedadDeduccionesForm } from './forms/NovedadDeduccionesForm';
 import { NovedadPrestamosForm } from './forms/NovedadPrestamosForm';
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Check, X } from 'lucide-react';
+import { Plus, Check, X, Edit, Trash2, FileText } from 'lucide-react';
+import { useNovedades } from '@/hooks/useNovedades';
 
 interface NovedadUnifiedModalProps {
   isOpen: boolean;
@@ -21,11 +23,12 @@ interface NovedadUnifiedModalProps {
   employeeName: string;
   employeeId: string;
   employeeSalary: number;
+  periodId: string;
   onCreateNovedad: (data: CreateNovedadData) => Promise<void>;
   calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number, dias?: number) => number | null;
 }
 
-type ModalView = 'selector' | 'form' | 'summary';
+type ModalView = 'consolidated' | 'selector' | 'form' | 'summary';
 
 interface AddedNovedad {
   id: string;
@@ -43,17 +46,44 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   employeeName,
   employeeId,
   employeeSalary,
+  periodId,
   onCreateNovedad,
   calculateSuggestedValue
 }) => {
-  const [currentView, setCurrentView] = useState<ModalView>('selector');
+  const [currentView, setCurrentView] = useState<ModalView>('consolidated');
   const [selectedCategory, setSelectedCategory] = useState<NovedadCategory | null>(null);
   const [addedNovedades, setAddedNovedades] = useState<AddedNovedad[]>([]);
+  const [existingNovedades, setExistingNovedades] = useState<PayrollNovedad[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { loadNovedades, deleteNovedad } = useNovedades(periodId);
+
+  // Load existing novedades when modal opens
+  useEffect(() => {
+    if (isOpen && employeeId) {
+      setIsLoading(true);
+      loadNovedades(employeeId)
+        .then((novedades) => {
+          setExistingNovedades(novedades);
+        })
+        .catch((error) => {
+          console.error('Error loading existing novedades:', error);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [isOpen, employeeId, loadNovedades]);
 
   const handleSelectCategory = (category: NovedadCategory) => {
     setSelectedCategory(category);
     setCurrentView('form');
+  };
+
+  const handleBackToConsolidated = () => {
+    setCurrentView('consolidated');
+    setSelectedCategory(null);
   };
 
   const handleBackToSelector = () => {
@@ -62,9 +92,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleClose = () => {
-    setCurrentView('selector');
+    setCurrentView('consolidated');
     setSelectedCategory(null);
     setAddedNovedades([]);
+    setExistingNovedades([]);
     onClose();
   };
 
@@ -73,6 +104,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     
     const novedadData: CreateNovedadData = {
       empleado_id: employeeId,
+      periodo_id: periodId,
       ...formData
     };
 
@@ -87,8 +119,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       };
       setAddedNovedades(prev => [...prev, newNovedad]);
       
-      // Show summary view
-      setCurrentView('summary');
+      // Reload existing novedades to show the new one
+      const updatedNovedades = await loadNovedades(employeeId);
+      setExistingNovedades(updatedNovedades);
+      
+      // Go back to consolidated view
+      setCurrentView('consolidated');
     } catch (error) {
       console.error('❌ Error creating novedad:', error);
     } finally {
@@ -108,6 +144,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       for (const formData of formDataArray) {
         const novedadData: CreateNovedadData = {
           empleado_id: employeeId,
+          periodo_id: periodId,
           ...formData
         };
         
@@ -122,12 +159,29 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       // Add all to added novedades list
       setAddedNovedades(prev => [...prev, ...newNovedades]);
       
-      // Show summary view
-      setCurrentView('summary');
+      // Reload existing novedades to show the new ones
+      const updatedNovedades = await loadNovedades(employeeId);
+      setExistingNovedades(updatedNovedades);
+      
+      // Go back to consolidated view
+      setCurrentView('consolidated');
     } catch (error) {
       console.error('❌ Error creating novedades:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteNovedad = async (novedadId: string) => {
+    if (window.confirm('¿Está seguro de que desea eliminar esta novedad?')) {
+      try {
+        await deleteNovedad(novedadId);
+        // Reload existing novedades
+        const updatedNovedades = await loadNovedades(employeeId);
+        setExistingNovedades(updatedNovedades);
+      } catch (error) {
+        console.error('Error deleting novedad:', error);
+      }
     }
   };
 
@@ -142,11 +196,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       'recargo_nocturno': 'Recargo Nocturno',
       'vacaciones': 'Vacaciones',
       'incapacidades': 'Incapacidades',
+      'incapacidad': 'Incapacidades',
       'licencias': 'Licencias',
+      'licencia_remunerada': 'Licencias',
       'ingresos_adicionales': 'Ingresos Adicionales',
+      'otros_ingresos': 'Ingresos Adicionales',
       'deducciones': 'Deducciones',
       'prestamos': 'Préstamos',
-      'retefuente': 'Retención en la Fuente'
+      'libranza': 'Préstamos',
+      'retefuente': 'Retención en la Fuente',
+      'retencion_fuente': 'Retención en la Fuente'
     };
     return labels[tipo] || tipo;
   };
@@ -163,18 +222,166 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     return labels[subtipo] || subtipo;
   };
 
+  const getAllNovedades = () => {
+    return [...existingNovedades];
+  };
+
   const getTotalDevengos = () => {
-    const devengos = ['horas_extra', 'recargo_nocturno', 'vacaciones', 'incapacidades', 'licencias', 'ingresos_adicionales'];
-    return addedNovedades
+    const devengos = ['horas_extra', 'recargo_nocturno', 'vacaciones', 'incapacidades', 'incapacidad', 'licencias', 'licencia_remunerada', 'ingresos_adicionales', 'otros_ingresos'];
+    return getAllNovedades()
       .filter(n => devengos.includes(n.tipo_novedad))
-      .reduce((sum, n) => sum + n.valor, 0);
+      .reduce((sum, n) => sum + Number(n.valor), 0);
   };
 
   const getTotalDeducciones = () => {
-    const deducciones = ['deducciones', 'prestamos', 'retefuente'];
-    return addedNovedades
+    const deducciones = ['deducciones', 'prestamos', 'libranza', 'retefuente', 'retencion_fuente'];
+    return getAllNovedades()
       .filter(n => deducciones.includes(n.tipo_novedad))
-      .reduce((sum, n) => sum + n.valor, 0);
+      .reduce((sum, n) => sum + Number(n.valor), 0);
+  };
+
+  const renderConsolidatedView = () => {
+    const allNovedades = getAllNovedades();
+    const totalDevengos = getTotalDevengos();
+    const totalDeducciones = getTotalDeducciones();
+    const totalNeto = totalDevengos - totalDeducciones;
+
+    // Group novedades by type for better display
+    const groupedNovedades = allNovedades.reduce((acc, novedad) => {
+      const key = novedad.tipo_novedad;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(novedad);
+      return acc;
+    }, {} as Record<string, PayrollNovedad[]>);
+
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-2">Cargando novedades...</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between pb-4 border-b">
+          <div className="flex items-center gap-3">
+            <FileText className="h-5 w-5 text-blue-600" />
+            <h3 className="text-lg font-semibold">Novedades - {employeeName}</h3>
+          </div>
+          <Button onClick={handleAddAnother} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Novedad
+          </Button>
+        </div>
+
+        {allNovedades.length === 0 ? (
+          <div className="text-center py-8">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 mb-4">No hay novedades registradas para este empleado</p>
+            <Button onClick={handleAddAnother} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Primera Novedad
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4">
+              {Object.entries(groupedNovedades).map(([tipo, novedades]) => (
+                <div key={tipo} className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-gray-900">{getTipoLabel(tipo)}</h4>
+                      <span className="text-sm text-gray-600">
+                        {novedades.length} registro{novedades.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {novedades.map((novedad) => (
+                      <div key={novedad.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4">
+                            {novedad.subtipo && (
+                              <div className="text-sm font-medium text-gray-700">
+                                {getSubtipoLabel(novedad.subtipo)}
+                              </div>
+                            )}
+                            <div className="text-sm text-gray-500 flex gap-3">
+                              {novedad.horas && <span>{novedad.horas} horas</span>}
+                              {novedad.dias && <span>{novedad.dias} días</span>}
+                            </div>
+                          </div>
+                          {novedad.observacion && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {novedad.observacion}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="font-semibold text-right">
+                            {formatCurrency(Number(novedad.valor))}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteNovedad(novedad.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-gray-50 px-4 py-2 border-t">
+                    <div className="flex justify-between font-medium">
+                      <span>Subtotal {getTipoLabel(tipo)}:</span>
+                      <span>{formatCurrency(novedades.reduce((sum, n) => sum + Number(n.valor), 0))}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Summary totals */}
+            <div className="bg-gray-50 border rounded-lg p-4 space-y-3">
+              <div className="flex justify-between text-base">
+                <span className="font-medium">Total Devengos:</span>
+                <span className="text-green-600 font-semibold">
+                  {formatCurrency(totalDevengos)}
+                </span>
+              </div>
+              <div className="flex justify-between text-base">
+                <span className="font-medium">Total Deducciones:</span>
+                <span className="text-red-600 font-semibold">
+                  {formatCurrency(totalDeducciones)}
+                </span>
+              </div>
+              <div className="border-t pt-3">
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total Neto:</span>
+                  <span className={totalNeto >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {formatCurrency(totalNeto)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="flex justify-end pt-4 border-t">
+          <Button variant="outline" onClick={handleClose}>
+            Cerrar
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   const renderForm = () => {
@@ -335,9 +542,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       closeOnEscape={true}
       closeOnBackdrop={true}
     >
+      {currentView === 'consolidated' && renderConsolidatedView()}
+      
       {currentView === 'selector' && (
         <NovedadTypeSelector
-          onClose={handleClose}
+          onClose={handleBackToConsolidated}
           onSelectCategory={handleSelectCategory}
           employeeName={employeeName}
         />
