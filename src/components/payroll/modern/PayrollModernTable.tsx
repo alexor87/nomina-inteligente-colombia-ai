@@ -28,6 +28,7 @@ import { EmployeeLiquidationModal } from '@/components/payroll/modals/EmployeeLi
 import { EmployeeCalculationModal } from '@/components/payroll/modals/EmployeeCalculationModal';
 import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
 import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
+import { EmployeeNotesModal } from '@/components/payroll/notes/EmployeeNotesModal';
 import { useNovedades } from '@/hooks/useNovedades';
 import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
@@ -44,7 +45,7 @@ interface PayrollModernTableProps {
   onDeleteMultipleEmployees?: (employeeIds: string[]) => Promise<void>;
 }
 
-type ActiveModal = 'novedades' | 'liquidation' | 'calculation' | 'voucherPreview' | 'voucherSend' | null;
+type ActiveModal = 'novedades' | 'liquidation' | 'calculation' | 'voucherPreview' | 'voucherSend' | 'notes' | null;
 
 export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   employees,
@@ -332,7 +333,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
                           <DollarSign className="h-4 w-4 mr-2" />
                           Liquidar empleado
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenModal('novedades', employee)}>
+                        <DropdownMenuItem onClick={() => handleOpenModal('notes', employee)}>
                           <StickyNote className="h-4 w-4 mr-2" />
                           Agregar nota
                         </DropdownMenuItem>
@@ -459,6 +460,15 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         onClose={handleCloseModal}
         employee={selectedEmployee}
         period={periodInfo}
+      />
+
+      <EmployeeNotesModal
+        isOpen={activeModal === 'notes'}
+        onClose={handleCloseModal}
+        employeeId={selectedEmployee?.id || ''}
+        employeeName={selectedEmployee?.name || ''}
+        periodId={periodoId}
+        periodName={`Período actual`}
       />
     </>
   );
