@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollCalculationService } from './PayrollCalculationService';
@@ -54,7 +53,7 @@ export class PayrollLiquidationService {
       const payrollInserts = data.employees.map(employee => ({
         company_id: companyId,
         employee_id: employee.id,
-        periodo: `${data.period.startDate} al ${data.period.endDate}`,
+        periodo: `${data.period.fecha_inicio} al ${data.period.fecha_fin}`,
         salario_base: employee.baseSalary,
         dias_trabajados: employee.workedDays,
         horas_extra: employee.extraHours,
@@ -99,9 +98,9 @@ export class PayrollLiquidationService {
         company_id: companyId,
         employee_id: employee.id,
         payroll_id: payrollRecords[index]?.id,
-        periodo: `${liquidationData.period.startDate} al ${liquidationData.period.endDate}`,
-        start_date: liquidationData.period.startDate,
-        end_date: liquidationData.period.endDate,
+        periodo: `${liquidationData.period.fecha_inicio} al ${liquidationData.period.fecha_fin}`,
+        start_date: liquidationData.period.fecha_inicio,
+        end_date: liquidationData.period.fecha_fin,
         net_pay: employee.netPay,
         voucher_status: 'generado',
         sent_to_employee: false,

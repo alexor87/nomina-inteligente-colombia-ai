@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Calendar, Edit, Save, X, Lock, CheckCircle } from 'lucide-react';
-import { PayrollPeriod } from '@/services/PayrollPeriodService';
+import { PayrollPeriod } from '@/types/payroll';
 import { PayrollPeriodService } from '@/services/PayrollPeriodService';
 
 interface PayrollPeriodCardProps {

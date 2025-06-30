@@ -1,5 +1,6 @@
 
-import { PayrollPeriodService, PayrollPeriod } from './PayrollPeriodService';
+import { PayrollPeriodService } from './PayrollPeriodService';
+import { PayrollPeriod } from '@/types/payroll';
 import { PayrollConfigurationService } from './payroll-intelligent/PayrollConfigurationService';
 import { PayrollPeriodDetectionService, PeriodStatus } from './payroll-intelligent/PayrollPeriodDetectionService';
 import { PayrollPeriodValidationService } from './payroll-intelligent/PayrollPeriodValidationService';

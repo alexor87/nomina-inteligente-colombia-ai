@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -8,6 +7,27 @@ import { PayrollEmployee, PayrollSummary, PayrollPeriod } from '@/types/payroll'
 import { calculateEmployee, calculatePayrollSummary, convertToBaseEmployeeData } from '@/utils/payrollCalculations';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { supabase } from '@/integrations/supabase/client';
+
+// Helper function to convert database period to PayrollPeriod interface
+const convertToPayrollPeriod = (dbPeriod: any): PayrollPeriod => {
+  return {
+    id: dbPeriod.id,
+    company_id: dbPeriod.company_id,
+    fecha_inicio: dbPeriod.fecha_inicio,
+    fecha_fin: dbPeriod.fecha_fin,
+    estado: dbPeriod.estado as 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado',
+    tipo_periodo: dbPeriod.tipo_periodo as 'quincenal' | 'mensual' | 'semanal' | 'personalizado',
+    periodo: dbPeriod.periodo || `${dbPeriod.fecha_inicio}-${dbPeriod.fecha_fin}`,
+    empleados_count: dbPeriod.empleados_count || 0,
+    total_devengado: dbPeriod.total_devengado || 0,
+    total_deducciones: dbPeriod.total_deducciones || 0,
+    total_neto: dbPeriod.total_neto || 0,
+    created_at: dbPeriod.created_at,
+    updated_at: dbPeriod.updated_at || dbPeriod.created_at,
+    modificado_por: dbPeriod.modificado_por,
+    modificado_en: dbPeriod.modificado_en
+  };
+};
 
 export const usePayrollLiquidation = () => {
   const { toast } = useToast();
@@ -63,7 +83,7 @@ export const usePayrollLiquidation = () => {
           }
 
           if (existingPeriod) {
-            setCurrentPeriod(existingPeriod);
+            setCurrentPeriod(convertToPayrollPeriod(existingPeriod));
             setIsReopenedPeriod(true);
             
             toast({
@@ -335,13 +355,7 @@ export const usePayrollLiquidation = () => {
 
     try {
       const liquidationData = {
-        period: {
-          id: currentPeriod.id,
-          startDate: currentPeriod.fecha_inicio,
-          endDate: currentPeriod.fecha_fin,
-          status: 'approved' as const,
-          type: currentPeriod.tipo_periodo as 'quincenal' | 'mensual'
-        },
+        period: currentPeriod,
         employees
       };
 

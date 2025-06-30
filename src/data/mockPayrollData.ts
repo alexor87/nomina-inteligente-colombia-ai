@@ -3,10 +3,17 @@ import { PayrollPeriod, BaseEmployeeData } from '@/types/payroll';
 
 export const mockPeriod: PayrollPeriod = {
   id: '1',
-  startDate: '2025-06-01',
-  endDate: '2025-06-15',
-  status: 'in_progress',
-  type: 'quincenal'
+  company_id: 'mock-company-id',
+  fecha_inicio: '2025-06-01',
+  fecha_fin: '2025-06-15',
+  estado: 'en_proceso',
+  tipo_periodo: 'quincenal',
+  periodo: '2025-06',
+  empleados_count: 3,
+  total_devengado: 7600000,
+  total_deducciones: 1520000,
+  total_neto: 6080000,
+  created_at: '2025-06-01T00:00:00Z'
 };
 
 export const mockEmployeesBase: BaseEmployeeData[] = [
