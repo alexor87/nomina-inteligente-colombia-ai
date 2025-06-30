@@ -1,11 +1,6 @@
 
 import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PayrollEmployee } from '@/types/payroll';
@@ -105,123 +100,127 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
   };
 
   return (
-    <Dialog open={isOpen}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Vista Previa - Comprobante de Pago
-          </DialogTitle>
-        </DialogHeader>
+    <CustomModal 
+      isOpen={isOpen} 
+      onClose={onClose}
+      className="max-w-2xl max-h-[90vh] overflow-y-auto"
+      closeOnEscape={!isGenerating}
+      closeOnBackdrop={!isGenerating}
+    >
+      <CustomModalHeader>
+        <CustomModalTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Vista Previa - Comprobante de Pago
+        </CustomModalTitle>
+      </CustomModalHeader>
 
-        <div className="space-y-4">
-          {/* Información del Período */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Información del Período</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-gray-600">Período</div>
-                  <div className="font-semibold">
-                    {formatDate(period.startDate)} - {formatDate(period.endDate)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600">Tipo</div>
-                  <div className="font-semibold capitalize">{period.type}</div>
+      <div className="space-y-4">
+        {/* Información del Período */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Información del Período</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-sm text-gray-600">Período</div>
+                <div className="font-semibold">
+                  {formatDate(period.startDate)} - {formatDate(period.endDate)}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Información del Empleado */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Información del Empleado</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-gray-600">Nombre</div>
-                  <div className="font-semibold">{employee.name}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600">Cargo</div>
-                  <div className="font-semibold">{employee.position}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600">EPS</div>
-                  <div className="font-semibold">{employee.eps || 'No asignada'}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600">AFP</div>
-                  <div className="font-semibold">{employee.afp || 'No asignada'}</div>
-                </div>
+              <div>
+                <div className="text-sm text-gray-600">Tipo</div>
+                <div className="font-semibold capitalize">{period.type}</div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Detalles de Pago */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Detalles de Pago</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between py-2 border-b">
-                  <span>Salario Base</span>
-                  <span className="font-semibold">{formatCurrency(employee.baseSalary)}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span>Días Trabajados</span>
-                  <span className="font-semibold">{employee.workedDays}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span>Horas Extra</span>
-                  <span className="font-semibold">{employee.extraHours}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span>Bonificaciones</span>
-                  <span className="font-semibold">{formatCurrency(employee.bonuses)}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span>Incapacidades</span>
-                  <span className="font-semibold text-red-600">-{formatCurrency(employee.disabilities)}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b bg-blue-50 px-3 rounded">
-                  <span className="font-semibold">Total Devengado</span>
-                  <span className="font-bold">{formatCurrency(employee.grossPay)}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b bg-red-50 px-3 rounded">
-                  <span className="font-semibold">Total Deducciones</span>
-                  <span className="font-bold text-red-600">-{formatCurrency(employee.deductions)}</span>
-                </div>
-                <div className="flex justify-between py-3 bg-green-50 px-3 rounded">
-                  <span className="font-bold text-lg">Neto a Pagar</span>
-                  <span className="font-bold text-lg text-green-600">{formatCurrency(employee.netPay)}</span>
-                </div>
+        {/* Información del Empleado */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Información del Empleado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-sm text-gray-600">Nombre</div>
+                <div className="font-semibold">{employee.name}</div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div>
+                <div className="text-sm text-gray-600">Cargo</div>
+                <div className="font-semibold">{employee.position}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">EPS</div>
+                <div className="font-semibold">{employee.eps || 'No asignada'}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">AFP</div>
+                <div className="font-semibold">{employee.afp || 'No asignada'}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            <X className="h-4 w-4 mr-2" />
-            Cerrar
-          </Button>
-          <Button onClick={handleDownloadVoucher} disabled={isGenerating}>
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4 mr-2" />
-            )}
-            {isGenerating ? 'Generando...' : 'Descargar PDF'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        {/* Detalles de Pago */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Detalles de Pago</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between py-2 border-b">
+                <span>Salario Base</span>
+                <span className="font-semibold">{formatCurrency(employee.baseSalary)}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span>Días Trabajados</span>
+                <span className="font-semibold">{employee.workedDays}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span>Horas Extra</span>
+                <span className="font-semibold">{employee.extraHours}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span>Bonificaciones</span>
+                <span className="font-semibold">{formatCurrency(employee.bonuses)}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span>Incapacidades</span>
+                <span className="font-semibold text-red-600">-{formatCurrency(employee.disabilities)}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b bg-blue-50 px-3 rounded">
+                <span className="font-semibold">Total Devengado</span>
+                <span className="font-bold">{formatCurrency(employee.grossPay)}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b bg-red-50 px-3 rounded">
+                <span className="font-semibold">Total Deducciones</span>
+                <span className="font-bold text-red-600">-{formatCurrency(employee.deductions)}</span>
+              </div>
+              <div className="flex justify-between py-3 bg-green-50 px-3 rounded">
+                <span className="font-bold text-lg">Neto a Pagar</span>
+                <span className="font-bold text-lg text-green-600">{formatCurrency(employee.netPay)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4 border-t">
+        <Button variant="outline" onClick={onClose} disabled={isGenerating}>
+          <X className="h-4 w-4 mr-2" />
+          Cerrar
+        </Button>
+        <Button onClick={handleDownloadVoucher} disabled={isGenerating}>
+          {isGenerating ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
+          {isGenerating ? 'Generando...' : 'Descargar PDF'}
+        </Button>
+      </div>
+    </CustomModal>
   );
 };

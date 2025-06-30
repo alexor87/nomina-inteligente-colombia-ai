@@ -1,11 +1,6 @@
 
 import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PayrollEmployee } from '@/types/payroll';
@@ -79,103 +74,105 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
   ];
 
   return (
-    <Dialog open={isOpen}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Detalle de Cálculos - {employee.name}
-          </DialogTitle>
-        </DialogHeader>
+    <CustomModal 
+      isOpen={isOpen} 
+      onClose={onClose}
+      className="max-w-4xl max-h-[90vh] overflow-y-auto"
+    >
+      <CustomModalHeader>
+        <CustomModalTitle className="flex items-center gap-2">
+          <Calculator className="h-5 w-5" />
+          Detalle de Cálculos - {employee.name}
+        </CustomModalTitle>
+      </CustomModalHeader>
 
-        <div className="space-y-4">
-          {/* Información General */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Información Base</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-sm text-gray-600">Salario Base</div>
-                <div className="font-semibold">{formatCurrency(employee.baseSalary)}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Salario Diario</div>
-                <div className="font-semibold">{formatCurrency(dailySalary)}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Valor Hora</div>
-                <div className="font-semibold">{formatCurrency(hourlySalary)}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Días Trabajados</div>
-                <div className="font-semibold">{employee.workedDays}</div>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="space-y-4">
+        {/* Información General */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Información Base</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <div className="text-sm text-gray-600">Salario Base</div>
+              <div className="font-semibold">{formatCurrency(employee.baseSalary)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Salario Diario</div>
+              <div className="font-semibold">{formatCurrency(dailySalary)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Valor Hora</div>
+              <div className="font-semibold">{formatCurrency(hourlySalary)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Días Trabajados</div>
+              <div className="font-semibold">{employee.workedDays}</div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Detalle de Cálculos */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Detalle de Cálculos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {calculations.map((calc, index) => (
-                  <div key={index} className="border-b pb-4 last:border-b-0">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{calc.title}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{calc.formula}</p>
-                        <p className="text-sm text-blue-600 mt-1">{calc.calculation}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-lg">{calc.result}</div>
-                      </div>
+        {/* Detalle de Cálculos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Detalle de Cálculos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {calculations.map((calc, index) => (
+                <div key={index} className="border-b pb-4 last:border-b-0">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">{calc.title}</h4>
+                      <p className="text-sm text-gray-600 mt-1">{calc.formula}</p>
+                      <p className="text-sm text-blue-600 mt-1">{calc.calculation}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-lg">{calc.result}</div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Resumen Final */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Resumen Final</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-sm text-blue-600 font-medium">Total Devengado</div>
-                  <div className="text-2xl font-bold text-blue-700">
-                    {formatCurrency(employee.grossPay)}
-                  </div>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <div className="text-sm text-red-600 font-medium">Total Deducciones</div>
-                  <div className="text-2xl font-bold text-red-700">
-                    {formatCurrency(employee.deductions)}
-                  </div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-sm text-green-600 font-medium">Neto a Pagar</div>
-                  <div className="text-2xl font-bold text-green-700">
-                    {formatCurrency(employee.netPay)}
-                  </div>
+        {/* Resumen Final */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Resumen Final</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="text-sm text-blue-600 font-medium">Total Devengado</div>
+                <div className="text-2xl font-bold text-blue-700">
+                  {formatCurrency(employee.grossPay)}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="bg-red-50 p-4 rounded-lg">
+                <div className="text-sm text-red-600 font-medium">Total Deducciones</div>
+                <div className="text-2xl font-bold text-red-700">
+                  {formatCurrency(employee.deductions)}
+                </div>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="text-sm text-green-600 font-medium">Neto a Pagar</div>
+                <div className="text-2xl font-bold text-green-700">
+                  {formatCurrency(employee.netPay)}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        <div className="flex justify-end pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            <X className="h-4 w-4 mr-2" />
-            Cerrar
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <div className="flex justify-end pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>
+          <X className="h-4 w-4 mr-2" />
+          Cerrar
+        </Button>
+      </div>
+    </CustomModal>
   );
 };

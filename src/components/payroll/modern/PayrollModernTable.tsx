@@ -422,7 +422,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         )}
       </div>
 
-      {/* Todos los modales usando el estado unificado - SIN onOpenChange */}
+      {/* Todos los modales usando CustomModal */}
       <NovedadUnifiedModal
         isOpen={activeModal === 'novedades'}
         onClose={handleCloseModal}
