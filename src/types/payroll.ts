@@ -12,7 +12,7 @@ export interface PayrollPeriod {
   total_deducciones: number;
   total_neto: number;
   created_at: string;
-  updated_at?: string;
+  updated_at: string; // Made required instead of optional
   modificado_por?: string;
   modificado_en?: string;
 }
