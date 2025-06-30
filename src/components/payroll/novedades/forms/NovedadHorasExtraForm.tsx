@@ -1,27 +1,28 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calculator, Info } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
-import { getJornadaLegal, getDailyHours } from '@/utils/jornadaLegal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Save, Calculator } from 'lucide-react';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface NovedadHorasExtraFormProps {
   onBack: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: CreateNovedadData) => Promise<void>;
   employeeSalary: number;
-  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number) => number | null;
+  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number, dias?: number) => number | null;
 }
 
-const horasExtraSubtipos = [
-  { value: 'diurnas', label: 'Diurnas (25%)', description: 'Lunes a sábado 6:00 AM - 10:00 PM' },
-  { value: 'nocturnas', label: 'Nocturnas (75%)', description: 'Lunes a sábado 10:00 PM - 6:00 AM' },
-  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', description: 'Domingos 6:00 AM - 10:00 PM' },
-  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', description: 'Domingos 10:00 PM - 6:00 AM' },
-  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', description: 'Días festivos 6:00 AM - 10:00 PM' },
-  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', description: 'Días festivos 10:00 PM - 6:00 AM' }
+const horasExtraOptions = [
+  { value: 'diurnas', label: 'Diurnas (25%)', factor: 1.25 },
+  { value: 'nocturnas', label: 'Nocturnas (75%)', factor: 1.75 },
+  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', factor: 2.0 },
+  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', factor: 2.5 },
+  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', factor: 2.0 },
+  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', factor: 2.5 }
 ];
 
 export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
@@ -30,127 +31,219 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   employeeSalary,
   calculateSuggestedValue
 }) => {
-  const [subtipo, setSubtipo] = useState<string>('');
-  const [horas, setHoras] = useState<string>('');
-  const [valorCalculado, setValorCalculado] = useState<number>(0);
-  const [observacion, setObservacion] = useState<string>('');
+  const [formData, setFormData] = useState<CreateNovedadData>({
+    tipo_novedad: 'horas_extra',
+    subtipo: 'diurnas',
+    valor: 0,
+    horas: null,
+    dias: null,
+    observacion: '',
+    fecha_inicio: '',
+    fecha_fin: ''
+  });
 
-  // Get current legal workday info for display
-  const jornadaLegal = getJornadaLegal();
-  const horasPorDia = getDailyHours();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Auto-calculate value when hours or type changes
   useEffect(() => {
-    if (subtipo && horas && parseFloat(horas) > 0 && calculateSuggestedValue) {
-      const calculatedValue = calculateSuggestedValue('horas_extra', subtipo, parseFloat(horas));
-      if (calculatedValue) {
-        setValorCalculado(calculatedValue);
+    if (formData.horas && formData.horas > 0 && formData.subtipo) {
+      let suggestedValue = null;
+      
+      if (calculateSuggestedValue) {
+        suggestedValue = calculateSuggestedValue('horas_extra', formData.subtipo, formData.horas);
+      } else {
+        // Fallback calculation
+        const valorHora = employeeSalary / 240;
+        const option = horasExtraOptions.find(opt => opt.value === formData.subtipo);
+        if (option) {
+          suggestedValue = Math.round(valorHora * option.factor * formData.horas);
+        }
+      }
+      
+      if (suggestedValue && suggestedValue > 0) {
+        setFormData(prev => ({ ...prev, valor: suggestedValue }));
       }
     }
-  }, [subtipo, horas, calculateSuggestedValue]);
+  }, [formData.horas, formData.subtipo, employeeSalary, calculateSuggestedValue]);
 
-  const handleSubmit = () => {
-    if (!subtipo || !horas || parseFloat(horas) <= 0) return;
-
-    onSubmit({
-      tipo_novedad: 'horas_extra',
-      subtipo,
-      horas: parseFloat(horas),
-      valor: valorCalculado,
-      observacion
-    });
+  const handleInputChange = (field: keyof CreateNovedadData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const isValid = subtipo && horas && parseFloat(horas) > 0 && valorCalculado > 0;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!isFormValid()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error('Error submitting novedad:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isFormValid = () => {
+    return (
+      formData.tipo_novedad &&
+      formData.subtipo &&
+      formData.horas !== null && 
+      formData.horas > 0 &&
+      formData.valor > 0
+    );
+  };
+
+  const applySuggestedValue = () => {
+    if (formData.horas && formData.horas > 0 && formData.subtipo) {
+      let suggestedValue = null;
+      
+      if (calculateSuggestedValue) {
+        suggestedValue = calculateSuggestedValue('horas_extra', formData.subtipo, formData.horas);
+      } else {
+        // Fallback calculation
+        const valorHora = employeeSalary / 240;
+        const option = horasExtraOptions.find(opt => opt.value === formData.subtipo);
+        if (option) {
+          suggestedValue = Math.round(valorHora * option.factor * formData.horas);
+        }
+      }
+      
+      if (suggestedValue && suggestedValue > 0) {
+        setFormData(prev => ({ ...prev, valor: suggestedValue }));
+      }
+    }
+  };
+
+  const getSuggestedValue = () => {
+    if (!formData.horas || formData.horas <= 0 || !formData.subtipo) return null;
+    
+    if (calculateSuggestedValue) {
+      return calculateSuggestedValue('horas_extra', formData.subtipo, formData.horas);
+    }
+    
+    // Fallback calculation
+    const valorHora = employeeSalary / 240;
+    const option = horasExtraOptions.find(opt => opt.value === formData.subtipo);
+    if (option) {
+      return Math.round(valorHora * option.factor * formData.horas);
+    }
+    
+    return null;
+  };
+
+  const suggestedValue = getSuggestedValue();
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b">
+      <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">Horas Extra</h3>
-      </div>
-
-      {/* Legal workday info */}
-      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex items-start gap-2 text-blue-700">
-          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium">Jornada legal vigente: {jornadaLegal.horasSemanales} horas semanales</p>
-            <p>Horas por día: {horasPorDia.toFixed(2)} según {jornadaLegal.ley}</p>
-          </div>
+        <div>
+          <h3 className="text-lg font-semibold">Horas Extra</h3>
+          <p className="text-sm text-gray-500">
+            Registro de horas adicionales trabajadas
+          </p>
         </div>
       </div>
 
-      {/* Form */}
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="subtipo">Tipo de Horas Extra</Label>
-          <Select value={subtipo} onValueChange={setSubtipo}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label>Tipo de Horas Extra *</Label>
+          <Select
+            value={formData.subtipo || 'diurnas'}
+            onValueChange={(value) => handleInputChange('subtipo', value)}
+          >
             <SelectTrigger>
-              <SelectValue placeholder="Selecciona el tipo de horas extra" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {horasExtraSubtipos.map((tipo) => (
-                <SelectItem key={tipo.value} value={tipo.value}>
-                  <div>
-                    <div className="font-medium">{tipo.label}</div>
-                    <div className="text-xs text-gray-500">{tipo.description}</div>
-                  </div>
+              {horasExtraOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        <div>
-          <Label htmlFor="horas">Cantidad de Horas</Label>
+        <div className="space-y-2">
+          <Label>Cantidad de Horas *</Label>
           <Input
-            id="horas"
             type="number"
-            placeholder="0"
-            value={horas}
-            onChange={(e) => setHoras(e.target.value)}
             min="0"
+            max="24"
             step="0.5"
+            value={formData.horas || ''}
+            onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
+            placeholder="Ej: 2.5"
           />
         </div>
 
-        {valorCalculado > 0 && (
-          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-            <div className="flex items-center gap-2 text-green-700">
-              <Calculator className="h-4 w-4" />
-              <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
-            </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Valor *</Label>
+            {suggestedValue && suggestedValue !== formData.valor && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={applySuggestedValue}
+                className="text-xs h-7 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+              >
+                <Calculator className="h-3 w-3 mr-1" />
+                ${suggestedValue.toLocaleString()}
+              </Button>
+            )}
+          </div>
+          <Input
+            type="number"
+            min="0"
+            step="1000"
+            value={formData.valor}
+            onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
+            placeholder="0"
+            className="text-lg font-medium"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Observaciones</Label>
+          <Textarea
+            value={formData.observacion || ''}
+            onChange={(e) => handleInputChange('observacion', e.target.value)}
+            placeholder="Detalles adicionales sobre las horas extra..."
+            rows={3}
+            className="resize-none"
+          />
+        </div>
+
+        {formData.valor > 0 && (
+          <div className="p-3 bg-green-50 rounded-lg text-center">
+            <Badge variant="default" className="text-sm px-3 py-1 bg-green-600">
+              + ${formData.valor.toLocaleString()}
+            </Badge>
           </div>
         )}
 
-        <div>
-          <Label htmlFor="observacion">Observaciones (Opcional)</Label>
-          <Textarea
-            id="observacion"
-            placeholder="Detalles adicionales sobre las horas extra..."
-            value={observacion}
-            onChange={(e) => setObservacion(e.target.value)}
-            rows={3}
-          />
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <Button type="button" variant="outline" onClick={onBack}>
+            Atrás
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={!isFormValid() || isSubmitting}
+            className="min-w-[120px]"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {isSubmitting ? 'Guardando...' : 'Agregar Novedad'}
+          </Button>
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-between pt-4 border-t">
-        <Button variant="outline" onClick={onBack}>
-          Atrás
-        </Button>
-        <Button 
-          onClick={handleSubmit}
-          disabled={!isValid}
-          className="min-w-[120px]"
-        >
-          Agregar Novedad
-        </Button>
-      </div>
+      </form>
     </div>
   );
 };
