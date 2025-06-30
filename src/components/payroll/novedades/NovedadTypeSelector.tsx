@@ -1,11 +1,5 @@
 
 import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { 
   Clock, 
@@ -31,7 +25,6 @@ export type NovedadCategory =
   | 'retefuente';
 
 interface NovedadTypeSelectorProps {
-  isOpen: boolean;
   onClose: () => void;
   onSelectCategory: (category: NovedadCategory) => void;
   employeeName: string;
@@ -104,48 +97,45 @@ const novedadCategories = [
 ];
 
 export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
-  isOpen,
   onClose,
   onSelectCategory,
   employeeName
 }) => {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">
-            Agregar Novedad - {employeeName}
-          </DialogTitle>
-        </DialogHeader>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 pb-4 border-b">
+        <h3 className="text-lg font-semibold">
+          Agregar Novedad - {employeeName}
+        </h3>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-4">
-          {novedadCategories.map((category) => {
-            const IconComponent = category.icon;
-            return (
-              <Button
-                key={category.id}
-                variant="outline"
-                className={`h-auto p-4 flex flex-col items-start gap-2 hover:shadow-md transition-all ${category.color}`}
-                onClick={() => onSelectCategory(category.id)}
-              >
-                <div className="flex items-center gap-2 w-full">
-                  <IconComponent className="h-5 w-5" />
-                  <span className="font-medium text-sm">{category.title}</span>
-                </div>
-                <p className="text-xs opacity-75 text-left">
-                  {category.description}
-                </p>
-              </Button>
-            );
-          })}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-4">
+        {novedadCategories.map((category) => {
+          const IconComponent = category.icon;
+          return (
+            <Button
+              key={category.id}
+              variant="outline"
+              className={`h-auto p-4 flex flex-col items-start gap-2 hover:shadow-md transition-all ${category.color}`}
+              onClick={() => onSelectCategory(category.id)}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <IconComponent className="h-5 w-5" />
+                <span className="font-medium text-sm">{category.title}</span>
+              </div>
+              <p className="text-xs opacity-75 text-left">
+                {category.description}
+              </p>
+            </Button>
+          );
+        })}
+      </div>
 
-        <div className="flex justify-end pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <div className="flex justify-end pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
   );
 };

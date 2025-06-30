@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { CustomModal } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
@@ -338,7 +337,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     >
       {currentView === 'selector' && (
         <NovedadTypeSelector
-          isOpen={true}
           onClose={handleClose}
           onSelectCategory={handleSelectCategory}
           employeeName={employeeName}
