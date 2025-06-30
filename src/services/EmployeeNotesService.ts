@@ -9,10 +9,10 @@ export class EmployeeNotesService {
       .select(`
         *,
         employee:employees(nombre, apellido, cargo),
-        creator:profiles!employee_notes_created_by_fkey(first_name, last_name),
+        creator:profiles!created_by(first_name, last_name),
         mentions:employee_note_mentions(
           *,
-          mentioned_user:profiles!employee_note_mentions_mentioned_user_id_fkey(first_name, last_name)
+          mentioned_user:profiles!mentioned_user_id(first_name, last_name)
         )
       `)
       .eq('employee_id', employeeId)
@@ -24,13 +24,20 @@ export class EmployeeNotesService {
   }
 
   static async createEmployeeNote(request: CreateEmployeeNoteRequest): Promise<EmployeeNote> {
-    const { data: companyData } = await supabase
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+
+    if (!userId) {
+      throw new Error('Usuario no autenticado');
+    }
+
+    const { data: profileData } = await supabase
       .from('profiles')
       .select('company_id')
-      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+      .eq('user_id', userId)
       .single();
 
-    if (!companyData?.company_id) {
+    if (!profileData?.company_id) {
       throw new Error('No se pudo obtener la empresa del usuario');
     }
 
@@ -40,14 +47,14 @@ export class EmployeeNotesService {
       .insert({
         employee_id: request.employee_id,
         period_id: request.period_id,
-        company_id: companyData.company_id,
+        company_id: profileData.company_id,
         note_text: request.note_text,
-        created_by: (await supabase.auth.getUser()).data.user?.id
+        created_by: userId
       })
       .select(`
         *,
         employee:employees(nombre, apellido, cargo),
-        creator:profiles!employee_notes_created_by_fkey(first_name, last_name)
+        creator:profiles!created_by(first_name, last_name)
       `)
       .single();
 
@@ -70,7 +77,7 @@ export class EmployeeNotesService {
       await this.createNotificationsForMentions(
         noteData.id,
         request.mentioned_users,
-        companyData.company_id,
+        profileData.company_id,
         noteData.employee?.nombre || '',
         noteData.employee?.apellido || ''
       );
@@ -110,14 +117,23 @@ export class EmployeeNotesService {
   }
 
   static async getCompanyUsers(): Promise<CompanyUser[]> {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+
+    if (!userId) return [];
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (!profileData?.company_id) return [];
+
     const { data, error } = await supabase
       .from('profiles')
       .select('user_id, first_name, last_name')
-      .eq('company_id', (await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        .single()).data?.company_id);
+      .eq('company_id', profileData.company_id);
 
     if (error) throw error;
 
@@ -128,10 +144,15 @@ export class EmployeeNotesService {
   }
 
   static async getUserNotifications(): Promise<UserNotification[]> {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+
+    if (!userId) return [];
+
     const { data, error } = await supabase
       .from('user_notifications')
       .select('*')
-      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -149,10 +170,15 @@ export class EmployeeNotesService {
   }
 
   static async getUnreadNotificationCount(): Promise<number> {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+
+    if (!userId) return 0;
+
     const { count, error } = await supabase
       .from('user_notifications')
       .select('id', { count: 'exact' })
-      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+      .eq('user_id', userId)
       .eq('read', false);
 
     if (error) throw error;

@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
-import { Header } from './Header';
+import Header from './Header';
 
 export const Layout = () => {
   const { roles } = useAuth();
