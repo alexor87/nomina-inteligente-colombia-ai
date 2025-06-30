@@ -13,7 +13,8 @@ export const mockPeriod: PayrollPeriod = {
   total_devengado: 7600000,
   total_deducciones: 1520000,
   total_neto: 6080000,
-  created_at: '2025-06-01T00:00:00Z'
+  created_at: '2025-06-01T00:00:00Z',
+  updated_at: '2025-06-01T00:00:00Z'
 };
 
 export const mockEmployeesBase: BaseEmployeeData[] = [
