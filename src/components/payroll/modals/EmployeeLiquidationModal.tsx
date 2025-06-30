@@ -83,7 +83,9 @@ export const EmployeeLiquidationModal: React.FC<EmployeeLiquidationModalProps> =
     <CustomModal 
       isOpen={isOpen} 
       onClose={onClose}
-      className="max-w-4xl max-h-[90vh] overflow-y-auto"
+      className="max-w-3xl max-h-[90vh] overflow-y-auto"
+      closeOnEscape={false}
+      closeOnBackdrop={false}
     >
       <CustomModalHeader>
         <CustomModalTitle className="flex items-center gap-2">

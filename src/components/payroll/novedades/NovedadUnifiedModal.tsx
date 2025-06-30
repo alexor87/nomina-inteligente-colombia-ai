@@ -1,9 +1,6 @@
 
 import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-} from '@/components/ui/dialog';
+import { CustomModal } from '@/components/ui/custom-modal';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadHorasExtraForm } from './forms/NovedadHorasExtraForm';
 import { NovedadRecargoForm } from './forms/NovedadRecargoForm';
@@ -115,19 +112,23 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        {currentView === 'selector' && (
-          <NovedadTypeSelector
-            isOpen={true}
-            onClose={handleClose}
-            onSelectCategory={handleSelectCategory}
-            employeeName={employeeName}
-          />
-        )}
-        
-        {currentView === 'form' && renderForm()}
-      </DialogContent>
-    </Dialog>
+    <CustomModal 
+      isOpen={isOpen} 
+      onClose={handleClose}
+      className="max-w-2xl max-h-[90vh] overflow-y-auto"
+      closeOnEscape={false}
+      closeOnBackdrop={false}
+    >
+      {currentView === 'selector' && (
+        <NovedadTypeSelector
+          isOpen={true}
+          onClose={handleClose}
+          onSelectCategory={handleSelectCategory}
+          employeeName={employeeName}
+        />
+      )}
+      
+      {currentView === 'form' && renderForm()}
+    </CustomModal>
   );
 };

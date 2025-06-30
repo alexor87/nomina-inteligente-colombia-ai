@@ -103,9 +103,9 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     <CustomModal 
       isOpen={isOpen} 
       onClose={onClose}
-      className="max-w-2xl max-h-[90vh] overflow-y-auto"
-      closeOnEscape={!isGenerating}
-      closeOnBackdrop={!isGenerating}
+      className="max-w-3xl max-h-[90vh] overflow-y-auto"
+      closeOnEscape={false}
+      closeOnBackdrop={false}
     >
       <CustomModalHeader>
         <CustomModalTitle className="flex items-center gap-2">

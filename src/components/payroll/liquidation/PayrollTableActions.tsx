@@ -7,13 +7,15 @@ import {
   Download, 
   Send, 
   Edit,
-  StickyNote
+  StickyNote,
+  FileText
 } from 'lucide-react';
 import { EmployeeCalculationModal } from '../modals/EmployeeCalculationModal';
 import { VoucherPreviewModal } from '../modals/VoucherPreviewModal';
 import { VoucherSendDialog } from '../modals/VoucherSendDialog';
 import { EmployeeLiquidationModal } from '../modals/EmployeeLiquidationModal';
 import { EmployeeNotesModal } from '../notes/EmployeeNotesModal';
+import { NovedadUnifiedModal } from '../novedades/NovedadUnifiedModal';
 
 interface PayrollTableActionsProps {
   employee: PayrollEmployee;
@@ -37,6 +39,12 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
   const [showVoucherSend, setShowVoucherSend] = useState(false);
   const [showLiquidationModal, setShowLiquidationModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showNovedadesModal, setShowNovedadesModal] = useState(false);
+
+  const handleCreateNovedad = async (novedadData: any) => {
+    // Aquí implementarías la lógica para crear la novedad
+    console.log('Creando novedad:', novedadData);
+  };
 
   return (
     <>
@@ -76,6 +84,16 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
           className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
         >
           <StickyNote className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowNovedadesModal(true)}
+          title="Agregar novedad"
+          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+        >
+          <FileText className="h-4 w-4" />
         </Button>
 
         {canEdit && onUpdateEmployee && (
@@ -118,6 +136,15 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         employeeName={`${employee.name}`}
         periodId={period.startDate} // Aquí necesitarías el ID real del período
         periodName={`${period.startDate} - ${period.endDate}`}
+      />
+
+      <NovedadUnifiedModal
+        isOpen={showNovedadesModal}
+        onClose={() => setShowNovedadesModal(false)}
+        employeeName={employee.name}
+        employeeId={employee.id}
+        employeeSalary={employee.baseSalary}
+        onCreateNovedad={handleCreateNovedad}
       />
 
       {canEdit && onUpdateEmployee && (
