@@ -1,26 +1,65 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeNote, EmployeeNoteMention, UserNotification, CompanyUser, CreateEmployeeNoteRequest } from '@/types/employee-notes';
 
 export class EmployeeNotesService {
   static async getEmployeeNotes(employeeId: string, periodId: string): Promise<EmployeeNote[]> {
-    const { data, error } = await supabase
+    // First get the basic notes data
+    const { data: notesData, error: notesError } = await supabase
       .from('employee_notes')
-      .select(`
-        *,
-        employee:employees(nombre, apellido, cargo),
-        creator:profiles(first_name, last_name),
-        mentions:employee_note_mentions(
-          *,
-          mentioned_user:profiles(first_name, last_name)
-        )
-      `)
+      .select('*')
       .eq('employee_id', employeeId)
       .eq('period_id', periodId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+    if (notesError) throw notesError;
+    if (!notesData) return [];
+
+    // Get employee data
+    const { data: employeeData } = await supabase
+      .from('employees')
+      .select('nombre, apellido, cargo')
+      .eq('id', employeeId)
+      .single();
+
+    // Get creator profiles for all notes
+    const creatorIds = [...new Set(notesData.map(note => note.created_by).filter(Boolean))];
+    const { data: creatorsData } = await supabase
+      .from('profiles')
+      .select('user_id, first_name, last_name')
+      .in('user_id', creatorIds);
+
+    // Get mentions for all notes
+    const noteIds = notesData.map(note => note.id);
+    const { data: mentionsData } = await supabase
+      .from('employee_note_mentions')
+      .select('*')
+      .in('note_id', noteIds);
+
+    // Get mentioned user profiles
+    const mentionedUserIds = [...new Set((mentionsData || []).map(mention => mention.mentioned_user_id))];
+    const { data: mentionedUsersData } = await supabase
+      .from('profiles')
+      .select('user_id, first_name, last_name')
+      .in('user_id', mentionedUserIds);
+
+    // Combine all data
+    const result: EmployeeNote[] = notesData.map(note => ({
+      ...note,
+      employee: employeeData ? {
+        nombre: employeeData.nombre,
+        apellido: employeeData.apellido,
+        cargo: employeeData.cargo
+      } : undefined,
+      creator: creatorsData?.find(creator => creator.user_id === note.created_by) || undefined,
+      mentions: (mentionsData || [])
+        .filter(mention => mention.note_id === note.id)
+        .map(mention => ({
+          ...mention,
+          mentioned_user: mentionedUsersData?.find(user => user.user_id === mention.mentioned_user_id) || undefined
+        }))
+    }));
+
+    return result;
   }
 
   static async createEmployeeNote(request: CreateEmployeeNoteRequest): Promise<EmployeeNote> {
@@ -41,7 +80,7 @@ export class EmployeeNotesService {
       throw new Error('No se pudo obtener la empresa del usuario');
     }
 
-    // Crear la nota
+    // Create the note
     const { data: noteData, error: noteError } = await supabase
       .from('employee_notes')
       .insert({
@@ -51,16 +90,26 @@ export class EmployeeNotesService {
         note_text: request.note_text,
         created_by: userId
       })
-      .select(`
-        *,
-        employee:employees(nombre, apellido, cargo),
-        creator:profiles(first_name, last_name)
-      `)
+      .select('*')
       .single();
 
     if (noteError) throw noteError;
 
-    // Crear las menciones si existen
+    // Get employee data
+    const { data: employeeData } = await supabase
+      .from('employees')
+      .select('nombre, apellido, cargo')
+      .eq('id', request.employee_id)
+      .single();
+
+    // Get creator profile
+    const { data: creatorData } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('user_id', userId)
+      .single();
+
+    // Create mentions if they exist
     if (request.mentioned_users.length > 0) {
       const mentionInserts = request.mentioned_users.map(userId => ({
         note_id: noteData.id,
@@ -73,17 +122,27 @@ export class EmployeeNotesService {
 
       if (mentionError) throw mentionError;
 
-      // Crear notificaciones para usuarios mencionados
+      // Create notifications for mentioned users
       await this.createNotificationsForMentions(
         noteData.id,
         request.mentioned_users,
         profileData.company_id,
-        noteData.employee?.nombre || '',
-        noteData.employee?.apellido || ''
+        employeeData?.nombre || '',
+        employeeData?.apellido || ''
       );
     }
 
-    return noteData;
+    // Return the complete note with related data
+    return {
+      ...noteData,
+      employee: employeeData ? {
+        nombre: employeeData.nombre,
+        apellido: employeeData.apellido,
+        cargo: employeeData.cargo
+      } : undefined,
+      creator: creatorData || undefined,
+      mentions: []
+    };
   }
 
   static async updateEmployeeNote(noteId: string, noteText: string): Promise<void> {
