@@ -32,6 +32,8 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   calculateSuggestedValue
 }) => {
   const [formData, setFormData] = useState<CreateNovedadData>({
+    empleado_id: '', // Will be set by parent component
+    periodo_id: '', // Will be set by parent component
     tipo_novedad: 'horas_extra',
     subtipo: 'diurnas',
     valor: 0,
