@@ -80,6 +80,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   // Handler único para abrir modales
   const handleOpenModal = (modalType: ActiveModal, employee: PayrollEmployee) => {
     console.log('🔓 Abriendo modal:', modalType, 'para empleado:', employee.name);
+    console.log('📅 Usando período ID:', periodoId);
     setActiveModal(modalType);
     setSelectedEmployee(employee);
   };
@@ -96,7 +97,13 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     if (!selectedEmployee) return;
     
     console.log('🔄 PayrollModernTable - Creating novedad with data:', data);
-    console.log('📅 Period ID being used:', periodoId);
+    console.log('📅 PayrollModernTable - Period ID being used:', periodoId);
+    
+    // Verify that we have a valid period ID
+    if (!periodoId) {
+      console.error('❌ PayrollModernTable - No period ID available');
+      return;
+    }
     
     const createData: CreateNovedadData = {
       empleado_id: selectedEmployee.id,
@@ -106,8 +113,15 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     
     console.log('📤 PayrollModernTable - Final create data:', createData);
     
-    await createNovedad(createData, true);
-    onRecalculate();
+    try {
+      await createNovedad(createData, true);
+      onRecalculate();
+      // Close modal after successful creation
+      handleCloseModal();
+    } catch (error) {
+      console.error('❌ PayrollModernTable - Error creating novedad:', error);
+      // Don't close modal on error so user can retry
+    }
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
@@ -138,7 +152,8 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
       subtipo,
       horas,
       dias,
-      employeeSalary: selectedEmployee.baseSalary
+      employeeSalary: selectedEmployee.baseSalary,
+      periodoId: periodoId
     });
     
     // Use current date as period date (in a real scenario, this should come from the period)

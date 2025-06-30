@@ -54,38 +54,62 @@ export class NovedadesEnhancedService {
         company_id: companyId
       });
 
-      // Enhanced period validation with multiple checks
+      // Enhanced period validation - check for the current active period
       console.log('🔍 Validating period with multiple table checks...');
       
-      // Check payroll_periods_real first
-      const { data: periodExistsReal, error: periodErrorReal } = await supabase
-        .from('payroll_periods_real')
-        .select('id, fecha_inicio, fecha_fin, estado')
-        .eq('id', data.periodo_id)
-        .eq('company_id', companyId);
-
-      console.log('📊 Period check in payroll_periods_real:', { periodExistsReal, periodErrorReal });
-
-      // Check payroll_periods as fallback
-      const { data: periodExistsRegular, error: periodErrorRegular } = await supabase
+      // First, get the current active period from payroll_periods
+      const { data: activePeriod, error: activePeriodError } = await supabase
         .from('payroll_periods')
         .select('id, fecha_inicio, fecha_fin, estado')
-        .eq('id', data.periodo_id)
-        .eq('company_id', companyId);
+        .eq('company_id', companyId)
+        .eq('estado', 'borrador')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      console.log('📊 Period check in payroll_periods:', { periodExistsRegular, periodErrorRegular });
-
-      const periodExists = periodExistsReal?.[0] || periodExistsRegular?.[0];
-
-      if (!periodExists) {
-        console.error('❌ Period validation failed for period ID:', data.periodo_id);
-        console.error('Available periods in real table:', periodExistsReal);
-        console.error('Available periods in regular table:', periodExistsRegular);
-        throw new Error(`Invalid or non-existent period ID: ${data.periodo_id}`);
+      if (activePeriodError) {
+        console.error('❌ Error getting active period:', activePeriodError);
+        throw new Error('Error validating active period');
       }
 
-      console.log('✅ Period validated successfully:', periodExists);
+      console.log('📊 Active period found:', activePeriod);
+
+      // If no active period in payroll_periods, check payroll_periods_real
+      let validPeriodId = activePeriod?.id;
       
+      if (!validPeriodId) {
+        const { data: realPeriod, error: realPeriodError } = await supabase
+          .from('payroll_periods_real')
+          .select('id, fecha_inicio, fecha_fin, estado')
+          .eq('company_id', companyId)
+          .eq('estado', 'borrador')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (realPeriodError) {
+          console.error('❌ Error getting real period:', realPeriodError);
+          throw new Error('Error validating period');
+        }
+
+        validPeriodId = realPeriod?.id;
+        console.log('📊 Real period found:', realPeriod);
+      }
+
+      if (!validPeriodId) {
+        console.error('❌ No active period found for company:', companyId);
+        throw new Error('No active period found. Please create a payroll period first.');
+      }
+
+      // If the provided periodo_id is different from the active one, use the active one
+      if (data.periodo_id !== validPeriodId) {
+        console.warn('⚠️ Using active period instead of provided period:', {
+          provided: data.periodo_id,
+          active: validPeriodId
+        });
+        data.periodo_id = validPeriodId;
+      }
+
       // Enhanced employee validation
       const { data: employeeExists, error: employeeError } = await supabase
         .from('employees')
@@ -102,7 +126,8 @@ export class NovedadesEnhancedService {
       console.log('✅ Employee validated successfully:', employeeExists);
       
       // Use period date for enhanced calculations
-      const fechaPeriodoReal = new Date(periodExists.fecha_inicio);
+      const fechaPeriodoReal = activePeriod?.fecha_inicio ? 
+        new Date(activePeriod.fecha_inicio) : new Date();
 
       // Enhanced auto-calculation with period-specific legal workday
       let valorFinal = data.valor || 0;
@@ -152,7 +177,7 @@ export class NovedadesEnhancedService {
         creado_por: user.id
       };
 
-      console.log('📤 Inserting enhanced novedad with complete validation:', insertData);
+      console.log('📤 Inserting enhanced novedad with validated period:', insertData);
       
       const { data: result, error } = await supabase
         .from('payroll_novedades')
@@ -178,6 +203,14 @@ export class NovedadesEnhancedService {
       if (error) {
         console.error('❌ Error inserting enhanced novedad:', error);
         console.error('Insert data that failed:', insertData);
+        
+        // Provide more specific error messages
+        if (error.code === '23503') {
+          throw new Error('The selected period is no longer valid. Please refresh the page and try again.');
+        } else if (error.code === '23505') {
+          throw new Error('A similar novedad already exists for this employee and period.');
+        }
+        
         throw error;
       }
 
