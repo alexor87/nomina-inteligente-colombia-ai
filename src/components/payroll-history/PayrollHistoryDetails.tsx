@@ -39,10 +39,9 @@ export const PayrollHistoryDetails = () => {
   // Check if user can edit periods
   const canEditPeriods = isSuperAdmin || hasModuleAccess('payroll-history');
 
-  // Hook para manejar novedades - fix the argument count
+  // Hook para manejar novedades - using the correct method name
   const {
-    createNovedad,
-    loadNovedadesForEmployee
+    loadNovedades
   } = useNovedades(periodId || '');
 
   useEffect(() => {
@@ -59,9 +58,9 @@ export const PayrollHistoryDetails = () => {
       const data = await PayrollHistoryService.getPeriodDetails(periodId);
       setDetails(data);
       
-      // Cargar novedades para todos los empleados
+      // Cargar novedades para todos los empleados usando el método correcto
       data.employees.forEach(employee => {
-        loadNovedadesForEmployee(employee.id);
+        loadNovedades(employee.id);
       });
     } catch (error) {
       console.error('Error loading period details:', error);
