@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { PayrollPeriod } from '@/types/payroll';
 
 export interface CompanySettings {
   id: string;
@@ -7,24 +7,6 @@ export interface CompanySettings {
   periodicity: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
   created_at: string;
   updated_at: string;
-}
-
-export interface PayrollPeriod {
-  id: string;
-  company_id: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  tipo_periodo: string;
-  estado: string;
-  periodo: string;
-  empleados_count: number;
-  total_devengado: number;
-  total_deducciones: number;
-  total_neto: number;
-  created_at: string;
-  updated_at?: string;
-  modificado_por?: string;
-  modificado_en?: string;
 }
 
 export class PayrollPeriodService {

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, CheckCircle, AlertCircle, Edit, Save, X, Users, DollarSign, Lock } from 'lucide-react';
-import { PayrollPeriod } from '@/services/PayrollPeriodService';
+import { PayrollPeriod } from '@/types/payroll';
 import { PayrollPeriodService } from '@/services/PayrollPeriodService';
 import { Input } from '@/components/ui/input';
 
@@ -42,7 +42,7 @@ const statusConfig = {
     color: 'bg-green-50 text-green-700 border-green-200', 
     icon: CheckCircle
   }
-};
+} as const;
 
 export const PayrollPeriodHeader = ({ 
   period, 

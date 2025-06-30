@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -24,27 +25,6 @@ export const usePayrollLiquidation = () => {
     employerContributions: 0,
     totalPayrollCost: 0
   });
-
-  // Helper function to convert database period to PayrollPeriod interface
-  const convertToPayrollPeriod = (dbPeriod: any): PayrollPeriod => {
-    return {
-      id: dbPeriod.id,
-      company_id: dbPeriod.company_id,
-      fecha_inicio: dbPeriod.fecha_inicio,
-      fecha_fin: dbPeriod.fecha_fin,
-      estado: dbPeriod.estado,
-      tipo_periodo: dbPeriod.tipo_periodo,
-      periodo: dbPeriod.periodo || `${dbPeriod.fecha_inicio} - ${dbPeriod.fecha_fin}`,
-      empleados_count: dbPeriod.empleados_count || 0,
-      total_devengado: dbPeriod.total_devengado || 0,
-      total_deducciones: dbPeriod.total_deducciones || 0,
-      total_neto: dbPeriod.total_neto || 0,
-      created_at: dbPeriod.created_at,
-      updated_at: dbPeriod.updated_at,
-      modificado_por: dbPeriod.modificado_por,
-      modificado_en: dbPeriod.modificado_en
-    };
-  };
 
   // Inicializar período al cargar
   const initializePeriod = useCallback(async () => {
@@ -83,7 +63,7 @@ export const usePayrollLiquidation = () => {
           }
 
           if (existingPeriod) {
-            setCurrentPeriod(convertToPayrollPeriod(existingPeriod));
+            setCurrentPeriod(existingPeriod);
             setIsReopenedPeriod(true);
             
             toast({
@@ -130,7 +110,7 @@ export const usePayrollLiquidation = () => {
       }
       
       if (activePeriod) {
-        setCurrentPeriod(convertToPayrollPeriod(activePeriod));
+        setCurrentPeriod(activePeriod);
         setIsReopenedPeriod(false);
         console.log('Active period loaded:', activePeriod);
       }
@@ -257,7 +237,7 @@ export const usePayrollLiquidation = () => {
       });
 
       if (updatedPeriod) {
-        setCurrentPeriod(convertToPayrollPeriod(updatedPeriod));
+        setCurrentPeriod(updatedPeriod);
         
         // Mostrar advertencias si las hay
         if (validation.warnings.length > 0) {
@@ -373,7 +353,7 @@ export const usePayrollLiquidation = () => {
       });
 
       if (updatedPeriod) {
-        setCurrentPeriod(convertToPayrollPeriod(updatedPeriod));
+        setCurrentPeriod(updatedPeriod);
       }
 
       // If this was a reopened period, create audit log for closure

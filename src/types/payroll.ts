@@ -1,10 +1,20 @@
 
 export interface PayrollPeriod {
   id: string;
-  startDate: string;
-  endDate: string;
-  status: 'draft' | 'in_progress' | 'closed' | 'approved';
-  type: 'quincenal' | 'mensual';
+  company_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
+  tipo_periodo: 'quincenal' | 'mensual' | 'semanal' | 'personalizado';
+  periodo: string;
+  empleados_count: number;
+  total_devengado: number;
+  total_deducciones: number;
+  total_neto: number;
+  created_at: string;
+  updated_at?: string;
+  modificado_por?: string;
+  modificado_en?: string;
 }
 
 export interface PayrollEmployee {

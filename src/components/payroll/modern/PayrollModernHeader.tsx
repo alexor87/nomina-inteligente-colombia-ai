@@ -1,6 +1,6 @@
 
 import { Button } from '@/components/ui/button';
-import { PayrollPeriod } from '@/services/PayrollPeriodService';
+import { PayrollPeriod } from '@/types/payroll';
 import { PayrollSummary } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
 
