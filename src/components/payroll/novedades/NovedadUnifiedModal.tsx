@@ -54,12 +54,17 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleSubmit = async (formData: any) => {
+    console.log('📝 NovedadUnifiedModal - Submitting form data:', formData);
+    console.log('👤 Employee ID:', employeeId);
+    
+    // DO NOT override periodo_id - let the parent component handle it
     const novedadData: CreateNovedadData = {
       empleado_id: employeeId,
-      periodo_id: '', // This will be set by the parent component
       ...formData
     };
 
+    console.log('📤 NovedadUnifiedModal - Final data being sent:', novedadData);
+    
     await onCreateNovedad(novedadData);
     handleClose();
   };

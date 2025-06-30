@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -95,11 +94,16 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   const handleCreateNovedad = async (data: CreateNovedadData) => {
     if (!selectedEmployee) return;
     
+    console.log('🔄 PayrollModernTable - Creating novedad with data:', data);
+    console.log('📅 Period ID being used:', periodoId);
+    
     const createData: CreateNovedadData = {
       empleado_id: selectedEmployee.id,
-      periodo_id: periodoId,
+      periodo_id: periodoId, // Use the periodoId passed from parent
       ...data
     };
+    
+    console.log('📤 PayrollModernTable - Final create data:', createData);
     
     await createNovedad(createData, true);
     onRecalculate();
@@ -128,6 +132,14 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   ): number | null => {
     if (!selectedEmployee) return null;
     
+    console.log('🧮 PayrollModernTable - Calculating suggested value:', {
+      tipo,
+      subtipo,
+      horas,
+      dias,
+      employeeSalary: selectedEmployee.baseSalary
+    });
+    
     const salarioDiario = selectedEmployee.baseSalary / 30;
     const valorHora = selectedEmployee.baseSalary / 240;
     
@@ -142,7 +154,9 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
           'festivas_diurnas': 2.0,
           'festivas_nocturnas': 2.5
         };
-        return Math.round(valorHora * factors[subtipo] * horas);
+        const result = Math.round(valorHora * factors[subtipo] * horas);
+        console.log('💰 Overtime calculation result:', result);
+        return result;
         
       case 'recargo':
         if (!horas || !subtipo) return null;
