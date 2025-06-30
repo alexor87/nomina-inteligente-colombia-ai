@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
@@ -25,13 +26,15 @@ interface PayrollTableActionsProps {
   };
   canEdit: boolean;
   onUpdateEmployee?: (id: string, updates: Partial<PayrollEmployee>) => void;
+  periodId?: string;
 }
 
 export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
   employee,
   period,
   canEdit,
-  onUpdateEmployee
+  onUpdateEmployee,
+  periodId = period.startDate // fallback to startDate if periodId not provided
 }) => {
   const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [showVoucherPreview, setShowVoucherPreview] = useState(false);
@@ -136,7 +139,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         onClose={() => setShowNotesModal(false)}
         employeeId={employee.id}
         employeeName={employee.name}
-        periodId={period.startDate}
+        periodId={periodId}
         periodName={`${period.startDate} - ${period.endDate}`}
       />
 
@@ -147,6 +150,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         employeeName={employee.name}
         employeeId={employee.id}
         employeeSalary={employee.baseSalary}
+        periodId={periodId}
         onCreateNovedad={handleCreateNovedad}
       />
 
@@ -156,7 +160,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
           isOpen={showLiquidationModal}
           onClose={() => setShowLiquidationModal(false)}
           employee={employee}
-          periodId={period.startDate}
+          periodId={periodId}
           onUpdateEmployee={onUpdateEmployee}
           canEdit={canEdit}
         />

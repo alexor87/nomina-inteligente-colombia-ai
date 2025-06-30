@@ -380,6 +380,7 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
             employeeName={selectedEmployee.name}
             employeeId={selectedEmployee.id}
             employeeSalary={selectedEmployee.baseSalary}
+            periodId={periodoId}
             onCreateNovedad={handleCreateNovedad}
             calculateSuggestedValue={calculateSuggestedValue}
           />

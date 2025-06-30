@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { CustomModal } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
@@ -210,7 +209,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     return labels[tipo] || tipo;
   };
 
-  const getSubtipoLabel = (subtipo: string): string => {
+  const getSubtipoLabel = (subtipo: string | undefined): string => {
+    if (!subtipo) return '';
     const labels: Record<string, string> = {
       'diurnas': 'Diurnas',
       'nocturnas': 'Nocturnas',
@@ -305,9 +305,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
                       <div key={novedad.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
                         <div className="flex-1">
                           <div className="flex items-center gap-4">
-                            {novedad.subtipo && (
+                            {(novedad as any).subtipo && (
                               <div className="text-sm font-medium text-gray-700">
-                                {getSubtipoLabel(novedad.subtipo)}
+                                {getSubtipoLabel((novedad as any).subtipo)}
                               </div>
                             )}
                             <div className="text-sm text-gray-500 flex gap-3">
@@ -553,9 +553,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       )}
       
       {currentView === 'form' && renderForm()}
-
+      
       {currentView === 'summary' && renderSummary()}
-
+      
       {isSubmitting && (
         <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded-lg shadow-lg">
