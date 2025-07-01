@@ -189,10 +189,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     setSelectedCategory(null);
   };
 
-  const getTipoLabel = (tipo: string): string => {
+  const getTipoLabel = (tipo: string, subtipo?: string): string => {
     const labels: Record<string, string> = {
       'horas_extra': 'Horas Extra',
-      'recargo_nocturno': 'Recargo Nocturno',
+      'recargo_nocturno': 'Recargo',
       'vacaciones': 'Vacaciones',
       'incapacidades': 'Incapacidades',
       'incapacidad': 'Incapacidades',
@@ -206,18 +206,36 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       'retefuente': 'Retención en la Fuente',
       'retencion_fuente': 'Retención en la Fuente'
     };
-    return labels[tipo] || tipo;
+    
+    let baseLabel = labels[tipo] || tipo;
+    
+    // For recargos and horas_extra, add the subtipo for better identification
+    if ((tipo === 'recargo_nocturno' || tipo === 'horas_extra') && subtipo) {
+      const subtipoLabel = getSubtipoLabel(subtipo);
+      if (subtipoLabel) {
+        baseLabel = `${baseLabel} - ${subtipoLabel}`;
+      }
+    }
+    
+    return baseLabel;
   };
 
   const getSubtipoLabel = (subtipo: string | undefined): string => {
     if (!subtipo) return '';
     const labels: Record<string, string> = {
+      // Horas extra subtipos
       'diurnas': 'Diurnas',
       'nocturnas': 'Nocturnas',
       'dominicales_diurnas': 'Dom. Diurnas',
       'dominicales_nocturnas': 'Dom. Nocturnas',
       'festivas_diurnas': 'Fest. Diurnas',
-      'festivas_nocturnas': 'Fest. Nocturnas'
+      'festivas_nocturnas': 'Fest. Nocturnas',
+      // Recargo subtipos
+      'nocturno': 'Nocturno',
+      'dominical': 'Dominical',
+      'nocturno_dominical': 'Nocturno Dominical',
+      'festivo': 'Festivo',
+      'nocturno_festivo': 'Nocturno Festivo'
     };
     return labels[subtipo] || subtipo;
   };
@@ -272,7 +290,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             <FileText className="h-5 w-5 text-blue-600" />
             <h3 className="text-lg font-semibold">Novedades - {employeeName}</h3>
           </div>
-          <Button onClick={handleAddAnother} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={handleAddAnother} className="bg-blue-600 hover:bg-blue-700 relative">
             <Plus className="h-4 w-4 mr-2" />
             Agregar Novedad
           </Button>

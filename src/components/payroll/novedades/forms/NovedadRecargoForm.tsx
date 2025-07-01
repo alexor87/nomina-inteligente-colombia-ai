@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,16 +25,16 @@ const tiposRecargo = [
   { 
     value: 'dominical', 
     label: 'Recargo Dominical', 
-    porcentaje: 75,
+    porcentaje: 80, // Actualizado según el artículo
     descripcion: 'Trabajo en día domingo',
-    info: '75% adicional sobre el valor de la hora ordinaria'
+    info: '80% adicional sobre el valor de la hora ordinaria'
   },
   { 
     value: 'nocturno_dominical', 
     label: 'Recargo Nocturno Dominical', 
-    porcentaje: 110,
+    porcentaje: 115, // Actualizado según el artículo
     descripcion: 'Trabajo nocturno en día domingo',
-    info: '110% adicional (35% nocturno + 75% dominical)'
+    info: '115% adicional (35% nocturno + 80% dominical)'
   },
   { 
     value: 'festivo', 
