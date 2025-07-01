@@ -8,9 +8,15 @@ export type NovedadType =
   | 'licencia_remunerada'
   | 'incapacidad'
   | 'bonificacion'
+  | 'bonificacion_salarial'
+  | 'bonificacion_no_salarial'
   | 'comision'
   | 'prima'
   | 'otros_ingresos'
+  | 'auxilio_conectividad'
+  | 'viaticos'
+  | 'retroactivos'
+  | 'compensacion_ordinaria'
   | 'libranza'
   | 'multa'
   | 'ausencia'
@@ -22,7 +28,10 @@ export type NovedadType =
   | 'arl'
   | 'caja_compensacion'
   | 'icbf'
-  | 'sena';
+  | 'sena'
+  | 'embargo'
+  | 'anticipo'
+  | 'aporte_voluntario';
 
 export const NOVEDAD_CATEGORIES: Record<NovedadType, 'devengado' | 'deduccion'> = {
   horas_extra: 'devengado',
@@ -31,9 +40,15 @@ export const NOVEDAD_CATEGORIES: Record<NovedadType, 'devengado' | 'deduccion'> 
   licencia_remunerada: 'devengado',
   incapacidad: 'devengado',
   bonificacion: 'devengado',
+  bonificacion_salarial: 'devengado',
+  bonificacion_no_salarial: 'devengado',
   comision: 'devengado',
   prima: 'devengado',
   otros_ingresos: 'devengado',
+  auxilio_conectividad: 'devengado',
+  viaticos: 'devengado',
+  retroactivos: 'devengado',
+  compensacion_ordinaria: 'devengado',
   libranza: 'deduccion',
   multa: 'deduccion',
   ausencia: 'deduccion',
@@ -45,7 +60,10 @@ export const NOVEDAD_CATEGORIES: Record<NovedadType, 'devengado' | 'deduccion'> 
   arl: 'deduccion',
   caja_compensacion: 'deduccion',
   icbf: 'deduccion',
-  sena: 'deduccion'
+  sena: 'deduccion',
+  embargo: 'deduccion',
+  anticipo: 'deduccion',
+  aporte_voluntario: 'deduccion'
 };
 
 export interface PayrollNovedad {
@@ -98,17 +116,57 @@ export interface CalculationResult {
 }
 
 /**
+ * Calcula el FSP con tarifas escalonadas según la normativa colombiana
+ */
+const calcularFSP = (ibc: number, smmlv: number): number => {
+  const multiplicadorIBC = ibc / smmlv;
+  
+  if (multiplicadorIBC <= 4) return 0;
+  if (multiplicadorIBC <= 16) return ibc * 0.01;
+  if (multiplicadorIBC <= 17) return ibc * 0.012;
+  if (multiplicadorIBC <= 18) return ibc * 0.014;
+  if (multiplicadorIBC <= 19) return ibc * 0.016;
+  if (multiplicadorIBC <= 20) return ibc * 0.018;
+  return ibc * 0.02;
+};
+
+/**
+ * Validaciones legales obligatorias
+ */
+const validarLimitesLegales = (
+  tipoNovedad: NovedadType,
+  valor: number,
+  horas?: number,
+  salarioBase?: number
+): { esValido: boolean; mensajes: string[] } => {
+  const mensajes: string[] = [];
+  let esValido = true;
+
+  switch (tipoNovedad) {
+    case 'horas_extra':
+      if (horas && horas > 12) {
+        esValido = false;
+        mensajes.push('Las horas extra no pueden superar 12 por día');
+      }
+      break;
+    
+    case 'auxilio_conectividad':
+      if (salarioBase && salarioBase > 2600000) { // 2 SMMLV aprox
+        esValido = false;
+        mensajes.push('El auxilio de conectividad solo aplica para salarios ≤ 2 SMMLV');
+      }
+      break;
+  }
+
+  return { esValido, mensajes };
+};
+
+/**
  * Calcula el valor hora ordinaria para recargos usando la fórmula correcta
  * Según el artículo: salario / 30 / 7.3333
- * Para el ejemplo: $1.718.661 / 30 / 7.3333 = $7,815.74 (valor hora ordinaria)
- * Recargo nocturno (35%): $7,815.74 × 0.35 = $2,735.51 ≈ $2,615 (ajustado)
  */
 const calcularValorHoraRecargo = (salarioBase: number): number => {
-  // Usando un divisor ajustado para que coincida con los valores esperados
-  // Basado en el ejemplo: $1,718,661 → 1 hora recargo nocturno = $2,615
-  // Esto implica: $2,615 / 0.35 = $7,471.43 (valor hora)
-  // Por lo tanto: $1,718,661 / $7,471.43 = 230 horas aprox
-  return salarioBase / 230;
+  return salarioBase / 30 / 7.3333;
 };
 
 /**
@@ -120,17 +178,13 @@ export const calcularValorNovedadEnhanced = (
   salarioBase: number,
   dias?: number,
   horas?: number,
-  fechaPeriodo: Date = new Date() // Nueva propiedad para cálculos históricos
+  fechaPeriodo: Date = new Date()
 ): CalculationResult => {
   const jornadaLegal = getJornadaLegal(fechaPeriodo);
   const hourlyDivisor = getHourlyDivisor(fechaPeriodo);
   const valorHoraOrdinaria = salarioBase / hourlyDivisor;
   const valorDiario = salarioBase / 30;
-
-  // Para horas extra, usar la fórmula específica
   const valorHoraExtra = calcularValorHoraExtra(salarioBase, fechaPeriodo);
-
-  // Para recargos, usar la fórmula ajustada
   const valorHoraRecargo = calcularValorHoraRecargo(salarioBase);
 
   console.log(`💰 Calculando novedad ${tipoNovedad} con jornada de ${jornadaLegal.horasSemanales}h semanales`);
@@ -151,6 +205,13 @@ export const calcularValorNovedadEnhanced = (
     }
   };
 
+  // Validar límites legales
+  const validacion = validarLimitesLegales(tipoNovedad, 0, horas, salarioBase);
+  if (!validacion.esValido) {
+    result.baseCalculo.detalle_calculo = `Error: ${validacion.mensajes.join(', ')}`;
+    return result;
+  }
+
   try {
     switch (tipoNovedad) {
       case 'horas_extra':
@@ -158,42 +219,39 @@ export const calcularValorNovedadEnhanced = (
           throw new Error('Las horas extra deben ser mayor a 0');
         }
 
-        let recargo = 0.25; // 25% por defecto
-        let descripcionRecargo = 'diurnas (25%)';
+        // MULTIPLICADORES CORREGIDOS según especificación
+        let recargo = 0.25; // 25% por defecto (1.25 total)
+        let descripcionRecargo = 'diurnas (1.25x)';
 
-        // Manejar tanto undefined como "diurnas" como el caso por defecto
         if (subtipo && subtipo !== 'diurnas') {
           switch (subtipo) {
             case 'nocturnas':
-              recargo = 0.75;
-              descripcionRecargo = 'nocturnas (75%)';
+              recargo = 0.75; // 75% (1.75x total)
+              descripcionRecargo = 'nocturnas (1.75x)';
               break;
             case 'dominicales_diurnas':
-              recargo = 1.0;
-              descripcionRecargo = 'dominicales diurnas (100%)';
+              recargo = 1.05; // 105% (2.05x total)
+              descripcionRecargo = 'dominicales diurnas (2.05x)';
               break;
             case 'dominicales_nocturnas':
-              recargo = 1.5;
-              descripcionRecargo = 'dominicales nocturnas (150%)';
+              recargo = 1.55; // 155% (2.55x total)
+              descripcionRecargo = 'dominicales nocturnas (2.55x)';
               break;
             case 'festivas_diurnas':
-              recargo = 1.0;
-              descripcionRecargo = 'festivas diurnas (100%)';
+              recargo = 1.05; // 105% (2.05x total)
+              descripcionRecargo = 'festivas diurnas (2.05x)';
               break;
             case 'festivas_nocturnas':
-              recargo = 1.5;
-              descripcionRecargo = 'festivas nocturnas (150%)';
+              recargo = 1.55; // 155% (2.55x total)
+              descripcionRecargo = 'festivas nocturnas (2.55x)';
               break;
           }
         }
 
-        // USAR LA FÓRMULA CORRECTA PARA HORAS EXTRA
         result.valor = horas * valorHoraExtra * (1 + recargo);
         result.baseCalculo.factor_calculo = (1 + recargo);
         result.baseCalculo.detalle_calculo = 
-          `${horas} horas extra ${descripcionRecargo} × $${Math.round(valorHoraExtra)} × ${(1 + recargo)} = $${Math.round(result.valor)}. ` +
-          `Fórmula: (Salario ÷ 30) ÷ ${(jornadaLegal.horasSemanales / 6).toFixed(3)} horas/día. ` +
-          `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
+          `${horas} horas extra ${descripcionRecargo} × $${Math.round(valorHoraExtra)} × ${(1 + recargo)} = $${Math.round(result.valor)}`;
         break;
 
       case 'recargo_nocturno':
@@ -201,7 +259,7 @@ export const calcularValorNovedadEnhanced = (
           throw new Error('Las horas de recargo deben ser mayor a 0');
         }
         
-        let factorRecargo = 0.35; // 35% por defecto para nocturno
+        let factorRecargo = 0.35;
         let descripcionTipoRecargo = 'nocturno (35%)';
         
         if (subtipo) {
@@ -211,11 +269,11 @@ export const calcularValorNovedadEnhanced = (
               descripcionTipoRecargo = 'nocturno (35%)';
               break;
             case 'dominical':
-              factorRecargo = 0.80; // Actualizado según el artículo
+              factorRecargo = 0.80;
               descripcionTipoRecargo = 'dominical (80%)';
               break;
             case 'nocturno_dominical':
-              factorRecargo = 1.15; // Actualizado según el artículo
+              factorRecargo = 1.15;
               descripcionTipoRecargo = 'nocturno dominical (115%)';
               break;
             case 'festivo':
@@ -229,12 +287,28 @@ export const calcularValorNovedadEnhanced = (
           }
         }
         
-        // Solo se paga el porcentaje de recargo, NO la hora completa + recargo
         result.valor = horas * valorHoraRecargo * factorRecargo;
         result.baseCalculo.factor_calculo = factorRecargo;
         result.baseCalculo.detalle_calculo = 
-          `${horas} horas recargo ${descripcionTipoRecargo} × $${Math.round(valorHoraRecargo)} × ${factorRecargo} = $${Math.round(result.valor)}. ` +
-          `Fórmula hora ordinaria para recargos: Salario ÷ 230 horas (ajustado para coincidencia con valores esperados)`;
+          `${horas} horas recargo ${descripcionTipoRecargo} × $${Math.round(valorHoraRecargo)} × ${factorRecargo} = $${Math.round(result.valor)}`;
+        break;
+
+      case 'fondo_solidaridad':
+        // Implementar FSP con tarifas escalonadas
+        const smmlv = 1300000; // 2025
+        const fspCalculado = calcularFSP(salarioBase, smmlv);
+        result.valor = fspCalculado;
+        result.baseCalculo.detalle_calculo = 
+          `FSP calculado según IBC: $${Math.round(fspCalculado)} (IBC: ${(salarioBase/smmlv).toFixed(2)} SMMLV)`;
+        break;
+
+      case 'auxilio_conectividad':
+        if (salarioBase <= 2600000) { // 2 SMMLV aprox
+          result.valor = dias ? (dias * 50000 / 30) : 50000; // Valor mensual ejemplo
+          result.baseCalculo.detalle_calculo = 'Auxilio de conectividad digital';
+        } else {
+          throw new Error('Auxilio de conectividad solo aplica para salarios ≤ 2 SMMLV');
+        }
         break;
 
       case 'vacaciones':
@@ -314,13 +388,13 @@ export const calcularValorNovedadEnhanced = (
       case 'multa':
       case 'descuento_voluntario':
       case 'retencion_fuente':
-      case 'fondo_solidaridad':
       case 'salud':
       case 'pension':
       case 'arl':
       case 'caja_compensacion':
       case 'icbf':
       case 'sena':
+      case 'ausencia':
         result.baseCalculo.detalle_calculo = 'Valor fijo de deducción';
         break;
 
@@ -334,12 +408,15 @@ export const calcularValorNovedadEnhanced = (
         result.baseCalculo.detalle_calculo = 
           `${dias} días ausencia × $${Math.round(valorDiario)} = $${Math.round(result.valor)} (deducción)`;
         break;
-
+      
       default:
-        throw new Error(`Tipo de novedad no soportado: ${tipoNovedad}`);
+        if (['bonificacion_salarial', 'bonificacion_no_salarial', 'viaticos', 'retroactivos', 'compensacion_ordinaria', 'embargo', 'anticipo', 'aporte_voluntario'].includes(tipoNovedad)) {
+          result.baseCalculo.detalle_calculo = `${tipoNovedad.replace('_', ' ')} - Valor a ingresar manualmente`;
+        } else {
+          throw new Error(`Tipo de novedad no soportado: ${tipoNovedad}`);
+        }
     }
 
-    // Validar que el valor sea positivo para devengados
     if (result.valor < 0) {
       result.valor = 0;
     }

@@ -27,10 +27,10 @@ interface HorasExtraRow {
 const horasExtraTypes: Omit<HorasExtraRow, 'horas' | 'valor'>[] = [
   { subtipo: 'diurnas', label: 'Diurnas', description: 'Lunes a sábado 6:00 AM - 10:00 PM', factor: '1.25' },
   { subtipo: 'nocturnas', label: 'Nocturnas', description: 'Lunes a sábado 10:00 PM - 6:00 AM', factor: '1.75' },
-  { subtipo: 'dominicales_diurnas', label: 'Dominicales Diurnas', description: 'Domingos 6:00 AM - 10:00 PM', factor: '2.00' },
-  { subtipo: 'dominicales_nocturnas', label: 'Dominicales Nocturnas', description: 'Domingos 10:00 PM - 6:00 AM', factor: '2.50' },
-  { subtipo: 'festivas_diurnas', label: 'Festivas Diurnas', description: 'Días festivos 6:00 AM - 10:00 PM', factor: '2.00' },
-  { subtipo: 'festivas_nocturnas', label: 'Festivas Nocturnas', description: 'Días festivos 10:00 PM - 6:00 AM', factor: '2.50' }
+  { subtipo: 'dominicales_diurnas', label: 'Dominicales Diurnas', description: 'Domingos 6:00 AM - 10:00 PM', factor: '2.05' }, // Corregido
+  { subtipo: 'dominicales_nocturnas', label: 'Dominicales Nocturnas', description: 'Domingos 10:00 PM - 6:00 AM', factor: '2.55' }, // Corregido
+  { subtipo: 'festivas_diurnas', label: 'Festivas Diurnas', description: 'Días festivos 6:00 AM - 10:00 PM', factor: '2.05' }, // Corregido
+  { subtipo: 'festivas_nocturnas', label: 'Festivas Nocturnas', description: 'Días festivos 10:00 PM - 6:00 AM', factor: '2.55' } // Corregido
 ];
 
 export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsolidatedFormProps> = ({

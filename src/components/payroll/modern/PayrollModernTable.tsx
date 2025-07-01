@@ -156,27 +156,23 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
       periodoId: periodoId
     });
     
-    // Use current date as period date (in a real scenario, this should come from the period)
     const fechaPeriodo = new Date();
-    
     const salarioDiario = selectedEmployee.baseSalary / 30;
-    // Use the dynamic legal workday calculation for horas extra
     const valorHoraExtra = calcularValorHoraExtra(selectedEmployee.baseSalary, fechaPeriodo);
-    // Use the adjusted formula for recargos: salario / 230 (adjusted to match expected values)
-    const valorHoraRecargo = selectedEmployee.baseSalary / 230;
+    const valorHoraRecargo = selectedEmployee.baseSalary / 30 / 7.3333; // Fórmula correcta
     
     switch (tipo) {
       case 'horas_extra':
         if (!horas || !subtipo) return null;
+        // MULTIPLICADORES CORREGIDOS según especificación
         const factors: Record<string, number> = {
           'diurnas': 1.25,
           'nocturnas': 1.75,
-          'dominicales_diurnas': 2.0,
-          'dominicales_nocturnas': 2.5,
-          'festivas_diurnas': 2.0,
-          'festivas_nocturnas': 2.5
+          'dominicales_diurnas': 2.05,  // Corregido de 2.0 a 2.05
+          'dominicales_nocturnas': 2.55, // Corregido de 2.5 a 2.55
+          'festivas_diurnas': 2.05,     // Corregido de 2.0 a 2.05
+          'festivas_nocturnas': 2.55    // Corregido de 2.5 a 2.55
         };
-        // Use the dynamic hora extra value with the overtime factors
         const result = Math.round(valorHoraExtra * factors[subtipo] * horas);
         console.log(`💰 Overtime calculation: $${Math.round(valorHoraExtra)} × ${factors[subtipo]} × ${horas}h = $${result}`);
         return result;
@@ -185,15 +181,13 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         if (!horas || !subtipo) return null;
         const recargoFactors: Record<string, number> = {
           'nocturno': 0.35,
-          'dominical': 0.80, // Actualizado según el artículo
-          'nocturno_dominical': 1.15, // Actualizado según el artículo  
+          'dominical': 0.80,
+          'nocturno_dominical': 1.15,
           'festivo': 0.75,
           'nocturno_festivo': 1.10
         };
-        // Solo el factor de recargo sobre la hora ordinaria ajustada
         const recargoResult = Math.round(valorHoraRecargo * recargoFactors[subtipo] * horas);
         console.log(`💰 Recargo calculation: $${Math.round(valorHoraRecargo)} × ${recargoFactors[subtipo]} × ${horas}h = $${recargoResult}`);
-        console.log(`📐 Recargo formula: Salario (${selectedEmployee.baseSalary}) ÷ 230 = $${Math.round(valorHoraRecargo)} hora ordinaria (ajustado)`);
         return recargoResult;
         
       case 'vacaciones':

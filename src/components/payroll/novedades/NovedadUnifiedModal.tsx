@@ -11,6 +11,7 @@ import { NovedadIngresosAdicionalesForm } from './forms/NovedadIngresosAdicional
 import { NovedadDeduccionesForm } from './forms/NovedadDeduccionesForm';
 import { NovedadPrestamosForm } from './forms/NovedadPrestamosForm';
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
+import { NovedadBonificacionesForm } from './forms/NovedadBonificacionesForm';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 import { formatCurrency } from '@/lib/utils';
 import { Plus, Check, X, Edit, Trash2, FileText } from 'lucide-react';
@@ -193,6 +194,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     const labels: Record<string, string> = {
       'horas_extra': 'Horas Extra',
       'recargo_nocturno': 'Recargo',
+      'bonificaciones': 'Bonificaciones',
       'vacaciones': 'Vacaciones',
       'incapacidades': 'Incapacidades',
       'incapacidad': 'Incapacidades',
@@ -201,6 +203,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       'ingresos_adicionales': 'Ingresos Adicionales',
       'otros_ingresos': 'Ingresos Adicionales',
       'deducciones': 'Deducciones',
+      'deducciones_especiales': 'Deducciones Especiales',
       'prestamos': 'Préstamos',
       'libranza': 'Préstamos',
       'retefuente': 'Retención en la Fuente',
@@ -245,14 +248,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const getTotalDevengos = () => {
-    const devengos = ['horas_extra', 'recargo_nocturno', 'vacaciones', 'incapacidades', 'incapacidad', 'licencias', 'licencia_remunerada', 'ingresos_adicionales', 'otros_ingresos'];
+    const devengos = ['horas_extra', 'recargo_nocturno', 'bonificaciones', 'vacaciones', 'incapacidades', 'incapacidad', 'licencias', 'licencia_remunerada', 'ingresos_adicionales', 'otros_ingresos'];
     return getAllNovedades()
       .filter(n => devengos.includes(n.tipo_novedad))
       .reduce((sum, n) => sum + Number(n.valor), 0);
   };
 
   const getTotalDeducciones = () => {
-    const deducciones = ['deducciones', 'prestamos', 'libranza', 'retefuente', 'retencion_fuente'];
+    const deducciones = ['deducciones', 'deducciones_especiales', 'prestamos', 'libranza', 'retefuente', 'retencion_fuente'];
     return getAllNovedades()
       .filter(n => deducciones.includes(n.tipo_novedad))
       .reduce((sum, n) => sum + Number(n.valor), 0);
@@ -430,6 +433,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         );
       case 'recargo_nocturno':
         return <NovedadRecargoForm {...commonProps} />;
+      case 'bonificaciones':
+        return <NovedadBonificacionesForm {...commonPropsWithoutCalculation} />;
       case 'vacaciones':
         return <NovedadVacacionesForm {...commonProps} />;
       case 'incapacidades':
@@ -438,6 +443,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         return <NovedadLicenciasForm {...commonProps} />;
       case 'ingresos_adicionales':
         return <NovedadIngresosAdicionalesForm {...commonPropsWithoutCalculation} />;
+      case 'deducciones_especiales':
+        return <NovedadDeduccionesForm {...commonPropsWithoutCalculation} />;
       case 'deducciones':
         return <NovedadDeduccionesForm {...commonPropsWithoutCalculation} />;
       case 'prestamos':
