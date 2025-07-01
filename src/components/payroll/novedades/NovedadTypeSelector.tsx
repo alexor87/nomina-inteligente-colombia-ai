@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Clock, DollarSign, TrendingUp, TrendingDown, Users, FileText, CreditCard, AlertTriangle, Percent } from 'lucide-react';
 
 export type NovedadCategory = 
@@ -22,7 +23,7 @@ interface NovedadTypeSelectorProps {
   employeeName: string;
 }
 
-const categorias = [
+const devengadosCategorias = [
   {
     id: 'horas_extra' as NovedadCategory,
     title: 'Horas Extra',
@@ -64,6 +65,19 @@ const categorias = [
     borderColor: 'border-orange-200'
   },
   {
+    id: 'ingresos_adicionales' as NovedadCategory,
+    title: 'Otros Ingresos',
+    description: 'Comisiones, viáticos, retroactivos',
+    icon: TrendingUp,
+    color: 'bg-teal-500',
+    textColor: 'text-teal-600',
+    bgColor: 'bg-teal-50',
+    borderColor: 'border-teal-200'
+  }
+];
+
+const deduccionesCategorias = [
+  {
     id: 'incapacidades' as NovedadCategory,
     title: 'Incapacidades',
     description: 'Común, laboral y maternidad',
@@ -82,16 +96,6 @@ const categorias = [
     textColor: 'text-indigo-600',
     bgColor: 'bg-indigo-50',
     borderColor: 'border-indigo-200'
-  },
-  {
-    id: 'ingresos_adicionales' as NovedadCategory,
-    title: 'Otros Ingresos',
-    description: 'Comisiones, viáticos, retroactivos',
-    icon: TrendingUp,
-    color: 'bg-teal-500',
-    textColor: 'text-teal-600',
-    bgColor: 'bg-teal-50',
-    borderColor: 'border-teal-200'
   },
   {
     id: 'deducciones_especiales' as NovedadCategory,
@@ -125,6 +129,35 @@ const categorias = [
   }
 ];
 
+const renderCategoriesGrid = (categorias: typeof devengadosCategorias) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {categorias.map((categoria) => {
+      const IconComponent = categoria.icon;
+      return (
+        <button
+          key={categoria.id}
+          onClick={() => onSelectCategory(categoria.id)}
+          className={`p-4 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-md ${categoria.bgColor} ${categoria.borderColor} hover:border-opacity-100 border-opacity-50`}
+        >
+          <div className="flex items-start space-x-3">
+            <div className={`p-2 rounded-lg ${categoria.color} text-white flex-shrink-0`}>
+              <IconComponent className="h-5 w-5" />
+            </div>
+            <div className="flex-1 text-left">
+              <h4 className={`font-semibold ${categoria.textColor} mb-1`}>
+                {categoria.title}
+              </h4>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {categoria.description}
+              </p>
+            </div>
+          </div>
+        </button>
+      );
+    })}
+  </div>
+);
+
 export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
   onClose,
   onSelectCategory,
@@ -144,33 +177,35 @@ export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
         Selecciona el tipo de novedad que deseas agregar para <strong>{employeeName}</strong>
       </div>
 
-      {/* Categories Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {categorias.map((categoria) => {
-          const IconComponent = categoria.icon;
-          return (
-            <button
-              key={categoria.id}
-              onClick={() => onSelectCategory(categoria.id)}
-              className={`p-4 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-md ${categoria.bgColor} ${categoria.borderColor} hover:border-opacity-100 border-opacity-50`}
-            >
-              <div className="flex items-start space-x-3">
-                <div className={`p-2 rounded-lg ${categoria.color} text-white flex-shrink-0`}>
-                  <IconComponent className="h-5 w-5" />
-                </div>
-                <div className="flex-1 text-left">
-                  <h4 className={`font-semibold ${categoria.textColor} mb-1`}>
-                    {categoria.title}
-                  </h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {categoria.description}
-                  </p>
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {/* Tabs System */}
+      <Tabs defaultValue="devengos" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="devengos" className="flex items-center space-x-2">
+            <TrendingUp className="h-4 w-4" />
+            <span>Devengos</span>
+          </TabsTrigger>
+          <TabsTrigger value="deducciones" className="flex items-center space-x-2">
+            <TrendingDown className="h-4 w-4" />
+            <span>Deducciones</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="devengos" className="mt-6">
+          <div className="mb-4">
+            <h4 className="font-medium text-green-700 mb-2">Conceptos que incrementan el salario</h4>
+            <p className="text-sm text-gray-600">Selecciona los conceptos que aumentan el pago del empleado</p>
+          </div>
+          {renderCategoriesGrid(devengadosCategorias)}
+        </TabsContent>
+
+        <TabsContent value="deducciones" className="mt-6">
+          <div className="mb-4">
+            <h4 className="font-medium text-red-700 mb-2">Conceptos que reducen el salario</h4>
+            <p className="text-sm text-gray-600">Selecciona los conceptos que reducen el pago del empleado</p>
+          </div>
+          {renderCategoriesGrid(deduccionesCategorias)}
+        </TabsContent>
+      </Tabs>
 
       {/* Footer */}
       <div className="flex justify-end pt-4 border-t">
