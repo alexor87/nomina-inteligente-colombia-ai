@@ -129,40 +129,40 @@ const deduccionesCategorias = [
   }
 ];
 
-const renderCategoriesGrid = (categorias: typeof devengadosCategorias) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {categorias.map((categoria) => {
-      const IconComponent = categoria.icon;
-      return (
-        <button
-          key={categoria.id}
-          onClick={() => onSelectCategory(categoria.id)}
-          className={`p-4 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-md ${categoria.bgColor} ${categoria.borderColor} hover:border-opacity-100 border-opacity-50`}
-        >
-          <div className="flex items-start space-x-3">
-            <div className={`p-2 rounded-lg ${categoria.color} text-white flex-shrink-0`}>
-              <IconComponent className="h-5 w-5" />
-            </div>
-            <div className="flex-1 text-left">
-              <h4 className={`font-semibold ${categoria.textColor} mb-1`}>
-                {categoria.title}
-              </h4>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {categoria.description}
-              </p>
-            </div>
-          </div>
-        </button>
-      );
-    })}
-  </div>
-);
-
 export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
   onClose,
   onSelectCategory,
   employeeName
 }) => {
+  const renderCategoriesGrid = (categorias: typeof devengadosCategorias, onSelectCategoryFn: (category: NovedadCategory) => void) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {categorias.map((categoria) => {
+        const IconComponent = categoria.icon;
+        return (
+          <button
+            key={categoria.id}
+            onClick={() => onSelectCategoryFn(categoria.id)}
+            className={`p-4 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-md ${categoria.bgColor} ${categoria.borderColor} hover:border-opacity-100 border-opacity-50`}
+          >
+            <div className="flex items-start space-x-3">
+              <div className={`p-2 rounded-lg ${categoria.color} text-white flex-shrink-0`}>
+                <IconComponent className="h-5 w-5" />
+              </div>
+              <div className="flex-1 text-left">
+                <h4 className={`font-semibold ${categoria.textColor} mb-1`}>
+                  {categoria.title}
+                </h4>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {categoria.description}
+                </p>
+              </div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -195,7 +195,7 @@ export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
             <h4 className="font-medium text-green-700 mb-2">Conceptos que incrementan el salario</h4>
             <p className="text-sm text-gray-600">Selecciona los conceptos que aumentan el pago del empleado</p>
           </div>
-          {renderCategoriesGrid(devengadosCategorias)}
+          {renderCategoriesGrid(devengadosCategorias, onSelectCategory)}
         </TabsContent>
 
         <TabsContent value="deducciones" className="mt-6">
@@ -203,7 +203,7 @@ export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
             <h4 className="font-medium text-red-700 mb-2">Conceptos que reducen el salario</h4>
             <p className="text-sm text-gray-600">Selecciona los conceptos que reducen el pago del empleado</p>
           </div>
-          {renderCategoriesGrid(deduccionesCategorias)}
+          {renderCategoriesGrid(deduccionesCategorias, onSelectCategory)}
         </TabsContent>
       </Tabs>
 
