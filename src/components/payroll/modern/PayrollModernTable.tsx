@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -179,18 +180,17 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         console.log(`💰 Overtime calculation: $${Math.round(valorHoraExtra)} × ${factors[subtipo]} × ${horas}h = $${result}`);
         return result;
         
-      case 'recargo':
       case 'recargo_nocturno':
         if (!horas || !subtipo) return null;
         const recargoFactors: Record<string, number> = {
-          'nocturno': 1.35,
-          'dominical': 1.75,
-          'nocturno_dominical': 2.10,
-          'festivo': 1.75,
-          'nocturno_festivo': 2.10
+          'nocturno': 0.35,
+          'dominical': 0.75,
+          'nocturno_dominical': 1.10,
+          'festivo': 0.75,
+          'nocturno_festivo': 1.10
         };
-        const recargoResult = Math.round(valorHoraExtra * recargoFactors[subtipo] * horas);
-        console.log(`💰 Night shift calculation: $${Math.round(valorHoraExtra)} × ${recargoFactors[subtipo]} × ${horas}h = $${recargoResult}`);
+        const recargoResult = Math.round(valorHoraExtra * (1 + recargoFactors[subtipo]) * horas);
+        console.log(`💰 Recargo calculation: $${Math.round(valorHoraExtra)} × ${(1 + recargoFactors[subtipo])} × ${horas}h = $${recargoResult}`);
         return recargoResult;
         
       case 'vacaciones':

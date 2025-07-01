@@ -1,3 +1,4 @@
+
 import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
 // Enhanced NovedadType that includes all database types
@@ -181,14 +182,42 @@ export const calcularValorNovedadEnhanced = (
 
       case 'recargo_nocturno':
         if (!horas || horas <= 0) {
-          throw new Error('Las horas de recargo nocturno deben ser mayor a 0');
+          throw new Error('Las horas de recargo deben ser mayor a 0');
         }
         
-        // Para recargo nocturno también usar la fórmula de horas extra
-        result.valor = horas * valorHoraExtra * 0.35; // 35% recargo nocturno
-        result.baseCalculo.factor_calculo = 0.35;
+        let factorRecargo = 0.35; // 35% por defecto para nocturno
+        let descripcionTipoRecargo = 'nocturno (35%)';
+        
+        if (subtipo) {
+          switch (subtipo) {
+            case 'nocturno':
+              factorRecargo = 0.35;
+              descripcionTipoRecargo = 'nocturno (35%)';
+              break;
+            case 'dominical':
+              factorRecargo = 0.75;
+              descripcionTipoRecargo = 'dominical (75%)';
+              break;
+            case 'nocturno_dominical':
+              factorRecargo = 1.10;
+              descripcionTipoRecargo = 'nocturno dominical (110%)';
+              break;
+            case 'festivo':
+              factorRecargo = 0.75;
+              descripcionTipoRecargo = 'festivo (75%)';
+              break;
+            case 'nocturno_festivo':
+              factorRecargo = 1.10;
+              descripcionTipoRecargo = 'nocturno festivo (110%)';
+              break;
+          }
+        }
+        
+        // Para recargos, se paga sobre el valor de la hora ordinaria + el factor de recargo
+        result.valor = horas * valorHoraExtra * (1 + factorRecargo);
+        result.baseCalculo.factor_calculo = (1 + factorRecargo);
         result.baseCalculo.detalle_calculo = 
-          `${horas} horas recargo nocturno × $${Math.round(valorHoraExtra)} × 0.35 = $${Math.round(result.valor)}. ` +
+          `${horas} horas recargo ${descripcionTipoRecargo} × $${Math.round(valorHoraExtra)} × ${(1 + factorRecargo)} = $${Math.round(result.valor)}. ` +
           `Fórmula: (Salario ÷ 30) ÷ ${(jornadaLegal.horasSemanales / 6).toFixed(3)} horas/día. ` +
           `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
         break;

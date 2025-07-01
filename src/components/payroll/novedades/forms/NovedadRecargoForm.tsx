@@ -66,7 +66,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
 
   useEffect(() => {
     if (horas && parseFloat(horas) > 0 && tipoRecargo && calculateSuggestedValue) {
-      const calculatedValue = calculateSuggestedValue('recargo', tipoRecargo, parseFloat(horas));
+      const calculatedValue = calculateSuggestedValue('recargo_nocturno', tipoRecargo, parseFloat(horas));
       if (calculatedValue) {
         setValorCalculado(calculatedValue);
       }
@@ -85,7 +85,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
     if (!tipoRecargo || !horas || parseFloat(horas) <= 0) return;
 
     onSubmit({
-      tipo_novedad: 'recargo',
+      tipo_novedad: 'recargo_nocturno',
       subtipo: tipoRecargo,
       horas: parseFloat(horas),
       valor: valorCalculado,
