@@ -1,4 +1,3 @@
-
 import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
 // Enhanced NovedadType that includes all database types
@@ -213,12 +212,13 @@ export const calcularValorNovedadEnhanced = (
           }
         }
         
-        // Para recargos, se paga sobre el valor de la hora ordinaria + el factor de recargo
-        result.valor = horas * valorHoraExtra * (1 + factorRecargo);
-        result.baseCalculo.factor_calculo = (1 + factorRecargo);
+        // CORRECCIÓN: Para recargos, solo se paga el porcentaje adicional sobre la hora ordinaria
+        // NO se paga la hora completa + recargo, solo el recargo
+        result.valor = horas * valorHoraOrdinaria * factorRecargo;
+        result.baseCalculo.factor_calculo = factorRecargo;
         result.baseCalculo.detalle_calculo = 
-          `${horas} horas recargo ${descripcionTipoRecargo} × $${Math.round(valorHoraExtra)} × ${(1 + factorRecargo)} = $${Math.round(result.valor)}. ` +
-          `Fórmula: (Salario ÷ 30) ÷ ${(jornadaLegal.horasSemanales / 6).toFixed(3)} horas/día. ` +
+          `${horas} horas recargo ${descripcionTipoRecargo} × $${Math.round(valorHoraOrdinaria)} × ${factorRecargo} = $${Math.round(result.valor)}. ` +
+          `Fórmula hora ordinaria: Salario ÷ ${hourlyDivisor} horas mensuales. ` +
           `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
         break;
 

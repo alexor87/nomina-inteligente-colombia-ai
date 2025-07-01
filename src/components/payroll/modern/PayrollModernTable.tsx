@@ -163,6 +163,8 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     const salarioDiario = selectedEmployee.baseSalary / 30;
     // Use the dynamic legal workday calculation instead of fixed 240
     const valorHoraExtra = calcularValorHoraExtra(selectedEmployee.baseSalary, fechaPeriodo);
+    // Calculate ordinary hour value for recargos
+    const valorHoraOrdinaria = selectedEmployee.baseSalary / getDailyHours(fechaPeriodo) / 30 * getDailyHours(fechaPeriodo);
     
     switch (tipo) {
       case 'horas_extra':
@@ -189,8 +191,12 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
           'festivo': 0.75,
           'nocturno_festivo': 1.10
         };
-        const recargoResult = Math.round(valorHoraExtra * (1 + recargoFactors[subtipo]) * horas);
-        console.log(`💰 Recargo calculation: $${Math.round(valorHoraExtra)} × ${(1 + recargoFactors[subtipo])} × ${horas}h = $${recargoResult}`);
+        // CORRECCIÓN: Solo usar el factor de recargo, no (1 + factor)
+        // Y usar valorHoraOrdinaria en lugar de valorHoraExtra
+        const hourlyDivisor = getHourlyDivisor(fechaPeriodo);
+        const valorHoraOrdinariaCorrect = selectedEmployee.baseSalary / hourlyDivisor;
+        const recargoResult = Math.round(valorHoraOrdinariaCorrect * recargoFactors[subtipo] * horas);
+        console.log(`💰 Recargo calculation: $${Math.round(valorHoraOrdinariaCorrect)} × ${recargoFactors[subtipo]} × ${horas}h = $${recargoResult}`);
         return recargoResult;
         
       case 'vacaciones':
