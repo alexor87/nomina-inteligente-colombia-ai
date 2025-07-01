@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -34,7 +33,7 @@ import { useNovedades } from '@/hooks/useNovedades';
 import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
 import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
-import { calcularValorHoraExtra, getDailyHours } from '@/utils/jornadaLegal';
+import { calcularValorHoraExtra, getDailyHours, getHourlyDivisor } from '@/utils/jornadaLegal';
 
 interface PayrollModernTableProps {
   employees: PayrollEmployee[];
