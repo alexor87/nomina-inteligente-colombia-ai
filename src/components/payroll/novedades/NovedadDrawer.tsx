@@ -264,9 +264,15 @@ export const NovedadDrawer = ({
       licencia_remunerada: 'Licencia Remunerada',
       incapacidad: 'Incapacidad',
       bonificacion: 'Bonificación',
+      bonificacion_salarial: 'Bonificación Salarial',
+      bonificacion_no_salarial: 'Bonificación No Salarial',
       comision: 'Comisión',
       prima: 'Prima',
       otros_ingresos: 'Otros Ingresos',
+      auxilio_conectividad: 'Auxilio de Conectividad',
+      viaticos: 'Viáticos',
+      retroactivos: 'Retroactivos',
+      compensacion_ordinaria: 'Compensación Ordinaria',
       libranza: 'Libranza',
       multa: 'Multa',
       ausencia: 'Ausencia',
@@ -278,7 +284,10 @@ export const NovedadDrawer = ({
       arl: 'ARL',
       caja_compensacion: 'Caja de Compensación',
       icbf: 'ICBF',
-      sena: 'SENA'
+      sena: 'SENA',
+      embargo: 'Embargo',
+      anticipo: 'Anticipo',
+      aporte_voluntario: 'Aporte Voluntario'
     };
     return labels[tipo] || tipo;
   };
