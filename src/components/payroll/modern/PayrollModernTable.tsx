@@ -160,10 +160,10 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     const fechaPeriodo = new Date();
     
     const salarioDiario = selectedEmployee.baseSalary / 30;
-    // Use the dynamic legal workday calculation instead of fixed 240
+    // Use the dynamic legal workday calculation for horas extra
     const valorHoraExtra = calcularValorHoraExtra(selectedEmployee.baseSalary, fechaPeriodo);
-    // Calculate ordinary hour value for recargos
-    const valorHoraOrdinaria = selectedEmployee.baseSalary / getDailyHours(fechaPeriodo) / 30 * getDailyHours(fechaPeriodo);
+    // Use the fixed formula for recargos: salario / 30 / 7.3333
+    const valorHoraRecargo = selectedEmployee.baseSalary / 30 / 7.3333;
     
     switch (tipo) {
       case 'horas_extra':
@@ -185,17 +185,15 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
         if (!horas || !subtipo) return null;
         const recargoFactors: Record<string, number> = {
           'nocturno': 0.35,
-          'dominical': 0.75,
-          'nocturno_dominical': 1.10,
+          'dominical': 0.80, // Actualizado según el artículo
+          'nocturno_dominical': 1.15, // Actualizado según el artículo
           'festivo': 0.75,
           'nocturno_festivo': 1.10
         };
-        // CORRECCIÓN: Solo usar el factor de recargo, no (1 + factor)
-        // Y usar valorHoraOrdinaria en lugar de valorHoraExtra
-        const hourlyDivisor = getHourlyDivisor(fechaPeriodo);
-        const valorHoraOrdinariaCorrect = selectedEmployee.baseSalary / hourlyDivisor;
-        const recargoResult = Math.round(valorHoraOrdinariaCorrect * recargoFactors[subtipo] * horas);
-        console.log(`💰 Recargo calculation: $${Math.round(valorHoraOrdinariaCorrect)} × ${recargoFactors[subtipo]} × ${horas}h = $${recargoResult}`);
+        // USAR LA FÓRMULA CORRECTA: solo el factor de recargo sobre la hora ordinaria fija
+        const recargoResult = Math.round(valorHoraRecargo * recargoFactors[subtipo] * horas);
+        console.log(`💰 Recargo calculation: $${Math.round(valorHoraRecargo)} × ${recargoFactors[subtipo]} × ${horas}h = $${recargoResult}`);
+        console.log(`📐 Recargo formula: Salario (${selectedEmployee.baseSalary}) ÷ 30 ÷ 7.3333 = $${Math.round(valorHoraRecargo)} hora ordinaria`);
         return recargoResult;
         
       case 'vacaciones':

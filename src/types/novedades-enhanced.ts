@@ -1,3 +1,4 @@
+
 import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
 // Enhanced NovedadType that includes all database types
@@ -98,6 +99,16 @@ export interface CalculationResult {
 }
 
 /**
+ * Calcula el valor hora ordinaria para recargos usando la fórmula tradicional
+ * Fórmula: salario / 30 / 7.3333 (equivale a salario / 220)
+ */
+const calcularValorHoraRecargo = (salarioBase: number): number => {
+  // Fórmula del artículo: salario / 30 / 7.3333
+  // Esto equivale a usar 220 horas mensuales (30 días × 7.3333 horas/día)
+  return salarioBase / 30 / 7.3333;
+};
+
+/**
  * Versión mejorada de calcularValorNovedad que considera la jornada legal dinámica
  */
 export const calcularValorNovedadEnhanced = (
@@ -115,6 +126,9 @@ export const calcularValorNovedadEnhanced = (
 
   // Para horas extra, usar la fórmula específica
   const valorHoraExtra = calcularValorHoraExtra(salarioBase, fechaPeriodo);
+
+  // Para recargos, usar la fórmula tradicional fija
+  const valorHoraRecargo = calcularValorHoraRecargo(salarioBase);
 
   console.log(`💰 Calculando novedad ${tipoNovedad} con jornada de ${jornadaLegal.horasSemanales}h semanales`);
 
@@ -194,12 +208,14 @@ export const calcularValorNovedadEnhanced = (
               descripcionTipoRecargo = 'nocturno (35%)';
               break;
             case 'dominical':
-              factorRecargo = 0.75;
-              descripcionTipoRecargo = 'dominical (75%)';
+              // Según el artículo, dominical es 80%, no 75%
+              factorRecargo = 0.80;
+              descripcionTipoRecargo = 'dominical (80%)';
               break;
             case 'nocturno_dominical':
-              factorRecargo = 1.10;
-              descripcionTipoRecargo = 'nocturno dominical (110%)';
+              // Según el artículo, nocturno dominical es 115%, no 110%
+              factorRecargo = 1.15;
+              descripcionTipoRecargo = 'nocturno dominical (115%)';
               break;
             case 'festivo':
               factorRecargo = 0.75;
@@ -212,14 +228,13 @@ export const calcularValorNovedadEnhanced = (
           }
         }
         
-        // CORRECCIÓN: Para recargos, solo se paga el porcentaje adicional sobre la hora ordinaria
-        // NO se paga la hora completa + recargo, solo el recargo
-        result.valor = horas * valorHoraOrdinaria * factorRecargo;
+        // USAR LA FÓRMULA CORRECTA PARA RECARGOS: salario / 30 / 7.3333
+        // Solo se paga el porcentaje de recargo, NO la hora completa + recargo
+        result.valor = horas * valorHoraRecargo * factorRecargo;
         result.baseCalculo.factor_calculo = factorRecargo;
         result.baseCalculo.detalle_calculo = 
-          `${horas} horas recargo ${descripcionTipoRecargo} × $${Math.round(valorHoraOrdinaria)} × ${factorRecargo} = $${Math.round(result.valor)}. ` +
-          `Fórmula hora ordinaria: Salario ÷ ${hourlyDivisor} horas mensuales. ` +
-          `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
+          `${horas} horas recargo ${descripcionTipoRecargo} × $${Math.round(valorHoraRecargo)} × ${factorRecargo} = $${Math.round(result.valor)}. ` +
+          `Fórmula hora ordinaria para recargos: Salario ÷ 30 ÷ 7.3333 (220 horas mensuales fijas)`;
         break;
 
       case 'vacaciones':
