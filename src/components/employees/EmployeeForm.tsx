@@ -11,6 +11,7 @@ import { CONTRACT_TYPES, TIPOS_DOCUMENTO } from '@/types/employee-config';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
+import { AffiliationsSection } from './form/AffiliationsSection';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EmployeeFormProps {
@@ -36,6 +37,9 @@ interface EmployeeFormData {
   cajaCompensacion: string;
   cargo: string;
   estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
+  regimenSalud: 'contributivo' | 'subsidiado';
+  tipoCotizanteId: string;
+  subtipoCotizanteId: string;
   banco: string;
   tipoCuenta: 'ahorros' | 'corriente';
   numeroCuenta: string;
@@ -65,7 +69,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
   const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUD();
   const [companyId, setCompanyId] = useState<string | null>(null);
   
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<EmployeeFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch, control } = useForm<EmployeeFormData>({
     defaultValues: {
       cedula: employee?.cedula || '',
       tipoDocumento: employee?.tipoDocumento || 'CC',
@@ -83,12 +87,18 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       cajaCompensacion: employee?.cajaCompensacion || '',
       cargo: employee?.cargo || '',
       estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
+      regimenSalud: employee?.regimenSalud || 'contributivo',
+      tipoCotizanteId: employee?.tipoCotizanteId || '',
+      subtipoCotizanteId: employee?.subtipoCotizanteId || '',
       banco: '',
       tipoCuenta: 'ahorros',
       numeroCuenta: '',
       titularCuenta: ''
     }
   });
+
+  // Watch all form values for the AffiliationsSection
+  const watchedValues = watch();
 
   // Obtener company_id del usuario actual
   useEffect(() => {
@@ -140,7 +150,10 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       arl: data.arl,
       cajaCompensacion: data.cajaCompensacion,
       cargo: data.cargo,
-      estadoAfiliacion: data.estadoAfiliacion
+      estadoAfiliacion: data.estadoAfiliacion,
+      regimenSalud: data.regimenSalud,
+      tipoCotizanteId: data.tipoCotizanteId,
+      subtipoCotizanteId: data.subtipoCotizanteId
     };
 
     let result;
@@ -307,6 +320,14 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
           </div>
         </div>
 
+        {/* Afiliaciones - Now using the proper AffiliationsSection component */}
+        <AffiliationsSection
+          control={control}
+          errors={errors}
+          watchedValues={watchedValues}
+          setValue={setValue}
+        />
+
         {/* Información Bancaria */}
         <div>
           <h3 className="text-lg font-medium text-gray-900 mb-4">Información Bancaria</h3>
@@ -359,62 +380,6 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
                 placeholder="Juan Pérez"
               />
               {errors.titularCuenta && <p className="text-red-500 text-sm mt-1">{errors.titularCuenta.message}</p>}
-            </div>
-          </div>
-        </div>
-
-        {/* Afiliaciones */}
-        <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Afiliaciones</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="eps">EPS</Label>
-              <Input
-                id="eps"
-                {...register('eps')}
-                placeholder="Sura EPS"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="afp">AFP</Label>
-              <Input
-                id="afp"
-                {...register('afp')}
-                placeholder="Porvenir"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="arl">ARL</Label>
-              <Input
-                id="arl"
-                {...register('arl')}
-                placeholder="Sura ARL"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="cajaCompensacion">Caja de Compensación</Label>
-              <Input
-                id="cajaCompensacion"
-                {...register('cajaCompensacion')}
-                placeholder="Compensar"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="estadoAfiliacion">Estado Afiliación</Label>
-              <Select onValueChange={(value) => setValue('estadoAfiliacion', value as 'completa' | 'pendiente' | 'inconsistente')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="completa">Completa</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="inconsistente">Inconsistente</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </div>
