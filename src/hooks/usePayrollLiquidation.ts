@@ -459,89 +459,82 @@ export const usePayrollLiquidation = () => {
 
       console.log('✅ Período cerrado exitosamente');
 
-      // FASE 4: Calcular y crear siguiente período
+      // FASE 4: Calcular y crear siguiente período usando fechas reales del período cerrado
       console.log('🔄 FASE 4: Creando siguiente período');
       
       try {
         const companySettings = await PayrollPeriodService.getCompanySettings();
         const periodicity = companySettings?.periodicity || 'mensual';
         
-        console.log('📊 Periodicidad configurada:', periodicity);
-        console.log('📅 Período base para cálculo:', {
-          id: currentPeriod.id,
-          fechaInicio: currentPeriod.fecha_inicio,
-          fechaFin: currentPeriod.fecha_fin,
-          tipo: currentPeriod.tipo_periodo
+        // Usar el período cerrado real, no el currentPeriod que puede estar desactualizado
+        const actualClosedPeriod = closureResult.period || currentPeriod;
+        
+        console.log('📅 Período base para cálculo (período cerrado real):', {
+          id: actualClosedPeriod.id,
+          fechaInicio: actualClosedPeriod.fecha_inicio,
+          fechaFin: actualClosedPeriod.fecha_fin,
+          estado: actualClosedPeriod.estado
         });
 
         // Importar el servicio de cálculo
         const { PayrollPeriodCalculationService } = await import('@/services/payroll-intelligent/PayrollPeriodCalculationService');
         
-        // Calcular siguiente período
+        // Calcular siguiente período basado en fechas reales del período cerrado
         const { startDate, endDate } = PayrollPeriodCalculationService.calculateNextPeriod(
           periodicity, 
-          closureResult.period || currentPeriod
+          actualClosedPeriod
         );
         
         console.log('📅 Fechas calculadas para siguiente período:', { startDate, endDate });
+        
+        // Validar que no haya superposición con períodos existentes
+        const { PayrollPeriodValidationService } = await import('@/services/payroll-intelligent/PayrollPeriodValidationService');
+        const validation = await PayrollPeriodValidationService.validateNonOverlappingPeriod(startDate, endDate);
+        
+        if (!validation.isValid) {
+          throw new Error(`Error: ${validation.message}`);
+        }
         
         if (startDate && endDate) {
           const nextPeriod = await PayrollPeriodService.createPayrollPeriod(startDate, endDate, periodicity);
           
           if (nextPeriod) {
-            console.log('✅ Siguiente período creado automáticamente:', nextPeriod);
+            console.log('✅ Siguiente período creado automáticamente sin superposición:', nextPeriod);
             
-            // FASE 5: Actualizar UI inmediatamente
-            console.log('🔄 FASE 5: Actualizando interfaz');
+            // FASE 5: Actualizar UI inmediatamente con nuevo período
+            console.log('🔄 FASE 5: Actualizando interfaz con nuevo período');
             setCurrentPeriod(nextPeriod);
             setIsReopenedPeriod(false);
             setEmployees([]); // Limpiar empleados del período anterior
             
-            // Cargar empleados para el nuevo período automáticamente
+            // Cargar empleados para el nuevo período
             setTimeout(async () => {
               console.log('🔄 Cargando empleados para nuevo período...');
               await loadEmployees();
-            }, 500);
+            }, 100);
             
-            // Mostrar mensajes de éxito
+            // Mostrar mensajes de éxito secuenciales
             toast({
               title: "Liquidación completada",
-              description: "Período cerrado y nuevo período iniciado exitosamente"
+              description: `Período cerrado y nuevo período ${PayrollPeriodService.formatPeriodText(nextPeriod.fecha_inicio, nextPeriod.fecha_fin)} iniciado`
             });
-            
-            setTimeout(() => {
-              toast({
-                title: "Nuevo período iniciado",
-                description: `Período ${PayrollPeriodService.formatPeriodText(nextPeriod.fecha_inicio, nextPeriod.fecha_fin)} listo para liquidación`
-              });
-            }, 1500);
             
             // Mostrar modal de éxito
             setShowSuccessModal(true);
             
           } else {
-            console.warn('⚠️ No se pudo crear el siguiente período');
-            toast({
-              title: "Advertencia",
-              description: "Período cerrado exitosamente, pero el siguiente período debe crearse manualmente",
-              variant: "default"
-            });
+            throw new Error('No se pudo crear el siguiente período');
           }
         } else {
-          console.error('❌ No se pudieron calcular las fechas del siguiente período');
-          toast({
-            title: "Error calculando siguiente período",
-            description: "Período cerrado exitosamente, pero no se pudo calcular el siguiente período",
-            variant: "default"
-          });
+          throw new Error('No se pudieron calcular las fechas del siguiente período');
         }
         
       } catch (nextPeriodError) {
-        console.error('❌ Error creando siguiente período:', nextPeriodError);
+        console.error('❌ Error crítico creando siguiente período:', nextPeriodError);
         toast({
-          title: "Período cerrado",
-          description: `El período se cerró correctamente, pero hubo un problema creando el siguiente período: ${nextPeriodError.message}`,
-          variant: "default"
+          title: "Error en creación de siguiente período",
+          description: `Período cerrado exitosamente, pero error creando siguiente: ${nextPeriodError.message}`,
+          variant: "destructive"
         });
       }
 

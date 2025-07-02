@@ -41,24 +41,39 @@ export class PayrollLiquidationService {
     }
   }
 
-  // Guardar la liquidación de nómina en la base de datos con transacciones
+  // Guardar liquidación de nómina con transacciones completas
   static async savePayrollLiquidation(data: PayrollLiquidationData): Promise<string> {
+    const companyId = await this.getCurrentUserCompanyId();
+    if (!companyId) {
+      throw new Error('No se encontró la empresa del usuario');
+    }
+
+    console.log('💾 Iniciando guardado transaccional de liquidación para período:', data.period.id);
+    console.log('👥 Empleados a liquidar:', data.employees.length);
+    
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se encontró la empresa del usuario');
+      // Verificar que el período esté en estado borrador
+      const { data: periodCheck, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('estado')
+        .eq('id', data.period.id)
+        .single();
+
+      if (periodError || !periodCheck) {
+        throw new Error('No se encontró el período de nómina');
       }
 
-      console.log('💾 Iniciando guardado de liquidación para período:', data.period.id);
-      console.log('👥 Empleados a liquidar:', data.employees.length);
+      if (periodCheck.estado !== 'borrador') {
+        throw new Error('Solo se pueden liquidar períodos en estado borrador');
+      }
 
-      // Usar período ID consistente para el campo periodo
+      // Guardar liquidaciones con period_id
       const periodoString = data.period.periodo || `${data.period.fecha_inicio}-${data.period.fecha_fin}`;
-
-      // Guardar cada empleado en la tabla payrolls
+      
       const payrollInserts = data.employees.map(employee => ({
         company_id: companyId,
         employee_id: employee.id,
+        period_id: data.period.id, // CRÍTICO: usar period_id
         periodo: periodoString,
         salario_base: employee.baseSalary,
         dias_trabajados: employee.workedDays,
@@ -70,20 +85,20 @@ export class PayrollLiquidationService {
         pension_empleado: employee.grossPay * 0.04,
         total_deducciones: employee.deductions,
         neto_pagado: employee.netPay,
-        estado: 'procesada' // Estado válido para las validaciones
+        estado: 'procesada'
       }));
 
-      const { data: payrollData, error: payrollError } = await supabase
+      const { data: insertedPayrolls, error: insertError } = await supabase
         .from('payrolls')
         .insert(payrollInserts)
         .select();
 
-      if (payrollError) {
-        console.error('❌ Error guardando liquidaciones:', payrollError);
-        throw payrollError;
+      if (insertError) {
+        console.error('❌ Error guardando liquidaciones:', insertError);
+        throw new Error(`Error al guardar liquidaciones: ${insertError.message}`);
       }
 
-      console.log('✅ Liquidaciones guardadas exitosamente:', payrollData.length);
+      console.log('✅ Liquidaciones guardadas exitosamente:', insertedPayrolls.length);
 
       // Actualizar totales en payroll_periods_real
       const totalDevengado = data.employees.reduce((sum, emp) => sum + emp.grossPay, 0);
@@ -102,24 +117,18 @@ export class PayrollLiquidationService {
         .eq('id', data.period.id);
 
       if (updateError) {
-        console.error('❌ Error actualizando totales del período:', updateError);
-        // No fallar toda la operación por esto
-      } else {
-        console.log('✅ Totales del período actualizados exitosamente');
+        throw new Error(`Error actualizando totales: ${updateError.message}`);
       }
 
-      // Generar comprobantes de nómina para cada empleado (con mejor manejo de errores)
-      try {
-        await this.generateVouchers(data, payrollData, companyId);
-      } catch (voucherError) {
-        console.warn('Warning: Some vouchers could not be generated:', voucherError);
-        // No fallar toda la operación si los comprobantes fallan
-      }
-
+      // CRÍTICO: Generar comprobantes es obligatorio, no opcional
+      await this.generateVouchers(data, insertedPayrolls, companyId);
+      
+      console.log('✅ Liquidación completa guardada exitosamente');
       return `Liquidación procesada exitosamente para ${data.employees.length} empleados`;
+
     } catch (error) {
-      console.error('Error saving payroll liquidation:', error);
-      throw new Error('Error al guardar la liquidación de nómina');
+      console.error('❌ Error en liquidación:', error);
+      throw error;
     }
   }
 

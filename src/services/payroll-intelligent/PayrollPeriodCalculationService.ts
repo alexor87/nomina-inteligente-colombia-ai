@@ -1,122 +1,76 @@
-import { PayrollPeriodService } from '../PayrollPeriodService';
 import { PayrollPeriod } from '@/types/payroll';
 
 export class PayrollPeriodCalculationService {
-  // Calcular siguiente periodo basado en el último cerrado
-  static calculateNextPeriod(
-    periodicity: string, 
-    lastPeriod?: PayrollPeriod | null
-  ): { startDate: string; endDate: string } {
-    console.log('📊 Calculando periodo con periodicidad:', periodicity);
+  // Calcular siguiente período basado en el período cerrado real
+  static calculateNextPeriod(periodicity: string, closedPeriod: PayrollPeriod): {
+    startDate: string;
+    endDate: string;
+  } {
+    console.log('📅 Calculando siguiente período:', {
+      periodicity,
+      closedPeriodEnd: closedPeriod.fecha_fin,
+      closedPeriodType: closedPeriod.tipo_periodo
+    });
+
+    // Usar la fecha fin del período cerrado como base
+    const baseDate = new Date(closedPeriod.fecha_fin);
     
-    if (!lastPeriod) {
-      // Si no hay periodo anterior, usar la periodicidad configurada correctamente
-      console.log('📅 No hay periodo anterior, generando periodo inicial con periodicidad:', periodicity);
-      const result = this.generateInitialPeriod(periodicity);
-      console.log('📅 Periodo inicial generado:', result);
-      return result;
-    }
-
-    const lastEndDate = new Date(lastPeriod.fecha_fin);
-    const nextStartDate = new Date(lastEndDate);
-    nextStartDate.setDate(lastEndDate.getDate() + 1); // Día siguiente al último periodo
-
-    // Calcular el fin del siguiente periodo basado en la periodicidad configurada
-    let nextEndDate: Date;
+    // El siguiente período inicia el día después del cierre
+    const startDate = new Date(baseDate);
+    startDate.setDate(startDate.getDate() + 1);
+    
+    // Calcular fecha fin según periodicidad
+    const endDate = new Date(startDate);
     
     switch (periodicity) {
-      case 'semanal':
-        console.log('📅 Calculando periodo semanal');
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextStartDate.getDate() + 6); // 7 días total
-        break;
-        
       case 'quincenal':
-        console.log('📅 Calculando periodo quincenal');
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextStartDate.getDate() + 14); // 15 días total
+        endDate.setDate(endDate.getDate() + 14); // 15 días
         break;
-        
       case 'mensual':
-        console.log('📅 Calculando periodo mensual');
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setMonth(nextStartDate.getMonth() + 1);
-        nextEndDate.setDate(0); // Último día del mes
+        endDate.setMonth(endDate.getMonth() + 1);
+        endDate.setDate(endDate.getDate() - 1); // Último día del mes
         break;
-        
+      case 'semanal':
+        endDate.setDate(endDate.getDate() + 6); // 7 días
+        break;
       default:
-        // Fallback a mensual
-        console.log('📅 Periodicidad no reconocida, usando mensual como fallback');
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setMonth(nextStartDate.getMonth() + 1);
-        nextEndDate.setDate(0);
+        // Por defecto mensual
+        endDate.setMonth(endDate.getMonth() + 1);
+        endDate.setDate(endDate.getDate() - 1);
     }
 
     const result = {
-      startDate: nextStartDate.toISOString().split('T')[0],
-      endDate: nextEndDate.toISOString().split('T')[0]
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
     };
 
-    console.log('📅 Periodo calculado:', result);
+    console.log('✅ Fechas calculadas para siguiente período:', result);
     return result;
   }
 
-  // Generar periodo inicial basado en periodicidad
-  private static generateInitialPeriod(periodicity: string): { startDate: string; endDate: string } {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const day = today.getDate();
+  // Validar que las fechas calculadas no se superpongan con períodos existentes
+  static validateNonOverlapping(startDate: string, endDate: string, existingPeriods: PayrollPeriod[]): {
+    isValid: boolean;
+    conflictPeriod?: PayrollPeriod;
+  } {
+    const newStart = new Date(startDate).getTime();
+    const newEnd = new Date(endDate).getTime();
 
-    console.log('📅 Generando periodo inicial para periodicidad:', periodicity);
-    console.log('📅 Fecha actual:', { year, month, day });
-
-    switch (periodicity) {
-      case 'mensual':
-        console.log('📅 Generando periodo mensual inicial');
-        return {
-          startDate: new Date(year, month, 1).toISOString().split('T')[0],
-          endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
-        };
-
-      case 'quincenal':
-        console.log('📅 Generando periodo quincenal inicial');
-        if (day <= 15) {
-          // Primera quincena del mes
-          return {
-            startDate: new Date(year, month, 1).toISOString().split('T')[0],
-            endDate: new Date(year, month, 15).toISOString().split('T')[0]
-          };
-        } else {
-          // Segunda quincena del mes
-          return {
-            startDate: new Date(year, month, 16).toISOString().split('T')[0],
-            endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
-          };
-        }
-
-      case 'semanal':
-        console.log('📅 Generando periodo semanal inicial');
-        const dayOfWeek = today.getDay();
-        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Lunes = 1
-        const monday = new Date(today);
-        monday.setDate(today.getDate() + mondayOffset);
-        
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-
-        return {
-          startDate: monday.toISOString().split('T')[0],
-          endDate: sunday.toISOString().split('T')[0]
-        };
-
-      case 'personalizado':
-      default:
-        console.log('📅 Periodicidad personalizada o no reconocida, usando mensual');
-        return {
-          startDate: new Date(year, month, 1).toISOString().split('T')[0],
-          endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
-        };
+    for (const period of existingPeriods) {
+      // Ignorar períodos cerrados, solo verificar activos y borradores
+      
+      const periodStart = new Date(period.fecha_inicio).getTime();
+      const periodEnd = new Date(period.fecha_fin).getTime();
+      
+      // Verificar superposición
+      const overlaps = newStart <= periodEnd && newEnd >= periodStart;
+      
+      if (overlaps) {
+        console.warn('⚠️ Superposición detectada con período:', period);
+        return { isValid: false, conflictPeriod: period };
+      }
     }
+
+    return { isValid: true };
   }
 }

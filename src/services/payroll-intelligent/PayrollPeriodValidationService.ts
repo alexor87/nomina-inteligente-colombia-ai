@@ -343,12 +343,12 @@ export class PayrollPeriodValidationService {
       } else {
         console.log('👥 Empleados activos encontrados:', employees?.length || 0);
 
-       // 3. Verificar empleados con liquidación en el período
+        // 3. Verificar empleados con liquidación en el período (CORREGIDO: usar period_id)
         const { data: payrolls, error: payrollsError } = await supabase
           .from('payrolls')
           .select('employee_id, estado, neto_pagado')
           .eq('company_id', period.company_id)
-          .eq('periodo', period.periodo);
+          .eq('period_id', periodId);
 
         if (payrollsError) {
           console.error('❌ Error obteniendo liquidaciones:', payrollsError);
@@ -466,12 +466,12 @@ export class PayrollPeriodValidationService {
         };
       }
 
-      // 2. Obtener empleados con liquidación válida en el período
+      // 2. Obtener empleados con liquidación válida en el período (CORREGIDO: usar period_id)
       const { data: validPayrolls, error: payrollsError } = await supabase
         .from('payrolls')
         .select('employee_id, neto_pagado')
         .eq('company_id', period.company_id)
-        .eq('periodo', period.periodo)
+        .eq('period_id', periodId)
         .gt('neto_pagado', 0);
 
       if (payrollsError) {
@@ -482,12 +482,19 @@ export class PayrollPeriodValidationService {
 
       const totalValidEmployees = validPayrolls?.length || 0;
 
-      // 3. Obtener comprobantes generados para este período
+      // 3. Obtener comprobantes generados para este período 
+      // Primero obtener los payroll_ids
+      const { data: payrollIds } = await supabase
+        .from('payrolls')
+        .select('id')
+        .eq('period_id', periodId);
+
+      const payrollIdsList = payrollIds?.map(p => p.id) || [];
+      
       const { data: vouchers, error: vouchersError } = await supabase
         .from('payroll_vouchers')
         .select('employee_id, voucher_status')
-        .eq('company_id', period.company_id)
-        .eq('periodo', period.periodo);
+        .in('payroll_id', payrollIdsList);
 
       if (vouchersError) {
         console.error('❌ Error obteniendo comprobantes:', vouchersError);

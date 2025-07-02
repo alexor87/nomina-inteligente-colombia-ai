@@ -1107,6 +1107,7 @@ export type Database = {
           neto_pagado: number | null
           otras_deducciones: number | null
           pension_empleado: number | null
+          period_id: string | null
           periodo: string
           prima: number | null
           reabierto_por: string | null
@@ -1138,6 +1139,7 @@ export type Database = {
           neto_pagado?: number | null
           otras_deducciones?: number | null
           pension_empleado?: number | null
+          period_id?: string | null
           periodo: string
           prima?: number | null
           reabierto_por?: string | null
@@ -1169,6 +1171,7 @@ export type Database = {
           neto_pagado?: number | null
           otras_deducciones?: number | null
           pension_empleado?: number | null
+          period_id?: string | null
           periodo?: string
           prima?: number | null
           reabierto_por?: string | null
@@ -1196,6 +1199,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payrolls_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_periods_real"
             referencedColumns: ["id"]
           },
         ]
