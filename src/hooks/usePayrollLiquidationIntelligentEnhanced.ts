@@ -414,7 +414,7 @@ export const usePayrollLiquidationIntelligentEnhanced = () => {
       
       toast({
         title: "🎉 Período aprobado y cerrado inteligentemente",
-        description: `${employees.length} empleados procesados • ${formatCurrency(summary.totalNetPay)} • Comprobantes generados automáticamente`,
+        description: `${employees.length} empleados procesados • ${formatCurrency(summary.totalNetPay)} • Comprobantes generados automáticamente. Puedes consultar el período procesado desde el Historial de Nómina.`,
         className: "border-green-200 bg-green-50"
       });
     } catch (error) {

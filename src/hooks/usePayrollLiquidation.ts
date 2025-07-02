@@ -424,7 +424,7 @@ export const usePayrollLiquidation = () => {
       
       toast({
         title: isReopenedPeriod ? "¡Período cerrado nuevamente!" : "¡Período aprobado!",
-        description: message
+        description: `${message} Puedes consultar el período procesado desde el Historial de Nómina.`
       });
     } catch (error) {
       console.error('Error approving period:', error);

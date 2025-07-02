@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { Layout } from "@/components/layout/Layout";
 
 // Pages
@@ -26,19 +27,21 @@ function App() {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <Routes>
-              <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
-              <Route path="/app" element={<Layout />}>
-                <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="employees" element={<EmployeesPage />} />
-                <Route path="payroll" element={<PayrollPage />} />
-                <Route path="payroll-history" element={<PayrollHistoryPage />} />
-                <Route path="payroll-history/:id" element={<PayrollHistoryDetailsPage />} />
-                <Route path="payroll-history/:id/edit" element={<PayrollHistoryDetailsPage />} />
-                <Route path="reports" element={<ReportsPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-              </Route>
-            </Routes>
+            <SubscriptionProvider>
+              <Routes>
+                <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
+                <Route path="/app" element={<Layout />}>
+                  <Route path="dashboard" element={<DashboardPage />} />
+                  <Route path="employees" element={<EmployeesPage />} />
+                  <Route path="payroll" element={<PayrollPage />} />
+                  <Route path="payroll-history" element={<PayrollHistoryPage />} />
+                  <Route path="payroll-history/:id" element={<PayrollHistoryDetailsPage />} />
+                  <Route path="payroll-history/:id/edit" element={<PayrollHistoryDetailsPage />} />
+                  <Route path="reports" element={<ReportsPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                </Route>
+              </Routes>
+            </SubscriptionProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
