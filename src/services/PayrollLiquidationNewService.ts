@@ -1,6 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
-import { PayrollCalculationService } from './PayrollCalculationService';
+import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
 import { NovedadesBackupService } from './NovedadesBackupService';
 
 export class PayrollLiquidationNewService {
@@ -46,15 +47,16 @@ export class PayrollLiquidationNewService {
             additionalDeductions: novedadesTotals.deductions
           };
 
-          // Calcular liquidación completa
-          const calculation = await PayrollCalculationService.calculatePayroll({
+          // Calcular liquidación completa usando el servicio mejorado
+          const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
             baseSalary: baseData.baseSalary,
             workedDays: baseData.workedDays,
             extraHours: baseData.extraHours,
             disabilities: baseData.disabilities,
             bonuses: baseData.bonuses + novedadesTotals.bonuses,
             absences: baseData.absences,
-            periodType: period.tipo_periodo as 'quincenal' | 'mensual'
+            periodType: period.tipo_periodo as 'quincenal' | 'mensual',
+            periodDate: new Date(period.fecha_inicio)
           });
 
           return {
@@ -133,7 +135,7 @@ export class PayrollLiquidationNewService {
     return totals;
   }
 
-  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes CON UPSERT MEJORADO
+  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes CON UPSERT CORREGIDO
   static async closePeriod(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<string> {
     try {
       console.log('🔒 Iniciando cierre de período:', period.id);
@@ -144,8 +146,8 @@ export class PayrollLiquidationNewService {
         throw new Error(`${invalidEmployees.length} empleados tienen errores en su liquidación`);
       }
 
-      // Guardar liquidaciones en la base de datos CON UPSERT MEJORADO
-      await this.savePeriodLiquidationsUpsert(period, employees);
+      // Guardar liquidaciones en la base de datos CON UPSERT CORREGIDO
+      await this.savePeriodLiquidationsFixed(period, employees);
       
       // Generar comprobantes automáticamente CON VALIDACIÓN DE DUPLICADOS
       await this.generateVouchersWithDuplicateCheck(period, employees);
@@ -170,10 +172,10 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  // NUEVO: Método con UPSERT MEJORADO para evitar error 409
-  static async savePeriodLiquidationsUpsert(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
+  // CORREGIDO: Método con INSERT ... ON CONFLICT DO UPDATE usando la restricción única creada
+  static async savePeriodLiquidationsFixed(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
-      console.log('💾 Guardando liquidaciones con UPSERT MEJORADO...');
+      console.log('💾 Guardando liquidaciones con UPSERT CORREGIDO...');
       
       for (const emp of employees) {
         const liquidationData = {
@@ -192,12 +194,11 @@ export class PayrollLiquidationNewService {
           estado: 'procesada'
         };
 
-        // Usar ON CONFLICT DO UPDATE para evitar duplicados
+        // Usar la restricción única que acabamos de crear
         const { error } = await supabase
           .from('payrolls')
           .upsert(liquidationData, {
-            onConflict: 'company_id,employee_id,period_id',
-            ignoreDuplicates: false
+            onConflict: 'company_id,employee_id,period_id'
           });
 
         if (error) {
@@ -206,14 +207,14 @@ export class PayrollLiquidationNewService {
         }
       }
       
-      console.log('✅ Liquidaciones guardadas exitosamente con UPSERT');
+      console.log('✅ Liquidaciones guardadas exitosamente con UPSERT CORREGIDO');
     } catch (error) {
       console.error('❌ Error guardando liquidaciones:', error);
       throw error;
     }
   }
 
-  // NUEVO: Generar comprobantes con validación de duplicados
+  // MEJORADO: Generar comprobantes con validación de duplicados y manejo de errores
   static async generateVouchersWithDuplicateCheck(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
       console.log('📄 Generando comprobantes con validación de duplicados...');
@@ -319,15 +320,16 @@ export class PayrollLiquidationNewService {
         absences: updates.absences || 0
       };
 
-      // Recalcular liquidación
-      const calculation = await PayrollCalculationService.calculatePayroll({
+      // Recalcular liquidación usando el servicio mejorado
+      const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
         baseSalary: updatedData.baseSalary,
         workedDays: updatedData.workedDays,
         extraHours: updatedData.extraHours,
         disabilities: 0,
         bonuses: updatedData.bonuses,
         absences: updatedData.absences,
-        periodType: period.tipo_periodo as 'quincenal' | 'mensual'
+        periodType: period.tipo_periodo as 'quincenal' | 'mensual',
+        periodDate: new Date(period.fecha_inicio)
       });
 
       return {
