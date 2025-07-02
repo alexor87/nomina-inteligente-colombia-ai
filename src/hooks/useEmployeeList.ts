@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeEmployees } from '@/hooks/useRealtimeEmployees';
@@ -8,9 +9,11 @@ import { usePagination } from '@/hooks/usePagination';
 import { useEmployeeFiltering } from '@/hooks/useEmployeeFiltering';
 import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
 import { useEmployeeCompliance } from '@/hooks/useEmployeeCompliance';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const useEmployeeList = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [allEmployees, setAllEmployees] = useState<EmployeeWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,12 +59,46 @@ export const useEmployeeList = () => {
     toggleAllEmployeesBase(currentPageEmployeeIds);
   }, [employees, toggleAllEmployeesBase]);
 
+  const invalidateAllCaches = useCallback(() => {
+    console.log('🗑️ Invalidando todas las cachés...');
+    
+    // Invalidar React Query
+    queryClient.invalidateQueries();
+    queryClient.removeQueries();
+    
+    // Limpiar localStorage relacionado con empleados
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('employee') || key.includes('payroll') || key.includes('nomina'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Limpiar sessionStorage
+    const sessionKeysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && (key.includes('employee') || key.includes('payroll') || key.includes('nomina'))) {
+        sessionKeysToRemove.push(key);
+      }
+    }
+    sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+    
+    console.log('✅ Cachés invalidadas');
+  }, [queryClient]);
+
   const loadEmployees = useCallback(async (force = false) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      console.log('🔄 Loading employees...', force ? '(forced refresh)' : '');
+      console.log('🔄 Loading employees...', force ? '(forced refresh with cache invalidation)' : '');
+      
+      if (force) {
+        invalidateAllCaches();
+      }
       
       const data = await EmployeeService.getAllEmployees();
       const employeesWithStatus = data.map(mapToEmployeeWithStatus);
@@ -73,7 +110,7 @@ export const useEmployeeList = () => {
       if (force) {
         toast({
           title: "Datos actualizados",
-          description: `Se cargaron ${data.length} empleados`,
+          description: `Se cargaron ${data.length} empleados (caché limpiado)`,
         });
       }
     } catch (err) {
@@ -87,7 +124,7 @@ export const useEmployeeList = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, invalidateAllCaches]);
 
   // Usar realtime para empleados
   useRealtimeEmployees({
@@ -102,9 +139,30 @@ export const useEmployeeList = () => {
   }, [loadEmployees]);
 
   const refreshEmployees = useCallback(() => {
-    console.log('🔄 Manual refresh requested');
+    console.log('🔄 Manual refresh requested with complete cache invalidation');
     loadEmployees(true);
   }, [loadEmployees]);
+
+  const forceCompleteRefresh = useCallback(() => {
+    console.log('💥 Force complete refresh - clearing everything');
+    
+    // Limpiar estado local
+    setAllEmployees([]);
+    setError(null);
+    
+    // Invalidar cachés
+    invalidateAllCaches();
+    
+    // Recargar después de un pequeño delay para asegurar que las cachés se limpiaron
+    setTimeout(() => {
+      loadEmployees(true);
+    }, 100);
+    
+    toast({
+      title: "Recargando completamente...",
+      description: "Limpiando todas las cachés y recargando datos",
+    });
+  }, [loadEmployees, invalidateAllCaches, toast]);
 
   return {
     // Datos de empleados
@@ -134,6 +192,8 @@ export const useEmployeeList = () => {
     getComplianceIndicators,
     
     // Acciones
-    refreshEmployees
+    refreshEmployees,
+    forceCompleteRefresh,
+    invalidateAllCaches
   };
 };

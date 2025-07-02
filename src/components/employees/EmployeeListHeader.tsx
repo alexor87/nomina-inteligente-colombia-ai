@@ -10,7 +10,8 @@ import {
   Filter, 
   RefreshCw,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Zap
 } from 'lucide-react';
 import { DataCleanupDialog } from './DataCleanupDialog';
 
@@ -27,6 +28,7 @@ interface EmployeeListHeaderProps {
   onExportToExcel: () => void;
   onCreateEmployee: () => void;
   onRefreshData?: () => void;
+  onForceCompleteRefresh?: () => void;
 }
 
 export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
@@ -41,7 +43,8 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
   onOpenImport,
   onExportToExcel,
   onCreateEmployee,
-  onRefreshData
+  onRefreshData,
+  onForceCompleteRefresh
 }) => {
   const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
 
@@ -58,9 +61,15 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
     }
   };
 
+  const handleForceRefresh = () => {
+    if (onForceCompleteRefresh) {
+      onForceCompleteRefresh();
+    }
+  };
+
   const handleCleanupComplete = () => {
-    if (onRefreshData) {
-      onRefreshData();
+    if (onForceCompleteRefresh) {
+      onForceCompleteRefresh();
     }
   };
 
@@ -86,7 +95,7 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Botón de refresh */}
+          {/* Botón de refresh normal */}
           <Button 
             variant="outline" 
             size="sm" 
@@ -95,6 +104,17 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
           >
             <RefreshCw className="h-4 w-4" />
             Actualizar
+          </Button>
+
+          {/* Botón de refresh completo */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleForceRefresh}
+            className="flex items-center gap-2 border-orange-300 text-orange-700 hover:bg-orange-50"
+          >
+            <Zap className="h-4 w-4" />
+            Recarga Total
           </Button>
 
           {/* Botón de limpieza completa (solo para soporte) */}
@@ -106,7 +126,7 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
               className="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
             >
               <Trash2 className="h-4 w-4" />
-              Limpiar Datos
+              Limpiar Cuenta
             </Button>
           )}
 

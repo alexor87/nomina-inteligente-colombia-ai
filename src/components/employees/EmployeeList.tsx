@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -35,6 +36,7 @@ export const EmployeeList = () => {
     totalEmployees,
     filteredCount,
     refreshEmployees,
+    forceCompleteRefresh,
     getComplianceIndicators,
     clearSelection
   } = useEmployeeList();
@@ -215,6 +217,7 @@ export const EmployeeList = () => {
           onExportToExcel={handleExportToExcel}
           onCreateEmployee={handleCreateEmployee}
           onRefreshData={refreshEmployees}
+          onForceCompleteRefresh={forceCompleteRefresh}
         />
 
         {/* Barra de búsqueda con botón de filtros */}
