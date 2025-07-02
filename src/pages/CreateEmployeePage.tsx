@@ -1,6 +1,6 @@
 
 import { useNavigate } from 'react-router-dom';
-import { EmployeeForm } from '@/components/employees/EmployeeForm';
+import { EmployeeFormModern } from '@/components/employees/EmployeeFormModern';
 
 const CreateEmployeePage = () => {
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ const CreateEmployeePage = () => {
   };
 
   return (
-    <EmployeeForm 
+    <EmployeeFormModern 
       onSuccess={handleSuccess}
       onCancel={handleCancel}
     />

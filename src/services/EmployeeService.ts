@@ -1,272 +1,151 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Employee } from '@/types';
-import { CompanyConfigurationService } from '@/services/CompanyConfigurationService';
+import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 
 export class EmployeeService {
-  private static mapDatabaseToEmployee(dbEmployee: any): Employee {
-    return {
-      id: dbEmployee.id,
-      empresaId: dbEmployee.company_id,
-      cedula: dbEmployee.cedula,
-      tipoDocumento: dbEmployee.tipo_documento || 'CC',
-      nombre: dbEmployee.nombre,
-      segundoNombre: dbEmployee.segundo_nombre,
-      apellido: dbEmployee.apellido,
-      email: dbEmployee.email,
-      telefono: dbEmployee.telefono,
-      salarioBase: Number(dbEmployee.salario_base) || 0,
-      tipoContrato: dbEmployee.tipo_contrato || 'indefinido',
-      fechaIngreso: dbEmployee.fecha_ingreso,
-      estado: dbEmployee.estado || 'activo',
-      eps: dbEmployee.eps,
-      afp: dbEmployee.afp,
-      arl: dbEmployee.arl,
-      cajaCompensacion: dbEmployee.caja_compensacion,
-      cargo: dbEmployee.cargo,
-      estadoAfiliacion: dbEmployee.estado_afiliacion || 'pendiente',
-      nivelRiesgoARL: dbEmployee.nivel_riesgo_arl,
-      banco: dbEmployee.banco,
-      tipoCuenta: dbEmployee.tipo_cuenta || 'ahorros',
-      numeroCuenta: dbEmployee.numero_cuenta,
-      titularCuenta: dbEmployee.titular_cuenta,
-      sexo: dbEmployee.sexo,
-      fechaNacimiento: dbEmployee.fecha_nacimiento,
-      direccion: dbEmployee.direccion,
-      ciudad: dbEmployee.ciudad,
-      departamento: dbEmployee.departamento,
-      periodicidadPago: dbEmployee.periodicidad_pago || 'mensual',
-      codigoCIIU: dbEmployee.codigo_ciiu,
-      centroCostos: dbEmployee.centro_costos,
-      fechaFirmaContrato: dbEmployee.fecha_firma_contrato,
-      fechaFinalizacionContrato: dbEmployee.fecha_finalizacion_contrato,
-      tipoJornada: dbEmployee.tipo_jornada,
-      diasTrabajo: dbEmployee.dias_trabajo,
-      horasTrabajo: dbEmployee.horas_trabajo,
-      beneficiosExtralegales: dbEmployee.beneficios_extralegales,
-      clausulasEspeciales: dbEmployee.clausulas_especiales,
-      formaPago: dbEmployee.forma_pago,
-      regimenSalud: dbEmployee.regimen_salud,
-      tipoCotizanteId: dbEmployee.tipo_cotizante_id,
-      subtipoCotizanteId: dbEmployee.subtipo_cotizante_id,
-      createdAt: dbEmployee.created_at,
-      updatedAt: dbEmployee.updated_at,
-      // Legacy fields
-      avatar: dbEmployee.avatar,
-      centrosocial: dbEmployee.centro_costos,
-      ultimaLiquidacion: dbEmployee.ultima_liquidacion,
-      contratoVencimiento: dbEmployee.fecha_finalizacion_contrato
-    };
-  }
-
-  private static mapEmployeeToDatabase(employee: Partial<Employee>) {
-    return {
-      company_id: employee.empresaId,
-      cedula: employee.cedula,
-      tipo_documento: employee.tipoDocumento,
-      nombre: employee.nombre,
-      segundo_nombre: employee.segundoNombre,
-      apellido: employee.apellido,
-      email: employee.email,
-      telefono: employee.telefono,
-      salario_base: employee.salarioBase,
-      tipo_contrato: employee.tipoContrato,
-      fecha_ingreso: employee.fechaIngreso,
-      estado: employee.estado,
-      eps: employee.eps,
-      afp: employee.afp,
-      arl: employee.arl,
-      caja_compensacion: employee.cajaCompensacion,
-      cargo: employee.cargo,
-      estado_afiliacion: employee.estadoAfiliacion,
-      nivel_riesgo_arl: employee.nivelRiesgoARL,
-      banco: employee.banco,
-      tipo_cuenta: employee.tipoCuenta,
-      numero_cuenta: employee.numeroCuenta,
-      titular_cuenta: employee.titularCuenta,
-      sexo: employee.sexo,
-      fecha_nacimiento: employee.fechaNacimiento,
-      direccion: employee.direccion,
-      ciudad: employee.ciudad,
-      departamento: employee.departamento,
-      periodicidad_pago: employee.periodicidadPago,
-      codigo_ciiu: employee.codigoCIIU,
-      centro_costos: employee.centroCostos,
-      fecha_firma_contrato: employee.fechaFirmaContrato,
-      fecha_finalizacion_contrato: employee.fechaFinalizacionContrato,
-      tipo_jornada: employee.tipoJornada,
-      dias_trabajo: employee.diasTrabajo,
-      horas_trabajo: employee.horasTrabajo,
-      beneficios_extralegales: employee.beneficiosExtralegales,
-      clausulas_especiales: employee.clausulasEspeciales,
-      forma_pago: employee.formaPago,
-      regimen_salud: employee.regimenSalud,
-      tipo_cotizante_id: employee.tipoCotizanteId,
-      subtipo_cotizante_id: employee.subtipoCotizanteId
-    };
-  }
-
-  static async getAllEmployees(): Promise<Employee[]> {
+  static async getAllEmployees(): Promise<EmployeeUnified[]> {
     try {
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        console.warn('No company ID found for current user');
-        return [];
-      }
-
+      console.log('🔄 EmployeeService: Fetching all employees');
+      
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('company_id', companyId)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching employees:', error);
-        throw new Error(`Error al obtener empleados: ${error.message}`);
+        console.error('❌ Error fetching employees:', error);
+        throw error;
       }
 
-      return (data || []).map(this.mapDatabaseToEmployee);
+      console.log('✅ EmployeeService: Fetched', data?.length || 0, 'employees');
+      
+      return (data || []).map(mapDatabaseToUnified);
     } catch (error) {
-      console.error('Error in getAllEmployees:', error);
+      console.error('❌ EmployeeService getAllEmployees error:', error);
       throw error;
     }
   }
 
-  static async getEmployees(): Promise<Employee[]> {
-    return this.getAllEmployees();
-  }
-
-  static async getEmployeeById(id: string): Promise<Employee | null> {
+  static async getEmployeeById(id: string): Promise<EmployeeUnified | null> {
     try {
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        console.warn('No company ID found for current user');
-        return null;
-      }
-
+      console.log('🔄 EmployeeService: Fetching employee by ID:', id);
+      
       const { data, error } = await supabase
         .from('employees')
         .select('*')
         .eq('id', id)
-        .eq('company_id', companyId)
         .single();
 
       if (error) {
-        console.error('Error fetching employee:', error);
-        throw new Error(`Error al obtener empleado: ${error.message}`);
+        if (error.code === 'PGRST116') {
+          console.log('ℹ️ Employee not found:', id);
+          return null;
+        }
+        console.error('❌ Error fetching employee:', error);
+        throw error;
       }
 
-      return this.mapDatabaseToEmployee(data);
+      console.log('✅ EmployeeService: Fetched employee:', data?.nombre, data?.apellido);
+      
+      return mapDatabaseToUnified(data);
     } catch (error) {
-      console.error('Error in getEmployeeById:', error);
+      console.error('❌ EmployeeService getEmployeeById error:', error);
       throw error;
     }
   }
 
-  static async create(employeeData: Partial<Employee>): Promise<Employee> {
+  static async createEmployee(employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmployeeUnified> {
     try {
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener el ID de la empresa');
-      }
-
-      const dbData = this.mapEmployeeToDatabase({
-        ...employeeData,
-        empresaId: companyId
-      });
-
+      console.log('🔄 EmployeeService: Creating employee:', employeeData.nombre, employeeData.apellido);
+      
+      const dbData = mapUnifiedToDatabase(employeeData);
+      
       const { data, error } = await supabase
         .from('employees')
-        .insert(dbData)
+        .insert([dbData])
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating employee:', error);
-        throw new Error(`Error al crear empleado: ${error.message}`);
+        console.error('❌ Error creating employee:', error);
+        throw error;
       }
 
-      return this.mapDatabaseToEmployee(data);
+      console.log('✅ EmployeeService: Created employee:', data?.nombre, data?.apellido);
+      
+      return mapDatabaseToUnified(data);
     } catch (error) {
-      console.error('Error in create:', error);
+      console.error('❌ EmployeeService createEmployee error:', error);
       throw error;
     }
   }
 
-  static async createEmployee(employeeData: Partial<Employee>): Promise<Employee> {
-    return this.create(employeeData);
-  }
-
-  static async update(id: string, employeeData: Partial<Employee>): Promise<Employee> {
+  static async updateEmployee(id: string, employeeData: Partial<EmployeeUnified>): Promise<EmployeeUnified> {
     try {
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener el ID de la empresa');
-      }
-
-      const dbData = this.mapEmployeeToDatabase(employeeData);
-
+      console.log('🔄 EmployeeService: Updating employee:', id);
+      
+      const dbData = mapUnifiedToDatabase(employeeData);
+      
       const { data, error } = await supabase
         .from('employees')
         .update(dbData)
         .eq('id', id)
-        .eq('company_id', companyId)
         .select()
         .single();
 
       if (error) {
-        console.error('Error updating employee:', error);
-        throw new Error(`Error al actualizar empleado: ${error.message}`);
+        console.error('❌ Error updating employee:', error);
+        throw error;
       }
 
-      return this.mapDatabaseToEmployee(data);
+      console.log('✅ EmployeeService: Updated employee:', data?.nombre, data?.apellido);
+      
+      return mapDatabaseToUnified(data);
     } catch (error) {
-      console.error('Error in update:', error);
-      throw error;
-    }
-  }
-
-  static async updateEmployee(id: string, employeeData: Partial<Employee>): Promise<Employee> {
-    return this.update(id, employeeData);
-  }
-
-  static async delete(id: string): Promise<void> {
-    try {
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener el ID de la empresa');
-      }
-
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', id)
-        .eq('company_id', companyId);
-
-      if (error) {
-        console.error('Error deleting employee:', error);
-        throw new Error(`Error al eliminar empleado: ${error.message}`);
-      }
-    } catch (error) {
-      console.error('Error in delete:', error);
+      console.error('❌ EmployeeService updateEmployee error:', error);
       throw error;
     }
   }
 
   static async deleteEmployee(id: string): Promise<void> {
-    return this.delete(id);
-  }
-
-  static async changeStatus(id: string, newStatus: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'): Promise<Employee> {
     try {
-      return await this.update(id, { estado: newStatus });
+      console.log('🔄 EmployeeService: Deleting employee:', id);
+      
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error deleting employee:', error);
+        throw error;
+      }
+
+      console.log('✅ EmployeeService: Deleted employee:', id);
     } catch (error) {
-      console.error('Error changing employee status:', error);
+      console.error('❌ EmployeeService deleteEmployee error:', error);
       throw error;
     }
   }
 
-  static async changeEmployeeStatus(id: string, newStatus: string): Promise<Employee> {
-    return this.changeStatus(id, newStatus as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad');
+  static async changeEmployeeStatus(id: string, newStatus: string): Promise<void> {
+    try {
+      console.log('🔄 EmployeeService: Changing employee status:', id, 'to', newStatus);
+      
+      const { error } = await supabase
+        .from('employees')
+        .update({ estado: newStatus })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error changing employee status:', error);
+        throw error;
+      }
+
+      console.log('✅ EmployeeService: Changed employee status successfully');
+    } catch (error) {
+      console.error('❌ EmployeeService changeEmployeeStatus error:', error);
+      throw error;
+    }
   }
 }
