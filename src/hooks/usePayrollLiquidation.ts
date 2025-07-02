@@ -436,13 +436,24 @@ export const usePayrollLiquidation = () => {
         const companySettings = await PayrollPeriodService.getCompanySettings();
         const periodicity = companySettings?.periodicity || 'mensual';
         
-        const { startDate, endDate } = PayrollPeriodService.generatePeriodDates(periodicity);
+        // Importar el servicio de cálculo correcto
+        const { PayrollPeriodCalculationService } = await import('@/services/payroll-intelligent/PayrollPeriodCalculationService');
+        
+        // Calcular siguiente período basado en el período recién cerrado
+        const { startDate, endDate } = PayrollPeriodCalculationService.calculateNextPeriod(
+          periodicity, 
+          currentPeriod
+        );
         
         if (startDate && endDate) {
           const nextPeriod = await PayrollPeriodService.createPayrollPeriod(startDate, endDate, periodicity);
           
           if (nextPeriod) {
             console.log('✅ Siguiente período creado automáticamente:', nextPeriod);
+            // Opcional: Cargar el nuevo período automáticamente
+            setTimeout(() => {
+              window.location.reload(); // Recargar para mostrar el nuevo período
+            }, 2000);
           }
         }
       } catch (nextPeriodError) {
