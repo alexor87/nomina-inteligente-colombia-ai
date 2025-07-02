@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
@@ -23,7 +22,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   console.log('🔄 EmployeeFormModern: Component rendered');
   console.log('🔄 EmployeeFormModern: Received employee:', employee ? `${employee.nombre} ${employee.apellido} (${employee.id})` : 'undefined');
   
-  const isEditing = !!employee;
+  const isEditMode = !!employee;
   const { configuration } = useEmployeeGlobalConfiguration();
   
   const {
@@ -61,12 +60,12 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     memoizedDataRefresh
   );
 
-  const { handleSubmit: handleEditSubmission, isSubmitting: isEditing } = useEmployeeEditSubmission(
+  const { handleSubmit: handleEditSubmission, isSubmitting: isSubmittingEdit } = useEmployeeEditSubmission(
     employee || null,
     onSuccess
   );
 
-  const isLoading = isCreating || isEditing;
+  const isLoading = isCreating || isSubmittingEdit;
 
   const onSubmit = async (data: any) => {
     if (!companyId) return;
@@ -75,7 +74,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     if (employee) {
       await handleEditSubmission(data);
     } else {
-      await handleCreateSubmission(data, companyId);
+      await handleCreateSubmission(data, companyId, []);
     }
   };
 
@@ -87,7 +86,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   console.log('🎯 EmployeeFormModern: Rendering form with employee:', {
     id: employee?.id,
     name: employee ? `${employee.nombre} ${employee.apellido}` : 'undefined',
-    mode: isEditing ? 'edit' : 'create'
+    mode: isEditMode ? 'edit' : 'create'
   });
 
   return (
