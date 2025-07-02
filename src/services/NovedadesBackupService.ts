@@ -12,22 +12,19 @@ export class NovedadesBackupService {
       
       const { data: result, error } = await supabase
         .from('payroll_novedades')
-        .insert([{
-          company_id: data.company_id,
+        .insert({
           empleado_id: data.empleado_id,
           periodo_id: data.periodo_id,
           tipo_novedad: data.tipo_novedad,
-          subtipo: data.subtipo,
-          valor: data.valor,
+          valor: data.valor || 0,
           dias: data.dias,
           horas: data.horas,
           fecha_inicio: data.fecha_inicio,
           fecha_fin: data.fecha_fin,
           observacion: data.observacion,
-          adjunto_url: data.adjunto_url,
-          base_calculo: data.base_calculo,
-          creado_por: data.creado_por
-        }])
+          base_calculo: data.base_calculo ? JSON.stringify(data.base_calculo) : null,
+          subtipo: data.subtipo
+        })
         .select()
         .single();
 
@@ -61,7 +58,7 @@ export class NovedadesBackupService {
     }
   }
 
-  static async updateNovedad(id: string, updates: Partial<CreateNovedadData>): Promise<PayrollNovedad | null> {
+  static async updateNovedad(id: string, updates: Partial<PayrollNovedad>): Promise<PayrollNovedad | null> {
     try {
       const { data, error } = await supabase
         .from('payroll_novedades')

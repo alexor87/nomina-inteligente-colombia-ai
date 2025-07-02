@@ -209,8 +209,7 @@ export const PayrollLiquidationNew = () => {
                       : 'bg-green-100 text-green-800'
                   }
                 >
-                  {currentPeriod.estado === 'borrador' ? 'Borrador' : 
-                   currentPeriod.estado === 'reabierto' ? 'Reabierto' : 'Cerrado'}
+                  {currentPeriod.estado === 'borrador' ? 'Borrador' : 'Cerrado'}
                 </Badge>
                 
                 <Badge variant="secondary">
