@@ -33,9 +33,8 @@ export const useEmployeeList = () => {
   } = useEmployeeFiltering(allEmployees);
 
   // Paginación
-  const pagination = usePagination({
-    totalItems: filteredEmployees.length,
-    itemsPerPage: 10
+  const pagination = usePagination(filteredEmployees, {
+    defaultPageSize: 10
   });
 
   // Selección de empleados
@@ -50,10 +49,7 @@ export const useEmployeeList = () => {
   const { getComplianceIndicators } = useEmployeeCompliance();
 
   // Obtener empleados paginados
-  const employees = filteredEmployees.slice(
-    pagination.offset,
-    pagination.offset + pagination.itemsPerPage
-  );
+  const employees = pagination.paginatedItems;
 
   const toggleAllEmployees = useCallback(() => {
     const currentPageEmployeeIds = employees.map(emp => emp.id);

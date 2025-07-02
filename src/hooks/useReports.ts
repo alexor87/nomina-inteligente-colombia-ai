@@ -1,9 +1,13 @@
 
 import { useState } from 'react';
-import { ReportFilters } from '@/types/reports';
+import { ReportFilters, SavedFilter, ExportHistory, IncomeRetentionCertificate } from '@/types/reports';
 
 export const useReports = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [filters, setFilters] = useState<ReportFilters>({});
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [exportHistory, setExportHistory] = useState<ExportHistory[]>([]);
+  const [activeReportType, setActiveReportType] = useState('payroll-summary');
 
   const getPayrollSummaryReport = async (filters: ReportFilters) => {
     setIsLoading(true);
@@ -128,12 +132,94 @@ export const useReports = () => {
     }
   };
 
+  const getIncomeRetentionCertificates = async (year: number) => {
+    setIsLoading(true);
+    try {
+      const mockData = [];
+      const employees = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Rodríguez', 'Luis Martínez'];
+      
+      for (let i = 0; i < 10; i++) {
+        mockData.push({
+          employeeId: `emp-${i + 1}`,
+          employeeName: employees[i % employees.length],
+          year,
+          totalIncome: 35000000 + (i * 2000000),
+          totalRetentions: 1500000 + (i * 100000),
+          status: ['generated', 'sent', 'pending'][i % 3] as 'generated' | 'sent' | 'pending',
+          generatedAt: '2024-01-15',
+          sentAt: i % 3 === 1 ? '2024-01-20' : undefined
+        });
+      }
+      
+      return mockData;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const exportToExcel = async (reportType: string, data: any[], fileName: string) => {
+    console.log('Exporting to Excel:', { reportType, fileName, records: data.length });
+    const newExport: ExportHistory = {
+      id: Date.now().toString(),
+      reportType,
+      fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`,
+      format: 'excel',
+      generatedBy: 'admin@empresa.com',
+      generatedAt: new Date().toISOString(),
+      parameters: filters
+    };
+    setExportHistory(prev => [newExport, ...prev]);
+  };
+
+  const exportToPDF = async (reportType: string, data: any[], fileName: string) => {
+    console.log('Exporting to PDF:', { reportType, fileName, records: data.length });
+    const newExport: ExportHistory = {
+      id: Date.now().toString(),
+      reportType,
+      fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.pdf`,
+      format: 'pdf',
+      generatedBy: 'admin@empresa.com',
+      generatedAt: new Date().toISOString(),
+      parameters: filters
+    };
+    setExportHistory(prev => [newExport, ...prev]);
+  };
+
+  const saveFilter = async (name: string, reportType: string) => {
+    const newFilter: SavedFilter = {
+      id: Date.now().toString(),
+      name,
+      filters,
+      reportType,
+      userId: 'user1',
+      createdAt: new Date().toISOString()
+    };
+    setSavedFilters(prev => [...prev, newFilter]);
+  };
+
+  const applyFilter = (filter: SavedFilter) => {
+    setFilters(filter.filters);
+    setActiveReportType(filter.reportType);
+  };
+
   return {
     isLoading,
+    loading: isLoading,
+    filters,
+    setFilters,
+    savedFilters,
+    exportHistory,
+    activeReportType,
+    setActiveReportType,
     getPayrollSummaryReport,
     getLaborCostReport,
     getSocialSecurityReport,
     getNoveltyHistoryReport,
-    getAccountingExports
+    getAccountingExports,
+    getIncomeRetentionCertificates,
+    exportToExcel,
+    exportToPDF,
+    saveFilter,
+    applyFilter
   };
 };
