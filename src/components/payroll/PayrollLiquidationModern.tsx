@@ -2,6 +2,7 @@
 import { PayrollModernHeader } from './modern/PayrollModernHeader';
 import { PayrollInlineFilters } from './modern/PayrollInlineFilters';
 import { PayrollModernTable } from './modern/PayrollModernTable';
+import { PayrollSuccessModal } from './modals/PayrollSuccessModal';
 import { usePayrollLiquidationIntelligentEnhanced } from '@/hooks/usePayrollLiquidationIntelligentEnhanced';
 
 export const PayrollLiquidationModern = () => {
@@ -11,6 +12,8 @@ export const PayrollLiquidationModern = () => {
     summary,
     isValid,
     canEdit,
+    showSuccessModal,
+    setShowSuccessModal,
     updateEmployee,
     recalculateAll,
     approvePeriod,
@@ -63,6 +66,20 @@ export const PayrollLiquidationModern = () => {
         onDeleteEmployee={deleteEmployee}
         onDeleteMultipleEmployees={deleteMultipleEmployees}
       />
+
+      {/* Success Modal */}
+      {currentPeriod && (
+        <PayrollSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          periodData={{
+            startDate: currentPeriod.fecha_inicio,
+            endDate: currentPeriod.fecha_fin,
+            type: currentPeriod.tipo_periodo
+          }}
+          summary={summary}
+        />
+      )}
     </div>
   );
 };

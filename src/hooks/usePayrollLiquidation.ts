@@ -37,6 +37,7 @@ export const usePayrollLiquidation = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingPeriod, setIsEditingPeriod] = useState(false);
   const [isReopenedPeriod, setIsReopenedPeriod] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [summary, setSummary] = useState<PayrollSummary>({
     totalEmployees: 0,
     validEmployees: 0,
@@ -422,10 +423,8 @@ export const usePayrollLiquidation = () => {
         setIsReopenedPeriod(false);
       }
       
-      toast({
-        title: isReopenedPeriod ? "¡Período cerrado nuevamente!" : "¡Período aprobado!",
-        description: `${message} Puedes consultar el período procesado desde el Historial de Nómina.`
-      });
+      // Show success modal instead of toast
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error approving period:', error);
       toast({
@@ -458,7 +457,9 @@ export const usePayrollLiquidation = () => {
     canEdit,
     isEditingPeriod,
     isReopenedPeriod,
+    showSuccessModal,
     setIsEditingPeriod,
+    setShowSuccessModal,
     updateEmployee,
     updatePeriod,
     recalculateAll,

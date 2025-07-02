@@ -2,6 +2,7 @@ import { PayrollLiquidationHeader } from './PayrollLiquidationHeader';
 import { PayrollPeriodCard } from './PayrollPeriodCard';
 import { PayrollSummaryCards } from './liquidation/PayrollSummaryCards';
 import { PayrollTable } from './liquidation/PayrollTable';
+import { PayrollSuccessModal } from './modals/PayrollSuccessModal';
 import { usePayrollLiquidationIntelligentEnhanced } from '@/hooks/usePayrollLiquidationIntelligentEnhanced';
 
 export const PayrollLiquidationIntelligentEnhanced = () => {
@@ -12,7 +13,9 @@ export const PayrollLiquidationIntelligentEnhanced = () => {
     isValid,
     canEdit,
     isEditingPeriod,
+    showSuccessModal,
     setIsEditingPeriod,
+    setShowSuccessModal,
     updateEmployee,
     updatePeriod,
     recalculateAll,
@@ -90,6 +93,20 @@ export const PayrollLiquidationIntelligentEnhanced = () => {
           />
         </div>
       </div>
+
+      {/* Success Modal */}
+      {currentPeriod && (
+        <PayrollSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          periodData={{
+            startDate: currentPeriod.fecha_inicio,
+            endDate: currentPeriod.fecha_fin,
+            type: currentPeriod.tipo_periodo
+          }}
+          summary={summary}
+        />
+      )}
     </div>
   );
 };

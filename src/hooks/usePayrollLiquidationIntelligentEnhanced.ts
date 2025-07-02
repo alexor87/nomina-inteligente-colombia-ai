@@ -13,6 +13,7 @@ export const usePayrollLiquidationIntelligentEnhanced = () => {
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingPeriod, setIsEditingPeriod] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [summary, setSummary] = useState<PayrollSummary>({
     totalEmployees: 0,
     validEmployees: 0,
@@ -404,19 +405,8 @@ export const usePayrollLiquidationIntelligentEnhanced = () => {
         setCurrentPeriod(updatedPeriod);
       }
 
-      const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-          style: 'currency',
-          currency: 'COP',
-          minimumFractionDigits: 0,
-        }).format(amount);
-      };
-      
-      toast({
-        title: "🎉 Período aprobado y cerrado inteligentemente",
-        description: `${employees.length} empleados procesados • ${formatCurrency(summary.totalNetPay)} • Comprobantes generados automáticamente. Puedes consultar el período procesado desde el Historial de Nómina.`,
-        className: "border-green-200 bg-green-50"
-      });
+      // Show success modal instead of toast
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('❌ Error aprobando período:', error);
       toast({
@@ -440,7 +430,9 @@ export const usePayrollLiquidationIntelligentEnhanced = () => {
     isLoading,
     canEdit,
     isEditingPeriod,
+    showSuccessModal,
     setIsEditingPeriod,
+    setShowSuccessModal,
     updateEmployee,
     updatePeriod,
     recalculateAll,

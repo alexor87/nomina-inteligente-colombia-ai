@@ -4,18 +4,25 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollHistoryEmployee } from '@/types/payroll-history';
-import { Plus, Edit } from 'lucide-react';
+import { Plus, Edit, Download, Mail, Loader2 } from 'lucide-react';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
 import { useNovedades } from '@/hooks/useNovedades';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { calcularValorHoraExtra } from '@/utils/jornadaLegal';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EditableEmployeeTableProps {
   employees: PayrollHistoryEmployee[];
   isEditMode: boolean;
   onEmployeeUpdate: (employeeId: string, updates: Partial<PayrollHistoryEmployee>) => void;
   periodId: string;
+  periodData?: {
+    startDate: string;
+    endDate: string;
+    type: string;
+  };
   onNovedadChange: () => void;
 }
 
@@ -24,8 +31,10 @@ export const EditableEmployeeTable = ({
   isEditMode,
   onEmployeeUpdate,
   periodId,
+  periodData,
   onNovedadChange
 }: EditableEmployeeTableProps) => {
+  const { toast } = useToast();
   const [novedadModal, setNovedadModal] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -37,6 +46,9 @@ export const EditableEmployeeTable = ({
     employeeName: '',
     employeeSalary: 0
   });
+
+  const [downloadingEmployees, setDownloadingEmployees] = useState<Set<string>>(new Set());
+  const [sendingEmployees, setSendingEmployees] = useState<Set<string>>(new Set());
 
   const {
     loadNovedadesTotals,
@@ -179,6 +191,162 @@ export const EditableEmployeeTable = ({
     }
   };
 
+  const handleDownloadVoucher = async (employee: PayrollHistoryEmployee) => {
+    if (!periodData) {
+      toast({
+        title: "Error",
+        description: "Información del período no disponible",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setDownloadingEmployees(prev => new Set(prev).add(employee.id));
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+        body: {
+          employee: {
+            id: employee.id,
+            name: employee.name,
+            position: employee.position,
+            baseSalary: employee.baseSalary,
+            workedDays: 30, // Default for history
+            extraHours: 0,
+            bonuses: 0,
+            disabilities: 0,
+            grossPay: employee.grossPay,
+            deductions: employee.deductions,
+            netPay: employee.netPay,
+            eps: '', // These might not be available in history
+            afp: ''
+          },
+          period: periodData
+        }
+      });
+
+      if (error) throw error;
+
+      // Create blob and download
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `comprobante-${employee.name.replace(/\s+/g, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "✅ Comprobante descargado",
+        description: "El comprobante de pago se ha descargado exitosamente",
+        className: "border-green-200 bg-green-50"
+      });
+    } catch (error) {
+      console.error('Error downloading voucher:', error);
+      toast({
+        title: "Error al descargar",
+        description: "No se pudo descargar el comprobante",
+        variant: "destructive"
+      });
+    } finally {
+      setDownloadingEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employee.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleResendVoucher = async (employee: PayrollHistoryEmployee) => {
+    if (!periodData) {
+      toast({
+        title: "Error",
+        description: "Información del período no disponible",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // For now, we'll ask for email in a simple prompt
+    // In a real implementation, you might want to create a modal for this
+    const email = prompt(`Ingresa el email para enviar el comprobante de ${employee.name}:`);
+    
+    if (!email) return;
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Email inválido",
+        description: "Por favor ingresa un email con formato válido",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSendingEmployees(prev => new Set(prev).add(employee.id));
+
+    try {
+      // First generate the voucher
+      const { data: voucherData, error: voucherError } = await supabase.functions.invoke('generate-voucher-pdf', {
+        body: {
+          employee: {
+            id: employee.id,
+            name: employee.name,
+            position: employee.position,
+            baseSalary: employee.baseSalary,
+            workedDays: 30,
+            extraHours: 0,
+            bonuses: 0,
+            disabilities: 0,
+            grossPay: employee.grossPay,
+            deductions: employee.deductions,
+            netPay: employee.netPay,
+            eps: '',
+            afp: ''
+          },
+          period: periodData
+        }
+      });
+
+      if (voucherError) throw voucherError;
+
+      // Then send the email
+      const { error: emailError } = await supabase.functions.invoke('send-voucher-email', {
+        body: {
+          employeeEmail: email,
+          employeeName: employee.name,
+          period: periodData,
+          netPay: employee.netPay,
+          voucherData: voucherData
+        }
+      });
+
+      if (emailError) throw emailError;
+
+      toast({
+        title: "✅ Comprobante enviado",
+        description: `El comprobante se ha enviado exitosamente a ${email}`,
+        className: "border-green-200 bg-green-50"
+      });
+    } catch (error) {
+      console.error('Error sending voucher:', error);
+      toast({
+        title: "Error al enviar",
+        description: "No se pudo enviar el comprobante por email",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employee.id);
+        return newSet;
+      });
+    }
+  };
+
   return (
     <>
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
@@ -196,6 +364,9 @@ export const EditableEmployeeTable = ({
               </th>
               <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
                 Neto a Pagar
+              </th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">
+                Acciones
               </th>
             </tr>
           </thead>
@@ -249,6 +420,41 @@ export const EditableEmployeeTable = ({
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900">
                     {formatCurrency(employee.netPay + novedadesValue)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      {/* Download Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadVoucher(employee)}
+                        disabled={downloadingEmployees.has(employee.id) || !periodData}
+                        className="h-8 w-8 p-0 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                        title="Descargar comprobante"
+                      >
+                        {downloadingEmployees.has(employee.id) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                      </Button>
+                      
+                      {/* Resend Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleResendVoucher(employee)}
+                        disabled={sendingEmployees.has(employee.id) || !periodData}
+                        className="h-8 w-8 p-0 border-green-300 text-green-600 hover:border-green-500 hover:text-green-700 hover:bg-green-50"
+                        title="Reenviar por correo"
+                      >
+                        {sendingEmployees.has(employee.id) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Mail className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               );

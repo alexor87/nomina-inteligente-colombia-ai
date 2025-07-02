@@ -381,6 +381,11 @@ export const PayrollHistoryDetails = () => {
               isEditMode={isEditMode}
               onEmployeeUpdate={handleEmployeeUpdate}
               periodId={periodId!}
+              periodData={{
+                startDate: details.period.startDate,
+                endDate: details.period.endDate,
+                type: details.period.type
+              }}
               onNovedadChange={handleNovedadChange}
             />
           </CardContent>
