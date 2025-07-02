@@ -19,6 +19,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import CreateEmployeePage from "./pages/CreateEmployeePage";
+import EditEmployeePage from "./pages/EditEmployeePage";
 import PayrollPage from "./pages/PayrollPage";
 import PayrollHistoryPage from "./pages/PayrollHistoryPage";
 import PayrollHistoryDetailsPage from "./pages/PayrollHistoryDetailsPage";
