@@ -9,6 +9,13 @@ import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { Layout } from "@/components/layout/Layout";
 
 // Pages
+import AuthPage from "./pages/AuthPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import PayrollPage from "./pages/PayrollPage";
@@ -29,8 +36,17 @@ function App() {
           <AuthProvider>
             <SubscriptionProvider>
               <Routes>
-                <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
-                <Route path="/app" element={<Layout />}>
+                {/* Rutas públicas */}
+                <Route path="/" element={<Navigate to="/auth" replace />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+                
+                {/* Rutas protegidas */}
+                <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                   <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="employees" element={<EmployeesPage />} />
                   <Route path="payroll" element={<PayrollPage />} />
