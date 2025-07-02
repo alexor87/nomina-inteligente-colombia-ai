@@ -53,13 +53,13 @@ export const Dashboard = () => {
           </Button>
           <Button 
             className="bg-blue-600 text-white hover:bg-blue-700"
-            onClick={() => navigate('/payroll')}
+            onClick={() => navigate('/app/payroll')}
           >
             Procesar Nómina
           </Button>
           <Button 
             variant="outline"
-            onClick={() => navigate('/reports')}
+            onClick={() => navigate('/app/reports')}
           >
             Generar Reporte
           </Button>

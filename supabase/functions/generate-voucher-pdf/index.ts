@@ -303,90 +303,165 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { voucherId, regenerate = false } = await req.json();
+    const requestBody = await req.json();
+    const { voucherId, regenerate = false, employee, period } = requestBody;
 
-    console.log('Generating voucher PDF for:', voucherId);
+    console.log('Generating voucher PDF for:', { voucherId, employee: employee?.name, period: period?.startDate });
 
-    // Obtener datos del comprobante con información completa
-    const { data: voucher, error: voucherError } = await supabase
-      .from('payroll_vouchers')
-      .select(`
-        *,
-        employees (nombre, apellido, cedula, email, cargo),
-        payrolls (
-          salario_base, 
-          total_devengado, 
-          total_deducciones, 
-          salud_empleado, 
-          pension_empleado, 
-          retencion_fuente, 
-          bonificaciones,
-          horas_extra,
-          recargo_nocturno,
-          recargo_dominical,
-          auxilio_transporte,
-          otras_deducciones
-        )
-      `)
-      .eq('id', voucherId)
-      .single();
+    let voucherData: VoucherData;
+    let company: any;
 
-    if (voucherError || !voucher) {
-      console.error('Voucher not found:', voucherError);
-      throw new Error('Comprobante no encontrado');
+    if (voucherId) {
+      // Existing voucher flow
+      const { data: voucher, error: voucherError } = await supabase
+        .from('payroll_vouchers')
+        .select(`
+          *,
+          employees (nombre, apellido, cedula, email, cargo),
+          payrolls (
+            salario_base, 
+            total_devengado, 
+            total_deducciones, 
+            salud_empleado, 
+            pension_empleado, 
+            retencion_fuente, 
+            bonificaciones,
+            horas_extra,
+            recargo_nocturno,
+            recargo_dominical,
+            auxilio_transporte,
+            otras_deducciones
+          )
+        `)
+        .eq('id', voucherId)
+        .single();
+
+      if (voucherError || !voucher) {
+        console.error('Voucher not found:', voucherError);
+        throw new Error('Comprobante no encontrado');
+      }
+
+      console.log('Voucher found:', voucher.id);
+
+      // Obtener información de la empresa
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', voucher.company_id)
+        .single();
+
+      company = companyData;
+
+      voucherData = {
+        voucherId: voucher.id,
+        companyId: voucher.company_id,
+        employeeName: `${voucher.employees.nombre} ${voucher.employees.apellido}`,
+        employeeId: voucher.employee_id,
+        employeeCedula: voucher.employees.cedula,
+        employeePosition: voucher.employees.cargo,
+        periodo: voucher.periodo,
+        startDate: voucher.start_date,
+        endDate: voucher.end_date,
+        netPay: voucher.net_pay,
+        salaryDetails: {
+          baseSalary: voucher.payrolls?.salario_base || voucher.net_pay,
+          extraHours: voucher.payrolls?.horas_extra || 0,
+          nightSurcharge: voucher.payrolls?.recargo_nocturno || 0,
+          sundaySurcharge: voucher.payrolls?.recargo_dominical || 0,
+          transportAllowance: voucher.payrolls?.auxilio_transporte || 0,
+          bonuses: voucher.payrolls?.bonificaciones || 0,
+          totalEarnings: voucher.payrolls?.total_devengado || voucher.net_pay,
+          healthContribution: voucher.payrolls?.salud_empleado || 0,
+          pensionContribution: voucher.payrolls?.pension_empleado || 0,
+          withholdingTax: voucher.payrolls?.retencion_fuente || 0,
+          otherDeductions: voucher.payrolls?.otras_deducciones || 0,
+          totalDeductions: voucher.payrolls?.total_deducciones || 0
+        }
+      };
+    } else if (employee && period) {
+      // Direct generation from employee and period data
+      console.log('Generating voucher from direct employee data');
+      
+      // Get current user's company
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: userCompany } = await supabase
+        .from('user_company_assignments')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userCompany) throw new Error('Usuario sin empresa asignada');
+
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', userCompany.company_id)
+        .single();
+
+      company = companyData;
+
+      // Get employee details from database
+      const { data: employeeData } = await supabase
+        .from('employees')
+        .select('nombre, apellido, cedula, cargo')
+        .eq('id', employee.id)
+        .single();
+
+      const transportAllowance = employee.baseSalary <= 2600000 ? 200000 : 0;
+      const healthContribution = employee.baseSalary * 0.04;
+      const pensionContribution = employee.baseSalary * 0.04;
+      const totalDeductions = healthContribution + pensionContribution + (employee.deductions || 0);
+      const totalEarnings = employee.baseSalary + transportAllowance + (employee.bonuses || 0);
+
+      voucherData = {
+        voucherId: 'temp-' + Date.now(),
+        companyId: userCompany.company_id,
+        employeeName: employeeData ? `${employeeData.nombre} ${employeeData.apellido}` : employee.name,
+        employeeId: employee.id,
+        employeeCedula: employeeData?.cedula || 'Sin documento',
+        employeePosition: employeeData?.cargo || employee.position || 'Sin cargo',
+        periodo: `${period.startDate} - ${period.endDate}`,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        netPay: employee.netPay || totalEarnings - totalDeductions,
+        salaryDetails: {
+          baseSalary: employee.baseSalary,
+          extraHours: employee.extraHours || 0,
+          nightSurcharge: 0,
+          sundaySurcharge: 0,
+          transportAllowance,
+          bonuses: employee.bonuses || 0,
+          totalEarnings,
+          healthContribution,
+          pensionContribution,
+          withholdingTax: 0,
+          otherDeductions: (employee.deductions || 0) - healthContribution - pensionContribution,
+          totalDeductions
+        }
+      };
+    } else {
+      throw new Error('Datos insuficientes: se requiere voucherId o employee + period');
     }
 
-    console.log('Voucher found:', voucher.id);
-
-    // Obtener información de la empresa
-    const { data: company } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', voucher.company_id)
-      .single();
-
     console.log('Company found:', company?.razon_social);
-
-    const voucherData: VoucherData = {
-      voucherId: voucher.id,
-      companyId: voucher.company_id,
-      employeeName: `${voucher.employees.nombre} ${voucher.employees.apellido}`,
-      employeeId: voucher.employee_id,
-      employeeCedula: voucher.employees.cedula,
-      employeePosition: voucher.employees.cargo,
-      periodo: voucher.periodo,
-      startDate: voucher.start_date,
-      endDate: voucher.end_date,
-      netPay: voucher.net_pay,
-      salaryDetails: {
-        baseSalary: voucher.payrolls?.salario_base || voucher.net_pay,
-        extraHours: voucher.payrolls?.horas_extra || 0,
-        nightSurcharge: voucher.payrolls?.recargo_nocturno || 0,
-        sundaySurcharge: voucher.payrolls?.recargo_dominical || 0,
-        transportAllowance: voucher.payrolls?.auxilio_transporte || 0,
-        bonuses: voucher.payrolls?.bonificaciones || 0,
-        totalEarnings: voucher.payrolls?.total_devengado || voucher.net_pay,
-        healthContribution: voucher.payrolls?.salud_empleado || 0,
-        pensionContribution: voucher.payrolls?.pension_empleado || 0,
-        withholdingTax: voucher.payrolls?.retencion_fuente || 0,
-        otherDeductions: voucher.payrolls?.otras_deducciones || 0,
-        totalDeductions: voucher.payrolls?.total_deducciones || 0
-      }
-    };
 
     // Generar PDF buffer
     const pdfBuffer = await generatePDFBuffer(voucherData, company);
     
-    // Actualizar el comprobante con el estado generado
-    await supabase
-      .from('payroll_vouchers')
-      .update({ 
-        voucher_status: 'generado',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', voucherId);
+    // Update voucher status only if it's an existing voucher
+    if (voucherId && voucherId !== 'temp-' + Date.now()) {
+      await supabase
+        .from('payroll_vouchers')
+        .update({ 
+          voucher_status: 'generado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', voucherId);
 
-    console.log('Voucher updated successfully');
+      console.log('Voucher updated successfully');
+    }
 
     const fileName = `comprobante-nomina_${voucherData.employeeCedula}_${voucherData.periodo.replace(/\s+/g, '_')}.pdf`;
 

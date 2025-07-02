@@ -161,31 +161,41 @@ export const useReports = () => {
     try {
       console.log('Exporting to Excel:', { reportType, fileName, records: data.length });
       
+      // Ensure we have data to export
+      if (!data || data.length === 0) {
+        console.warn('No data to export');
+        throw new Error('No hay datos para exportar');
+      }
+      
       // Use ExcelExportService for actual export
       const { ExcelExportService } = await import('@/services/ExcelExportService');
+      
+      // Generate proper filename with timestamp
+      const timestamp = new Date().toISOString().split('T')[0];
+      const finalFileName = `${fileName}_${timestamp}`;
       
       switch (reportType) {
         case 'payroll-summary':
         case 'cost-centers':
         case 'employee-detail':
         case 'employee-detail-hr':
-          ExcelExportService.exportPayrollSummaryExcel(data, fileName);
+          ExcelExportService.exportPayrollSummaryExcel(data, finalFileName);
           break;
         case 'labor-costs':
-          ExcelExportService.exportLaborCostsExcel(data, fileName);
+          ExcelExportService.exportLaborCostsExcel(data, finalFileName);
           break;
         case 'social-security':
         case 'ugpp-social-security':
-          ExcelExportService.exportSocialSecurityExcel(data, fileName);
+          ExcelExportService.exportSocialSecurityExcel(data, finalFileName);
           break;
         default:
-          ExcelExportService.exportToExcel(data, fileName, 'Reporte');
+          ExcelExportService.exportToExcel(data, finalFileName, 'Reporte');
       }
 
       const newExport: ExportHistory = {
         id: Date.now().toString(),
         reportType,
-        fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`,
+        fileName: `${finalFileName}.xlsx`,
         format: 'excel',
         generatedBy: 'admin@empresa.com',
         generatedAt: new Date().toISOString(),
@@ -202,25 +212,35 @@ export const useReports = () => {
     try {
       console.log('Exporting to PDF:', { reportType, fileName, records: data.length });
       
+      // Ensure we have data to export
+      if (!data || data.length === 0) {
+        console.warn('No data to export');
+        throw new Error('No hay datos para exportar');
+      }
+      
       // Use PDFExportService for actual export
       const { PDFExportService } = await import('@/services/PDFExportService');
+      
+      // Generate proper filename with timestamp
+      const timestamp = new Date().toISOString().split('T')[0];
+      const finalFileName = `${fileName}_${timestamp}`;
       
       switch (reportType) {
         case 'payroll-summary':
         case 'cost-centers':
         case 'employee-detail':
         case 'employee-detail-hr':
-          PDFExportService.exportPayrollSummaryPDF(data, fileName);
+          PDFExportService.exportPayrollSummaryPDF(data, finalFileName);
           break;
         case 'labor-costs':
-          PDFExportService.exportLaborCostsPDF(data, fileName);
+          PDFExportService.exportLaborCostsPDF(data, finalFileName);
           break;
         case 'social-security':
         case 'ugpp-social-security':
-          PDFExportService.exportSocialSecurityPDF(data, fileName);
+          PDFExportService.exportSocialSecurityPDF(data, finalFileName);
           break;
         default:
-          PDFExportService.exportToPDF(data, fileName, 'Reporte', [
+          PDFExportService.exportToPDF(data, finalFileName, 'Reporte', [
             { header: 'ID', dataKey: 'id' },
             { header: 'Descripción', dataKey: 'name' },
             { header: 'Valor', dataKey: 'value' },
@@ -231,7 +251,7 @@ export const useReports = () => {
       const newExport: ExportHistory = {
         id: Date.now().toString(),
         reportType,
-        fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.pdf`,
+        fileName: `${finalFileName}.pdf`,
         format: 'pdf',
         generatedBy: 'admin@empresa.com',
         generatedAt: new Date().toISOString(),

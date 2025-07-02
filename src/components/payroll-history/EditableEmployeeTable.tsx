@@ -204,12 +204,12 @@ export const EditableEmployeeTable = ({
     setDownloadingEmployees(prev => new Set(prev).add(employee.id));
     
     try {
-      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+      const response = await supabase.functions.invoke('generate-voucher-pdf', {
         body: {
           employee: {
             id: employee.id,
             name: employee.name,
-            position: employee.position,
+            position: employee.position || 'Sin cargo',
             baseSalary: employee.baseSalary,
             workedDays: 30, // Default for history
             extraHours: 0,
@@ -225,14 +225,17 @@ export const EditableEmployeeTable = ({
         }
       });
 
-      if (error) throw error;
+      if (response.error) throw response.error;
 
-      // Create blob and download
-      const blob = new Blob([data], { type: 'application/pdf' });
+      // The response.data should be the PDF buffer
+      const pdfData = response.data;
+      
+      // Convert buffer to blob
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `comprobante-${employee.name.replace(/\s+/g, '-')}.pdf`;
+      a.download = `comprobante-${employee.name.replace(/\s+/g, '-')}-${periodData.startDate}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
