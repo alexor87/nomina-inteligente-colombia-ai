@@ -25,50 +25,76 @@ export class PayrollLiquidationNewService {
       // Procesar cada empleado con cálculos y novedades
       const processedEmployees = await Promise.all(
         employees.map(async (emp) => {
-          // Obtener novedades del empleado para este período
-          const novedades = await NovedadesBackupService.getNovedadesByEmployee(emp.id, period.id);
-          
-          // Calcular totales de novedades
-          const novedadesTotals = this.calculateNovedadesTotals(novedades);
-          
-          // Datos base del empleado
-          const baseData = {
-            id: emp.id,
-            name: `${emp.nombre} ${emp.apellido}`,
-            position: emp.cargo || 'No especificado',
-            baseSalary: Number(emp.salario_base),
-            workedDays: this.getWorkedDaysForPeriod(period.tipo_periodo),
-            extraHours: novedadesTotals.extraHours,
-            disabilities: novedadesTotals.disabilities,
-            bonuses: novedadesTotals.bonuses,
-            absences: novedadesTotals.absences,
-            eps: emp.eps,
-            afp: emp.afp,
-            additionalDeductions: novedadesTotals.deductions
-          };
+          try {
+            // Obtener novedades del empleado para este período
+            const novedades = await NovedadesBackupService.getNovedadesByEmployee(emp.id, period.id);
+            
+            // Calcular totales de novedades
+            const novedadesTotals = this.calculateNovedadesTotals(novedades);
+            
+            // Datos base del empleado
+            const baseData = {
+              id: emp.id,
+              name: `${emp.nombre} ${emp.apellido}`,
+              position: emp.cargo || 'No especificado',
+              baseSalary: Number(emp.salario_base),
+              workedDays: this.getWorkedDaysForPeriod(period.tipo_periodo),
+              extraHours: novedadesTotals.extraHours,
+              disabilities: novedadesTotals.disabilities,
+              bonuses: novedadesTotals.bonuses,
+              absences: novedadesTotals.absences,
+              eps: emp.eps,
+              afp: emp.afp,
+              additionalDeductions: novedadesTotals.deductions
+            };
 
-          // Calcular liquidación completa usando el servicio mejorado
-          const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
-            baseSalary: baseData.baseSalary,
-            workedDays: baseData.workedDays,
-            extraHours: baseData.extraHours,
-            disabilities: baseData.disabilities,
-            bonuses: baseData.bonuses + novedadesTotals.bonuses,
-            absences: baseData.absences,
-            periodType: period.tipo_periodo as 'quincenal' | 'mensual',
-            periodDate: new Date(period.fecha_inicio)
-          });
+            // Calcular liquidación completa usando el servicio mejorado
+            const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
+              baseSalary: baseData.baseSalary,
+              workedDays: baseData.workedDays,
+              extraHours: baseData.extraHours,
+              disabilities: baseData.disabilities,
+              bonuses: baseData.bonuses + novedadesTotals.bonuses,
+              absences: baseData.absences,
+              periodType: period.tipo_periodo as 'quincenal' | 'mensual',
+              periodDate: new Date(period.fecha_inicio)
+            });
 
-          return {
-            ...baseData,
-            grossPay: calculation.grossPay + novedadesTotals.bonuses,
-            deductions: calculation.totalDeductions + novedadesTotals.deductions,
-            netPay: calculation.netPay + novedadesTotals.bonuses - novedadesTotals.deductions,
-            transportAllowance: calculation.transportAllowance,
-            employerContributions: calculation.employerContributions,
-            status: 'valid' as PayrollEmployee['status'],
-            errors: []
-          };
+            return {
+              ...baseData,
+              grossPay: calculation.grossPay + novedadesTotals.bonuses,
+              deductions: calculation.totalDeductions + novedadesTotals.deductions,
+              netPay: calculation.netPay + novedadesTotals.bonuses - novedadesTotals.deductions,
+              transportAllowance: calculation.transportAllowance,
+              employerContributions: calculation.employerContributions,
+              status: 'valid' as PayrollEmployee['status'],
+              errors: []
+            };
+          } catch (error) {
+            console.error(`❌ Error procesando empleado ${emp.nombre}:`, error);
+            
+            // Retornar empleado con error pero datos básicos
+            return {
+              id: emp.id,
+              name: `${emp.nombre} ${emp.apellido}`,
+              position: emp.cargo || 'No especificado',
+              baseSalary: Number(emp.salario_base),
+              workedDays: this.getWorkedDaysForPeriod(period.tipo_periodo),
+              extraHours: 0,
+              disabilities: 0,
+              bonuses: 0,
+              absences: 0,
+              eps: emp.eps,
+              afp: emp.afp,
+              grossPay: 0,
+              deductions: 0,
+              netPay: 0,
+              transportAllowance: 0,
+              employerContributions: 0,
+              status: 'error' as PayrollEmployee['status'],
+              errors: [`Error en cálculo: ${error instanceof Error ? error.message : 'Error desconocido'}`]
+            };
+          }
         })
       );
 
@@ -135,7 +161,7 @@ export class PayrollLiquidationNewService {
     return totals;
   }
 
-  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes CON UPSERT CORREGIDO
+  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes OPTIMIZADO
   static async closePeriod(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<string> {
     try {
       console.log('🔒 Iniciando cierre de período:', period.id);
@@ -143,20 +169,27 @@ export class PayrollLiquidationNewService {
       // Validar que todos los empleados estén correctamente liquidados
       const invalidEmployees = employees.filter(emp => emp.status === 'error' || emp.netPay <= 0);
       if (invalidEmployees.length > 0) {
+        console.error('❌ Empleados con errores:', invalidEmployees.map(e => e.name));
         throw new Error(`${invalidEmployees.length} empleados tienen errores en su liquidación`);
       }
 
-      // Guardar liquidaciones en la base de datos CON UPSERT CORREGIDO
-      await this.savePeriodLiquidationsFixed(period, employees);
+      console.log(`✅ Validación completada - ${employees.length} empleados válidos`);
+
+      // Guardar liquidaciones en la base de datos OPTIMIZADO
+      await this.savePeriodLiquidationsOptimized(period, employees);
       
-      // Generar comprobantes automáticamente CON VALIDACIÓN DE DUPLICADOS
-      await this.generateVouchersWithDuplicateCheck(period, employees);
+      // Generar comprobantes automáticamente MEJORADO
+      await this.generateVouchersOptimized(period, employees);
       
       // Cambiar estado del período a cerrado
       const { error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({ 
           estado: 'cerrado',
+          empleados_count: employees.length,
+          total_devengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
+          total_deducciones: employees.reduce((sum, emp) => sum + emp.deductions, 0),
+          total_neto: employees.reduce((sum, emp) => sum + emp.netPay, 0),
           updated_at: new Date().toISOString()
         })
         .eq('id', period.id);
@@ -172,72 +205,110 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  // CORREGIDO: Método con INSERT ... ON CONFLICT DO UPDATE usando la restricción única creada
-  static async savePeriodLiquidationsFixed(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
+  // OPTIMIZADO: Método de guardado con mejor manejo de errores y validación previa
+  static async savePeriodLiquidationsOptimized(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
-      console.log('💾 Guardando liquidaciones con UPSERT CORREGIDO...');
+      console.log('💾 Guardando liquidaciones OPTIMIZADO...');
       
-      for (const emp of employees) {
-        const liquidationData = {
-          company_id: period.company_id,
-          employee_id: emp.id,
-          period_id: period.id,
-          periodo: period.periodo,
-          salario_base: emp.baseSalary,
-          dias_trabajados: emp.workedDays,
-          horas_extra: emp.extraHours,
-          bonificaciones: emp.bonuses,
-          auxilio_transporte: emp.transportAllowance,
-          total_devengado: emp.grossPay,
-          total_deducciones: emp.deductions,
-          neto_pagado: emp.netPay,
-          estado: 'procesada'
-        };
+      // Validar datos antes de guardar
+      const validEmployees = employees.filter(emp => {
+        if (!emp.id || !period.id || !period.company_id) {
+          console.warn(`⚠️ Empleado con datos incompletos: ${emp.name}`);
+          return false;
+        }
+        return true;
+      });
 
-        // Usar la restricción única que acabamos de crear
-        const { error } = await supabase
-          .from('payrolls')
-          .upsert(liquidationData, {
-            onConflict: 'company_id,employee_id,period_id'
-          });
+      console.log(`📋 Guardando ${validEmployees.length} liquidaciones válidas`);
 
-        if (error) {
-          console.error('❌ Error en upsert para empleado:', emp.name, error);
-          throw error;
+      // Procesar en lotes para mejor rendimiento
+      const batchSize = 10;
+      for (let i = 0; i < validEmployees.length; i += batchSize) {
+        const batch = validEmployees.slice(i, i + batchSize);
+        
+        await Promise.all(batch.map(async (emp) => {
+          const liquidationData = {
+            company_id: period.company_id,
+            employee_id: emp.id,
+            period_id: period.id,
+            periodo: period.periodo,
+            salario_base: emp.baseSalary,
+            dias_trabajados: emp.workedDays,
+            horas_extra: emp.extraHours,
+            bonificaciones: emp.bonuses,
+            auxilio_transporte: emp.transportAllowance,
+            total_devengado: emp.grossPay,
+            total_deducciones: emp.deductions,
+            neto_pagado: emp.netPay,
+            estado: 'procesada'
+          };
+
+          try {
+            // Usar la restricción única corregida
+            const { error } = await supabase
+              .from('payrolls')
+              .upsert(liquidationData, {
+                onConflict: 'company_id,employee_id,period_id',
+                ignoreDuplicates: false
+              });
+
+            if (error) {
+              console.error(`❌ Error guardando liquidación para ${emp.name}:`, error);
+              throw error;
+            }
+
+            console.log(`✅ Liquidación guardada: ${emp.name}`);
+          } catch (error) {
+            console.error(`❌ Error en upsert para empleado ${emp.name}:`, error);
+            throw error;
+          }
+        }));
+
+        // Pequeña pausa entre lotes
+        if (i + batchSize < validEmployees.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
       
-      console.log('✅ Liquidaciones guardadas exitosamente con UPSERT CORREGIDO');
+      console.log('✅ Todas las liquidaciones guardadas exitosamente');
     } catch (error) {
       console.error('❌ Error guardando liquidaciones:', error);
       throw error;
     }
   }
 
-  // MEJORADO: Generar comprobantes con validación de duplicados y manejo de errores
-  static async generateVouchersWithDuplicateCheck(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
+  // MEJORADO: Generar comprobantes con mejor manejo de errores
+  static async generateVouchersOptimized(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
-      console.log('📄 Generando comprobantes con validación de duplicados...');
+      console.log('📄 Generando comprobantes OPTIMIZADO...');
       
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
+      if (!user) {
+        console.warn('⚠️ Usuario no autenticado - omitiendo generación de comprobantes');
+        return;
+      }
 
-      // Verificar qué empleados ya tienen comprobantes para este período
-      const { data: existingVouchers } = await supabase
+      // Verificar qué empleados ya tienen comprobantes
+      const { data: existingVouchers, error: checkError } = await supabase
         .from('payroll_vouchers')
         .select('employee_id')
         .eq('company_id', period.company_id)
         .eq('periodo', period.periodo);
 
-      const existingEmployeeIds = new Set(existingVouchers?.map(v => v.employee_id) || []);
+      if (checkError) {
+        console.error('❌ Error verificando comprobantes existentes:', checkError);
+        throw checkError;
+      }
 
-      // Filtrar empleados que no tienen comprobantes
+      const existingEmployeeIds = new Set(existingVouchers?.map(v => v.employee_id) || []);
       const employeesNeedingVouchers = employees.filter(emp => !existingEmployeeIds.has(emp.id));
 
       if (employeesNeedingVouchers.length === 0) {
-        console.log('✅ Todos los empleados ya tienen comprobantes generados');
+        console.log('✅ Todos los empleados ya tienen comprobantes');
         return;
       }
+
+      console.log(`📋 Generando ${employeesNeedingVouchers.length} comprobantes nuevos`);
 
       const vouchers = employeesNeedingVouchers.map(emp => ({
         company_id: period.company_id,
@@ -252,19 +323,20 @@ export class PayrollLiquidationNewService {
         dian_status: 'pendiente'
       }));
 
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('payroll_vouchers')
         .insert(vouchers);
 
-      if (error) {
-        console.error('❌ Error insertando comprobantes:', error);
-        throw error;
+      if (insertError) {
+        console.error('❌ Error insertando comprobantes:', insertError);
+        // No lanzar error para no bloquear el cierre del período
+        console.warn('⚠️ Continuando sin generar comprobantes...');
+        return;
       }
       
-      console.log(`✅ ${vouchers.length} comprobantes generados automáticamente`);
+      console.log(`✅ ${vouchers.length} comprobantes generados exitosamente`);
     } catch (error) {
       console.error('❌ Error generando comprobantes:', error);
-      // No lanzar error aquí para no bloquear el cierre del período
       console.warn('⚠️ Continuando sin generar comprobantes...');
     }
   }
@@ -299,7 +371,6 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  // Método para recalcular empleado individual
   static async recalculateEmployee(employeeId: string, period: PayrollPeriod, updates: Partial<PayrollEmployee>): Promise<PayrollEmployee> {
     try {
       // Obtener empleado actual
