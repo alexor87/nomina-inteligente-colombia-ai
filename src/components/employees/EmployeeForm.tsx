@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -178,6 +179,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
     }
 
     if (result.success) {
+      console.log('✅ Employee saved successfully, calling onSuccess callback');
       onSuccess();
     }
   };

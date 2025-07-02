@@ -6,11 +6,13 @@ const CreateEmployeePage = () => {
   const navigate = useNavigate();
 
   const handleSuccess = () => {
-    navigate('/employees');
+    console.log('✅ Employee created successfully, navigating to employees list');
+    navigate('/app/employees');
   };
 
   const handleCancel = () => {
-    navigate('/employees');
+    console.log('🔙 Employee creation cancelled, navigating back to employees list');
+    navigate('/app/employees');
   };
 
   return (
