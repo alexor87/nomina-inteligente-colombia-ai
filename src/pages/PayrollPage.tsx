@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { PayrollLiquidationModern } from '@/components/payroll/PayrollLiquidationModern';
+import { PayrollLiquidationNew } from '@/components/payroll/PayrollLiquidationNew';
 
 const PayrollPage = () => {
-  return <PayrollLiquidationModern />;
+  return <PayrollLiquidationNew />;
 };
 
 export default PayrollPage;
