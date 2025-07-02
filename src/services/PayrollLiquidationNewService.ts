@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationUnifiedService } from './PayrollCalculationUnifiedService';
@@ -227,6 +226,97 @@ export class PayrollLiquidationNewService {
       console.log(`✅ Contador de empleados actualizado: ${count}`);
     } catch (error) {
       console.error('❌ Error actualizando contador de empleados:', error);
+    }
+  }
+
+  static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
+    try {
+      console.log(`🗑️ Removiendo empleado ${employeeId} del período ${periodId}`);
+      
+      // Eliminar nómina del empleado para este período
+      const { error: payrollError } = await supabase
+        .from('payrolls')
+        .delete()
+        .eq('employee_id', employeeId)
+        .eq('period_id', periodId);
+
+      if (payrollError) {
+        console.error('❌ Error eliminando nómina:', payrollError);
+        throw payrollError;
+      }
+
+      // Eliminar novedades del empleado para este período
+      const { error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .delete()
+        .eq('empleado_id', employeeId)
+        .eq('periodo_id', periodId);
+
+      if (novedadesError) {
+        console.error('❌ Error eliminando novedades:', novedadesError);
+        throw novedadesError;
+      }
+
+      console.log(`✅ Empleado ${employeeId} removido del período ${periodId}`);
+    } catch (error) {
+      console.error('❌ Error removiendo empleado del período:', error);
+      throw error;
+    }
+  }
+
+  static async closePeriod(period: any, employees: PayrollEmployee[]): Promise<string> {
+    try {
+      console.log(`🔐 Cerrando período: ${period.periodo}`);
+      
+      // Actualizar estado del período
+      const { error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .update({ 
+          estado: 'cerrado',
+          empleados_count: employees.length,
+          total_devengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
+          total_deducciones: employees.reduce((sum, emp) => sum + emp.deductions, 0),
+          total_neto: employees.reduce((sum, emp) => sum + emp.netPay, 0)
+        })
+        .eq('id', period.id);
+
+      if (periodError) {
+        console.error('❌ Error actualizando período:', periodError);
+        throw periodError;
+      }
+
+      // Crear/actualizar nóminas individuales
+      for (const employee of employees) {
+        if (employee.status === 'valid') {
+          const { error: payrollError } = await supabase
+            .from('payrolls')
+            .upsert({
+              company_id: period.company_id,
+              employee_id: employee.id,
+              periodo: period.periodo,
+              period_id: period.id,
+              salario_base: employee.baseSalary,
+              dias_trabajados: employee.workedDays,
+              horas_extra: employee.extraHours,
+              bonificaciones: employee.bonuses,
+              auxilio_transporte: employee.transportAllowance,
+              total_devengado: employee.grossPay,
+              total_deducciones: employee.deductions,
+              neto_pagado: employee.netPay,
+              estado: 'cerrado'
+            });
+
+          if (payrollError) {
+            console.error(`❌ Error creando nómina para empleado ${employee.id}:`, payrollError);
+          }
+        }
+      }
+
+      console.log(`✅ Período ${period.periodo} cerrado exitosamente`);
+      return `Período ${period.periodo} cerrado con ${employees.length} empleados procesados`;
+    } catch (error) {
+      console.error('❌ Error cerrando período:', error);
+      throw error;
     }
   }
 }
