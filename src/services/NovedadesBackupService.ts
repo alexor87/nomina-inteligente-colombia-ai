@@ -1,6 +1,38 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
+
+// Usar tipos directos de la base de datos en lugar de los tipos enhanced
+export interface CreateNovedadData {
+  empleado_id: string;
+  periodo_id: string;
+  tipo_novedad: 'horas_extra' | 'recargo_nocturno' | 'vacaciones' | 'licencia_remunerada' | 'incapacidad' | 'bonificacion' | 'comision' | 'prima' | 'otros_ingresos' | 'salud' | 'pension' | 'fondo_solidaridad' | 'retencion_fuente' | 'libranza' | 'ausencia' | 'multa' | 'descuento_voluntario';
+  valor?: number;
+  dias?: number;
+  horas?: number;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  observacion?: string;
+  base_calculo?: any;
+  subtipo?: string;
+}
+
+export interface PayrollNovedad {
+  id: string;
+  company_id: string;
+  empleado_id: string;
+  periodo_id: string;
+  tipo_novedad: 'horas_extra' | 'recargo_nocturno' | 'vacaciones' | 'licencia_remunerada' | 'incapacidad' | 'bonificacion' | 'comision' | 'prima' | 'otros_ingresos' | 'salud' | 'pension' | 'fondo_solidaridad' | 'retencion_fuente' | 'libranza' | 'ausencia' | 'multa' | 'descuento_voluntario';
+  valor: number;
+  horas?: number;
+  dias?: number;
+  observacion?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  base_calculo?: string;
+  subtipo?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export class NovedadesBackupService {
   // Este servicio mantiene toda la funcionalidad de novedades intacta
@@ -10,9 +42,22 @@ export class NovedadesBackupService {
     try {
       console.log('🚀 Creating novedad with data:', data);
       
+      // Obtener company_id del usuario actual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+      
       const { data: result, error } = await supabase
         .from('payroll_novedades')
         .insert({
+          company_id: profile.company_id,
           empleado_id: data.empleado_id,
           periodo_id: data.periodo_id,
           tipo_novedad: data.tipo_novedad,
@@ -23,7 +68,8 @@ export class NovedadesBackupService {
           fecha_fin: data.fecha_fin,
           observacion: data.observacion,
           base_calculo: data.base_calculo ? JSON.stringify(data.base_calculo) : null,
-          subtipo: data.subtipo
+          subtipo: data.subtipo,
+          creado_por: user.id
         })
         .select()
         .single();
@@ -58,7 +104,7 @@ export class NovedadesBackupService {
     }
   }
 
-  static async updateNovedad(id: string, updates: Partial<PayrollNovedad>): Promise<PayrollNovedad | null> {
+  static async updateNovedad(id: string, updates: Partial<CreateNovedadData>): Promise<PayrollNovedad | null> {
     try {
       const { data, error } = await supabase
         .from('payroll_novedades')

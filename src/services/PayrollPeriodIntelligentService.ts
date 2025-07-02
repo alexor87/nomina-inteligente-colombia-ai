@@ -1,6 +1,31 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollPeriod, CompanySettings } from '@/types/payroll';
+
+// Tipos específicos para este servicio basados en la base de datos real
+interface CompanySettings {
+  id: string;
+  company_id: string;
+  periodicity: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
+  custom_period_days?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface PayrollPeriod {
+  id: string;
+  company_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
+  tipo_periodo: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
+  periodo: string;
+  empleados_count: number;
+  total_devengado: number;
+  total_deducciones: number;
+  total_neto: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface PeriodStatus {
   hasActivePeriod: boolean;
@@ -175,7 +200,7 @@ export class PayrollPeriodIntelligentService {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as CompanySettings;
     } catch (error) {
       console.error('Error getting company settings:', error);
       return null;
@@ -194,7 +219,7 @@ export class PayrollPeriodIntelligentService {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data as PayrollPeriod;
     } catch (error) {
       console.error('Error finding active period:', error);
       return null;
@@ -213,7 +238,7 @@ export class PayrollPeriodIntelligentService {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data as PayrollPeriod;
     } catch (error) {
       return null;
     }
@@ -239,7 +264,7 @@ export class PayrollPeriodIntelligentService {
       if (error) throw error;
       
       console.log('✅ Período automático creado:', data);
-      return data;
+      return data as PayrollPeriod;
     } catch (error) {
       console.error('❌ Error creating automatic period:', error);
       throw error;
