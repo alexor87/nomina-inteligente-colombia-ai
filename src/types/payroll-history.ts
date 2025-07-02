@@ -6,7 +6,7 @@ export interface PayrollHistoryPeriod {
   endDate: string;
   type: 'semanal' | 'quincenal' | 'mensual' | 'personalizado';
   employeesCount: number;
-  status: 'cerrado' | 'con_errores' | 'revision' | 'editado' | 'reabierto';
+  status: 'borrador' | 'cerrado' | 'con_errores' | 'editado' | 'reabierto';
   totalGrossPay: number;
   totalNetPay: number;
   totalDeductions: number;

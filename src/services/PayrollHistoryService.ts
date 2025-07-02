@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PAYROLL_STATES, STATE_MAPPING } from '@/constants/payrollStates';
@@ -111,7 +112,7 @@ export class PayrollHistoryService {
       console.log('📊 Período encontrado:', period);
 
       // Get employees for this period using period_id relationship
-      const { data: payrolls, error: payrollsError } = await supabase
+      let { data: payrolls, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
           *,

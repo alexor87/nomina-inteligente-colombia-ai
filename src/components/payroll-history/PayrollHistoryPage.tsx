@@ -49,32 +49,6 @@ export const PayrollHistoryPage = () => {
       
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
-        // Mapeo correcto de estados de la base de datos
-        let mappedStatus: 'cerrado' | 'con_errores' | 'borrador' | 'editado' | 'reabierto' = 'borrador';
-        
-        switch (record.estado) {
-          case 'cerrado':
-          case 'procesada':
-          case 'pagada':
-            mappedStatus = 'cerrado';
-            break;
-          case 'borrador':
-            mappedStatus = 'borrador';
-            break;
-          case 'editado':
-            mappedStatus = 'editado';
-            break;
-          case 'reabierto':
-            mappedStatus = 'reabierto';
-            break;
-          case 'con_errores':
-            mappedStatus = 'con_errores';
-            break;
-          default:
-            mappedStatus = 'borrador';
-            break;
-        }
-
         return {
           id: record.id,
           period: record.periodo || 'Sin período',
@@ -82,7 +56,7 @@ export const PayrollHistoryPage = () => {
           endDate: record.fecha_fin || record.fechaCreacion,
           type: 'mensual' as const,
           employeesCount: record.empleados || 0,
-          status: mappedStatus,
+          status: record.estado as 'borrador' | 'cerrado' | 'con_errores' | 'editado' | 'reabierto',
           totalGrossPay: Number(record.totalNomina || 0),
           totalNetPay: Number(record.totalNomina || 0),
           totalDeductions: 0,
