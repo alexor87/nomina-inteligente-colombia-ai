@@ -195,6 +195,11 @@ export const EmployeeNotesModal: React.FC<EmployeeNotesModalProps> = ({
       closeOnEscape={!isCreating}
       closeOnBackdrop={!isCreating}
     >
+      <div className="sr-only">
+        <h2>Notas del Empleado - {employeeName}</h2>
+        <p>Modal para gestionar las notas del empleado {employeeName} en el período {periodName}. Permite crear, editar y eliminar notas, así como mencionar a otros usuarios de la empresa.</p>
+      </div>
+      
       <CustomModalHeader>
         <CustomModalTitle className="flex items-center gap-2">
           <StickyNote className="h-5 w-5" />
@@ -243,7 +248,7 @@ export const EmployeeNotesModal: React.FC<EmployeeNotesModalProps> = ({
           </CardContent>
         </Card>
 
-        {/* Lista de notas existentes */}
+        {/* Lista de novedades existentes */}
         <Card className="flex-1 overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">

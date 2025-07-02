@@ -75,11 +75,15 @@ export const usePayrollLiquidationRobust = () => {
     try {
       setIsProcessing(true);
       console.log('👥 Cargando empleados para período:', period.periodo);
+      console.log('📅 Período completo:', period);
       
       const loadedEmployees = await PayrollLiquidationNewService.loadEmployeesForActivePeriod(period);
+      console.log('✅ Empleados cargados desde servicio:', loadedEmployees.length);
+      
       setEmployees(loadedEmployees);
       
       // Actualizar contador de empleados en el período
+      console.log('📊 Actualizando contador de empleados en BD...');
       await PayrollLiquidationNewService.updateEmployeeCount(period.id, loadedEmployees.length);
       
       // Calcular resumen
@@ -97,10 +101,15 @@ export const usePayrollLiquidationRobust = () => {
       setSummary(newSummary);
       
       console.log('✅ Empleados cargados y resumen calculado');
-      console.log('📊 Resumen:', {
+      console.log('📊 Resumen detallado:', {
         totalEmployees: loadedEmployees.length,
         validEmployees: validEmployees.length,
-        totalGrossPay: newSummary.totalGrossPay
+        totalGrossPay: newSummary.totalGrossPay,
+        totalNetPay: newSummary.totalNetPay,
+        empleadosEstados: loadedEmployees.reduce((acc, emp) => {
+          acc[emp.status] = (acc[emp.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
       });
       
     } catch (error) {
@@ -185,6 +194,19 @@ export const usePayrollLiquidationRobust = () => {
   useEffect(() => {
     initializeWithDiagnosis();
   }, [initializeWithDiagnosis]);
+
+  // Debug logging para monitorear cambios de estado
+  useEffect(() => {
+    console.log('🔄 usePayrollLiquidationRobust - Estado actualizado:', {
+      isLoading,
+      isProcessing,
+      employeesCount: employees.length,
+      currentPeriodId: currentPeriod?.id,
+      periodStatus: periodStatus?.action,
+      summaryTotalEmployees: summary.totalEmployees,
+      hasActivePeriod: periodStatus?.hasActivePeriod
+    });
+  }, [isLoading, isProcessing, employees.length, currentPeriod, periodStatus, summary.totalEmployees]);
 
   return {
     // Estado
