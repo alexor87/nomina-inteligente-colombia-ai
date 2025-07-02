@@ -13,7 +13,7 @@ import {
 import { PayrollEmployee } from '@/types/payroll';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { NovedadUnifiedModal } from './novedades/NovedadUnifiedModal';
-import { CreateNovedadData } from '@/services/NovedadesBackupService';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface PayrollTableNewProps {
   employees: PayrollEmployee[];
@@ -74,7 +74,12 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
                   checked={allSelected}
                   onCheckedChange={onToggleAll}
                   ref={(el) => {
-                    if (el) el.indeterminate = someSelected;
+                    if (el) {
+                      const checkbox = el.querySelector('input[type="checkbox"]') as HTMLInputElement;
+                      if (checkbox) {
+                        checkbox.indeterminate = someSelected;
+                      }
+                    }
                   }}
                 />
               </TableHead>

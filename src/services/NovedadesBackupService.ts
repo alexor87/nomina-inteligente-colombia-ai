@@ -1,27 +1,13 @@
 
 import { supabase } from '@/integrations/supabase/client';
-
-// Usar tipos directos de la base de datos en lugar de los tipos enhanced
-export interface CreateNovedadData {
-  empleado_id: string;
-  periodo_id: string;
-  tipo_novedad: 'horas_extra' | 'recargo_nocturno' | 'vacaciones' | 'licencia_remunerada' | 'incapacidad' | 'bonificacion' | 'comision' | 'prima' | 'otros_ingresos' | 'salud' | 'pension' | 'fondo_solidaridad' | 'retencion_fuente' | 'libranza' | 'ausencia' | 'multa' | 'descuento_voluntario';
-  valor?: number;
-  dias?: number;
-  horas?: number;
-  fecha_inicio?: string;
-  fecha_fin?: string;
-  observacion?: string;
-  base_calculo?: any;
-  subtipo?: string;
-}
+import { CreateNovedadData, NovedadType } from '@/types/novedades-enhanced';
 
 export interface PayrollNovedad {
   id: string;
   company_id: string;
   empleado_id: string;
   periodo_id: string;
-  tipo_novedad: 'horas_extra' | 'recargo_nocturno' | 'vacaciones' | 'licencia_remunerada' | 'incapacidad' | 'bonificacion' | 'comision' | 'prima' | 'otros_ingresos' | 'salud' | 'pension' | 'fondo_solidaridad' | 'retencion_fuente' | 'libranza' | 'ausencia' | 'multa' | 'descuento_voluntario';
+  tipo_novedad: NovedadType;
   valor: number;
   horas?: number;
   dias?: number;
