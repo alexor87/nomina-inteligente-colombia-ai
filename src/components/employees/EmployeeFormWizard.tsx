@@ -36,7 +36,7 @@ interface EmployeeFormData {
   tipoCuenta: 'ahorros' | 'corriente';
   numeroCuenta: string;
   titularCuenta: string;
-  periodicidadPago: 'mensual' as const;
+  periodicidadPago: 'quincenal' | 'mensual';
 }
 
 interface EmployeeFormWizardProps {
@@ -83,10 +83,11 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
       cajaCompensacion: employee?.cajaCompensacion || '',
       cargo: employee?.cargo || '',
       estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
-      banco: '',
-      tipoCuenta: 'ahorros',
-      numeroCuenta: '',
-      titularCuenta: ''
+      banco: employee?.banco || '',
+      tipoCuenta: employee?.tipoCuenta || 'ahorros',
+      numeroCuenta: employee?.numeroCuenta || '',
+      titularCuenta: employee?.titularCuenta || '',
+      periodicidadPago: employee?.periodicidadPago || 'mensual'
     }
   });
 
@@ -176,7 +177,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
       salarioBase: Number(data.salarioBase),
       tipoContrato: data.tipoContrato,
       fechaIngreso: data.fechaIngreso,
-      periodicidadPago: 'mensual' as const,
+      periodicidadPago: data.periodicidadPago,
       estado: data.estado,
       eps: data.eps,
       afp: data.afp,
