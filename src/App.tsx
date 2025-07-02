@@ -18,6 +18,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
+import CreateEmployeePage from "./pages/CreateEmployeePage";
 import PayrollPage from "./pages/PayrollPage";
 import PayrollHistoryPage from "./pages/PayrollHistoryPage";
 import PayrollHistoryDetailsPage from "./pages/PayrollHistoryDetailsPage";
@@ -49,6 +50,7 @@ function App() {
                 <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                   <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="employees" element={<EmployeesPage />} />
+                  <Route path="employees/create" element={<CreateEmployeePage />} />
                   <Route path="payroll" element={<PayrollPage />} />
                   <Route path="payroll-history" element={<PayrollHistoryPage />} />
                   <Route path="payroll-history/:id" element={<PayrollHistoryDetailsPage />} />
