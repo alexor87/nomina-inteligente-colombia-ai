@@ -4,9 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { Layout } from "@/components/layout/Layout";
 
 // Pages
 import DashboardPage from "./pages/DashboardPage";
@@ -25,29 +24,21 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <SidebarProvider>
-            <div className="min-h-screen flex w-full">
-              <AppSidebar />
-              <main className="flex-1 flex flex-col">
-                <header className="h-12 flex items-center border-b bg-white px-4">
-                  <SidebarTrigger />
-                </header>
-                <div className="flex-1">
-                  <Routes>
-                    <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
-                    <Route path="/app/dashboard" element={<DashboardPage />} />
-                    <Route path="/app/employees" element={<EmployeesPage />} />
-                    <Route path="/app/payroll" element={<PayrollPage />} />
-                    <Route path="/app/payroll-history" element={<PayrollHistoryPage />} />
-                    <Route path="/app/payroll-history/:id" element={<PayrollHistoryPage />} />
-                    <Route path="/app/payroll-history/:id/edit" element={<PayrollHistoryPage />} />
-                    <Route path="/app/reports" element={<ReportsPage />} />
-                    <Route path="/app/settings" element={<SettingsPage />} />
-                  </Routes>
-                </div>
-              </main>
-            </div>
-          </SidebarProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
+              <Route path="/app" element={<Layout />}>
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="payroll" element={<PayrollPage />} />
+                <Route path="payroll-history" element={<PayrollHistoryPage />} />
+                <Route path="payroll-history/:id" element={<PayrollHistoryPage />} />
+                <Route path="payroll-history/:id/edit" element={<PayrollHistoryPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
