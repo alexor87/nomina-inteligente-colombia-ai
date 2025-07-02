@@ -11,9 +11,11 @@ import {
   RefreshCw,
   Trash2,
   AlertTriangle,
-  Zap
+  Zap,
+  Settings
 } from 'lucide-react';
 import { DataCleanupDialog } from './DataCleanupDialog';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 
 interface EmployeeListHeaderProps {
   filteredCount: number;
@@ -47,6 +49,7 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
   onForceCompleteRefresh
 }) => {
   const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
+  const { companyId } = useCurrentCompany();
 
   const getEmployeeCountText = () => {
     if (searchTerm && filteredCount !== totalEmployees) {
@@ -73,6 +76,19 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
     }
   };
 
+  const activateSupportMode = () => {
+    if (companyId) {
+      const currentUrl = window.location.origin + window.location.pathname;
+      const newUrl = `${currentUrl}?support_company=${companyId}`;
+      window.location.href = newUrl;
+    }
+  };
+
+  const deactivateSupportMode = () => {
+    const currentUrl = window.location.origin + window.location.pathname;
+    window.location.href = currentUrl;
+  };
+
   return (
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -95,6 +111,30 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Botón para activar/desactivar modo soporte */}
+          {!isSupportMode ? (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={activateSupportMode}
+              disabled={!companyId}
+              className="flex items-center gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
+            >
+              <Settings className="h-4 w-4" />
+              Modo Soporte
+            </Button>
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={deactivateSupportMode}
+              className="flex items-center gap-2 border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              <Settings className="h-4 w-4" />
+              Salir Soporte
+            </Button>
+          )}
+
           {/* Botón de refresh normal */}
           <Button 
             variant="outline" 
