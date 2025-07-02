@@ -129,7 +129,7 @@ export class PayrollHistoryService {
           period: this.generatePeriodName(period.fecha_inicio, period.fecha_fin),
           startDate: period.fecha_inicio,
           endDate: period.fecha_fin,
-          type: 'mensual' as const,
+          type: this.mapPeriodType(period.tipo_periodo),
           employeesCount: employees.length,
           status: this.mapStatus(period.estado) as any,
           totalGrossPay: summary.totalDevengado,
@@ -270,6 +270,17 @@ export class PayrollHistoryService {
     };
     
     return statusMap[estado] || 'revision';
+  }
+
+  static mapPeriodType(tipoPeriodo: string): 'semanal' | 'quincenal' | 'mensual' | 'personalizado' {
+    const typeMap: Record<string, 'semanal' | 'quincenal' | 'mensual' | 'personalizado'> = {
+      'semanal': 'semanal',
+      'quincenal': 'quincenal',
+      'mensual': 'mensual',
+      'personalizado': 'personalizado'
+    };
+    
+    return typeMap[tipoPeriodo] || 'mensual';
   }
 
   static async recalculateEmployeeTotalsWithNovedades(employeeId: string, periodId: string): Promise<void> {
