@@ -231,20 +231,20 @@ export const EditableEmployeeTable = ({
                           </div>
                         </div>
                       )}
-                      {isEditMode && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenNovedadModal(employee)}
-                          className={`h-8 w-8 p-0 rounded-full border-dashed border-2 ${
-                            hasNovedades 
-                              ? 'border-purple-300 text-purple-600 hover:border-purple-500 hover:text-purple-700 hover:bg-purple-50'
-                              : 'border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50'
-                          }`}
-                        >
-                          {hasNovedades ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                        </Button>
-                      )}
+                  {isEditMode && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenNovedadModal(employee)}
+                      className={`h-8 w-8 p-0 rounded-full border-dashed border-2 ${
+                        hasNovedades 
+                          ? 'border-purple-300 text-purple-600 hover:border-purple-500 hover:text-purple-700 hover:bg-purple-50'
+                          : 'border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50'
+                      }`}
+                    >
+                      {hasNovedades ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    </Button>
+                  )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900">

@@ -55,27 +55,28 @@ export class NovedadesEnhancedService {
         company_id: companyId
       });
 
-      // Get the current active period using the updated service
-      console.log('🔍 Validating period using PayrollPeriodService...');
-      const activePeriod = await PayrollPeriodService.getCurrentActivePeriod();
+      // Validate the provided period exists and belongs to the company
+      console.log('🔍 Validating provided period:', data.periodo_id);
       
-      if (!activePeriod) {
-        console.error('❌ No active period found for company:', companyId);
-        throw new Error('No active period found. Please create a payroll period first.');
+      const { data: periodExists, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('id, estado, periodo, fecha_inicio')
+        .eq('id', data.periodo_id)
+        .eq('company_id', companyId)
+        .single();
+
+      if (periodError || !periodExists) {
+        console.error('❌ Invalid period provided:', { periodError, periodo_id: data.periodo_id });
+        throw new Error('Invalid period ID provided');
       }
 
-      console.log('✅ Active period found:', activePeriod);
-
-      // Use the active period ID if the provided one is different or invalid
-      let validPeriodId = activePeriod.id;
-      
-      if (data.periodo_id !== validPeriodId) {
-        console.warn('⚠️ Using active period instead of provided period:', {
-          provided: data.periodo_id,
-          active: validPeriodId
-        });
-        data.periodo_id = validPeriodId;
+      // Allow editing only if period is in 'borrador' or 'reabierto' state
+      if (!['borrador', 'reabierto'].includes(periodExists.estado)) {
+        console.error('❌ Period is not editable. Current state:', periodExists.estado);
+        throw new Error('This period cannot be edited. Only draft or reopened periods can be modified.');
       }
+
+      console.log('✅ Period validated successfully:', periodExists);
 
       // Enhanced employee validation
       const { data: employeeExists, error: employeeError } = await supabase
@@ -92,9 +93,8 @@ export class NovedadesEnhancedService {
 
       console.log('✅ Employee validated successfully:', employeeExists);
       
-      // Use period date for enhanced calculations
-      const fechaPeriodoReal = activePeriod?.fecha_inicio ? 
-        new Date(activePeriod.fecha_inicio) : new Date();
+      // Use period date for enhanced calculations - default to current date if no period date
+      const fechaPeriodoReal = new Date();
 
       // Enhanced auto-calculation with period-specific legal workday
       let valorFinal = data.valor || 0;

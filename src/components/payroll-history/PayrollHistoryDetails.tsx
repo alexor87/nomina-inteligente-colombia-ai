@@ -22,7 +22,10 @@ import { PayrollHistoryDetails as PayrollDetails, PayrollHistoryEmployee } from 
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNovedades } from '@/hooks/useNovedades';
+import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { EditableEmployeeTable } from './EditableEmployeeTable';
+import { ReopenedPeriodBanner } from '../payroll/ReopenedPeriodBanner';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export const PayrollHistoryDetails = () => {
   const { id: periodId } = useParams<{ id: string }>();
@@ -35,9 +38,19 @@ export const PayrollHistoryDetails = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showReopenDialog, setShowReopenDialog] = useState(false);
 
   // Check if user can edit periods
   const canEditPeriods = isSuperAdmin || hasModuleAccess('payroll-history');
+  
+  // Payroll history hooks for reopening functionality
+  const {
+    isReopening,
+    canUserReopenPeriods,
+    checkUserPermissions,
+    reopenPeriod,
+    closePeriodAgain
+  } = usePayrollHistory();
 
   // Hook para manejar novedades - using the correct method name
   const {
@@ -47,8 +60,9 @@ export const PayrollHistoryDetails = () => {
   useEffect(() => {
     if (periodId) {
       loadPeriodDetails();
+      checkUserPermissions();
     }
-  }, [periodId]);
+  }, [periodId, checkUserPermissions]);
 
   const loadPeriodDetails = async () => {
     if (!periodId) return;
@@ -146,10 +160,45 @@ export const PayrollHistoryDetails = () => {
     loadPeriodDetails();
   };
 
+  const handleReopenPeriod = async () => {
+    if (!details?.period.period) return;
+    
+    try {
+      await reopenPeriod(details.period.period);
+      setShowReopenDialog(false);
+      await loadPeriodDetails(); // Refresh to show updated status
+    } catch (error) {
+      console.error('Error reopening period:', error);
+    }
+  };
+
+  const handleClosePeriod = async () => {
+    if (!details?.period.period) return;
+    
+    try {
+      await closePeriodAgain(details.period.period);
+      await loadPeriodDetails(); // Refresh to show updated status
+      setIsEditMode(false);
+    } catch (error) {
+      console.error('Error closing period:', error);
+    }
+  };
+
+  const handleFinishEditing = () => {
+    handleClosePeriod();
+  };
+
+  const handleDismissBanner = () => {
+    // Just hide edit mode but keep period reopened
+    setIsEditMode(false);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'cerrado':
         return 'bg-green-100 text-green-800';
+      case 'reabierto':
+        return 'bg-amber-100 text-amber-800';
       case 'con_errores':
         return 'bg-red-100 text-red-800';
       case 'revision':
@@ -188,7 +237,9 @@ export const PayrollHistoryDetails = () => {
     );
   }
 
-  const canEdit = canEditPeriods && (details.period.status === 'revision' || details.period.status === 'editado');
+  const canEdit = canEditPeriods && (details.period.status === 'revision' || details.period.status === 'editado' || details.period.status === 'reabierto');
+  const canReopen = canEditPeriods && canUserReopenPeriods && details.period.status === 'cerrado';
+  const isReopened = details.period.status === 'reabierto';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -219,6 +270,17 @@ export const PayrollHistoryDetails = () => {
                 <Download className="h-4 w-4" />
                 <span>Exportar Detalles</span>
               </Button>
+              {canReopen && (
+                <Button
+                  onClick={() => setShowReopenDialog(true)}
+                  variant="default"
+                  className="flex items-center space-x-2"
+                  disabled={isReopening}
+                >
+                  <Edit className="h-4 w-4" />
+                  <span>{isReopening ? 'Reabriendo...' : 'Editar período'}</span>
+                </Button>
+              )}
               {canEdit && (
                 <Button
                   onClick={handleToggleEditMode}
@@ -235,6 +297,17 @@ export const PayrollHistoryDetails = () => {
       </div>
 
       <div className="p-6 space-y-6">
+        {/* Reopened Period Banner */}
+        {isReopened && (
+          <ReopenedPeriodBanner
+            periodName={details.period.period}
+            startDate={details.period.startDate}
+            endDate={details.period.endDate}
+            onFinishEditing={handleFinishEditing}
+            onDismiss={handleDismissBanner}
+          />
+        )}
+
         {/* Period Summary */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
@@ -343,6 +416,26 @@ export const PayrollHistoryDetails = () => {
           </div>
         </div>
       )}
+
+      {/* Reopen Confirmation Dialog */}
+      <AlertDialog open={showReopenDialog} onOpenChange={setShowReopenDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reabrir Período Cerrado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este período está cerrado. Si deseas hacer ajustes, será reabierto temporalmente. 
+              Podrás agregar, editar o eliminar novedades. Para que los cambios sean válidos, 
+              deberás cerrarlo nuevamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReopenPeriod} disabled={isReopening}>
+              {isReopening ? 'Reabriendo...' : 'Reabrir Período'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
