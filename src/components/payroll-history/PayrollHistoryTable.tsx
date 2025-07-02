@@ -23,6 +23,11 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
 }) => {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
+      borrador: { 
+        variant: 'secondary' as const, 
+        className: 'bg-gray-100 text-gray-800 border-gray-200',
+        label: 'Borrador' 
+      },
       cerrado: { 
         variant: 'default' as const, 
         className: 'bg-green-100 text-green-800 border-green-200',
@@ -32,11 +37,6 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
         variant: 'destructive' as const, 
         className: 'bg-red-100 text-red-800 border-red-200',
         label: 'Con Errores' 
-      },
-      revision: { 
-        variant: 'secondary' as const, 
-        className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        label: 'En Revisión' 
       },
       editado: { 
         variant: 'outline' as const, 
@@ -50,7 +50,7 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
       }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.revision;
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.borrador;
     
     return (
       <Badge variant={config.variant} className={config.className}>
@@ -109,12 +109,6 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Neto Pagado
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Archivo PILA
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Estado Pagos
-              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Acciones
               </th>
@@ -147,18 +141,6 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {formatCurrency(period.totalNetPay)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {period.pilaFileUrl ? (
-                    <span className="text-green-600">Generado</span>
-                  ) : (
-                    <span className="text-gray-400">Pendiente</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge variant={period.paymentStatus === 'pagado' ? 'default' : 'secondary'}>
-                    {period.paymentStatus === 'pagado' ? 'Pagado' : 'Pendiente'}
-                  </Badge>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">

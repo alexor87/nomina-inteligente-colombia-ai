@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
@@ -5,7 +6,7 @@ import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Search, Filter, Calendar, Users, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
+import { Download, Search, Filter, Calendar, Users, CheckCircle, AlertCircle, Clock, FileText, Edit } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryFilters as FiltersType } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
@@ -48,20 +49,29 @@ export const PayrollHistoryPage = () => {
       
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
       const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
-        // Fix the status mapping logic to handle all possible estados
-        let mappedStatus: 'cerrado' | 'con_errores' | 'revision' | 'editado' | 'reabierto' = 'revision';
+        // Mapeo correcto de estados de la base de datos
+        let mappedStatus: 'cerrado' | 'con_errores' | 'borrador' | 'editado' | 'reabierto' = 'borrador';
         
         switch (record.estado) {
-          case 'cerrada':
+          case 'cerrado':
           case 'procesada':
           case 'pagada':
             mappedStatus = 'cerrado';
             break;
           case 'borrador':
-            mappedStatus = 'revision';
+            mappedStatus = 'borrador';
+            break;
+          case 'editado':
+            mappedStatus = 'editado';
+            break;
+          case 'reabierto':
+            mappedStatus = 'reabierto';
+            break;
+          case 'con_errores':
+            mappedStatus = 'con_errores';
             break;
           default:
-            mappedStatus = 'con_errores';
+            mappedStatus = 'borrador';
             break;
         }
 
@@ -135,11 +145,12 @@ export const PayrollHistoryPage = () => {
   const getMetrics = () => {
     const total = periods.length;
     const cerrados = periods.filter(p => p.status === 'cerrado').length;
+    const borrador = periods.filter(p => p.status === 'borrador').length;
     const editados = periods.filter(p => p.status === 'editado').length;
     const conErrores = periods.filter(p => p.status === 'con_errores').length;
-    const enRevision = periods.filter(p => p.status === 'revision').length;
+    const reabiertos = periods.filter(p => p.status === 'reabierto').length;
 
-    return { total, cerrados, editados, conErrores, enRevision };
+    return { total, cerrados, borrador, editados, conErrores, reabiertos };
   };
 
   const handlePeriodClick = (period: PayrollHistoryPeriod) => {
@@ -203,7 +214,7 @@ export const PayrollHistoryPage = () => {
 
       <div className="p-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Períodos</CardTitle>
@@ -211,6 +222,16 @@ export const PayrollHistoryPage = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{metrics.total}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Borrador</CardTitle>
+              <Clock className="h-4 w-4 text-gray-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-600">{metrics.borrador}</div>
             </CardContent>
           </Card>
           
@@ -227,10 +248,20 @@ export const PayrollHistoryPage = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Editados</CardTitle>
-              <FileText className="h-4 w-4 text-blue-600" />
+              <Edit className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">{metrics.editados}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Reabiertos</CardTitle>
+              <FileText className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{metrics.reabiertos}</div>
             </CardContent>
           </Card>
           
@@ -241,16 +272,6 @@ export const PayrollHistoryPage = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{metrics.conErrores}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En Revisión</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{metrics.enRevision}</div>
             </CardContent>
           </Card>
         </div>

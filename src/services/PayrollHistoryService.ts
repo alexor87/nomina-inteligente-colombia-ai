@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
-import { PAYROLL_STATES } from '@/constants/payrollStates';
+import { PAYROLL_STATES, STATE_MAPPING } from '@/constants/payrollStates';
 import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
 
 export interface PayrollHistoryRecord {
@@ -59,12 +59,12 @@ export class PayrollHistoryService {
       console.log('📊 Períodos encontrados:', periods?.length || 0);
 
       const transformedPeriods = periods?.map(period => {
-        console.log(`📄 Procesando período "${period.periodo}"`);
+        console.log(`📄 Procesando período "${period.periodo}" con estado "${period.estado}"`);
         
-        // Usar servicio unificado para estado
-        const stateInfo = PeriodNameUnifiedService.getUnifiedStateInfo(period.estado);
+        // Mapear estado directamente usando las constantes
+        const mappedState = STATE_MAPPING[period.estado] || period.estado;
         
-        console.log(`📊 Estado: DB="${period.estado}" → UI="${stateInfo.displayState}"`);
+        console.log(`📊 Estado: DB="${period.estado}" → UI="${mappedState}"`);
         
         return {
           id: period.id,
@@ -73,9 +73,9 @@ export class PayrollHistoryService {
           fecha_fin: period.fecha_fin,
           empleados: period.empleados_count || 0,
           totalNomina: Number(period.total_neto || 0),
-          estado: stateInfo.displayState,
+          estado: mappedState,
           fechaCreacion: period.created_at,
-          editable: stateInfo.isEditable,
+          editable: ['borrador', 'editado', 'reabierto'].includes(period.estado),
           reportado_dian: false
         };
       }) || [];
@@ -93,6 +93,8 @@ export class PayrollHistoryService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('No company ID found');
 
+      console.log('🔍 Obteniendo detalles del período:', periodId);
+
       // Get period details
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
@@ -101,9 +103,14 @@ export class PayrollHistoryService {
         .eq('company_id', companyId)
         .single();
 
-      if (periodError) throw periodError;
+      if (periodError) {
+        console.error('❌ Error obteniendo período:', periodError);
+        throw periodError;
+      }
 
-      // Get employees for this period
+      console.log('📊 Período encontrado:', period);
+
+      // Get employees for this period using period_id relationship
       const { data: payrolls, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
@@ -116,16 +123,37 @@ export class PayrollHistoryService {
           )
         `)
         .eq('company_id', companyId)
-        .eq('periodo', period.periodo);
+        .eq('period_id', periodId);
 
-      if (payrollsError) throw payrollsError;
+      if (payrollsError) {
+        console.error('❌ Error obteniendo payrolls:', payrollsError);
+        // If period_id relationship fails, try fallback with periodo text
+        const { data: fallbackPayrolls, error: fallbackError } = await supabase
+          .from('payrolls')
+          .select(`
+            *,
+            employees (
+              id,
+              nombre,
+              apellido,
+              cargo
+            )
+          `)
+          .eq('company_id', companyId)
+          .eq('periodo', period.periodo);
+
+        if (fallbackError) throw fallbackError;
+        payrolls = fallbackPayrolls;
+      }
+
+      console.log('👥 Empleados encontrados:', payrolls?.length || 0);
 
       const employees: PayrollHistoryEmployee[] = payrolls?.map(payroll => ({
         id: payroll.employee_id,
         periodId: periodId,
         payrollId: payroll.id,
-        name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
-        position: payroll.employees.cargo || 'N/A',
+        name: `${payroll.employees?.nombre || 'N/A'} ${payroll.employees?.apellido || ''}`.trim(),
+        position: payroll.employees?.cargo || 'N/A',
         grossPay: Number(payroll.total_devengado || 0),
         deductions: Number(payroll.total_deducciones || 0),
         netPay: Number(payroll.neto_pagado || 0),
@@ -137,12 +165,14 @@ export class PayrollHistoryService {
         totalDevengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
         totalDeducciones: employees.reduce((sum, emp) => sum + emp.deductions, 0),
         totalNeto: employees.reduce((sum, emp) => sum + emp.netPay, 0),
-        costoTotal: employees.reduce((sum, emp) => sum + emp.grossPay + emp.deductions, 0),
+        costoTotal: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
         aportesEmpleador: employees.length * 100000 // Mock calculation
       };
 
-      // Usar servicio unificado para información del estado
-      const stateInfo = PeriodNameUnifiedService.getUnifiedStateInfo(period.estado);
+      // Mapear estado correctamente
+      const displayState = STATE_MAPPING[period.estado] || period.estado;
+
+      console.log('✅ Detalles del período construidos correctamente');
 
       return {
         period: {
@@ -152,7 +182,7 @@ export class PayrollHistoryService {
           endDate: period.fecha_fin,
           type: this.mapPeriodType(period.tipo_periodo),
           employeesCount: employees.length,
-          status: stateInfo.displayState as any,
+          status: displayState as any,
           totalGrossPay: summary.totalDevengado,
           totalNetPay: summary.totalNeto,
           totalDeductions: summary.totalDeducciones,
@@ -162,7 +192,7 @@ export class PayrollHistoryService {
           version: 1,
           createdAt: period.created_at,
           updatedAt: period.updated_at,
-          editable: stateInfo.isEditable
+          editable: ['borrador', 'editado', 'reabierto'].includes(period.estado)
         },
         summary,
         employees,
@@ -173,7 +203,7 @@ export class PayrollHistoryService {
         }
       };
     } catch (error) {
-      console.error('Error getting period details:', error);
+      console.error('💥 Error obteniendo detalles del período:', error);
       throw error;
     }
   }
