@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationUnifiedService } from './PayrollCalculationUnifiedService';
@@ -268,29 +269,16 @@ export class PayrollLiquidationNewService {
     try {
       console.log(`🔐 Cerrando período: ${period.periodo}`);
       
-      // Actualizar estado del período
-      const { error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .update({ 
-          estado: 'cerrado',
-          empleados_count: employees.length,
-          total_devengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
-          total_deducciones: employees.reduce((sum, emp) => sum + emp.deductions, 0),
-          total_neto: employees.reduce((sum, emp) => sum + emp.netPay, 0)
-        })
-        .eq('id', period.id);
+      // **CRÍTICO: Guardar registros individuales ANTES de actualizar período**
+      console.log(`💾 Guardando ${employees.length} registros de nómina individuales...`);
+      
+      let successfulRecords = 0;
+      const failedRecords: string[] = [];
 
-      if (periodError) {
-        console.error('❌ Error actualizando período:', periodError);
-        throw periodError;
-      }
-
-      // Crear/actualizar nóminas individuales
       for (const employee of employees) {
         if (employee.status === 'valid') {
-          const { error: payrollError } = await supabase
-            .from('payrolls')
-            .upsert({
+          try {
+            const payrollData = {
               company_id: period.company_id,
               employee_id: employee.id,
               periodo: period.periodo,
@@ -304,16 +292,64 @@ export class PayrollLiquidationNewService {
               total_deducciones: employee.deductions,
               neto_pagado: employee.netPay,
               estado: 'cerrado'
-            });
+            };
 
-          if (payrollError) {
-            console.error(`❌ Error creando nómina para empleado ${employee.id}:`, payrollError);
+            const { error: payrollError } = await supabase
+              .from('payrolls')
+              .upsert(payrollData, {
+                onConflict: 'company_id,employee_id,periodo',
+                ignoreDuplicates: false
+              });
+
+            if (payrollError) {
+              console.error(`❌ Error guardando nómina para empleado ${employee.name}:`, payrollError);
+              failedRecords.push(employee.name);
+            } else {
+              successfulRecords++;
+              console.log(`✅ Nómina guardada para ${employee.name}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error crítico guardando empleado ${employee.name}:`, error);
+            failedRecords.push(employee.name);
           }
         }
       }
 
-      console.log(`✅ Período ${period.periodo} cerrado exitosamente`);
-      return `Período ${period.periodo} cerrado con ${employees.length} empleados procesados`;
+      console.log(`📊 Resultados del guardado: ${successfulRecords} exitosos, ${failedRecords.length} fallidos`);
+
+      if (failedRecords.length > 0) {
+        console.error('⚠️ Empleados que fallaron al guardar:', failedRecords);
+      }
+
+      // Calcular totales basados en registros válidos
+      const validEmployees = employees.filter(emp => emp.status === 'valid');
+      const totalDevengado = validEmployees.reduce((sum, emp) => sum + emp.grossPay, 0);
+      const totalDeducciones = validEmployees.reduce((sum, emp) => sum + emp.deductions, 0);
+      const totalNeto = validEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
+
+      // Actualizar estado del período con totales actualizados
+      const { error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .update({ 
+          estado: 'cerrado',
+          empleados_count: successfulRecords, // Usar empleados exitosamente guardados
+          total_devengado: totalDevengado,
+          total_deducciones: totalDeducciones,
+          total_neto: totalNeto
+        })
+        .eq('id', period.id);
+
+      if (periodError) {
+        console.error('❌ Error actualizando período:', periodError);
+        throw periodError;
+      }
+
+      const message = failedRecords.length > 0 
+        ? `Período ${period.periodo} cerrado con ${successfulRecords} empleados. ${failedRecords.length} empleados fallaron al guardar.`
+        : `Período ${period.periodo} cerrado exitosamente con ${successfulRecords} empleados procesados`;
+
+      console.log(`✅ ${message}`);
+      return message;
     } catch (error) {
       console.error('❌ Error cerrando período:', error);
       throw error;

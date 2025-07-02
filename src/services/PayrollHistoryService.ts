@@ -149,6 +149,36 @@ export class PayrollHistoryService {
 
       console.log('👥 Empleados encontrados:', payrolls?.length || 0);
 
+      // Si no hay empleados y el período está cerrado, intentar sincronización
+      if ((!payrolls || payrolls.length === 0) && period.estado === 'cerrado') {
+        console.log('🔄 Período cerrado sin empleados, intentando sincronización...');
+        
+        try {
+          await this.syncHistoricalData(periodId);
+          
+          // Reintentar obtener los empleados después de la sincronización
+          const { data: syncedPayrolls } = await supabase
+            .from('payrolls')
+            .select(`
+              *,
+              employees (
+                id,
+                nombre,
+                apellido,
+                cargo
+              )
+            `)
+            .eq('company_id', companyId)
+            .eq('period_id', periodId);
+          
+          payrolls = syncedPayrolls;
+          console.log('✅ Empleados sincronizados:', payrolls?.length || 0);
+        } catch (syncError) {
+          console.error('❌ Error en sincronización:', syncError);
+          // Continuar sin sincronización si falla
+        }
+      }
+
       const employees: PayrollHistoryEmployee[] = payrolls?.map(payroll => ({
         id: payroll.employee_id,
         periodId: periodId,
@@ -205,6 +235,26 @@ export class PayrollHistoryService {
       };
     } catch (error) {
       console.error('💥 Error obteniendo detalles del período:', error);
+      throw error;
+    }
+  }
+
+  static async syncHistoricalData(periodId: string): Promise<void> {
+    try {
+      console.log('🔄 Sincronizando datos históricos para período:', periodId);
+      
+      const { data, error } = await supabase.rpc('sync_historical_payroll_data', {
+        p_period_id: periodId
+      });
+
+      if (error) {
+        console.error('❌ Error en sincronización:', error);
+        throw error;
+      }
+
+      console.log('✅ Sincronización completada:', data);
+    } catch (error) {
+      console.error('❌ Error crítico en sincronización:', error);
       throw error;
     }
   }

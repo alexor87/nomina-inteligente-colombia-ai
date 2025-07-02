@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +14,8 @@ import {
   Edit,
   Save,
   Undo2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
@@ -40,6 +40,7 @@ export const PayrollHistoryDetails = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showReopenDialog, setShowReopenDialog] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Check if user can edit periods
   const canEditPeriods = isSuperAdmin || hasModuleAccess('payroll-history');
@@ -86,6 +87,32 @@ export const PayrollHistoryDetails = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSyncHistoricalData = async () => {
+    if (!periodId) return;
+    
+    try {
+      setIsSyncing(true);
+      await PayrollHistoryService.syncHistoricalData(periodId);
+      
+      toast({
+        title: "Sincronización completada",
+        description: "Los datos históricos se han sincronizado correctamente"
+      });
+      
+      // Reload the period details
+      await loadPeriodDetails();
+    } catch (error) {
+      console.error('Error syncing data:', error);
+      toast({
+        title: "Error en sincronización",
+        description: "No se pudieron sincronizar los datos históricos",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -241,6 +268,8 @@ export const PayrollHistoryDetails = () => {
   const canEdit = canEditPeriods && (details.period.status === 'borrador' || details.period.status === 'editado' || details.period.status === 'reabierto');
   const canReopen = canEditPeriods && canUserReopenPeriods && details.period.status === 'cerrado';
   const isReopened = details.period.status === 'reabierto';
+  const hasNoEmployees = details.employees.length === 0;
+  const isClosedPeriod = details.period.status === 'cerrado';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -307,6 +336,37 @@ export const PayrollHistoryDetails = () => {
             onFinishEditing={handleFinishEditing}
             onDismiss={handleDismissBanner}
           />
+        )}
+
+        {/* Empty Employees Alert for Closed Periods */}
+        {hasNoEmployees && isClosedPeriod && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                  <div>
+                    <h3 className="text-sm font-medium text-amber-800">
+                      Sin datos de empleados
+                    </h3>
+                    <p className="text-sm text-amber-700">
+                      Este período cerrado no tiene datos individuales de empleados. Puedes regenerar los datos históricos.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleSyncHistoricalData}
+                  disabled={isSyncing}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Sincronizando...' : 'Regenerar datos'}</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Period Summary */}
@@ -377,18 +437,33 @@ export const PayrollHistoryDetails = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <EditableEmployeeTable
-              employees={details.employees}
-              isEditMode={isEditMode}
-              onEmployeeUpdate={handleEmployeeUpdate}
-              periodId={periodId!}
-              periodData={{
-                startDate: details.period.startDate,
-                endDate: details.period.endDate,
-                type: details.period.type
-              }}
-              onNovedadChange={handleNovedadChange}
-            />
+            {hasNoEmployees ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Sin empleados registrados
+                </h3>
+                <p className="text-gray-600">
+                  {isClosedPeriod 
+                    ? 'Este período no tiene datos de empleados. Usa el botón "Regenerar datos" para recuperar la información histórica.'
+                    : 'Aún no se han procesado empleados para este período.'
+                  }
+                </p>
+              </div>
+            ) : (
+              <EditableEmployeeTable
+                employees={details.employees}
+                isEditMode={isEditMode}
+                onEmployeeUpdate={handleEmployeeUpdate}
+                periodId={periodId!}
+                periodData={{
+                  startDate: details.period.startDate,
+                  endDate: details.period.endDate,
+                  type: details.period.type
+                }}
+                onNovedadChange={handleNovedadChange}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

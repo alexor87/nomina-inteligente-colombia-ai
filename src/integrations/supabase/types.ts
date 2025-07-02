@@ -1001,6 +1001,45 @@ export type Database = {
           },
         ]
       }
+      payroll_sync_log: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          period_id: string
+          records_created: number | null
+          records_updated: number | null
+          status: string
+          sync_type: string
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          period_id: string
+          records_created?: number | null
+          records_updated?: number | null
+          status?: string
+          sync_type: string
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          period_id?: string
+          records_created?: number | null
+          records_updated?: number | null
+          status?: string
+          sync_type?: string
+        }
+        Relationships: []
+      }
       payroll_vouchers: {
         Row: {
           company_id: string
@@ -1529,6 +1568,10 @@ export type Database = {
       is_support_user: {
         Args: { _user_id?: string }
         Returns: boolean
+      }
+      sync_historical_payroll_data: {
+        Args: { p_period_id: string; p_company_id?: string }
+        Returns: Json
       }
       sync_payroll_periods: {
         Args: Record<PropertyKey, never>
