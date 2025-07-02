@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -61,7 +60,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       salarioBase: employee?.salarioBase || 0,
       tipoContrato: employee?.tipoContrato || 'indefinido',
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
-      periodicidadPago: employee?.periodicidadPago || 'mensual',
+      periodicidadPago: (employee?.periodicidadPago === 'quincenal' ? 'quincenal' : 'mensual') as 'quincenal' | 'mensual',
       cargo: employee?.cargo || '',
       codigoCIIU: employee?.codigoCIIU || '',
       nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
