@@ -14,6 +14,7 @@ import { formatCurrency } from '@/lib/utils';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
+  onPeriodClick: (period: PayrollHistoryPeriod) => void;
   onViewDetails: (period: PayrollHistoryPeriod) => void;
   onEditPeriod: (period: PayrollHistoryPeriod) => void;
   canUserEditPeriods: boolean;
@@ -21,6 +22,7 @@ interface PayrollHistoryTableProps {
 
 export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
   periods,
+  onPeriodClick,
   onViewDetails,
   onEditPeriod,
   canUserEditPeriods
@@ -102,22 +104,22 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
                 Período
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Fechas
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Tipo
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Empleados
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Total Bruto
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Total Neto
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Estado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total Devengado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Neto Pagado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Archivo PILA
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado Pagos
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Acciones
@@ -128,25 +130,23 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
             {periods.map((period) => (
               <tr key={period.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{period.period}</div>
-                  <div className="text-xs text-gray-500">
-                    Versión {period.version}
-                    {period.originalId && ' (Editado)'}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {new Date(period.startDate).toLocaleDateString('es-ES')}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {new Date(period.endDate).toLocaleDateString('es-ES')}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getTypeBadge(period.type)}
+                  <button
+                    onClick={() => onPeriodClick(period)}
+                    className="text-left"
+                  >
+                    <div className="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer">
+                      {period.period}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(period.startDate).toLocaleDateString('es-ES')} - {new Date(period.endDate).toLocaleDateString('es-ES')}
+                    </div>
+                  </button>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {period.employeesCount}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getStatusBadge(period.status)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {formatCurrency(period.totalGrossPay)}
@@ -154,8 +154,17 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {formatCurrency(period.totalNetPay)}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {period.pilaFileUrl ? (
+                    <span className="text-green-600">Generado</span>
+                  ) : (
+                    <span className="text-gray-400">Pendiente</span>
+                  )}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(period.status)}
+                  <Badge variant={period.paymentStatus === 'pagado' ? 'default' : 'secondary'}>
+                    {period.paymentStatus === 'pagado' ? 'Pagado' : 'Pendiente'}
+                  </Badge>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">

@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Download, Search, Filter, Calendar, Users, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryFilters as FiltersType } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
@@ -13,6 +15,8 @@ export const PayrollHistoryPage = () => {
   const navigate = useNavigate();
   const [periods, setPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FiltersType>({
     dateRange: {},
     status: '',
@@ -36,7 +40,7 @@ export const PayrollHistoryPage = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [periods, filters]);
+  }, [periods, filters, searchTerm]);
 
   const loadPayrollHistory = async () => {
     try {
@@ -96,6 +100,13 @@ export const PayrollHistoryPage = () => {
   const applyFilters = () => {
     let filtered = [...periods];
 
+    // Apply search term
+    if (searchTerm) {
+      filtered = filtered.filter(p => 
+        p.period.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
     if (filters.status) {
       filtered = filtered.filter(p => p.status === filters.status);
     }
@@ -119,6 +130,20 @@ export const PayrollHistoryPage = () => {
     }
 
     setFilteredPeriods(filtered);
+  };
+
+  const getMetrics = () => {
+    const total = periods.length;
+    const cerrados = periods.filter(p => p.status === 'cerrado').length;
+    const editados = periods.filter(p => p.status === 'editado').length;
+    const conErrores = periods.filter(p => p.status === 'con_errores').length;
+    const enRevision = periods.filter(p => p.status === 'revision').length;
+
+    return { total, cerrados, editados, conErrores, enRevision };
+  };
+
+  const handlePeriodClick = (period: PayrollHistoryPeriod) => {
+    navigate(`/app/payroll-history/${period.id}`);
   };
 
   const handleViewDetails = (period: PayrollHistoryPeriod) => {
@@ -148,6 +173,8 @@ export const PayrollHistoryPage = () => {
     );
   }
 
+  const metrics = getMetrics();
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -175,16 +202,92 @@ export const PayrollHistoryPage = () => {
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Filters */}
-        <PayrollHistoryFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Períodos</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{metrics.total}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Cerrados</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{metrics.cerrados}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Editados</CardTitle>
+              <FileText className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{metrics.editados}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Con Errores</CardTitle>
+              <AlertCircle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{metrics.conErrores}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">En Revisión</CardTitle>
+              <Clock className="h-4 w-4 text-yellow-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{metrics.enRevision}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="flex items-center space-x-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Buscar empleado o período..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filtros
+          </Button>
+        </div>
+
+        {/* Advanced Filters */}
+        {showFilters && (
+          <PayrollHistoryFilters
+            filters={filters}
+            onFiltersChange={setFilters}
+          />
+        )}
 
         {/* Table */}
         <div className="bg-white rounded-lg shadow">
           <PayrollHistoryTable
             periods={filteredPeriods}
+            onPeriodClick={handlePeriodClick}
             onViewDetails={handleViewDetails}
             onEditPeriod={handleEditPeriod}
             canUserEditPeriods={canUserEditPeriods}
