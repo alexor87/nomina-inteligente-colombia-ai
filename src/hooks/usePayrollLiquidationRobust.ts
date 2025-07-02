@@ -1,0 +1,202 @@
+
+import { useState, useEffect, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { PayrollPeriodDetectionRobust, RobustPeriodStatus } from '@/services/payroll-intelligent/PayrollPeriodDetectionRobust';
+import { PayrollDiagnosticService } from '@/services/payroll-intelligent/PayrollDiagnosticService';
+import { PayrollLiquidationNewService } from '@/services/PayrollLiquidationNewService';
+import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
+
+export const usePayrollLiquidationRobust = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPeriod, setCurrentPeriod] = useState<any>(null);
+  const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
+  const [periodStatus, setPeriodStatus] = useState<RobustPeriodStatus | null>(null);
+  const [diagnostic, setDiagnostic] = useState<any>(null);
+  const [summary, setSummary] = useState<PayrollSummary>({
+    totalEmployees: 0,
+    validEmployees: 0,
+    totalGrossPay: 0,
+    totalDeductions: 0,
+    totalNetPay: 0,
+    employerContributions: 0,
+    totalPayrollCost: 0
+  });
+  const { toast } = useToast();
+
+  // Inicialización robusta con diagnóstico
+  const initializeWithDiagnosis = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      console.log('🚀 INICIALIZACIÓN ROBUSTA CON DIAGNÓSTICO...');
+      
+      const status = await PayrollPeriodDetectionRobust.detectWithDiagnosis();
+      setPeriodStatus(status);
+      setDiagnostic(status.diagnostic);
+      
+      console.log('📊 Estado detectado:', status.action);
+      console.log('💬 Mensaje:', status.message);
+      
+      if (status.currentPeriod) {
+        setCurrentPeriod(status.currentPeriod);
+        await loadEmployeesForPeriod(status.currentPeriod);
+      }
+      
+      // Mostrar diagnóstico en consola si está disponible
+      if (status.diagnostic) {
+        console.log('🔍 DIAGNÓSTICO DETALLADO:');
+        console.log('- Total períodos:', status.diagnostic.totalPeriods);
+        console.log('- Problemas:', status.diagnostic.issues);
+        console.log('- Recomendaciones:', status.diagnostic.recommendations);
+      }
+      
+    } catch (error) {
+      console.error('💥 Error en inicialización robusta:', error);
+      toast({
+        title: "Error de Inicialización",
+        description: "Error detectando período. Ver consola para detalles.",
+        variant: "destructive"
+      });
+      
+      // Estado de emergencia
+      setPeriodStatus({
+        hasActivePeriod: false,
+        action: 'emergency',
+        message: "Error crítico - Ver diagnóstico en consola"
+      });
+      
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  // Cargar empleados para período
+  const loadEmployeesForPeriod = useCallback(async (period: any) => {
+    try {
+      setIsProcessing(true);
+      console.log('👥 Cargando empleados para período:', period.periodo);
+      
+      const loadedEmployees = await PayrollLiquidationNewService.loadEmployeesForActivePeriod(period);
+      setEmployees(loadedEmployees);
+      
+      // Calcular resumen
+      const validEmployees = loadedEmployees.filter(emp => emp.status === 'valid');
+      const newSummary: PayrollSummary = {
+        totalEmployees: loadedEmployees.length,
+        validEmployees: validEmployees.length,
+        totalGrossPay: validEmployees.reduce((sum, emp) => sum + emp.grossPay, 0),
+        totalDeductions: validEmployees.reduce((sum, emp) => sum + emp.deductions, 0),
+        totalNetPay: validEmployees.reduce((sum, emp) => sum + emp.netPay, 0),
+        employerContributions: validEmployees.reduce((sum, emp) => sum + emp.employerContributions, 0),
+        totalPayrollCost: validEmployees.reduce((sum, emp) => sum + emp.grossPay + emp.employerContributions, 0)
+      };
+      
+      setSummary(newSummary);
+      console.log('✅ Empleados cargados y resumen calculado');
+      
+    } catch (error) {
+      console.error('❌ Error cargando empleados:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los empleados",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [toast]);
+
+  // Crear período sugerido
+  const createSuggestedPeriod = useCallback(async () => {
+    if (!periodStatus?.nextPeriod) return;
+    
+    try {
+      setIsProcessing(true);
+      
+      const newPeriod = await PayrollPeriodDetectionRobust.createPeriodFromSuggestion(periodStatus.nextPeriod);
+      
+      setCurrentPeriod(newPeriod);
+      await loadEmployeesForPeriod(newPeriod);
+      
+      // Actualizar estado
+      setPeriodStatus({
+        hasActivePeriod: true,
+        currentPeriod: newPeriod,
+        action: 'resume',
+        message: `Período creado: ${newPeriod.periodo}`
+      });
+      
+      toast({
+        title: "✅ Período Creado",
+        description: `Nuevo período ${newPeriod.periodo} listo para liquidación`,
+        className: "border-green-200 bg-green-50"
+      });
+      
+    } catch (error) {
+      console.error('❌ Error creando período sugerido:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear el período sugerido",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [periodStatus, loadEmployeesForPeriod, toast]);
+
+  // Ejecutar diagnóstico manual
+  const runManualDiagnosis = useCallback(async () => {
+    try {
+      setIsProcessing(true);
+      
+      const companyId = await PayrollPeriodDetectionRobust['getCurrentUserCompanyId']?.();
+      if (companyId) {
+        await PayrollDiagnosticService.runDiagnosticAndLog(companyId);
+        
+        toast({
+          title: "📊 Diagnóstico Ejecutado",
+          description: "Revisa la consola para ver el reporte completo",
+          className: "border-blue-200 bg-blue-50"
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Error en diagnóstico manual:', error);
+      toast({
+        title: "Error",
+        description: "Error ejecutando diagnóstico",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [toast]);
+
+  // Inicializar al montar
+  useEffect(() => {
+    initializeWithDiagnosis();
+  }, [initializeWithDiagnosis]);
+
+  return {
+    // Estado
+    isLoading,
+    isProcessing,
+    currentPeriod,
+    employees,
+    summary,
+    periodStatus,
+    diagnostic,
+    
+    // Acciones principales
+    createSuggestedPeriod,
+    runManualDiagnosis,
+    refreshDiagnosis: initializeWithDiagnosis,
+    
+    // Estados calculados
+    canCreatePeriod: periodStatus?.action === 'create' && periodStatus?.nextPeriod,
+    needsDiagnosis: periodStatus?.action === 'diagnose',
+    isEmergency: periodStatus?.action === 'emergency',
+    hasActivePeriod: periodStatus?.hasActivePeriod || false,
+    hasEmployees: employees.length > 0
+  };
+};
