@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -48,6 +47,7 @@ export const ImportConfirmationStep: React.FC<ImportConfirmationStepProps> = ({
             salarioBase: parseFloat(row.salarioBase) || 0,
             tipoContrato: row.tipoContrato || 'indefinido' as const,
             fechaIngreso: row.fechaIngreso || new Date().toISOString().split('T')[0],
+            periodicidadPago: row.periodicidadPago || 'mensual', // Add missing periodicidadPago
             estado: row.estado || 'activo' as const,
             eps: row.eps || '',
             afp: row.afp || '',
@@ -89,7 +89,6 @@ export const ImportConfirmationStep: React.FC<ImportConfirmationStepProps> = ({
     }
   };
 
-  
   return (
     <div className="space-y-6">
       <Card className="p-6">

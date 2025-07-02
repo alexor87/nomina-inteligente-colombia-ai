@@ -27,7 +27,7 @@ export interface EmployeeUnified {
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: 'quincenal' | 'mensual';
+  periodicidadPago: string; // Changed to string to match Employee type
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
@@ -86,7 +86,7 @@ export function mapDatabaseToUnified(dbEmployee: any): EmployeeUnified {
     salarioBase: Number(dbEmployee.salario_base || dbEmployee.salarioBase || 0),
     tipoContrato: dbEmployee.tipo_contrato || dbEmployee.tipoContrato || 'indefinido',
     fechaIngreso: dbEmployee.fecha_ingreso || dbEmployee.fechaIngreso || new Date().toISOString().split('T')[0],
-    periodicidadPago: (dbEmployee.periodicidad_pago || dbEmployee.periodicidadPago || 'mensual') as 'quincenal' | 'mensual',
+    periodicidadPago: dbEmployee.periodicidad_pago || dbEmployee.periodicidadPago || 'mensual',
     cargo: dbEmployee.cargo || '',
     codigoCIIU: dbEmployee.codigo_ciiu || dbEmployee.codigoCIIU || '',
     nivelRiesgoARL: dbEmployee.nivel_riesgo_arl || dbEmployee.nivelRiesgoARL || 'I',

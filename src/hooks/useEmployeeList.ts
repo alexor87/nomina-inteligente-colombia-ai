@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeEmployees } from '@/hooks/useRealtimeEmployees';
@@ -22,7 +21,8 @@ export const useEmployeeList = () => {
   // Convertir EmployeeUnified a EmployeeWithStatus
   const mapToEmployeeWithStatus = (employee: EmployeeUnified): EmployeeWithStatus => ({
     ...employee,
-    periodicidadPago: (employee.periodicidadPago as 'quincenal' | 'mensual') || 'mensual'
+    periodicidadPago: (employee.periodicidadPago as 'quincenal' | 'mensual') || 'mensual',
+    empresaId: employee.empresaId || employee.company_id || '' // Ensure empresaId is always present
   });
 
   // Filtros y paginación
