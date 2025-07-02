@@ -1,11 +1,15 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollHistoryEmployee } from '@/types/payroll-history';
-import { Plus } from 'lucide-react';
-import { DevengoModal } from './DevengoModal';
+import { Plus, Edit } from 'lucide-react';
+import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
+import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
+import { useNovedades } from '@/hooks/useNovedades';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
 interface EditableEmployeeTableProps {
   employees: PayrollHistoryEmployee[];
@@ -22,143 +26,247 @@ export const EditableEmployeeTable = ({
   periodId,
   onNovedadChange
 }: EditableEmployeeTableProps) => {
-  const [devengoModal, setDevengoModal] = React.useState<{
+  const [novedadModal, setNovedadModal] = useState<{
     isOpen: boolean;
     employeeId: string;
     employeeName: string;
     employeeSalary: number;
-    payrollId: string;
-    modalType: 'devengado' | 'deduccion';
   }>({
     isOpen: false,
     employeeId: '',
     employeeName: '',
-    employeeSalary: 0,
-    payrollId: '',
-    modalType: 'devengado'
+    employeeSalary: 0
   });
 
-  const handleOpenDevengoModal = (
-    employee: PayrollHistoryEmployee, 
-    modalType: 'devengado' | 'deduccion'
-  ) => {
-    console.log('🎯 Opening modal for employee:', {
+  const {
+    loadNovedadesTotals,
+    refreshEmployeeNovedades,
+    getEmployeeNovedades
+  } = usePayrollNovedades(periodId);
+
+  const {
+    createNovedad,
+    isLoading: novedadesLoading
+  } = useNovedades(periodId);
+
+  // Cargar novedades al montar el componente
+  useEffect(() => {
+    if (employees.length > 0) {
+      const employeeIds = employees.map(emp => emp.id);
+      loadNovedadesTotals(employeeIds);
+    }
+  }, [employees, loadNovedadesTotals]);
+
+  const handleOpenNovedadModal = (employee: PayrollHistoryEmployee) => {
+    console.log('🎯 Opening novedad modal for employee:', {
       id: employee.id,
       name: employee.name,
-      salary: employee.baseSalary,
-      modalType
+      salary: employee.baseSalary
     });
     
-    setDevengoModal({
+    setNovedadModal({
       isOpen: true,
       employeeId: employee.id,
       employeeName: employee.name,
-      employeeSalary: employee.baseSalary,
-      payrollId: employee.payrollId || '',
-      modalType
+      employeeSalary: employee.baseSalary
     });
   };
 
-  const handleCloseDevengoModal = () => {
-    setDevengoModal({
+  const handleCloseNovedadModal = () => {
+    setNovedadModal({
       isOpen: false,
       employeeId: '',
       employeeName: '',
-      employeeSalary: 0,
-      payrollId: '',
-      modalType: 'devengado'
+      employeeSalary: 0
     });
   };
 
-  const handleNovedadCreated = (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => {
-    console.log('💰 Novedad created callback triggered, refreshing full period data');
+  const handleCreateNovedad = async (data: CreateNovedadData) => {
+    console.log('🔄 Creating novedad with data:', data);
     
-    // En lugar de actualizar solo valores locales, disparar un refresh completo
-    // que incluirá el recálculo automático de novedades en PayrollHistoryService.getPeriodDetails()
+    const createData: CreateNovedadData = {
+      empleado_id: novedadModal.employeeId,
+      periodo_id: periodId,
+      ...data
+    };
+    
+    await createNovedad(createData, true);
+    
+    // Actualizar novedades para este empleado específico
+    await refreshEmployeeNovedades(novedadModal.employeeId);
+    
+    // Trigger full refresh
     onNovedadChange();
+  };
+
+  const calculateSuggestedValue = (
+    tipo: string,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ): number | null => {
+    if (!novedadModal.employeeId) return null;
+    
+    const employee = employees.find(emp => emp.id === novedadModal.employeeId);
+    if (!employee) return null;
+    
+    console.log('🧮 Calculating suggested value:', {
+      tipo,
+      subtipo,
+      horas,
+      dias,
+      employeeSalary: employee.baseSalary,
+      periodId: periodId
+    });
+    
+    const fechaPeriodo = new Date();
+    const salarioDiario = employee.baseSalary / 30;
+    const valorHoraExtra = calcularValorHoraExtra(employee.baseSalary, fechaPeriodo);
+    const valorHoraRecargo = employee.baseSalary / 30 / 7.3333;
+    
+    switch (tipo) {
+      case 'horas_extra':
+        if (!horas || !subtipo) return null;
+        const factors: Record<string, number> = {
+          'diurnas': 1.25,
+          'nocturnas': 1.75,
+          'dominicales_diurnas': 2.05,
+          'dominicales_nocturnas': 2.55,
+          'festivas_diurnas': 2.05,
+          'festivas_nocturnas': 2.55
+        };
+        const result = Math.round(valorHoraExtra * factors[subtipo] * horas);
+        console.log(`💰 Overtime calculation: $${Math.round(valorHoraExtra)} × ${factors[subtipo]} × ${horas}h = $${result}`);
+        return result;
+        
+      case 'recargo_nocturno':
+        if (!horas || !subtipo) return null;
+        const recargoFactors: Record<string, number> = {
+          'nocturno': 0.35,
+          'dominical': 0.80,
+          'nocturno_dominical': 1.15,
+          'festivo': 0.75,
+          'nocturno_festivo': 1.10
+        };
+        const recargoResult = Math.round(valorHoraRecargo * recargoFactors[subtipo] * horas);
+        console.log(`💰 Recargo calculation: $${Math.round(valorHoraRecargo)} × ${recargoFactors[subtipo]} × ${horas}h = $${recargoResult}`);
+        return recargoResult;
+        
+      case 'vacaciones':
+        if (!dias) return null;
+        return Math.round(salarioDiario * dias);
+        
+      case 'incapacidad':
+        if (!dias || !subtipo) return null;
+        const percentages: Record<string, number> = {
+          'comun': 0.667,
+          'laboral': 1.0,
+          'maternidad': 1.0
+        };
+        const diasPagados = subtipo === 'comun' ? Math.max(0, dias - 3) : dias;
+        return Math.round(salarioDiario * percentages[subtipo] * diasPagados);
+        
+      case 'licencia_remunerada':
+        if (!dias) return null;
+        return Math.round(salarioDiario * dias);
+        
+      case 'ausencia':
+        if (!dias) return null;
+        return Math.round(salarioDiario * dias);
+        
+      default:
+        return null;
+    }
   };
 
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-gray-300">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="border border-gray-300 px-4 py-2 text-left">Empleado</th>
-              <th className="border border-gray-300 px-4 py-2 text-center">Salario Base</th>
-              <th className="border border-gray-300 px-4 py-2 text-center">Devengado</th>
-              <th className="border border-gray-300 px-4 py-2 text-center">Deducciones</th>
-              <th className="border border-gray-300 px-4 py-2 text-center">Neto</th>
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">
+                Empleado
+              </th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
+                Salario Base
+              </th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">
+                Novedades
+              </th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
+                Neto a Pagar
+              </th>
             </tr>
           </thead>
-          <tbody>
-            {employees.map((employee) => (
-              <tr key={employee.id} className="hover:bg-gray-50">
-                <td className="border border-gray-300 px-4 py-2">
-                  <div>
-                    <div className="font-medium">{employee.name}</div>
-                    <div className="text-sm text-gray-500">{employee.position}</div>
-                  </div>
-                </td>
-                <td className="border border-gray-300 px-4 py-2 text-center">
-                  {formatCurrency(employee.baseSalary)}
-                </td>
-                <td className="border border-gray-300 px-4 py-2 text-center">
-                  <div className="flex items-center justify-center space-x-2">
-                    <span className="text-green-600 font-medium">
-                      {formatCurrency(employee.grossPay)}
-                    </span>
-                    {isEditMode && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenDevengoModal(employee, 'devengado')}
-                        className="h-6 w-6 p-0 text-green-600 hover:text-green-700"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-                <td className="border border-gray-300 px-4 py-2 text-center">
-                  <div className="flex items-center justify-center space-x-2">
-                    <span className="text-red-600 font-medium">
-                      {formatCurrency(employee.deductions)}
-                    </span>
-                    {isEditMode && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenDevengoModal(employee, 'deduccion')}
-                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-                <td className="border border-gray-300 px-4 py-2 text-center">
-                  <span className="font-medium">
-                    {formatCurrency(employee.netPay)}
-                  </span>
-                </td>
-              </tr>
-            ))}
+          <tbody className="divide-y divide-gray-200">
+            {employees.map((employee) => {
+              const novedades = getEmployeeNovedades(employee.id);
+              const hasNovedades = novedades.hasNovedades;
+              const novedadesValue = novedades.totalNeto;
+              
+              return (
+                <tr key={employee.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div>
+                      <div className="font-medium text-gray-900">{employee.name}</div>
+                      <div className="text-sm text-gray-500">{employee.position}</div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-gray-900">
+                    {formatCurrency(employee.baseSalary)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      {hasNovedades && (
+                        <div className="text-center">
+                          <div className={`text-sm font-medium ${
+                            novedadesValue >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {formatCurrency(novedadesValue)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {novedades.totalDevengos > 0 && `+${formatCurrency(novedades.totalDevengos)}`}
+                            {novedades.totalDeducciones > 0 && ` -${formatCurrency(novedades.totalDeducciones)}`}
+                          </div>
+                        </div>
+                      )}
+                      {isEditMode && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenNovedadModal(employee)}
+                          className={`h-8 w-8 p-0 rounded-full border-dashed border-2 ${
+                            hasNovedades 
+                              ? 'border-purple-300 text-purple-600 hover:border-purple-500 hover:text-purple-700 hover:bg-purple-50'
+                              : 'border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50'
+                          }`}
+                        >
+                          {hasNovedades ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                    {formatCurrency(employee.netPay + novedadesValue)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Modal de Devengados/Deducciones */}
-      <DevengoModal
-        isOpen={devengoModal.isOpen}
-        onClose={handleCloseDevengoModal}
-        employeeId={devengoModal.employeeId}
-        employeeName={devengoModal.employeeName}
-        employeeSalary={devengoModal.employeeSalary}
-        payrollId={devengoModal.payrollId}
+      {/* Modal de Novedades */}
+      <NovedadUnifiedModal
+        isOpen={novedadModal.isOpen}
+        onClose={handleCloseNovedadModal}
+        employeeName={novedadModal.employeeName}
+        employeeId={novedadModal.employeeId}
+        employeeSalary={novedadModal.employeeSalary}
         periodId={periodId}
-        modalType={devengoModal.modalType}
-        onNovedadCreated={handleNovedadCreated}
+        onCreateNovedad={handleCreateNovedad}
+        calculateSuggestedValue={calculateSuggestedValue}
       />
     </>
   );
