@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
@@ -161,54 +160,131 @@ export class PayrollLiquidationNewService {
     return totals;
   }
 
-  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes OPTIMIZADO
+  // ✅ 5. PASO 1-3: CIERRE COMPLETO Y CONSISTENTE DEL PERÍODO
   static async closePeriod(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<string> {
     try {
-      console.log('🔒 Iniciando cierre de período:', period.id);
+      console.log('🔒 INICIANDO CIERRE DEFINITIVO DE PERÍODO:', period.id);
+      console.log('📊 Estado actual del período:', period.estado);
       
-      // Validar que todos los empleados estén correctamente liquidados
+      // PASO 1: Validar que todos los empleados estén correctamente liquidados
       const invalidEmployees = employees.filter(emp => emp.status === 'error' || emp.netPay <= 0);
       if (invalidEmployees.length > 0) {
         console.error('❌ Empleados con errores:', invalidEmployees.map(e => e.name));
         throw new Error(`${invalidEmployees.length} empleados tienen errores en su liquidación`);
       }
 
-      console.log(`✅ Validación completada - ${employees.length} empleados válidos`);
-
-      // Guardar liquidaciones en la base de datos OPTIMIZADO
-      await this.savePeriodLiquidationsOptimized(period, employees);
+      console.log(`✅ VALIDACIÓN COMPLETADA - ${employees.length} empleados válidos`);
       
-      // Generar comprobantes automáticamente MEJORADO
-      await this.generateVouchersOptimized(period, employees);
+      // PASO 2: Guardar liquidaciones con validación completa
+      console.log('💾 Guardando liquidaciones...');
+      await this.savePeriodLiquidationsWithValidation(period, employees);
+      console.log('✅ Liquidaciones guardadas correctamente');
       
-      // Cambiar estado del período a cerrado
-      const { error: updateError } = await supabase
+      // PASO 3: Generar comprobantes (sin bloquear el cierre)
+      console.log('📄 Generando comprobantes...');
+      try {
+        await this.generateVouchersOptimized(period, employees);
+        console.log('✅ Comprobantes generados exitosamente');
+      } catch (error) {
+        console.warn('⚠️ Error en comprobantes, pero continuando cierre:', error);
+      }
+      
+      // PASO 4: CAMBIAR ESTADO A CERRADO CON VALIDACIÓN COMPLETA
+      console.log('🔐 Cambiando estado del período a CERRADO...');
+      const totals = this.calculatePeriodTotals(employees);
+      
+      const { data: updatedPeriod, error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({ 
-          estado: 'cerrado',
+          estado: 'cerrado', // ESTADO CONSISTENTE
           empleados_count: employees.length,
-          total_devengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
-          total_deducciones: employees.reduce((sum, emp) => sum + emp.deductions, 0),
-          total_neto: employees.reduce((sum, emp) => sum + emp.netPay, 0),
+          total_devengado: totals.totalDevengado,
+          total_deducciones: totals.totalDeducciones,
+          total_neto: totals.totalNeto,
           updated_at: new Date().toISOString()
         })
-        .eq('id', period.id);
+        .eq('id', period.id)
+        .select()
+        .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('❌ Error actualizando período:', updateError);
+        throw updateError;
+      }
 
-      console.log('✅ Período cerrado exitosamente');
-      return `Período ${period.periodo} cerrado exitosamente. ${employees.length} empleados liquidados.`;
+      console.log('✅ PERÍODO ACTUALIZADO:', updatedPeriod);
+      
+      // PASO 5: VERIFICACIÓN FINAL - Confirmar que el cambio se aplicó
+      const { data: verificationPeriod, error: verifyError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', period.id)
+        .single();
+
+      if (verifyError) {
+        console.error('❌ Error verificando período:', verifyError);
+        throw verifyError;
+      }
+
+      console.log('🔍 VERIFICACIÓN FINAL - Estado del período:', verificationPeriod.estado);
+      
+      if (verificationPeriod.estado !== 'cerrado') {
+        throw new Error(`Error crítico: El período no se cerró correctamente. Estado actual: ${verificationPeriod.estado}`);
+      }
+
+      // PASO 6: Crear log de auditoría
+      console.log('📝 Registrando en auditoría...');
+      await this.createClosureAuditLog(period, employees.length, totals);
+      
+      const successMessage = `✅ PERÍODO ${period.periodo} CERRADO EXITOSAMENTE
+📊 ${employees.length} empleados liquidados
+💰 Total devengado: ${this.formatCurrency(totals.totalDevengado)}
+💸 Total neto: ${this.formatCurrency(totals.totalNeto)}
+🔐 Estado: CERRADO`;
+
+      console.log('🎉 CIERRE COMPLETADO EXITOSAMENTE');
+      return successMessage;
 
     } catch (error) {
-      console.error('❌ Error cerrando período:', error);
+      console.error('💥 ERROR CRÍTICO EN CIERRE DE PERÍODO:', error);
+      
+      // Registrar el error en auditoría
+      try {
+        await this.createClosureErrorLog(period, error instanceof Error ? error.message : 'Error desconocido');
+      } catch (auditError) {
+        console.error('❌ Error registrando fallo en auditoría:', auditError);
+      }
+      
       throw error;
     }
   }
 
-  // OPTIMIZADO: Método de guardado con mejor manejo de errores y validación previa
-  static async savePeriodLiquidationsOptimized(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
+  // Método auxiliar para calcular totales del período
+  static calculatePeriodTotals(employees: PayrollEmployee[]) {
+    return employees.reduce((totals, emp) => ({
+      totalDevengado: totals.totalDevengado + emp.grossPay,
+      totalDeducciones: totals.totalDeducciones + emp.deductions,
+      totalNeto: totals.totalNeto + emp.netPay
+    }), {
+      totalDevengado: 0,
+      totalDeducciones: 0,
+      totalNeto: 0
+    });
+  }
+
+  // Método auxiliar para formatear moneda
+  static formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  }
+
+  // OPTIMIZADO: Guardado con validación completa
+  static async savePeriodLiquidationsWithValidation(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
-      console.log('💾 Guardando liquidaciones OPTIMIZADO...');
+      console.log('💾 GUARDANDO LIQUIDACIONES CON VALIDACIÓN COMPLETA...');
       
       // Validar datos antes de guardar
       const validEmployees = employees.filter(emp => {
@@ -219,14 +295,17 @@ export class PayrollLiquidationNewService {
         return true;
       });
 
-      console.log(`📋 Guardando ${validEmployees.length} liquidaciones válidas`);
+      console.log(`📋 Procesando ${validEmployees.length} liquidaciones válidas`);
 
-      // Procesar en lotes para mejor rendimiento
+      // Procesar en lotes con validación individual
       const batchSize = 10;
+      const results = [];
+      
       for (let i = 0; i < validEmployees.length; i += batchSize) {
         const batch = validEmployees.slice(i, i + batchSize);
+        console.log(`📦 Procesando lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(validEmployees.length/batchSize)}`);
         
-        await Promise.all(batch.map(async (emp) => {
+        const batchPromises = batch.map(async (emp) => {
           const liquidationData = {
             company_id: period.company_id,
             employee_id: emp.id,
@@ -240,29 +319,34 @@ export class PayrollLiquidationNewService {
             total_devengado: emp.grossPay,
             total_deducciones: emp.deductions,
             neto_pagado: emp.netPay,
-            estado: 'procesada'
+            estado: 'procesada' // Consistente con el estado del período
           };
 
           try {
-            // Usar la restricción única corregida
-            const { error } = await supabase
+            const { data, error } = await supabase
               .from('payrolls')
               .upsert(liquidationData, {
                 onConflict: 'company_id,employee_id,period_id',
                 ignoreDuplicates: false
-              });
+              })
+              .select()
+              .single();
 
             if (error) {
               console.error(`❌ Error guardando liquidación para ${emp.name}:`, error);
               throw error;
             }
 
-            console.log(`✅ Liquidación guardada: ${emp.name}`);
+            console.log(`✅ Liquidación guardada para: ${emp.name} (ID: ${data.id})`);
+            return { success: true, employee: emp.name, data };
           } catch (error) {
-            console.error(`❌ Error en upsert para empleado ${emp.name}:`, error);
-            throw error;
+            console.error(`💥 Error crítico para empleado ${emp.name}:`, error);
+            return { success: false, employee: emp.name, error };
           }
-        }));
+        });
+
+        const batchResults = await Promise.allSettled(batchPromises);
+        results.push(...batchResults);
 
         // Pequeña pausa entre lotes
         if (i + batchSize < validEmployees.length) {
@@ -270,17 +354,28 @@ export class PayrollLiquidationNewService {
         }
       }
       
-      console.log('✅ Todas las liquidaciones guardadas exitosamente');
+      // Validar resultados
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+      const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length;
+      
+      console.log(`📊 RESULTADO GUARDADO: ${successful} exitosas, ${failed} fallidas`);
+      
+      if (failed > 0) {
+        console.error('❌ Algunas liquidaciones fallaron:', results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)));
+        throw new Error(`${failed} liquidaciones fallaron al guardarse`);
+      }
+      
+      console.log('✅ TODAS LAS LIQUIDACIONES GUARDADAS EXITOSAMENTE');
     } catch (error) {
-      console.error('❌ Error guardando liquidaciones:', error);
+      console.error('💥 ERROR CRÍTICO GUARDANDO LIQUIDACIONES:', error);
       throw error;
     }
   }
 
-  // MEJORADO: Generar comprobantes con mejor manejo de errores
+  // MEJORADO: Generar comprobantes sin bloquear cierre
   static async generateVouchersOptimized(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
-      console.log('📄 Generando comprobantes OPTIMIZADO...');
+      console.log('📄 GENERANDO COMPROBANTES OPTIMIZADO...');
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -329,15 +424,52 @@ export class PayrollLiquidationNewService {
 
       if (insertError) {
         console.error('❌ Error insertando comprobantes:', insertError);
-        // No lanzar error para no bloquear el cierre del período
-        console.warn('⚠️ Continuando sin generar comprobantes...');
-        return;
+        throw insertError;
       }
       
       console.log(`✅ ${vouchers.length} comprobantes generados exitosamente`);
     } catch (error) {
       console.error('❌ Error generando comprobantes:', error);
+      // No lanzar error para no bloquear el cierre del período
       console.warn('⚠️ Continuando sin generar comprobantes...');
+    }
+  }
+
+  // Método para crear log de auditoría del cierre
+  static async createClosureAuditLog(period: PayrollPeriod, employeeCount: number, totals: any): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      await supabase
+        .from('dashboard_activity')
+        .insert({
+          company_id: period.company_id,
+          user_email: user?.email || 'sistema',
+          action: `Período ${period.periodo} cerrado exitosamente`,
+          type: 'payroll_closure'
+        });
+      
+      console.log('✅ Log de auditoría creado');
+    } catch (error) {
+      console.warn('⚠️ Error creando log de auditoría:', error);
+    }
+  }
+
+  // Método para crear log de error en auditoría
+  static async createClosureErrorLog(period: PayrollPeriod, errorMessage: string): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      await supabase
+        .from('dashboard_activity')
+        .insert({
+          company_id: period.company_id,
+          user_email: user?.email || 'sistema',
+          action: `Error cerrando período ${period.periodo}: ${errorMessage}`,
+          type: 'payroll_error'
+        });
+    } catch (error) {
+      console.warn('⚠️ Error creando log de error:', error);
     }
   }
 

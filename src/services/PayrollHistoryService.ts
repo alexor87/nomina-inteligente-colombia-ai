@@ -39,6 +39,8 @@ export class PayrollHistoryService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) return [];
 
+      console.log('🔍 Consultando períodos para empresa:', companyId);
+
       const { data: periods, error: periodsError } = await supabase
         .from('payroll_periods_real')
         .select('*')
@@ -46,26 +48,33 @@ export class PayrollHistoryService {
         .order('fecha_inicio', { ascending: false });
 
       if (periodsError) {
-        console.error('Error fetching periods:', periodsError);
+        console.error('❌ Error consultando períodos:', periodsError);
         return [];
       }
 
-      const transformedPeriods = periods?.map(period => ({
-        id: period.id,
-        periodo: this.generatePeriodName(period.fecha_inicio, period.fecha_fin),
-        fecha_inicio: period.fecha_inicio,
-        fecha_fin: period.fecha_fin,
-        empleados: period.empleados_count || 0,
-        totalNomina: Number(period.total_neto || 0),
-        estado: this.mapStatus(period.estado),
-        fechaCreacion: period.created_at,
-        editable: period.estado !== 'cerrada',
-        reportado_dian: false
-      })) || [];
+      console.log('📊 Períodos encontrados:', periods?.length || 0);
 
+      const transformedPeriods = periods?.map(period => {
+        console.log(`📅 Período ${period.periodo}: estado="${period.estado}"`);
+        
+        return {
+          id: period.id,
+          periodo: this.generatePeriodName(period.fecha_inicio, period.fecha_fin),
+          fecha_inicio: period.fecha_inicio,
+          fecha_fin: period.fecha_fin,
+          empleados: period.empleados_count || 0,
+          totalNomina: Number(period.total_neto || 0),
+          estado: this.mapStatus(period.estado),
+          fechaCreacion: period.created_at,
+          editable: period.estado !== 'cerrado', // CORREGIDO: solo no editable si está cerrado
+          reportado_dian: false
+        };
+      }) || [];
+
+      console.log('✅ Períodos transformados:', transformedPeriods.length);
       return transformedPeriods;
     } catch (error) {
-      console.error('Error in getPayrollPeriods:', error);
+      console.error('💥 Error crítico en getPayrollPeriods:', error);
       return [];
     }
   }
@@ -141,7 +150,7 @@ export class PayrollHistoryService {
           version: 1,
           createdAt: period.created_at,
           updatedAt: period.updated_at,
-          editable: period.estado !== 'cerrada'
+          editable: period.estado !== 'cerrado'
         },
         summary,
         employees,
@@ -258,18 +267,25 @@ export class PayrollHistoryService {
     return `${startDate.getDate()}/${startDate.getMonth() + 1}/${startYear} - ${endDate.getDate()}/${endDate.getMonth() + 1}/${endYear}`;
   }
 
+  // PASO 1: MAPEO DE ESTADOS CORREGIDO
   static mapStatus(estado: string): string {
+    console.log(`🔄 Mapeando estado: "${estado}"`);
+    
     const statusMap: Record<string, string> = {
       'borrador': 'revision',
       'procesada': 'cerrado',
-      'cerrada': 'cerrado',
+      'cerrado': 'cerrado',    // ✅ CORREGIDO: Ahora reconoce 'cerrado'
+      'cerrada': 'cerrado',    // Mantener compatibilidad
+      'pagado': 'cerrado',
       'pagada': 'cerrado',
       'con_errores': 'con_errores',
       'editado': 'editado',
       'reabierto': 'reabierto'
     };
     
-    return statusMap[estado] || 'revision';
+    const mappedStatus = statusMap[estado] || 'revision';
+    console.log(`📊 Estado "${estado}" → "${mappedStatus}"`);
+    return mappedStatus;
   }
 
   static mapPeriodType(tipoPeriodo: string): 'semanal' | 'quincenal' | 'mensual' | 'personalizado' {

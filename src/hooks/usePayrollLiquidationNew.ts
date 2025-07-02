@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollPeriod, PayrollEmployee, PayrollSummary } from '@/types/payroll';
@@ -210,30 +211,60 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, loadEmployeesForPeriod, employees.length, toast]);
 
-  // ✅ Cerrar período
+  // ✅ PASO 2-3: CERRAR PERÍODO CON VERIFICACIÓN COMPLETA
   const closePeriod = useCallback(async () => {
     if (!currentPeriod) return;
     
     try {
       setIsProcessing(true);
+      console.log('🔐 INICIANDO CIERRE DE PERÍODO CON VERIFICACIÓN COMPLETA...');
       
-      const result = await PayrollLiquidationNewService.closePeriod(currentPeriod, employees);
-      
+      // Mostrar toast de inicio
       toast({
-        title: "✅ Período cerrado",
-        description: result,
-        className: "border-green-200 bg-green-50"
+        title: "🔄 Cerrando período...",
+        description: "Procesando liquidación y generando comprobantes",
       });
       
-      // Reinicializar para detectar siguiente período
-      await initializePeriod();
+      // Ejecutar el cierre completo
+      const result = await PayrollLiquidationNewService.closePeriod(currentPeriod, employees);
+      
+      console.log('✅ PERÍODO CERRADO EXITOSAMENTE');
+      
+      // Mostrar resultado exitoso
+      toast({
+        title: "✅ Período cerrado exitosamente",
+        description: result,
+        className: "border-green-200 bg-green-50",
+        duration: 10000
+      });
+      
+      // PASO 3: FORZAR REDETECCIÓN Y ACTUALIZACIÓN COMPLETA
+      console.log('🔄 Redetectando períodos después del cierre...');
+      
+      // Limpiar estado actual
+      setCurrentPeriod(null);
+      setEmployees([]);
+      setSelectedEmployees([]);
+      
+      // Reinicializar completamente para detectar siguiente período
+      setTimeout(async () => {
+        await initializePeriod();
+        
+        // Mostrar notificación adicional
+        toast({
+          title: "🎯 Sistema actualizado",
+          description: "El período cerrado aparece ahora en el historial de nómina",
+          className: "border-blue-200 bg-blue-50"
+        });
+      }, 1000);
       
     } catch (error) {
-      console.error('❌ Error cerrando período:', error);
+      console.error('💥 ERROR EN CIERRE DE PERÍODO:', error);
       toast({
-        title: "Error",
+        title: "❌ Error cerrando período",
         description: error instanceof Error ? error.message : "No se pudo cerrar el período",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 10000
       });
     } finally {
       setIsProcessing(false);
