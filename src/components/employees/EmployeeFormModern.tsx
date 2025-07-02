@@ -56,18 +56,17 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   // Use different submission hooks based on whether we're creating or editing
   const { handleSubmit: handleCreateSubmission, isLoading: isCreating } = useEmployeeFormSubmission(
-    undefined,
+    employee,
     onSuccess, 
     memoizedDataRefresh
   );
 
-  const { handleSubmit: handleEditSubmission, isLoading: isEditingLoading } = useEmployeeEditSubmission(
+  const { handleSubmit: handleEditSubmission, isSubmitting: isEditing } = useEmployeeEditSubmission(
     employee || null,
-    onSuccess,
-    memoizedDataRefresh
+    onSuccess
   );
 
-  const isLoading = isCreating || isEditingLoading;
+  const isLoading = isCreating || isEditing;
 
   const onSubmit = async (data: any) => {
     if (!companyId) return;
@@ -76,7 +75,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     if (employee) {
       await handleEditSubmission(data);
     } else {
-      await handleCreateSubmission(data, companyId, []);
+      await handleCreateSubmission(data, companyId);
     }
   };
 

@@ -19,14 +19,18 @@ export const useEmployeeEdit = (employeeId?: string) => {
         setError(null);
         console.log('🔍 Loading employee for editing:', employeeId);
         
-        const employeeData = await EmployeeUnifiedService.getEmployeeById(employeeId);
+        const result = await EmployeeUnifiedService.getEmployeeById(employeeId);
         
-        if (!employeeData) {
+        if (!result.success) {
+          throw new Error(result.error || 'Empleado no encontrado');
+        }
+
+        if (!result.data) {
           throw new Error('Empleado no encontrado');
         }
 
-        console.log('✅ Employee loaded for editing:', employeeData);
-        setEmployee(employeeData);
+        console.log('✅ Employee loaded for editing:', result.data);
+        setEmployee(result.data);
       } catch (err) {
         console.error('❌ Error loading employee:', err);
         const errorMessage = err instanceof Error ? err.message : 'Error desconocido';

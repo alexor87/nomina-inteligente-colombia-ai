@@ -1,3 +1,4 @@
+
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { PORCENTAJES_NOMINA, SALARIO_MINIMO_2024, AUXILIO_TRANSPORTE_2024 } from '@/constants';
 import { PayrollCalculation, LegalValidation, Payroll } from '@/types';
@@ -6,7 +7,7 @@ export class PayrollService {
   /**
    * Calcula la nómina completa de un empleado
    */
-  static calculatePayroll(calculation: PayrollCalculation): Omit<Payroll, 'id' | 'empleadoId' | 'empresaId' | 'periodo' | 'estado' | 'createdAt' | 'updatedAt'> {
+  static calculatePayroll(calculation: PayrollCalculation): PayrollCalculation {
     // Obtener configuración actual
     const config = ConfigurationService.getConfiguration();
     
@@ -72,7 +73,7 @@ export class PayrollService {
       saludEmpleado,
       pensionEmpleado,
       retencionFuente,
-      otrasDeduciones: 0,
+      otrasDeducciones: 0,
       totalDevengado,
       totalDeducciones,
       netoPagado
