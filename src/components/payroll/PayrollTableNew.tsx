@@ -75,9 +75,9 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
                   onCheckedChange={onToggleAll}
                   ref={(el) => {
                     if (el) {
-                      const checkbox = el.querySelector('input[type="checkbox"]') as HTMLInputElement;
-                      if (checkbox) {
-                        checkbox.indeterminate = someSelected;
+                      const input = el.querySelector('input[type="checkbox"]') as HTMLInputElement;
+                      if (input) {
+                        input.indeterminate = someSelected;
                       }
                     }
                   }}
@@ -118,10 +118,9 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => handleOpenNovedadModal(employee)}
-                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                    className="h-8 w-8 p-0 rounded-full border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50 transition-colors"
                   >
-                    <Plus className="h-4 w-4 mr-1" />
-                    +
+                    <Plus className="h-4 w-4 text-blue-500" />
                   </Button>
                 </TableCell>
                 

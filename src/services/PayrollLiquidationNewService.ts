@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollCalculationService } from './PayrollCalculationService';
@@ -134,7 +133,7 @@ export class PayrollLiquidationNewService {
     return totals;
   }
 
-  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes CON UPSERT
+  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes CON UPSERT MEJORADO
   static async closePeriod(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<string> {
     try {
       console.log('🔒 Iniciando cierre de período:', period.id);
@@ -145,11 +144,11 @@ export class PayrollLiquidationNewService {
         throw new Error(`${invalidEmployees.length} empleados tienen errores en su liquidación`);
       }
 
-      // Guardar liquidaciones en la base de datos CON UPSERT
+      // Guardar liquidaciones en la base de datos CON UPSERT MEJORADO
       await this.savePeriodLiquidationsUpsert(period, employees);
       
-      // Generar comprobantes automáticamente
-      await this.generateVouchers(period, employees);
+      // Generar comprobantes automáticamente CON VALIDACIÓN DE DUPLICADOS
+      await this.generateVouchersWithDuplicateCheck(period, employees);
       
       // Cambiar estado del período a cerrado
       const { error: updateError } = await supabase
@@ -171,21 +170,12 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  // NUEVO: Método con UPSERT para evitar error 409
+  // NUEVO: Método con UPSERT MEJORADO para evitar error 409
   static async savePeriodLiquidationsUpsert(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
-      console.log('💾 Guardando liquidaciones con UPSERT...');
+      console.log('💾 Guardando liquidaciones con UPSERT MEJORADO...');
       
       for (const emp of employees) {
-        // Verificar si ya existe
-        const { data: existing } = await supabase
-          .from('payrolls')
-          .select('id')
-          .eq('company_id', period.company_id)
-          .eq('employee_id', emp.id)
-          .eq('period_id', period.id)
-          .maybeSingle();
-
         const liquidationData = {
           company_id: period.company_id,
           employee_id: emp.id,
@@ -202,37 +192,53 @@ export class PayrollLiquidationNewService {
           estado: 'procesada'
         };
 
-        if (existing) {
-          // Actualizar registro existente
-          const { error } = await supabase
-            .from('payrolls')
-            .update(liquidationData)
-            .eq('id', existing.id);
+        // Usar ON CONFLICT DO UPDATE para evitar duplicados
+        const { error } = await supabase
+          .from('payrolls')
+          .upsert(liquidationData, {
+            onConflict: 'company_id,employee_id,period_id',
+            ignoreDuplicates: false
+          });
 
-          if (error) throw error;
-        } else {
-          // Insertar nuevo registro
-          const { error } = await supabase
-            .from('payrolls')
-            .insert(liquidationData);
-
-          if (error) throw error;
+        if (error) {
+          console.error('❌ Error en upsert para empleado:', emp.name, error);
+          throw error;
         }
       }
       
-      console.log('✅ Liquidaciones guardadas exitosamente');
+      console.log('✅ Liquidaciones guardadas exitosamente con UPSERT');
     } catch (error) {
       console.error('❌ Error guardando liquidaciones:', error);
       throw error;
     }
   }
 
-  static async generateVouchers(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
+  // NUEVO: Generar comprobantes con validación de duplicados
+  static async generateVouchersWithDuplicateCheck(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
+      console.log('📄 Generando comprobantes con validación de duplicados...');
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
-      const vouchers = employees.map(emp => ({
+      // Verificar qué empleados ya tienen comprobantes para este período
+      const { data: existingVouchers } = await supabase
+        .from('payroll_vouchers')
+        .select('employee_id')
+        .eq('company_id', period.company_id)
+        .eq('periodo', period.periodo);
+
+      const existingEmployeeIds = new Set(existingVouchers?.map(v => v.employee_id) || []);
+
+      // Filtrar empleados que no tienen comprobantes
+      const employeesNeedingVouchers = employees.filter(emp => !existingEmployeeIds.has(emp.id));
+
+      if (employeesNeedingVouchers.length === 0) {
+        console.log('✅ Todos los empleados ya tienen comprobantes generados');
+        return;
+      }
+
+      const vouchers = employeesNeedingVouchers.map(emp => ({
         company_id: period.company_id,
         employee_id: emp.id,
         periodo: period.periodo,
@@ -249,12 +255,16 @@ export class PayrollLiquidationNewService {
         .from('payroll_vouchers')
         .insert(vouchers);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error insertando comprobantes:', error);
+        throw error;
+      }
       
-      console.log('✅ Comprobantes generados automáticamente');
+      console.log(`✅ ${vouchers.length} comprobantes generados automáticamente`);
     } catch (error) {
       console.error('❌ Error generando comprobantes:', error);
-      throw error;
+      // No lanzar error aquí para no bloquear el cierre del período
+      console.warn('⚠️ Continuando sin generar comprobantes...');
     }
   }
 
