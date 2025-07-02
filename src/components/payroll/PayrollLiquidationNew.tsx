@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,11 @@ export const PayrollLiquidationNew = () => {
     isValidPeriod,
     hasEmployees
   } = usePayrollLiquidationNew();
+
+  // Wrapper functions for button handlers
+  const handleRefreshPeriod = () => refreshPeriod(0);
+  const handleRetryInitialization = () => refreshPeriod(0);
+  const handleForceRefresh = () => refreshPeriod(0);
 
   // Loading inicial
   if (isLoading) {
@@ -117,7 +123,7 @@ export const PayrollLiquidationNew = () => {
                 
                 <Button 
                   variant="outline" 
-                  onClick={refreshPeriod}
+                  onClick={handleRefreshPeriod}
                   disabled={isProcessing}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
@@ -141,9 +147,9 @@ export const PayrollLiquidationNew = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.location.reload()}
+                      onClick={handleForceRefresh}
                     >
-                      Recargar Página
+                      Forzar Actualización
                     </Button>
                   </div>
                 </div>
@@ -167,7 +173,7 @@ export const PayrollLiquidationNew = () => {
             No se pudo detectar o crear un período válido para la liquidación.
           </p>
           <div className="space-y-2">
-            <Button onClick={refreshPeriod} disabled={isProcessing}>
+            <Button onClick={handleRetryInitialization} disabled={isProcessing}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Intentar Nuevamente
             </Button>
@@ -199,7 +205,7 @@ export const PayrollLiquidationNew = () => {
           <div className="flex items-center space-x-3">
             <Button
               variant="outline"
-              onClick={refreshPeriod}
+              onClick={handleRefreshPeriod}
               disabled={isProcessing}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-spin' : ''}`} />
