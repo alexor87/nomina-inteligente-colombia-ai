@@ -2,16 +2,16 @@
 // Unified Employee types to resolve inconsistencies
 
 export interface EmployeeUnified {
-  // Core identification
-  id?: string;
+  // Core identification - make id required to match Employee type
+  id: string;
   cedula: string;
   tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   
-  // Personal information
+  // Personal information - make email optional to match Employee type
   nombre: string;
   segundoNombre?: string;
   apellido: string;
-  email: string;
+  email?: string; // Made optional to match Employee type
   telefono?: string;
   sexo?: 'M' | 'F' | 'O';
   fechaNacimiento?: string;
@@ -117,7 +117,7 @@ export function mapDatabaseToUnified(dbEmployee: any): EmployeeUnified {
   };
 }
 
-export function mapUnifiedToDatabase(employee: EmployeeUnified): any {
+export function mapUnifiedToDatabase(employee: Partial<EmployeeUnified>): any {
   return {
     id: employee.id,
     cedula: employee.cedula,

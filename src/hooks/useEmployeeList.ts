@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeEmployees } from '@/hooks/useRealtimeEmployees';
 import { EmployeeService } from '@/services/EmployeeService';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { usePagination } from '@/hooks/usePagination';
 import { useEmployeeFiltering } from '@/hooks/useEmployeeFiltering';
@@ -19,8 +19,8 @@ export const useEmployeeList = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
 
-  // Convertir Employee a EmployeeWithStatus
-  const mapToEmployeeWithStatus = (employee: Employee): EmployeeWithStatus => ({
+  // Convertir EmployeeUnified a EmployeeWithStatus
+  const mapToEmployeeWithStatus = (employee: EmployeeUnified): EmployeeWithStatus => ({
     ...employee,
     periodicidadPago: (employee.periodicidadPago as 'quincenal' | 'mensual') || 'mensual'
   });

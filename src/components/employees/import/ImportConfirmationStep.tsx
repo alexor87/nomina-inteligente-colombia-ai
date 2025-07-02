@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -62,7 +63,7 @@ export const ImportConfirmationStep: React.FC<ImportConfirmationStepProps> = ({
             titularCuenta: row.titularCuenta || null
           };
 
-          await EmployeeService.create(employeeData);
+          await EmployeeService.createEmployee(employeeData);
           successCount++;
         } catch (error) {
           console.error('Error importing employee:', error);

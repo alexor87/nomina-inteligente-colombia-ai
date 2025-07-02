@@ -148,4 +148,26 @@ export class EmployeeService {
       throw error;
     }
   }
+
+  // Add backward compatibility methods
+  static async create(employeeData: any): Promise<EmployeeUnified> {
+    return this.createEmployee(employeeData);
+  }
+
+  static async update(id: string, employeeData: any): Promise<EmployeeUnified> {
+    return this.updateEmployee(id, employeeData);
+  }
+
+  static async delete(id: string): Promise<void> {
+    return this.deleteEmployee(id);
+  }
+
+  static async changeStatus(id: string, newStatus: string): Promise<void> {
+    return this.changeEmployeeStatus(id, newStatus);
+  }
+
+  // Alias for backward compatibility
+  static async getEmployees(): Promise<EmployeeUnified[]> {
+    return this.getAllEmployees();
+  }
 }

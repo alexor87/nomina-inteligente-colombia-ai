@@ -62,7 +62,7 @@ const EditEmployeePage = () => {
 
   return (
     <EmployeeFormModern
-      employee={employee}
+      employee={employee as any} // Type assertion for compatibility
       onSuccess={handleSuccess}
       onCancel={handleCancel}
       onDataRefresh={handleDataRefresh}
