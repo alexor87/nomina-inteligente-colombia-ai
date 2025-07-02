@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +48,7 @@ export const EmployeeCreationTest = () => {
       salarioBase: 2500000,
       tipoContrato: 'indefinido',
       fechaIngreso: new Date().toISOString().split('T')[0],
+      periodicidadPago: 'mensual', // Agregar campo faltante
       estado: 'activo',
       eps: 'Compensar EPS',
       afp: 'Porvenir',

@@ -1,14 +1,9 @@
 
 import { Employee } from '@/types';
 
-export interface EmployeeWithStatus extends Omit<Employee, 'periodicidadPago'> {
-  periodicidadPago: 'quincenal' | 'mensual';
-  // Propiedades adicionales para indicadores de compliance
-  complianceStatus?: {
-    documentos: 'completo' | 'incompleto' | 'pendiente';
-    afiliaciones: 'completo' | 'incompleto' | 'pendiente';
-    contractual: 'completo' | 'incompleto' | 'pendiente';
-  };
+export interface EmployeeWithStatus extends Employee {
+  // All properties are inherited from Employee
+  // This ensures compatibility with existing code
 }
 
 export interface EmployeeComplianceIndicators {

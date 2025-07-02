@@ -127,7 +127,7 @@ export const EmployeeTable = ({
                   <p className="font-medium">{employee.cargo}</p>
                   <div className="flex items-center text-sm text-gray-600">
                     <Building2 className="h-3 w-3 mr-1" />
-                    {employee.centrosocial || 'Sin asignar'}
+                    {employee.centroCostos || employee.centrosocial || 'Sin asignar'}
                   </div>
                 </div>
               </TableCell>

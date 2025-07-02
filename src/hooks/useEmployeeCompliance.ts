@@ -29,8 +29,8 @@ export const useEmployeeCompliance = () => {
       });
     }
 
-    if (employee.contratoVencimiento) {
-      const vencimiento = new Date(employee.contratoVencimiento);
+    if (employee.contratoVencimiento || employee.fechaFinalizacionContrato) {
+      const vencimiento = new Date(employee.contratoVencimiento || employee.fechaFinalizacionContrato || '');
       const hoy = new Date();
       const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 3600 * 24));
       

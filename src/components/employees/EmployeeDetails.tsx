@@ -95,7 +95,7 @@ export const EmployeeDetails = ({ employee, onEdit, onClose }: EmployeeDetailsPr
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">Centro de Costo</label>
-              <p className="text-gray-900">{employee.centrosocial || 'No asignado'}</p>
+              <p className="text-gray-900">{employee.centroCostos || employee.centrosocial || 'No asignado'}</p>
             </div>
           </div>
         </Card>

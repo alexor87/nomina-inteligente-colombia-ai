@@ -1,343 +1,186 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { Employee } from '@/types';
-import { CompanyConfigurationService } from '@/services/CompanyConfigurationService';
-
-interface EmployeeDataWithExtended extends Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> {
-  segundoNombre?: string;
-  banco?: string;
-  tipoCuenta?: 'ahorros' | 'corriente';
-  numeroCuenta?: string;
-  titularCuenta?: string;
-  tipoCotizanteId?: string | null;
-  subtipoCotizanteId?: string | null;
-}
+import { Employee, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 
 export class EmployeeUnifiedService {
-  private static mapDatabaseToEmployee(dbEmployee: any): Employee {
-    console.log('🔄 Mapping database employee to frontend format:', dbEmployee.id);
-    
-    return {
-      id: dbEmployee.id,
-      empresaId: dbEmployee.company_id,
-      cedula: dbEmployee.cedula,
-      tipoDocumento: dbEmployee.tipo_documento || 'CC',
-      nombre: dbEmployee.nombre,
-      segundoNombre: dbEmployee.segundo_nombre,
-      apellido: dbEmployee.apellido,
-      email: dbEmployee.email,
-      telefono: dbEmployee.telefono,
-      salarioBase: Number(dbEmployee.salario_base) || 0,
-      tipoContrato: dbEmployee.tipo_contrato || 'indefinido',
-      fechaIngreso: dbEmployee.fecha_ingreso,
-      estado: dbEmployee.estado || 'activo',
-      eps: dbEmployee.eps,
-      afp: dbEmployee.afp,
-      arl: dbEmployee.arl,
-      cajaCompensacion: dbEmployee.caja_compensacion,
-      cargo: dbEmployee.cargo,
-      estadoAfiliacion: dbEmployee.estado_afiliacion || 'pendiente',
-      nivelRiesgoARL: dbEmployee.nivel_riesgo_arl,
-      banco: dbEmployee.banco,
-      tipoCuenta: dbEmployee.tipo_cuenta || 'ahorros',
-      numeroCuenta: dbEmployee.numero_cuenta,
-      titularCuenta: dbEmployee.titular_cuenta,
-      sexo: dbEmployee.sexo,
-      fechaNacimiento: dbEmployee.fecha_nacimiento,
-      direccion: dbEmployee.direccion,
-      ciudad: dbEmployee.ciudad,
-      departamento: dbEmployee.departamento,
-      periodicidadPago: dbEmployee.periodicidad_pago || 'mensual',
-      codigoCIIU: dbEmployee.codigo_ciiu,
-      centroCostos: dbEmployee.centro_costos,
-      fechaFirmaContrato: dbEmployee.fecha_firma_contrato,
-      fechaFinalizacionContrato: dbEmployee.fecha_finalizacion_contrato,
-      tipoJornada: dbEmployee.tipo_jornada,
-      diasTrabajo: dbEmployee.dias_trabajo,
-      horasTrabajo: dbEmployee.horas_trabajo,
-      beneficiosExtralegales: dbEmployee.beneficios_extralegales,
-      clausulasEspeciales: dbEmployee.clausulas_especiales,
-      formaPago: dbEmployee.forma_pago,
-      regimenSalud: dbEmployee.regimen_salud,
-      tipoCotizanteId: dbEmployee.tipo_cotizante_id,
-      subtipoCotizanteId: dbEmployee.subtipo_cotizante_id,
-      createdAt: dbEmployee.created_at,
-      updatedAt: dbEmployee.updated_at,
-      // Legacy fields
-      avatar: dbEmployee.avatar,
-      centrosocial: dbEmployee.centro_costos,
-      ultimaLiquidacion: dbEmployee.ultima_liquidacion,
-      contratoVencimiento: dbEmployee.fecha_finalizacion_contrato
-    };
-  }
-
-  private static mapEmployeeToDatabase(employee: Partial<EmployeeDataWithExtended>) {
-    console.log('🔄 Mapping frontend employee to database format:', employee);
-    
-    // Helper function to handle text fields - convert empty strings and 'null' to null
-    const cleanTextField = (value: any) => {
-      if (value === '' || value === undefined || value === null || value === 'null') return null;
-      if (typeof value === 'string') return value.trim() || null;
-      return value ? String(value).trim() || null : null;
-    };
-
-    // Helper function to handle UUID fields - convert empty strings and 'null' to null
-    const cleanUuidField = (value: any) => {
-      if (value === '' || value === undefined || value === null || value === 'null') return null;
-      if (typeof value === 'string') return value.trim() || null;
-      return value;
-    };
-
-    // Helper function to handle date fields
-    const cleanDateField = (value: any) => {
-      if (value === '' || value === undefined || value === null || value === 'null') return null;
-      return value;
-    };
-
-    const mapped = {
-      company_id: employee.empresaId,
-      cedula: employee.cedula,
-      tipo_documento: employee.tipoDocumento,
-      nombre: employee.nombre,
-      segundo_nombre: cleanTextField(employee.segundoNombre),
-      apellido: employee.apellido,
-      email: cleanTextField(employee.email),
-      telefono: cleanTextField(employee.telefono),
-      salario_base: employee.salarioBase,
-      tipo_contrato: employee.tipoContrato,
-      fecha_ingreso: employee.fechaIngreso,
-      estado: employee.estado,
-      eps: cleanTextField(employee.eps),
-      afp: cleanTextField(employee.afp),
-      arl: cleanTextField(employee.arl),
-      caja_compensacion: cleanTextField(employee.cajaCompensacion),
-      cargo: cleanTextField(employee.cargo),
-      estado_afiliacion: employee.estadoAfiliacion,
-      nivel_riesgo_arl: employee.nivelRiesgoARL,
-      banco: cleanTextField(employee.banco),
-      tipo_cuenta: employee.tipoCuenta,
-      numero_cuenta: cleanTextField(employee.numeroCuenta),
-      titular_cuenta: cleanTextField(employee.titularCuenta),
-      sexo: employee.sexo,
-      fecha_nacimiento: cleanDateField(employee.fechaNacimiento),
-      direccion: cleanTextField(employee.direccion),
-      ciudad: cleanTextField(employee.ciudad),
-      departamento: employee.departamento,
-      periodicidad_pago: employee.periodicidadPago,
-      codigo_ciiu: cleanTextField(employee.codigoCIIU),
-      centro_costos: cleanTextField(employee.centroCostos),
-      fecha_firma_contrato: cleanDateField(employee.fechaFirmaContrato),
-      fecha_finalizacion_contrato: cleanDateField(employee.fechaFinalizacionContrato),
-      tipo_jornada: employee.tipoJornada,
-      dias_trabajo: employee.diasTrabajo,
-      horas_trabajo: employee.horasTrabajo,
-      beneficios_extralegales: employee.beneficiosExtralegales,
-      clausulas_especiales: cleanTextField(employee.clausulasEspeciales),
-      forma_pago: employee.formaPago,
-      regimen_salud: employee.regimenSalud,
-      // CRITICAL: Handle UUID fields with proper cleaning
-      tipo_cotizante_id: cleanUuidField(employee.tipoCotizanteId),
-      subtipo_cotizante_id: cleanUuidField(employee.subtipoCotizanteId)
-    };
-
-    console.log('✅ Mapped employee data:', {
-      ...mapped,
-      tipo_cotizante_id: mapped.tipo_cotizante_id,
-      subtipo_cotizante_id: mapped.subtipo_cotizante_id
-    });
-
-    return mapped;
-  }
-
-  static async getAllEmployees(): Promise<Employee[]> {
+  static async getAll(): Promise<{ success: boolean; data?: Employee[]; error?: string }> {
     try {
-      console.log('🔍 Getting all employees...');
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        console.warn('⚠️ No company ID found for current user');
-        return [];
-      }
-
+      console.log('🔄 EmployeeUnifiedService: Fetching all employees');
+      
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('company_id', companyId)
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching employees:', error);
-        throw new Error(`Error al obtener empleados: ${error.message}`);
+        return { success: false, error: error.message };
       }
 
-      console.log('✅ Fetched employees:', data?.length || 0);
-      return (data || []).map(this.mapDatabaseToEmployee);
-    } catch (error) {
-      console.error('❌ Error in getAllEmployees:', error);
-      throw error;
+      console.log('✅ EmployeeUnifiedService: Fetched', data?.length || 0, 'employees');
+      
+      return {
+        success: true,
+        data: (data || []).map(mapDatabaseToUnified)
+      };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService getAll error:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  static async getEmployeeById(id: string): Promise<Employee | null> {
+  static async getById(id: string): Promise<{ success: boolean; data?: Employee | null; error?: string }> {
     try {
-      console.log('🔍 Getting employee by ID:', id);
+      console.log('🔄 EmployeeUnifiedService: Fetching employee by ID:', id);
       
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        console.warn('⚠️ No company ID found for current user');
-        return null;
-      }
-
       const { data, error } = await supabase
         .from('employees')
         .select('*')
         .eq('id', id)
-        .eq('company_id', companyId)
         .single();
 
       if (error) {
         console.error('❌ Error fetching employee:', error);
-        return null;
+        return { success: false, error: error.message };
       }
 
-      console.log('✅ Fetched employee:', data?.nombre, data?.apellido);
-      return this.mapDatabaseToEmployee(data);
-    } catch (error) {
-      console.error('❌ Error in getEmployeeById:', error);
-      return null;
+      console.log('✅ EmployeeUnifiedService: Fetched employee:', data?.nombre, data?.apellido);
+      
+      return {
+        success: true,
+        data: data ? mapDatabaseToUnified(data) : null
+      };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService getById error:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  static async create(employeeData: Partial<EmployeeDataWithExtended>): Promise<Employee> {
+  static async create(employeeData: any): Promise<{ success: boolean; data?: Employee; error?: string }> {
     try {
-      console.log('🚀 Creating new employee...', employeeData.nombre, employeeData.apellido);
+      console.log('🔄 EmployeeUnifiedService: Creating employee with data:', employeeData);
       
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener el ID de la empresa');
+      // Get current user's company ID
+      const { data: companyData, error: companyError } = await supabase
+        .rpc('get_current_user_company_id');
+
+      if (companyError || !companyData) {
+        console.error('❌ Error getting company ID:', companyError);
+        throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // Check for duplicate cedula
-      const { data: existingEmployee } = await supabase
-        .from('employees')
-        .select('id, cedula, nombre, apellido')
-        .eq('company_id', companyId)
-        .eq('cedula', String(employeeData.cedula || '').trim())
-        .maybeSingle();
-
-      if (existingEmployee) {
-        throw new Error(`Ya existe un empleado con la cédula ${employeeData.cedula} en esta empresa: ${existingEmployee.nombre} ${existingEmployee.apellido}`);
-      }
-
-      const dbData = this.mapEmployeeToDatabase({
+      // Prepare employee data without avatar field for database
+      const dbEmployeeData = {
         ...employeeData,
-        empresaId: companyId
-      });
+        company_id: companyData,
+        // Remove avatar as it's not in the database schema
+        avatar: undefined
+      };
 
       const { data, error } = await supabase
         .from('employees')
-        .insert(dbData)
+        .insert([dbEmployeeData])
         .select()
         .single();
 
       if (error) {
         console.error('❌ Error creating employee:', error);
-        throw new Error(`Error al crear empleado: ${error.message}`);
+        throw error;
       }
 
-      console.log('✅ Employee created successfully:', data.id);
-      return this.mapDatabaseToEmployee(data);
-    } catch (error) {
-      console.error('❌ Error in create:', error);
-      throw error;
+      console.log('✅ EmployeeUnifiedService: Employee created successfully:', data);
+      
+      return {
+        success: true,
+        data: mapDatabaseToUnified(data)
+      };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService create error:', error);
+      return {
+        success: false,
+        error: error.message || 'Error creating employee'
+      };
     }
   }
 
-  static async update(id: string, employeeData: Partial<EmployeeDataWithExtended>): Promise<Employee> {
+  static async update(id: string, employeeData: any): Promise<{ success: boolean; data?: Employee; error?: string }> {
     try {
-      console.log('🔄 Updating employee:', id, employeeData);
+      console.log('🔄 EmployeeUnifiedService: Updating employee:', id, 'with data:', employeeData);
       
-      if (!id) {
-        throw new Error('ID de empleado es requerido para actualizar');
-      }
-
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener el ID de la empresa');
-      }
-
-      const dbData = this.mapEmployeeToDatabase(employeeData);
-      console.log('📤 Sending update to Supabase:', dbData);
-
+      // Prepare employee data for database (remove avatar)
+      const dbEmployeeData = {
+        ...employeeData,
+        avatar: undefined // Remove avatar as it's not in the database schema
+      };
+      
       const { data, error } = await supabase
         .from('employees')
-        .update(dbData)
+        .update(dbEmployeeData)
         .eq('id', id)
-        .eq('company_id', companyId)
         .select()
         .single();
 
       if (error) {
         console.error('❌ Error updating employee:', error);
-        throw new Error(`Error al actualizar empleado: ${error.message}`);
+        return { success: false, error: error.message };
       }
 
-      if (!data) {
-        throw new Error('No se encontró el empleado para actualizar');
-      }
-
-      console.log('✅ Employee updated successfully:', data.id);
-      return this.mapDatabaseToEmployee(data);
-    } catch (error) {
-      console.error('❌ Error in update:', error);
-      throw error;
+      console.log('✅ EmployeeUnifiedService: Employee updated successfully:', data);
+      
+      return {
+        success: true,
+        data: mapDatabaseToUnified(data)
+      };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService update error:', error);
+      return {
+        success: false,
+        error: error.message || 'Error updating employee'
+      };
     }
   }
 
-  static async delete(id: string): Promise<void> {
+  static async delete(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('🗑️ Deleting employee:', id);
+      console.log('🔄 EmployeeUnifiedService: Deleting employee:', id);
       
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener el ID de la empresa');
-      }
-
-      // Check if employee has payrolls
-      const { data: payrolls } = await supabase
-        .from('payrolls')
-        .select('id')
-        .eq('employee_id', id)
-        .limit(1);
-
-      if (payrolls && payrolls.length > 0) {
-        throw new Error('No se puede eliminar el empleado porque tiene nóminas asociadas');
-      }
-
       const { error } = await supabase
         .from('employees')
         .delete()
-        .eq('id', id)
-        .eq('company_id', companyId);
+        .eq('id', id);
 
       if (error) {
         console.error('❌ Error deleting employee:', error);
-        throw new Error(`Error al eliminar empleado: ${error.message}`);
+        return { success: false, error: error.message };
       }
 
-      console.log('✅ Employee deleted successfully');
-    } catch (error) {
-      console.error('❌ Error in delete:', error);
-      throw error;
+      console.log('✅ EmployeeUnifiedService: Employee deleted successfully:', id);
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService delete error:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  static async changeStatus(id: string, newStatus: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'): Promise<Employee> {
+  static async changeStatus(id: string, newStatus: string): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('🔄 Changing employee status:', id, newStatus);
-      return await this.update(id, { estado: newStatus });
-    } catch (error) {
-      console.error('❌ Error changing employee status:', error);
-      throw error;
+      console.log('🔄 EmployeeUnifiedService: Changing employee status:', id, 'to', newStatus);
+      
+      const { error } = await supabase
+        .from('employees')
+        .update({ estado: newStatus })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error changing employee status:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ EmployeeUnifiedService: Employee status changed successfully');
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService changeStatus error:', error);
+      return { success: false, error: error.message };
     }
   }
 }

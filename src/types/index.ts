@@ -1,3 +1,4 @@
+
 // Employee interface
 export interface Employee {
   // Core identification
@@ -25,7 +26,7 @@ export interface Employee {
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: 'quincenal' | 'mensual'; // Fixed: made it specific union type
+  periodicidadPago: 'quincenal' | 'mensual';
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
@@ -58,7 +59,62 @@ export interface Employee {
   regimenSalud?: 'contributivo' | 'subsidiado';
   estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   
+  // UI/Display properties
+  avatar?: string;
+  centrosocial?: string;
+  ultimaLiquidacion?: string;
+  contratoVencimiento?: string;
+  
   // Timestamps
   createdAt?: string;
   updatedAt?: string;
+}
+
+// Payroll related types
+export interface PayrollCalculation {
+  salarioBase: number;
+  diasTrabajados: number;
+  horasExtra: number;
+  recargoNocturno: number;
+  recargoDominical: number;
+  bonificaciones: number;
+  auxilioTransporte: number;
+  totalDevengado: number;
+  saludEmpleado: number;
+  pensionEmpleado: number;
+  retencionFuente: number;
+  otrasDeducciones: number;
+  totalDeducciones: number;
+  netoPagado: number;
+  cesantias: number;
+  interesesCesantias: number;
+  prima: number;
+  vacaciones: number;
+}
+
+export interface Payroll {
+  id: string;
+  employeeId: string;
+  companyId: string;
+  periodo: string;
+  calculation: PayrollCalculation;
+  estado: 'borrador' | 'procesado' | 'pagado';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LegalValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+// Dashboard types
+export interface DashboardMetrics {
+  totalEmployees: number;
+  activeEmployees: number;
+  pendingPayrolls: number;
+  monthlyPayrollTotal: number;
+  complianceScore: number;
+  alerts: number;
 }

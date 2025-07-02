@@ -36,6 +36,7 @@ interface EmployeeFormData {
   tipoCuenta: 'ahorros' | 'corriente';
   numeroCuenta: string;
   titularCuenta: string;
+  periodicidadPago: 'mensual' as const;
 }
 
 interface EmployeeFormWizardProps {
@@ -175,6 +176,7 @@ export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFo
       salarioBase: Number(data.salarioBase),
       tipoContrato: data.tipoContrato,
       fechaIngreso: data.fechaIngreso,
+      periodicidadPago: 'mensual' as const,
       estado: data.estado,
       eps: data.eps,
       afp: data.afp,

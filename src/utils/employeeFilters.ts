@@ -1,34 +1,33 @@
-
 import { EmployeeWithStatus, EmployeeFilters } from '@/types/employee-extended';
 
 export const filterEmployees = (employees: EmployeeWithStatus[], filters: EmployeeFilters): EmployeeWithStatus[] => {
   return employees.filter(employee => {
-    // Búsqueda por texto
+    // Search term filter
     if (filters.searchTerm) {
       const searchLower = filters.searchTerm.toLowerCase();
-      const matchesSearch = 
-        employee.nombre.toLowerCase().includes(searchLower) ||
-        employee.apellido.toLowerCase().includes(searchLower) ||
-        employee.cedula.includes(filters.searchTerm) ||
-        employee.email.toLowerCase().includes(searchLower) ||
-        employee.cargo?.toLowerCase().includes(searchLower) ||
-        employee.centrosocial?.toLowerCase().includes(searchLower);
+      const fullName = `${employee.nombre} ${employee.apellido}`.toLowerCase();
+      const matchesName = fullName.includes(searchLower);
+      const matchesCedula = employee.cedula.includes(searchLower);
+      const matchesEmail = employee.email?.toLowerCase().includes(searchLower) || false;
       
-      if (!matchesSearch) return false;
+      if (!matchesName && !matchesCedula && !matchesEmail) {
+        return false;
+      }
     }
 
-    // Filtro por estado
+    // Status filter
     if (filters.estado && employee.estado !== filters.estado) {
       return false;
     }
 
-    // Filtro por tipo de contrato
+    // Contract type filter
     if (filters.tipoContrato && employee.tipoContrato !== filters.tipoContrato) {
       return false;
     }
 
-    // Filtro por centro de costo
-    if (filters.centroCosto && employee.centrosocial !== filters.centroCosto) {
+    // Cost center filter
+    if (filters.centroCosto && 
+        (employee.centroCostos || employee.centrosocial || '') !== filters.centroCosto) {
       return false;
     }
 
