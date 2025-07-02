@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,7 +72,7 @@ export const PayrollLiquidationNew = () => {
               
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  Período Actual Cerrado
+                  {periodStatus.nextPeriod ? 'Crear Siguiente Período' : 'Configuración Requerida'}
                 </h2>
                 <p className="text-gray-600">
                   {periodStatus.message}
@@ -93,18 +92,28 @@ export const PayrollLiquidationNew = () => {
               )}
 
               <div className="flex gap-3 justify-center">
-                <Button 
-                  onClick={createNewPeriod}
-                  disabled={isProcessing}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {isProcessing ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
+                {periodStatus.nextPeriod ? (
+                  <Button 
+                    onClick={createNewPeriod}
+                    disabled={isProcessing}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isProcessing ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Crear Nuevo Período
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={() => window.location.href = '/app/settings'}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Crear Nuevo Período
-                </Button>
+                    Ir a Configuración
+                  </Button>
+                )}
                 
                 <Button 
                   variant="outline" 
@@ -115,6 +124,30 @@ export const PayrollLiquidationNew = () => {
                   Actualizar
                 </Button>
               </div>
+
+              {/* Opciones de emergencia si hay error de detección */}
+              {periodStatus.message.includes('Error') && (
+                <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <h4 className="font-medium text-yellow-800 mb-2">Opciones de Emergencia</h4>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = '/app/payroll-history'}
+                      className="mr-2"
+                    >
+                      Ver Historial de Nómina
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.reload()}
+                    >
+                      Recargar Página
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -133,10 +166,18 @@ export const PayrollLiquidationNew = () => {
           <p className="text-gray-600 mb-4">
             No se pudo detectar o crear un período válido para la liquidación.
           </p>
-          <Button onClick={refreshPeriod} disabled={isProcessing}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Intentar Nuevamente
-          </Button>
+          <div className="space-y-2">
+            <Button onClick={refreshPeriod} disabled={isProcessing}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Intentar Nuevamente
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.href = '/app/settings'}
+            >
+              Verificar Configuración
+            </Button>
+          </div>
         </Card>
       </div>
     );
