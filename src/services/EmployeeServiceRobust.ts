@@ -1,9 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types';
 import { EmployeeDataMapper } from './EmployeeDataMapper';
 import { validateEmployeeData, ValidatedEmployeeData } from '@/schemas/employeeValidation';
-import { useToast } from '@/hooks/use-toast';
 
 export interface ServiceResponse<T> {
   success: boolean;
@@ -48,7 +46,11 @@ export class EmployeeServiceRobust {
       // Step 3: Check for duplicate cedula
       const duplicateCheck = await this.checkDuplicateCedula(validatedData.cedula, companyId);
       if (!duplicateCheck.success) {
-        return duplicateCheck;
+        return {
+          success: false,
+          error: duplicateCheck.error,
+          details: duplicateCheck.details
+        };
       }
 
       // Step 4: Map form data to database format
@@ -259,7 +261,7 @@ export class EmployeeServiceRobust {
     }
 
     console.log('✅ No duplicate cedula found');
-    return { success: true };
+    return { success: true, data: true };
   }
 
   /**
