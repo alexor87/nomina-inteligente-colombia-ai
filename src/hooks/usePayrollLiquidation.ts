@@ -362,12 +362,16 @@ export const usePayrollLiquidation = () => {
     }
   }, [toast, currentPeriod, employees, loadNovedadesTotals]);
 
-  // Aprobar período y guardar en base de datos
+  // Aprobar período y guardar en base de datos con validaciones completas
   const approvePeriod = useCallback(async () => {
     if (!currentPeriod) return;
 
+    console.log('🔒 Iniciando proceso de aprobación de período');
+
+    // 1. Validar que todos los empleados estén correctamente liquidados
     const invalidEmployees = employees.filter(emp => emp.status !== 'valid');
     if (invalidEmployees.length > 0) {
+      console.error('❌ Empleados con errores:', invalidEmployees.map(e => e.name));
       toast({
         title: "No se puede aprobar",
         description: `Corrige los errores en ${invalidEmployees.length} empleado(s) antes de aprobar.`,
@@ -376,6 +380,28 @@ export const usePayrollLiquidation = () => {
       return;
     }
 
+    // 2. Validar que haya empleados para liquidar
+    if (employees.length === 0) {
+      toast({
+        title: "No se puede aprobar",
+        description: "No hay empleados para liquidar en este período.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // 3. Validar que el período esté en estado editable
+    if (currentPeriod.estado !== 'borrador') {
+      toast({
+        title: "Período no editable",
+        description: "Solo se pueden aprobar períodos en estado borrador",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('✅ Validaciones previas completadas exitosamente');
+
     setIsLoading(true);
     toast({
       title: isReopenedPeriod ? "Cerrando período reabierto" : "Aprobando período",
@@ -383,24 +409,33 @@ export const usePayrollLiquidation = () => {
     });
 
     try {
+      // 4. Preparar datos de liquidación
       const liquidationData = {
         period: currentPeriod,
         employees
       };
 
+      console.log('💾 Guardando liquidación en base de datos...');
       const message = await PayrollLiquidationService.savePayrollLiquidation(liquidationData);
       
-      // Actualizar estado del período a aprobado
+      // 5. Actualizar estado del período a aprobado
+      console.log('📝 Actualizando estado del período a aprobado...');
       const updatedPeriod = await PayrollPeriodService.updatePayrollPeriod(currentPeriod.id, {
-        estado: 'aprobado'
+        estado: 'aprobado',
+        empleados_count: employees.length,
+        total_devengado: summary.totalGrossPay,
+        total_deducciones: summary.totalDeductions,
+        total_neto: summary.totalNetPay
       });
 
       if (updatedPeriod) {
         setCurrentPeriod(updatedPeriod);
+        console.log('✅ Estado del período actualizado correctamente');
       }
 
-      // If this was a reopened period, create audit log for closure
+      // 6. Crear registro de auditoría si es período reabierto
       if (isReopenedPeriod) {
+        console.log('📋 Creando registro de auditoría para período reabierto...');
         const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
         const { data: { user } } = await supabase.auth.getUser();
         
@@ -416,17 +451,21 @@ export const usePayrollLiquidation = () => {
               previous_state: 'reabierto',
               new_state: 'cerrado',
               has_vouchers: true,
-              notes: `Período cerrado nuevamente desde liquidación de nómina`
+              notes: `Período cerrado nuevamente desde liquidación de nómina. ${employees.length} empleados liquidados.`
             });
+          
+          console.log('✅ Registro de auditoría creado exitosamente');
         }
         
         setIsReopenedPeriod(false);
       }
+
+      console.log('🎉 Proceso de aprobación completado exitosamente');
       
-      // Show success modal instead of toast
+      // 7. Mostrar modal de éxito
       setShowSuccessModal(true);
     } catch (error) {
-      console.error('Error approving period:', error);
+      console.error('❌ Error en proceso de aprobación:', error);
       toast({
         title: "Error al aprobar",
         description: error instanceof Error ? error.message : "No se pudo aprobar el período.",
@@ -435,7 +474,7 @@ export const usePayrollLiquidation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, employees, currentPeriod, isReopenedPeriod]);
+  }, [toast, employees, currentPeriod, isReopenedPeriod, summary]);
 
   const handleFinishEditing = useCallback(async () => {
     await approvePeriod();

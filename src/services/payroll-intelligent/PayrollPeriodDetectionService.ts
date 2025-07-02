@@ -207,7 +207,7 @@ export class PayrollPeriodDetectionService {
   private static async findPeriodForDate(date: string, companyId: string): Promise<any> {
     try {
       const { data: period, error } = await supabase
-        .from('payroll_periods')
+        .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
         .lte('fecha_inicio', date)
@@ -227,7 +227,7 @@ export class PayrollPeriodDetectionService {
   private static async checkPeriodOverlap(startDate: string, endDate: string, companyId: string): Promise<boolean> {
     try {
       const { data: periods, error } = await supabase
-        .from('payroll_periods')
+        .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
         .neq('estado', 'cancelado');
@@ -287,9 +287,14 @@ export class PayrollPeriodDetectionService {
 
   private static async findNextAvailablePeriod(periodicity: string, companyId: string): Promise<{ startDate: string; endDate: string } | null> {
     try {
-      // Obtener todos los períodos existentes
+      console.log('🔍 Buscando siguiente período disponible para periodicidad:', periodicity);
+
+      // Import validation service to use new validation logic
+      const { PayrollPeriodValidationService } = await import('./PayrollPeriodValidationService');
+
+      // Obtener todos los períodos existentes desde payroll_periods_real
       const { data: periods, error } = await supabase
-        .from('payroll_periods')
+        .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
         .order('fecha_fin', { ascending: false });
@@ -298,15 +303,17 @@ export class PayrollPeriodDetectionService {
 
       if (!periods || periods.length === 0) {
         // Si no hay períodos, generar el primero
+        console.log('📅 No hay períodos existentes, generando el primero');
         return PayrollPeriodService.generatePeriodDates(periodicity);
       }
 
       // Encontrar el último período y calcular el siguiente disponible
       const latestPeriod = periods[0];
       const lastEndDate = new Date(latestPeriod.fecha_fin);
+      console.log('📊 Último período encontrado:', latestPeriod.fecha_inicio, '-', latestPeriod.fecha_fin);
       
-      // Calcular 6 meses hacia adelante para encontrar un período disponible
-      for (let i = 1; i <= 6; i++) {
+      // Calcular hasta 12 períodos hacia adelante para encontrar uno disponible
+      for (let i = 1; i <= 12; i++) {
         const candidateStart = new Date(lastEndDate);
         candidateStart.setDate(candidateStart.getDate() + 1);
 
@@ -315,6 +322,10 @@ export class PayrollPeriodDetectionService {
           candidateStart.setDate(candidateStart.getDate() + (i - 1) * 15);
           candidateEnd = new Date(candidateStart);
           candidateEnd.setDate(candidateEnd.getDate() + 14);
+        } else if (periodicity === 'semanal') {
+          candidateStart.setDate(candidateStart.getDate() + (i - 1) * 7);
+          candidateEnd = new Date(candidateStart);
+          candidateEnd.setDate(candidateEnd.getDate() + 6);
         } else { // mensual
           candidateStart.setMonth(candidateStart.getMonth() + (i - 1));
           candidateEnd = new Date(candidateStart);
@@ -325,12 +336,24 @@ export class PayrollPeriodDetectionService {
         const startStr = candidateStart.toISOString().split('T')[0];
         const endStr = candidateEnd.toISOString().split('T')[0];
 
-        const hasOverlap = await this.checkPeriodOverlap(startStr, endStr, companyId);
-        if (!hasOverlap) {
+        console.log(`📅 Evaluando período candidato ${i}: ${startStr} - ${endStr}`);
+
+        // Usar validación integral para verificar si este período es válido
+        const validation = await PayrollPeriodValidationService.validatePeriodCreation(
+          startStr, 
+          endStr, 
+          companyId
+        );
+
+        if (validation.isValid) {
+          console.log(`✅ Período disponible encontrado: ${startStr} - ${endStr}`);
           return { startDate: startStr, endDate: endStr };
+        } else {
+          console.log(`❌ Período ${startStr} - ${endStr} no válido:`, validation.errors);
         }
       }
 
+      console.log('⚠️ No se encontraron períodos disponibles en los próximos 12 períodos');
       return null;
     } catch (error) {
       console.error('❌ Error encontrando siguiente período disponible:', error);
@@ -363,9 +386,9 @@ export class PayrollPeriodDetectionService {
         console.log('📊 Último período del historial:', lastHistoryRecord?.periodo);
 
         if (lastHistoryRecord) {
-          // Intentar encontrar este período en payroll_periods por coincidencia de fechas/período
+          // Intentar encontrar este período en payroll_periods_real por coincidencia de fechas/período
           const { data: payrollPeriods, error } = await supabase
-            .from('payroll_periods')
+            .from('payroll_periods_real')
             .select('*')
             .eq('company_id', companyId)
             .neq('estado', 'borrador')
@@ -380,7 +403,7 @@ export class PayrollPeriodDetectionService {
             });
 
             if (matchingPeriod) {
-              console.log('✅ Período encontrado en payroll_periods:', matchingPeriod.id);
+              console.log('✅ Período encontrado en payroll_periods_real:', matchingPeriod.id);
               return {
                 lastLiquidatedPeriod: matchingPeriod as PayrollPeriod,
                 lastLiquidatedPeriodId: matchingPeriod.id
@@ -397,9 +420,9 @@ export class PayrollPeriodDetectionService {
         }
       }
 
-      // Si no hay historial en payrolls, buscar en payroll_periods cerrados
+      // Si no hay historial en payrolls, buscar en payroll_periods_real cerrados
       const { data: closedPeriods, error } = await supabase
-        .from('payroll_periods')
+        .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
         .in('estado', ['cerrada', 'procesada', 'pagada', 'aprobado'])

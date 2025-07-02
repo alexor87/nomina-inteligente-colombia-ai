@@ -129,7 +129,7 @@ export class PayrollPeriodService {
     }
   }
 
-  // Crear un nuevo período de nómina usando payroll_periods_real
+  // Crear un nuevo período de nómina con validaciones completas
   static async createPayrollPeriod(startDate: string, endDate: string, periodType: string): Promise<PayrollPeriod | null> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -138,8 +138,27 @@ export class PayrollPeriodService {
         return null;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log('🚀 Creando nuevo período con validaciones completas:', { startDate, endDate, periodType });
+
+      // Importar PayrollPeriodValidationService dinámicamente para evitar dependencias circulares
+      const { PayrollPeriodValidationService } = await import('./payroll-intelligent/PayrollPeriodValidationService');
       
+      // Ejecutar validaciones integrales
+      const validation = await PayrollPeriodValidationService.validatePeriodCreation(
+        startDate, 
+        endDate, 
+        companyId
+      );
+
+      if (!validation.isValid) {
+        console.error('❌ Validación de período falló:', validation.errors);
+        throw new Error(`No se puede crear el período: ${validation.errors.join(', ')}`);
+      }
+
+      if (validation.warnings.length > 0) {
+        console.warn('⚠️ Advertencias en creación de período:', validation.warnings);
+      }
+
       // Generate period string (e.g., "2025-01")
       const startDateObj = new Date(startDate);
       const periodo = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}`;
@@ -162,14 +181,14 @@ export class PayrollPeriodService {
         .single();
 
       if (error) {
-        console.error('Error inserting payroll period:', error);
-        return null;
+        console.error('❌ Error insertando período de nómina:', error);
+        throw error;
       }
       
-      console.log('Payroll period created successfully in payroll_periods_real:', data);
+      console.log('✅ Período de nómina creado exitosamente:', data);
       return data as PayrollPeriod;
     } catch (error) {
-      console.error('Error creating payroll period:', error);
+      console.error('❌ Error creando período de nómina:', error);
       return null;
     }
   }
