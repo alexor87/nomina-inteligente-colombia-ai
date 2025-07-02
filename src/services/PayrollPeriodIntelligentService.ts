@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { PAYROLL_STATES } from '@/constants/payrollStates';
 
 // Tipos específicos para este servicio basados en la base de datos real
 interface CompanySettings {
@@ -40,7 +40,7 @@ export interface PeriodStatus {
 }
 
 export class PayrollPeriodIntelligentService {
-  // 📅 1. Detección automática del período MEJORADA
+  // 📅 1. Detección automática del período MEJORADA con manejo post-cierre
   static async detectCurrentPeriod(): Promise<PeriodStatus> {
     try {
       console.log('🔍 INICIANDO DETECCIÓN AUTOMÁTICA MEJORADA...');
@@ -73,12 +73,13 @@ export class PayrollPeriodIntelligentService {
 
       console.log('📋 No hay período activo, buscando último período cerrado...');
 
-      // PASO 3: BUSCAR ÚLTIMO PERÍODO CERRADO PARA CALCULAR SIGUIENTE
-      const lastClosedPeriod = await this.findLastClosedPeriod(companyId);
+      // PASO 3: BUSCAR ÚLTIMO PERÍODO CERRADO CON RETRY MEJORADO
+      const lastClosedPeriod = await this.findLastClosedPeriodWithRetry(companyId);
       
       if (lastClosedPeriod) {
         console.log('🔒 Último período cerrado encontrado:', lastClosedPeriod.periodo);
         console.log('📅 Fechas:', lastClosedPeriod.fecha_inicio, '-', lastClosedPeriod.fecha_fin);
+        console.log('📊 Estado confirmado:', lastClosedPeriod.estado);
         
         // Calcular siguiente período basado en el cerrado
         const nextPeriodDates = this.generateNextPeriodFromClosed(lastClosedPeriod, periodicity);
@@ -132,6 +133,55 @@ export class PayrollPeriodIntelligentService {
       console.error('❌ ERROR CRÍTICO EN DETECCIÓN:', error);
       throw error;
     }
+  }
+
+  // 🆕 NUEVO: Buscar último período cerrado con retry para problemas post-cierre
+  static async findLastClosedPeriodWithRetry(companyId: string, maxRetries: number = 3): Promise<PayrollPeriod | null> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔍 Buscando último período cerrado (intento ${attempt}/${maxRetries})`);
+        
+        const { data, error } = await supabase
+          .from('payroll_periods_real')
+          .select('*')
+          .eq('company_id', companyId)
+          .eq('estado', PAYROLL_STATES.CERRADO)
+          .order('fecha_fin', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error(`❌ Error en intento ${attempt}:`, error);
+          if (attempt === maxRetries) throw error;
+          continue;
+        }
+        
+        if (data) {
+          console.log(`✅ Período cerrado encontrado en intento ${attempt}:`, data.periodo, 'ID:', data.id);
+          console.log(`📊 Estado verificado: "${data.estado}"`);
+          return data as PayrollPeriod;
+        } else {
+          console.log(`ℹ️ No se encontró período cerrado en intento ${attempt}`);
+        }
+        
+        // Si no encontramos nada pero no hay error, esperar un poco antes del siguiente intento
+        if (attempt < maxRetries) {
+          console.log(`⏰ Esperando 1000ms antes del siguiente intento...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+      } catch (error) {
+        console.error(`❌ Error en intento ${attempt} buscando período cerrado:`, error);
+        if (attempt === maxRetries) {
+          console.error('❌ Todos los intentos fallaron');
+          return null;
+        }
+        // Esperar antes del siguiente intento
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+    
+    return null;
   }
 
   // 🆕 NUEVO: Asegurar configuración de empresa

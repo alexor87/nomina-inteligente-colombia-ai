@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollPeriod, PayrollEmployee, PayrollSummary } from '@/types/payroll';
@@ -24,7 +23,7 @@ export const usePayrollLiquidationNew = () => {
   const [periodStatus, setPeriodStatus] = useState<PeriodStatus | null>(null);
   const { toast } = useToast();
 
-  // 📅 Detección automática MEJORADA con reintentos
+  // 📅 Detección automática MEJORADA con reintentos y mejor logging
   const initializePeriod = useCallback(async (retryCount = 0) => {
     try {
       setIsLoading(true);
@@ -35,20 +34,22 @@ export const usePayrollLiquidationNew = () => {
       
       if (status.currentPeriod) {
         console.log('✅ Período actual detectado:', status.currentPeriod.id);
+        console.log('📊 Estado del período:', status.currentPeriod.estado);
         setCurrentPeriod(status.currentPeriod);
         await loadEmployeesForPeriod(status.currentPeriod);
       } else {
         console.log('ℹ️ No hay período actual, esperando acción:', status.action);
+        console.log('💡 Mensaje del sistema:', status.message);
       }
       
-      console.log('✅ Módulo de liquidación inicializado:', status.message);
+      console.log('✅ Módulo de liquidación inicializado exitosamente');
       
     } catch (error) {
       console.error(`❌ Error inicializando período (intento ${retryCount + 1}):`, error);
       
-      // RETRY LOGIC: Reintentar hasta 2 veces con delay creciente
+      // RETRY LOGIC MEJORADO: Reintentar hasta 3 veces con delay progresivo
       if (retryCount < 2) {
-        const delay = (retryCount + 1) * 1000; // 1s, 2s
+        const delay = (retryCount + 1) * 1500; // 1.5s, 3s
         console.log(`🔄 Reintentando en ${delay}ms...`);
         
         setTimeout(() => {
@@ -58,6 +59,7 @@ export const usePayrollLiquidationNew = () => {
       }
       
       // Si fallan todos los reintentos
+      console.error('💥 TODOS LOS REINTENTOS FALLARON');
       toast({
         title: "Error de Inicialización",
         description: "No se pudo inicializar el período de liquidación. Verifica la configuración.",
@@ -68,7 +70,7 @@ export const usePayrollLiquidationNew = () => {
       setPeriodStatus({
         hasActivePeriod: false,
         action: 'suggest_next',
-        message: "Error en detección automática. Verifica la configuración de periodicidad."
+        message: "Error en detección automática. Verifica la configuración de periodicidad o recarga la página."
       });
     } finally {
       setIsLoading(false);
@@ -229,7 +231,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, loadEmployeesForPeriod, employees.length, toast]);
 
-  // ✅ CIERRE MEJORADO CON REINICIALIZACIÓN ROBUSTA
+  // ✅ CIERRE MEJORADO CON FLUJO POST-CIERRE ROBUSTO
   const closePeriod = useCallback(async () => {
     if (!currentPeriod) return;
     
@@ -242,7 +244,7 @@ export const usePayrollLiquidationNew = () => {
         description: "Procesando liquidación y generando comprobantes",
       });
       
-      // Ejecutar el cierre completo
+      // Ejecutar el cierre completo con verificación
       const result = await PayrollLiquidationNewService.closePeriod(currentPeriod, employees);
       
       console.log('✅ PERÍODO CERRADO EXITOSAMENTE');
@@ -254,8 +256,8 @@ export const usePayrollLiquidationNew = () => {
         duration: 8000
       });
       
-      // FLUJO POST-CIERRE MEJORADO CON REINTENTOS
-      console.log('🔄 Iniciando flujo post-cierre con reintentos...');
+      // FLUJO POST-CIERRE MEJORADO CON DELAY Y VERIFICACIÓN
+      console.log('🔄 Iniciando flujo post-cierre mejorado...');
       
       // Limpiar estado actual inmediatamente
       setCurrentPeriod(null);
@@ -270,50 +272,56 @@ export const usePayrollLiquidationNew = () => {
         className: "border-blue-200 bg-blue-50"
       });
       
-      // REINICIALIZACIÓN CON DELAY PROGRESIVO
+      // REINICIALIZACIÓN CON DELAY PROGRESIVO Y MEJOR MANEJO
       const attemptReinitialization = async (attempt: number = 1) => {
-        const delay = attempt * 1500; // 1.5s, 3s, 4.5s
+        const delay = attempt * 2000; // 2s, 4s, 6s
         
-        console.log(`⏰ Esperando ${delay}ms antes del intento ${attempt}...`);
+        console.log(`⏰ Esperando ${delay}ms antes del intento de reinicialización #${attempt}...`);
         
         setTimeout(async () => {
           try {
             console.log(`🔄 Intento de reinicialización #${attempt}`);
             await initializePeriod(0);
             
-            // Verificar si la reinicialización fue exitosa
+            // Verificar si la reinicialización fue exitosa con timeout
             const isSuccessful = await new Promise<boolean>((resolve) => {
+              let hasResolved = false;
+              
               const checkInterval = setInterval(() => {
-                if (periodStatus !== null) {
+                if (!hasResolved && (periodStatus !== null || currentPeriod !== null)) {
+                  hasResolved = true;
                   clearInterval(checkInterval);
                   resolve(true);
                 }
               }, 500);
               
-              // Timeout después de 3 segundos
+              // Timeout después de 5 segundos
               setTimeout(() => {
-                clearInterval(checkInterval);
-                resolve(false);
-              }, 3000);
+                if (!hasResolved) {
+                  hasResolved = true;
+                  clearInterval(checkInterval);
+                  resolve(false);
+                }
+              }, 5000);
             });
             
             if (isSuccessful) {
               console.log('✅ Reinicialización exitosa');
               toast({
                 title: "🎯 Sistema actualizado",
-                description: "Período cerrado agregado al historial. Sistema listo para siguiente período.",
+                description: "Período cerrado y sistema listo para el siguiente período.",
                 className: "border-green-200 bg-green-50"
               });
             } else if (attempt < 3) {
               console.log(`⚠️ Intento ${attempt} no completado, reintentando...`);
               attemptReinitialization(attempt + 1);
             } else {
-              console.log('❌ Reinicialización fallida después de 3 intentos, mostrando opciones de emergencia');
+              console.log('❌ Reinicialización fallida después de 3 intentos');
               showEmergencyOptions();
             }
             
           } catch (error) {
-            console.error(`❌ Error en intento ${attempt}:`, error);
+            console.error(`❌ Error en intento de reinicialización ${attempt}:`, error);
             if (attempt < 3) {
               attemptReinitialization(attempt + 1);
             } else {
@@ -339,17 +347,17 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, employees, initializePeriod, toast]);
 
-  // 🚨 Opciones de emergencia si falla la reinicialización
+  // 🚨 Opciones de emergencia mejoradas si falla la reinicialización
   const showEmergencyOptions = useCallback(() => {
     setPeriodStatus({
       hasActivePeriod: false,
       action: 'suggest_next',
-      message: "Período cerrado exitosamente. Si no ves el siguiente período, actualiza la página o verifica el historial."
+      message: "Período cerrado exitosamente. El siguiente período se puede crear manualmente o actualizar la página."
     });
 
     toast({
       title: "⚠️ Reinicialización pendiente",
-      description: "El período se cerró correctamente. Actualiza la página para ver el siguiente período.",
+      description: "El período se cerró correctamente. Para continuar, actualiza la página o crea el siguiente período manualmente.",
       className: "border-yellow-200 bg-yellow-50",
       duration: 15000
     });

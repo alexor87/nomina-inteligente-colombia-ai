@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
 import { NovedadesBackupService } from './NovedadesBackupService';
+import { PAYROLL_STATES } from '@/constants/payrollStates';
 
 export class PayrollLiquidationNewService {
   // 🧮 4. Durante el período activo - Cargar empleados y calcular liquidación
@@ -189,14 +190,14 @@ export class PayrollLiquidationNewService {
         console.warn('⚠️ Error en comprobantes, pero continuando cierre:', error);
       }
       
-      // PASO 4: CAMBIAR ESTADO A CERRADO CON VALIDACIÓN COMPLETA
+      // PASO 4: CAMBIAR ESTADO A CERRADO CON ESTADO CONSISTENTE
       console.log('🔐 Cambiando estado del período a CERRADO...');
       const totals = this.calculatePeriodTotals(employees);
       
       const { data: updatedPeriod, error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({ 
-          estado: 'cerrado', // ESTADO CONSISTENTE
+          estado: PAYROLL_STATES.CERRADO, // USAR CONSTANTE CONSISTENTE
           empleados_count: employees.length,
           total_devengado: totals.totalDevengado,
           total_deducciones: totals.totalDeducciones,
@@ -214,22 +215,12 @@ export class PayrollLiquidationNewService {
 
       console.log('✅ PERÍODO ACTUALIZADO:', updatedPeriod);
       
-      // PASO 5: VERIFICACIÓN FINAL - Confirmar que el cambio se aplicó
-      const { data: verificationPeriod, error: verifyError } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('id', period.id)
-        .single();
-
-      if (verifyError) {
-        console.error('❌ Error verificando período:', verifyError);
-        throw verifyError;
-      }
-
-      console.log('🔍 VERIFICACIÓN FINAL - Estado del período:', verificationPeriod.estado);
+      // PASO 5: VERIFICACIÓN FINAL CON RETRY - Confirmar que el cambio se aplicó
+      console.log('🔍 INICIANDO VERIFICACIÓN FINAL CON RETRY...');
+      const verificationSuccess = await this.verifyPeriodClosureWithRetry(period.id, 3);
       
-      if (verificationPeriod.estado !== 'cerrado') {
-        throw new Error(`Error crítico: El período no se cerró correctamente. Estado actual: ${verificationPeriod.estado}`);
+      if (!verificationSuccess) {
+        throw new Error(`Error crítico: No se pudo verificar el cierre del período después de múltiples intentos`);
       }
 
       // PASO 6: Crear log de auditoría
@@ -240,7 +231,7 @@ export class PayrollLiquidationNewService {
 📊 ${employees.length} empleados liquidados
 💰 Total devengado: ${this.formatCurrency(totals.totalDevengado)}
 💸 Total neto: ${this.formatCurrency(totals.totalNeto)}
-🔐 Estado: CERRADO`;
+🔐 Estado: ${PAYROLL_STATES.CERRADO}`;
 
       console.log('🎉 CIERRE COMPLETADO EXITOSAMENTE');
       return successMessage;
@@ -257,6 +248,49 @@ export class PayrollLiquidationNewService {
       
       throw error;
     }
+  }
+
+  // 🆕 NUEVO: Verificación con retry del cierre del período
+  static async verifyPeriodClosureWithRetry(periodId: string, maxRetries: number = 3): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔍 Verificación de cierre - intento ${attempt}/${maxRetries}`);
+        
+        const { data: verificationPeriod, error: verifyError } = await supabase
+          .from('payroll_periods_real')
+          .select('*')
+          .eq('id', periodId)
+          .single();
+
+        if (verifyError) {
+          console.error(`❌ Error verificando período en intento ${attempt}:`, verifyError);
+          if (attempt === maxRetries) return false;
+          continue;
+        }
+
+        console.log(`📊 Estado verificado en intento ${attempt}: "${verificationPeriod.estado}"`);
+        
+        if (verificationPeriod.estado === PAYROLL_STATES.CERRADO) {
+          console.log(`✅ Verificación exitosa en intento ${attempt} - período correctamente cerrado`);
+          return true;
+        } else {
+          console.warn(`⚠️ Estado inesperado en intento ${attempt}: "${verificationPeriod.estado}"`);
+          if (attempt < maxRetries) {
+            console.log(`⏰ Esperando 2000ms antes del siguiente intento...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+        
+      } catch (error) {
+        console.error(`❌ Error en verificación intento ${attempt}:`, error);
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+    
+    console.error('❌ Verificación falló después de todos los intentos');
+    return false;
   }
 
   // Método auxiliar para calcular totales del período

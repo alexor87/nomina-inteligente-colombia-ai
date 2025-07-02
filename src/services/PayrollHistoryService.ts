@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
+import { STATE_MAPPING, PAYROLL_STATES } from '@/constants/payrollStates';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -55,7 +55,7 @@ export class PayrollHistoryService {
       console.log('📊 Períodos encontrados:', periods?.length || 0);
 
       const transformedPeriods = periods?.map(period => {
-        console.log(`📅 Período ${period.periodo}: estado="${period.estado}"`);
+        console.log(`📄 Período "${period.periodo}": DB estado="${period.estado}" → UI estado="${this.mapStatus(period.estado)}"`);
         
         return {
           id: period.id,
@@ -64,14 +64,14 @@ export class PayrollHistoryService {
           fecha_fin: period.fecha_fin,
           empleados: period.empleados_count || 0,
           totalNomina: Number(period.total_neto || 0),
-          estado: this.mapStatus(period.estado),
+          estado: this.mapStatus(period.estado), // CORREGIDO: Usar mapeo mejorado
           fechaCreacion: period.created_at,
-          editable: period.estado !== 'cerrado', // CORREGIDO: solo no editable si está cerrado
+          editable: period.estado === PAYROLL_STATES.BORRADOR, // Solo borrador es editable
           reportado_dian: false
         };
       }) || [];
 
-      console.log('✅ Períodos transformados:', transformedPeriods.length);
+      console.log('✅ Períodos transformados con estados corregidos:', transformedPeriods.length);
       return transformedPeriods;
     } catch (error) {
       console.error('💥 Error crítico en getPayrollPeriods:', error);
@@ -267,23 +267,13 @@ export class PayrollHistoryService {
     return `${startDate.getDate()}/${startDate.getMonth() + 1}/${startYear} - ${endDate.getDate()}/${endDate.getMonth() + 1}/${endYear}`;
   }
 
-  // PASO 1: MAPEO DE ESTADOS CORREGIDO
+  // PASO 1: MAPEO DE ESTADOS COMPLETAMENTE CORREGIDO
   static mapStatus(estado: string): string {
-    console.log(`🔄 Mapeando estado: "${estado}"`);
+    console.log(`🔄 Mapeando estado de base de datos: "${estado}"`);
     
-    const statusMap: Record<string, string> = {
-      'borrador': 'revision',
-      'procesada': 'cerrado',
-      'cerrado': 'cerrado',    // ✅ CORREGIDO: Ahora reconoce 'cerrado'
-      'cerrada': 'cerrado',    // Mantener compatibilidad
-      'pagado': 'cerrado',
-      'pagada': 'cerrado',
-      'con_errores': 'con_errores',
-      'editado': 'editado',
-      'reabierto': 'reabierto'
-    };
+    // Usar constantes compartidas para el mapeo
+    const mappedStatus = STATE_MAPPING[estado] || 'con_errores';
     
-    const mappedStatus = statusMap[estado] || 'revision';
     console.log(`📊 Estado "${estado}" → "${mappedStatus}"`);
     return mappedStatus;
   }
