@@ -343,7 +343,7 @@ export class PayrollPeriodValidationService {
       } else {
         console.log('👥 Empleados activos encontrados:', employees?.length || 0);
 
-        // 3. Verificar empleados con liquidación en el período
+       // 3. Verificar empleados con liquidación en el período
         const { data: payrolls, error: payrollsError } = await supabase
           .from('payrolls')
           .select('employee_id, estado, neto_pagado')
@@ -357,7 +357,7 @@ export class PayrollPeriodValidationService {
           const totalEmployees = employees?.length || 0;
           const employeesWithPayroll = payrolls?.length || 0;
           const employeesWithoutPayroll = totalEmployees - employeesWithPayroll;
-          const validPayrolls = payrolls?.filter(p => p.estado === 'valid' || p.neto_pagado > 0)?.length || 0;
+          const validPayrolls = payrolls?.filter(p => p.estado === 'procesada' && p.neto_pagado > 0)?.length || 0;
           const invalidPayrolls = employeesWithPayroll - validPayrolls;
 
           const employeeValidation = {

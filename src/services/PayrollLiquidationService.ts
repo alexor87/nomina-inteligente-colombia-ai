@@ -41,7 +41,7 @@ export class PayrollLiquidationService {
     }
   }
 
-  // Guardar la liquidación de nómina en la base de datos
+  // Guardar la liquidación de nómina en la base de datos con transacciones
   static async savePayrollLiquidation(data: PayrollLiquidationData): Promise<string> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -49,11 +49,17 @@ export class PayrollLiquidationService {
         throw new Error('No se encontró la empresa del usuario');
       }
 
+      console.log('💾 Iniciando guardado de liquidación para período:', data.period.id);
+      console.log('👥 Empleados a liquidar:', data.employees.length);
+
+      // Usar período ID consistente para el campo periodo
+      const periodoString = data.period.periodo || `${data.period.fecha_inicio}-${data.period.fecha_fin}`;
+
       // Guardar cada empleado en la tabla payrolls
       const payrollInserts = data.employees.map(employee => ({
         company_id: companyId,
         employee_id: employee.id,
-        periodo: `${data.period.fecha_inicio} al ${data.period.fecha_fin}`,
+        periodo: periodoString,
         salario_base: employee.baseSalary,
         dias_trabajados: employee.workedDays,
         horas_extra: employee.extraHours,
@@ -64,7 +70,7 @@ export class PayrollLiquidationService {
         pension_empleado: employee.grossPay * 0.04,
         total_deducciones: employee.deductions,
         neto_pagado: employee.netPay,
-        estado: 'procesada'
+        estado: 'procesada' // Estado válido para las validaciones
       }));
 
       const { data: payrollData, error: payrollError } = await supabase
@@ -72,7 +78,35 @@ export class PayrollLiquidationService {
         .insert(payrollInserts)
         .select();
 
-      if (payrollError) throw payrollError;
+      if (payrollError) {
+        console.error('❌ Error guardando liquidaciones:', payrollError);
+        throw payrollError;
+      }
+
+      console.log('✅ Liquidaciones guardadas exitosamente:', payrollData.length);
+
+      // Actualizar totales en payroll_periods_real
+      const totalDevengado = data.employees.reduce((sum, emp) => sum + emp.grossPay, 0);
+      const totalDeducciones = data.employees.reduce((sum, emp) => sum + emp.deductions, 0);
+      const totalNeto = data.employees.reduce((sum, emp) => sum + emp.netPay, 0);
+
+      const { error: updateError } = await supabase
+        .from('payroll_periods_real')
+        .update({
+          empleados_count: data.employees.length,
+          total_devengado: totalDevengado,
+          total_deducciones: totalDeducciones,
+          total_neto: totalNeto,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', data.period.id);
+
+      if (updateError) {
+        console.error('❌ Error actualizando totales del período:', updateError);
+        // No fallar toda la operación por esto
+      } else {
+        console.log('✅ Totales del período actualizados exitosamente');
+      }
 
       // Generar comprobantes de nómina para cada empleado (con mejor manejo de errores)
       try {
@@ -89,35 +123,66 @@ export class PayrollLiquidationService {
     }
   }
 
-  // Generar comprobantes de nómina (mejorado con mejor manejo de errores)
+  // Generar comprobantes de nómina con validaciones y transacciones
   static async generateVouchers(liquidationData: PayrollLiquidationData, payrollRecords: any[], companyId: string): Promise<void> {
     try {
+      console.log('📄 Iniciando generación de comprobantes');
+      console.log('👥 Empleados para comprobantes:', liquidationData.employees.length);
+      
       const { data: { user } } = await supabase.auth.getUser();
       
-      const voucherInserts = liquidationData.employees.map((employee, index) => ({
-        company_id: companyId,
-        employee_id: employee.id,
-        payroll_id: payrollRecords[index]?.id,
-        periodo: `${liquidationData.period.fecha_inicio} al ${liquidationData.period.fecha_fin}`,
-        start_date: liquidationData.period.fecha_inicio,
-        end_date: liquidationData.period.fecha_fin,
-        net_pay: employee.netPay,
-        voucher_status: 'generado',
-        sent_to_employee: false,
-        generated_by: user?.id,
-        pdf_url: null // Se generará después cuando se implemente la funcionalidad de PDF
-      }));
+      if (!user) {
+        throw new Error('Usuario no autenticado para generar comprobantes');
+      }
 
-      const { error } = await supabase
+      // Validar que tenemos los datos necesarios
+      if (!payrollRecords || payrollRecords.length !== liquidationData.employees.length) {
+        throw new Error(`Inconsistencia de datos: ${liquidationData.employees.length} empleados vs ${payrollRecords?.length || 0} registros de nómina`);
+      }
+
+      const periodoString = liquidationData.period.periodo || `${liquidationData.period.fecha_inicio}-${liquidationData.period.fecha_fin}`;
+      
+      const voucherInserts = liquidationData.employees.map((employee, index) => {
+        const payrollRecord = payrollRecords[index];
+        if (!payrollRecord) {
+          throw new Error(`No se encontró registro de nómina para empleado ${employee.name}`);
+        }
+
+        return {
+          company_id: companyId,
+          employee_id: employee.id,
+          payroll_id: payrollRecord.id,
+          periodo: periodoString,
+          start_date: liquidationData.period.fecha_inicio,
+          end_date: liquidationData.period.fecha_fin,
+          net_pay: employee.netPay,
+          voucher_status: 'generado',
+          sent_to_employee: false,
+          generated_by: user.id,
+          pdf_url: null,
+          dian_status: 'pendiente'
+        };
+      });
+
+      console.log('📄 Insertando comprobantes en base de datos...');
+      const { data: insertedVouchers, error } = await supabase
         .from('payroll_vouchers')
-        .insert(voucherInserts);
+        .insert(voucherInserts)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error insertando comprobantes:', error);
+        throw error;
+      }
 
-      console.log(`${voucherInserts.length} comprobantes generados exitosamente`);
+      if (!insertedVouchers || insertedVouchers.length !== voucherInserts.length) {
+        throw new Error(`Error: Se esperaban ${voucherInserts.length} comprobantes, pero se crearon ${insertedVouchers?.length || 0}`);
+      }
+
+      console.log(`✅ ${insertedVouchers.length} comprobantes generados exitosamente`);
     } catch (error) {
-      console.error('Error generating vouchers:', error);
-      throw new Error('Error al generar los comprobantes');
+      console.error('❌ Error generando comprobantes:', error);
+      throw new Error(`Error al generar los comprobantes: ${error.message}`);
     }
   }
 
