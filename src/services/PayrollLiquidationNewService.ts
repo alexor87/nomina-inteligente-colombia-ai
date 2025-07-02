@@ -108,21 +108,24 @@ export class PayrollLiquidationNewService {
         case 'incapacidad':
           totals.disabilities += Number(novedad.dias) || 0;
           break;
-        case 'bonificacion_salarial':
-        case 'bonificacion_no_salarial':
-        case 'auxilio_conectividad':
+        case 'bonificacion':
+        case 'comision':
+        case 'prima':
+        case 'otros_ingresos':
           totals.bonuses += valor;
           break;
         case 'vacaciones':
+        case 'licencia_remunerada':
           totals.absences += Number(novedad.dias) || 0;
           break;
+        case 'salud':
+        case 'pension':
+        case 'fondo_solidaridad':
+        case 'retencion_fuente':
+        case 'libranza':
+        case 'ausencia':
         case 'multa':
         case 'descuento_voluntario':
-        case 'embargo':
-        case 'cooperativa':
-        case 'seguro':
-        case 'prestamo_empresa':
-        case 'otros_descuentos':
           totals.deductions += valor;
           break;
       }
@@ -131,7 +134,7 @@ export class PayrollLiquidationNewService {
     return totals;
   }
 
-  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes
+  // ✅ 5. Al cerrar el período - Validación y generación de comprobantes CON UPSERT
   static async closePeriod(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<string> {
     try {
       console.log('🔒 Iniciando cierre de período:', period.id);
@@ -142,8 +145,8 @@ export class PayrollLiquidationNewService {
         throw new Error(`${invalidEmployees.length} empleados tienen errores en su liquidación`);
       }
 
-      // Guardar liquidaciones en la base de datos
-      await this.savePeriodLiquidations(period, employees);
+      // Guardar liquidaciones en la base de datos CON UPSERT
+      await this.savePeriodLiquidationsUpsert(period, employees);
       
       // Generar comprobantes automáticamente
       await this.generateVouchers(period, employees);
@@ -159,9 +162,6 @@ export class PayrollLiquidationNewService {
 
       if (updateError) throw updateError;
 
-      // Calcular automáticamente el siguiente período
-      await this.prepareNextPeriod(period);
-
       console.log('✅ Período cerrado exitosamente');
       return `Período ${period.periodo} cerrado exitosamente. ${employees.length} empleados liquidados.`;
 
@@ -171,31 +171,56 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  static async savePeriodLiquidations(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
+  // NUEVO: Método con UPSERT para evitar error 409
+  static async savePeriodLiquidationsUpsert(period: PayrollPeriod, employees: PayrollEmployee[]): Promise<void> {
     try {
-      const liquidations = employees.map(emp => ({
-        company_id: period.company_id,
-        employee_id: emp.id,
-        period_id: period.id,
-        periodo: period.periodo,
-        salario_base: emp.baseSalary,
-        dias_trabajados: emp.workedDays,
-        horas_extra: emp.extraHours,
-        bonificaciones: emp.bonuses,
-        auxilio_transporte: emp.transportAllowance,
-        total_devengado: emp.grossPay,
-        total_deducciones: emp.deductions,
-        neto_pagado: emp.netPay,
-        estado: 'procesada'
-      }));
-
-      const { error } = await supabase
-        .from('payrolls')
-        .insert(liquidations);
-
-      if (error) throw error;
+      console.log('💾 Guardando liquidaciones con UPSERT...');
       
-      console.log('✅ Liquidaciones guardadas en base de datos');
+      for (const emp of employees) {
+        // Verificar si ya existe
+        const { data: existing } = await supabase
+          .from('payrolls')
+          .select('id')
+          .eq('company_id', period.company_id)
+          .eq('employee_id', emp.id)
+          .eq('period_id', period.id)
+          .maybeSingle();
+
+        const liquidationData = {
+          company_id: period.company_id,
+          employee_id: emp.id,
+          period_id: period.id,
+          periodo: period.periodo,
+          salario_base: emp.baseSalary,
+          dias_trabajados: emp.workedDays,
+          horas_extra: emp.extraHours,
+          bonificaciones: emp.bonuses,
+          auxilio_transporte: emp.transportAllowance,
+          total_devengado: emp.grossPay,
+          total_deducciones: emp.deductions,
+          neto_pagado: emp.netPay,
+          estado: 'procesada'
+        };
+
+        if (existing) {
+          // Actualizar registro existente
+          const { error } = await supabase
+            .from('payrolls')
+            .update(liquidationData)
+            .eq('id', existing.id);
+
+          if (error) throw error;
+        } else {
+          // Insertar nuevo registro
+          const { error } = await supabase
+            .from('payrolls')
+            .insert(liquidationData);
+
+          if (error) throw error;
+        }
+      }
+      
+      console.log('✅ Liquidaciones guardadas exitosamente');
     } catch (error) {
       console.error('❌ Error guardando liquidaciones:', error);
       throw error;
@@ -233,13 +258,33 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  static async prepareNextPeriod(closedPeriod: PayrollPeriod): Promise<void> {
+  // Método para remover empleado del período
+  static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
     try {
-      // El siguiente período se creará automáticamente cuando sea necesario
-      // mediante el sistema de detección automática
-      console.log('✅ Sistema preparado para el siguiente período');
+      console.log('🗑️ Removiendo empleado del período:', employeeId);
+      
+      // Eliminar liquidación si existe
+      const { error: payrollError } = await supabase
+        .from('payrolls')
+        .delete()
+        .eq('employee_id', employeeId)
+        .eq('period_id', periodId);
+
+      if (payrollError) throw payrollError;
+
+      // Eliminar novedades del período
+      const { error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .delete()
+        .eq('empleado_id', employeeId)
+        .eq('periodo_id', periodId);
+
+      if (novedadesError) throw novedadesError;
+
+      console.log('✅ Empleado removido del período exitosamente');
     } catch (error) {
-      console.error('❌ Error preparando siguiente período:', error);
+      console.error('❌ Error removiendo empleado:', error);
+      throw error;
     }
   }
 

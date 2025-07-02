@@ -106,7 +106,7 @@ export class PayrollPeriodIntelligentService {
     }
   }
 
-  // 🔄 2. Reglas de generación y validación de períodos
+  // 🔄 2. Reglas de generación y validación de períodos CORREGIDAS
   static generatePeriodDates(currentDate: Date, periodicity: string) {
     const today = new Date(currentDate);
     let startDate: Date;
@@ -121,9 +121,11 @@ export class PayrollPeriodIntelligentService {
       case 'quincenal':
         const day = today.getDate();
         if (day <= 15) {
+          // Primera quincena: 1-15
           startDate = new Date(today.getFullYear(), today.getMonth(), 1);
           endDate = new Date(today.getFullYear(), today.getMonth(), 15);
         } else {
+          // Segunda quincena: 16-fin de mes
           startDate = new Date(today.getFullYear(), today.getMonth(), 16);
           endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         }
@@ -166,7 +168,14 @@ export class PayrollPeriodIntelligentService {
     ];
     
     if (start.getMonth() === end.getMonth()) {
-      return `${months[start.getMonth()]} ${start.getFullYear()}`;
+      // Para quincenas, mostrar detalle específico
+      if (start.getDate() === 1 && end.getDate() <= 15) {
+        return `${months[start.getMonth()]} ${start.getFullYear()} - 1ra Quincena`;
+      } else if (start.getDate() === 16) {
+        return `${months[start.getMonth()]} ${start.getFullYear()} - 2da Quincena`;
+      } else {
+        return `${months[start.getMonth()]} ${start.getFullYear()}`;
+      }
     } else {
       return `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}/${end.getFullYear()}`;
     }

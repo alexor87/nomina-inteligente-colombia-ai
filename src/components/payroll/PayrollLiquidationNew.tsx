@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { PayrollEmployeeTable } from './PayrollEmployeeTable';
+import { PayrollTableNew } from './PayrollTableNew';
 import { PayrollSummaryStats } from './PayrollSummaryStats';
 
 export const PayrollLiquidationNew = () => {
@@ -25,9 +25,13 @@ export const PayrollLiquidationNew = () => {
     isProcessing,
     currentPeriod,
     employees,
+    selectedEmployees,
     summary,
     periodStatus,
-    updateEmployee,
+    removeEmployeeFromPeriod,
+    createNovedadForEmployee,
+    toggleEmployeeSelection,
+    toggleAllEmployees,
     recalculateAll,
     closePeriod,
     createNewPeriod,
@@ -142,7 +146,7 @@ export const PayrollLiquidationNew = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         
-        {/* Header */}
+        {/* Header con botón Liquidar Nómina */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Liquidación de Nómina</h1>
@@ -174,10 +178,10 @@ export const PayrollLiquidationNew = () => {
               <Button
                 onClick={closePeriod}
                 disabled={isProcessing}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-blue-600 hover:bg-blue-700"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Cerrar Período
+                Liquidar Nómina
               </Button>
             )}
           </div>
@@ -223,7 +227,7 @@ export const PayrollLiquidationNew = () => {
         {/* Resumen Estadístico */}
         <PayrollSummaryStats summary={summary} isLoading={isProcessing} />
 
-        {/* Tabla de Empleados */}
+        {/* Nueva Tabla de Empleados con diseño mejorado */}
         {hasEmployees ? (
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
@@ -238,12 +242,15 @@ export const PayrollLiquidationNew = () => {
               </div>
             </div>
             
-            <PayrollEmployeeTable
+            <PayrollTableNew
               employees={employees}
-              onUpdateEmployee={updateEmployee}
-              isLoading={isProcessing}
+              onRemoveEmployee={removeEmployeeFromPeriod}
+              onCreateNovedad={createNovedadForEmployee}
+              periodId={currentPeriod?.id || ''}
               canEdit={currentPeriod?.estado === 'borrador'}
-              currentPeriod={currentPeriod}
+              selectedEmployees={selectedEmployees}
+              onToggleEmployee={toggleEmployeeSelection}
+              onToggleAll={toggleAllEmployees}
             />
           </Card>
         ) : (

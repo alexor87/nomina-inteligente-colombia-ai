@@ -4,12 +4,14 @@ import { useToast } from '@/hooks/use-toast';
 import { PayrollPeriod, PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollPeriodIntelligentService, PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
 import { PayrollLiquidationNewService } from '@/services/PayrollLiquidationNewService';
+import { CreateNovedadData } from '@/services/NovedadesBackupService';
 
 export const usePayrollLiquidationNew = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPeriod, setCurrentPeriod] = useState<PayrollPeriod | null>(null);
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [summary, setSummary] = useState<PayrollSummary>({
     totalEmployees: 0,
     validEmployees: 0,
@@ -58,6 +60,7 @@ export const usePayrollLiquidationNew = () => {
       
       const loadedEmployees = await PayrollLiquidationNewService.loadEmployeesForActivePeriod(period);
       setEmployees(loadedEmployees);
+      setSelectedEmployees(loadedEmployees.map(emp => emp.id)); // Seleccionar todos por defecto
       
       // Calcular resumen
       calculateSummary(loadedEmployees);
@@ -93,42 +96,91 @@ export const usePayrollLiquidationNew = () => {
     setSummary(newSummary);
   }, []);
 
-  // 🔄 Actualizar empleado individual
-  const updateEmployee = useCallback(async (employeeId: string, field: string, value: number) => {
+  // 🗑️ Remover empleado del período
+  const removeEmployeeFromPeriod = useCallback(async (employeeId: string) => {
     if (!currentPeriod) return;
     
     try {
       setIsProcessing(true);
       
-      const employeeIndex = employees.findIndex(emp => emp.id === employeeId);
-      if (employeeIndex === -1) return;
+      await PayrollLiquidationNewService.removeEmployeeFromPeriod(employeeId, currentPeriod.id);
       
-      const updates = { [field]: value };
-      const updatedEmployee = await PayrollLiquidationNewService.recalculateEmployee(
-        employeeId, 
-        currentPeriod, 
-        updates
-      );
-      
-      const newEmployees = [...employees];
-      newEmployees[employeeIndex] = updatedEmployee;
+      // Actualizar estado local
+      const newEmployees = employees.filter(emp => emp.id !== employeeId);
       setEmployees(newEmployees);
+      setSelectedEmployees(prev => prev.filter(id => id !== employeeId));
       
       calculateSummary(newEmployees);
       
-      console.log('✅ Empleado actualizado:', updatedEmployee.name);
+      toast({
+        title: "✅ Empleado removido",
+        description: "El empleado ha sido removido del período de liquidación",
+        className: "border-green-200 bg-green-50"
+      });
       
     } catch (error) {
-      console.error('❌ Error actualizando empleado:', error);
+      console.error('❌ Error removiendo empleado:', error);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el empleado",
+        description: "No se pudo remover el empleado del período",
         variant: "destructive"
       });
     } finally {
       setIsProcessing(false);
     }
   }, [currentPeriod, employees, calculateSummary, toast]);
+
+  // 📝 Crear novedad para empleado
+  const createNovedadForEmployee = useCallback(async (employeeId: string, data: CreateNovedadData) => {
+    if (!currentPeriod) return;
+    
+    try {
+      setIsProcessing(true);
+      
+      // Crear la novedad
+      await import('@/services/NovedadesBackupService').then(({ NovedadesBackupService }) => 
+        NovedadesBackupService.createNovedad({
+          ...data,
+          empleado_id: employeeId,
+          periodo_id: currentPeriod.id
+        })
+      );
+      
+      // Recargar empleados para reflejar cambios
+      await loadEmployeesForPeriod(currentPeriod);
+      
+      toast({
+        title: "✅ Novedad creada",
+        description: "La novedad ha sido registrada exitosamente",
+        className: "border-green-200 bg-green-50"
+      });
+      
+    } catch (error) {
+      console.error('❌ Error creando novedad:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la novedad",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [currentPeriod, loadEmployeesForPeriod, toast]);
+
+  // 🔄 Selección de empleados
+  const toggleEmployeeSelection = useCallback((employeeId: string) => {
+    setSelectedEmployees(prev => 
+      prev.includes(employeeId) 
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
+  }, []);
+
+  const toggleAllEmployees = useCallback(() => {
+    setSelectedEmployees(prev => 
+      prev.length === employees.length ? [] : employees.map(emp => emp.id)
+    );
+  }, [employees]);
 
   // 🔄 Recalcular todos los empleados
   const recalculateAll = useCallback(async () => {
@@ -240,11 +292,15 @@ export const usePayrollLiquidationNew = () => {
     isProcessing,
     currentPeriod,
     employees,
+    selectedEmployees,
     summary,
     periodStatus,
     
     // Acciones
-    updateEmployee,
+    removeEmployeeFromPeriod,
+    createNovedadForEmployee,
+    toggleEmployeeSelection,
+    toggleAllEmployees,
     recalculateAll,
     closePeriod,
     createNewPeriod,
