@@ -162,46 +162,22 @@ export class DataCleanupService {
 
   private static async executeCleanupByBatches(companyId: string, report: CleanupReport) {
     const cleanupSteps = [
-      { name: 'Audit Logs', table: 'payroll_novedades_audit', orderBy: 'created_at' },
-      { name: 'Reopen Audit', table: 'payroll_reopen_audit', orderBy: 'created_at' },
-      { name: 'Voucher Audit', table: 'voucher_audit_log', orderBy: 'created_at' },
-      { name: 'Employee Note Mentions', table: 'employee_note_mentions', needsJoin: true },
-      { name: 'Employee Notes', table: 'employee_notes', orderBy: 'created_at' },
-      { name: 'User Notifications', table: 'user_notifications', orderBy: 'created_at' },
-      { name: 'Dashboard Activity', table: 'dashboard_activity', orderBy: 'created_at' },
-      { name: 'Employee Imports', table: 'employee_imports', orderBy: 'created_at' },
-      { name: 'Vouchers', table: 'payroll_vouchers', orderBy: 'created_at' },
-      { name: 'Novedades', table: 'payroll_novedades', orderBy: 'created_at' },
-      { name: 'Payrolls', table: 'payrolls', orderBy: 'created_at' },
-      { name: 'Periods Real', table: 'payroll_periods_real', orderBy: 'created_at' },
-      { name: 'Periods', table: 'payroll_periods', orderBy: 'created_at' },
-      { name: 'Employees', table: 'employees', orderBy: 'created_at' }
+      { name: 'Employee Note Mentions', handler: () => this.deleteEmployeeNoteMentions(companyId) },
+      { name: 'Employee Notes', handler: () => this.deleteInBatchesEmployeeNotes(companyId) },
+      { name: 'User Notifications', handler: () => this.deleteInBatchesUserNotifications(companyId) },
+      { name: 'Dashboard Activity', handler: () => this.deleteInBatchesDashboardActivity(companyId) },
+      { name: 'Employee Imports', handler: () => this.deleteInBatchesEmployeeImports(companyId) },
+      { name: 'Vouchers', handler: () => this.deleteInBatchesPayrollVouchers(companyId) },
+      { name: 'Novedades', handler: () => this.deleteInBatchesPayrollNovedades(companyId) },
+      { name: 'Payrolls', handler: () => this.deleteInBatchesPayrolls(companyId) },
+      { name: 'Periods Real', handler: () => this.deleteInBatchesPayrollPeriodsReal(companyId) },
+      { name: 'Employees', handler: () => this.deleteInBatchesEmployees(companyId) }
     ];
 
     for (const step of cleanupSteps) {
       try {
         console.log(`🧹 Limpiando ${step.name}...`);
-        
-        if (step.name === 'Employee Note Mentions') {
-          // Caso especial: eliminar menciones de notas de empleados
-          const { data: noteIds } = await supabase
-            .from('employee_notes')
-            .select('id')
-            .eq('company_id', companyId);
-          
-          if (noteIds && noteIds.length > 0) {
-            const { error } = await supabase
-              .from('employee_note_mentions')
-              .delete()
-              .in('note_id', noteIds.map(n => n.id));
-            
-            if (error) throw error;
-          }
-        } else {
-          // Limpieza normal por lotes
-          await this.deleteInBatches(step.table, companyId);
-        }
-
+        await step.handler();
         report.stepResults.push({ step: step.name, success: true });
         console.log(`✅ ${step.name} limpiado exitosamente`);
         
@@ -220,52 +196,228 @@ export class DataCleanupService {
     }
   }
 
-  private static async deleteInBatches(tableName: string, companyId: string, batchSize: number = 100) {
-    let deletedCount = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      try {
-        // Obtener IDs de registros a eliminar
-        const { data: records, error: selectError } = await supabase
-          .from(tableName)
-          .select('id')
-          .eq('company_id', companyId)
-          .limit(batchSize);
-
-        if (selectError) throw selectError;
-
-        if (!records || records.length === 0) {
-          hasMore = false;
-          break;
-        }
-
-        // Eliminar lote
-        const { error: deleteError } = await supabase
-          .from(tableName)
-          .delete()
-          .in('id', records.map(r => r.id));
-
-        if (deleteError) throw deleteError;
-
-        deletedCount += records.length;
-        console.log(`📦 Eliminados ${records.length} registros de ${tableName} (total: ${deletedCount})`);
-
-        // Si eliminamos menos del tamaño del lote, ya no hay más
-        if (records.length < batchSize) {
-          hasMore = false;
-        }
-
-        // Pausa entre lotes
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-      } catch (error) {
-        console.error(`❌ Error en lote de ${tableName}:`, error);
-        throw error;
-      }
+  // Type-safe deletion methods for each table
+  private static async deleteEmployeeNoteMentions(companyId: string) {
+    const { data: noteIds } = await supabase
+      .from('employee_notes')
+      .select('id')
+      .eq('company_id', companyId);
+    
+    if (noteIds && noteIds.length > 0) {
+      const { error } = await supabase
+        .from('employee_note_mentions')
+        .delete()
+        .in('note_id', noteIds.map(n => n.id));
+      
+      if (error) throw error;
     }
+  }
 
-    console.log(`🎯 Total eliminado de ${tableName}: ${deletedCount} registros`);
+  private static async deleteInBatchesEmployeeNotes(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('employee_notes')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('employee_notes')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  private static async deleteInBatchesUserNotifications(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('user_notifications')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('user_notifications')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  private static async deleteInBatchesDashboardActivity(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('dashboard_activity')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('dashboard_activity')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  private static async deleteInBatchesEmployeeImports(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('employee_imports')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('employee_imports')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  private static async deleteInBatchesPayrollVouchers(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('payroll_vouchers')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('payroll_vouchers')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  private static async deleteInBatchesPayrollNovedades(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('payroll_novedades')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('payroll_novedades')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  private static async deleteInBatchesPayrolls(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('payrolls')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('payrolls')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  private static async deleteInBatchesPayrollPeriodsReal(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('payroll_periods_real')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('payroll_periods_real')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  private static async deleteInBatchesEmployees(companyId: string, batchSize: number = 100) {
+    let hasMore = true;
+    while (hasMore) {
+      const { data: records, error: selectError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(batchSize);
+
+      if (selectError) throw selectError;
+      if (!records || records.length === 0) break;
+
+      const { error: deleteError } = await supabase
+        .from('employees')
+        .delete()
+        .in('id', records.map(r => r.id));
+
+      if (deleteError) throw deleteError;
+      if (records.length < batchSize) hasMore = false;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
   }
 
   private static calculateDeletedCounts(report: CleanupReport) {
