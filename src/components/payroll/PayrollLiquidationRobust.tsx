@@ -10,11 +10,13 @@ import {
   AlertCircle,
   CheckCircle,
   Search,
-  FileText
+  FileText,
+  Shield
 } from 'lucide-react';
 import { usePayrollLiquidationRobust } from '@/hooks/usePayrollLiquidationRobust';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PayrollSummaryStats } from './PayrollSummaryStats';
+import { DataIntegrityMonitor } from './DataIntegrityMonitor';
 
 export const PayrollLiquidationRobust = () => {
   const {
@@ -268,6 +270,14 @@ export const PayrollLiquidationRobust = () => {
           </div>
         </div>
 
+        {/* Data Integrity Monitor */}
+        {currentPeriod && (
+          <DataIntegrityMonitor 
+            companyId={currentPeriod.company_id}
+            onCleanupComplete={refreshDiagnosis}
+          />
+        )}
+
         {/* Información del Período */}
         {currentPeriod && (
           <Card className="p-6">
@@ -369,12 +379,12 @@ export const PayrollLiquidationRobust = () => {
         <Card className="p-4 bg-blue-50 border-blue-200">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-100 rounded-full">
-              <CheckCircle className="h-4 w-4 text-blue-600" />
+              <Shield className="h-4 w-4 text-blue-600" />
             </div>
             <div>
               <p className="text-blue-800 font-medium">Sistema Robusto Activo</p>
               <p className="text-blue-600 text-sm">
-                Diagnóstico automático completado ✓ | Empleados: {employees.length} | Estado: {currentPeriod?.estado}
+                Diagnóstico automático completado ✓ | Empleados: {employees.length} | Estado: {currentPeriod?.estado} | Integridad de datos monitoreada
               </p>
             </div>
           </div>

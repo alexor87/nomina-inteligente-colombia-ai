@@ -1,94 +1,136 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { UNIFIED_PAYROLL_STATES } from '@/constants/payrollStatesUnified';
 
-export interface PeriodDiagnostic {
-  id: string;
-  periodo: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  estado: string;
-  tipo_periodo: string;
-  company_id: string;
-  created_at: string;
-  source: 'payroll_periods_real' | 'payrolls';
-}
-
-export interface DiagnosticReport {
+interface DiagnosticResult {
+  companyId: string;
   totalPeriods: number;
-  periodsReal: PeriodDiagnostic[];
-  payrollsData: PeriodDiagnostic[];
+  periodsReal: any[];
+  payrollsData: any[];
   stateDistribution: Record<string, number>;
   issues: string[];
   recommendations: string[];
+  timestamp: string;
 }
 
 export class PayrollDiagnosticService {
-  static async generateCompleteDiagnostic(companyId: string): Promise<DiagnosticReport> {
-    console.log('🔍 DIAGNÓSTICO COMPLETO INICIADO para empresa:', companyId);
-    
+  
+  static async generateCompleteDiagnostic(companyId: string): Promise<DiagnosticResult> {
     try {
-      // 1. Obtener todos los períodos de payroll_periods_real
+      console.log('🔍 DIAGNÓSTICO COMPLETO INICIADO para empresa:', companyId);
+      
+      // Obtener todos los períodos de payroll_periods_real
       const { data: periodsReal, error: periodsError } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
-        .order('fecha_inicio', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (periodsError) {
-        console.error('❌ Error consultando payroll_periods_real:', periodsError);
+        console.error('Error cargando períodos reales:', periodsError);
         throw periodsError;
       }
 
-      // 2. Obtener datos de payrolls agrupados por período
+      // Obtener datos únicos de payrolls
       const { data: payrollsData, error: payrollsError } = await supabase
         .from('payrolls')
-        .select('periodo, created_at, estado')
-        .eq('company_id', companyId);
+        .select('periodo, estado, created_at, updated_at')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
 
       if (payrollsError) {
-        console.error('❌ Error consultando payrolls:', payrollsError);
+        console.error('Error cargando datos de payrolls:', payrollsError);
         throw payrollsError;
       }
 
-      // 3. Procesar datos de payrolls
-      const payrollsPeriods = this.processPayrollsData(payrollsData || [], companyId);
-
-      // 4. Convertir períodos reales
-      const periodsRealProcessed: PeriodDiagnostic[] = (periodsReal || []).map(period => ({
-        id: period.id,
-        periodo: period.periodo,
-        fecha_inicio: period.fecha_inicio,
-        fecha_fin: period.fecha_fin,
-        estado: period.estado,
-        tipo_periodo: period.tipo_periodo,
-        company_id: period.company_id,
-        created_at: period.created_at,
-        source: 'payroll_periods_real' as const
-      }));
-
-      // 5. Analizar distribución de estados
-      const stateDistribution = this.analyzeStateDistribution([
-        ...periodsRealProcessed,
-        ...payrollsPeriods
-      ]);
-
-      // 6. Detectar problemas
-      const issues = this.detectIssues(periodsRealProcessed, payrollsPeriods);
+      // Analizar distribución de estados
+      const stateDistribution: Record<string, number> = {};
       
-      // 7. Generar recomendaciones
-      const recommendations = this.generateRecommendations(issues, stateDistribution);
+      periodsReal.forEach(period => {
+        const estado = period.estado;
+        stateDistribution[estado] = (stateDistribution[estado] || 0) + 1;
+      });
 
-      const report: DiagnosticReport = {
-        totalPeriods: periodsRealProcessed.length + payrollsPeriods.length,
-        periodsReal: periodsRealProcessed,
-        payrollsData: payrollsPeriods,
+      // Obtener períodos únicos de payrolls
+      const uniquePayrollPeriods = [...new Set(payrollsData.map(p => p.periodo))];
+
+      // Detectar problemas
+      const issues: string[] = [];
+      const recommendations: string[] = [];
+
+      // 1. Períodos que están solo en payroll_periods_real
+      const periodsOnlyInReal = periodsReal.filter(pr => 
+        !uniquePayrollPeriods.includes(pr.periodo)
+      );
+
+      if (periodsOnlyInReal.length > 0) {
+        issues.push(`Períodos solo en payroll_periods_real: ${periodsOnlyInReal.map(p => p.periodo).join(', ')}`);
+        recommendations.push('Crear registros de nómina para períodos faltantes');
+      }
+
+      // 2. Períodos que están solo en payrolls
+      const periodsOnlyInPayrolls = uniquePayrollPeriods.filter(periodo => 
+        !periodsReal.some(pr => pr.periodo === periodo)
+      );
+
+      if (periodsOnlyInPayrolls.length > 0) {
+        issues.push(`Períodos solo en payrolls: ${periodsOnlyInPayrolls.join(', ')}`);
+        recommendations.push('Crear períodos faltantes en payroll_periods_real');
+      }
+
+      // 3. Estados no reconocidos
+      const invalidStates = periodsReal.filter(p => 
+        !Object.values(UNIFIED_PAYROLL_STATES).includes(p.estado)
+      );
+
+      if (invalidStates.length > 0) {
+        issues.push(`Estados no reconocidos encontrados: ${invalidStates.map(p => `${p.periodo}:${p.estado}`).join(', ')}`);
+        recommendations.push('Normalizar estados usando el enum unificado');
+      }
+
+      // 4. Múltiples períodos en borrador
+      const draftPeriods = periodsReal.filter(p => p.estado === UNIFIED_PAYROLL_STATES.BORRADOR);
+      if (draftPeriods.length > 1) {
+        issues.push(`Múltiples períodos en borrador: ${draftPeriods.length}`);
+        recommendations.push('Revisar períodos en borrador múltiples');
+      }
+
+      // 5. Períodos sin period_id en payrolls
+      const { data: missingPeriodIds } = await supabase
+        .from('payrolls')
+        .select('periodo')
+        .eq('company_id', companyId)
+        .is('period_id', null);
+
+      if (missingPeriodIds && missingPeriodIds.length > 0) {
+        issues.push(`Registros de nómina sin period_id: ${missingPeriodIds.length}`);
+        recommendations.push('Actualizar period_id en registros de nómina');
+      }
+
+      // Agregar recomendaciones generales
+      if (issues.length === 0) {
+        recommendations.push('✅ Los datos están correctamente sincronizados');
+      } else {
+        recommendations.unshift('Sincronizar datos entre payroll_periods_real y payrolls');
+      }
+
+      const diagnostic: DiagnosticResult = {
+        companyId,
+        totalPeriods: periodsReal.length + uniquePayrollPeriods.length,
+        periodsReal: periodsReal || [],
+        payrollsData: payrollsData || [],
         stateDistribution,
         issues,
-        recommendations
+        recommendations,
+        timestamp: new Date().toISOString()
       };
 
-      console.log('📊 DIAGNÓSTICO COMPLETO:', report);
-      return report;
+      console.log('📊 DIAGNÓSTICO COMPLETO:', diagnostic);
+      
+      // Log del reporte
+      this.logDiagnosticReport(diagnostic);
+      
+      return diagnostic;
 
     } catch (error) {
       console.error('💥 Error en diagnóstico completo:', error);
@@ -96,141 +138,43 @@ export class PayrollDiagnosticService {
     }
   }
 
-  private static processPayrollsData(payrollsData: any[], companyId: string): PeriodDiagnostic[] {
-    const periodsMap = new Map<string, PeriodDiagnostic>();
-
-    payrollsData.forEach(payroll => {
-      if (!periodsMap.has(payroll.periodo)) {
-        periodsMap.set(payroll.periodo, {
-          id: `payroll-${payroll.periodo}`,
-          periodo: payroll.periodo,
-          fecha_inicio: 'N/A',
-          fecha_fin: 'N/A',
-          estado: payroll.estado || 'desconocido',
-          tipo_periodo: 'desconocido',
-          company_id: companyId,
-          created_at: payroll.created_at,
-          source: 'payrolls' as const
-        });
-      }
-    });
-
-    return Array.from(periodsMap.values());
-  }
-
-  private static analyzeStateDistribution(periods: PeriodDiagnostic[]): Record<string, number> {
-    const distribution: Record<string, number> = {};
-    
-    periods.forEach(period => {
-      distribution[period.estado] = (distribution[period.estado] || 0) + 1;
-    });
-
-    return distribution;
-  }
-
-  private static detectIssues(periodsReal: PeriodDiagnostic[], payrollsPeriods: PeriodDiagnostic[]): string[] {
-    const issues: string[] = [];
-
-    // 1. Verificar si no hay períodos
-    if (periodsReal.length === 0 && payrollsPeriods.length === 0) {
-      issues.push('No se encontraron períodos en ninguna tabla');
-    }
-
-    // 2. Verificar inconsistencias de nombres
-    const realPeriodNames = new Set(periodsReal.map(p => p.periodo));
-    const payrollPeriodNames = new Set(payrollsPeriods.map(p => p.periodo));
-    
-    const onlyInReal = Array.from(realPeriodNames).filter(name => !payrollPeriodNames.has(name));
-    const onlyInPayrolls = Array.from(payrollPeriodNames).filter(name => !realPeriodNames.has(name));
-
-    if (onlyInReal.length > 0) {
-      issues.push(`Períodos solo en payroll_periods_real: ${onlyInReal.join(', ')}`);
-    }
-
-    if (onlyInPayrolls.length > 0) {
-      issues.push(`Períodos solo en payrolls: ${onlyInPayrolls.join(', ')}`);
-    }
-
-    // 3. Verificar estados problemáticos
-    const problematicStates = periodsReal.filter(p => 
-      !['borrador', 'cerrado', 'procesada', 'pagada'].includes(p.estado)
-    );
-
-    if (problematicStates.length > 0) {
-      issues.push(`Estados no reconocidos encontrados: ${problematicStates.map(p => `${p.periodo}:${p.estado}`).join(', ')}`);
-    }
-
-    // 4. Verificar período activo
-    const activePeriods = periodsReal.filter(p => p.estado === 'borrador');
-    if (activePeriods.length > 1) {
-      issues.push(`Múltiples períodos activos encontrados: ${activePeriods.map(p => p.periodo).join(', ')}`);
-    }
-
-    return issues;
-  }
-
-  private static generateRecommendations(issues: string[], stateDistribution: Record<string, number>): string[] {
-    const recommendations: string[] = [];
-
-    // Recomendaciones basadas en problemas detectados
-    if (issues.some(issue => issue.includes('No se encontraron períodos'))) {
-      recommendations.push('Crear un período inicial automáticamente');
-    }
-
-    if (issues.some(issue => issue.includes('solo en'))) {
-      recommendations.push('Sincronizar datos entre payroll_periods_real y payrolls');
-    }
-
-    if (issues.some(issue => issue.includes('Estados no reconocidos'))) {
-      recommendations.push('Normalizar estados usando el enum unificado');
-    }
-
-    if (issues.some(issue => issue.includes('Múltiples períodos activos'))) {
-      recommendations.push('Cerrar períodos adicionales o consolidar');
-    }
-
-    // Recomendaciones basadas en distribución de estados
-    if (stateDistribution['borrador'] && stateDistribution['borrador'] > 1) {
-      recommendations.push('Revisar períodos en borrador múltiples');
-    }
-
-    if (!stateDistribution['borrador']) {
-      recommendations.push('Crear nuevo período en borrador para continuar operaciones');
-    }
-
-    return recommendations;
-  }
-
   static async runDiagnosticAndLog(companyId: string): Promise<void> {
     try {
       console.log('🚀 EJECUTANDO DIAGNÓSTICO AUTOMÁTICO...');
-      const report = await this.generateCompleteDiagnostic(companyId);
+      const diagnostic = await this.generateCompleteDiagnostic(companyId);
       
-      console.log('📋 REPORTE DE DIAGNÓSTICO:');
-      console.log('==========================');
-      console.log(`📊 Total de períodos: ${report.totalPeriods}`);
-      console.log(`📅 Períodos en payroll_periods_real: ${report.periodsReal.length}`);
-      console.log(`💰 Períodos en payrolls: ${report.payrollsData.length}`);
-      
-      console.log('\n🎯 DISTRIBUCIÓN DE ESTADOS:');
-      Object.entries(report.stateDistribution).forEach(([state, count]) => {
-        console.log(`  ${state}: ${count}`);
-      });
-      
-      console.log('\n⚠️ PROBLEMAS DETECTADOS:');
-      report.issues.forEach((issue, index) => {
-        console.log(`  ${index + 1}. ${issue}`);
-      });
-      
-      console.log('\n💡 RECOMENDACIONES:');
-      report.recommendations.forEach((rec, index) => {
-        console.log(`  ${index + 1}. ${rec}`);
-      });
-      
-      console.log('==========================');
+      // El diagnóstico ya incluye logging interno
+      console.log('✅ Diagnóstico completado exitosamente');
       
     } catch (error) {
-      console.error('💥 Error en diagnóstico automático:', error);
+      console.error('❌ Error ejecutando diagnóstico:', error);
+      throw error;
     }
+  }
+
+  private static logDiagnosticReport(diagnostic: DiagnosticResult): void {
+    console.log('\n📋 REPORTE DE DIAGNÓSTICO:');
+    console.log('==========================');
+    console.log(`📊 Total de períodos: ${diagnostic.totalPeriods}`);
+    console.log(`📅 Períodos en payroll_periods_real: ${diagnostic.periodsReal.length}`);
+    console.log(`💰 Períodos en payrolls: ${[...new Set(diagnostic.payrollsData.map(p => p.periodo))].length}`);
+    
+    console.log('\n🎯 DISTRIBUCIÓN DE ESTADOS:');
+    Object.entries(diagnostic.stateDistribution).forEach(([estado, count]) => {
+      console.log(`  ${estado}: ${count}`);
+    });
+    
+    if (diagnostic.issues.length > 0) {
+      console.log('\n⚠️ PROBLEMAS DETECTADOS:');
+      diagnostic.issues.forEach((issue, index) => {
+        console.log(`  ${index + 1}. ${issue}`);
+      });
+    }
+    
+    console.log('\n💡 RECOMENDACIONES:');
+    diagnostic.recommendations.forEach((rec, index) => {
+      console.log(`  ${index + 1}. ${rec}`);
+    });
+    console.log('==========================');
   }
 }
