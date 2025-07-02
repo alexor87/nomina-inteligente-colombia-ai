@@ -27,7 +27,7 @@ export interface EmployeeUnified {
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: string; // Changed to string to match Employee type
+  periodicidadPago?: string; // Made optional to match Employee type
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
