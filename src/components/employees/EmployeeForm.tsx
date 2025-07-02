@@ -12,38 +12,13 @@ import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { AffiliationsSection } from './form/AffiliationsSection';
+import { EmployeeFormData } from './form/types';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EmployeeFormProps {
   employee?: Employee;
   onSuccess: () => void;
   onCancel: () => void;
-}
-
-interface EmployeeFormData {
-  cedula: string;
-  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
-  nombre: string;
-  apellido: string;
-  email: string;
-  telefono: string;
-  salarioBase: number;
-  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
-  fechaIngreso: string;
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
-  eps: string;
-  afp: string;
-  arl: string;
-  cajaCompensacion: string;
-  cargo: string;
-  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
-  regimenSalud: 'contributivo' | 'subsidiado';
-  tipoCotizanteId: string;
-  subtipoCotizanteId: string;
-  banco: string;
-  tipoCuenta: 'ahorros' | 'corriente';
-  numeroCuenta: string;
-  titularCuenta: string;
 }
 
 const BANCOS_COLOMBIA = [
@@ -74,30 +49,48 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       cedula: employee?.cedula || '',
       tipoDocumento: employee?.tipoDocumento || 'CC',
       nombre: employee?.nombre || '',
+      segundoNombre: employee?.segundoNombre || '',
       apellido: employee?.apellido || '',
       email: employee?.email || '',
       telefono: employee?.telefono || '',
+      sexo: employee?.sexo || 'M',
+      fechaNacimiento: employee?.fechaNacimiento || '',
+      direccion: employee?.direccion || '',
+      ciudad: employee?.ciudad || '',
+      departamento: employee?.departamento || '',
       salarioBase: employee?.salarioBase || 0,
       tipoContrato: employee?.tipoContrato || 'indefinido',
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
+      periodicidadPago: employee?.periodicidadPago || 'mensual',
+      cargo: employee?.cargo || '',
+      codigoCIIU: employee?.codigoCIIU || '',
+      nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
       estado: employee?.estado || 'activo',
+      centroCostos: employee?.centroCostos || '',
+      fechaFirmaContrato: employee?.fechaFirmaContrato || '',
+      fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
+      tipoJornada: employee?.tipoJornada || 'completa',
+      diasTrabajo: employee?.diasTrabajo || 30,
+      horasTrabajo: employee?.horasTrabajo || 8,
+      beneficiosExtralegales: employee?.beneficiosExtralegales || false,
+      clausulasEspeciales: employee?.clausulasEspeciales || '',
+      banco: employee?.banco || '',
+      tipoCuenta: employee?.tipoCuenta || 'ahorros',
+      numeroCuenta: employee?.numeroCuenta || '',
+      titularCuenta: employee?.titularCuenta || '',
+      formaPago: employee?.formaPago || 'dispersion',
       eps: employee?.eps || '',
       afp: employee?.afp || '',
       arl: employee?.arl || '',
       cajaCompensacion: employee?.cajaCompensacion || '',
-      cargo: employee?.cargo || '',
-      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
-      regimenSalud: employee?.regimenSalud || 'contributivo',
       tipoCotizanteId: employee?.tipoCotizanteId || '',
       subtipoCotizanteId: employee?.subtipoCotizanteId || '',
-      banco: '',
-      tipoCuenta: 'ahorros',
-      numeroCuenta: '',
-      titularCuenta: ''
+      regimenSalud: employee?.regimenSalud || 'contributivo',
+      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente'
     }
   });
 
-  // Watch all form values for the AffiliationsSection
+  // Watch all form values for the AffiliationsSection 
   const watchedValues = watch();
 
   // Obtener company_id del usuario actual
@@ -138,22 +131,44 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       cedula: data.cedula,
       tipoDocumento: data.tipoDocumento,
       nombre: data.nombre,
+      segundoNombre: data.segundoNombre,
       apellido: data.apellido,
       email: data.email,
       telefono: data.telefono,
+      sexo: data.sexo,
+      fechaNacimiento: data.fechaNacimiento,
+      direccion: data.direccion,
+      ciudad: data.ciudad,
+      departamento: data.departamento,
       salarioBase: Number(data.salarioBase),
       tipoContrato: data.tipoContrato,
       fechaIngreso: data.fechaIngreso,
+      periodicidadPago: data.periodicidadPago,
+      cargo: data.cargo,
+      codigoCIIU: data.codigoCIIU,
+      nivelRiesgoARL: data.nivelRiesgoARL,
       estado: data.estado,
+      centroCostos: data.centroCostos,
+      fechaFirmaContrato: data.fechaFirmaContrato,
+      fechaFinalizacionContrato: data.fechaFinalizacionContrato,
+      tipoJornada: data.tipoJornada,
+      diasTrabajo: data.diasTrabajo,
+      horasTrabajo: data.horasTrabajo,
+      beneficiosExtralegales: data.beneficiosExtralegales,
+      clausulasEspeciales: data.clausulasEspeciales,
+      banco: data.banco,
+      tipoCuenta: data.tipoCuenta,
+      numeroCuenta: data.numeroCuenta,
+      titularCuenta: data.titularCuenta,
+      formaPago: data.formaPago,
       eps: data.eps,
       afp: data.afp,
       arl: data.arl,
       cajaCompensacion: data.cajaCompensacion,
-      cargo: data.cargo,
-      estadoAfiliacion: data.estadoAfiliacion,
-      regimenSalud: data.regimenSalud,
       tipoCotizanteId: data.tipoCotizanteId,
-      subtipoCotizanteId: data.subtipoCotizanteId
+      subtipoCotizanteId: data.subtipoCotizanteId,
+      regimenSalud: data.regimenSalud,
+      estadoAfiliacion: data.estadoAfiliacion
     };
 
     let result;
