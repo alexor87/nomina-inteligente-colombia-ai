@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CleanupReport {
@@ -162,15 +161,17 @@ export class DataCleanupService {
 
   private static async executeCleanupByBatches(companyId: string, report: CleanupReport) {
     const cleanupSteps = [
+      // Limpiar primero las dependencias más profundas
       { name: 'Employee Note Mentions', handler: () => this.deleteEmployeeNoteMentions(companyId) },
       { name: 'Employee Notes', handler: () => this.deleteInBatchesEmployeeNotes(companyId) },
       { name: 'User Notifications', handler: () => this.deleteInBatchesUserNotifications(companyId) },
       { name: 'Dashboard Activity', handler: () => this.deleteInBatchesDashboardActivity(companyId) },
       { name: 'Employee Imports', handler: () => this.deleteInBatchesEmployeeImports(companyId) },
-      { name: 'Vouchers', handler: () => this.deleteInBatchesPayrollVouchers(companyId) },
-      { name: 'Novedades', handler: () => this.deleteInBatchesPayrollNovedades(companyId) },
+      { name: 'Payroll Vouchers', handler: () => this.deleteInBatchesPayrollVouchers(companyId) },
+      { name: 'Payroll Novedades', handler: () => this.deleteInBatchesPayrollNovedades(companyId) },
       { name: 'Payrolls', handler: () => this.deleteInBatchesPayrolls(companyId) },
-      { name: 'Periods Real', handler: () => this.deleteInBatchesPayrollPeriodsReal(companyId) },
+      // IMPORTANTE: Limpiar períodos reales después de payrolls
+      { name: 'Payroll Periods Real', handler: () => this.deleteInBatchesPayrollPeriodsReal(companyId) },
       { name: 'Employees', handler: () => this.deleteInBatchesEmployees(companyId) }
     ];
 
@@ -375,26 +376,37 @@ export class DataCleanupService {
   }
 
   private static async deleteInBatchesPayrollPeriodsReal(companyId: string, batchSize: number = 100) {
+    console.log('🗑️ Iniciando limpieza de períodos reales...');
     let hasMore = true;
+    let totalDeleted = 0;
+    
     while (hasMore) {
       const { data: records, error: selectError } = await supabase
         .from('payroll_periods_real')
-        .select('id')
+        .select('id, periodo')
         .eq('company_id', companyId)
         .limit(batchSize);
 
       if (selectError) throw selectError;
       if (!records || records.length === 0) break;
 
+      console.log(`🗑️ Eliminando ${records.length} períodos reales...`);
+      
       const { error: deleteError } = await supabase
         .from('payroll_periods_real')
         .delete()
         .in('id', records.map(r => r.id));
 
       if (deleteError) throw deleteError;
+      
+      totalDeleted += records.length;
+      console.log(`✅ Eliminados ${totalDeleted} períodos reales hasta ahora`);
+      
       if (records.length < batchSize) hasMore = false;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
+    
+    console.log(`✅ Limpieza de períodos reales completada: ${totalDeleted} eliminados`);
   }
 
   private static async deleteInBatchesEmployees(companyId: string, batchSize: number = 100) {
