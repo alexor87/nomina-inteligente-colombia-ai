@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
-import { useEmployeeFormSubmission } from '@/hooks/useEmployeeFormSubmission';
+import { useEmployeeFormSubmissionRobust } from '@/hooks/useEmployeeFormSubmissionRobust';
 import { useEmployeeEditSubmission } from '@/hooks/useEmployeeEditSubmission';
 
 // Import refactored components
@@ -53,40 +53,70 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     };
   }, [onDataRefresh]);
 
-  // Use different submission hooks based on whether we're creating or editing
-  const { handleSubmit: handleCreateSubmission, isLoading: isCreating } = useEmployeeFormSubmission(
+  // Use robust submission hook for better error handling
+  const { 
+    handleSubmit: handleRobustSubmission, 
+    isLoading: isLoadingRobust,
+    error: submissionError
+  } = useEmployeeFormSubmissionRobust(
     employee,
     onSuccess, 
     memoizedDataRefresh
   );
 
+  // Keep legacy edit submission for compatibility
   const { handleSubmit: handleEditSubmission, isSubmitting: isSubmittingEdit } = useEmployeeEditSubmission(
     employee || null,
     onSuccess
   );
 
-  const isLoading = isCreating || isSubmittingEdit;
+  const isLoading = isLoadingRobust || isSubmittingEdit;
 
   const onSubmit = async (data: any) => {
-    if (!companyId) return;
-    console.log('🚀 EmployeeFormModern: Form submission triggered with data:', data);
+    console.log('🚀 EmployeeFormModern: Form submission triggered');
+    console.log('📝 Form data:', data);
+    console.log('🎯 Submission mode:', isEditMode ? 'edit' : 'create');
     
-    if (employee) {
-      await handleEditSubmission(data);
+    if (!companyId) {
+      console.error('❌ No company ID available');
+      return;
+    }
+
+    // Add company ID to form data
+    const formDataWithCompany = {
+      ...data,
+      empresaId: companyId
+    };
+
+    // Use robust submission for both create and update operations
+    const result = await handleRobustSubmission(formDataWithCompany);
+    
+    if (!result.success) {
+      console.error('❌ Form submission failed:', result.error);
+      if (result.details) {
+        console.error('❌ Error details:', result.details);
+      }
     } else {
-      await handleCreateSubmission(data, companyId, []);
+      console.log('✅ Form submission completed successfully');
     }
   };
 
   const handleDuplicate = () => {
-    console.log('Duplicating employee...');
+    console.log('📋 Duplicating employee...');
     // TODO: Implement duplication logic
   };
 
-  console.log('🎯 EmployeeFormModern: Rendering form with employee:', {
+  // Show submission error if any
+  if (submissionError) {
+    console.log('⚠️  Submission error displayed:', submissionError);
+  }
+
+  console.log('🎯 EmployeeFormModern: Rendering form with:', {
     id: employee?.id,
-    name: employee ? `${employee.nombre} ${employee.apellido}` : 'undefined',
-    mode: isEditMode ? 'edit' : 'create'
+    name: employee ? `${employee.nombre} ${employee.apellido}` : 'New Employee',
+    mode: isEditMode ? 'edit' : 'create',
+    isLoading,
+    hasError: !!submissionError
   });
 
   return (
@@ -103,6 +133,14 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           onCancel={onCancel}
           onDuplicate={handleDuplicate}
         />
+
+        {/* Show error message if submission failed */}
+        {submissionError && (
+          <div className="mx-8 mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-800 text-sm font-medium">Error al guardar empleado:</p>
+            <p className="text-red-700 text-sm">{submissionError}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <EmployeeFormContent
