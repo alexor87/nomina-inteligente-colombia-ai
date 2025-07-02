@@ -2,25 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Clock, AlertCircle } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryFilters as FiltersType } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
-import { usePagination } from '@/hooks/usePagination';
-import { PaginationControls } from '@/components/ui/PaginationControls';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 export const PayrollHistoryPage = () => {
   const navigate = useNavigate();
   const [periods, setPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [canUserEditPeriods, setCanUserEditPeriods] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [filters, setFilters] = useState<FiltersType>({
     dateRange: {},
     status: '',
@@ -29,62 +21,25 @@ export const PayrollHistoryPage = () => {
     employeeSearch: ''
   });
 
-  // Add pagination for payroll history periods
-  const pagination = usePagination(filteredPeriods, {
-    defaultPageSize: 25,
-    pageSizeOptions: [25, 50, 75, 100],
-    storageKey: 'payroll-history'
-  });
+  const {
+    isLoading,
+    isExporting,
+    canUserReopenPeriods: canUserEditPeriods,
+    checkUserPermissions,
+    exportToExcel
+  } = usePayrollHistory();
 
   useEffect(() => {
     loadPayrollHistory();
     checkUserPermissions();
-  }, []);
+  }, [checkUserPermissions]);
 
   useEffect(() => {
     applyFilters();
   }, [periods, filters]);
 
-  const checkUserPermissions = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setCanUserEditPeriods(false);
-        return;
-      }
-
-      const companyId = await PayrollHistoryService.getCurrentUserCompanyId();
-      if (!companyId) {
-        setCanUserEditPeriods(false);
-        return;
-      }
-
-      // Check if user is superadmin or has admin role
-      const isSuperAdmin = user.email === 'alexor87@gmail.com';
-      
-      if (isSuperAdmin) {
-        setCanUserEditPeriods(true);
-        return;
-      }
-
-      // Check if user has admin role in company
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('company_id', companyId)
-        .in('role', ['administrador', 'rrhh']);
-
-      setCanUserEditPeriods(userRoles && userRoles.length > 0);
-    } catch (error) {
-      console.error('Error checking user permissions:', error);
-      setCanUserEditPeriods(false);
-    }
-  };
-
   const loadPayrollHistory = async () => {
     try {
-      setIsLoading(true);
       const data = await PayrollHistoryService.getPayrollPeriods();
       
       // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
@@ -109,7 +64,6 @@ export const PayrollHistoryPage = () => {
         return {
           id: record.id,
           period: record.periodo || 'Sin período',
-          // Use the correct date range from the service
           startDate: record.fecha_inicio || record.fechaCreacion,
           endDate: record.fecha_fin || record.fechaCreacion,
           type: 'mensual' as const,
@@ -136,8 +90,6 @@ export const PayrollHistoryPage = () => {
         description: "No se pudo cargar el historial de nómina",
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -177,60 +129,9 @@ export const PayrollHistoryPage = () => {
     navigate(`/app/payroll-history/${period.id}/edit`);
   };
 
-  const exportToExcel = async (periods: PayrollHistoryPeriod[]) => {
-    try {
-      setIsExporting(true);
-      // Mock export functionality
-      console.log('Exporting to Excel:', periods);
-      toast({
-        title: "Exportación completada",
-        description: "El archivo Excel se ha descargado correctamente"
-      });
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo exportar el archivo",
-        variant: "destructive"
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const downloadFile = async (fileUrl: string, fileName: string) => {
-    try {
-      console.log('Downloading file:', fileUrl, fileName);
-      toast({
-        title: "Descarga iniciada",
-        description: `Descargando ${fileName}`
-      });
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo descargar el archivo",
-        variant: "destructive"
-      });
-    }
-  };
-
   const handleExportToExcel = async () => {
     await exportToExcel(filteredPeriods);
   };
-
-  const getStatusSummary = () => {
-    const summary = {
-      total: filteredPeriods.length,
-      cerrados: filteredPeriods.filter(p => p.status === 'cerrado').length,
-      conErrores: filteredPeriods.filter(p => p.status === 'con_errores').length,
-      enRevision: filteredPeriods.filter(p => p.status === 'revision').length,
-      editados: filteredPeriods.filter(p => p.status === 'editado').length
-    };
-    return summary;
-  };
-
-  const statusSummary = getStatusSummary();
 
   if (isLoading) {
     return (
@@ -274,87 +175,19 @@ export const PayrollHistoryPage = () => {
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Períodos</p>
-                  <p className="text-2xl font-bold text-gray-900">{statusSummary.total}</p>
-                </div>
-                <FileText className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Cerrados</p>
-                  <p className="text-2xl font-bold text-green-600">{statusSummary.cerrados}</p>
-                </div>
-                <Badge className="bg-green-100 text-green-800">✓</Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Editados</p>
-                  <p className="text-2xl font-bold text-blue-600">{statusSummary.editados}</p>
-                </div>
-                <Badge className="bg-blue-100 text-blue-800">✏</Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Con Errores</p>
-                  <p className="text-2xl font-bold text-red-600">{statusSummary.conErrores}</p>
-                </div>
-                <AlertCircle className="h-8 w-8 text-red-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">En Revisión</p>
-                  <p className="text-2xl font-bold text-yellow-600">{statusSummary.enRevision}</p>
-                </div>
-                <Clock className="h-8 w-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Filters */}
         <PayrollHistoryFilters
           filters={filters}
           onFiltersChange={setFilters}
         />
 
-        {/* Table with Pagination */}
+        {/* Table */}
         <div className="bg-white rounded-lg shadow">
           <PayrollHistoryTable
-            periods={pagination.paginatedItems}
+            periods={filteredPeriods}
             onViewDetails={handleViewDetails}
             onEditPeriod={handleEditPeriod}
             canUserEditPeriods={canUserEditPeriods}
-          />
-          
-          <PaginationControls 
-            pagination={pagination} 
-            itemName="períodos"
           />
         </div>
       </div>
