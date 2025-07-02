@@ -1,6 +1,6 @@
 
 import { useForm } from 'react-hook-form';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeFormData } from './types';
 import { getEmployeeFormDefaults } from './useEmployeeFormDefaults';
 import { useEmployeeFormState } from './useEmployeeFormState';
@@ -9,7 +9,7 @@ import { useCompanyId } from './useCompanyId';
 import { useEmployeeFormEffects } from './useEmployeeFormEffects';
 import { useEmployeeFormPopulation } from './useEmployeeFormPopulation';
 
-export const useEmployeeForm = (employee?: Employee) => {
+export const useEmployeeForm = (employee?: EmployeeUnified) => {
   console.log('🔄 useEmployeeForm: Hook called with employee:', employee?.id);
   
   // Initialize form state
