@@ -77,8 +77,9 @@ export const useNovedades = (periodoId: string) => {
     }
   }, [periodoId, toast]);
 
-  const loadNovedades = useCallback(async (employeeId: string) => {
-    setIsLoading(true);
+  const loadNovedades = useCallback(async (employeeId?: string) => {
+    if (!employeeId || !periodoId) return [];
+    
     try {
       console.log('📋 Loading novedades for employee:', employeeId, 'period:', periodoId);
       const result = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodoId);
@@ -87,16 +88,9 @@ export const useNovedades = (periodoId: string) => {
       return result;
     } catch (error) {
       console.error('❌ Error loading novedades:', error);
-      toast({
-        title: "❌ Error al cargar novedades",
-        description: "No se pudieron cargar las novedades del empleado",
-        variant: "destructive"
-      });
       return [];
-    } finally {
-      setIsLoading(false);
     }
-  }, [periodoId, toast]);
+  }, [periodoId]);
 
   const updateNovedad = useCallback(async (id: string, updates: Partial<CreateNovedadData>) => {
     setIsLoading(true);

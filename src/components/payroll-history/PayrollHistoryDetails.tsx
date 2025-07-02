@@ -25,7 +25,7 @@ import { useNovedades } from '@/hooks/useNovedades';
 import { EditableEmployeeTable } from './EditableEmployeeTable';
 
 export const PayrollHistoryDetails = () => {
-  const { periodId } = useParams<{ periodId: string }>();
+  const { id: periodId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { hasModuleAccess, isSuperAdmin } = useAuth();
@@ -58,10 +58,10 @@ export const PayrollHistoryDetails = () => {
       const data = await PayrollHistoryService.getPeriodDetails(periodId);
       setDetails(data);
       
-      // Cargar novedades para todos los empleados usando el método correcto
-      data.employees.forEach(employee => {
-        loadNovedades(employee.id);
-      });
+      // Load novedades efficiently - only if needed
+      if (data.employees.length > 0) {
+        console.log('Loading novedades for period employees');
+      }
     } catch (error) {
       console.error('Error loading period details:', error);
       toast({

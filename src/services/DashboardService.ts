@@ -33,9 +33,9 @@ export interface DashboardActivity {
 export class DashboardService {
   static async getCurrentCompanyId(): Promise<string | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('No authenticated user found');
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.log('No authenticated user found:', userError);
         return null;
       }
 
@@ -43,7 +43,7 @@ export class DashboardService {
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('Error getting user profile:', error);

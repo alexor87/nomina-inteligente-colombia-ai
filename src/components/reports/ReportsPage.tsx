@@ -230,16 +230,18 @@ export const ReportsPage = () => {
   const handleExportExcel = async (reportId: string, data: any[]) => {
     try {
       await exportToExcel(reportId, data, `reporte-${reportId}`);
+      console.log('✅ Excel export completed successfully');
     } catch (error) {
-      console.error('Error exporting to Excel:', error);
+      console.error('❌ Error exporting to Excel:', error);
     }
   };
 
   const handleExportPDF = async (reportId: string, data: any[]) => {
     try {
       await exportToPDF(reportId, data, `reporte-${reportId}`);
+      console.log('✅ PDF export completed successfully');
     } catch (error) {
-      console.error('Error exporting to PDF:', error);
+      console.error('❌ Error exporting to PDF:', error);
     }
   };
 

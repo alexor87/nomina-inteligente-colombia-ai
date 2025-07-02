@@ -158,31 +158,90 @@ export const useReports = () => {
   };
 
   const exportToExcel = async (reportType: string, data: any[], fileName: string) => {
-    console.log('Exporting to Excel:', { reportType, fileName, records: data.length });
-    const newExport: ExportHistory = {
-      id: Date.now().toString(),
-      reportType,
-      fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`,
-      format: 'excel',
-      generatedBy: 'admin@empresa.com',
-      generatedAt: new Date().toISOString(),
-      parameters: filters
-    };
-    setExportHistory(prev => [newExport, ...prev]);
+    try {
+      console.log('Exporting to Excel:', { reportType, fileName, records: data.length });
+      
+      // Use ExcelExportService for actual export
+      const { ExcelExportService } = await import('@/services/ExcelExportService');
+      
+      switch (reportType) {
+        case 'payroll-summary':
+        case 'cost-centers':
+        case 'employee-detail':
+        case 'employee-detail-hr':
+          ExcelExportService.exportPayrollSummaryExcel(data, fileName);
+          break;
+        case 'labor-costs':
+          ExcelExportService.exportLaborCostsExcel(data, fileName);
+          break;
+        case 'social-security':
+        case 'ugpp-social-security':
+          ExcelExportService.exportSocialSecurityExcel(data, fileName);
+          break;
+        default:
+          ExcelExportService.exportToExcel(data, fileName, 'Reporte');
+      }
+
+      const newExport: ExportHistory = {
+        id: Date.now().toString(),
+        reportType,
+        fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`,
+        format: 'excel',
+        generatedBy: 'admin@empresa.com',
+        generatedAt: new Date().toISOString(),
+        parameters: filters
+      };
+      setExportHistory(prev => [newExport, ...prev]);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      throw error;
+    }
   };
 
   const exportToPDF = async (reportType: string, data: any[], fileName: string) => {
-    console.log('Exporting to PDF:', { reportType, fileName, records: data.length });
-    const newExport: ExportHistory = {
-      id: Date.now().toString(),
-      reportType,
-      fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.pdf`,
-      format: 'pdf',
-      generatedBy: 'admin@empresa.com',
-      generatedAt: new Date().toISOString(),
-      parameters: filters
-    };
-    setExportHistory(prev => [newExport, ...prev]);
+    try {
+      console.log('Exporting to PDF:', { reportType, fileName, records: data.length });
+      
+      // Use PDFExportService for actual export
+      const { PDFExportService } = await import('@/services/PDFExportService');
+      
+      switch (reportType) {
+        case 'payroll-summary':
+        case 'cost-centers':
+        case 'employee-detail':
+        case 'employee-detail-hr':
+          PDFExportService.exportPayrollSummaryPDF(data, fileName);
+          break;
+        case 'labor-costs':
+          PDFExportService.exportLaborCostsPDF(data, fileName);
+          break;
+        case 'social-security':
+        case 'ugpp-social-security':
+          PDFExportService.exportSocialSecurityPDF(data, fileName);
+          break;
+        default:
+          PDFExportService.exportToPDF(data, fileName, 'Reporte', [
+            { header: 'ID', dataKey: 'id' },
+            { header: 'Descripción', dataKey: 'name' },
+            { header: 'Valor', dataKey: 'value' },
+            { header: 'Fecha', dataKey: 'date' }
+          ]);
+      }
+
+      const newExport: ExportHistory = {
+        id: Date.now().toString(),
+        reportType,
+        fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.pdf`,
+        format: 'pdf',
+        generatedBy: 'admin@empresa.com',
+        generatedAt: new Date().toISOString(),
+        parameters: filters
+      };
+      setExportHistory(prev => [newExport, ...prev]);
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+      throw error;
+    }
   };
 
   const saveFilter = async (name: string, reportType: string) => {
