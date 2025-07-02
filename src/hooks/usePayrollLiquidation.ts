@@ -430,6 +430,26 @@ export const usePayrollLiquidation = () => {
       // Mostrar modal de éxito
       setShowSuccessModal(true);
 
+      // Crear automáticamente el siguiente período
+      try {
+        console.log('🔄 Creando siguiente período después de liquidación exitosa...');
+        const companySettings = await PayrollPeriodService.getCompanySettings();
+        const periodicity = companySettings?.periodicity || 'mensual';
+        
+        const { startDate, endDate } = PayrollPeriodService.generatePeriodDates(periodicity);
+        
+        if (startDate && endDate) {
+          const nextPeriod = await PayrollPeriodService.createPayrollPeriod(startDate, endDate, periodicity);
+          
+          if (nextPeriod) {
+            console.log('✅ Siguiente período creado automáticamente:', nextPeriod);
+          }
+        }
+      } catch (nextPeriodError) {
+        console.warn('⚠️ No se pudo crear el siguiente período automáticamente:', nextPeriodError);
+        // No bloquear el flujo principal
+      }
+
       // Crear entrada en el historial simplificada
       try {
         console.log('📝 Guardando liquidación en historial...');

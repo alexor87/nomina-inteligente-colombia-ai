@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { PayrollPeriod } from '@/types/payroll';
 import { PayrollSummary } from '@/types/payroll';
-import { formatCurrency } from '@/lib/utils';
+import { PayrollPeriodService } from '@/services/PayrollPeriodService';
 
 interface PayrollModernHeaderProps {
   period: PayrollPeriod | null;
@@ -17,14 +17,7 @@ export const PayrollModernHeader = ({
 
   const formatPeriod = () => {
     if (!period.fecha_inicio || !period.fecha_fin) return 'Período no definido';
-    const start = new Date(period.fecha_inicio);
-    const end = new Date(period.fecha_fin);
-    const startDay = start.getDate();
-    const endDay = end.getDate();
-    const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-    const month = monthNames[start.getMonth()];
-    const year = start.getFullYear();
-    return `${startDay}-${endDay} ${month} ${year}`;
+    return PayrollPeriodService.formatPeriodText(period.fecha_inicio, period.fecha_fin);
   };
 
   return (
