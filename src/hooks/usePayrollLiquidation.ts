@@ -450,10 +450,18 @@ export const usePayrollLiquidation = () => {
           
           if (nextPeriod) {
             console.log('✅ Siguiente período creado automáticamente:', nextPeriod);
-            // Opcional: Cargar el nuevo período automáticamente
+            
+            // Actualizar estado inmediatamente sin recargar página
+            setCurrentPeriod(nextPeriod);
+            setIsReopenedPeriod(false);
+            
+            // Mostrar mensaje de transición
             setTimeout(() => {
-              window.location.reload(); // Recargar para mostrar el nuevo período
-            }, 2000);
+              toast({
+                title: "Nuevo período iniciado",
+                description: `Período ${PayrollPeriodService.formatPeriodText(nextPeriod.fecha_inicio, nextPeriod.fecha_fin)} listo para liquidación`
+              });
+            }, 1000);
           }
         }
       } catch (nextPeriodError) {
