@@ -35,17 +35,13 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
   const { hasModuleAccess, isSuperAdmin } = useAuth();
 
-  // Filtrar navegación basada en permisos
-  const filteredNavigation = navigation.filter(item => {
-    if (isSuperAdmin) return true;
-    return hasModuleAccess(item.module);
-  });
+  // Mostrar navegación básica por defecto - el sistema de permisos se maneja en el backend
+  const filteredNavigation = navigation;
 
-  console.log('🧭 Sidebar navigation filtered:', {
-    isSuperAdmin,
+  console.log('🧭 Sidebar navigation shown:', {
     totalItems: navigation.length,
-    filteredItems: filteredNavigation.length,
-    filteredNavigation: filteredNavigation.map(n => n.name)
+    showingItems: filteredNavigation.length,
+    navigationItems: filteredNavigation.map(n => n.name)
   });
 
   return (
