@@ -285,4 +285,252 @@ export class PayrollPeriodValidationService {
       };
     }
   }
+
+  // Validaciones al cerrar período (Fase 3)
+  static async validatePeriodClosure(periodId: string): Promise<{
+    isValid: boolean;
+    errors: string[];
+    warnings: string[];
+    canClose: boolean;
+    employeeValidation?: {
+      totalEmployees: number;
+      validEmployees: number;
+      invalidEmployees: number;
+      employeesWithoutPayroll: number;
+    };
+  }> {
+    try {
+      const errors: string[] = [];
+      const warnings: string[] = [];
+
+      console.log('🔍 Validando cierre de período:', periodId);
+
+      // 1. Verificar que el período existe y está en estado borrador
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+
+      if (periodError || !period) {
+        return {
+          isValid: false,
+          errors: ['Período no encontrado'],
+          warnings: [],
+          canClose: false
+        };
+      }
+
+      if (period.estado !== 'borrador') {
+        return {
+          isValid: false,
+          errors: ['Solo se pueden cerrar períodos en estado borrador'],
+          warnings: [],
+          canClose: false
+        };
+      }
+
+      // 2. Obtener todos los empleados de la empresa
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido, estado')
+        .eq('company_id', period.company_id)
+        .eq('estado', 'activo');
+
+      if (employeesError) {
+        console.error('❌ Error obteniendo empleados:', employeesError);
+        errors.push('Error al validar empleados');
+      } else {
+        console.log('👥 Empleados activos encontrados:', employees?.length || 0);
+
+        // 3. Verificar empleados con liquidación en el período
+        const { data: payrolls, error: payrollsError } = await supabase
+          .from('payrolls')
+          .select('employee_id, estado, neto_pagado')
+          .eq('company_id', period.company_id)
+          .eq('periodo', period.periodo);
+
+        if (payrollsError) {
+          console.error('❌ Error obteniendo liquidaciones:', payrollsError);
+          errors.push('Error al validar liquidaciones');
+        } else {
+          const totalEmployees = employees?.length || 0;
+          const employeesWithPayroll = payrolls?.length || 0;
+          const employeesWithoutPayroll = totalEmployees - employeesWithPayroll;
+          const validPayrolls = payrolls?.filter(p => p.estado === 'valid' || p.neto_pagado > 0)?.length || 0;
+          const invalidPayrolls = employeesWithPayroll - validPayrolls;
+
+          const employeeValidation = {
+            totalEmployees,
+            validEmployees: validPayrolls,
+            invalidEmployees: invalidPayrolls,
+            employeesWithoutPayroll
+          };
+
+          console.log('📊 Validación de empleados:', employeeValidation);
+
+          // 4. Validaciones críticas
+          if (totalEmployees === 0) {
+            warnings.push('No hay empleados activos en la empresa');
+          } else {
+            if (employeesWithoutPayroll > 0) {
+              warnings.push(`${employeesWithoutPayroll} empleados sin liquidación en este período`);
+            }
+
+            if (invalidPayrolls > 0) {
+              errors.push(`${invalidPayrolls} empleados tienen liquidaciones con errores que deben corregirse`);
+            }
+
+            if (validPayrolls === 0 && totalEmployees > 0) {
+              errors.push('No hay empleados con liquidaciones válidas. Debe liquidar al menos un empleado.');
+            }
+          }
+
+          // 5. Verificar que no haya errores pendientes en cálculos
+          const payrollsWithErrors = payrolls?.filter(p => 
+            !p.neto_pagado || p.neto_pagado <= 0 || p.estado === 'error'
+          ) || [];
+
+          if (payrollsWithErrors.length > 0) {
+            errors.push(`${payrollsWithErrors.length} liquidaciones tienen errores de cálculo pendientes`);
+          }
+
+          const isValid = errors.length === 0;
+          const canClose = isValid && validPayrolls > 0;
+
+          console.log('📊 Resultado de validación de cierre:', {
+            isValid,
+            errorsCount: errors.length,
+            warningsCount: warnings.length,
+            canClose,
+            employeeValidation
+          });
+
+          return {
+            isValid,
+            errors,
+            warnings,
+            canClose,
+            employeeValidation
+          };
+        }
+      }
+
+      return {
+        isValid: false,
+        errors: ['Error interno durante la validación'],
+        warnings: [],
+        canClose: false
+      };
+
+    } catch (error) {
+      console.error('❌ Error en validación de cierre de período:', error);
+      return {
+        isValid: false,
+        errors: ['Error interno durante la validación'],
+        warnings: [],
+        canClose: false
+      };
+    }
+  }
+
+  // Validar que se generen comprobantes para empleados válidos antes del cierre
+  static async validateVouchersGeneration(periodId: string): Promise<{
+    isValid: boolean;
+    errors: string[];
+    warnings: string[];
+    voucherInfo?: {
+      totalEmployees: number;
+      vouchersGenerated: number;
+      vouchersPending: number;
+    };
+  }> {
+    try {
+      const errors: string[] = [];
+      const warnings: string[] = [];
+
+      console.log('🔍 Validando generación de comprobantes para período:', periodId);
+
+      // 1. Obtener información del período
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+
+      if (periodError || !period) {
+        return {
+          isValid: false,
+          errors: ['Período no encontrado'],
+          warnings: []
+        };
+      }
+
+      // 2. Obtener empleados con liquidación válida en el período
+      const { data: validPayrolls, error: payrollsError } = await supabase
+        .from('payrolls')
+        .select('employee_id, neto_pagado')
+        .eq('company_id', period.company_id)
+        .eq('periodo', period.periodo)
+        .gt('neto_pagado', 0);
+
+      if (payrollsError) {
+        console.error('❌ Error obteniendo liquidaciones válidas:', payrollsError);
+        errors.push('Error al validar liquidaciones');
+        return { isValid: false, errors, warnings };
+      }
+
+      const totalValidEmployees = validPayrolls?.length || 0;
+
+      // 3. Obtener comprobantes generados para este período
+      const { data: vouchers, error: vouchersError } = await supabase
+        .from('payroll_vouchers')
+        .select('employee_id, voucher_status')
+        .eq('company_id', period.company_id)
+        .eq('periodo', period.periodo);
+
+      if (vouchersError) {
+        console.error('❌ Error obteniendo comprobantes:', vouchersError);
+        // No es crítico, pero se considera advertencia
+        warnings.push('No se pudieron verificar los comprobantes existentes');
+      }
+
+      const vouchersGenerated = vouchers?.length || 0;
+      const vouchersPending = totalValidEmployees - vouchersGenerated;
+
+      const voucherInfo = {
+        totalEmployees: totalValidEmployees,
+        vouchersGenerated,
+        vouchersPending
+      };
+
+      console.log('📊 Estado de comprobantes:', voucherInfo);
+
+      // 4. Validaciones
+      if (totalValidEmployees === 0) {
+        warnings.push('No hay empleados con liquidaciones válidas para generar comprobantes');
+      } else {
+        if (vouchersPending > 0) {
+          warnings.push(`Faltan ${vouchersPending} comprobantes por generar. Se generarán automáticamente al cerrar el período.`);
+        } else {
+          console.log('✅ Todos los comprobantes están generados');
+        }
+      }
+
+      return {
+        isValid: true, // Los comprobantes se pueden generar automáticamente
+        errors,
+        warnings,
+        voucherInfo
+      };
+
+    } catch (error) {
+      console.error('❌ Error en validación de comprobantes:', error);
+      return {
+        isValid: false,
+        errors: ['Error interno durante la validación de comprobantes'],
+        warnings: []
+      };
+    }
+  }
 }

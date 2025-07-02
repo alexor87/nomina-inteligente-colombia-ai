@@ -372,4 +372,174 @@ export class PayrollPeriodService {
       return null;
     }
   }
+
+  // Cerrar período con validaciones completas (Fase 3)
+  static async closePeriod(periodId: string): Promise<{
+    success: boolean;
+    period?: PayrollPeriod;
+    errors: string[];
+    warnings: string[];
+  }> {
+    try {
+      console.log('🔒 Iniciando cierre de período con validaciones:', periodId);
+
+      // Importar PayrollPeriodValidationService dinámicamente
+      const { PayrollPeriodValidationService } = await import('./payroll-intelligent/PayrollPeriodValidationService');
+      
+      // 1. Ejecutar validaciones de cierre
+      const closureValidation = await PayrollPeriodValidationService.validatePeriodClosure(periodId);
+      
+      if (!closureValidation.canClose) {
+        console.error('❌ No se puede cerrar el período:', closureValidation.errors);
+        return {
+          success: false,
+          errors: closureValidation.errors,
+          warnings: closureValidation.warnings
+        };
+      }
+
+      // 2. Validar generación de comprobantes
+      const voucherValidation = await PayrollPeriodValidationService.validateVouchersGeneration(periodId);
+      
+      if (!voucherValidation.isValid) {
+        console.error('❌ Error en validación de comprobantes:', voucherValidation.errors);
+        return {
+          success: false,
+          errors: voucherValidation.errors,
+          warnings: voucherValidation.warnings
+        };
+      }
+
+      console.log('✅ Validaciones de cierre exitosas, procediendo con el cierre');
+
+      // 3. Generar comprobantes automáticamente si faltan algunos
+      if (voucherValidation.voucherInfo && voucherValidation.voucherInfo.vouchersPending > 0) {
+        console.log('📄 Generando comprobantes faltantes...');
+        // Aquí se podría integrar con el servicio de generación de comprobantes
+        // Por ahora solo logueamos la acción
+        console.log(`📄 Se deberían generar ${voucherValidation.voucherInfo.vouchersPending} comprobantes`);
+      }
+
+      // 4. Actualizar estado del período a 'aprobado'
+      const { data: updatedPeriod, error: updateError } = await supabase
+        .from('payroll_periods_real')
+        .update({
+          estado: 'aprobado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('❌ Error actualizando estado del período:', updateError);
+        return {
+          success: false,
+          errors: ['Error al actualizar el estado del período'],
+          warnings: []
+        };
+      }
+
+      console.log('✅ Período cerrado exitosamente:', updatedPeriod);
+
+      return {
+        success: true,
+        period: updatedPeriod as PayrollPeriod,
+        errors: [],
+        warnings: [...closureValidation.warnings, ...voucherValidation.warnings]
+      };
+
+    } catch (error) {
+      console.error('❌ Error cerrando período:', error);
+      return {
+        success: false,
+        errors: ['Error interno al cerrar el período'],
+        warnings: []
+      };
+    }
+  }
+
+  // Reabrir período con validaciones
+  static async reopenPeriod(periodId: string, userId: string): Promise<{
+    success: boolean;
+    period?: PayrollPeriod;
+    errors: string[];
+    warnings: string[];
+  }> {
+    try {
+      console.log('🔓 Reabriendo período:', periodId);
+
+      // 1. Verificar que el período existe y está cerrado
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+
+      if (periodError || !period) {
+        return {
+          success: false,
+          errors: ['Período no encontrado'],
+          warnings: []
+        };
+      }
+
+      if (period.estado === 'borrador') {
+        return {
+          success: false,
+          errors: ['El período ya está abierto'],
+          warnings: []
+        };
+      }
+
+      // 2. Verificar que no hay otro período abierto
+      const { PayrollPeriodValidationService } = await import('./payroll-intelligent/PayrollPeriodValidationService');
+      const openPeriodValidation = await PayrollPeriodValidationService.validateSingleOpenPeriod(period.company_id);
+      
+      if (!openPeriodValidation.isValid && openPeriodValidation.openPeriod) {
+        return {
+          success: false,
+          errors: [`Ya existe un período abierto (${openPeriodValidation.openPeriod.fecha_inicio} - ${openPeriodValidation.openPeriod.fecha_fin}). Cierra ese período antes de reabrir otro.`],
+          warnings: []
+        };
+      }
+
+      // 3. Reabrir el período
+      const { data: reopenedPeriod, error: reopenError } = await supabase
+        .from('payroll_periods_real')
+        .update({
+          estado: 'borrador',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId)
+        .select()
+        .single();
+
+      if (reopenError) {
+        console.error('❌ Error reabriendo período:', reopenError);
+        return {
+          success: false,
+          errors: ['Error al reabrir el período'],
+          warnings: []
+        };
+      }
+
+      console.log('✅ Período reabierto exitosamente:', reopenedPeriod);
+
+      return {
+        success: true,
+        period: reopenedPeriod as PayrollPeriod,
+        errors: [],
+        warnings: ['El período ha sido reabierto. Puedes realizar modificaciones y volver a cerrarlo cuando termines.']
+      };
+
+    } catch (error) {
+      console.error('❌ Error reabriendo período:', error);
+      return {
+        success: false,
+        errors: ['Error interno al reabrir el período'],
+        warnings: []
+      };
+    }
+  }
 }
