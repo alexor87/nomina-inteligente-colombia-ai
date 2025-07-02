@@ -12,6 +12,7 @@ import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import PayrollPage from "./pages/PayrollPage";
 import PayrollHistoryPage from "./pages/PayrollHistoryPage";
+import PayrollHistoryDetailsPage from "./pages/PayrollHistoryDetailsPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 
@@ -32,8 +33,8 @@ function App() {
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="payroll" element={<PayrollPage />} />
                 <Route path="payroll-history" element={<PayrollHistoryPage />} />
-                <Route path="payroll-history/:id" element={<PayrollHistoryPage />} />
-                <Route path="payroll-history/:id/edit" element={<PayrollHistoryPage />} />
+                <Route path="payroll-history/:id" element={<PayrollHistoryDetailsPage />} />
+                <Route path="payroll-history/:id/edit" element={<PayrollHistoryDetailsPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

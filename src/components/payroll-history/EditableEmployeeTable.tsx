@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollHistoryEmployee } from '@/types/payroll-history';
-import { Pencil, Plus, Minus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { DevengoModal } from './DevengoModal';
 
 interface EditableEmployeeTableProps {
@@ -89,7 +89,6 @@ export const EditableEmployeeTable = ({
               <th className="border border-gray-300 px-4 py-2 text-center">Devengado</th>
               <th className="border border-gray-300 px-4 py-2 text-center">Deducciones</th>
               <th className="border border-gray-300 px-4 py-2 text-center">Neto</th>
-              {isEditMode && <th className="border border-gray-300 px-4 py-2 text-center">Acciones</th>}
             </tr>
           </thead>
           <tbody>
@@ -143,17 +142,6 @@ export const EditableEmployeeTable = ({
                     {formatCurrency(employee.netPay)}
                   </span>
                 </td>
-                {isEditMode && (
-                  <td className="border border-gray-300 px-4 py-2 text-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                  </td>
-                )}
               </tr>
             ))}
           </tbody>

@@ -3,13 +3,7 @@ import React from 'react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, Edit, MoreHorizontal } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Eye, Edit } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface PayrollHistoryTableProps {
@@ -187,24 +181,6 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
                         <Edit className="h-4 w-4" />
                       </Button>
                     )}
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onViewDetails(period)}>
-                          Ver detalles
-                        </DropdownMenuItem>
-                        {canUserEditPeriods && period.editable && (
-                          <DropdownMenuItem onClick={() => onEditPeriod(period)}>
-                            Editar período
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
                 </td>
               </tr>
