@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeEmployees } from '@/hooks/useRealtimeEmployees';
@@ -15,6 +14,7 @@ export const useEmployeeList = () => {
   const [allEmployees, setAllEmployees] = useState<EmployeeWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
 
   // Convertir Employee a EmployeeWithStatus
   const mapToEmployeeWithStatus = (employee: Employee): EmployeeWithStatus => ({
@@ -56,14 +56,26 @@ export const useEmployeeList = () => {
     toggleAllEmployeesBase(currentPageEmployeeIds);
   }, [employees, toggleAllEmployeesBase]);
 
-  const loadEmployees = useCallback(async () => {
+  const loadEmployees = useCallback(async (force = false) => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      console.log('🔄 Loading employees...', force ? '(forced refresh)' : '');
+      
       const data = await EmployeeService.getAllEmployees();
       const employeesWithStatus = data.map(mapToEmployeeWithStatus);
       setAllEmployees(employeesWithStatus);
-      console.log('👥 Empleados cargados:', data.length);
+      setLastRefresh(Date.now());
+      
+      console.log('👥 Employees loaded:', data.length);
+      
+      if (force) {
+        toast({
+          title: "Datos actualizados",
+          description: `Se cargaron ${data.length} empleados`,
+        });
+      }
     } catch (err) {
       console.error('Error loading employees:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -90,7 +102,8 @@ export const useEmployeeList = () => {
   }, [loadEmployees]);
 
   const refreshEmployees = useCallback(() => {
-    loadEmployees();
+    console.log('🔄 Manual refresh requested');
+    loadEmployees(true);
   }, [loadEmployees]);
 
   return {
@@ -99,6 +112,7 @@ export const useEmployeeList = () => {
     allEmployees,
     isLoading,
     error,
+    lastRefresh,
     
     // Filtros
     filters,

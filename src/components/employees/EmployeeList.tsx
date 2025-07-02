@@ -214,6 +214,7 @@ export const EmployeeList = () => {
           onOpenImport={() => setIsImportDrawerOpen(true)}
           onExportToExcel={handleExportToExcel}
           onCreateEmployee={handleCreateEmployee}
+          onRefreshData={refreshEmployees}
         />
 
         {/* Barra de búsqueda con botón de filtros */}

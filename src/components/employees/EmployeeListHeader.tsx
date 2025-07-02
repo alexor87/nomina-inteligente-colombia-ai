@@ -1,12 +1,24 @@
 
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, Upload, Download, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Users, 
+  Plus, 
+  Upload, 
+  Download, 
+  Filter, 
+  RefreshCw,
+  Trash2,
+  AlertTriangle
+} from 'lucide-react';
+import { DataCleanupDialog } from './DataCleanupDialog';
 
 interface EmployeeListHeaderProps {
   filteredCount: number;
   totalEmployees: number;
   searchTerm: string;
-  isSupportMode: boolean;
+  isSupportMode?: boolean;
   showFilters: boolean;
   isExporting: boolean;
   employeeCount: number;
@@ -14,57 +26,133 @@ interface EmployeeListHeaderProps {
   onOpenImport: () => void;
   onExportToExcel: () => void;
   onCreateEmployee: () => void;
+  onRefreshData?: () => void;
 }
 
-export const EmployeeListHeader = ({
+export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
   filteredCount,
   totalEmployees,
   searchTerm,
-  isSupportMode,
+  isSupportMode = false,
   showFilters,
   isExporting,
   employeeCount,
   onToggleFilters,
   onOpenImport,
   onExportToExcel,
-  onCreateEmployee
-}: EmployeeListHeaderProps) => {
+  onCreateEmployee,
+  onRefreshData
+}) => {
+  const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
+
+  const getEmployeeCountText = () => {
+    if (searchTerm && filteredCount !== totalEmployees) {
+      return `${filteredCount} de ${totalEmployees} empleados`;
+    }
+    return `${totalEmployees} empleado${totalEmployees !== 1 ? 's' : ''}`;
+  };
+
+  const handleRefresh = () => {
+    if (onRefreshData) {
+      onRefreshData();
+    }
+  };
+
+  const handleCleanupComplete = () => {
+    if (onRefreshData) {
+      onRefreshData();
+    }
+  };
+
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Empleados</h1>
-        <p className="text-gray-600">
-          {filteredCount} de {totalEmployees} empleados
-          {searchTerm && ` - Filtrado por: "${searchTerm}"`}
-          {isSupportMode && " (Vista de Soporte)"}
-        </p>
-      </div>
-      <div className="flex space-x-3">
-        <Button variant="outline" onClick={onToggleFilters}>
-          <Filter className="h-4 w-4 mr-2" />
-          Filtros
-        </Button>
-        <Button variant="outline" onClick={onOpenImport}>
-          <Upload className="h-4 w-4 mr-2" />
-          Importar
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={onExportToExcel}
-          disabled={isExporting || employeeCount === 0}
-        >
-          {isExporting ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4 mr-2" />
+    <>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Users className="h-6 w-6 text-blue-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Empleados
+            </h1>
+            <p className="text-sm text-gray-600">
+              {getEmployeeCountText()}
+            </p>
+          </div>
+          {isSupportMode && (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-300">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              Modo Soporte
+            </Badge>
           )}
-          {isExporting ? 'Exportando...' : 'Exportar'}
-        </Button>
-        <Button onClick={onCreateEmployee}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Empleado
-        </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botón de refresh */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Actualizar
+          </Button>
+
+          {/* Botón de limpieza completa (solo para soporte) */}
+          {isSupportMode && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsCleanupDialogOpen(true)}
+              className="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Limpiar Datos
+            </Button>
+          )}
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onToggleFilters}
+            className={`flex items-center gap-2 ${showFilters ? 'bg-blue-50 text-blue-700 border-blue-300' : ''}`}
+          >
+            <Filter className="h-4 w-4" />
+            Filtros
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onOpenImport}
+            className="flex items-center gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Importar
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onExportToExcel}
+            disabled={isExporting || employeeCount === 0}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? 'Exportando...' : 'Exportar'}
+          </Button>
+
+          <Button onClick={onCreateEmployee} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Empleado
+          </Button>
+        </div>
       </div>
-    </div>
+
+      <DataCleanupDialog
+        isOpen={isCleanupDialogOpen}
+        onClose={() => setIsCleanupDialogOpen(false)}
+        onCleanupComplete={handleCleanupComplete}
+      />
+    </>
   );
 };
