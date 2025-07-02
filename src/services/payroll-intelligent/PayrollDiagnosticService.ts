@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { UNIFIED_PAYROLL_STATES } from '@/constants/payrollStatesUnified';
+import { UNIFIED_PAYROLL_STATES, UnifiedPayrollState } from '@/constants/payrollStatesUnified';
 
 interface DiagnosticResult {
   companyId: string;
@@ -79,8 +79,9 @@ export class PayrollDiagnosticService {
       }
 
       // 3. Estados no reconocidos
+      const validStates = Object.values(UNIFIED_PAYROLL_STATES);
       const invalidStates = periodsReal.filter(p => 
-        !Object.values(UNIFIED_PAYROLL_STATES).includes(p.estado)
+        !validStates.includes(p.estado as UnifiedPayrollState)
       );
 
       if (invalidStates.length > 0) {

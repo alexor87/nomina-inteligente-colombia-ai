@@ -18,13 +18,19 @@ export class PayrollDataIntegrityService {
     try {
       console.log('🔍 GENERANDO REPORTE DE INTEGRIDAD para empresa:', companyId);
       
-      // Check for duplicate periods
-      const { data: duplicates } = await supabase
+      // Check for duplicate periods using a different approach
+      const { data: allPeriods } = await supabase
         .from('payroll_periods_real')
-        .select('periodo, count(*)')
-        .eq('company_id', companyId)
-        .group('periodo')
-        .having('count(*) > 1');
+        .select('periodo')
+        .eq('company_id', companyId);
+
+      // Count duplicates manually
+      const periodCounts = allPeriods?.reduce((acc, item) => {
+        acc[item.periodo] = (acc[item.periodo] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>) || {};
+      
+      const duplicatesCount = Object.values(periodCounts).filter(count => count > 1).length;
 
       // Check for orphaned payrolls (payrolls without corresponding period)
       const { data: orphanedPayrolls } = await supabase
@@ -41,11 +47,15 @@ export class PayrollDataIntegrityService {
         .is('period_id', null);
 
       // Check for state consistency issues
-      const { data: invalidStates } = await supabase
+      const validStates = Object.values(UNIFIED_PAYROLL_STATES);
+      const { data: allPeriodsWithStates } = await supabase
         .from('payroll_periods_real')
         .select('id, estado')
-        .eq('company_id', companyId)
-        .not('estado', 'in', `(${Object.values(UNIFIED_PAYROLL_STATES).map(s => `'${s}'`).join(',')})`);
+        .eq('company_id', companyId);
+
+      const invalidStates = allPeriodsWithStates?.filter(period => 
+        !validStates.includes(period.estado as any)
+      ) || [];
 
       // Get total periods count
       const { count: totalPeriods } = await supabase
@@ -55,7 +65,7 @@ export class PayrollDataIntegrityService {
 
       const recommendations: string[] = [];
       
-      if (duplicates && duplicates.length > 0) {
+      if (duplicatesCount > 0) {
         recommendations.push('Eliminar períodos duplicados encontrados');
       }
       
@@ -67,7 +77,7 @@ export class PayrollDataIntegrityService {
         recommendations.push('Actualizar period_id en registros de nómina');
       }
       
-      if (invalidStates && invalidStates.length > 0) {
+      if (invalidStates.length > 0) {
         recommendations.push('Normalizar estados no reconocidos');
       }
 
@@ -79,10 +89,10 @@ export class PayrollDataIntegrityService {
         timestamp: new Date().toISOString(),
         companyId,
         totalPeriods: totalPeriods || 0,
-        duplicatePeriods: duplicates ? duplicates.length : 0,
+        duplicatePeriods: duplicatesCount,
         orphanedPayrolls: orphanedPayrolls ? orphanedPayrolls.length : 0,
         missingPeriodIds: missingPeriodIds ? missingPeriodIds.length : 0,
-        stateConsistencyIssues: invalidStates ? invalidStates.length : 0,
+        stateConsistencyIssues: invalidStates.length,
         recommendations
       };
 
