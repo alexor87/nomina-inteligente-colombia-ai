@@ -15,7 +15,7 @@ export const useEmployeeList = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [allEmployees, setAllEmployees] = useState<EmployeeWithStatus[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
 
@@ -60,41 +60,20 @@ export const useEmployeeList = () => {
   }, [employees, toggleAllEmployeesBase]);
 
   const invalidateAllCaches = useCallback(() => {
-    console.log('🗑️ Invalidando todas las cachés...');
-    
-    // Invalidar React Query
+    console.log('🗑️ Invalidating caches...');
     queryClient.invalidateQueries();
     queryClient.removeQueries();
-    
-    // Limpiar localStorage relacionado con empleados
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.includes('employee') || key.includes('payroll') || key.includes('nomina'))) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    
-    // Limpiar sessionStorage
-    const sessionKeysToRemove = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (key && (key.includes('employee') || key.includes('payroll') || key.includes('nomina'))) {
-        sessionKeysToRemove.push(key);
-      }
-    }
-    sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
-    
-    console.log('✅ Cachés invalidadas');
   }, [queryClient]);
 
   const loadEmployees = useCallback(async (force = false) => {
     try {
-      setIsLoading(true);
+      // Don't show loading for forced refreshes to avoid UI blocking
+      if (!force) {
+        setIsLoading(true);
+      }
       setError(null);
       
-      console.log('🔄 Loading employees...', force ? '(forced refresh with cache invalidation)' : '');
+      console.log('🔄 Loading employees...', force ? '(forced refresh)' : '');
       
       if (force) {
         invalidateAllCaches();
@@ -110,17 +89,21 @@ export const useEmployeeList = () => {
       if (force) {
         toast({
           title: "Datos actualizados",
-          description: `Se cargaron ${data.length} empleados (caché limpiado)`,
+          description: `Se cargaron ${data.length} empleados`,
         });
       }
     } catch (err) {
       console.error('Error loading employees:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
-      toast({
-        title: "Error al cargar empleados",
-        description: "No se pudieron cargar los empleados",
-        variant: "destructive"
-      });
+      
+      // Only show error toast if it's not a forced refresh
+      if (!force) {
+        toast({
+          title: "Error al cargar empleados",
+          description: "No se pudieron cargar los empleados",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -130,37 +113,42 @@ export const useEmployeeList = () => {
   useRealtimeEmployees({
     onEmployeeChange: useCallback(() => {
       console.log('🔄 Detectado cambio en empleados via realtime, recargando...');
-      loadEmployees();
+      loadEmployees(true); // Use forced refresh for realtime updates
     }, [loadEmployees])
   });
 
+  // Load employees on mount with a slight delay to allow auth to settle
   useEffect(() => {
-    loadEmployees();
-  }, [loadEmployees]);
+    const timer = setTimeout(() => {
+      loadEmployees();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const refreshEmployees = useCallback(() => {
-    console.log('🔄 Manual refresh requested with complete cache invalidation');
+    console.log('🔄 Manual refresh requested');
     loadEmployees(true);
   }, [loadEmployees]);
 
   const forceCompleteRefresh = useCallback(() => {
-    console.log('💥 Force complete refresh - clearing everything');
+    console.log('💥 Force complete refresh');
     
-    // Limpiar estado local
+    // Clear state
     setAllEmployees([]);
     setError(null);
     
-    // Invalidar cachés
+    // Invalidate caches
     invalidateAllCaches();
     
-    // Recargar después de un pequeño delay para asegurar que las cachés se limpiaron
+    // Reload after short delay
     setTimeout(() => {
       loadEmployees(true);
-    }, 100);
+    }, 50);
     
     toast({
       title: "Recargando completamente...",
-      description: "Limpiando todas las cachés y recargando datos",
+      description: "Limpiando cachés y recargando datos",
     });
   }, [loadEmployees, invalidateAllCaches, toast]);
 

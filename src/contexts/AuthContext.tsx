@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { performCompleteRoleCheck } from '@/utils/roleUtils';
@@ -51,7 +52,7 @@ const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports'],
   contador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
   visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
-  soporte: ['dashboard', 'reports', 'employees'] // Agregar acceso a empleados para soporte
+  soporte: ['dashboard', 'reports', 'employees']
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -60,80 +61,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false); // Siempre false ahora
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  
+  // Refs to prevent redundant calls
+  const isRefreshingUserData = useRef(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const hasRole = (role: AppRole, companyId?: string): boolean => {
-    console.log('🔍 Checking role:', { 
-      role, 
-      companyId, 
-      roles,
-      userEmail: user?.email,
-      profileCompanyId: profile?.company_id 
-    });
-    
+  const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     if (roles.length === 0) {
-      console.log('❌ No roles found for user');
       return false;
     }
     
-    const hasRoleAccess = roles.some(r => {
+    return roles.some(r => {
       const roleMatch = r.role === role;
       const companyMatch = companyId ? r.company_id === companyId : true;
-      console.log('🔍 Role check:', { 
-        userRole: r.role, 
-        roleMatch, 
-        companyMatch, 
-        requiredRole: role,
-        userCompanyId: r.company_id,
-        requiredCompanyId: companyId
-      });
       return roleMatch && companyMatch;
     });
-    
-    console.log('📊 Role access result:', hasRoleAccess);
-    return hasRoleAccess;
-  };
+  }, [roles]);
 
-  const hasModuleAccess = (module: string): boolean => {
-    console.log('🔍 Checking module access:', { 
-      module, 
-      roles,
-      userEmail: user?.email,
-      rolesDetail: roles.map(r => ({ role: r.role, company_id: r.company_id }))
-    });
-    
+  const hasModuleAccess = useCallback((module: string): boolean => {
     if (roles.length === 0) {
-      console.log('❌ No roles found - denying module access');
       return false;
     }
     
-    // Verificar si alguno de los roles del usuario tiene acceso al módulo
-    const hasAccess = roles.some(userRole => {
-      const moduleAccess = ROLE_PERMISSIONS[userRole.role]?.includes(module);
-      console.log('🔍 Module check:', { 
-        userRole: userRole.role, 
-        module, 
-        moduleAccess,
-        availableModules: ROLE_PERMISSIONS[userRole.role]
-      });
-      return moduleAccess;
+    return roles.some(userRole => {
+      return ROLE_PERMISSIONS[userRole.role]?.includes(module);
     });
-    
-    console.log('📊 Module access result:', hasAccess);
-    return hasAccess;
-  };
+  }, [roles]);
 
-  const refreshUserData = async () => {
+  const refreshUserData = useCallback(async () => {
+    if (isRefreshingUserData.current) {
+      console.log('🔄 User data refresh already in progress, skipping...');
+      return;
+    }
+
     const currentUser = (await supabase.auth.getUser()).data.user;
     if (!currentUser) {
       console.log('❌ No current user found');
       return;
     }
 
+    isRefreshingUserData.current = true;
     console.log('🔄 Refreshing user data for:', currentUser.email);
 
     try {
-      // Obtener perfil del usuario
+      // Fetch profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -142,11 +114,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!profileError && profileData) {
         setProfile(profileData);
-        console.log('👤 User profile fetched:', profileData);
+        console.log('👤 User profile fetched successfully');
         
-        // Si el usuario tiene una empresa, ejecutar verificación completa de roles
+        // Only run role check if user has a company
         if (profileData.company_id) {
-          console.log('🔧 Performing complete role check...');
+          console.log('🔧 Running role check for company:', profileData.company_id);
           await performCompleteRoleCheck(currentUser.id);
         }
       } else {
@@ -154,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
 
-      // Obtener roles del usuario usando la nueva función
+      // Fetch roles
       const { data: userRoles, error: rolesError } = await supabase
         .rpc('get_user_companies_simple', { _user_id: currentUser.id });
       
@@ -164,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           company_id: role.company_id
         }));
         setRoles(transformedRoles);
-        console.log('👥 User roles fetched:', transformedRoles);
+        console.log('👥 User roles fetched:', transformedRoles.length, 'roles');
       } else {
         console.error('❌ Error fetching user roles:', rolesError);
         setRoles([]);
@@ -172,8 +144,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     } catch (error) {
       console.error('❌ Error refreshing user data:', error);
+    } finally {
+      isRefreshingUserData.current = false;
     }
-  };
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -207,48 +181,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsSuperAdmin(false);
   };
 
-  const value = {
-    user,
-    session,
-    loading,
-    roles,
-    profile,
-    isSuperAdmin,
-    hasRole,
-    hasModuleAccess,
-    signIn: async (email: string, password: string) => {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      return { error };
-    },
-    signUp: async (email: string, password: string, firstName?: string, lastName?: string) => {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            first_name: firstName,
-            last_name: lastName
-          }
-        }
-      });
-      return { error };
-    },
-    signOut: async () => {
-      await supabase.auth.signOut();
-      setRoles([]);
-      setProfile(null);
-      setIsSuperAdmin(false);
-    },
-    refreshUserData,
-  };
-
   useEffect(() => {
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -257,11 +195,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user data after successful auth with shorter delay
+          // Debounce user data refresh
           setTimeout(async () => {
-            await refreshUserData();
-            setLoading(false); // Mover aquí para asegurar que se completa la carga
-          }, 500); // Reducir delay pero asegurar que los triggers se procesen
+            if (!isRefreshingUserData.current) {
+              await refreshUserData();
+            }
+            setLoading(false);
+          }, 300);
         } else {
           setRoles([]);
           setProfile(null);
@@ -279,25 +219,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (session?.user) {
         setTimeout(async () => {
-          await refreshUserData();
+          if (!isRefreshingUserData.current) {
+            await refreshUserData();
+          }
           setLoading(false);
-        }, 500);
+        }, 300);
       } else {
         setLoading(false);
       }
     });
 
-    // Timeout de seguridad para evitar loading infinito
-    const loadingTimeout = setTimeout(() => {
+    // Reduced timeout for faster loading
+    loadingTimeoutRef.current = setTimeout(() => {
       console.warn('⚠️ Auth loading timeout reached, setting loading to false');
       setLoading(false);
-    }, 6000); // 6 segundos de timeout
+    }, 3000);
 
     return () => {
       subscription.unsubscribe();
-      clearTimeout(loadingTimeout);
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
     };
-  }, []);
+  }, [refreshUserData]);
+
+  const value = {
+    user,
+    session,
+    loading,
+    roles,
+    profile,
+    isSuperAdmin,
+    hasRole,
+    hasModuleAccess,
+    signIn,
+    signUp,
+    signOut,
+    refreshUserData,
+  };
 
   return (
     <AuthContext.Provider value={value}>

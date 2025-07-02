@@ -51,6 +51,7 @@ function App() {
                   <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="employees" element={<EmployeesPage />} />
                   <Route path="employees/create" element={<CreateEmployeePage />} />
+                  <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
                   <Route path="payroll" element={<PayrollPage />} />
                   <Route path="payroll-history" element={<PayrollHistoryPage />} />
                   <Route path="payroll-history/:id" element={<PayrollHistoryDetailsPage />} />
