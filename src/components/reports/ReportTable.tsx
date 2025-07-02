@@ -243,7 +243,7 @@ export const ReportTable: React.FC<ReportTableProps> = ({
   };
 
   const renderTableRows = () => {
-    return pagination.currentItems.map((item, index) => {
+    return pagination.paginatedItems.map((item, index) => {
       switch (reportType) {
         case 'payroll-summary':
         case 'employee-detail':

@@ -1,151 +1,117 @@
 
+import React from 'react';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious,
-  PaginationEllipsis
-} from '@/components/ui/pagination';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { PaginationResult } from '@/hooks/usePagination';
 
-interface PaginationControlsProps<T = any> {
-  pagination: PaginationResult<T>;
+interface PaginationControlsProps {
+  pagination: PaginationResult<any>;
   itemName?: string;
 }
 
-export const PaginationControls = <T,>({ 
-  pagination, 
-  itemName = 'registros' 
-}: PaginationControlsProps<T>) => {
+export const PaginationControls: React.FC<PaginationControlsProps> = ({
+  pagination,
+  itemName = 'elementos'
+}) => {
   const {
     currentPage,
     pageSize,
-    totalPages,
     totalItems,
-    startIndex,
-    endIndex,
-    hasNextPage,
-    hasPreviousPage,
+    totalPages,
     goToPage,
     goToNextPage,
     goToPreviousPage,
     changePageSize,
-    pageSizeOptions
+    canGoNext,
+    canGoPrevious
   } = pagination;
 
-  if (totalItems === 0) {
-    return null;
-  }
+  if (totalItems === 0) return null;
 
-  // Generate page numbers to show
-  const getPageNumbers = () => {
-    const pages: (number | 'ellipsis')[] = [];
-    const maxVisiblePages = 5;
-    
-    if (totalPages <= maxVisiblePages) {
-      // Show all pages if total is small
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Always show first page
-      pages.push(1);
-      
-      if (currentPage > 3) {
-        pages.push('ellipsis');
-      }
-      
-      // Show pages around current page
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-      
-      for (let i = start; i <= end; i++) {
-        if (!pages.includes(i)) {
-          pages.push(i);
-        }
-      }
-      
-      if (currentPage < totalPages - 2) {
-        pages.push('ellipsis');
-      }
-      
-      // Always show last page
-      if (!pages.includes(totalPages)) {
-        pages.push(totalPages);
-      }
+  const startItem = (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(currentPage * pageSize, totalItems);
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage + 1 < maxPagesToShow) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
-    
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
+          size="sm"
+          onClick={() => goToPage(i)}
+          className="min-w-8"
+        >
+          {i}
+        </Button>
+      );
+    }
+
     return pages;
   };
 
-  const pageNumbers = getPageNumbers();
-
   return (
-    <div className="flex items-center justify-between px-2 py-4">
-      {/* Records info and page size selector */}
-      <div className="flex items-center space-x-6 text-sm text-gray-600">
-        <div>
-          Mostrando {startIndex + 1} a {endIndex} de {totalItems} {itemName}
-        </div>
+    <div className="flex items-center justify-between px-4 py-3 border-t">
+      <div className="flex items-center space-x-2 text-sm text-gray-700">
+        <span>Mostrando</span>
+        <span className="font-medium">{startItem}</span>
+        <span>a</span>
+        <span className="font-medium">{endItem}</span>
+        <span>de</span>
+        <span className="font-medium">{totalItems}</span>
+        <span>{itemName}</span>
+      </div>
+
+      <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
-          <span>Mostrar:</span>
+          <span className="text-sm text-gray-700">Elementos por página:</span>
           <Select
             value={pageSize.toString()}
-            onValueChange={(value) => changePageSize(parseInt(value, 10))}
+            onValueChange={(value) => changePageSize(parseInt(value))}
           >
-            <SelectTrigger className="h-8 w-[70px]">
+            <SelectTrigger className="w-20">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent side="top">
-              {pageSizeOptions.map((size) => (
-                <SelectItem key={size} value={size.toString()}>
-                  {size}
-                </SelectItem>
-              ))}
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious 
-                onClick={goToPreviousPage}
-                className={hasPreviousPage ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}
-              />
-            </PaginationItem>
-            
-            {pageNumbers.map((page, index) => (
-              <PaginationItem key={index}>
-                {page === 'ellipsis' ? (
-                  <PaginationEllipsis />
-                ) : (
-                  <PaginationLink
-                    onClick={() => goToPage(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                )}
-              </PaginationItem>
-            ))}
-            
-            <PaginationItem>
-              <PaginationNext 
-                onClick={goToNextPage}
-                className={hasNextPage ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
+        <div className="flex items-center space-x-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToPreviousPage}
+            disabled={!canGoPrevious}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          {renderPageNumbers()}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToNextPage}
+            disabled={!canGoNext}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
