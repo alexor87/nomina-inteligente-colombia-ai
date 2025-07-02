@@ -148,28 +148,37 @@ export class EmployeeDataMapper {
   }
 
   /**
-   * Validates required fields for employee creation
+   * Validates required fields for employee creation - UPDATED TO USE SNAKE_CASE
    */
   static validateRequiredFields(data: any): { isValid: boolean; errors: string[] } {
-    console.log('🔍 EmployeeDataMapper: Validating required fields');
+    console.log('🔍 EmployeeDataMapper: Validating required fields (snake_case format)');
+    console.log('📊 Data to validate:', data);
     
     const errors: string[] = [];
+    
+    // Updated to check snake_case field names after mapping
     const requiredFields = [
       { field: 'cedula', message: 'El número de documento es requerido' },
       { field: 'nombre', message: 'El nombre es requerido' },
       { field: 'apellido', message: 'El apellido es requerido' },
-      { field: 'salarioBase', message: 'El salario base es requerido' },
-      { field: 'fechaIngreso', message: 'La fecha de ingreso es requerida' }
+      { field: 'salario_base', message: 'El salario base es requerido' }, // Changed from salarioBase
+      { field: 'fecha_ingreso', message: 'La fecha de ingreso es requerida' } // Changed from fechaIngreso
     ];
 
     requiredFields.forEach(({ field, message }) => {
-      if (!data[field] || (typeof data[field] === 'string' && data[field].trim() === '')) {
+      const value = data[field];
+      console.log(`🔍 Checking field '${field}':`, value);
+      
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        console.log(`❌ Field '${field}' is missing or empty`);
         errors.push(message);
+      } else {
+        console.log(`✅ Field '${field}' is valid:`, value);
       }
     });
 
-    // Validate salary minimum
-    if (data.salarioBase && Number(data.salarioBase) < 1300000) {
+    // Validate salary minimum (using snake_case field name)
+    if (data.salario_base && Number(data.salario_base) < 1300000) {
       errors.push('El salario base no puede ser menor al salario mínimo legal');
     }
 
@@ -185,12 +194,23 @@ export class EmployeeDataMapper {
   }
 
   /**
-   * Logs data for debugging purposes
+   * Enhanced debugging method with detailed field analysis
    */
   static debugLogData(stage: string, data: any): void {
     console.group(`🐛 Debug - ${stage}`);
     console.log('Data type:', typeof data);
     console.log('Data keys:', Object.keys(data || {}));
+    
+    // Check specific problematic fields
+    const criticalFields = ['salarioBase', 'salario_base', 'fechaIngreso', 'fecha_ingreso'];
+    criticalFields.forEach(field => {
+      if (data && data[field] !== undefined) {
+        console.log(`🔍 ${field}:`, data[field], `(type: ${typeof data[field]})`);
+      } else {
+        console.log(`❌ ${field}: MISSING`);
+      }
+    });
+    
     console.log('Full data:', data);
     console.groupEnd();
   }

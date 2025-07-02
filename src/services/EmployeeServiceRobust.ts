@@ -56,13 +56,21 @@ export class EmployeeServiceRobust {
       // Step 4: Map form data to database format
       const dbData = EmployeeDataMapper.mapFormToDatabase(validatedData, companyId);
       
-      // Step 5: Final validation of mapped data
+      // DEBUG: Log the mapped data before validation
+      EmployeeDataMapper.debugLogData('After mapping to database format', dbData);
+      
+      // Step 5: Final validation of mapped data (NOW USES CORRECT SNAKE_CASE FIELDS)
       const finalValidation = EmployeeDataMapper.validateRequiredFields(dbData);
       if (!finalValidation.isValid) {
+        console.error('❌ Final validation failed:', finalValidation.errors);
         return {
           success: false,
-          error: 'Validación final falló',
-          details: finalValidation.errors
+          error: 'Los datos mapeados no pasaron la validación final',
+          details: {
+            errors: finalValidation.errors,
+            mappedData: dbData,
+            originalFormData: formData
+          }
         };
       }
 
