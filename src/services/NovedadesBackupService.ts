@@ -1,9 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CreateNovedadData, NovedadType } from '@/types/novedades-enhanced';
 
 // Export the interface for use in other files
-export { CreateNovedadData } from '@/types/novedades-enhanced';
+export type { CreateNovedadData } from '@/types/novedades-enhanced';
 
 export interface PayrollNovedad {
   id: string;
