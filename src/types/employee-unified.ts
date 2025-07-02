@@ -2,16 +2,16 @@
 // Unified Employee types to resolve inconsistencies
 
 export interface EmployeeUnified {
-  // Core identification - make id required to match Employee type
+  // Core identification
   id: string;
   cedula: string;
   tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   
-  // Personal information - make email optional to match Employee type
+  // Personal information
   nombre: string;
   segundoNombre?: string;
   apellido: string;
-  email?: string; // Made optional to match Employee type
+  email?: string;
   telefono?: string;
   sexo?: 'M' | 'F' | 'O';
   fechaNacimiento?: string;
@@ -20,14 +20,14 @@ export interface EmployeeUnified {
   departamento?: string;
   
   // Company relationship
-  empresaId?: string;
+  empresaId: string; // Made required for consistency
   company_id?: string; // For compatibility with database
   
   // Labor information
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago?: string; // Made optional to match Employee type
+  periodicidadPago: 'quincenal' | 'mensual'; // Made required with specific values
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
@@ -65,6 +65,9 @@ export interface EmployeeUnified {
   updatedAt?: string;
 }
 
+// Use EmployeeUnified as the main type for all employee operations
+export type EmployeeWithStatus = EmployeeUnified;
+
 // Helper function to convert between database and form formats
 export function mapDatabaseToUnified(dbEmployee: any): EmployeeUnified {
   return {
@@ -72,44 +75,44 @@ export function mapDatabaseToUnified(dbEmployee: any): EmployeeUnified {
     cedula: dbEmployee.cedula || '',
     tipoDocumento: dbEmployee.tipo_documento || dbEmployee.tipoDocumento || 'CC',
     nombre: dbEmployee.nombre || '',
-    segundoNombre: dbEmployee.segundo_nombre || dbEmployee.segundoNombre || '',
+    segundoNombre: dbEmployee.segundo_nombre || dbEmployee.segundoNombre,
     apellido: dbEmployee.apellido || '',
-    email: dbEmployee.email || '',
-    telefono: dbEmployee.telefono || '',
-    sexo: dbEmployee.sexo || 'M',
-    fechaNacimiento: dbEmployee.fecha_nacimiento || dbEmployee.fechaNacimiento || '',
-    direccion: dbEmployee.direccion || '',
-    ciudad: dbEmployee.ciudad || '',
-    departamento: dbEmployee.departamento || '',
-    empresaId: dbEmployee.empresa_id || dbEmployee.company_id,
+    email: dbEmployee.email,
+    telefono: dbEmployee.telefono,
+    sexo: dbEmployee.sexo,
+    fechaNacimiento: dbEmployee.fecha_nacimiento || dbEmployee.fechaNacimiento,
+    direccion: dbEmployee.direccion,
+    ciudad: dbEmployee.ciudad,
+    departamento: dbEmployee.departamento,
+    empresaId: dbEmployee.company_id || dbEmployee.empresa_id || '',
     company_id: dbEmployee.company_id || dbEmployee.empresa_id,
     salarioBase: Number(dbEmployee.salario_base || dbEmployee.salarioBase || 0),
     tipoContrato: dbEmployee.tipo_contrato || dbEmployee.tipoContrato || 'indefinido',
     fechaIngreso: dbEmployee.fecha_ingreso || dbEmployee.fechaIngreso || new Date().toISOString().split('T')[0],
-    periodicidadPago: dbEmployee.periodicidad_pago || dbEmployee.periodicidadPago || 'mensual',
-    cargo: dbEmployee.cargo || '',
-    codigoCIIU: dbEmployee.codigo_ciiu || dbEmployee.codigoCIIU || '',
-    nivelRiesgoARL: dbEmployee.nivel_riesgo_arl || dbEmployee.nivelRiesgoARL || 'I',
+    periodicidadPago: (dbEmployee.periodicidad_pago || dbEmployee.periodicidadPago || 'mensual') as 'quincenal' | 'mensual',
+    cargo: dbEmployee.cargo,
+    codigoCIIU: dbEmployee.codigo_ciiu || dbEmployee.codigoCIIU,
+    nivelRiesgoARL: dbEmployee.nivel_riesgo_arl || dbEmployee.nivelRiesgoARL,
     estado: dbEmployee.estado || 'activo',
-    centroCostos: dbEmployee.centro_costos || dbEmployee.centroCostos || '',
-    fechaFirmaContrato: dbEmployee.fecha_firma_contrato || dbEmployee.fechaFirmaContrato || '',
-    fechaFinalizacionContrato: dbEmployee.fecha_finalizacion_contrato || dbEmployee.fechaFinalizacionContrato || '',
+    centroCostos: dbEmployee.centro_costos || dbEmployee.centroCostos,
+    fechaFirmaContrato: dbEmployee.fecha_firma_contrato || dbEmployee.fechaFirmaContrato,
+    fechaFinalizacionContrato: dbEmployee.fecha_finalizacion_contrato || dbEmployee.fechaFinalizacionContrato,
     tipoJornada: dbEmployee.tipo_jornada || dbEmployee.tipoJornada || 'completa',
     diasTrabajo: dbEmployee.dias_trabajo || dbEmployee.diasTrabajo || 30,
     horasTrabajo: dbEmployee.horas_trabajo || dbEmployee.horasTrabajo || 8,
     beneficiosExtralegales: dbEmployee.beneficios_extralegales || dbEmployee.beneficiosExtralegales || false,
-    clausulasEspeciales: dbEmployee.clausulas_especiales || dbEmployee.clausulasEspeciales || '',
-    banco: dbEmployee.banco || '',
+    clausulasEspeciales: dbEmployee.clausulas_especiales || dbEmployee.clausulasEspeciales,
+    banco: dbEmployee.banco,
     tipoCuenta: dbEmployee.tipo_cuenta || dbEmployee.tipoCuenta || 'ahorros',
-    numeroCuenta: dbEmployee.numero_cuenta || dbEmployee.numeroCuenta || '',
-    titularCuenta: dbEmployee.titular_cuenta || dbEmployee.titularCuenta || '',
+    numeroCuenta: dbEmployee.numero_cuenta || dbEmployee.numeroCuenta,
+    titularCuenta: dbEmployee.titular_cuenta || dbEmployee.titularCuenta,
     formaPago: dbEmployee.forma_pago || dbEmployee.formaPago || 'dispersion',
-    eps: dbEmployee.eps || '',
-    afp: dbEmployee.afp || '',
-    arl: dbEmployee.arl || '',
-    cajaCompensacion: dbEmployee.caja_compensacion || dbEmployee.cajaCompensacion || '',
-    tipoCotizanteId: dbEmployee.tipo_cotizante_id || dbEmployee.tipoCotizanteId || '',
-    subtipoCotizanteId: dbEmployee.subtipo_cotizante_id || dbEmployee.subtipoCotizanteId || '',
+    eps: dbEmployee.eps,
+    afp: dbEmployee.afp,
+    arl: dbEmployee.arl,
+    cajaCompensacion: dbEmployee.caja_compensacion || dbEmployee.cajaCompensacion,
+    tipoCotizanteId: dbEmployee.tipo_cotizante_id || dbEmployee.tipoCotizanteId,
+    subtipoCotizanteId: dbEmployee.subtipo_cotizante_id || dbEmployee.subtipoCotizanteId,
     regimenSalud: dbEmployee.regimen_salud || dbEmployee.regimenSalud || 'contributivo',
     estadoAfiliacion: dbEmployee.estado_afiliacion || dbEmployee.estadoAfiliacion || 'pendiente',
     createdAt: dbEmployee.created_at || dbEmployee.createdAt,

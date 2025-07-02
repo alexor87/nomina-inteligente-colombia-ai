@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -6,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { CheckCircle, AlertCircle, User, Mail, Phone, Building, Calendar, CreditCard } from 'lucide-react';
 import { EmployeeService } from '@/services/EmployeeService';
 import { toast } from 'sonner';
-import { TIPOS_DOCUMENTO } from '@/types/employee-config';
 
 interface ImportData {
   validRows: any[];
@@ -47,7 +47,7 @@ export const ImportConfirmationStep: React.FC<ImportConfirmationStepProps> = ({
             salarioBase: parseFloat(row.salarioBase) || 0,
             tipoContrato: row.tipoContrato || 'indefinido' as const,
             fechaIngreso: row.fechaIngreso || new Date().toISOString().split('T')[0],
-            periodicidadPago: row.periodicidadPago || 'mensual', // Add missing periodicidadPago
+            periodicidadPago: (row.periodicidadPago || 'mensual') as 'quincenal' | 'mensual',
             estado: row.estado || 'activo' as const,
             eps: row.eps || '',
             afp: row.afp || '',
@@ -56,11 +56,10 @@ export const ImportConfirmationStep: React.FC<ImportConfirmationStepProps> = ({
             cargo: row.cargo || '',
             empresaId: '', // Se asignará automáticamente en el servicio
             estadoAfiliacion: 'pendiente' as const,
-            // Campos bancarios opcionales
-            banco: row.banco || null,
-            tipoCuenta: row.tipoCuenta || 'ahorros',
-            numeroCuenta: row.numeroCuenta || null,
-            titularCuenta: row.titularCuenta || null
+            banco: row.banco || undefined,
+            tipoCuenta: row.tipoCuenta || 'ahorros' as const,
+            numeroCuenta: row.numeroCuenta || undefined,
+            titularCuenta: row.titularCuenta || undefined
           };
 
           await EmployeeService.createEmployee(employeeData);
@@ -126,7 +125,7 @@ export const ImportConfirmationStep: React.FC<ImportConfirmationStepProps> = ({
               <span className="text-blue-800 font-medium">Total</span>
               <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                 {data.totalRows}
-              </Badge>
+              </Badge> 
             </div>
           </div>
         </div>

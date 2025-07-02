@@ -27,7 +27,6 @@ const EditEmployeePage = () => {
 
   const handleDataRefresh = (updatedEmployee: any) => {
     console.log('🔄 Employee data refreshed:', updatedEmployee);
-    // The query will automatically refresh due to cache invalidation
   };
 
   if (isLoading) {
@@ -62,7 +61,7 @@ const EditEmployeePage = () => {
 
   return (
     <EmployeeFormModern
-      employee={employee as any} // Type assertion for compatibility
+      employee={employee}
       onSuccess={handleSuccess}
       onCancel={handleCancel}
       onDataRefresh={handleDataRefresh}

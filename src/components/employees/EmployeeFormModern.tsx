@@ -1,6 +1,6 @@
 
 import { useMemo } from 'react';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeFormSubmission } from '@/hooks/useEmployeeFormSubmission';
 import { useEmployeeEditSubmission } from '@/hooks/useEmployeeEditSubmission';
@@ -13,10 +13,10 @@ import { EmployeeFormFooter } from './form/EmployeeFormFooter';
 import { useEmployeeForm } from './form/useEmployeeForm';
 
 interface EmployeeFormModernProps {
-  employee?: Employee;
+  employee?: EmployeeUnified;
   onSuccess: () => void;
   onCancel: () => void;
-  onDataRefresh?: (updatedEmployee: Employee) => void;
+  onDataRefresh?: (updatedEmployee: EmployeeUnified) => void;
 }
 
 export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefresh }: EmployeeFormModernProps) => {
@@ -48,7 +48,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   // Memoize the data refresh handler to prevent unnecessary re-renders
   const memoizedDataRefresh = useMemo(() => {
-    return (updatedEmployee: Employee) => {
+    return (updatedEmployee: EmployeeUnified) => {
       console.log('🔄 EmployeeFormModern: Data refresh callback triggered');
       onDataRefresh?.(updatedEmployee);
     };
@@ -56,7 +56,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   // Use different submission hooks based on whether we're creating or editing
   const { handleSubmit: handleCreateSubmission, isLoading: isCreating } = useEmployeeFormSubmission(
-    undefined, // No employee for creation
+    undefined,
     onSuccess, 
     memoizedDataRefresh
   );
@@ -74,10 +74,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     console.log('🚀 EmployeeFormModern: Form submission triggered with data:', data);
     
     if (employee) {
-      // Edit mode
       await handleEditSubmission(data);
     } else {
-      // Create mode
       await handleCreateSubmission(data, companyId, []);
     }
   };

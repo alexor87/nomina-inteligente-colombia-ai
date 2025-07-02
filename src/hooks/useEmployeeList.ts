@@ -1,9 +1,9 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtimeEmployees } from '@/hooks/useRealtimeEmployees';
 import { EmployeeService } from '@/services/EmployeeService';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { EmployeeWithStatus } from '@/types/employee-extended';
 import { usePagination } from '@/hooks/usePagination';
 import { useEmployeeFiltering } from '@/hooks/useEmployeeFiltering';
 import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
@@ -13,17 +13,10 @@ import { useQueryClient } from '@tanstack/react-query';
 export const useEmployeeList = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [allEmployees, setAllEmployees] = useState<EmployeeWithStatus[]>([]);
+  const [allEmployees, setAllEmployees] = useState<EmployeeUnified[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
-
-  // Convertir EmployeeUnified a EmployeeWithStatus
-  const mapToEmployeeWithStatus = (employee: EmployeeUnified): EmployeeWithStatus => ({
-    ...employee,
-    periodicidadPago: (employee.periodicidadPago as 'quincenal' | 'mensual') || 'mensual',
-    empresaId: employee.empresaId || employee.company_id || '' // Ensure empresaId is always present
-  });
 
   // Filtros y paginación
   const {
@@ -61,13 +54,12 @@ export const useEmployeeList = () => {
 
   const invalidateAllCaches = useCallback(() => {
     console.log('🗑️ Invalidating caches...');
-    queryClient.invalidateQueries();
-    queryClient.removeQueries();
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
+    queryClient.removeQueries({ queryKey: ['employees'] });
   }, [queryClient]);
 
   const loadEmployees = useCallback(async (force = false) => {
     try {
-      // Don't show loading for forced refreshes to avoid UI blocking
       if (!force) {
         setIsLoading(true);
       }
@@ -80,11 +72,10 @@ export const useEmployeeList = () => {
       }
       
       const data = await EmployeeService.getAllEmployees();
-      const employeesWithStatus = data.map(mapToEmployeeWithStatus);
-      setAllEmployees(employeesWithStatus);
-      setLastRefresh(Date.now());
-      
       console.log('👥 Employees loaded:', data.length);
+      
+      setAllEmployees(data);
+      setLastRefresh(Date.now());
       
       if (force) {
         toast({
@@ -94,13 +85,13 @@ export const useEmployeeList = () => {
       }
     } catch (err) {
       console.error('Error loading employees:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      setError(errorMessage);
       
-      // Only show error toast if it's not a forced refresh
       if (!force) {
         toast({
           title: "Error al cargar empleados",
-          description: "No se pudieron cargar los empleados",
+          description: errorMessage,
           variant: "destructive"
         });
       }
@@ -113,18 +104,18 @@ export const useEmployeeList = () => {
   useRealtimeEmployees({
     onEmployeeChange: useCallback(() => {
       console.log('🔄 Detectado cambio en empleados via realtime, recargando...');
-      loadEmployees(true); // Use forced refresh for realtime updates
+      loadEmployees(true);
     }, [loadEmployees])
   });
 
-  // Load employees on mount with a slight delay to allow auth to settle
+  // Load employees on mount
   useEffect(() => {
     const timer = setTimeout(() => {
       loadEmployees();
     }, 100);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [loadEmployees]);
 
   const refreshEmployees = useCallback(() => {
     console.log('🔄 Manual refresh requested');
@@ -134,14 +125,10 @@ export const useEmployeeList = () => {
   const forceCompleteRefresh = useCallback(() => {
     console.log('💥 Force complete refresh');
     
-    // Clear state
     setAllEmployees([]);
     setError(null);
-    
-    // Invalidate caches
     invalidateAllCaches();
     
-    // Reload after short delay
     setTimeout(() => {
       loadEmployees(true);
     }, 50);

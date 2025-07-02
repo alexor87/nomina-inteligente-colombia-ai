@@ -5,11 +5,24 @@ import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/t
 export class EmployeeService {
   static async getAllEmployees(): Promise<EmployeeUnified[]> {
     try {
-      console.log('🔄 EmployeeService: Fetching all employees');
+      console.log('🔄 EmployeeService: Fetching all employees with company filter');
       
+      // Get current user's company ID first
+      const { data: companyData, error: companyError } = await supabase
+        .rpc('get_current_user_company_id');
+
+      if (companyError || !companyData) {
+        console.error('❌ Error getting company ID:', companyError);
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+
+      console.log('🏢 Company ID:', companyData);
+
+      // Now fetch employees for the specific company
       const { data, error } = await supabase
         .from('employees')
         .select('*')
+        .eq('company_id', companyData)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -17,7 +30,7 @@ export class EmployeeService {
         throw error;
       }
 
-      console.log('✅ EmployeeService: Fetched', data?.length || 0, 'employees');
+      console.log('✅ EmployeeService: Fetched', data?.length || 0, 'employees for company:', companyData);
       
       return (data || []).map(mapDatabaseToUnified);
     } catch (error) {
@@ -58,7 +71,23 @@ export class EmployeeService {
     try {
       console.log('🔄 EmployeeService: Creating employee:', employeeData.nombre, employeeData.apellido);
       
-      const dbData = mapUnifiedToDatabase(employeeData);
+      // Get current user's company ID
+      const { data: companyData, error: companyError } = await supabase
+        .rpc('get_current_user_company_id');
+
+      if (companyError || !companyData) {
+        console.error('❌ Error getting company ID:', companyError);
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+
+      // Set company_id for the employee
+      const employeeWithCompany = {
+        ...employeeData,
+        empresaId: companyData,
+        company_id: companyData
+      };
+      
+      const dbData = mapUnifiedToDatabase(employeeWithCompany);
       
       const { data, error } = await supabase
         .from('employees')
@@ -149,7 +178,7 @@ export class EmployeeService {
     }
   }
 
-  // Add backward compatibility methods
+  // Backward compatibility methods
   static async create(employeeData: any): Promise<EmployeeUnified> {
     return this.createEmployee(employeeData);
   }
@@ -166,7 +195,6 @@ export class EmployeeService {
     return this.changeEmployeeStatus(id, newStatus);
   }
 
-  // Alias for backward compatibility
   static async getEmployees(): Promise<EmployeeUnified[]> {
     return this.getAllEmployees();
   }
