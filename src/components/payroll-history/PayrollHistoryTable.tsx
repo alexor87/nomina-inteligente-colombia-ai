@@ -1,217 +1,208 @@
 
+import React from 'react';
+import { PayrollHistoryPeriod } from '@/types/payroll-history';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Download, FileText, Edit2 } from 'lucide-react';
-import { PayrollHistoryPeriod } from '@/types/payroll-history';
-import { formatPeriodDateRange } from '@/utils/periodDateUtils';
+import { Eye, Edit, MoreHorizontal } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { formatCurrency } from '@/lib/utils';
 
 interface PayrollHistoryTableProps {
   periods: PayrollHistoryPeriod[];
   onViewDetails: (period: PayrollHistoryPeriod) => void;
-  onEditPeriod?: (period: PayrollHistoryPeriod) => void;
-  onDownloadFile?: (fileUrl: string, fileName: string) => void;
-  canUserEditPeriods?: boolean;
+  onEditPeriod: (period: PayrollHistoryPeriod) => void;
+  canUserEditPeriods: boolean;
 }
 
-export const PayrollHistoryTable = ({ 
-  periods, 
+export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
+  periods,
   onViewDetails,
   onEditPeriod,
-  onDownloadFile,
-  canUserEditPeriods = false
-}: PayrollHistoryTableProps) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const formatPeriodDate = (startDate: string, endDate: string) => {
-    return formatPeriodDateRange(startDate, endDate);
-  };
-
-  const getStatusBadge = (status: PayrollHistoryPeriod['status']) => {
+  canUserEditPeriods
+}) => {
+  const getStatusBadge = (status: string) => {
     const statusConfig = {
-      cerrado: { color: 'bg-green-100 text-green-800', text: 'Cerrado', icon: '✓' },
-      con_errores: { color: 'bg-red-100 text-red-800', text: 'Con errores', icon: '✗' },
-      revision: { color: 'bg-yellow-100 text-yellow-800', text: 'En revisión', icon: '⚠' },
-      editado: { color: 'bg-blue-100 text-blue-800', text: 'Editado', icon: '✏' },
-      reabierto: { color: 'bg-amber-100 text-amber-800', text: 'Reabierto', icon: '🔓' }
+      cerrado: { 
+        variant: 'default' as const, 
+        className: 'bg-green-100 text-green-800 border-green-200',
+        label: 'Cerrado' 
+      },
+      con_errores: { 
+        variant: 'destructive' as const, 
+        className: 'bg-red-100 text-red-800 border-red-200',
+        label: 'Con Errores' 
+      },
+      revision: { 
+        variant: 'secondary' as const, 
+        className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        label: 'En Revisión' 
+      },
+      editado: { 
+        variant: 'outline' as const, 
+        className: 'bg-blue-100 text-blue-800 border-blue-200',
+        label: 'Editado' 
+      },
+      reabierto: { 
+        variant: 'outline' as const, 
+        className: 'bg-orange-100 text-orange-800 border-orange-200',
+        label: 'Reabierto' 
+      }
     };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.revision;
     
-    const config = statusConfig[status];
     return (
-      <Badge className={`${config.color} text-xs`}>
-        <span className="mr-1">{config.icon}</span>
-        {config.text}
+      <Badge variant={config.variant} className={config.className}>
+        {config.label}
       </Badge>
     );
   };
 
-  const getPaymentStatusBadge = (status: PayrollHistoryPeriod['paymentStatus']) => {
-    const statusConfig = {
-      pagado: { color: 'bg-green-100 text-green-800', text: 'Pagado', icon: '✓' },
-      parcial: { color: 'bg-yellow-100 text-yellow-800', text: 'Parcial', icon: '⚠' },
-      pendiente: { color: 'bg-red-100 text-red-800', text: 'Pendiente', icon: '⏳' }
+  const getTypeBadge = (type: string) => {
+    const typeLabels = {
+      semanal: 'Semanal',
+      quincenal: 'Quincenal', 
+      mensual: 'Mensual',
+      personalizado: 'Personalizado'
     };
     
-    const config = statusConfig[status];
     return (
-      <Badge className={`${config.color} text-xs`}>
-        <span className="mr-1">{config.icon}</span>
-        {config.text}
+      <Badge variant="outline" className="text-xs">
+        {typeLabels[type as keyof typeof typeLabels] || type}
       </Badge>
     );
   };
 
-  const handleDownloadPila = (period: PayrollHistoryPeriod) => {
-    if (period.pilaFileUrl && onDownloadFile) {
-      onDownloadFile(period.pilaFileUrl, `pila-${period.id}.txt`);
-    }
-  };
-
-  const handleEditPeriod = (period: PayrollHistoryPeriod) => {
-    if (onEditPeriod) {
-      onEditPeriod(period);
-    }
-  };
-
-  // Check if period has vouchers (simplified check based on status)
-  const hasVouchers = (period: PayrollHistoryPeriod) => {
-    return period.status === 'cerrado' || period.pilaFileUrl;
-  };
+  if (periods.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-gray-500 mb-4">
+          <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No hay períodos de nómina</h3>
+        <p className="text-gray-500">Aún no se han procesado períodos de nómina para mostrar en el historial.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50">
-              <TableHead className="font-semibold min-w-[180px] w-[180px]">Período</TableHead>
-              <TableHead className="font-semibold text-center min-w-[100px]">Empleados</TableHead>
-              <TableHead className="font-semibold min-w-[120px]">Estado</TableHead>
-              <TableHead className="font-semibold min-w-[140px]">Total Devengado</TableHead>
-              <TableHead className="font-semibold min-w-[140px]">Neto Pagado</TableHead>
-              <TableHead className="font-semibold min-w-[130px]">Archivo PILA</TableHead>
-              <TableHead className="font-semibold min-w-[120px]">Estado Pagos</TableHead>
-              <TableHead className="font-semibold text-center min-w-[140px]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Período
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Fechas
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tipo
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Empleados
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total Bruto
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total Neto
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
             {periods.map((period) => (
-              <TableRow key={period.id} className="hover:bg-gray-50">
-                <TableCell className="font-medium min-w-[180px] w-[180px]">
-                  <div className="min-w-0">
-                    <button
-                      onClick={() => onViewDetails(period)}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block truncate"
-                      title={formatPeriodDate(period.startDate, period.endDate)}
-                    >
-                      <span className="whitespace-nowrap">
-                        {formatPeriodDate(period.startDate, period.endDate)}
-                      </span>
-                    </button>
-                    <div className="text-xs text-gray-500 capitalize">{period.type}</div>
-                    {period.version > 1 && (
-                      <div className="text-xs text-blue-600 font-medium">v{period.version}</div>
-                    )}
-                    {period.editedBy && (
-                      <div className="text-xs text-gray-400 truncate">
-                        Editado por {period.editedBy.split('@')[0]}
-                      </div>
-                    )}
+              <tr key={period.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">{period.period}</div>
+                  <div className="text-xs text-gray-500">
+                    Versión {period.version}
+                    {period.originalId && ' (Editado)'}
                   </div>
-                </TableCell>
-                <TableCell className="min-w-[100px]">
-                  <div className="text-center">
-                    <span className="text-lg font-semibold text-gray-900">{period.employeesCount}</span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">
+                    {new Date(period.startDate).toLocaleDateString('es-ES')}
                   </div>
-                </TableCell>
-                <TableCell className="min-w-[120px]">
+                  <div className="text-sm text-gray-500">
+                    {new Date(period.endDate).toLocaleDateString('es-ES')}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getTypeBadge(period.type)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {period.employeesCount}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {formatCurrency(period.totalGrossPay)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {formatCurrency(period.totalNetPay)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   {getStatusBadge(period.status)}
-                </TableCell>
-                <TableCell className="font-medium text-green-600 min-w-[140px]">
-                  <span className="whitespace-nowrap">
-                    {formatCurrency(period.totalGrossPay)}
-                  </span>
-                </TableCell>
-                <TableCell className="font-medium text-blue-600 min-w-[140px]">
-                  <span className="whitespace-nowrap">
-                    {formatCurrency(period.totalNetPay)}
-                  </span>
-                </TableCell>
-                <TableCell className="min-w-[130px]">
-                  {period.pilaFileUrl ? (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-blue-600 hover:text-blue-800 whitespace-nowrap"
-                      onClick={() => handleDownloadPila(period)}
-                    >
-                      <FileText className="h-4 w-4 mr-1" />
-                      Descargar
-                    </Button>
-                  ) : (
-                    <span className="text-gray-400 text-sm">No disponible</span>
-                  )}
-                </TableCell>
-                <TableCell className="min-w-[120px]">
-                  {getPaymentStatusBadge(period.paymentStatus)}
-                </TableCell>
-                <TableCell className="min-w-[140px]">
-                  <div className="flex items-center justify-center space-x-1">
-                    {/* View Details Button */}
-                    <Button 
-                      variant="ghost" 
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div className="flex items-center justify-end space-x-2">
+                    <Button
+                      variant="ghost"
                       size="sm"
                       onClick={() => onViewDetails(period)}
-                      className="text-blue-600 hover:text-blue-800 flex-shrink-0"
-                      title="Ver detalles"
+                      className="text-gray-600 hover:text-gray-900"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-
-                    {/* Edit Period Button - Only show if user can edit and period is closed */}
-                    {canUserEditPeriods && period.status === 'cerrado' && (
-                      <Button 
-                        variant="ghost" 
+                    
+                    {canUserEditPeriods && period.editable && (
+                      <Button
+                        variant="ghost"
                         size="sm"
-                        onClick={() => handleEditPeriod(period)}
-                        className="text-amber-600 hover:text-amber-800 flex-shrink-0"
-                        title="Editar período"
+                        onClick={() => onEditPeriod(period)}
+                        className="text-blue-600 hover:text-blue-900"
                       >
-                        <Edit2 className="h-4 w-4" />
+                        <Edit className="h-4 w-4" />
                       </Button>
                     )}
                     
-                    {/* Download Button - Only show if has vouchers */}
-                    {hasVouchers(period) && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="text-green-600 hover:text-green-800 flex-shrink-0"
-                        onClick={() => handleDownloadPila(period)}
-                        title="Descargar archivos"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onViewDetails(period)}>
+                          Ver detalles
+                        </DropdownMenuItem>
+                        {canUserEditPeriods && period.editable && (
+                          <DropdownMenuItem onClick={() => onEditPeriod(period)}>
+                            Editar período
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             ))}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
-      
-      {periods.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">No se encontraron períodos que coincidan con los filtros</p>
-        </div>
-      )}
     </div>
   );
 };
