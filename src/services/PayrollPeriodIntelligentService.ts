@@ -1,7 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PAYROLL_STATES } from '@/constants/payrollStates';
+import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
+import { PostClosureDetectionService } from './payroll-intelligent/PostClosureDetectionService';
 
-// Tipos específicos para este servicio basados en la base de datos real
 interface CompanySettings {
   id: string;
   company_id: string;
@@ -40,7 +41,7 @@ export interface PeriodStatus {
 }
 
 export class PayrollPeriodIntelligentService {
-  // 📅 1. Detección automática del período MEJORADA con manejo post-cierre
+  // 📅 1. Detección automática del período MEJORADA con servicio post-cierre
   static async detectCurrentPeriod(): Promise<PeriodStatus> {
     try {
       console.log('🔍 INICIANDO DETECCIÓN AUTOMÁTICA MEJORADA...');
@@ -73,48 +74,26 @@ export class PayrollPeriodIntelligentService {
 
       console.log('📋 No hay período activo, buscando último período cerrado...');
 
-      // PASO 3: BUSCAR ÚLTIMO PERÍODO CERRADO CON RETRY MEJORADO
-      const lastClosedPeriod = await this.findLastClosedPeriodWithRetry(companyId);
+      // PASO 3: BUSCAR ÚLTIMO PERÍODO CERRADO CON SERVICIO MEJORADO
+      const lastClosedPeriod = await this.findLastClosedPeriodRobust(companyId);
       
       if (lastClosedPeriod) {
         console.log('🔒 Último período cerrado encontrado:', lastClosedPeriod.periodo);
-        console.log('📅 Fechas:', lastClosedPeriod.fecha_inicio, '-', lastClosedPeriod.fecha_fin);
-        console.log('📊 Estado confirmado:', lastClosedPeriod.estado);
         
-        // Calcular siguiente período basado en el cerrado
-        const nextPeriodDates = this.generateNextPeriodFromClosed(lastClosedPeriod, periodicity);
-        console.log('📊 Siguiente período calculado:', nextPeriodDates);
-        
-        // Verificar si ya existe un período para esas fechas
-        const existingNextPeriod = await this.findPeriodByDates(companyId, nextPeriodDates.startDate, nextPeriodDates.endDate);
-        
-        if (existingNextPeriod) {
-          console.log('⚠️ Ya existe período para esas fechas:', existingNextPeriod.id);
-          // Buscar el siguiente disponible
-          const nextAvailableDates = this.generateSubsequentPeriod(nextPeriodDates, periodicity);
-          
+        // Usar servicio de detección post-cierre
+        const postClosureResult = await PostClosureDetectionService.verifyClosureAndDetectNext(
+          lastClosedPeriod.id,
+          companyId
+        );
+
+        if (postClosureResult.success && postClosureResult.nextPeriodSuggestion) {
           return {
             hasActivePeriod: false,
-            nextPeriod: {
-              startDate: nextAvailableDates.startDate,
-              endDate: nextAvailableDates.endDate,
-              type: periodicity
-            },
+            nextPeriod: postClosureResult.nextPeriodSuggestion,
             action: 'suggest_next',
-            message: `Crear siguiente período disponible: ${this.formatPeriodName(nextAvailableDates.startDate, nextAvailableDates.endDate)}`
+            message: postClosureResult.message
           };
         }
-        
-        return {
-          hasActivePeriod: false,
-          nextPeriod: {
-            startDate: nextPeriodDates.startDate,
-            endDate: nextPeriodDates.endDate,
-            type: periodicity
-          },
-          action: 'suggest_next',
-          message: `Crear siguiente período: ${this.formatPeriodName(nextPeriodDates.startDate, nextPeriodDates.endDate)}`
-        };
       }
 
       // PASO 4: Si no hay períodos cerrados, crear el primer período
@@ -135,17 +114,18 @@ export class PayrollPeriodIntelligentService {
     }
   }
 
-  // 🆕 NUEVO: Buscar último período cerrado con retry para problemas post-cierre
-  static async findLastClosedPeriodWithRetry(companyId: string, maxRetries: number = 3): Promise<PayrollPeriod | null> {
+  // 🆕 NUEVO: Buscar último período cerrado con robustez mejorada
+  static async findLastClosedPeriodRobust(companyId: string, maxRetries: number = 5): Promise<PayrollPeriod | null> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🔍 Buscando último período cerrado (intento ${attempt}/${maxRetries})`);
+        console.log(`🔍 Búsqueda robusta de período cerrado (intento ${attempt}/${maxRetries})`);
         
+        // Consulta mejorada con múltiples estados cerrados
         const { data, error } = await supabase
           .from('payroll_periods_real')
           .select('*')
           .eq('company_id', companyId)
-          .eq('estado', PAYROLL_STATES.CERRADO)
+          .in('estado', [PAYROLL_STATES.CERRADO, PAYROLL_STATES.PROCESADA, PAYROLL_STATES.PAGADA])
           .order('fecha_fin', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -157,26 +137,24 @@ export class PayrollPeriodIntelligentService {
         }
         
         if (data) {
-          console.log(`✅ Período cerrado encontrado en intento ${attempt}:`, data.periodo, 'ID:', data.id);
-          console.log(`📊 Estado verificado: "${data.estado}"`);
+          console.log(`✅ Período cerrado encontrado en intento ${attempt}:`, data.periodo);
           return data as PayrollPeriod;
         } else {
           console.log(`ℹ️ No se encontró período cerrado en intento ${attempt}`);
         }
         
-        // Si no encontramos nada pero no hay error, esperar un poco antes del siguiente intento
+        // Esperar antes del siguiente intento
         if (attempt < maxRetries) {
-          console.log(`⏰ Esperando 1000ms antes del siguiente intento...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          console.log(`⏰ Esperando ${1000 * attempt}ms antes del siguiente intento...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
         
       } catch (error) {
-        console.error(`❌ Error en intento ${attempt} buscando período cerrado:`, error);
+        console.error(`❌ Error en intento ${attempt}:`, error);
         if (attempt === maxRetries) {
           console.error('❌ Todos los intentos fallaron');
           return null;
         }
-        // Esperar antes del siguiente intento
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     }
@@ -184,7 +162,6 @@ export class PayrollPeriodIntelligentService {
     return null;
   }
 
-  // 🆕 NUEVO: Asegurar configuración de empresa
   static async ensureCompanySettings(companyId: string): Promise<CompanySettings> {
     try {
       console.log('⚙️ Verificando configuración de empresa...');
@@ -225,105 +202,6 @@ export class PayrollPeriodIntelligentService {
     }
   }
 
-  // 🆕 NUEVO: Buscar último período cerrado
-  static async findLastClosedPeriod(companyId: string): Promise<PayrollPeriod | null> {
-    try {
-      const { data, error } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('estado', 'cerrado')
-        .order('fecha_fin', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      
-      if (data) {
-        console.log('🔒 Último período cerrado:', data.periodo, 'ID:', data.id);
-      }
-      
-      return data as PayrollPeriod;
-    } catch (error) {
-      console.error('❌ Error buscando último período cerrado:', error);
-      return null;
-    }
-  }
-
-  // 🆕 NUEVO: Generar siguiente período basado en período cerrado específico
-  static generateNextPeriodFromClosed(closedPeriod: PayrollPeriod, periodicity: string) {
-    console.log('📅 Generando siguiente período desde período cerrado:', closedPeriod.periodo);
-    
-    const lastEndDate = new Date(closedPeriod.fecha_fin);
-    console.log('📆 Última fecha fin:', lastEndDate.toISOString().split('T')[0]);
-    
-    // El siguiente período inicia el día después del cierre
-    const nextStartDate = new Date(lastEndDate);
-    nextStartDate.setDate(nextStartDate.getDate() + 1);
-    
-    let nextEndDate: Date;
-    
-    switch (periodicity) {
-      case 'mensual':
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setMonth(nextEndDate.getMonth() + 1);
-        nextEndDate.setDate(nextEndDate.getDate() - 1);
-        break;
-        
-      case 'quincenal':
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextEndDate.getDate() + 14);
-        break;
-        
-      case 'semanal':
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextEndDate.getDate() + 6);
-        break;
-        
-      default:
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setMonth(nextEndDate.getMonth() + 1);
-        nextEndDate.setDate(nextEndDate.getDate() - 1);
-    }
-
-    const result = {
-      startDate: nextStartDate.toISOString().split('T')[0],
-      endDate: nextEndDate.toISOString().split('T')[0]
-    };
-    
-    console.log('✅ Siguiente período calculado:', result);
-    return result;
-  }
-
-  // 🆕 NUEVO: Buscar período por fechas específicas
-  static async findPeriodByDates(companyId: string, startDate: string, endDate: string): Promise<PayrollPeriod | null> {
-    try {
-      const { data, error } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('fecha_inicio', startDate)
-        .eq('fecha_fin', endDate)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data as PayrollPeriod;
-    } catch (error) {
-      console.error('❌ Error buscando período por fechas:', error);
-      return null;
-    }
-  }
-
-  // 🆕 NUEVO: Generar período subsecuente si ya existe
-  static generateSubsequentPeriod(currentDates: { startDate: string; endDate: string }, periodicity: string) {
-    const currentEndDate = new Date(currentDates.endDate);
-    const nextStartDate = new Date(currentEndDate);
-    nextStartDate.setDate(nextStartDate.getDate() + 1);
-    
-    return this.generatePeriodDates(nextStartDate, periodicity);
-  }
-
-  // 🔄 2. Reglas de generación y validación de períodos CORREGIDAS
   static generatePeriodDates(currentDate: Date, periodicity: string) {
     const today = new Date(currentDate);
     let startDate: Date;
@@ -365,29 +243,6 @@ export class PayrollPeriodIntelligentService {
     };
   }
 
-  static formatPeriodName(startDate: string, endDate: string): string {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    const months = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    
-    if (start.getMonth() === end.getMonth()) {
-      if (start.getDate() === 1 && end.getDate() <= 15) {
-        return `${months[start.getMonth()]} ${start.getFullYear()} - 1ra Quincena`;
-      } else if (start.getDate() === 16) {
-        return `${months[start.getMonth()]} ${start.getFullYear()} - 2da Quincena`;
-      } else {
-        return `${months[start.getMonth()]} ${start.getFullYear()}`;
-      }
-    } else {
-      return `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}/${end.getFullYear()}`;
-    }
-  }
-
-  // Métodos auxiliares existentes
   static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -443,7 +298,12 @@ export class PayrollPeriodIntelligentService {
 
   static async createAutomaticPeriod(companyId: string, dates: { startDate: string; endDate: string }, periodicity: string): Promise<PayrollPeriod> {
     try {
-      const periodName = this.formatPeriodName(dates.startDate, dates.endDate);
+      // Usar servicio unificado para generar nombre
+      const periodName = PeriodNameUnifiedService.generateUnifiedPeriodName({
+        startDate: dates.startDate,
+        endDate: dates.endDate,
+        periodicity: periodicity as any
+      });
       
       const { data, error } = await supabase
         .from('payroll_periods_real')

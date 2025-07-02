@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
-import { STATE_MAPPING, PAYROLL_STATES } from '@/constants/payrollStates';
+import { PAYROLL_STATES } from '@/constants/payrollStates';
+import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -41,6 +42,9 @@ export class PayrollHistoryService {
 
       console.log('🔍 Consultando períodos para empresa:', companyId);
 
+      // Primero normalizar períodos existentes para consistencia
+      await PeriodNameUnifiedService.normalizeExistingPeriods(companyId);
+
       const { data: periods, error: periodsError } = await supabase
         .from('payroll_periods_real')
         .select('*')
@@ -55,23 +59,28 @@ export class PayrollHistoryService {
       console.log('📊 Períodos encontrados:', periods?.length || 0);
 
       const transformedPeriods = periods?.map(period => {
-        console.log(`📄 Período "${period.periodo}": DB estado="${period.estado}" → UI estado="${this.mapStatus(period.estado)}"`);
+        console.log(`📄 Procesando período "${period.periodo}"`);
+        
+        // Usar servicio unificado para estado
+        const stateInfo = PeriodNameUnifiedService.getUnifiedStateInfo(period.estado);
+        
+        console.log(`📊 Estado: DB="${period.estado}" → UI="${stateInfo.displayState}"`);
         
         return {
           id: period.id,
-          periodo: this.generatePeriodName(period.fecha_inicio, period.fecha_fin),
+          periodo: period.periodo, // Ya normalizado
           fecha_inicio: period.fecha_inicio,
           fecha_fin: period.fecha_fin,
           empleados: period.empleados_count || 0,
           totalNomina: Number(period.total_neto || 0),
-          estado: this.mapStatus(period.estado), // CORREGIDO: Usar mapeo mejorado
+          estado: stateInfo.displayState,
           fechaCreacion: period.created_at,
-          editable: period.estado === PAYROLL_STATES.BORRADOR, // Solo borrador es editable
+          editable: stateInfo.isEditable,
           reportado_dian: false
         };
       }) || [];
 
-      console.log('✅ Períodos transformados con estados corregidos:', transformedPeriods.length);
+      console.log('✅ Períodos transformados correctamente:', transformedPeriods.length);
       return transformedPeriods;
     } catch (error) {
       console.error('💥 Error crítico en getPayrollPeriods:', error);
@@ -132,15 +141,18 @@ export class PayrollHistoryService {
         aportesEmpleador: employees.length * 100000 // Mock calculation
       };
 
+      // Usar servicio unificado para información del estado
+      const stateInfo = PeriodNameUnifiedService.getUnifiedStateInfo(period.estado);
+
       return {
         period: {
           id: period.id,
-          period: this.generatePeriodName(period.fecha_inicio, period.fecha_fin),
+          period: period.periodo,
           startDate: period.fecha_inicio,
           endDate: period.fecha_fin,
           type: this.mapPeriodType(period.tipo_periodo),
           employeesCount: employees.length,
-          status: this.mapStatus(period.estado) as any,
+          status: stateInfo.displayState as any,
           totalGrossPay: summary.totalDevengado,
           totalNetPay: summary.totalNeto,
           totalDeductions: summary.totalDeducciones,
@@ -150,7 +162,7 @@ export class PayrollHistoryService {
           version: 1,
           createdAt: period.created_at,
           updatedAt: period.updated_at,
-          editable: period.estado !== 'cerrado'
+          editable: stateInfo.isEditable
         },
         summary,
         employees,
@@ -249,33 +261,6 @@ export class PayrollHistoryService {
       console.error('Error recalculating period totals:', error);
       throw error;
     }
-  }
-
-  static generatePeriodName(fechaInicio: string, fechaFin: string): string {
-    const startDate = new Date(fechaInicio);
-    const endDate = new Date(fechaFin);
-    
-    const startMonth = startDate.toLocaleString('es-ES', { month: 'long' });
-    const startYear = startDate.getFullYear();
-    const endMonth = endDate.toLocaleString('es-ES', { month: 'long' });
-    const endYear = endDate.getFullYear();
-
-    if (startMonth === endMonth && startYear === endYear) {
-      return `${startMonth.charAt(0).toUpperCase() + startMonth.slice(1)} ${startYear}`;
-    }
-
-    return `${startDate.getDate()}/${startDate.getMonth() + 1}/${startYear} - ${endDate.getDate()}/${endDate.getMonth() + 1}/${endYear}`;
-  }
-
-  // PASO 1: MAPEO DE ESTADOS COMPLETAMENTE CORREGIDO
-  static mapStatus(estado: string): string {
-    console.log(`🔄 Mapeando estado de base de datos: "${estado}"`);
-    
-    // Usar constantes compartidas para el mapeo
-    const mappedStatus = STATE_MAPPING[estado] || 'con_errores';
-    
-    console.log(`📊 Estado "${estado}" → "${mappedStatus}"`);
-    return mappedStatus;
   }
 
   static mapPeriodType(tipoPeriodo: string): 'semanal' | 'quincenal' | 'mensual' | 'personalizado' {
