@@ -362,7 +362,7 @@ export const usePayrollLiquidation = () => {
     }
   }, [toast, currentPeriod, employees, loadNovedadesTotals]);
 
-  // Aprobar período con validaciones mejoradas (Fase 3)
+  // Aprobar período con validaciones mejoradas y flujo completo (Fase 3)
   const approvePeriod = useCallback(async () => {
     if (!currentPeriod) {
       toast({
@@ -375,64 +375,64 @@ export const usePayrollLiquidation = () => {
 
     setIsLoading(true);
     try {
-      console.log('🔒 Iniciando aprobación de período con validaciones completas:', currentPeriod.id);
+      console.log('🔒 Iniciando liquidación completa de período:', currentPeriod.id);
 
-      // Usar el nuevo método de cierre con validaciones
-      const closureResult = await PayrollPeriodService.closePeriod(currentPeriod.id);
-
-      if (!closureResult.success) {
-        // Mostrar errores específicos
+      // 1. Validar que hay empleados para liquidar
+      const validEmployees = employees.filter(emp => emp.status === 'valid');
+      if (validEmployees.length === 0) {
         toast({
-          title: "No se puede cerrar el período",
-          description: closureResult.errors.join('. '),
+          title: "Sin empleados válidos",
+          description: "No hay empleados válidos para liquidar",
           variant: "destructive"
         });
-
-        // Si hay advertencias, mostrarlas también
-        if (closureResult.warnings.length > 0) {
-          setTimeout(() => {
-            toast({
-              title: "Advertencias",
-              description: closureResult.warnings.join('. '),
-              variant: "default"
-            });
-          }, 2000);
-        }
         return;
       }
 
-      // Éxito en el cierre
+      console.log(`📋 Liquidando ${validEmployees.length} empleados válidos`);
+
+      // 2. Guardar liquidación en historial ANTES de cerrar el período
+      try {
+        console.log('💾 Guardando liquidación en historial...');
+        const liquidationData = {
+          period: currentPeriod,
+          employees: validEmployees
+        };
+
+        await PayrollLiquidationService.savePayrollLiquidation(liquidationData);
+        console.log('✅ Liquidación guardada exitosamente en historial');
+        
+        toast({
+          title: "Liquidación registrada",
+          description: `Nómina guardada para ${validEmployees.length} empleados`
+        });
+      } catch (historyError) {
+        console.error('❌ Error guardando liquidación:', historyError);
+        toast({
+          title: "Error en liquidación",
+          description: "No se pudo guardar la liquidación en el historial",
+          variant: "destructive"
+        });
+        return; // No continuar si no se puede guardar la liquidación
+      }
+
+      // 3. Cerrar período con validaciones
+      console.log('🔒 Cerrando período...');
+      const closureResult = await PayrollPeriodService.closePeriod(currentPeriod.id);
+
+      if (!closureResult.success) {
+        toast({
+          title: "Error cerrando período",
+          description: closureResult.errors.join('. '),
+          variant: "destructive"
+        });
+        return;
+      }
+
       console.log('✅ Período cerrado exitosamente');
 
-      // Actualizar el estado local
-      if (closureResult.period) {
-        setCurrentPeriod(closureResult.period);
-      }
-
-      // Mostrar mensaje de éxito
-      toast({
-        title: "Período aprobado",
-        description: "El período de nómina ha sido cerrado exitosamente",
-        variant: "default"
-      });
-
-      // Mostrar advertencias si las hay
-      if (closureResult.warnings.length > 0) {
-        setTimeout(() => {
-          toast({
-            title: "Información adicional",
-            description: closureResult.warnings.join('. '),
-            variant: "default"
-          });
-        }, 2000);
-      }
-
-      // Mostrar modal de éxito
-      setShowSuccessModal(true);
-
-      // Crear automáticamente el siguiente período
+      // 4. Crear siguiente período automáticamente
       try {
-        console.log('🔄 Creando siguiente período después de liquidación exitosa...');
+        console.log('🔄 Creando siguiente período...');
         const companySettings = await PayrollPeriodService.getCompanySettings();
         const periodicity = companySettings?.periodicity || 'mensual';
         
@@ -451,60 +451,58 @@ export const usePayrollLiquidation = () => {
           if (nextPeriod) {
             console.log('✅ Siguiente período creado automáticamente:', nextPeriod);
             
-            // Actualizar estado inmediatamente sin recargar página
+            // 5. Actualizar estado inmediatamente
             setCurrentPeriod(nextPeriod);
             setIsReopenedPeriod(false);
             
-            // Mostrar mensaje de transición
+            // 6. Limpiar empleados para el nuevo período
+            setEmployees([]);
+            
+            // 7. Mostrar mensajes de éxito
+            toast({
+              title: "Liquidación completada",
+              description: "Período cerrado y nuevo período iniciado exitosamente"
+            });
+            
             setTimeout(() => {
               toast({
                 title: "Nuevo período iniciado",
                 description: `Período ${PayrollPeriodService.formatPeriodText(nextPeriod.fecha_inicio, nextPeriod.fecha_fin)} listo para liquidación`
               });
             }, 1000);
+            
+            // 8. Mostrar modal de éxito
+            setShowSuccessModal(true);
+            
+          } else {
+            console.warn('⚠️ No se pudo crear el siguiente período');
+            toast({
+              title: "Advertencia",
+              description: "Período cerrado exitosamente, pero el siguiente período debe crearse manualmente",
+              variant: "default"
+            });
           }
         }
       } catch (nextPeriodError) {
-        console.warn('⚠️ No se pudo crear el siguiente período automáticamente:', nextPeriodError);
-        // No bloquear el flujo principal
-      }
-
-      // Crear entrada en el historial simplificada
-      try {
-        console.log('📝 Guardando liquidación en historial...');
-        
-        // Guardar liquidación usando el servicio existente
-        const liquidationData = {
-          period: currentPeriod,
-          employees: employees.filter(emp => emp.status === 'valid')
-        };
-
-        await PayrollLiquidationService.savePayrollLiquidation(liquidationData);
-        console.log('✅ Liquidación guardada en historial exitosamente');
-        
-      } catch (historyError) {
-        console.error('❌ Error guardando liquidación:', historyError);
-        // No bloquear el flujo principal, pero mostrar advertencia
-        setTimeout(() => {
-          toast({
-            title: "Advertencia",
-            description: "El período se cerró correctamente, pero hubo un problema guardando en el historial.",
-            variant: "default"
-          });
-        }, 3000);
+        console.warn('⚠️ Error creando siguiente período:', nextPeriodError);
+        toast({
+          title: "Período cerrado",
+          description: "El período se cerró correctamente, pero hubo un problema creando el siguiente período",
+          variant: "default"
+        });
       }
 
     } catch (error) {
-      console.error('❌ Error aprobando período:', error);
+      console.error('❌ Error en liquidación completa:', error);
       toast({
-        title: "Error",
-        description: "Error inesperado al aprobar el período. Inténtalo de nuevo.",
+        title: "Error en liquidación",
+        description: "Error inesperado durante la liquidación. Verifica el estado de los datos.",
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
-  }, [currentPeriod, summary, employees, toast]);
+  }, [currentPeriod, employees, toast]);
 
   const handleFinishEditing = useCallback(async () => {
     await approvePeriod();
