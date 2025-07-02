@@ -39,27 +39,27 @@ export const UNIFIED_STATE_MAPPING: Record<string, HistoryDisplayState> = {
 };
 
 // Estados que permiten edición
-export const EDITABLE_STATES = [
+export const EDITABLE_STATES: UnifiedPayrollState[] = [
   UNIFIED_PAYROLL_STATES.BORRADOR,
   UNIFIED_PAYROLL_STATES.EDITADO,
   UNIFIED_PAYROLL_STATES.REABIERTO
 ];
 
 // Estados que permiten reapertura
-export const REOPENABLE_STATES = [
+export const REOPENABLE_STATES: UnifiedPayrollState[] = [
   UNIFIED_PAYROLL_STATES.CERRADO,
   UNIFIED_PAYROLL_STATES.PROCESADA
 ];
 
 // Estados considerados como "cerrados/finalizados"
-export const CLOSED_STATES = [
+export const CLOSED_STATES: UnifiedPayrollState[] = [
   UNIFIED_PAYROLL_STATES.CERRADO,
   UNIFIED_PAYROLL_STATES.PROCESADA,
   UNIFIED_PAYROLL_STATES.PAGADA
 ];
 
 // Estados considerados como "activos/trabajables"
-export const ACTIVE_STATES = [
+export const ACTIVE_STATES: UnifiedPayrollState[] = [
   UNIFIED_PAYROLL_STATES.BORRADOR,
   UNIFIED_PAYROLL_STATES.EDITADO,
   UNIFIED_PAYROLL_STATES.REABIERTO
