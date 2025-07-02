@@ -2,6 +2,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { CreateNovedadData, NovedadType } from '@/types/novedades-enhanced';
 
+// Export the interface for use in other files
+export { CreateNovedadData } from '@/types/novedades-enhanced';
+
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -40,13 +43,14 @@ export class NovedadesBackupService {
 
       if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
       
+      // Cast the tipo_novedad to the database type to avoid TypeScript errors
       const { data: result, error } = await supabase
         .from('payroll_novedades')
         .insert({
           company_id: profile.company_id,
           empleado_id: data.empleado_id,
           periodo_id: data.periodo_id,
-          tipo_novedad: data.tipo_novedad,
+          tipo_novedad: data.tipo_novedad as any, // Cast to avoid type conflicts
           valor: data.valor || 0,
           dias: data.dias,
           horas: data.horas,
@@ -92,9 +96,15 @@ export class NovedadesBackupService {
 
   static async updateNovedad(id: string, updates: Partial<CreateNovedadData>): Promise<PayrollNovedad | null> {
     try {
+      // Cast the updates to avoid type conflicts
+      const updateData = { ...updates };
+      if (updateData.tipo_novedad) {
+        (updateData as any).tipo_novedad = updateData.tipo_novedad as any;
+      }
+
       const { data, error } = await supabase
         .from('payroll_novedades')
-        .update(updates)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();

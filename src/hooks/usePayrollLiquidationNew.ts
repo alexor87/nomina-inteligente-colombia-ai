@@ -1,10 +1,9 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollPeriod, PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollPeriodIntelligentService, PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
 import { PayrollLiquidationNewService } from '@/services/PayrollLiquidationNewService';
-import { CreateNovedadData } from '@/services/NovedadesBackupService';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 export const usePayrollLiquidationNew = () => {
   const [isLoading, setIsLoading] = useState(true);
