@@ -117,4 +117,10 @@ export interface DashboardMetrics {
   monthlyPayrollTotal: number;
   complianceScore: number;
   alerts: number;
+  // Legacy Spanish property names for compatibility
+  totalEmpleados: number;
+  nominasProcesadas: number;
+  alertasLegales: number;
+  gastosNomina: number;
+  tendenciaMensual: number;
 }

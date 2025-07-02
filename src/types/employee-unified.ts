@@ -1,75 +1,78 @@
 
-// Unified Employee types to resolve inconsistencies
+// Import from the main types file
+import { Employee as MainEmployee } from '@/types';
 
-export interface EmployeeUnified {
-  // Core identification
-  id: string;
-  cedula: string;
-  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
-  
-  // Personal information
-  nombre: string;
-  segundoNombre?: string;
-  apellido: string;
-  email?: string;
-  telefono?: string;
-  sexo?: 'M' | 'F' | 'O';
-  fechaNacimiento?: string;
-  direccion?: string;
-  ciudad?: string;
-  departamento?: string;
-  
-  // Company relationship
-  empresaId: string; // Made required for consistency
-  company_id?: string; // For compatibility with database
-  
-  // Labor information
-  salarioBase: number;
-  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
-  fechaIngreso: string;
-  periodicidadPago: 'quincenal' | 'mensual'; // Made required with specific values
-  cargo?: string;
-  codigoCIIU?: string;
-  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
-  centroCostos?: string;
-  
-  // Contract details
-  fechaFirmaContrato?: string;
-  fechaFinalizacionContrato?: string;
-  tipoJornada?: 'completa' | 'parcial' | 'horas';
-  diasTrabajo?: number;
-  horasTrabajo?: number;
-  beneficiosExtralegales?: boolean;
-  clausulasEspeciales?: string;
-  
-  // Banking information
-  banco?: string;
-  tipoCuenta?: 'ahorros' | 'corriente';
-  numeroCuenta?: string;
-  titularCuenta?: string;
-  formaPago?: 'dispersion' | 'manual';
-  
-  // Affiliations
-  eps?: string;
-  afp?: string;
-  arl?: string;
-  cajaCompensacion?: string;
-  tipoCotizanteId?: string;
-  subtipoCotizanteId?: string;
-  regimenSalud?: 'contributivo' | 'subsidiado';
-  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
-  
-  // Timestamps
-  createdAt?: string;
-  updatedAt?: string;
+// Re-export as EmployeeUnified for backward compatibility
+export type EmployeeUnified = MainEmployee;
+export type Employee = MainEmployee;
+export type EmployeeWithStatus = MainEmployee;
+
+export interface EmployeeComplianceIndicators {
+  documentos: 'completo' | 'incompleto' | 'pendiente';
+  afiliaciones: 'completo' | 'incompleto' | 'pendiente';
+  contractual: 'completo' | 'incompleto' | 'pendiente';
 }
 
-// Use EmployeeUnified as the main type for all employee operations
-export type EmployeeWithStatus = EmployeeUnified;
+export interface ComplianceIndicator {
+  type: 'eps' | 'pension' | 'arl' | 'contrato';
+  status: 'completo' | 'pendiente' | 'vencido';
+  message: string;
+}
+
+export interface EmployeeFilters {
+  searchTerm: string;
+  estado?: string;
+  tipoContrato?: string;
+  centroCosto?: string;
+  fechaIngresoInicio?: string;
+  fechaIngresoFin?: string;
+  nivelRiesgoARL?: string;
+  afiliacionIncompleta?: boolean;
+}
+
+export interface EmployeeListFilters {
+  searchTerm: string;
+  estado: string;
+  tipoContrato: string;
+  cargo: string;
+  eps: string;
+  afp: string;
+  dateRange: {
+    from?: Date;
+    to?: Date;
+  };
+}
+
+export interface EmployeePagination {
+  currentPage: number;
+  itemsPerPage: number;
+  totalItems: number;
+  totalPages: number;
+  offset: number;
+}
+
+// Estados de empleado
+export const ESTADOS_EMPLEADO = [
+  { value: 'activo', label: 'Activo', color: 'bg-green-100 text-green-800' },
+  { value: 'inactivo', label: 'Inactivo', color: 'bg-red-100 text-red-800' },
+  { value: 'vacaciones', label: 'Vacaciones', color: 'bg-blue-100 text-blue-800' },
+  { value: 'incapacidad', label: 'Incapacidad', color: 'bg-yellow-100 text-yellow-800' }
+];
+
+// Centros de costo disponibles
+export const CENTROS_COSTO = [
+  'Administración',
+  'Ventas',
+  'Producción',
+  'Marketing',
+  'Recursos Humanos',
+  'Tecnología',
+  'Finanzas',
+  'Operaciones'
+];
 
 // Helper function to convert between database and form formats
-export function mapDatabaseToUnified(dbEmployee: any): EmployeeUnified {
+export function mapDatabaseToUnified(dbEmployee: any): MainEmployee {
   return {
     id: dbEmployee.id,
     cedula: dbEmployee.cedula || '',
@@ -115,12 +118,16 @@ export function mapDatabaseToUnified(dbEmployee: any): EmployeeUnified {
     subtipoCotizanteId: dbEmployee.subtipo_cotizante_id || dbEmployee.subtipoCotizanteId,
     regimenSalud: dbEmployee.regimen_salud || dbEmployee.regimenSalud || 'contributivo',
     estadoAfiliacion: dbEmployee.estado_afiliacion || dbEmployee.estadoAfiliacion || 'pendiente',
+    avatar: undefined, // Not stored in database
+    centrosocial: dbEmployee.centro_costos || dbEmployee.centroCostos,
+    ultimaLiquidacion: undefined,
+    contratoVencimiento: dbEmployee.fecha_finalizacion_contrato || dbEmployee.fechaFinalizacionContrato,
     createdAt: dbEmployee.created_at || dbEmployee.createdAt,
     updatedAt: dbEmployee.updated_at || dbEmployee.updatedAt
   };
 }
 
-export function mapUnifiedToDatabase(employee: Partial<EmployeeUnified>): any {
+export function mapUnifiedToDatabase(employee: Partial<MainEmployee>): any {
   return {
     id: employee.id,
     cedula: employee.cedula,

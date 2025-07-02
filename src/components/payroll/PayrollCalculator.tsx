@@ -13,7 +13,19 @@ export const PayrollCalculator = () => {
     horasExtra: 0,
     recargoNocturno: 0,
     recargoDominical: 0,
-    bonificaciones: 0
+    bonificaciones: 0,
+    auxilioTransporte: 0,
+    totalDevengado: 0,
+    saludEmpleado: 0,
+    pensionEmpleado: 0,
+    retencionFuente: 0,
+    otrasDeducciones: 0,
+    totalDeducciones: 0,
+    netoPagado: 0,
+    cesantias: 0,
+    interesesCesantias: 0,
+    prima: 0,
+    vacaciones: 0
   });
 
   const [result, setResult] = useState<any>(null);

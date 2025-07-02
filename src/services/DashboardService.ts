@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardMetrics } from '@/types';
 
@@ -68,6 +67,13 @@ export class DashboardService {
       if (!companyId) {
         console.log('No company ID found, returning default metrics');
         return {
+          totalEmployees: 0,
+          activeEmployees: 0,
+          pendingPayrolls: 0,
+          monthlyPayrollTotal: 0,
+          complianceScore: 0,
+          alerts: 0,
+          // Legacy Spanish names for compatibility
           totalEmpleados: 0,
           nominasProcesadas: 0,
           alertasLegales: 0,
@@ -112,16 +118,34 @@ export class DashboardService {
       const gastosNomina = payrollData?.reduce((sum, payroll) => 
         sum + (parseFloat(payroll.neto_pagado?.toString() || '0')), 0) || 0;
 
+      const totalEmpleadosCount = totalEmpleados || 0;
+      const nominasProcesadasCount = nominasProcesadas || 0;
+      const alertasLegalesCount = alertasLegales || 0;
+
       return {
-        totalEmpleados: totalEmpleados || 0,
-        nominasProcesadas: nominasProcesadas || 0,
-        alertasLegales: alertasLegales || 0,
+        totalEmployees: totalEmpleadosCount,
+        activeEmployees: totalEmpleadosCount,
+        pendingPayrolls: 0,
+        monthlyPayrollTotal: gastosNomina,
+        complianceScore: 85,
+        alerts: alertasLegalesCount,
+        // Legacy Spanish names for compatibility
+        totalEmpleados: totalEmpleadosCount,
+        nominasProcesadas: nominasProcesadasCount,
+        alertasLegales: alertasLegalesCount,
         gastosNomina: gastosNomina,
         tendenciaMensual: 5.2
       };
     } catch (error) {
       console.error('Error fetching dashboard metrics:', error);
       return {
+        totalEmployees: 0,
+        activeEmployees: 0,
+        pendingPayrolls: 0,
+        monthlyPayrollTotal: 0,
+        complianceScore: 0,
+        alerts: 0,
+        // Legacy Spanish names for compatibility
         totalEmpleados: 0,
         nominasProcesadas: 0,
         alertasLegales: 0,

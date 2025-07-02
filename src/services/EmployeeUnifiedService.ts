@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Employee, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 
@@ -53,6 +54,10 @@ export class EmployeeUnifiedService {
       console.error('❌ EmployeeUnifiedService getById error:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  static async getEmployeeById(id: string): Promise<{ success: boolean; data?: Employee | null; error?: string }> {
+    return this.getById(id);
   }
 
   static async create(employeeData: any): Promise<{ success: boolean; data?: Employee; error?: string }> {
