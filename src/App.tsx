@@ -4,8 +4,8 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthContextProvider } from '@/contexts/AuthContext';
-import { SubscriptionContextProvider } from '@/contexts/SubscriptionContext';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import Index from './pages/Index';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -35,7 +35,7 @@ import CompanyRegisterPage from './pages/CompanyRegisterPage';
 import CompanyRegistrationPage from './pages/CompanyRegistrationPage';
 import LogoutPage from './pages/LogoutPage';
 import NotFound from './pages/NotFound';
-import ProtectedRoute from './components/auth/ProtectedRoute';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 const queryClient = new QueryClient();
 
@@ -43,8 +43,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthContextProvider>
-          <SubscriptionContextProvider>
+        <AuthProvider>
+          <SubscriptionProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -209,8 +209,8 @@ function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </SubscriptionContextProvider>
-        </AuthContextProvider>
+          </SubscriptionProvider>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
