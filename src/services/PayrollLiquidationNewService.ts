@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationUnifiedService } from './PayrollCalculationUnifiedService';
@@ -291,7 +290,7 @@ export class PayrollLiquidationNewService {
               total_devengado: employee.grossPay,
               total_deducciones: employee.deductions,
               neto_pagado: employee.netPay,
-              estado: 'cerrado'
+              estado: 'procesada' // CAMBIO: usar 'procesada' en lugar de 'cerrado'
             };
 
             const { error: payrollError } = await supabase
