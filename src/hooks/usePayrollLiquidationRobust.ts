@@ -79,6 +79,9 @@ export const usePayrollLiquidationRobust = () => {
       const loadedEmployees = await PayrollLiquidationNewService.loadEmployeesForActivePeriod(period);
       setEmployees(loadedEmployees);
       
+      // Actualizar contador de empleados en el período
+      await PayrollLiquidationNewService.updateEmployeeCount(period.id, loadedEmployees.length);
+      
       // Calcular resumen
       const validEmployees = loadedEmployees.filter(emp => emp.status === 'valid');
       const newSummary: PayrollSummary = {
@@ -92,7 +95,13 @@ export const usePayrollLiquidationRobust = () => {
       };
       
       setSummary(newSummary);
+      
       console.log('✅ Empleados cargados y resumen calculado');
+      console.log('📊 Resumen:', {
+        totalEmployees: loadedEmployees.length,
+        validEmployees: validEmployees.length,
+        totalGrossPay: newSummary.totalGrossPay
+      });
       
     } catch (error) {
       console.error('❌ Error cargando empleados:', error);
