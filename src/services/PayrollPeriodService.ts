@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollPeriod } from '@/types/payroll';
 
@@ -90,7 +91,7 @@ export class PayrollPeriodService {
 
       case 'quincenal':
         console.log('📅 Generando periodo quincenal consecutivo');
-        return this.generateNextBiWeeklyPeriod();
+        return this.getNextBiWeeklyPeriod();
 
       case 'semanal':
         console.log('📅 Generando periodo semanal');
@@ -122,7 +123,30 @@ export class PayrollPeriodService {
     }
   }
 
-  // Generar siguiente período quincenal consecutivo
+  // Generar siguiente período quincenal consecutivo - CORREGIDO para ser síncrono
+  static getNextBiWeeklyPeriod(): { startDate: string; endDate: string } {
+    // Para la generación inicial, usar lógica basada en la fecha actual
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const day = today.getDate();
+    
+    if (day <= 15) {
+      // Primera quincena (1-15)
+      return {
+        startDate: new Date(year, month, 1).toISOString().split('T')[0],
+        endDate: new Date(year, month, 15).toISOString().split('T')[0]
+      };
+    } else {
+      // Segunda quincena (16-fin de mes)
+      return {
+        startDate: new Date(year, month, 16).toISOString().split('T')[0],
+        endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+      };
+    }
+  }
+
+  // Generar siguiente período quincenal consecutivo - VERSIÓN ASYNC para servicios avanzados
   static async generateNextBiWeeklyPeriod(): Promise<{ startDate: string; endDate: string }> {
     try {
       const companyId = await this.getCurrentUserCompanyId();

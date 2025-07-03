@@ -3,6 +3,31 @@ import { supabase } from '@/integrations/supabase/client';
 import { parsePeriodToDateRange, getPeriodNameFromDates } from '@/utils/periodDateUtils';
 
 export class PeriodNameUnifiedService {
+  private static cache = new Map<string, any>();
+
+  /**
+   * Limpiar cache
+   */
+  static clearCache(): void {
+    this.cache.clear();
+    console.log('🧹 Cache de PeriodNameUnifiedService limpiado');
+  }
+
+  /**
+   * Generar nombre de período unificado - MÉTODO PRINCIPAL
+   */
+  static generateUnifiedPeriodName(params: {
+    startDate: string;
+    endDate: string;
+    periodicity: 'mensual' | 'quincenal' | 'semanal';
+  }): string {
+    return this.generateNormalizedPeriodName(
+      params.startDate,
+      params.endDate,
+      params.periodicity
+    );
+  }
+
   /**
    * Normalizar períodos existentes para asegurar consistencia en nombres
    */
