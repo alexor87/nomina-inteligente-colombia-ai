@@ -1,48 +1,87 @@
 
-import { useState, useEffect } from 'react';
-import { PayrollPeriodCalculationService } from '@/services/payroll-intelligent/PayrollPeriodCalculationService';
+import { useState } from 'react';
 import { DataMigrationService } from '@/services/payroll-intelligent/DataMigrationService';
-import { PeriodNameUnifiedService } from '@/services/payroll-intelligent/PeriodNameUnifiedService';
+import { PayrollPeriodCalculationService } from '@/services/payroll-intelligent/PayrollPeriodCalculationService';
 import { useToast } from '@/hooks/use-toast';
 
 export const usePeriodValidation = () => {
   const [isValidating, setIsValidating] = useState(false);
-  const [validationResults, setValidationResults] = useState<any[]>([]);
   const { toast } = useToast();
 
-  const validateBiWeeklyPeriods = async (companyId: string) => {
+  const executeIntegralCorrection = async (companyId: string) => {
     try {
       setIsValidating(true);
-      console.log('🔍 INICIANDO VALIDACIÓN PROFESIONAL CON ARQUITECTURA UNIFICADA...');
+      console.log('🚀 EJECUTANDO CORRECCIÓN INTEGRAL PROFESIONAL...');
       
-      // 1. Analizar períodos incorrectos
-      const analysis = await DataMigrationService.analyzeIncorrectPeriods(companyId);
-      console.log('📊 ANÁLISIS:', analysis);
+      const result = await DataMigrationService.executeIntegralCorrection(companyId);
       
-      // 2. Corregir automáticamente períodos irregulares
-      const correction = await DataMigrationService.correctAllBiWeeklyPeriods(companyId);
-      console.log('🔧 CORRECCIÓN:', correction);
-      
-      // 3. Normalizar nombres de períodos para consistencia
-      await PeriodNameUnifiedService.normalizeExistingPeriods(companyId);
-      
-      // 4. Verificar integridad post-corrección
-      const integrity = await DataMigrationService.verifyIntegrityAfterCorrection(companyId);
-      console.log('🔍 INTEGRIDAD:', integrity);
+      // Exponer funciones globales para testing
+      (window as any).testPeriodGeneration = async () => {
+        console.log('🧪 TESTING GENERACIÓN DE PERÍODOS:');
+        
+        try {
+          const { PeriodStrategyFactory } = await import('@/services/payroll-intelligent/PeriodGenerationStrategy');
+          
+          const strategy = PeriodStrategyFactory.createStrategy('quincenal');
+          
+          // Probar generación de primer período
+          const firstPeriod = strategy.generateFirstPeriod();
+          console.log('📅 PRIMER PERÍODO:', firstPeriod);
+          
+          // Probar generación consecutiva
+          const nextPeriod = strategy.generateNextConsecutivePeriod(firstPeriod.endDate);
+          console.log('📅 SIGUIENTE PERÍODO:', nextPeriod);
+          
+          // Probar validación
+          const validation1 = strategy.validateAndCorrectPeriod(firstPeriod.startDate, firstPeriod.endDate);
+          console.log('✅ VALIDACIÓN PERÍODO CORRECTO:', validation1);
+          
+          const validation2 = strategy.validateAndCorrectPeriod('2024-02-05', '2024-02-20');
+          console.log('⚠️ VALIDACIÓN PERÍODO IRREGULAR:', validation2);
+          
+          toast({
+            title: "🧪 Test Completado",
+            description: "Revisa la consola para ver los resultados de las pruebas",
+            className: "border-blue-200 bg-blue-50"
+          });
+          
+        } catch (error) {
+          console.error('❌ Error en test:', error);
+        }
+      };
+
+      (window as any).validatePeriods = async () => {
+        console.log('🔍 VALIDANDO PERÍODOS EXISTENTES...');
+        
+        try {
+          const companyId = 'tu-company-id'; // Se debe obtener dinámicamente
+          const result = await DataMigrationService.executeIntegralCorrection(companyId);
+          console.log('📊 RESULTADO VALIDACIÓN:', result);
+          
+          toast({
+            title: "🔍 Validación Completada",
+            description: "Revisa la consola para ver el análisis detallado",
+            className: "border-green-200 bg-green-50"
+          });
+          
+        } catch (error) {
+          console.error('❌ Error en validación:', error);
+        }
+      };
       
       toast({
-        title: "✅ Validación Profesional Completada",
-        description: `${correction.summary}. ${integrity.summary}`,
-        className: "border-green-200 bg-green-50"
+        title: result.success ? "✅ Corrección Integral Exitosa" : "⚠️ Corrección con Advertencias",
+        description: result.summary,
+        className: result.success ? "border-green-200 bg-green-50" : "border-yellow-200 bg-yellow-50"
       });
       
-      console.log('✅ VALIDACIÓN PROFESIONAL COMPLETADA EXITOSAMENTE');
+      console.log('✅ CORRECCIÓN INTEGRAL COMPLETADA');
       
     } catch (error) {
-      console.error('❌ Error en validación profesional:', error);
+      console.error('❌ Error en corrección integral:', error);
       toast({
-        title: "Error en Validación Profesional",
-        description: "No se pudieron validar los períodos con la nueva arquitectura",
+        title: "Error en Corrección Integral",
+        description: "No se pudo ejecutar la corrección completa",
         variant: "destructive"
       });
     } finally {
@@ -50,65 +89,14 @@ export const usePeriodValidation = () => {
     }
   };
 
-  const testBiWeeklyGeneration = async () => {
-    console.log('🧪 PRUEBA DE GENERACIÓN CON ARQUITECTURA UNIFICADA:');
-    
-    try {
-      // Probar generación con diferentes strategies
-      const { PeriodStrategyFactory } = await import('@/services/payroll-intelligent/PeriodGenerationStrategy');
-      
-      const biWeeklyStrategy = PeriodStrategyFactory.createStrategy('quincenal');
-      const monthlyStrategy = PeriodStrategyFactory.createStrategy('mensual');
-      const weeklyStrategy = PeriodStrategyFactory.createStrategy('semanal');
-      
-      // Probar períodos quincenales
-      const firstPeriod = biWeeklyStrategy.generateFirstPeriod();
-      console.log('📅 PRIMER PERÍODO QUINCENAL:', firstPeriod);
-      
-      const nextPeriod = biWeeklyStrategy.generateNextConsecutivePeriod(firstPeriod.endDate);
-      console.log('📅 SIGUIENTE PERÍODO QUINCENAL:', nextPeriod);
-      
-      // Probar casos complejos (febrero)
-      const febPeriod1 = biWeeklyStrategy.generateNextConsecutivePeriod('2024-01-31');
-      const febPeriod2 = biWeeklyStrategy.generateNextConsecutivePeriod(febPeriod1.endDate);
-      console.log('📅 FEBRERO 2024 (bisiesto) 1ra quincena:', febPeriod1);
-      console.log('📅 FEBRERO 2024 (bisiesto) 2da quincena:', febPeriod2);
-      
-      // Probar validaciones
-      const validation1 = biWeeklyStrategy.validateAndCorrectPeriod(firstPeriod.startDate, firstPeriod.endDate);
-      const validation2 = biWeeklyStrategy.validateAndCorrectPeriod('2024-02-05', '2024-02-20'); // Período irregular
-      
-      console.log('✅ VALIDACIÓN PERÍODO CORRECTO:', validation1);
-      console.log('⚠️ VALIDACIÓN PERÍODO IRREGULAR (será corregido):', validation2);
-      
-      // Probar otros tipos de período
-      const monthlyPeriod = monthlyStrategy.generateCurrentPeriod();
-      const weeklyPeriod = weeklyStrategy.generateCurrentPeriod();
-      
-      console.log('📅 PERÍODO MENSUAL:', monthlyPeriod);
-      console.log('📅 PERÍODO SEMANAL:', weeklyPeriod);
-      
-      toast({
-        title: "🧪 Pruebas de Arquitectura Completadas",
-        description: "Revisa la consola para ver los resultados detallados de las pruebas con la nueva arquitectura unificada",
-        className: "border-blue-200 bg-blue-50"
-      });
-      
-    } catch (error) {
-      console.error('❌ Error en pruebas de arquitectura:', error);
-      toast({
-        title: "Error en Pruebas de Arquitectura",
-        description: "Ocurrió un error durante las pruebas de la nueva arquitectura",
-        variant: "destructive"
-      });
-    }
-  };
-
   return {
     // Estado
     isValidating,
-    validationResults,
-    validateBiWeeklyPeriods,
-    testBiWeeklyGeneration
+    
+    // Acciones principales
+    executeIntegralCorrection,
+    
+    // Estados calculados
+    isReady: !isValidating
   };
 };

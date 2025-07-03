@@ -1,19 +1,18 @@
-
 import { PayrollPeriod } from '@/types/payroll';
 import { supabase } from '@/integrations/supabase/client';
 import { PeriodStrategyFactory, PeriodGenerationStrategy } from './PeriodGenerationStrategy';
 
 export class PayrollPeriodCalculationService {
   /**
-   * NUEVA ARQUITECTURA PROFESIONAL - COORDINADOR PRINCIPAL
-   * Usa Strategy pattern para eliminar duplicación y asegurar consistencia
+   * ARQUITECTURA PROFESIONAL MEJORADA - COORDINADOR PRINCIPAL CON DETECCIÓN DE DATOS CORRUPTOS
+   * Usa Strategy pattern y detecta automáticamente períodos con fechas incorrectas
    */
   
   static async calculateNextPeriodFromDatabase(periodicity: string, companyId: string): Promise<{
     startDate: string;
     endDate: string;
   }> {
-    console.log('📅 CALCULANDO SIGUIENTE PERÍODO CON ARQUITECTURA UNIFICADA:', {
+    console.log('📅 CALCULANDO SIGUIENTE PERÍODO CON DETECCIÓN DE DATOS CORRUPTOS:', {
       periodicity,
       companyId
     });
@@ -21,38 +20,129 @@ export class PayrollPeriodCalculationService {
     const strategy = PeriodStrategyFactory.createStrategy(periodicity);
     
     try {
-      // Buscar el último período cerrado de la empresa
-      const { data: lastPeriod, error } = await supabase
+      // Buscar períodos cerrados ordenados por fecha
+      const { data: periods, error } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
         .eq('tipo_periodo', periodicity)
         .neq('estado', 'borrador')
-        .order('fecha_fin', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('fecha_fin', { ascending: false });
 
       if (error) {
-        console.error('Error obteniendo último período:', error);
+        console.error('Error obteniendo períodos:', error);
         return strategy.generateFirstPeriod();
       }
 
-      if (!lastPeriod) {
+      if (!periods || periods.length === 0) {
         console.log('❌ NO HAY PERÍODOS PREVIOS - Generando PRIMER período');
         return strategy.generateFirstPeriod();
       }
 
-      console.log('✅ Último período encontrado:', lastPeriod.fecha_inicio, '-', lastPeriod.fecha_fin);
+      // NUEVO: Detectar y filtrar períodos con datos corruptos
+      const validPeriods = periods.filter(period => {
+        const validation = strategy.validateAndCorrectPeriod(period.fecha_inicio, period.fecha_fin);
+        if (!validation.isValid) {
+          console.warn('⚠️ PERÍODO CORRUPTO DETECTADO:', {
+            id: period.id,
+            periodo: period.periodo,
+            fechas: `${period.fecha_inicio} - ${period.fecha_fin}`,
+            problema: validation.message
+          });
+          return false;
+        }
+        return true;
+      });
 
-      // Generar siguiente período usando la estrategia
-      const nextPeriod = strategy.generateNextConsecutivePeriod(lastPeriod.fecha_fin);
+      if (validPeriods.length === 0) {
+        console.log('❌ TODOS LOS PERÍODOS ESTÁN CORRUPTOS - Generando PRIMER período válido');
+        return strategy.generateFirstPeriod();
+      }
+
+      const lastValidPeriod = validPeriods[0];
+      console.log('✅ Último período VÁLIDO encontrado:', lastValidPeriod.fecha_inicio, '-', lastValidPeriod.fecha_fin);
+
+      // Generar siguiente período usando el último período válido
+      const nextPeriod = strategy.generateNextConsecutivePeriod(lastValidPeriod.fecha_fin);
       
-      console.log('✅ Siguiente período generado con arquitectura unificada:', nextPeriod);
+      console.log('✅ Siguiente período generado correctamente:', nextPeriod);
       return nextPeriod;
 
     } catch (error) {
       console.error('Error generando período desde BD:', error);
       return strategy.generateFirstPeriod();
+    }
+  }
+
+  /**
+   * NUEVO: Corrección automática de períodos corruptos
+   */
+  static async autoCorrectCorruptPeriods(companyId: string, periodicity: string = 'quincenal'): Promise<{
+    correctedCount: number;
+    errors: string[];
+    summary: string;
+  }> {
+    console.log('🔧 INICIANDO CORRECCIÓN AUTOMÁTICA DE PERÍODOS CORRUPTOS para:', companyId);
+    
+    const strategy = PeriodStrategyFactory.createStrategy(periodicity);
+    let correctedCount = 0;
+    const errors: string[] = [];
+
+    try {
+      const { data: periods, error } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('tipo_periodo', periodicity)
+        .order('fecha_inicio', { ascending: true });
+
+      if (error) throw error;
+
+      if (!periods || periods.length === 0) {
+        return { correctedCount: 0, errors: [], summary: 'No hay períodos para corregir' };
+      }
+
+      console.log(`📊 CORRIGIENDO ${periods.length} períodos automáticamente`);
+
+      // Corregir períodos uno por uno manteniendo la secuencia
+      for (const period of periods) {
+        const validation = strategy.validateAndCorrectPeriod(period.fecha_inicio, period.fecha_fin);
+        
+        if (!validation.isValid && validation.correctedPeriod) {
+          console.log('📝 CORRECCIÓN AUTOMÁTICA:', validation.message);
+          
+          const { error: updateError } = await supabase
+            .from('payroll_periods_real')
+            .update({
+              fecha_inicio: validation.correctedPeriod.startDate,
+              fecha_fin: validation.correctedPeriod.endDate,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', period.id);
+
+          if (updateError) {
+            const errorMsg = `Error corrigiendo período ${period.id}: ${updateError.message}`;
+            console.error('❌', errorMsg);
+            errors.push(errorMsg);
+          } else {
+            console.log(`✅ Período ${period.id} CORREGIDO: ${period.fecha_inicio}-${period.fecha_fin} → ${validation.correctedPeriod.startDate}-${validation.correctedPeriod.endDate}`);
+            correctedCount++;
+          }
+        }
+      }
+
+      const summary = `✅ Corrección automática completada: ${correctedCount} períodos corregidos, ${errors.length} errores`;
+      console.log(summary);
+      
+      return { correctedCount, errors, summary };
+
+    } catch (error) {
+      console.error('❌ Error en corrección automática:', error);
+      return {
+        correctedCount: 0,
+        errors: [`Error general: ${error.message}`],
+        summary: '❌ Error en corrección automática'
+      };
     }
   }
 

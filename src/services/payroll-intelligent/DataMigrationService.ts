@@ -1,7 +1,6 @@
-
 /**
- * SERVICIO DE MIGRACIÓN Y CORRECCIÓN DE DATOS
- * Limpia y corrige períodos con fechas incorrectas
+ * SERVICIO DE MIGRACIÓN Y CORRECCIÓN DE DATOS MEJORADO
+ * Detecta y corrige automáticamente períodos con fechas incorrectas
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -9,40 +8,54 @@ import { PayrollPeriodCalculationService } from './PayrollPeriodCalculationServi
 
 export class DataMigrationService {
   /**
-   * CORRECCIÓN MASIVA DE TODOS LOS PERÍODOS QUINCENALES INCORRECTOS
+   * CORRECCIÓN AUTOMÁTICA INTEGRAL - NUEVA VERSIÓN MEJORADA
    */
-  static async correctAllBiWeeklyPeriods(companyId: string): Promise<{
+  static async executeIntegralCorrection(companyId: string): Promise<{
     success: boolean;
-    corrected: number;
-    errors: string[];
+    analysis: any;
+    correction: any;
+    verification: any;
     summary: string;
   }> {
-    console.log('🔧 INICIANDO CORRECCIÓN MASIVA DE PERÍODOS QUINCENALES para empresa:', companyId);
+    console.log('🚀 INICIANDO CORRECCIÓN INTEGRAL para empresa:', companyId);
     
     try {
-      const result = await PayrollPeriodCalculationService.correctAllPeriodsForCompany(
-        companyId, 
-        'quincenal'
-      );
-
-      const summary = `✅ Corrección completada: ${result.corrected} períodos corregidos, ${result.errors.length} errores`;
+      // FASE 1: Análisis de períodos incorrectos
+      console.log('📊 FASE 1: Analizando períodos incorrectos...');
+      const analysis = await this.analyzeIncorrectPeriods(companyId);
+      
+      // FASE 2: Corrección automática
+      console.log('🔧 FASE 2: Ejecutando corrección automática...');
+      const correction = await PayrollPeriodCalculationService.autoCorrectCorruptPeriods(companyId, 'quincenal');
+      
+      // FASE 3: Verificación de integridad
+      console.log('🔍 FASE 3: Verificando integridad...');
+      const verification = await this.verifyIntegrityAfterCorrection(companyId);
+      
+      const summary = `✅ CORRECCIÓN INTEGRAL COMPLETADA:
+      - Períodos analizados: ${analysis.total}
+      - Períodos corregidos: ${correction.correctedCount}
+      - Estado final: ${verification.isValid ? 'VÁLIDO' : 'REQUIERE ATENCIÓN'}
+      - ${verification.summary}`;
       
       console.log(summary);
       
       return {
-        success: result.errors.length === 0,
-        corrected: result.corrected,
-        errors: result.errors,
+        success: correction.errors.length === 0 && verification.isValid,
+        analysis,
+        correction,
+        verification,
         summary
       };
       
     } catch (error) {
-      console.error('❌ Error en corrección masiva:', error);
+      console.error('❌ Error en corrección integral:', error);
       return {
         success: false,
-        corrected: 0,
-        errors: [`Error general: ${error.message}`],
-        summary: '❌ Error en corrección masiva'
+        analysis: null,
+        correction: null,
+        verification: null,
+        summary: `❌ Error en corrección integral: ${error.message}`
       };
     }
   }
@@ -91,9 +104,12 @@ export class DataMigrationService {
 
       let incorrectCount = 0;
 
+      // Usar la estrategia para validar cada período
+      const { PeriodStrategyFactory } = await import('./PeriodGenerationStrategy');
+      const strategy = PeriodStrategyFactory.createStrategy('quincenal');
+
       for (const period of periods) {
-        const validation = PayrollPeriodCalculationService.validateAndCorrectPeriod(
-          'quincenal',
+        const validation = strategy.validateAndCorrectPeriod(
           period.fecha_inicio,
           period.fecha_fin
         );
