@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PAYROLL_STATES } from '@/constants/payrollStates';
 import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
 import { PayrollPeriodCalculationService } from './payroll-intelligent/PayrollPeriodCalculationService';
+import { PayrollConfigurationService } from './payroll-intelligent/PayrollConfigurationService';
 
 interface CompanySettings {
   id: string;
@@ -35,6 +36,7 @@ export interface PeriodStatus {
     startDate: string;
     endDate: string;
     type: string;
+    calculatedDays: number;
   };
   action: 'resume' | 'create' | 'suggest_next';
   message: string;
@@ -42,11 +44,11 @@ export interface PeriodStatus {
 
 export class PayrollPeriodIntelligentService {
   /**
-   * DETECCIÓN CORREGIDA - PRIORIDAD ABSOLUTA AL PERÍODO ACTUAL DE JULIO 2025
+   * DETECCIÓN DINÁMICA CORREGIDA - RESPETA CONFIGURACIÓN DE EMPRESA
    */
   static async detectCurrentPeriod(): Promise<PeriodStatus> {
     try {
-      console.log('🎯 DETECCIÓN CORREGIDA - FORZANDO PERÍODO ACTUAL JULIO 2025...');
+      console.log('🎯 DETECCIÓN DINÁMICA - RESPETANDO CONFIGURACIÓN DE EMPRESA...');
       
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
@@ -55,15 +57,16 @@ export class PayrollPeriodIntelligentService {
 
       console.log('🏢 Company ID detectado:', companyId);
 
-      // PASO 1: ASEGURAR CONFIGURACIÓN DE EMPRESA
+      // PASO 1: OBTENER CONFIGURACIÓN DINÁMICA DE EMPRESA
       const settings = await this.ensureCompanySettings(companyId);
       const periodicity = settings.periodicity;
+      const customDays = settings.custom_period_days;
       
-      console.log('⚙️ Configuración asegurada - periodicidad:', periodicity);
+      console.log('⚙️ Configuración dinámica asegurada:', { periodicity, customDays });
       
-      // PASO 2: GENERAR PERÍODO ACTUAL FORZADO (JULIO 2025)
-      const actualCurrentPeriodDates = await this.generateTodaysPeriodDates(periodicity);
-      console.log('📊 PERÍODO ACTUAL REAL CALCULADO:', actualCurrentPeriodDates);
+      // PASO 2: GENERAR PERÍODO ACTUAL USANDO CONFIGURACIÓN DINÁMICA
+      const actualCurrentPeriodDates = await this.generateDynamicTodaysPeriodDates(periodicity, customDays);
+      console.log('📊 PERÍODO ACTUAL DINÁMICO CALCULADO:', actualCurrentPeriodDates);
 
       // PASO 3: Buscar período activo existente
       const activePeriod = await this.findActivePeriod(companyId);
@@ -124,8 +127,8 @@ export class PayrollPeriodIntelligentService {
         };
       }
 
-      // PASO 5: CREAR PERÍODO ACTUAL AUTOMÁTICAMENTE
-      console.log('🆕 CREANDO PERÍODO ACTUAL AUTOMÁTICAMENTE...');
+      // PASO 5: CREAR PERÍODO ACTUAL AUTOMÁTICAMENTE CON CONFIGURACIÓN DINÁMICA
+      console.log('🆕 CREANDO PERÍODO ACTUAL AUTOMÁTICAMENTE CON CONFIGURACIÓN DINÁMICA...');
       const newCurrentPeriod = await this.createAutomaticPeriod(
         companyId, 
         actualCurrentPeriodDates, 
@@ -140,8 +143,34 @@ export class PayrollPeriodIntelligentService {
       };
 
     } catch (error) {
-      console.error('❌ ERROR CRÍTICO EN DETECCIÓN CORREGIDA:', error);
+      console.error('❌ ERROR CRÍTICO EN DETECCIÓN DINÁMICA:', error);
       throw error;
+    }
+  }
+
+  /**
+   * NUEVA FUNCIÓN: Generar fechas del período ACTUAL usando configuración dinámica
+   */
+  static async generateDynamicTodaysPeriodDates(periodicity: string, customDays?: number): Promise<{ startDate: string; endDate: string }> {
+    try {
+      console.log('📅 GENERANDO PERÍODO ACTUAL DINÁMICO para:', { periodicity, customDays });
+      
+      const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
+      const strategy = PeriodStrategyFactory.createStrategy(periodicity, customDays);
+      
+      // CORRECCIÓN: Usar método dinámico para período actual
+      const currentPeriod = strategy.generateCurrentPeriod();
+      console.log('✅ PERÍODO ACTUAL DINÁMICO GENERADO:', currentPeriod);
+      
+      return currentPeriod;
+    } catch (error) {
+      console.error('❌ Error generando período actual dinámico:', error);
+      // Fallback dinámico basado en configuración
+      const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
+      const strategy = PeriodStrategyFactory.createStrategy(periodicity || 'mensual', customDays);
+      const fallback = strategy.generateCurrentPeriod();
+      console.log('🔄 FALLBACK DINÁMICO GENERADO:', fallback);
+      return fallback;
     }
   }
 
@@ -225,32 +254,6 @@ export class PayrollPeriodIntelligentService {
   }
 
   /**
-   * CORREGIDO: Generar fechas del período ACTUAL basado en la fecha de HOY
-   */
-  static async generateTodaysPeriodDates(periodicity: string): Promise<{ startDate: string; endDate: string }> {
-    try {
-      console.log('📅 GENERANDO PERÍODO ACTUAL CORREGIDO para periodicidad:', periodicity);
-      
-      const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
-      const strategy = PeriodStrategyFactory.createStrategy(periodicity);
-      
-      // CORRECCIÓN: Usar método corregido para período actual
-      const currentPeriod = strategy.generateCurrentPeriod();
-      console.log('✅ PERÍODO ACTUAL CORREGIDO GENERADO:', currentPeriod);
-      
-      return currentPeriod;
-    } catch (error) {
-      console.error('❌ Error generando período actual corregido:', error);
-      // Fallback corregido
-      const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
-      const strategy = PeriodStrategyFactory.createStrategy('quincenal');
-      const fallback = strategy.generateCurrentPeriod();
-      console.log('🔄 FALLBACK GENERADO:', fallback);
-      return fallback;
-    }
-  }
-
-  /**
    * CORREGIDO: Validar consistencia entre nombre del período y fechas almacenadas
    */
   static async validatePeriodNameConsistency(period: PayrollPeriod): Promise<void> {
@@ -316,29 +319,42 @@ export class PayrollPeriodIntelligentService {
     }
   }
 
-  static async handleClosedCurrentPeriod(companyId: string, periodicity: string, closedPeriod: PayrollPeriod): Promise<PeriodStatus> {
+  static async handleClosedCurrentPeriod(companyId: string, periodicity: string, closedPeriod: PayrollPeriod, customDays?: number): Promise<PeriodStatus> {
     try {
-      console.log('🔒 Manejando período actual cerrado, calculando siguiente...');
+      console.log('🔒 Manejando período actual cerrado, calculando siguiente con configuración dinámica...');
       
       const nextPeriodDates = await PayrollPeriodCalculationService.calculateNextPeriodFromDatabase(
         periodicity, 
         companyId
       );
 
+      // Calcular días del siguiente período
+      const calculatedDays = this.calculatePeriodDays(nextPeriodDates.startDate, nextPeriodDates.endDate);
+
       return {
         hasActivePeriod: false,
         nextPeriod: {
           startDate: nextPeriodDates.startDate,
           endDate: nextPeriodDates.endDate,
-          type: periodicity
+          type: periodicity,
+          calculatedDays
         },
         action: 'suggest_next',
-        message: `Período actual (${closedPeriod.periodo}) ya cerrado. Listo para crear siguiente: ${nextPeriodDates.startDate} - ${nextPeriodDates.endDate}`
+        message: `Período actual (${closedPeriod.periodo}) ya cerrado. Listo para crear siguiente: ${nextPeriodDates.startDate} - ${nextPeriodDates.endDate} (${calculatedDays} días)`
       };
     } catch (error) {
       console.error('❌ Error manejando período cerrado:', error);
       throw error;
     }
+  }
+
+  /**
+   * NUEVA FUNCIÓN: Calcular días de un período
+   */
+  static calculatePeriodDays(startDate: string, endDate: string): number {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   }
 
   static async findLastClosedPeriodRobust(companyId: string, maxRetries: number = 5): Promise<PayrollPeriod | null> {
@@ -390,20 +406,17 @@ export class PayrollPeriodIntelligentService {
     try {
       console.log('⚙️ Verificando configuración de empresa...');
       
-      let { data: settings, error } = await supabase
-        .from('company_settings')
-        .select('*')
-        .eq('company_id', companyId)
-        .single();
-
-      if (error && error.code === 'PGRST116') {
+      // USAR SERVICIO DE CONFIGURACIÓN PARA OBTENER DATOS FRESCOS
+      const settings = await PayrollConfigurationService.getCompanySettingsForceRefresh(companyId);
+      
+      if (!settings) {
         console.log('🆕 Creando configuración por defecto...');
         
         const { data: newSettings, error: insertError } = await supabase
           .from('company_settings')
           .insert({
             company_id: companyId,
-            periodicity: 'quincenal'
+            periodicity: 'mensual'
           })
           .select()
           .single();
@@ -411,12 +424,10 @@ export class PayrollPeriodIntelligentService {
         if (insertError) throw insertError;
         
         console.log('✅ Configuración creada exitosamente');
-        settings = newSettings;
-      } else if (error) {
-        throw error;
+        return newSettings as CompanySettings;
       }
 
-      console.log('📊 Configuración obtenida:', settings?.periodicity);
+      console.log('📊 Configuración obtenida:', { periodicity: settings.periodicity, customDays: settings.custom_period_days });
       return settings as CompanySettings;
     } catch (error) {
       console.error('❌ Error asegurando configuración:', error);

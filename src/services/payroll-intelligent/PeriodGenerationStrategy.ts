@@ -284,10 +284,94 @@ export class WeeklyPeriodStrategy implements PeriodGenerationStrategy {
 }
 
 /**
- * FACTORY PARA ESTRATEGIAS
+ * NUEVA ESTRATEGIA PERSONALIZADA PARA PERÍODOS CUSTOM
+ */
+export class CustomPeriodStrategy implements PeriodGenerationStrategy {
+  private customDays: number;
+
+  constructor(customDays: number = 30) {
+    this.customDays = customDays;
+    console.log('📅 ESTRATEGIA PERSONALIZADA CREADA con', customDays, 'días');
+  }
+
+  generateCurrentPeriod(): PeriodDates {
+    console.log('📅 GENERANDO PERÍODO PERSONALIZADO ACTUAL de', this.customDays, 'días');
+    
+    const today = new Date();
+    const startDate = new Date(today);
+    const endDate = new Date(today);
+    endDate.setDate(startDate.getDate() + this.customDays - 1);
+    
+    const period = {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    };
+    
+    console.log('✅ PERÍODO PERSONALIZADO GENERADO:', period);
+    return period;
+  }
+
+  generateNextConsecutivePeriod(lastPeriodEndDate: string): PeriodDates {
+    console.log('📅 GENERANDO SIGUIENTE PERÍODO PERSONALIZADO desde:', lastPeriodEndDate);
+    
+    const lastEnd = new Date(lastPeriodEndDate);
+    const nextStart = new Date(lastEnd);
+    nextStart.setDate(lastEnd.getDate() + 1);
+    
+    const nextEnd = new Date(nextStart);
+    nextEnd.setDate(nextStart.getDate() + this.customDays - 1);
+    
+    const period = {
+      startDate: nextStart.toISOString().split('T')[0],
+      endDate: nextEnd.toISOString().split('T')[0]
+    };
+    
+    console.log('✅ SIGUIENTE PERÍODO PERSONALIZADO:', period);
+    return period;
+  }
+
+  generateFirstPeriod(): PeriodDates {
+    return this.generateCurrentPeriod();
+  }
+
+  validateAndCorrectPeriod(startDate: string, endDate: string): {
+    isValid: boolean;
+    correctedPeriod?: PeriodDates;
+    message: string;
+  } {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const actualDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    if (actualDays === this.customDays) {
+      return {
+        isValid: true,
+        message: `✅ Período personalizado válido: ${actualDays} días`
+      };
+    }
+    
+    // Corregir período personalizado
+    const correctedEnd = new Date(start);
+    correctedEnd.setDate(start.getDate() + this.customDays - 1);
+    
+    return {
+      isValid: false,
+      correctedPeriod: {
+        startDate: start.toISOString().split('T')[0],
+        endDate: correctedEnd.toISOString().split('T')[0]
+      },
+      message: `🔧 Período personalizado corregido: ${actualDays} → ${this.customDays} días`
+    };
+  }
+}
+
+/**
+ * FACTORY PARA ESTRATEGIAS ACTUALIZADO
  */
 export class PeriodStrategyFactory {
-  static createStrategy(periodicity: string): PeriodGenerationStrategy {
+  static createStrategy(periodicity: string, customDays?: number): PeriodGenerationStrategy {
+    console.log('🏭 CREANDO ESTRATEGIA para periodicidad:', periodicity, 'días custom:', customDays);
+    
     switch (periodicity) {
       case 'quincenal':
         return new BiWeeklyPeriodStrategy();
@@ -295,9 +379,17 @@ export class PeriodStrategyFactory {
         return new MonthlyPeriodStrategy();
       case 'semanal':
         return new WeeklyPeriodStrategy();
+      case 'personalizado':
+        return new CustomPeriodStrategy(customDays || 30);
       default:
-        console.log('📅 PERIODICIDAD NO RECONOCIDA - Usando quincenal por defecto');
-        return new BiWeeklyPeriodStrategy();
+        console.log('📅 PERIODICIDAD NO RECONOCIDA - Usando mensual por defecto');
+        return new MonthlyPeriodStrategy();
     }
+  }
+  
+  static calculatePeriodDays(startDate: string, endDate: string): number {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   }
 }

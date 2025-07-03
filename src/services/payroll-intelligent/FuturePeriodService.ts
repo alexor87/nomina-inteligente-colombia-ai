@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollPeriodIntelligentService } from '@/services/PayrollPeriodIntelligentService';
+import { PayrollConfigurationService } from './PayrollConfigurationService';
 
 export interface FuturePeriodValidation {
   canCreateFuture: boolean;
@@ -10,17 +10,18 @@ export interface FuturePeriodValidation {
     endDate: string;
     type: string;
     period: string;
+    calculatedDays: number;
   };
   message: string;
 }
 
 export class FuturePeriodService {
   /**
-   * Validate if a future period can be created
+   * VALIDACIÓN DINÁMICA DE PERÍODOS FUTUROS - CORREGIDA
    */
   static async validateFuturePeriodCreation(companyId: string): Promise<FuturePeriodValidation> {
     try {
-      console.log('🔮 Validando creación de período futuro...');
+      console.log('🔮 VALIDANDO CREACIÓN DE PERÍODO FUTURO DINÁMICO...');
       
       // Check if there's already an active future period
       const { data: activePeriods, error } = await supabase
@@ -41,14 +42,14 @@ export class FuturePeriodService {
         };
       }
 
-      // Get company periodicity
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('periodicity')
-        .eq('company_id', companyId)
-        .single();
-
+      // OBTENER CONFIGURACIÓN DINÁMICA DE EMPRESA
+      console.log('⚙️ OBTENIENDO CONFIGURACIÓN DINÁMICA DE EMPRESA...');
+      const settings = await PayrollConfigurationService.getCompanySettingsForceRefresh(companyId);
+      
       const periodicity = settings?.periodicity || 'mensual';
+      const customDays = settings?.custom_period_days || 30;
+      
+      console.log('📊 CONFIGURACIÓN DINÁMICA:', { periodicity, customDays });
 
       // Find the last closed period
       const { data: lastClosedPeriod } = await supabase
@@ -61,30 +62,35 @@ export class FuturePeriodService {
         .maybeSingle();
 
       if (!lastClosedPeriod) {
-        // No closed periods, suggest current period
-        const currentPeriodDates = await this.generateCurrentPeriodDates(periodicity);
+        // No closed periods, suggest current period using DYNAMIC strategy
+        const currentPeriodDates = await this.generateDynamicCurrentPeriodDates(periodicity, customDays);
+        const calculatedDays = this.calculatePeriodDays(currentPeriodDates.startDate, currentPeriodDates.endDate);
+        
         return {
           canCreateFuture: true,
           nextSuggestedPeriod: {
             ...currentPeriodDates,
             type: periodicity,
-            period: this.generatePeriodName(currentPeriodDates.startDate, currentPeriodDates.endDate)
+            period: this.generatePeriodName(currentPeriodDates.startDate, currentPeriodDates.endDate),
+            calculatedDays
           },
-          message: 'Listo para crear el período actual'
+          message: `Listo para crear el período actual (${calculatedDays} días)`
         };
       }
 
-      // Calculate next period after the last closed one
-      const nextPeriodDates = this.calculateNextPeriodDates(lastClosedPeriod, periodicity);
+      // Calculate next period after the last closed one using DYNAMIC strategy
+      const nextPeriodDates = this.calculateDynamicNextPeriodDates(lastClosedPeriod, periodicity, customDays);
+      const calculatedDays = this.calculatePeriodDays(nextPeriodDates.startDate, nextPeriodDates.endDate);
       
       return {
         canCreateFuture: true,
         nextSuggestedPeriod: {
           ...nextPeriodDates,
           type: periodicity,
-          period: this.generatePeriodName(nextPeriodDates.startDate, nextPeriodDates.endDate)
+          period: this.generatePeriodName(nextPeriodDates.startDate, nextPeriodDates.endDate),
+          calculatedDays
         },
-        message: `Listo para crear el siguiente período: ${this.generatePeriodName(nextPeriodDates.startDate, nextPeriodDates.endDate)}`
+        message: `Listo para crear el siguiente período: ${this.generatePeriodName(nextPeriodDates.startDate, nextPeriodDates.endDate)} (${calculatedDays} días)`
       };
 
     } catch (error) {
@@ -94,6 +100,137 @@ export class FuturePeriodService {
         message: 'Error validando períodos futuros'
       };
     }
+  }
+
+  /**
+   * GENERACIÓN DINÁMICA DE PERÍODO ACTUAL
+   */
+  private static async generateDynamicCurrentPeriodDates(periodicity: string, customDays?: number): Promise<{ startDate: string; endDate: string }> {
+    console.log('📅 GENERANDO PERÍODO ACTUAL DINÁMICO:', { periodicity, customDays });
+    
+    const { PeriodStrategyFactory } = await import('./PeriodGenerationStrategy');
+    const strategy = PeriodStrategyFactory.createStrategy(periodicity, customDays);
+    
+    return strategy.generateCurrentPeriod();
+  }
+
+  /**
+   * CÁLCULO DINÁMICO DE SIGUIENTE PERÍODO
+   */
+  private static calculateDynamicNextPeriodDates(
+    closedPeriod: any, 
+    periodicity: string,
+    customDays?: number
+  ): { startDate: string; endDate: string } {
+    console.log('📅 CALCULANDO SIGUIENTE PERÍODO DINÁMICO:', { 
+      lastPeriod: closedPeriod.periodo,
+      periodicity, 
+      customDays 
+    });
+    
+    const lastEndDate = closedPeriod.fecha_fin;
+    
+    switch (periodicity) {
+      case 'quincenal':
+        return this.calculateNextBiWeeklyPeriod(lastEndDate);
+      case 'semanal':
+        return this.calculateNextWeeklyPeriod(lastEndDate);
+      case 'personalizado':
+        return this.calculateNextCustomPeriod(lastEndDate, customDays || 30);
+      default: // mensual
+        return this.calculateNextMonthlyPeriod(lastEndDate);
+    }
+  }
+
+  /**
+   * CÁLCULO ESPECÍFICO PARA PERÍODOS QUINCENALES
+   */
+  private static calculateNextBiWeeklyPeriod(lastEndDate: string): { startDate: string; endDate: string } {
+    const lastEnd = new Date(lastEndDate);
+    const nextStart = new Date(lastEnd);
+    nextStart.setDate(lastEnd.getDate() + 1);
+    
+    const startDay = nextStart.getDate();
+    const month = nextStart.getMonth();
+    const year = nextStart.getFullYear();
+    
+    if (startDay === 1) {
+      // Primera quincena (1-15)
+      return {
+        startDate: new Date(year, month, 1).toISOString().split('T')[0],
+        endDate: new Date(year, month, 15).toISOString().split('T')[0]
+      };
+    } else if (startDay === 16) {
+      // Segunda quincena (16-fin del mes)
+      return {
+        startDate: new Date(year, month, 16).toISOString().split('T')[0],
+        endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+      };
+    } else {
+      // Ajustar a la quincena más cercana
+      if (startDay <= 15) {
+        return {
+          startDate: new Date(year, month, 1).toISOString().split('T')[0],
+          endDate: new Date(year, month, 15).toISOString().split('T')[0]
+        };
+      } else {
+        return {
+          startDate: new Date(year, month, 16).toISOString().split('T')[0],
+          endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+        };
+      }
+    }
+  }
+
+  /**
+   * CÁLCULO ESPECÍFICO PARA PERÍODOS MENSUALES
+   */
+  private static calculateNextMonthlyPeriod(lastEndDate: string): { startDate: string; endDate: string } {
+    const lastEnd = new Date(lastEndDate);
+    const nextStart = new Date(lastEnd);
+    nextStart.setDate(lastEnd.getDate() + 1);
+    
+    const month = nextStart.getMonth();
+    const year = nextStart.getFullYear();
+    
+    return {
+      startDate: new Date(year, month, 1).toISOString().split('T')[0],
+      endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+    };
+  }
+
+  /**
+   * CÁLCULO ESPECÍFICO PARA PERÍODOS SEMANALES
+   */
+  private static calculateNextWeeklyPeriod(lastEndDate: string): { startDate: string; endDate: string } {
+    const lastEnd = new Date(lastEndDate);
+    const nextStart = new Date(lastEnd);
+    nextStart.setDate(lastEnd.getDate() + 1);
+    
+    const nextEnd = new Date(nextStart);
+    nextEnd.setDate(nextStart.getDate() + 6);
+    
+    return {
+      startDate: nextStart.toISOString().split('T')[0],
+      endDate: nextEnd.toISOString().split('T')[0]
+    };
+  }
+
+  /**
+   * CÁLCULO ESPECÍFICO PARA PERÍODOS PERSONALIZADOS
+   */
+  private static calculateNextCustomPeriod(lastEndDate: string, customDays: number): { startDate: string; endDate: string } {
+    const lastEnd = new Date(lastEndDate);
+    const nextStart = new Date(lastEnd);
+    nextStart.setDate(lastEnd.getDate() + 1);
+    
+    const nextEnd = new Date(nextStart);
+    nextEnd.setDate(nextStart.getDate() + customDays - 1);
+    
+    return {
+      startDate: nextStart.toISOString().split('T')[0],
+      endDate: nextEnd.toISOString().split('T')[0]
+    };
   }
 
   /**
@@ -148,51 +285,7 @@ export class FuturePeriodService {
   }
 
   /**
-   * Generate current period dates based on periodicity
-   */
-  private static async generateCurrentPeriodDates(periodicity: string): Promise<{ startDate: string; endDate: string }> {
-    const { PeriodStrategyFactory } = await import('./PeriodGenerationStrategy');
-    const strategy = PeriodStrategyFactory.createStrategy(periodicity);
-    return strategy.generateCurrentPeriod();
-  }
-
-  /**
-   * Calculate next period dates after a closed period
-   */
-  private static calculateNextPeriodDates(
-    closedPeriod: any, 
-    periodicity: string
-  ): { startDate: string; endDate: string } {
-    const lastEndDate = new Date(closedPeriod.fecha_fin);
-    const nextStartDate = new Date(lastEndDate);
-    nextStartDate.setDate(nextStartDate.getDate() + 1);
-
-    let nextEndDate: Date;
-
-    switch (periodicity) {
-      case 'quincenal':
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextEndDate.getDate() + 14);
-        break;
-      case 'semanal':
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextEndDate.getDate() + 6);
-        break;
-      default: // mensual
-        nextEndDate = new Date(nextStartDate);
-        nextEndDate.setMonth(nextEndDate.getMonth() + 1);
-        nextEndDate.setDate(nextEndDate.getDate() - 1);
-        break;
-    }
-
-    return {
-      startDate: nextStartDate.toISOString().split('T')[0],
-      endDate: nextEndDate.toISOString().split('T')[0]
-    };
-  }
-
-  /**
-   * Generate period name from dates
+   * UTILIDADES AUXILIARES
    */
   private static generatePeriodName(startDate: string, endDate: string): string {
     const start = new Date(startDate);
@@ -207,5 +300,11 @@ export class FuturePeriodService {
     } else {
       return `${startMonth.charAt(0).toUpperCase() + startMonth.slice(1)} - ${endMonth.charAt(0).toUpperCase() + endMonth.slice(1)} ${year}`;
     }
+  }
+
+  private static calculatePeriodDays(startDate: string, endDate: string): number {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   }
 }

@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PAYROLL_STATES, STATE_MAPPING } from '@/constants/payrollStates';
 import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
+import { PayrollConfigurationService } from './payroll-intelligent/PayrollConfigurationService';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -107,7 +108,7 @@ export class PayrollHistoryService {
         .select('*')
         .eq('id', periodId)
         .eq('company_id', companyId)
-        .maybeSingle(); // Use maybeSingle instead of single
+        .maybeSingle();
 
       if (periodError) {
         console.error('❌ Error obteniendo período:', periodError);
@@ -164,6 +165,10 @@ export class PayrollHistoryService {
       }
 
       console.log('👥 Empleados encontrados:', payrolls?.length || 0);
+
+      // CORREGIR CÁLCULO DE DÍAS TRABAJADOS BASADO EN FECHAS REALES
+      const periodDays = this.calculatePeriodDays(period.fecha_inicio, period.fecha_fin);
+      console.log('📅 Días calculados para el período:', periodDays);
 
       const employees: PayrollHistoryEmployee[] = payrolls?.map(payroll => ({
         id: payroll.employee_id,
@@ -225,12 +230,30 @@ export class PayrollHistoryService {
     }
   }
 
+  /**
+   * NUEVA FUNCIÓN: Calcular días reales de un período
+   */
+  static calculatePeriodDays(startDate: string, endDate: string): number {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    console.log(`📅 Período ${startDate} - ${endDate} = ${days} días`);
+    return days;
+  }
+
   static async regenerateHistoricalData(periodId: string): Promise<RegenerateResult> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('No company ID found');
 
       console.log('🔄 Regenerando datos históricos para período:', periodId);
+
+      // OBTENER CONFIGURACIÓN DINÁMICA PARA CÁLCULOS CORRECTOS
+      const settings = await PayrollConfigurationService.getCompanySettingsForceRefresh(companyId);
+      const periodicity = settings?.periodicity || 'mensual';
+      const customDays = settings?.custom_period_days;
+      
+      console.log('⚙️ Configuración para regeneración:', { periodicity, customDays });
 
       const { data: result, error } = await supabase.rpc(
         'sync_historical_payroll_data',
@@ -250,6 +273,9 @@ export class PayrollHistoryService {
 
       console.log('✅ Regeneración completada:', result);
       
+      // CORREGIR DÍAS TRABAJADOS DESPUÉS DE LA REGENERACIÓN
+      await this.correctWorkedDaysForPeriod(periodId, companyId);
+      
       // Type guard to safely access properties
       if (result && typeof result === 'object' && 'success' in result) {
         const typedResult = result as any;
@@ -262,7 +288,7 @@ export class PayrollHistoryService {
 
       return {
         success: true,
-        message: 'Datos históricos regenerados correctamente'
+        message: 'Datos históricos regenerados y corregidos correctamente'
       };
 
     } catch (error) {
@@ -270,6 +296,112 @@ export class PayrollHistoryService {
       return {
         success: false,
         message: 'Error crítico regenerando datos históricos'
+      };
+    }
+  }
+
+  /**
+   * NUEVA FUNCIÓN: Corregir días trabajados para un período específico
+   */
+  static async correctWorkedDaysForPeriod(periodId: string, companyId: string): Promise<void> {
+    try {
+      console.log('🔧 Corrigiendo días trabajados para período:', periodId);
+
+      // Obtener datos del período
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('fecha_inicio, fecha_fin, periodo')
+        .eq('id', periodId)
+        .single();
+
+      if (!period) return;
+
+      // Calcular días reales del período
+      const realDays = this.calculatePeriodDays(period.fecha_inicio, period.fecha_fin);
+      
+      console.log(`📅 Corrigiendo días trabajados a ${realDays} para período ${period.periodo}`);
+
+      // Actualizar todos los payrolls de este período
+      const { error: updateError } = await supabase
+        .from('payrolls')
+        .update({ 
+          dias_trabajados: realDays,
+          updated_at: new Date().toISOString()
+        })
+        .eq('period_id', periodId)
+        .eq('company_id', companyId);
+
+      if (updateError) {
+        console.error('❌ Error actualizando días trabajados:', updateError);
+      } else {
+        console.log('✅ Días trabajados corregidos exitosamente');
+      }
+
+    } catch (error) {
+      console.error('❌ Error en corrección de días trabajados:', error);
+    }
+  }
+
+  /**
+   * NUEVA FUNCIÓN: Limpiar duplicados en historial
+   */
+  static async cleanDuplicatePayrollRecords(companyId: string): Promise<{ success: boolean; message: string; removedCount: number }> {
+    try {
+      console.log('🧹 Limpiando registros duplicados para empresa:', companyId);
+
+      // Buscar y eliminar duplicados en payrolls (mantener el más reciente)
+      const { data: duplicates, error: findError } = await supabase
+        .from('payrolls')
+        .select('employee_id, periodo, period_id, id, created_at')
+        .eq('company_id', companyId)
+        .order('employee_id', { ascending: true })
+        .order('periodo', { ascending: true })
+        .order('created_at', { ascending: false });
+
+      if (findError) throw findError;
+
+      if (!duplicates || duplicates.length === 0) {
+        return { success: true, message: 'No se encontraron duplicados', removedCount: 0 };
+      }
+
+      // Agrupar por employee_id + periodo/period_id y mantener solo el más reciente
+      const toDelete: string[] = [];
+      const seen = new Set<string>();
+
+      duplicates.forEach(record => {
+        const key = `${record.employee_id}-${record.period_id || record.periodo}`;
+        
+        if (seen.has(key)) {
+          // Este es un duplicado, marcarlo para eliminación
+          toDelete.push(record.id);
+        } else {
+          seen.add(key);
+        }
+      });
+
+      if (toDelete.length > 0) {
+        console.log(`🗑️ Eliminando ${toDelete.length} registros duplicados`);
+        
+        const { error: deleteError } = await supabase
+          .from('payrolls')
+          .delete()
+          .in('id', toDelete);
+
+        if (deleteError) throw deleteError;
+      }
+
+      return {
+        success: true,
+        message: `Limpieza completada: ${toDelete.length} duplicados eliminados`,
+        removedCount: toDelete.length
+      };
+
+    } catch (error) {
+      console.error('❌ Error limpiando duplicados:', error);
+      return {
+        success: false,
+        message: 'Error durante la limpieza de duplicados',
+        removedCount: 0
       };
     }
   }
