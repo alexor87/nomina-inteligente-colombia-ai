@@ -1,11 +1,12 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollPeriodDetectionRobust } from '@/services/payroll-intelligent/PayrollPeriodDetectionRobust';
 import { PayrollDiagnosticService } from '@/services/payroll-intelligent/PayrollDiagnosticService';
 import { PayrollLiquidationNewService } from '@/services/PayrollLiquidationNewService';
+import { FuturePeriodService } from '@/services/payroll-intelligent/FuturePeriodService';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { UnifiedPeriodStatus } from '@/types/period-unified';
+import { supabase } from '@/integrations/supabase/client';
 
 export const usePayrollLiquidationRobust = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -26,35 +27,53 @@ export const usePayrollLiquidationRobust = () => {
   });
   const { toast } = useToast();
 
-  // Simplified initialization without delays or race conditions
+  // Simplified initialization
   const initializeSystem = useCallback(async () => {
     try {
       setIsLoading(true);
       console.log('🚀 INICIALIZANDO SISTEMA DE LIQUIDACIÓN...');
       
-      const status = await PayrollPeriodDetectionRobust.detectWithDiagnosis();
+      const companyId = await PayrollPeriodDetectionRobust.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se encontró información de la empresa');
+      }
+
+      // Use future period validation service
+      const validation = await FuturePeriodService.validateFuturePeriodCreation(companyId);
       
-      // Convert RobustPeriodStatus to UnifiedPeriodStatus
-      const unifiedStatus: UnifiedPeriodStatus = {
-        hasActivePeriod: status.hasActivePeriod,
-        currentPeriod: status.currentPeriod,
-        nextPeriod: status.nextPeriod,
-        action: status.action,
-        message: status.message,
-        diagnostic: status.diagnostic
-      };
-      
-      setPeriodStatus(unifiedStatus);
-      setDiagnostic(status.diagnostic);
-      
-      console.log('📊 Estado detectado:', status.action);
-      console.log('💬 Mensaje del sistema:', status.message);
-      
-      if (status.currentPeriod) {
-        setCurrentPeriod(status.currentPeriod);
-        await loadEmployeesForPeriod(status.currentPeriod);
+      if (validation.activeFuturePeriod) {
+        // There's an active period, load it
+        const status: UnifiedPeriodStatus = {
+          hasActivePeriod: true,
+          currentPeriod: validation.activeFuturePeriod,
+          action: 'resume',
+          message: `Continuando con el período ${validation.activeFuturePeriod.periodo}`
+        };
+        
+        setPeriodStatus(status);
+        setCurrentPeriod(validation.activeFuturePeriod);
+        await loadEmployeesForPeriod(validation.activeFuturePeriod);
+        
+      } else if (validation.canCreateFuture && validation.nextSuggestedPeriod) {
+        // Can create a future period
+        const status: UnifiedPeriodStatus = {
+          hasActivePeriod: false,
+          nextPeriod: validation.nextSuggestedPeriod,
+          action: 'create',
+          message: validation.message
+        };
+        
+        setPeriodStatus(status);
+        
       } else {
-        console.log('ℹ️ No hay período activo, preparando para crear nuevo período');
+        // Some issue, show diagnostic needed
+        const status: UnifiedPeriodStatus = {
+          hasActivePeriod: false,
+          action: 'suggest_next',
+          message: validation.message || 'Verificando configuración...'
+        };
+        
+        setPeriodStatus(status);
       }
       
     } catch (error) {
@@ -67,7 +86,7 @@ export const usePayrollLiquidationRobust = () => {
       
       setPeriodStatus({
         hasActivePeriod: false,
-        action: 'emergency',
+        action: 'suggest_next',
         message: "Error crítico - Ver diagnóstico en consola"
       });
       
@@ -76,7 +95,6 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, [toast]);
 
-  // Load employees for period
   const loadEmployeesForPeriod = useCallback(async (period: any) => {
     try {
       setIsProcessing(true);
@@ -117,7 +135,6 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, [toast]);
 
-  // Employee operations
   const removeEmployeeFromPeriod = useCallback(async (employeeId: string) => {
     try {
       setIsProcessing(true);
@@ -177,7 +194,6 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, []);
 
-  // Selection operations
   const toggleEmployeeSelection = useCallback((employeeId: string) => {
     setSelectedEmployees(prev => {
       if (prev.includes(employeeId)) {
@@ -198,7 +214,6 @@ export const usePayrollLiquidationRobust = () => {
     });
   }, [employees]);
 
-  // Period operations
   const recalculateAll = useCallback(async () => {
     try {
       setIsProcessing(true);
@@ -232,12 +247,24 @@ export const usePayrollLiquidationRobust = () => {
       
       console.log('🔒 Cerrando período:', currentPeriod.periodo);
       
+      // Close the period
+      const { error } = await supabase
+        .from('payroll_periods_real')
+        .update({ 
+          estado: 'cerrado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentPeriod.id);
+
+      if (error) throw error;
+      
       toast({
         title: "Período cerrado",
-        description: `El período ${currentPeriod.periodo} ha sido cerrado`,
+        description: `El período ${currentPeriod.periodo} ha sido cerrado exitosamente`,
       });
       
-      await initializeSystem();
+      // Don't refresh immediately - let the success modal handle it
+      
     } catch (error) {
       console.error('❌ Error cerrando período:', error);
       toast({
@@ -248,50 +275,48 @@ export const usePayrollLiquidationRobust = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [currentPeriod, toast, initializeSystem]);
+  }, [currentPeriod, toast]);
 
   const createNewPeriod = useCallback(async () => {
-    await createSuggestedPeriod();
-  }, []);
-
-  const refreshPeriod = useCallback(async () => {
-    await initializeSystem();
-  }, [initializeSystem]);
-
-  // Add the missing refreshDiagnosis function
-  const refreshDiagnosis = useCallback(async () => {
-    await initializeSystem();
-  }, [initializeSystem]);
-
-  const createSuggestedPeriod = useCallback(async () => {
-    if (!periodStatus?.nextPeriod) return;
-    
     try {
       setIsProcessing(true);
       
-      const newPeriod = await PayrollPeriodDetectionRobust.createPeriodFromSuggestion(periodStatus.nextPeriod);
+      if (!periodStatus?.nextPeriod) return;
       
-      setCurrentPeriod(newPeriod);
-      await loadEmployeesForPeriod(newPeriod);
+      const companyId = await PayrollPeriodDetectionRobust.getCurrentUserCompanyId();
+      if (!companyId) return;
       
-      setPeriodStatus({
-        hasActivePeriod: true,
-        currentPeriod: newPeriod,
-        action: 'resume',
-        message: `Período creado: ${newPeriod.periodo}`
-      });
+      const result = await FuturePeriodService.createFuturePeriod(companyId, periodStatus.nextPeriod);
       
-      toast({
-        title: "✅ Período Creado",
-        description: `Nuevo período ${newPeriod.periodo} listo para liquidación`,
-        className: "border-green-200 bg-green-50"
-      });
+      if (result.success && result.period) {
+        setCurrentPeriod(result.period);
+        await loadEmployeesForPeriod(result.period);
+        
+        setPeriodStatus({
+          hasActivePeriod: true,
+          currentPeriod: result.period,
+          action: 'resume',
+          message: `Período creado: ${result.period.periodo}`
+        });
+        
+        toast({
+          title: "✅ Período Creado",
+          description: result.message,
+          className: "border-green-200 bg-green-50"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
       
     } catch (error) {
-      console.error('❌ Error creando período sugerido:', error);
+      console.error('❌ Error creando período:', error);
       toast({
         title: "Error",
-        description: "No se pudo crear el período sugerido",
+        description: "No se pudo crear el período",
         variant: "destructive"
       });
     } finally {
@@ -299,11 +324,15 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, [periodStatus, loadEmployeesForPeriod, toast]);
 
+  const refreshPeriod = useCallback(async () => {
+    await initializeSystem();
+  }, [initializeSystem]);
+
   const runManualDiagnosis = useCallback(async () => {
     try {
       setIsProcessing(true);
       
-      const companyId = await PayrollPeriodDetectionRobust['getCurrentUserCompanyId']?.();
+      const companyId = await PayrollPeriodDetectionRobust.getCurrentUserCompanyId();
       if (companyId) {
         await PayrollDiagnosticService.runDiagnosticAndLog(companyId);
         
@@ -325,28 +354,10 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, [toast]);
 
-  // Initialize on mount - no delays or race conditions
+  // Initialize on mount
   useEffect(() => {
     initializeSystem();
   }, [initializeSystem]);
-
-  // Optimized logging
-  useEffect(() => {
-    if (!isLoading) {
-      console.log('🔄 Estado actualizado:', {
-        isLoading,
-        isProcessing,
-        employeesCount: employees.length,
-        selectedEmployeesCount: selectedEmployees.length,
-        currentPeriodId: currentPeriod?.id,
-        currentPeriodState: currentPeriod?.estado,
-        periodStatus: periodStatus?.action,
-        summaryTotalEmployees: summary.totalEmployees,
-        hasActivePeriod: periodStatus?.hasActivePeriod,
-        systemMessage: periodStatus?.message
-      });
-    }
-  }, [isLoading, isProcessing, employees.length, selectedEmployees.length, currentPeriod, periodStatus, summary.totalEmployees]);
 
   return {
     // Estado
@@ -371,9 +382,7 @@ export const usePayrollLiquidationRobust = () => {
     refreshPeriod,
     
     // Acciones adicionales
-    createSuggestedPeriod,
     runManualDiagnosis,
-    refreshDiagnosis, // Add the missing function
     
     // Estados calculados
     canCreatePeriod: periodStatus?.action === 'create' && periodStatus?.nextPeriod,
