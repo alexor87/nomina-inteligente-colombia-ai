@@ -1,22 +1,22 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Servicio profesional tipo Aleluya CORREGIDO con datos reales y cálculos exactos
-class AleluyaVoucherService {
-  static generateProfessionalVoucherHTML(data: any): string {
-    const { employee, period, company } = data;
+// Servicio HISTÓRICO que usa datos almacenados en lugar de recalcular
+class HistoricalVoucherService {
+  static generateVoucherHTML(historicalData: any): string {
+    const { payroll, employee, period, company } = historicalData;
     
     const formatCurrency = (amount: number) => {
       return new Intl.NumberFormat('es-CO', {
         style: 'currency',
         currency: 'COP',
         minimumFractionDigits: 0
-      }).format(amount);
+      }).format(amount || 0);
     };
 
     const formatDate = (dateString: string) => {
@@ -27,60 +27,39 @@ class AleluyaVoucherService {
       });
     };
 
-    // CÁLCULOS EXACTOS TIPO ALELUYA CORREGIDOS
-    const salarioBase = Number(employee.baseSalary) || 0;
-    const diasTrabajados = Number(employee.workedDays) || 30;
+    // Usar valores HISTÓRICOS almacenados (no recalcular)
+    const salarioBase = Number(payroll.salario_base) || 0;
+    const diasTrabajados = Number(payroll.dias_trabajados) || 30;
+    const auxilioTransporte = Number(payroll.auxilio_transporte) || 0;
+    const totalDevengado = Number(payroll.total_devengado) || 0;
+    const totalDeducciones = Number(payroll.total_deducciones) || 0;
+    const netoAPagar = Number(payroll.neto_pagado) || 0;
     
-    // Determinar período correcto
-    const esPeriodoQuincenal = diasTrabajados <= 15;
-    const diasDelPeriodo = esPeriodoQuincenal ? 15 : 30;
-    
-    // Factor proporcional CORRECTO
-    const factorProporcional = diasTrabajados / diasDelPeriodo;
-    
-    // Salario proporcional EXACTO
-    const salarioProporcional = Math.round(salarioBase * factorProporcional);
-    
-    // Auxilio de transporte CORRECTO (subsidio de transporte legal 2024)
-    const auxilioTransporteLegal = 162000; // Valor legal 2024
-    const auxilioTransporte = Math.round(auxilioTransporteLegal * factorProporcional);
-    
-    // Horas extra CORRECTAS
-    const horasDelPeriodo = esPeriodoQuincenal ? 120 : 240;
-    const valorHoraOrdinaria = salarioBase / horasDelPeriodo;
-    const valorHoraExtra = valorHoraOrdinaria * 1.25; // 25% recargo
-    const totalHorasExtra = Math.round((employee.extraHours || 0) * valorHoraExtra);
-    
-    // Bonificaciones
-    const bonificaciones = Number(employee.bonuses) || 0;
-    
-    // TOTAL DEVENGADO EXACTO
-    const totalDevengado = salarioProporcional + auxilioTransporte + totalHorasExtra + bonificaciones;
-    
-    // DEDUCCIONES PROPORCIONALES EXACTAS
-    const saludEmpleado = Math.round(salarioBase * 0.04 * factorProporcional); // 4% proporcional
-    const pensionEmpleado = Math.round(salarioBase * 0.04 * factorProporcional); // 4% proporcional
-    const fondoSolidaridad = salarioBase > 4000000 ? Math.round(salarioBase * 0.01 * factorProporcional) : 0;
-    
-    // Otras deducciones
-    const totalDeduccionesCalculadas = saludEmpleado + pensionEmpleado + fondoSolidaridad;
-    const otrasDeduccionesReales = Math.max(0, (employee.deductions || 0) - totalDeduccionesCalculadas);
-    const totalDeducciones = totalDeduccionesCalculadas + otrasDeduccionesReales;
-    
-    // NETO A PAGAR EXACTO
-    const netoAPagar = totalDevengado - totalDeducciones;
+    // Deducciones históricas específicas
+    const saludEmpleado = Number(payroll.salud_empleado) || 0;
+    const pensionEmpleado = Number(payroll.pension_empleado) || 0;
+    const horasExtra = Number(payroll.horas_extra) || 0;
+    const bonificaciones = Number(payroll.bonificaciones) || 0;
+    const recargoNocturno = Number(payroll.recargo_nocturno) || 0;
+    const recargoDominical = Number(payroll.recargo_dominical) || 0;
+    const vacaciones = Number(payroll.vacaciones) || 0;
+    const prima = Number(payroll.prima) || 0;
+    const cesantias = Number(payroll.cesantias) || 0;
+    const interesesCesantias = Number(payroll.intereses_cesantias) || 0;
+    const retencionFuente = Number(payroll.retencion_fuente) || 0;
+    const otrasDeducciones = Number(payroll.otras_deducciones) || 0;
 
-    // Usar datos REALES de empresa y empleado
+    // Datos REALES de empleado y empresa
+    const nombreCompleto = `${employee.nombre || ''} ${employee.apellido || ''}`.trim();
+    const cedulaEmpleado = employee.cedula || 'Sin cédula';
+    const tipoDocumento = employee.tipo_documento || 'CC';
+    const cargoEmpleado = employee.cargo || 'Empleado';
+
     const nombreEmpresa = company.razon_social || 'Empresa';
     const nitEmpresa = company.nit || 'Sin NIT';
     const direccionEmpresa = company.direccion || 'Dirección no especificada';
     const telefonoEmpresa = company.telefono || '';
     const emailEmpresa = company.email || '';
-    
-    const nombreEmpleado = employee.name || 'Empleado';
-    const cedulaEmpleado = employee.cedula || employee.id?.toString() || 'Sin cédula';
-    const tipoDocumento = employee.tipo_documento || 'CC';
-    const cargoEmpleado = employee.position || 'Empleado';
 
     return `
 <!DOCTYPE html>
@@ -88,7 +67,7 @@ class AleluyaVoucherService {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Comprobante de Nómina - ${nombreEmpleado}</title>
+  <title>Comprobante de Nómina - ${nombreCompleto}</title>
   <style>
     * {
       margin: 0;
@@ -224,7 +203,7 @@ class AleluyaVoucherService {
 </head>
 <body>
   <div class="voucher-container">
-    <h1>Comprobante de Nómina</h1>
+    <h1>Comprobante de Nómina HISTÓRICO</h1>
 
     <!-- Header con información REAL -->
     <div class="header-info">
@@ -238,23 +217,22 @@ class AleluyaVoucherService {
       
       <div class="info-section">
         <h3>Empleado</h3>
-        <p><strong>${nombreEmpleado}</strong></p>
+        <p><strong>${nombreCompleto}</strong></p>
         <p>${tipoDocumento}: ${cedulaEmpleado}</p>
         <p>Cargo: ${cargoEmpleado}</p>
       </div>
       
       <div class="info-section">
         <h3>Período de Pago</h3>
-        <p><strong>${formatDate(period.startDate)} - ${formatDate(period.endDate)}</strong></p>
+        <p><strong>${formatDate(period.fecha_inicio)} - ${formatDate(period.fecha_fin)}</strong></p>
         <p>Días trabajados: ${diasTrabajados}</p>
-        <p>Días pagados: ${diasTrabajados}</p>
         <p>Salario Base: ${formatCurrency(salarioBase)}</p>
       </div>
     </div>
 
-    <!-- Sección de Devengado EXACTA -->
+    <!-- Sección de Devengado HISTÓRICO -->
     <div class="section">
-      <div class="section-title">DEVENGADO</div>
+      <div class="section-title">DEVENGADO (Valores Históricos)</div>
       <table>
         <thead>
           <tr>
@@ -264,116 +242,116 @@ class AleluyaVoucherService {
         </thead>
         <tbody>
           <tr>
-            <td>Salario</td>
-            <td class="text-right">${formatCurrency(salarioProporcional)}</td>
+            <td>Salario Base</td>
+            <td class="text-right">${formatCurrency(salarioBase)}</td>
           </tr>
+          ${auxilioTransporte > 0 ? `
           <tr>
             <td>Auxilio de Transporte</td>
             <td class="text-right">${formatCurrency(auxilioTransporte)}</td>
-          </tr>
+          </tr>` : ''}
+          ${horasExtra > 0 ? `
+          <tr>
+            <td>Horas Extras</td>
+            <td class="text-right">${formatCurrency(horasExtra)}</td>
+          </tr>` : ''}
+          ${recargoNocturno > 0 ? `
+          <tr>
+            <td>Recargo Nocturno</td>
+            <td class="text-right">${formatCurrency(recargoNocturno)}</td>
+          </tr>` : ''}
+          ${recargoDominical > 0 ? `
+          <tr>
+            <td>Recargo Dominical</td>
+            <td class="text-right">${formatCurrency(recargoDominical)}</td>
+          </tr>` : ''}
           ${bonificaciones > 0 ? `
           <tr>
             <td>Bonificaciones</td>
             <td class="text-right">${formatCurrency(bonificaciones)}</td>
           </tr>` : ''}
-          ${totalHorasExtra > 0 ? `
+          ${vacaciones > 0 ? `
           <tr>
-            <td>Horas Extras y Recargos</td>
-            <td class="text-right">${formatCurrency(totalHorasExtra)}</td>
+            <td>Vacaciones</td>
+            <td class="text-right">${formatCurrency(vacaciones)}</td>
+          </tr>` : ''}
+          ${prima > 0 ? `
+          <tr>
+            <td>Prima</td>
+            <td class="text-right">${formatCurrency(prima)}</td>
+          </tr>` : ''}
+          ${cesantias > 0 ? `
+          <tr>
+            <td>Cesantías</td>
+            <td class="text-right">${formatCurrency(cesantias)}</td>
+          </tr>` : ''}
+          ${interesesCesantias > 0 ? `
+          <tr>
+            <td>Intereses Cesantías</td>
+            <td class="text-right">${formatCurrency(interesesCesantias)}</td>
           </tr>` : ''}
           <tr class="total-row">
-            <td><strong>Total Devengado</strong></td>
+            <td><strong>Total Devengado Histórico</strong></td>
             <td class="text-right"><strong>${formatCurrency(totalDevengado)}</strong></td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    ${totalHorasExtra > 0 ? `
-    <!-- Sección de Horas Extras EXACTA -->
+    <!-- Sección de Deducciones HISTÓRICAS -->
     <div class="section">
-      <div class="section-title">HORAS EXTRAS, ORDINARIAS Y RECARGOS</div>
+      <div class="section-title">DEDUCCIONES (Valores Históricos)</div>
       <table>
         <thead>
           <tr>
             <th>Concepto</th>
-            <th class="text-center">Cantidad</th>
-            <th class="text-right">Valor Hora</th>
-            <th class="text-right">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Hora Extra Ordinaria</td>
-            <td class="text-center">${employee.extraHours || 0}</td>
-            <td class="text-right">${formatCurrency(valorHoraExtra)}</td>
-            <td class="text-right">${formatCurrency(totalHorasExtra)}</td>
-          </tr>
-          <tr class="highlight">
-            <td colspan="3"><strong>Total Horas Extras</strong></td>
-            <td class="text-right"><strong>${formatCurrency(totalHorasExtra)}</strong></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>` : ''}
-
-    <!-- Sección de Deducciones EXACTA -->
-    <div class="section">
-      <div class="section-title">DEDUCCIONES</div>
-      <table>
-        <thead>
-          <tr>
-            <th>Concepto</th>
-            <th class="text-center">%</th>
             <th class="text-right">Valor</th>
           </tr>
         </thead>
         <tbody>
+          ${saludEmpleado > 0 ? `
           <tr>
-            <td>Salud</td>
-            <td class="text-center">4.0%</td>
+            <td>Salud Empleado</td>
             <td class="text-right">${formatCurrency(saludEmpleado)}</td>
-          </tr>
-          <tr>
-            <td>Pensión</td>
-            <td class="text-center">4.0%</td>
-            <td class="text-right">${formatCurrency(pensionEmpleado)}</td>
-          </tr>
-          ${fondoSolidaridad > 0 ? `
-          <tr>
-            <td>Fondo de Solidaridad</td>
-            <td class="text-center">1.0%</td>
-            <td class="text-right">${formatCurrency(fondoSolidaridad)}</td>
           </tr>` : ''}
-          ${otrasDeduccionesReales > 0 ? `
+          ${pensionEmpleado > 0 ? `
+          <tr>
+            <td>Pensión Empleado</td>
+            <td class="text-right">${formatCurrency(pensionEmpleado)}</td>
+          </tr>` : ''}
+          ${retencionFuente > 0 ? `
+          <tr>
+            <td>Retención en la Fuente</td>
+            <td class="text-right">${formatCurrency(retencionFuente)}</td>
+          </tr>` : ''}
+          ${otrasDeducciones > 0 ? `
           <tr>
             <td>Otras Deducciones</td>
-            <td class="text-center">-</td>
-            <td class="text-right">${formatCurrency(otrasDeduccionesReales)}</td>
+            <td class="text-right">${formatCurrency(otrasDeducciones)}</td>
           </tr>` : ''}
           <tr class="total-row">
-            <td colspan="2"><strong>Total Deducciones</strong></td>
+            <td><strong>Total Deducciones Históricas</strong></td>
             <td class="text-right"><strong>${formatCurrency(totalDeducciones)}</strong></td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Total Neto a Pagar EXACTO -->
+    <!-- Total Neto HISTÓRICO -->
     <div class="section">
       <table>
         <tr class="highlight" style="background-color: #d1ecf1;">
-          <td style="font-size: 16px; font-weight: bold; padding: 10px;">TOTAL NETO A PAGAR</td>
+          <td style="font-size: 16px; font-weight: bold; padding: 10px;">TOTAL NETO A PAGAR (HISTÓRICO)</td>
           <td class="text-right" style="font-size: 16px; font-weight: bold; padding: 10px;">${formatCurrency(netoAPagar)}</td>
         </tr>
       </table>
     </div>
 
-    <!-- Firmas con datos REALES -->
+    <!-- Firmas -->
     <div class="signatures">
       <div class="signature-box">
         <p><strong>Firma del Empleado</strong></p>
-        <p>${nombreEmpleado}</p>
+        <p>${nombreCompleto}</p>
         <p>${tipoDocumento}: ${cedulaEmpleado}</p>
       </div>
       <div class="signature-box">
@@ -387,6 +365,7 @@ class AleluyaVoucherService {
     <div class="footer-info">
       <p>Documento generado con <strong>Finppi</strong> - Sistema de Nómina Profesional</p>
       <p>www.finppi.com | Generado el ${new Date().toLocaleString('es-CO')}</p>
+      <p><strong>✓ COMPROBANTE HISTÓRICO</strong> - Refleja los valores exactos liquidados originalmente</p>
     </div>
   </div>
 </body>
@@ -394,8 +373,8 @@ class AleluyaVoucherService {
   }
 }
 
-// Convertidor HTML a PDF nativo mejorado
-class AleluyaHTMLToPDFConverter {
+// Convertidor HTML a PDF nativo
+class HistoricalHTMLToPDFConverter {
   private objects: string[] = [];
   private objectPositions: number[] = [];
   private currentObjectId = 1;
@@ -433,18 +412,12 @@ class AleluyaHTMLToPDFConverter {
       .replace(/Ú/g, '\\332');
   }
 
-  convertHTMLToPDF(employee: any, period: any, company: any): Uint8Array {
-    console.log('🎨 Generando PDF CORREGIDO con datos reales para:', employee.name);
-    console.log('📊 Datos empresa:', { 
-      nombre: company.razon_social,
-      nit: company.nit,
-      direccion: company.direccion
-    });
-    console.log('📊 Datos empleado:', { 
-      nombre: employee.name,
-      cedula: employee.cedula,
-      salario: employee.baseSalary,
-      diasTrabajados: employee.workedDays
+  convertHTMLToPDF(historicalData: any): Uint8Array {
+    console.log('🎨 Generando PDF HISTÓRICO con datos almacenados para:', historicalData.employee.nombre);
+    console.log('📊 Datos históricos:', { 
+      total_devengado: historicalData.payroll.total_devengado,
+      total_deducciones: historicalData.payroll.total_deducciones,
+      neto_pagado: historicalData.payroll.neto_pagado
     });
 
     // Crear fuentes
@@ -462,8 +435,8 @@ class AleluyaHTMLToPDFConverter {
 /Encoding /WinAnsiEncoding
 >>`);
 
-    // Generar contenido PDF CORREGIDO
-    const contentStream = this.generateCorrectedContentStream(employee, period, company);
+    // Generar contenido PDF HISTÓRICO
+    const contentStream = this.generateHistoricalContentStream(historicalData);
 
     const contentStreamId = this.addObject(`<<
 /Length ${contentStream.length}
@@ -502,8 +475,9 @@ endstream`);
     return this.buildPDF(catalogId);
   }
 
-  private generateCorrectedContentStream(employee: any, period: any, company: any): string {
-    const formatCurrency = (amount: number) => '$' + amount.toLocaleString('es-CO');
+  private generateHistoricalContentStream(historicalData: any): string {
+    const { payroll, employee, period, company } = historicalData;
+    const formatCurrency = (amount: number) => '$' + (amount || 0).toLocaleString('es-CO');
     const formatDate = (dateStr: string) => {
       try {
         const date = new Date(dateStr);
@@ -513,52 +487,35 @@ endstream`);
       }
     };
 
-    // CÁLCULOS EXACTOS CORREGIDOS
-    const salarioBase = Number(employee.baseSalary) || 0;
-    const diasTrabajados = Number(employee.workedDays) || 30;
-    const esPeriodoQuincenal = diasTrabajados <= 15;
-    const diasDelPeriodo = esPeriodoQuincenal ? 15 : 30;
-    const factorProporcional = diasTrabajados / diasDelPeriodo;
-    const salarioProporcional = Math.round(salarioBase * factorProporcional);
-    
-    // Auxilio de transporte CORRECTO
-    const auxilioTransporteLegal = 162000;
-    const auxilioTransporte = Math.round(auxilioTransporteLegal * factorProporcional);
-    
-    // Deducciones PROPORCIONALES
-    const saludEmpleado = Math.round(salarioBase * 0.04 * factorProporcional);
-    const pensionEmpleado = Math.round(salarioBase * 0.04 * factorProporcional);
-    const fondoSolidaridad = salarioBase > 4000000 ? Math.round(salarioBase * 0.01 * factorProporcional) : 0;
-    
-    const horasDelPeriodo = esPeriodoQuincenal ? 120 : 240;
-    const valorHoraOrdinaria = salarioBase / horasDelPeriodo;
-    const valorHoraExtra = valorHoraOrdinaria * 1.25;
-    const totalHorasExtra = Math.round((employee.extraHours || 0) * valorHoraExtra);
-    
-    const bonificaciones = Number(employee.bonuses) || 0;
-    const totalDevengado = salarioProporcional + auxilioTransporte + bonificaciones + totalHorasExtra;
-    const totalDeduccionesCalculadas = saludEmpleado + pensionEmpleado + fondoSolidaridad;
-    const otrasDeduccionesReales = Math.max(0, (employee.deductions || 0) - totalDeduccionesCalculadas);
-    const totalDeducciones = totalDeduccionesCalculadas + otrasDeduccionesReales;
-    const salarioNeto = totalDevengado - totalDeducciones;
+    // Usar valores HISTÓRICOS (no recalcular)
+    const salarioBase = Number(payroll.salario_base) || 0;
+    const diasTrabajados = Number(payroll.dias_trabajados) || 30;
+    const auxilioTransporte = Number(payroll.auxilio_transporte) || 0;
+    const totalDevengado = Number(payroll.total_devengado) || 0;
+    const totalDeducciones = Number(payroll.total_deducciones) || 0;
+    const netoAPagar = Number(payroll.neto_pagado) || 0;
+    const saludEmpleado = Number(payroll.salud_empleado) || 0;
+    const pensionEmpleado = Number(payroll.pension_empleado) || 0;
+    const horasExtra = Number(payroll.horas_extra) || 0;
+    const bonificaciones = Number(payroll.bonificaciones) || 0;
 
-    const fechaInicio = formatDate(period.startDate);
-    const fechaFin = formatDate(period.endDate);
+    const fechaInicio = formatDate(period.fecha_inicio);
+    const fechaFin = formatDate(period.fecha_fin);
 
-    // Usar datos REALES
+    // Datos REALES
+    const nombreCompleto = `${employee.nombre || ''} ${employee.apellido || ''}`.trim();
+    const cedulaEmpleado = employee.cedula || 'Sin cédula';
+    const tipoDocumento = employee.tipo_documento || 'CC';
+    const cargoEmpleado = employee.cargo || 'Empleado';
     const nombreEmpresa = company.razon_social || 'Empresa';
     const nitEmpresa = company.nit || 'Sin NIT';
     const direccionEmpresa = company.direccion || 'Dirección no especificada';
-    const nombreEmpleado = employee.name || 'Empleado';
-    const cedulaEmpleado = employee.cedula || employee.id?.toString() || 'Sin cédula';
-    const tipoDocumento = employee.tipo_documento || 'CC';
-    const cargoEmpleado = employee.position || 'Empleado';
 
     return `BT
 /F2 16 Tf
 0 0 0 rg
 306 750 Td
-(${this.escapeText('COMPROBANTE DE NOMINA')}) Tj
+(${this.escapeText('COMPROBANTE DE NOMINA HISTORICO')}) Tj
 ET
 
 BT
@@ -594,7 +551,7 @@ ET
 BT
 /F1 9 Tf
 230 705 Td
-(${this.escapeText(nombreEmpleado)}) Tj
+(${this.escapeText(nombreCompleto)}) Tj
 ET
 
 BT
@@ -630,12 +587,6 @@ ET
 BT
 /F1 8 Tf
 410 679 Td
-(${this.escapeText('Dias pagados: ' + diasTrabajados)}) Tj
-ET
-
-BT
-/F1 8 Tf
-410 666 Td
 (${this.escapeText('Salario Base: ' + formatCurrency(salarioBase))}) Tj
 ET
 
@@ -646,11 +597,11 @@ S
 BT
 /F2 12 Tf
 0.9 0.9 0.9 rg
-50 630 160 15 re
+50 630 180 15 re
 f
 0 0 0 rg
-115 635 Td
-(${this.escapeText('DEVENGADO')}) Tj
+130 635 Td
+(${this.escapeText('DEVENGADO HISTORICO')}) Tj
 ET
 
 BT
@@ -672,15 +623,16 @@ S
 BT
 /F1 8 Tf
 50 585 Td
-(${this.escapeText('Salario')}) Tj
+(${this.escapeText('Salario Base')}) Tj
 ET
 
 BT
 /F1 8 Tf
 450 585 Td
-(${this.escapeText(formatCurrency(salarioProporcional))}) Tj
+(${this.escapeText(formatCurrency(salarioBase))}) Tj
 ET
 
+${auxilioTransporte > 0 ? `
 BT
 /F1 8 Tf
 50 570 Td
@@ -692,32 +644,33 @@ BT
 450 570 Td
 (${this.escapeText(formatCurrency(auxilioTransporte))}) Tj
 ET
+` : ''}
 
-${bonificaciones > 0 ? `
+${horasExtra > 0 ? `
 BT
 /F1 8 Tf
 50 555 Td
-(${this.escapeText('Bonificaciones')}) Tj
+(${this.escapeText('Horas Extras')}) Tj
 ET
 
 BT
 /F1 8 Tf
 450 555 Td
-(${this.escapeText(formatCurrency(bonificaciones))}) Tj
+(${this.escapeText(formatCurrency(horasExtra))}) Tj
 ET
 ` : ''}
 
-${totalHorasExtra > 0 ? `
+${bonificaciones > 0 ? `
 BT
 /F1 8 Tf
 50 540 Td
-(${this.escapeText('Horas Extras y Recargos')}) Tj
+(${this.escapeText('Bonificaciones')}) Tj
 ET
 
 BT
 /F1 8 Tf
 450 540 Td
-(${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
+(${this.escapeText(formatCurrency(bonificaciones))}) Tj
 ET
 ` : ''}
 
@@ -729,7 +682,7 @@ BT
 /F2 9 Tf
 0 0.7 0 rg
 50 505 Td
-(${this.escapeText('Total Devengado')}) Tj
+(${this.escapeText('Total Devengado Historico')}) Tj
 ET
 
 BT
@@ -741,15 +694,14 @@ ET
 
 0 0 0 rg
 
-${totalHorasExtra > 0 ? `
 BT
 /F2 12 Tf
 0.9 0.9 0.9 rg
-50 475 200 15 re
+50 475 180 15 re
 f
 0 0 0 rg
-120 480 Td
-(${this.escapeText('HORAS EXTRAS, ORDINARIAS Y RECARGOS')}) Tj
+130 480 Td
+(${this.escapeText('DEDUCCIONES HISTORICAS')}) Tj
 ET
 
 BT
@@ -760,185 +712,64 @@ ET
 
 BT
 /F2 8 Tf
-200 455 Td
-(${this.escapeText('Cantidad')}) Tj
-ET
-
-BT
-/F2 8 Tf
-300 455 Td
-(${this.escapeText('Valor Hora')}) Tj
-ET
-
-BT
-/F2 8 Tf
 450 455 Td
-(${this.escapeText('Total')}) Tj
+(${this.escapeText('Valor')}) Tj
 ET
 
 50 450 m
 562 450 l
 S
 
+${saludEmpleado > 0 ? `
 BT
 /F1 8 Tf
 50 435 Td
-(${this.escapeText('Hora Extra Ordinaria')}) Tj
-ET
-
-BT
-/F1 8 Tf
-200 435 Td
-(${this.escapeText(String(employee.extraHours || 0))}) Tj
-ET
-
-BT
-/F1 8 Tf
-300 435 Td
-(${this.escapeText(formatCurrency(valorHoraExtra))}) Tj
+(${this.escapeText('Salud Empleado')}) Tj
 ET
 
 BT
 /F1 8 Tf
 450 435 Td
-(${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
-ET
-
-50 420 m
-562 420 l
-S
-` : ''}
-
-BT
-/F2 12 Tf
-0.9 0.9 0.9 rg
-50 395 160 15 re
-f
-0 0 0 rg
-115 400 Td
-(${this.escapeText('DEDUCCIONES')}) Tj
-ET
-
-BT
-/F2 8 Tf
-50 375 Td
-(${this.escapeText('Concepto')}) Tj
-ET
-
-BT
-/F2 8 Tf
-200 375 Td
-(${this.escapeText('%')}) Tj
-ET
-
-BT
-/F2 8 Tf
-450 375 Td
-(${this.escapeText('Valor')}) Tj
-ET
-
-50 370 m
-562 370 l
-S
-
-BT
-/F1 8 Tf
-50 355 Td
-(${this.escapeText('Salud')}) Tj
-ET
-
-BT
-/F1 8 Tf
-200 355 Td
-(${this.escapeText('4.0%')}) Tj
-ET
-
-BT
-/F1 8 Tf
-450 355 Td
 (${this.escapeText(formatCurrency(saludEmpleado))}) Tj
 ET
+` : ''}
 
+${pensionEmpleado > 0 ? `
 BT
 /F1 8 Tf
-50 340 Td
-(${this.escapeText('Pension')}) Tj
+50 420 Td
+(${this.escapeText('Pension Empleado')}) Tj
 ET
 
 BT
 /F1 8 Tf
-200 340 Td
-(${this.escapeText('4.0%')}) Tj
-ET
-
-BT
-/F1 8 Tf
-450 340 Td
+450 420 Td
 (${this.escapeText(formatCurrency(pensionEmpleado))}) Tj
 ET
-
-${fondoSolidaridad > 0 ? `
-BT
-/F1 8 Tf
-50 325 Td
-(${this.escapeText('Fondo de Solidaridad')}) Tj
-ET
-
-BT
-/F1 8 Tf
-200 325 Td
-(${this.escapeText('1.0%')}) Tj
-ET
-
-BT
-/F1 8 Tf
-450 325 Td
-(${this.escapeText(formatCurrency(fondoSolidaridad))}) Tj
-ET
 ` : ''}
 
-${otrasDeduccionesReales > 0 ? `
-BT
-/F1 8 Tf
-50 310 Td
-(${this.escapeText('Otras Deducciones')}) Tj
-ET
-
-BT
-/F1 8 Tf
-200 310 Td
-(${this.escapeText('-')}) Tj
-ET
-
-BT
-/F1 8 Tf
-450 310 Td
-(${this.escapeText(formatCurrency(otrasDeduccionesReales))}) Tj
-ET
-` : ''}
-
-50 295 m
-562 295 l
+50 405 m
+562 405 l
 S
 
 BT
 /F2 9 Tf
 1 0 0 rg
-50 275 Td
-(${this.escapeText('Total Deducciones')}) Tj
+50 385 Td
+(${this.escapeText('Total Deducciones Historicas')}) Tj
 ET
 
 BT
 /F2 9 Tf
 1 0 0 rg
-450 275 Td
+450 385 Td
 (${this.escapeText(formatCurrency(totalDeducciones))}) Tj
 ET
 
 0 0 0 rg
 
-50 255 m
-562 255 l
+50 365 m
+562 365 l
 2 w
 S
 1 w
@@ -946,84 +777,84 @@ S
 BT
 /F2 14 Tf
 0 0.5 0.8 rg
-50 225 Td
-(${this.escapeText('TOTAL NETO A PAGAR')}) Tj
+50 335 Td
+(${this.escapeText('TOTAL NETO HISTORICO')}) Tj
 ET
 
 BT
 /F2 14 Tf
 0 0.5 0.8 rg
-350 225 Td
-(${this.escapeText(formatCurrency(salarioNeto))}) Tj
+350 335 Td
+(${this.escapeText(formatCurrency(netoAPagar))}) Tj
 ET
 
 0 0 0 rg
 
 BT
 /F1 8 Tf
-50 150 Td
+50 250 Td
 (${this.escapeText('_________________________')}) Tj
 ET
 
 BT
 /F1 8 Tf
-350 150 Td
+350 250 Td
 (${this.escapeText('_________________________')}) Tj
 ET
 
 BT
 /F2 8 Tf
-50 135 Td
+50 235 Td
 (${this.escapeText('Firma del Empleado')}) Tj
 ET
 
 BT
 /F2 8 Tf
-350 135 Td
+350 235 Td
 (${this.escapeText('Firma del Empleador')}) Tj
 ET
 
 BT
 /F1 7 Tf
-50 120 Td
-(${this.escapeText(nombreEmpleado)}) Tj
+50 220 Td
+(${this.escapeText(nombreCompleto)}) Tj
 ET
 
 BT
 /F1 7 Tf
-350 120 Td
+350 220 Td
 (${this.escapeText(nombreEmpresa)}) Tj
 ET
 
 BT
 /F1 7 Tf
-50 108 Td
+50 208 Td
 (${this.escapeText(tipoDocumento + ': ' + cedulaEmpleado)}) Tj
 ET
 
 BT
 /F1 7 Tf
-350 108 Td
+350 208 Td
 (${this.escapeText('NIT: ' + nitEmpresa)}) Tj
 ET
 
 BT
 /F1 6 Tf
 0.5 0.5 0.5 rg
-50 80 Td
-(${this.escapeText('Documento generado con Finppi - Sistema de Nomina Profesional')}) Tj
+50 180 Td
+(${this.escapeText('Documento HISTORICO con valores almacenados - Finppi')}) Tj
 ET
 
 BT
 /F1 6 Tf
 0.5 0.5 0.5 rg
-50 70 Td
+50 170 Td
 (${this.escapeText('www.finppi.com | Generado el ' + new Date().toLocaleDateString('es-CO'))}) Tj
 ET`;
   }
 
   private buildPDF(catalogId: number): Uint8Array {
-    console.log('🏗️ Construyendo PDF CORREGIDO con datos reales...');
+    console.log('🏗️ Construyendo PDF HISTÓRICO...');
 
     let pdf = '%PDF-1.4\n';
     pdf += '%âãÏÓ\n';
@@ -1057,20 +888,15 @@ ET`;
     pdf += `${xrefPos}\n`;
     pdf += '%%EOF\n';
 
-    console.log('✅ PDF CORREGIDO generado exitosamente');
-    console.log(`📊 Objetos creados: ${this.objects.length - 1}`);
+    console.log('✅ PDF HISTÓRICO generado exitosamente');
     
     const encoder = new TextEncoder();
-    const pdfBytes = encoder.encode(pdf);
-    
-    console.log(`📋 Tamaño final del PDF: ${pdfBytes.length} bytes`);
-    
-    return pdfBytes;
+    return encoder.encode(pdf);
   }
 }
 
 serve(async (req) => {
-  console.log('🎨 PDF Generator CORREGIDO - Iniciando con datos reales...');
+  console.log('🎨 PDF Generator HISTÓRICO - Usando datos almacenados...');
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -1078,15 +904,14 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    console.log('📋 Request recibido para PDF CORREGIDO');
-    console.log('📊 Datos recibidos:', JSON.stringify(requestBody, null, 2));
+    console.log('📋 Request recibido para PDF HISTÓRICO');
 
-    const { employee, period, company } = requestBody;
+    const { employee_id, period_id } = requestBody;
 
-    if (!employee || !period) {
-      console.error('❌ Datos faltantes');
+    if (!employee_id || !period_id) {
+      console.error('❌ Faltan employee_id o period_id');
       return new Response(
-        JSON.stringify({ error: 'Faltan datos del empleado o período' }),
+        JSON.stringify({ error: 'Se requieren employee_id y period_id' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -1094,42 +919,64 @@ serve(async (req) => {
       );
     }
 
-    // Validar que tengamos datos reales de empresa
-    const companyData = company || {
-      razon_social: 'Empresa Sin Nombre',
-      nit: 'Sin NIT',
-      direccion: 'Dirección no especificada'
+    // Crear cliente Supabase para consultar datos históricos
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    console.log('🔍 Consultando datos históricos almacenados...');
+
+    // Consultar datos HISTÓRICOS almacenados (no recalcular)
+    const { data: historicalData, error } = await supabase
+      .from('payrolls')
+      .select(`
+        *,
+        employees!inner(nombre, apellido, cedula, tipo_documento, cargo),
+        companies!inner(razon_social, nit, direccion, telefono, email),
+        payroll_periods_real!inner(fecha_inicio, fecha_fin, periodo)
+      `)
+      .eq('employee_id', employee_id)
+      .eq('period_id', period_id)
+      .single();
+
+    if (error || !historicalData) {
+      console.error('❌ Error consultando datos históricos:', error);
+      return new Response(
+        JSON.stringify({ error: 'No se encontraron datos históricos para este empleado y período' }),
+        { 
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log('✅ Datos históricos encontrados:', {
+      empleado: historicalData.employees.nombre,
+      periodo: historicalData.payroll_periods_real.periodo,
+      total_devengado: historicalData.total_devengado,
+      neto_pagado: historicalData.neto_pagado
+    });
+
+    // Estructurar datos para el generador
+    const voucherData = {
+      payroll: historicalData,
+      employee: historicalData.employees,
+      period: historicalData.payroll_periods_real,
+      company: historicalData.companies
     };
 
-    console.log('🎨 Generando PDF CORREGIDO con datos reales...');
-    console.log('🏢 Empresa:', companyData.razon_social);
-    console.log('🆔 NIT:', companyData.nit);
-    console.log('👤 Empleado:', employee.name);
-    console.log('🆔 Cédula:', employee.cedula);
-    console.log('📅 Período:', period.startDate, '-', period.endDate);
-    console.log('💰 Salario base:', employee.baseSalary);
-    console.log('📊 Días trabajados:', employee.workedDays);
+    console.log('🎨 Generando PDF HISTÓRICO...');
     
-    const converter = new AleluyaHTMLToPDFConverter();
-    const pdfBytes = converter.convertHTMLToPDF(employee, period, companyData);
+    const converter = new HistoricalHTMLToPDFConverter();
+    const pdfBytes = converter.convertHTMLToPDF(voucherData);
     
-    console.log(`✅ PDF CORREGIDO generado - Tamaño: ${pdfBytes.length} bytes`);
+    console.log(`✅ PDF HISTÓRICO generado - Tamaño: ${pdfBytes.length} bytes`);
     
-    // Validaciones mejoradas
     if (pdfBytes.length < 2000) {
       throw new Error(`PDF muy pequeño: ${pdfBytes.length} bytes - posible error`);
     }
     
-    const pdfString = new TextDecoder().decode(pdfBytes.slice(0, 15));
-    if (!pdfString.startsWith('%PDF-')) {
-      throw new Error(`Header PDF inválido: ${pdfString}`);
-    }
-    
-    console.log('✅ PDF CORREGIDO validado correctamente');
-    console.log(`🔍 Header verificado: ${pdfString.slice(0, 8)}`);
-    console.log('🎨 Correcciones aplicadas: datos reales, cálculos exactos, auxilio de transporte, deducciones proporcionales');
-    
-    const fileName = `comprobante-corregido-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
+    const fileName = `comprobante-historico-${historicalData.employees.nombre?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
     
     return new Response(pdfBytes, {
       status: 200,
@@ -1145,12 +992,11 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('💥 ERROR en generador CORREGIDO:', error);
-    console.error('💥 Stack:', error.stack);
+    console.error('💥 ERROR en generador HISTÓRICO:', error);
     
     return new Response(
       JSON.stringify({ 
-        error: `Error generando PDF CORREGIDO: ${error.message}`,
+        error: `Error generando PDF HISTÓRICO: ${error.message}`,
         details: error.stack,
         timestamp: new Date().toISOString()
       }),

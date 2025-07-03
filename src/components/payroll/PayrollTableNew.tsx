@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Download, FileText, Edit, Trash2, Plus } from 'lucide-react';
 import { NovedadUnifiedModal } from './novedades/NovedadUnifiedModal';
-import { CompanyConfigurationService } from '@/services/CompanyConfigurationService';
 
 interface PayrollTableNewProps {
   employees: PayrollEmployee[];
@@ -36,34 +36,7 @@ export const PayrollTableNew = ({
   const [isGeneratingVoucher, setIsGeneratingVoucher] = useState<string | null>(null);
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
   const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<string | null>(null);
-  const [companyData, setCompanyData] = useState<any>(null);
   const checkboxRef = useRef<HTMLButtonElement>(null);
-
-  // Cargar datos REALES de la empresa al montar el componente
-  useEffect(() => {
-    const loadCompanyData = async () => {
-      try {
-        const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-        if (companyId) {
-          const company = await CompanyConfigurationService.getCompanyData(companyId);
-          if (company) {
-            setCompanyData(company);
-            console.log('✅ Datos REALES de empresa cargados:', {
-              razon_social: company.razon_social,
-              nit: company.nit,
-              direccion: company.direccion,
-              telefono: company.telefono,
-              email: company.email
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error loading company data:', error);
-      }
-    };
-
-    loadCompanyData();
-  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -86,58 +59,21 @@ export const PayrollTableNew = ({
     }
   };
 
-  const handleGenerateVoucher = async (employee: PayrollEmployee, period: any) => {
-    if (!companyData) {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los datos de la empresa",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleGenerateVoucher = async (employee: PayrollEmployee) => {
     setIsGeneratingVoucher(employee.id);
     
     try {
-      console.log('🎨 Generando comprobante CORREGIDO con datos reales...');
-      console.log('🏢 Empresa:', companyData.razon_social);
-      console.log('🆔 NIT empresa:', companyData.nit);
+      console.log('🎨 Generando comprobante HISTÓRICO usando datos almacenados...');
       console.log('👤 Empleado:', employee.name);
-      console.log('🆔 Cédula empleado:', employee.cedula);
-      console.log('💰 Salario:', employee.baseSalary);
-      console.log('📊 Días trabajados:', employee.workedDays);
+      console.log('📅 Período:', periodId);
 
+      // Enviar employee_id y period_id para consultar datos históricos
       const voucherData = {
-        employee: {
-          id: employee.id,
-          name: employee.name,
-          cedula: employee.cedula || employee.id,
-          tipo_documento: employee.tipo_documento || 'CC',
-          position: employee.position || 'Empleado',
-          baseSalary: employee.baseSalary,
-          workedDays: employee.workedDays || 30,
-          grossPay: employee.grossPay,
-          deductions: employee.deductions,
-          netPay: employee.netPay,
-          transportAllowance: employee.transportAllowance || 162000, // Auxilio legal 2024
-          bonuses: employee.bonuses || 0,
-          extraHours: employee.extraHours || 0
-        },
-        period: {
-          startDate: period?.startDate || new Date().toISOString().split('T')[0],
-          endDate: period?.endDate || new Date().toISOString().split('T')[0],
-          type: period?.type || 'mensual'
-        },
-        company: {
-          razon_social: companyData.razon_social,
-          nit: companyData.nit,
-          direccion: companyData.direccion || 'Dirección no especificada',
-          telefono: companyData.telefono,
-          email: companyData.email
-        }
+        employee_id: employee.id,
+        period_id: periodId
       };
 
-      console.log('📋 Datos REALES enviados a la edge function:', voucherData);
+      console.log('📋 Datos enviados a la edge function HISTÓRICA:', voucherData);
 
       const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
         body: voucherData
@@ -153,22 +89,22 @@ export const PayrollTableNew = ({
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `comprobante-corregido-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
+      link.download = `comprobante-historico-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
       toast({
-        title: "✅ Comprobante CORREGIDO generado",
-        description: `Comprobante con datos reales de ${employee.name} descargado correctamente`,
+        title: "✅ Comprobante HISTÓRICO generado",
+        description: `Comprobante con datos almacenados de ${employee.name} descargado correctamente`,
       });
 
     } catch (error) {
-      console.error('❌ Error generando comprobante corregido:', error);
+      console.error('❌ Error generando comprobante histórico:', error);
       toast({
         title: "Error",
-        description: "No se pudo generar el comprobante corregido. Intenta nuevamente.",
+        description: "No se pudo generar el comprobante histórico. Intenta nuevamente.",
         variant: "destructive"
       });
     } finally {
@@ -295,13 +231,9 @@ export const PayrollTableNew = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleGenerateVoucher(employee, { 
-                        startDate: new Date().toISOString().split('T')[0],
-                        endDate: new Date().toISOString().split('T')[0],
-                        type: 'mensual'
-                      })}
+                      onClick={() => handleGenerateVoucher(employee)}
                       disabled={isGeneratingVoucher === employee.id}
-                      title="Generar comprobante con datos reales"
+                      title="Generar comprobante con datos históricos almacenados"
                     >
                       {isGeneratingVoucher === employee.id ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
