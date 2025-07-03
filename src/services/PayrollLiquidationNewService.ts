@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
@@ -184,7 +183,7 @@ export class PayrollLiquidationNewService {
     };
   }
 
-  // ✅ NUEVA FUNCIÓN ALELUYA: Cálculo exacto como Aleluya
+  // ✅ NUEVA FUNCIÓN ALELUYA: Cálculo exacto como Aleluya CON NOVEDADES
   private static async calculateEmployeePayrollAleluya(
     employee: any, 
     period: any, 
@@ -198,7 +197,8 @@ export class PayrollLiquidationNewService {
       console.log(`🔢 ALELUYA - Calculando para ${employee.nombre}:`, {
         baseSalary,
         workedDays,
-        periodicity
+        periodicity,
+        novedades: novedades.length
       });
       
       // ✅ CÁLCULO ALELUYA EXACTO
@@ -212,23 +212,67 @@ export class PayrollLiquidationNewService {
         const dailyTransport = 200000 / 30;
         transportAllowance = Math.round(dailyTransport * workedDays);
       }
+
+      // ✅ 3. PROCESAR NOVEDADES
+      let extraHours = 0;
+      let bonuses = 0;
+      let additionalDeductions = 0;
+      let additionalEarnings = 0;
+
+      console.log(`📋 Procesando ${novedades.length} novedades para ${employee.nombre}:`);
       
-      // 3. Total devengado
-      const grossPay = proportionalSalary + transportAllowance;
+      for (const novedad of novedades) {
+        const valor = Number(novedad.valor) || 0;
+        
+        console.log(`   - ${novedad.tipo_novedad}: $${valor.toLocaleString()}`);
+        
+        // Clasificar novedades en devengos y deducciones
+        switch (novedad.tipo_novedad) {
+          case 'horas_extra':
+          case 'recargo_nocturno':
+            extraHours += valor;
+            additionalEarnings += valor;
+            break;
+          case 'bonificacion':
+          case 'comision':
+          case 'prima':
+          case 'otros_ingresos':
+            bonuses += valor;
+            additionalEarnings += valor;
+            break;
+          case 'retencion_fuente':
+          case 'prestamo':
+          case 'embargo':
+          case 'descuento_voluntario':
+          case 'fondo_solidaridad':
+            additionalDeductions += valor;
+            break;
+          // Salud y pensión no se incluyen aquí porque ya se calculan automáticamente
+          default:
+            console.log(`   ⚠️ Tipo de novedad no clasificado: ${novedad.tipo_novedad}`);
+        }
+      }
+
+      // 4. Total devengado CON NOVEDADES
+      const grossPay = proportionalSalary + transportAllowance + additionalEarnings;
       
-      // 4. Deducciones (solo sobre salario proporcional, sin auxilio)
+      // 5. Deducciones (solo sobre salario proporcional, sin auxilio) + novedades
       const healthDeduction = Math.round(proportionalSalary * 0.04); // 4%
       const pensionDeduction = Math.round(proportionalSalary * 0.04); // 4%
-      const totalDeductions = healthDeduction + pensionDeduction;
+      const totalDeductions = healthDeduction + pensionDeduction + additionalDeductions;
       
-      // 5. Neto a pagar
+      // 6. Neto a pagar
       const netPay = grossPay - totalDeductions;
       
-      console.log(`💰 RESULTADO ALELUYA para ${employee.nombre}:`, {
+      console.log(`💰 RESULTADO ALELUYA CON NOVEDADES para ${employee.nombre}:`, {
         proportionalSalary,
         transportAllowance,
+        additionalEarnings,
+        extraHours,
+        bonuses,
         grossPay,
         totalDeductions,
+        additionalDeductions,
         netPay
       });
 
@@ -238,9 +282,9 @@ export class PayrollLiquidationNewService {
         position: employee.cargo || 'Sin cargo',
         baseSalary,
         workedDays,
-        extraHours: 0,
+        extraHours,
         disabilities: 0,
-        bonuses: 0,
+        bonuses,
         absences: 0,
         grossPay,
         deductions: totalDeductions,
