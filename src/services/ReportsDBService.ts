@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { ReportFilters } from '@/types/reports';
+import { ReportFilters, NoveltyHistoryReport } from '@/types/reports';
 
 export class ReportsDBService {
   // Reporte de Resumen de Nómina
@@ -230,7 +229,8 @@ export class ReportsDBService {
     }
 
     if (filters.noveltyTypes && filters.noveltyTypes.length > 0) {
-      query = query.in('tipo_novedad', filters.noveltyTypes);
+      // Cast to any to handle the type mismatch temporarily
+      query = query.in('tipo_novedad', filters.noveltyTypes as any);
     }
 
     const { data, error } = await query;
@@ -246,7 +246,7 @@ export class ReportsDBService {
       id: item.id,
       employeeId: item.empleado_id,
       employeeName: `${item.employees?.nombre} ${item.employees?.apellido}`,
-      type: item.tipo_novedad,
+      type: item.tipo_novedad as NoveltyHistoryReport['type'],
       description: item.observacion || 'Sin descripción',
       amount: Number(item.valor) || 0,
       hours: Number(item.horas) || 0,

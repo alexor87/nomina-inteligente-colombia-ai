@@ -66,11 +66,12 @@ export interface IncomeRetentionCertificate {
   sentAt?: string;
 }
 
+// Updated NoveltyHistoryReport to match database types
 export interface NoveltyHistoryReport {
   id: string;
   employeeId: string;
   employeeName: string;
-  type: 'overtime' | 'incapacity' | 'license' | 'bonus' | 'advance' | 'absence';
+  type: 'horas_extra' | 'recargo_nocturno' | 'vacaciones' | 'licencia_remunerada' | 'incapacidad' | 'bonificacion' | 'comision' | 'prima' | 'otros_ingresos' | 'salud' | 'pension' | 'fondo_solidaridad' | 'retencion_fuente' | 'prestamo' | 'embargo' | 'descuento_voluntario';
   description: string;
   amount?: number;
   hours?: number;
@@ -111,3 +112,52 @@ export interface ReportMetrics {
   totalMonthlyCost: number;
   employeeCount: number;
 }
+
+// Helper function to convert database types to display labels
+export const noveltyTypeLabels: Record<string, string> = {
+  'horas_extra': 'Horas Extra',
+  'recargo_nocturno': 'Recargo Nocturno',
+  'vacaciones': 'Vacaciones',
+  'licencia_remunerada': 'Licencia Remunerada',
+  'incapacidad': 'Incapacidad',
+  'bonificacion': 'Bonificación',
+  'comision': 'Comisión',
+  'prima': 'Prima',
+  'otros_ingresos': 'Otros Ingresos',
+  'salud': 'Salud',
+  'pension': 'Pensión',
+  'fondo_solidaridad': 'Fondo Solidaridad',
+  'retencion_fuente': 'Retención Fuente',
+  'prestamo': 'Préstamo',
+  'embargo': 'Embargo',
+  'descuento_voluntario': 'Descuento Voluntario'
+};
+
+// Helper function to get badge variant for novelty types
+export const getNoveltyTypeBadgeVariant = (type: string) => {
+  switch (type) {
+    case 'horas_extra':
+    case 'recargo_nocturno':
+    case 'bonificacion':
+    case 'comision':
+    case 'prima':
+    case 'otros_ingresos':
+      return 'default';
+    case 'vacaciones':
+    case 'licencia_remunerada':
+      return 'secondary';
+    case 'incapacidad':
+      return 'destructive';
+    case 'salud':
+    case 'pension':
+    case 'fondo_solidaridad':
+      return 'outline';
+    case 'retencion_fuente':
+    case 'prestamo':
+    case 'embargo':
+    case 'descuento_voluntario':
+      return 'destructive';
+    default:
+      return 'outline';
+  }
+};

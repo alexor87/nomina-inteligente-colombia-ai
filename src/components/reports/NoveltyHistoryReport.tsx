@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Download, History, Clock, DollarSign } from 'lucide-react';
 import { useReports } from '@/hooks/useReports';
-import { NoveltyHistoryReport as NoveltyHistoryData } from '@/types/reports';
+import { NoveltyHistoryReport as NoveltyHistoryData, noveltyTypeLabels, getNoveltyTypeBadgeVariant } from '@/types/reports';
 
 export const NoveltyHistoryReport = () => {
   const { filters, getNoveltyHistoryReport, exportToExcel, exportToPDF, loading } = useReports();
@@ -27,30 +27,6 @@ export const NoveltyHistoryReport = () => {
       currency: 'COP',
       minimumFractionDigits: 0
     }).format(amount);
-  };
-
-  const getNoveltyTypeLabel = (type: string) => {
-    const labels = {
-      'overtime': 'Horas Extra',
-      'incapacity': 'Incapacidad',
-      'license': 'Licencia',
-      'bonus': 'Bonificación',
-      'advance': 'Anticipo',
-      'absence': 'Ausencia'
-    };
-    return labels[type as keyof typeof labels] || type;
-  };
-
-  const getNoveltyTypeBadgeVariant = (type: string) => {
-    switch (type) {
-      case 'overtime': return 'default';
-      case 'bonus': return 'secondary';
-      case 'incapacity': return 'destructive';
-      case 'license': return 'outline';
-      case 'advance': return 'secondary';
-      case 'absence': return 'destructive';
-      default: return 'outline';
-    }
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -89,7 +65,7 @@ export const NoveltyHistoryReport = () => {
               <span>Histórico de Novedades</span>
             </CardTitle>
             <CardDescription>
-              Horas extra, incapacidades, licencias, bonificaciones y ausencias
+              Horas extra, incapacidades, licencias, bonificaciones y otras novedades
             </CardDescription>
           </div>
           <div className="flex space-x-2">
@@ -124,7 +100,7 @@ export const NoveltyHistoryReport = () => {
                   <TableCell className="font-medium">{item.employeeName}</TableCell>
                   <TableCell>
                     <Badge variant={getNoveltyTypeBadgeVariant(item.type)}>
-                      {getNoveltyTypeLabel(item.type)}
+                      {noveltyTypeLabels[item.type] || item.type}
                     </Badge>
                   </TableCell>
                   <TableCell>{item.description}</TableCell>
