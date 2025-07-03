@@ -42,13 +42,14 @@ export interface PeriodStatus {
 
 export class PayrollPeriodIntelligentService {
   /**
-   * NUEVA ARQUITECTURA PROFESIONAL - DETECCIÓN CON PRIORIDAD DE PERÍODO ACTUAL
-   * Primero busca/crea período actual basado en fecha de hoy
-   * Solo como fallback usa la lógica de "siguiente período"
+   * DETECCIÓN MEJORADA - PRIORIDAD ABSOLUTA AL PERÍODO ACTUAL
+   * 1. Buscar período activo (borrador)
+   * 2. Detectar período ACTUAL basado en fecha de HOY
+   * 3. Solo como fallback: buscar siguiente período
    */
   static async detectCurrentPeriod(): Promise<PeriodStatus> {
     try {
-      console.log('🔍 INICIANDO DETECCIÓN CON PRIORIDAD DE PERÍODO ACTUAL...');
+      console.log('🎯 DETECCIÓN CON PRIORIDAD ABSOLUTA AL PERÍODO ACTUAL...');
       
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
@@ -68,6 +69,9 @@ export class PayrollPeriodIntelligentService {
       
       if (activePeriod) {
         console.log('✅ Período activo encontrado:', activePeriod.periodo);
+        // VALIDAR que el nombre coincida con las fechas
+        await this.validatePeriodNameConsistency(activePeriod);
+        
         return {
           hasActivePeriod: true,
           currentPeriod: activePeriod,
@@ -76,17 +80,20 @@ export class PayrollPeriodIntelligentService {
         };
       }
 
-      console.log('📅 No hay período activo, detectando período ACTUAL basado en fecha de hoy...');
+      console.log('📅 No hay período activo, detectando período ACTUAL basado en FECHA DE HOY...');
 
-      // PASO 3: NUEVO - DETECTAR PERÍODO ACTUAL BASADO EN FECHA DE HOY
-      const currentPeriodDates = await this.generateCurrentPeriodDates(periodicity);
-      console.log('📊 Fechas del período actual calculadas:', currentPeriodDates);
+      // PASO 3: DETECTAR PERÍODO ACTUAL BASADO EN FECHA DE HOY
+      const currentPeriodDates = await this.generateTodaysPeriodDates(periodicity);
+      console.log('📊 Fechas del período ACTUAL calculadas:', currentPeriodDates);
 
       // Verificar si ya existe un período que coincida con las fechas actuales
       const existingCurrentPeriod = await this.findPeriodByDates(companyId, currentPeriodDates.startDate, currentPeriodDates.endDate);
       
       if (existingCurrentPeriod) {
         console.log('✅ Período actual existente encontrado:', existingCurrentPeriod.periodo);
+        
+        // VALIDAR consistencia de nombre
+        await this.validatePeriodNameConsistency(existingCurrentPeriod);
         
         if (existingCurrentPeriod.estado === 'borrador') {
           return {
@@ -120,15 +127,16 @@ export class PayrollPeriodIntelligentService {
   }
 
   /**
-   * NUEVO: Generar fechas del período actual basado en la fecha de hoy
+   * NUEVO: Generar fechas del período ACTUAL basado en la fecha de HOY
    */
-  static async generateCurrentPeriodDates(periodicity: string): Promise<{ startDate: string; endDate: string }> {
+  static async generateTodaysPeriodDates(periodicity: string): Promise<{ startDate: string; endDate: string }> {
     try {
       const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
       const strategy = PeriodStrategyFactory.createStrategy(periodicity);
       
+      // Usar método específico para período actual (no siguiente)
       const currentPeriod = strategy.generateCurrentPeriod();
-      console.log('📅 Período actual generado:', currentPeriod);
+      console.log('📅 Período actual generado basado en HOY:', currentPeriod);
       
       return currentPeriod;
     } catch (error) {
@@ -137,6 +145,38 @@ export class PayrollPeriodIntelligentService {
       const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
       const strategy = PeriodStrategyFactory.createStrategy(periodicity);
       return strategy.generateFirstPeriod();
+    }
+  }
+
+  /**
+   * NUEVO: Validar consistencia entre nombre del período y fechas almacenadas
+   */
+  static async validatePeriodNameConsistency(period: PayrollPeriod): Promise<void> {
+    try {
+      const { getPeriodNameFromDates } = await import('@/utils/periodDateUtils');
+      const correctName = getPeriodNameFromDates(period.fecha_inicio, period.fecha_fin);
+      
+      if (correctName !== period.periodo) {
+        console.log(`⚠️ INCONSISTENCIA DETECTADA: "${period.periodo}" → "${correctName}"`);
+        
+        // Corregir el nombre automáticamente
+        const { error } = await supabase
+          .from('payroll_periods_real')
+          .update({ 
+            periodo: correctName,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', period.id);
+
+        if (error) {
+          console.error('❌ Error corrigiendo nombre:', error);
+        } else {
+          console.log('✅ Nombre corregido automáticamente');
+          period.periodo = correctName; // Actualizar en memoria
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error validando consistencia:', error);
     }
   }
 

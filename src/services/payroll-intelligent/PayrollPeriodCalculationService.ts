@@ -4,15 +4,15 @@ import { PeriodStrategyFactory, PeriodGenerationStrategy } from './PeriodGenerat
 
 export class PayrollPeriodCalculationService {
   /**
-   * ARQUITECTURA PROFESIONAL MEJORADA - COORDINADOR PRINCIPAL CON DETECCIÓN DE DATOS CORRUPTOS
-   * Usa Strategy pattern y detecta automáticamente períodos con fechas incorrectas
+   * ARQUITECTURA PROFESIONAL MEJORADA - COORDINADOR PRINCIPAL SIN RETROCESOS AUTOMÁTICOS
+   * Usa Strategy pattern y NO modifica períodos que están correctos
    */
   
   static async calculateNextPeriodFromDatabase(periodicity: string, companyId: string): Promise<{
     startDate: string;
     endDate: string;
   }> {
-    console.log('📅 CALCULANDO SIGUIENTE PERÍODO CON DETECCIÓN DE DATOS CORRUPTOS:', {
+    console.log('📅 CALCULANDO SIGUIENTE PERÍODO SIN RETROCESOS AUTOMÁTICOS:', {
       periodicity,
       companyId
     });
@@ -39,30 +39,26 @@ export class PayrollPeriodCalculationService {
         return strategy.generateFirstPeriod();
       }
 
-      // NUEVO: Detectar y filtrar períodos con datos corruptos
+      // MEJORADO: Solo considerar períodos genuinamente válidos, no hacer correcciones automáticas
       const validPeriods = periods.filter(period => {
         const validation = strategy.validateAndCorrectPeriod(period.fecha_inicio, period.fecha_fin);
         if (!validation.isValid) {
-          console.warn('⚠️ PERÍODO CORRUPTO DETECTADO:', {
+          console.warn('⚠️ PERÍODO CON FECHAS IRREGULARES (NO SE MODIFICA AUTOMÁTICAMENTE):', {
             id: period.id,
             periodo: period.periodo,
             fechas: `${period.fecha_inicio} - ${period.fecha_fin}`,
             problema: validation.message
           });
-          return false;
+          // NO retornamos false aquí - dejamos que el período se use tal como está
+          return true;
         }
         return true;
       });
 
-      if (validPeriods.length === 0) {
-        console.log('❌ TODOS LOS PERÍODOS ESTÁN CORRUPTOS - Generando PRIMER período válido');
-        return strategy.generateFirstPeriod();
-      }
-
       const lastValidPeriod = validPeriods[0];
-      console.log('✅ Último período VÁLIDO encontrado:', lastValidPeriod.fecha_inicio, '-', lastValidPeriod.fecha_fin);
+      console.log('✅ Último período encontrado (sin modificar):', lastValidPeriod.fecha_inicio, '-', lastValidPeriod.fecha_fin);
 
-      // Generar siguiente período usando el último período válido
+      // Generar siguiente período basado en el último período encontrado
       const nextPeriod = strategy.generateNextConsecutivePeriod(lastValidPeriod.fecha_fin);
       
       console.log('✅ Siguiente período generado correctamente:', nextPeriod);
@@ -75,14 +71,15 @@ export class PayrollPeriodCalculationService {
   }
 
   /**
-   * NUEVO: Corrección automática de períodos corruptos
+   * MEJORADO: Corrección automática SOLO de períodos genuinamente corruptos
+   * NO modifica períodos que simplemente tienen fechas irregulares pero válidas
    */
   static async autoCorrectCorruptPeriods(companyId: string, periodicity: string = 'quincenal'): Promise<{
     correctedCount: number;
     errors: string[];
     summary: string;
   }> {
-    console.log('🔧 INICIANDO CORRECCIÓN AUTOMÁTICA DE PERÍODOS CORRUPTOS para:', companyId);
+    console.log('🔧 INICIANDO CORRECCIÓN CONSERVADORA DE PERÍODOS CORRUPTOS para:', companyId);
     
     const strategy = PeriodStrategyFactory.createStrategy(periodicity);
     let correctedCount = 0;
@@ -102,14 +99,15 @@ export class PayrollPeriodCalculationService {
         return { correctedCount: 0, errors: [], summary: 'No hay períodos para corregir' };
       }
 
-      console.log(`📊 CORRIGIENDO ${periods.length} períodos automáticamente`);
+      console.log(`📊 ANALIZANDO ${periods.length} períodos (corrección conservadora)`);
 
-      // Corregir períodos uno por uno manteniendo la secuencia
+      // NUEVO: Solo corregir períodos que tienen errores CRÍTICOS, no irregularidades menores
       for (const period of periods) {
         const validation = strategy.validateAndCorrectPeriod(period.fecha_inicio, period.fecha_fin);
         
-        if (!validation.isValid && validation.correctedPeriod) {
-          console.log('📝 CORRECCIÓN AUTOMÁTICA:', validation.message);
+        // Solo corregir si hay errores CRÍTICOS (no solo irregularidades)
+        if (!validation.isValid && validation.correctedPeriod && this.isCriticalError(validation.message)) {
+          console.log('📝 CORRECCIÓN CRÍTICA NECESARIA:', validation.message);
           
           const { error: updateError } = await supabase
             .from('payroll_periods_real')
@@ -128,10 +126,12 @@ export class PayrollPeriodCalculationService {
             console.log(`✅ Período ${period.id} CORREGIDO: ${period.fecha_inicio}-${period.fecha_fin} → ${validation.correctedPeriod.startDate}-${validation.correctedPeriod.endDate}`);
             correctedCount++;
           }
+        } else if (!validation.isValid) {
+          console.log(`ℹ️ Período ${period.id} tiene fechas irregulares pero válidas - NO se modifica automáticamente`);
         }
       }
 
-      const summary = `✅ Corrección automática completada: ${correctedCount} períodos corregidos, ${errors.length} errores`;
+      const summary = `✅ Corrección conservadora completada: ${correctedCount} períodos corregidos, ${errors.length} errores`;
       console.log(summary);
       
       return { correctedCount, errors, summary };
@@ -144,6 +144,22 @@ export class PayrollPeriodCalculationService {
         summary: '❌ Error en corrección automática'
       };
     }
+  }
+
+  /**
+   * NUEVO: Determinar si un error es crítico y requiere corrección automática
+   */
+  private static isCriticalError(message: string): boolean {
+    const criticalErrors = [
+      'fecha de fin anterior a fecha de inicio',
+      'período de duración cero',
+      'fechas nulas o inválidas',
+      'superposición crítica'
+    ];
+
+    return criticalErrors.some(criticalError => 
+      message.toLowerCase().includes(criticalError.toLowerCase())
+    );
   }
 
   /**
@@ -185,7 +201,7 @@ export class PayrollPeriodCalculationService {
     corrected: number;
     errors: string[];
   }> {
-    console.log('🔧 INICIANDO CORRECCIÓN MASIVA DE PERÍODOS para empresa:', companyId);
+    console.log('🔧 INICIANDO CORRECCIÓN CONSERVADORA DE PERÍODOS para empresa:', companyId);
     
     const strategy = PeriodStrategyFactory.createStrategy(periodicity);
     let corrected = 0;
@@ -207,13 +223,14 @@ export class PayrollPeriodCalculationService {
         return { corrected: 0, errors: [] };
       }
 
-      console.log(`📊 CORRIGIENDO ${periods.length} períodos con arquitectura unificada`);
+      console.log(`📊 CORRIGIENDO ${periods.length} períodos con enfoque conservador`);
 
       for (const period of periods) {
         const validation = strategy.validateAndCorrectPeriod(period.fecha_inicio, period.fecha_fin);
         
-        if (!validation.isValid && validation.correctedPeriod) {
-          console.log('📝 CORRECCIÓN AUTOMÁTICA:', validation.message);
+        // Solo corregir errores críticos
+        if (!validation.isValid && validation.correctedPeriod && this.isCriticalError(validation.message)) {
+          console.log('📝 CORRECCIÓN CRÍTICA:', validation.message);
           
           const { error: updateError } = await supabase
             .from('payroll_periods_real')
@@ -229,17 +246,17 @@ export class PayrollPeriodCalculationService {
             console.error('❌', errorMsg);
             errors.push(errorMsg);
           } else {
-            console.log(`✅ Período ${period.id} CORREGIDO AUTOMÁTICAMENTE`);
+            console.log(`✅ Período ${period.id} CORREGIDO CRÍTICAMENTE`);
             corrected++;
           }
         }
       }
 
-      console.log('✅ CORRECCIÓN MASIVA COMPLETADA:', { corrected, errors: errors.length });
+      console.log('✅ CORRECCIÓN CONSERVADORA COMPLETADA:', { corrected, errors: errors.length });
       return { corrected, errors };
 
     } catch (error) {
-      console.error('❌ Error en corrección masiva:', error);
+      console.error('❌ Error en corrección conservadora:', error);
       errors.push(`Error general: ${error.message}`);
       return { corrected, errors };
     }

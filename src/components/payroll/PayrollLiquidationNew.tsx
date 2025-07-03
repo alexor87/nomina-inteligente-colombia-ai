@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,8 @@ import {
   RefreshCw,
   AlertCircle,
   TrendingUp,
-  Wrench
+  Wrench,
+  FileText
 } from 'lucide-react';
 import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
 import { usePeriodValidation } from '@/hooks/usePeriodValidation';
@@ -44,18 +44,30 @@ export const PayrollLiquidationNew = () => {
   } = usePayrollLiquidationNew();
 
   // Hook para corrección de períodos
-  const { executeIntegralCorrection, isValidating } = usePeriodValidation();
+  const { executeIntegralCorrection, executeNameOnlyCorrection, isValidating } = usePeriodValidation();
 
   // Wrapper functions for button handlers
   const handleRefreshPeriod = () => refreshPeriod(0);
   const handleRetryInitialization = () => refreshPeriod(0);
   const handleForceRefresh = () => refreshPeriod(0);
 
-  // Nueva función para ejecutar corrección integral CON REFRESH AUTOMÁTICO
+  // Función para ejecutar corrección integral CON REFRESH AUTOMÁTICO
   const handlePeriodCorrection = async () => {
     if (!currentPeriod?.company_id) return;
     
     await executeIntegralCorrection(currentPeriod.company_id);
+    
+    // Refrescar automáticamente los datos después de la corrección
+    setTimeout(() => {
+      refreshPeriod(0);
+    }, 1000);
+  };
+
+  // NUEVA: Función para corregir SOLO nombres
+  const handleNameOnlyCorrection = async () => {
+    if (!currentPeriod?.company_id) return;
+    
+    await executeNameOnlyCorrection(currentPeriod.company_id);
     
     // Refrescar automáticamente los datos después de la corrección
     setTimeout(() => {
@@ -238,7 +250,18 @@ export const PayrollLiquidationNew = () => {
               Recalcular Todo
             </Button>
 
-            {/* NUEVO: Botón de Corrección de Períodos */}
+            {/* NUEVO: Botón de Corrección SOLO de Nombres */}
+            <Button
+              variant="outline"
+              onClick={handleNameOnlyCorrection}
+              disabled={isValidating || !currentPeriod}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <FileText className={`h-4 w-4 mr-2 ${isValidating ? 'animate-spin' : ''}`} />
+              {isValidating ? 'Corrigiendo...' : 'Corregir Nombres'}
+            </Button>
+
+            {/* Botón de Corrección Integral */}
             <Button
               variant="outline"
               onClick={handlePeriodCorrection}
@@ -246,7 +269,7 @@ export const PayrollLiquidationNew = () => {
               className="border-orange-200 text-orange-700 hover:bg-orange-50"
             >
               <Wrench className={`h-4 w-4 mr-2 ${isValidating ? 'animate-spin' : ''}`} />
-              {isValidating ? 'Corrigiendo...' : 'Corregir Períodos'}
+              {isValidating ? 'Corrigiendo...' : 'Corrección Integral'}
             </Button>
 
             {canClosePeriod && (
@@ -355,17 +378,17 @@ export const PayrollLiquidationNew = () => {
           </Card>
         )}
 
-        {/* NUEVO: Card informativo sobre la corrección */}
+        {/* Card informativo sobre la corrección */}
         {isValidating && (
-          <Card className="p-4 bg-orange-50 border-orange-200">
+          <Card className="p-4 bg-green-50 border-green-200">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-orange-100 rounded-full">
-                <Wrench className="h-4 w-4 text-orange-600 animate-spin" />
+              <div className="p-2 bg-green-100 rounded-full">
+                <FileText className="h-4 w-4 text-green-600 animate-pulse" />
               </div>
               <div>
-                <p className="text-orange-800 font-medium">Corrección de Períodos en Proceso</p>
-                <p className="text-orange-600 text-sm">
-                  Ejecutando validación y corrección automática de fechas y nombres de períodos...
+                <p className="text-green-800 font-medium">Corrección en Proceso</p>
+                <p className="text-green-600 text-sm">
+                  Ejecutando corrección automática de períodos...
                 </p>
               </div>
             </div>
