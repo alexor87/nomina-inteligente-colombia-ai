@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,8 @@ import {
   RefreshCw,
   Download,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  Wrench
 } from 'lucide-react';
 
 export const PayrollHistoryDetails: React.FC = () => {
@@ -43,10 +45,12 @@ export const PayrollHistoryDetails: React.FC = () => {
   const {
     isReopening,
     isRegenerating,
+    isFixing,
     canUserReopenPeriods,
     checkUserPermissions,
     reopenPeriod,
-    regenerateHistoricalData
+    regenerateHistoricalData,
+    fixSpecificPeriodData
   } = usePayrollHistory();
 
   useEffect(() => {
@@ -120,6 +124,15 @@ export const PayrollHistoryDetails: React.FC = () => {
         title: "Datos regenerados",
         description: "Los datos históricos se han regenerado correctamente"
       });
+    }
+  };
+
+  const handleFixPeriodData = async () => {
+    if (!id) return;
+
+    const success = await fixSpecificPeriodData(id);
+    if (success) {
+      await loadDetails(); // Reload details after fixing
     }
   };
 
@@ -294,6 +307,17 @@ export const PayrollHistoryDetails: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Fix Period Data Button - Nueva funcionalidad de corrección específica */}
+          <Button
+            onClick={handleFixPeriodData}
+            disabled={isFixing}
+            variant="outline"
+            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+          >
+            <Wrench className={`h-4 w-4 mr-2 ${isFixing ? 'animate-spin' : ''}`} />
+            {isFixing ? 'Corrigiendo...' : 'Corregir Datos'}
+          </Button>
+
           {/* Regenerate Data Button - Show only if no employees and period is closed */}
           {hasNoEmployees && period.status === 'cerrado' && (
             <Button

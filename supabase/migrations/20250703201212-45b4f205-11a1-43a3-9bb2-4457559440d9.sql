@@ -1,6 +1,5 @@
 
-
--- Corregir función sync_historical_payroll_data para calcular días reales y valores proporcionales
+-- FASE 1: Corrección de función sync_historical_payroll_data para usar 15 días en períodos quincenales
 CREATE OR REPLACE FUNCTION public.sync_historical_payroll_data(p_period_id uuid, p_company_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -47,10 +46,17 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'message', 'Período no encontrado');
   END IF;
 
-  -- CALCULAR DÍAS REALES DEL PERÍODO
-  period_days := (period_record.fecha_fin - period_record.fecha_inicio) + 1;
+  -- CALCULAR DÍAS CORRECTOS SEGÚN TIPO DE PERÍODO
+  IF period_record.tipo_periodo = 'quincenal' THEN
+    period_days := 15; -- CORRECCIÓN: usar 15 días para quincenales
+  ELSIF period_record.tipo_periodo = 'semanal' THEN
+    period_days := 7;
+  ELSE
+    -- Para mensual o personalizado, calcular días reales
+    period_days := (period_record.fecha_fin - period_record.fecha_inicio) + 1;
+  END IF;
   
-  RAISE NOTICE 'Período: % - Días calculados: %', period_record.periodo, period_days;
+  RAISE NOTICE 'Período: % - Tipo: % - Días calculados: %', period_record.periodo, period_record.tipo_periodo, period_days;
 
   -- Si ya existen registros en payrolls para este período, actualizarlos
   IF EXISTS (
@@ -58,7 +64,7 @@ BEGIN
     WHERE company_id = p_company_id 
     AND (period_id = p_period_id OR periodo = period_record.periodo)
   ) THEN
-    -- Actualizar registros existentes con días reales
+    -- Actualizar registros existentes con días correctos
     FOR employee_record IN
       SELECT p.*, e.salario_base
       FROM public.payrolls p
@@ -66,7 +72,7 @@ BEGIN
       WHERE p.company_id = p_company_id 
       AND (p.period_id = p_period_id OR p.periodo = period_record.periodo)
     LOOP
-      -- Calcular valores proporcionales basados en días reales
+      -- Calcular valores proporcionales basados en días correctos
       proportional_salary := (employee_record.salario_base / 30.0) * period_days;
       proportional_deductions := proportional_salary * 0.08; -- 8% deducciones aproximadas
       proportional_net := proportional_salary - proportional_deductions;
@@ -78,6 +84,7 @@ BEGIN
         total_deducciones = proportional_deductions,
         neto_pagado = proportional_net,
         period_id = p_period_id, -- Asegurar period_id correcto
+        periodo = period_record.periodo, -- Sincronizar nombre del período
         updated_at = now()
       WHERE id = employee_record.id;
       
@@ -91,7 +98,7 @@ BEGIN
       SELECT * FROM public.employees 
       WHERE company_id = p_company_id AND estado = 'activo'
     LOOP
-      -- Calcular valores proporcionales basados en días reales del período
+      -- Calcular valores proporcionales basados en días correctos del período
       proportional_salary := (employee_record.salario_base / 30.0) * period_days;
       proportional_deductions := proportional_salary * 0.08; -- 8% deducciones aproximadas
       proportional_net := proportional_salary - proportional_deductions;
@@ -114,7 +121,7 @@ BEGIN
         period_record.periodo,
         p_period_id,
         employee_record.salario_base,
-        period_days, -- Usar días reales calculados
+        period_days, -- Usar días correctos calculados
         proportional_salary, -- Valor proporcional
         proportional_deductions, -- Deducciones proporcionales
         proportional_net, -- Neto proporcional
@@ -125,6 +132,16 @@ BEGIN
       records_created := records_created + 1;
     END LOOP;
   END IF;
+
+  -- FASE 2: Limpiar duplicados por empleado/período
+  WITH duplicates AS (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY employee_id, periodo ORDER BY updated_at DESC) as rn
+    FROM public.payrolls 
+    WHERE company_id = p_company_id 
+    AND (period_id = p_period_id OR periodo = period_record.periodo)
+  )
+  DELETE FROM public.payrolls 
+  WHERE id IN (SELECT id FROM duplicates WHERE rn > 1);
 
   -- Actualizar totales del período con valores reales
   UPDATE public.payroll_periods_real 
@@ -163,8 +180,8 @@ BEGIN
 
   RETURN jsonb_build_object(
     'success', true, 
-    'message', format('Sincronización completada: %s creados, %s actualizados (Días período: %s)', 
-                     records_created, records_updated, period_days),
+    'message', format('Corrección completada: %s creados, %s actualizados (Días período %s: %s)', 
+                     records_created, records_updated, period_record.tipo_periodo, period_days),
     'records_created', records_created,
     'records_updated', records_updated,
     'period_days', period_days
@@ -183,19 +200,32 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $function$;
 
--- Crear función para corregir períodos específicos existentes
-CREATE OR REPLACE FUNCTION public.fix_specific_period_data(p_period_id uuid)
+-- FASE 3: Función específica para limpiar períodos duplicados
+CREATE OR REPLACE FUNCTION public.clean_duplicate_periods()
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
 AS $function$
 DECLARE
-  result JSONB;
+  duplicates_removed INTEGER := 0;
 BEGIN
-  -- Llamar a la función de sincronización que ahora corrige datos existentes
-  SELECT sync_historical_payroll_data(p_period_id) INTO result;
+  -- Eliminar períodos duplicados manteniendo el más reciente
+  WITH duplicate_periods AS (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY company_id, periodo ORDER BY updated_at DESC) as rn
+    FROM public.payroll_periods_real
+  )
+  DELETE FROM public.payroll_periods_real 
+  WHERE id IN (SELECT id FROM duplicate_periods WHERE rn > 1);
   
-  RETURN result;
+  GET DIAGNOSTICS duplicates_removed = ROW_COUNT;
+  
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', format('%s períodos duplicados eliminados', duplicates_removed),
+    'duplicates_removed', duplicates_removed
+  );
 END;
 $function$;
 
+-- FASE 4: Ejecutar limpieza de duplicados
+SELECT public.clean_duplicate_periods();

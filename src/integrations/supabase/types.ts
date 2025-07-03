@@ -1515,6 +1515,10 @@ export type Database = {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
       }
+      clean_duplicate_periods: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       create_company_with_setup: {
         Args: {
           p_nit: string

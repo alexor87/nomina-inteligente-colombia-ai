@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PAYROLL_STATES, STATE_MAPPING } from '@/constants/payrollStates';
@@ -644,7 +645,7 @@ export class PayrollHistoryService {
     }
   }
 
-  static async recalculateEmployeeTotalsWithNovedades(employeeId: string, periodId: string): Promise<void> {
+  static async recalculateEmployeeTotalsWithNovelties(employeeId: string, periodId: string): Promise<void> {
     try {
       console.log('Recalculating totals for employee:', employeeId, 'period:', periodId);
     } catch (error) {
