@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { UserRegistrationStep } from './registration-steps/UserRegistrationStep';
 import { WelcomeModal } from './registration-steps/WelcomeModal';
 import { CompanyDataStep } from './registration-steps/CompanyDataStep';
 import { FunctionalAreaStep } from './registration-steps/FunctionalAreaStep';
@@ -12,7 +13,7 @@ interface CompanyRegistrationWizardProps {
   onCancel?: () => void;
 }
 
-export type WizardStep = 'welcome' | 'company-data' | 'functional-area' | 'team-invitation' | 'final';
+export type WizardStep = 'welcome' | 'user-registration' | 'company-data' | 'functional-area' | 'team-invitation' | 'final';
 
 export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegistrationWizardProps) => {
   const [currentStep, setCurrentStep] = useState<WizardStep>('welcome');
@@ -21,7 +22,7 @@ export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegis
   useEffect(() => {
     // Load saved progress on mount
     const savedStep = localStorage.getItem('company-registration-step');
-    if (savedStep && ['welcome', 'company-data', 'functional-area', 'team-invitation', 'final'].includes(savedStep)) {
+    if (savedStep && ['welcome', 'user-registration', 'company-data', 'functional-area', 'team-invitation', 'final'].includes(savedStep)) {
       setCurrentStep(savedStep as WizardStep);
     }
   }, []);
@@ -54,7 +55,9 @@ export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegis
   const renderStep = () => {
     switch (currentStep) {
       case 'welcome':
-        return <WelcomeModal onNext={() => handleStepComplete('company-data')} onCancel={handleCancel} />;
+        return <WelcomeModal onNext={() => handleStepComplete('user-registration')} onCancel={handleCancel} />;
+      case 'user-registration':
+        return <UserRegistrationStep onNext={() => handleStepComplete('company-data')} onCancel={handleCancel} />;
       case 'company-data':
         return <CompanyDataStep onNext={() => handleStepComplete('functional-area')} onCancel={handleCancel} />;
       case 'functional-area':
@@ -64,7 +67,7 @@ export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegis
       case 'final':
         return <FinalStep onComplete={handleFinalComplete} onCancel={handleCancel} />;
       default:
-        return <WelcomeModal onNext={() => handleStepComplete('company-data')} onCancel={handleCancel} />;
+        return <WelcomeModal onNext={() => handleStepComplete('user-registration')} onCancel={handleCancel} />;
     }
   };
 
