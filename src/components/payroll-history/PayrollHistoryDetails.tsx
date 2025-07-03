@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 export const PayrollHistoryDetails: React.FC = () => {
-  const { periodId } = useParams<{ periodId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [details, setDetails] = useState<PayrollHistoryDetailsType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +52,7 @@ export const PayrollHistoryDetails: React.FC = () => {
   }, [checkUserPermissions]);
 
   const loadDetails = async () => {
-    if (!periodId) {
+    if (!id) {
       setError('ID de período no válido');
       setIsLoading(false);
       return;
@@ -61,15 +61,22 @@ export const PayrollHistoryDetails: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      console.log('🔍 Cargando detalles del período:', periodId);
+      console.log('🔍 Cargando detalles del período:', id);
       
-      const data = await PayrollHistoryService.getPeriodDetails(periodId);
+      const data = await PayrollHistoryService.getPeriodDetails(id);
       console.log('✅ Detalles cargados:', data);
       
       setDetails(data);
     } catch (error: any) {
       console.error('❌ Error loading period details:', error);
       setError(error.message || 'Error al cargar los detalles del período');
+      
+      // Toast de error específico
+      toast({
+        title: "Error al cargar período",
+        description: error.message || "No se pudieron obtener los detalles del período",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +84,7 @@ export const PayrollHistoryDetails: React.FC = () => {
 
   useEffect(() => {
     loadDetails();
-  }, [periodId]);
+  }, [id]);
 
   const handleReopen = async (reason: string) => {
     if (!details?.period.period) return;
@@ -86,17 +93,31 @@ export const PayrollHistoryDetails: React.FC = () => {
       await reopenPeriod(details.period.period);
       setShowReopenDialog(false);
       await loadDetails(); // Reload details after reopening
+      
+      toast({
+        title: "Período reabierto",
+        description: "El período ha sido reabierto exitosamente"
+      });
     } catch (error) {
       console.error('Error reopening period:', error);
+      toast({
+        title: "Error al reabrir",
+        description: "No se pudo reabrir el período",
+        variant: "destructive"
+      });
     }
   };
 
   const handleRegenerateData = async () => {
-    if (!periodId) return;
+    if (!id) return;
 
-    const success = await regenerateHistoricalData(periodId);
+    const success = await regenerateHistoricalData(id);
     if (success) {
       await loadDetails(); // Reload details after regeneration
+      toast({
+        title: "Datos regenerados",
+        description: "Los datos históricos se han regenerado correctamente"
+      });
     }
   };
 
@@ -105,6 +126,11 @@ export const PayrollHistoryDetails: React.FC = () => {
     // Process the steps here
     setShowEditWizard(false);
     await loadDetails();
+    
+    toast({
+      title: "Período procesado",
+      description: "Los cambios se han aplicado correctamente"
+    });
   };
 
   if (isLoading) {
