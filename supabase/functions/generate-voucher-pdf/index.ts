@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -6,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Servicio profesional tipo Aleluya mejorado
+// Servicio profesional tipo Aleluya mejorado con datos reales
 class AleluyaVoucherService {
   static generateProfessionalVoucherHTML(data: any): string {
     const { employee, period, company } = data;
@@ -27,28 +26,36 @@ class AleluyaVoucherService {
       });
     };
 
-    // Cálculos exactos tipo Aleluya
+    // Cálculos exactos tipo Aleluya corregidos
     const salarioBase = employee.baseSalary;
     const diasTrabajados = employee.workedDays || 30;
     
-    // Para períodos quincenales, ajustar cálculos proporcionales
-    const esPeriodoQuincenal = period.type === 'quincenal' || diasTrabajados <= 15;
-    const factorProporcional = esPeriodoQuincenal ? (diasTrabajados / 15) : (diasTrabajados / 30);
+    // Determinar si es período quincenal basado en los días trabajados
+    const esPeriodoQuincenal = diasTrabajados <= 15;
+    const diasDelPeriodo = esPeriodoQuincenal ? 15 : 30;
     
+    // Calcular salario proporcional correcto
+    const factorProporcional = diasTrabajados / diasDelPeriodo;
     const salarioProporcional = Math.round(salarioBase * factorProporcional);
     
-    // Deducciones calculadas exactas
-    const saludEmpleado = Math.round(salarioBase * 0.04); // 4.0%
-    const pensionEmpleado = Math.round(salarioBase * 0.04); // 4.0%
-    const fondoSolidaridad = salarioBase > 4000000 ? Math.round(salarioBase * 0.01) : 0; // 1% si > 4 SMMLV
+    // Auxilio de transporte proporcional
+    const auxilioTransporte = employee.transportAllowance ? 
+      Math.round(employee.transportAllowance * factorProporcional) : 0;
+    
+    // Deducciones calculadas sobre salario base (proporcionales al período)
+    const saludEmpleado = Math.round(salarioBase * 0.04 * factorProporcional); // 4.0% proporcional
+    const pensionEmpleado = Math.round(salarioBase * 0.04 * factorProporcional); // 4.0% proporcional
+    const fondoSolidaridad = salarioBase > 4000000 ? Math.round(salarioBase * 0.01 * factorProporcional) : 0; // 1% si > 4 SMMLV
     
     // Horas extra - cálculo exacto
-    const valorHoraOrdinaria = salarioBase / (esPeriodoQuincenal ? 120 : 240);
+    const horasDelPeriodo = esPeriodoQuincenal ? 120 : 240;
+    const valorHoraOrdinaria = salarioBase / horasDelPeriodo;
     const valorHoraExtra = valorHoraOrdinaria * 1.25; // 25% recargo ordinario
-    const totalHorasExtra = Math.round(employee.extraHours * valorHoraExtra);
+    const totalHorasExtra = Math.round((employee.extraHours || 0) * valorHoraExtra);
 
-    const documento = employee.id?.slice(0, 8) || 'N/A';
-    const tipoDocumento = 'CC';
+    // Usar cédula real del empleado
+    const documento = employee.cedula || employee.id || 'N/A';
+    const tipoDocumento = employee.tipo_documento || 'CC';
 
     return `
 <!DOCTYPE html>
@@ -194,12 +201,12 @@ class AleluyaVoucherService {
   <div class="voucher-container">
     <h1>Comprobante de Nómina</h1>
 
-    <!-- Header con información tipo Aleluya -->
+    <!-- Header con información real tipo Aleluya -->
     <div class="header-info">
       <div class="info-section">
         <h3>Empresa</h3>
-        <p><strong>${company.razon_social || 'Mi Empresa S.A.S.'}</strong></p>
-        <p>NIT: ${company.nit || '900123456-1'}</p>
+        <p><strong>${company.razon_social}</strong></p>
+        <p>NIT: ${company.nit}</p>
         <p>${company.direccion || 'Dirección empresa'}</p>
       </div>
       
@@ -214,6 +221,7 @@ class AleluyaVoucherService {
         <h3>Período de Pago</h3>
         <p><strong>${formatDate(period.startDate)} - ${formatDate(period.endDate)}</strong></p>
         <p>Días trabajados: ${diasTrabajados}</p>
+        <p>Días pagados: ${diasTrabajados}</p>
         <p>Salario Base: ${formatCurrency(salarioBase)}</p>
       </div>
     </div>
@@ -233,10 +241,10 @@ class AleluyaVoucherService {
             <td>Salario</td>
             <td class="text-right">${formatCurrency(salarioProporcional)}</td>
           </tr>
-          ${employee.transportAllowance > 0 ? `
+          ${auxilioTransporte > 0 ? `
           <tr>
             <td>Auxilio de Transporte</td>
-            <td class="text-right">${formatCurrency(employee.transportAllowance)}</td>
+            <td class="text-right">${formatCurrency(auxilioTransporte)}</td>
           </tr>` : ''}
           ${employee.bonuses > 0 ? `
           <tr>
@@ -250,7 +258,7 @@ class AleluyaVoucherService {
           </tr>` : ''}
           <tr class="total-row">
             <td><strong>Total Devengado</strong></td>
-            <td class="text-right"><strong>${formatCurrency(employee.grossPay || (salarioProporcional + (employee.transportAllowance || 0) + (employee.bonuses || 0) + totalHorasExtra))}</strong></td>
+            <td class="text-right"><strong>${formatCurrency(employee.grossPay || (salarioProporcional + auxilioTransporte + (employee.bonuses || 0) + totalHorasExtra))}</strong></td>
           </tr>
         </tbody>
       </table>
@@ -272,7 +280,7 @@ class AleluyaVoucherService {
         <tbody>
           <tr>
             <td>Hora Extra Ordinaria</td>
-            <td class="text-center">${employee.extraHours}</td>
+            <td class="text-center">${employee.extraHours || 0}</td>
             <td class="text-right">${formatCurrency(valorHoraExtra)}</td>
             <td class="text-right">${formatCurrency(totalHorasExtra)}</td>
           </tr>
@@ -336,7 +344,7 @@ class AleluyaVoucherService {
       </table>
     </div>
 
-    <!-- Firmas tipo Aleluya -->
+    <!-- Firmas tipo Aleluya con datos reales -->
     <div class="signatures">
       <div class="signature-box">
         <p><strong>Firma del Empleado</strong></p>
@@ -345,8 +353,8 @@ class AleluyaVoucherService {
       </div>
       <div class="signature-box">
         <p><strong>Firma del Empleador</strong></p>
-        <p>${company.razon_social || 'Mi Empresa S.A.S.'}</p>
-        <p>NIT: ${company.nit || '900123456-1'}</p>
+        <p>${company.razon_social}</p>
+        <p>NIT: ${company.nit}</p>
       </div>
     </div>
 
@@ -385,23 +393,44 @@ class AleluyaHTMLToPDFConverter {
       .replace(/\(/g, '\\(')
       .replace(/\)/g, '\\)')
       .replace(/\r/g, '\\r')
-      .replace(/\n/g, '\\n');
+      .replace(/\n/g, '\\n')
+      // Manejar caracteres especiales como Ñ
+      .replace(/ñ/g, '\\361')
+      .replace(/Ñ/g, '\\321')
+      .replace(/á/g, '\\341')
+      .replace(/é/g, '\\351')
+      .replace(/í/g, '\\355')
+      .replace(/ó/g, '\\363')
+      .replace(/ú/g, '\\372')
+      .replace(/Á/g, '\\301')
+      .replace(/É/g, '\\311')
+      .replace(/Í/g, '\\315')
+      .replace(/Ó/g, '\\323')
+      .replace(/Ú/g, '\\332');
   }
 
-  convertHTMLToPDF(employee: any, period: any): Uint8Array {
-    console.log('🎨 Generando PDF tipo Aleluya para:', employee.name);
+  convertHTMLToPDF(employee: any, period: any, company: any): Uint8Array {
+    console.log('🎨 Generando PDF tipo Aleluya CORREGIDO para:', employee.name);
+    console.log('📊 Datos recibidos:', { 
+      employeeName: employee.name,
+      employeeCedula: employee.cedula,
+      companyName: company.razon_social,
+      companyNit: company.nit,
+      workedDays: employee.workedDays,
+      baseSalary: employee.baseSalary
+    });
 
     const voucherData = {
       employee: {
         ...employee,
-        documento: employee.id?.slice(0, 8) || 'N/A',
-        tipo_documento: 'CC'
+        documento: employee.cedula || employee.id || 'N/A',
+        tipo_documento: employee.tipo_documento || 'CC'
       },
       period,
       company: {
-        razon_social: 'Mi Empresa S.A.S.',
-        nit: '900123456-1',
-        direccion: 'Calle 123 # 45-67, Bogotá'
+        razon_social: company.razon_social || 'Mi Empresa S.A.S.',
+        nit: company.nit || '900123456-1',
+        direccion: company.direccion || 'Calle 123 # 45-67, Bogotá'
       }
     };
 
@@ -410,16 +439,18 @@ class AleluyaHTMLToPDFConverter {
 /Type /Font
 /Subtype /Type1
 /BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
 >>`);
 
     const fontBoldId = this.addObject(`<<
 /Type /Font
 /Subtype /Type1
 /BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
 >>`);
 
     // Generar contenido PDF tipo Aleluya
-    const contentStream = this.generateAleluyaContentStream(employee, period, voucherData);
+    const contentStream = this.generateAleluyaContentStream(employee, period, company);
 
     const contentStreamId = this.addObject(`<<
 /Length ${contentStream.length}
@@ -458,7 +489,7 @@ endstream`);
     return this.buildAleluyaPDF(catalogId);
   }
 
-  private generateAleluyaContentStream(employee: any, period: any, data: any): string {
+  private generateAleluyaContentStream(employee: any, period: any, company: any): string {
     const formatCurrency = (amount: number) => '$' + amount.toLocaleString('es-CO');
     const formatDate = (dateStr: string) => {
       try {
@@ -469,26 +500,42 @@ endstream`);
       }
     };
 
-    // Cálculos tipo Aleluya
+    // Cálculos tipo Aleluya CORREGIDOS
     const salarioBase = Number(employee.baseSalary) || 0;
     const diasTrabajados = Number(employee.workedDays) || 30;
-    const esPeriodoQuincenal = period.type === 'quincenal' || diasTrabajados <= 15;
-    const factorProporcional = esPeriodoQuincenal ? (diasTrabajados / 15) : (diasTrabajados / 30);
+    const esPeriodoQuincenal = diasTrabajados <= 15;
+    const diasDelPeriodo = esPeriodoQuincenal ? 15 : 30;
+    const factorProporcional = diasTrabajados / diasDelPeriodo;
     const salarioProporcional = Math.round(salarioBase * factorProporcional);
     
-    const saludEmpleado = Math.round(salarioBase * 0.04);
-    const pensionEmpleado = Math.round(salarioBase * 0.04);
-    const fondoSolidaridad = salarioBase > 4000000 ? Math.round(salarioBase * 0.01) : 0;
+    // Auxilio de transporte proporcional
+    const auxilioTransporte = employee.transportAllowance ? 
+      Math.round(employee.transportAllowance * factorProporcional) : 0;
     
-    const valorHoraOrdinaria = salarioBase / (esPeriodoQuincenal ? 120 : 240);
+    // Deducciones proporcionales al período
+    const saludEmpleado = Math.round(salarioBase * 0.04 * factorProporcional);
+    const pensionEmpleado = Math.round(salarioBase * 0.04 * factorProporcional);
+    const fondoSolidaridad = salarioBase > 4000000 ? Math.round(salarioBase * 0.01 * factorProporcional) : 0;
+    
+    const horasDelPeriodo = esPeriodoQuincenal ? 120 : 240;
+    const valorHoraOrdinaria = salarioBase / horasDelPeriodo;
     const valorHoraExtra = valorHoraOrdinaria * 1.25;
     const totalHorasExtra = Math.round((employee.extraHours || 0) * valorHoraExtra);
     
-    const totalDevengado = salarioProporcional + (employee.transportAllowance || 0) + (employee.bonuses || 0) + totalHorasExtra;
+    const totalDevengado = salarioProporcional + auxilioTransporte + (employee.bonuses || 0) + totalHorasExtra;
     const salarioNeto = Number(employee.netPay) || (totalDevengado - (employee.deductions || 0));
 
     const fechaInicio = formatDate(period.startDate);
     const fechaFin = formatDate(period.endDate);
+
+    // Usar datos reales de empresa y empleado
+    const nombreEmpresa = company.razon_social || 'Mi Empresa S.A.S.';
+    const nitEmpresa = company.nit || '900123456-1';
+    const direccionEmpresa = company.direccion || 'Calle 123 # 45-67, Bogotá';
+    const nombreEmpleado = employee.name || 'N/A';
+    const cedulaEmpleado = employee.cedula || employee.id || 'N/A';
+    const tipoDocumento = employee.tipo_documento || 'CC';
+    const cargoEmpleado = employee.position || 'Empleado';
 
     return `BT
 /F2 16 Tf
@@ -506,19 +553,19 @@ ET
 BT
 /F1 9 Tf
 50 705 Td
-(${this.escapeText('Mi Empresa S.A.S.')}) Tj
+(${this.escapeText(nombreEmpresa)}) Tj
 ET
 
 BT
 /F1 8 Tf
 50 692 Td
-(${this.escapeText('NIT: 900123456-1')}) Tj
+(${this.escapeText('NIT: ' + nitEmpresa)}) Tj
 ET
 
 BT
 /F1 8 Tf
 50 679 Td
-(${this.escapeText('Calle 123 # 45-67, Bogota')}) Tj
+(${this.escapeText(direccionEmpresa)}) Tj
 ET
 
 BT
@@ -530,19 +577,19 @@ ET
 BT
 /F1 9 Tf
 230 705 Td
-(${this.escapeText(employee.name || 'N/A')}) Tj
+(${this.escapeText(nombreEmpleado)}) Tj
 ET
 
 BT
 /F1 8 Tf
 230 692 Td
-(${this.escapeText('CC: ' + (employee.id?.slice(0, 8) || 'N/A'))}) Tj
+(${this.escapeText(tipoDocumento + ': ' + cedulaEmpleado)}) Tj
 ET
 
 BT
 /F1 8 Tf
 230 679 Td
-(${this.escapeText('Cargo: ' + (employee.position || 'Empleado'))}) Tj
+(${this.escapeText('Cargo: ' + cargoEmpleado)}) Tj
 ET
 
 BT
@@ -566,75 +613,81 @@ ET
 BT
 /F1 8 Tf
 410 679 Td
+(${this.escapeText('Dias pagados: ' + diasTrabajados)}) Tj
+ET
+
+BT
+/F1 8 Tf
+410 666 Td
 (${this.escapeText('Salario Base: ' + formatCurrency(salarioBase))}) Tj
 ET
 
-50 665 m
-562 665 l
+50 655 m
+562 655 l
 S
 
 BT
 /F2 12 Tf
 0.9 0.9 0.9 rg
-50 640 160 15 re
+50 630 160 15 re
 f
 0 0 0 rg
-115 645 Td
+115 635 Td
 (${this.escapeText('DEVENGADO')}) Tj
 ET
 
 BT
 /F2 9 Tf
-50 620 Td
+50 610 Td
 (${this.escapeText('Concepto')}) Tj
 ET
 
 BT
 /F2 9 Tf
-450 620 Td
+450 610 Td
 (${this.escapeText('Valor')}) Tj
 ET
 
-50 615 m
-562 615 l
+50 605 m
+562 605 l
 S
 
 BT
 /F1 8 Tf
-50 595 Td
+50 585 Td
 (${this.escapeText('Salario')}) Tj
 ET
 
 BT
 /F1 8 Tf
-450 595 Td
+450 585 Td
 (${this.escapeText(formatCurrency(salarioProporcional))}) Tj
 ET
 
-${employee.transportAllowance > 0 ? `
+${auxilioTransporte > 0 ? `
 BT
 /F1 8 Tf
-50 580 Td
+50 570 Td
 (${this.escapeText('Auxilio de Transporte')}) Tj
 ET
 
 BT
 /F1 8 Tf
-450 580 Td
-(${this.escapeText(formatCurrency(employee.transportAllowance))}) Tj
+450 570 Td
+(${this.escapeText(formatCurrency(auxilioTransporte))}) Tj
 ET
 ` : ''}
 
 ${employee.bonuses > 0 ? `
 BT
 /F1 8 Tf
-50 565 Td
+50 555 Td
 (${this.escapeText('Bonificaciones')}) Tj
 ET
 
 BT
 /F1 8 Tf
-450 565 Td
+450 555 Td
 (${this.escapeText(formatCurrency(employee.bonuses))}) Tj
 ET
 ` : ''}
@@ -642,32 +695,32 @@ ET
 ${totalHorasExtra > 0 ? `
 BT
 /F1 8 Tf
-50 550 Td
+50 540 Td
 (${this.escapeText('Horas Extras y Recargos')}) Tj
 ET
 
 BT
 /F1 8 Tf
-450 550 Td
+450 540 Td
 (${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
 ET
 ` : ''}
 
-50 535 m
-562 535 l
+50 525 m
+562 525 l
 S
 
 BT
 /F2 9 Tf
 0 0.7 0 rg
-50 515 Td
+50 505 Td
 (${this.escapeText('Total Devengado')}) Tj
 ET
 
 BT
 /F2 9 Tf
 0 0.7 0 rg
-450 515 Td
+450 505 Td
 (${this.escapeText(formatCurrency(totalDevengado))}) Tj
 ET
 
@@ -677,180 +730,180 @@ ${totalHorasExtra > 0 ? `
 BT
 /F2 12 Tf
 0.9 0.9 0.9 rg
-50 485 200 15 re
+50 475 200 15 re
 f
 0 0 0 rg
-120 490 Td
+120 480 Td
 (${this.escapeText('HORAS EXTRAS, ORDINARIAS Y RECARGOS')}) Tj
 ET
 
 BT
 /F2 8 Tf
-50 465 Td
+50 455 Td
 (${this.escapeText('Concepto')}) Tj
 ET
 
 BT
 /F2 8 Tf
-200 465 Td
+200 455 Td
 (${this.escapeText('Cantidad')}) Tj
 ET
 
 BT
 /F2 8 Tf
-300 465 Td
+300 455 Td
 (${this.escapeText('Valor Hora')}) Tj
 ET
 
 BT
 /F2 8 Tf
-450 465 Td
+450 455 Td
 (${this.escapeText('Total')}) Tj
 ET
 
-50 460 m
-562 460 l
+50 450 m
+562 450 l
 S
 
 BT
 /F1 8 Tf
-50 445 Td
+50 435 Td
 (${this.escapeText('Hora Extra Ordinaria')}) Tj
 ET
 
 BT
 /F1 8 Tf
-200 445 Td
+200 435 Td
 (${this.escapeText(String(employee.extraHours || 0))}) Tj
 ET
 
 BT
 /F1 8 Tf
-300 445 Td
+300 435 Td
 (${this.escapeText(formatCurrency(valorHoraExtra))}) Tj
 ET
 
 BT
 /F1 8 Tf
-450 445 Td
+450 435 Td
 (${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
 ET
 
-50 430 m
-562 430 l
+50 420 m
+562 420 l
 S
 ` : ''}
 
 BT
 /F2 12 Tf
 0.9 0.9 0.9 rg
-50 405 160 15 re
+50 395 160 15 re
 f
 0 0 0 rg
-115 410 Td
+115 400 Td
 (${this.escapeText('DEDUCCIONES')}) Tj
 ET
 
 BT
 /F2 8 Tf
-50 385 Td
+50 375 Td
 (${this.escapeText('Concepto')}) Tj
 ET
 
 BT
 /F2 8 Tf
-200 385 Td
+200 375 Td
 (${this.escapeText('%')}) Tj
 ET
 
 BT
 /F2 8 Tf
-450 385 Td
+450 375 Td
 (${this.escapeText('Valor')}) Tj
 ET
 
-50 380 m
-562 380 l
+50 370 m
+562 370 l
 S
 
 BT
 /F1 8 Tf
-50 365 Td
+50 355 Td
 (${this.escapeText('Salud')}) Tj
 ET
 
 BT
 /F1 8 Tf
-200 365 Td
+200 355 Td
 (${this.escapeText('4.0%')}) Tj
 ET
 
 BT
 /F1 8 Tf
-450 365 Td
+450 355 Td
 (${this.escapeText(formatCurrency(saludEmpleado))}) Tj
 ET
 
 BT
 /F1 8 Tf
-50 350 Td
+50 340 Td
 (${this.escapeText('Pension')}) Tj
 ET
 
 BT
 /F1 8 Tf
-200 350 Td
+200 340 Td
 (${this.escapeText('4.0%')}) Tj
 ET
 
 BT
 /F1 8 Tf
-450 350 Td
+450 340 Td
 (${this.escapeText(formatCurrency(pensionEmpleado))}) Tj
 ET
 
 ${fondoSolidaridad > 0 ? `
 BT
 /F1 8 Tf
-50 335 Td
+50 325 Td
 (${this.escapeText('Fondo de Solidaridad')}) Tj
 ET
 
 BT
 /F1 8 Tf
-200 335 Td
+200 325 Td
 (${this.escapeText('1.0%')}) Tj
 ET
 
 BT
 /F1 8 Tf
-450 335 Td
+450 325 Td
 (${this.escapeText(formatCurrency(fondoSolidaridad))}) Tj
 ET
 ` : ''}
 
-50 320 m
-562 320 l
+50 310 m
+562 310 l
 S
 
 BT
 /F2 9 Tf
 1 0 0 rg
-50 300 Td
+50 290 Td
 (${this.escapeText('Total Deducciones')}) Tj
 ET
 
 BT
 /F2 9 Tf
 1 0 0 rg
-450 300 Td
+450 290 Td
 (${this.escapeText(formatCurrency(employee.deductions || 0))}) Tj
 ET
 
 0 0 0 rg
 
-50 280 m
-562 280 l
+50 270 m
+562 270 l
 2 w
 S
 1 w
@@ -858,14 +911,14 @@ S
 BT
 /F2 14 Tf
 0 0.5 0.8 rg
-50 250 Td
+50 240 Td
 (${this.escapeText('TOTAL NETO A PAGAR')}) Tj
 ET
 
 BT
 /F2 14 Tf
 0 0.5 0.8 rg
-350 250 Td
+350 240 Td
 (${this.escapeText(formatCurrency(salarioNeto))}) Tj
 ET
 
@@ -898,25 +951,25 @@ ET
 BT
 /F1 7 Tf
 50 120 Td
-(${this.escapeText(employee.name || 'N/A')}) Tj
+(${this.escapeText(nombreEmpleado)}) Tj
 ET
 
 BT
 /F1 7 Tf
 350 120 Td
-(${this.escapeText('Mi Empresa S.A.S.')}) Tj
+(${this.escapeText(nombreEmpresa)}) Tj
 ET
 
 BT
 /F1 7 Tf
 50 108 Td
-(${this.escapeText('CC: ' + (employee.id?.slice(0, 8) || 'N/A'))}) Tj
+(${this.escapeText(tipoDocumento + ': ' + cedulaEmpleado)}) Tj
 ET
 
 BT
 /F1 7 Tf
 350 108 Td
-(${this.escapeText('NIT: 900123456-1')}) Tj
+(${this.escapeText('NIT: ' + nitEmpresa)}) Tj
 ET
 
 BT
@@ -982,7 +1035,7 @@ ET`;
 }
 
 serve(async (req) => {
-  console.log('🎨 PDF Generator Tipo Aleluya - Iniciando...');
+  console.log('🎨 PDF Generator Tipo Aleluya CORREGIDO - Iniciando...');
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -990,9 +1043,10 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    console.log('📋 Request recibido para PDF tipo Aleluya');
+    console.log('📋 Request recibido para PDF tipo Aleluya CORREGIDO');
+    console.log('📊 Datos recibidos:', JSON.stringify(requestBody, null, 2));
 
-    const { employee, period } = requestBody;
+    const { employee, period, company } = requestBody;
 
     if (!employee || !period) {
       console.error('❌ Datos faltantes');
@@ -1005,12 +1059,24 @@ serve(async (req) => {
       );
     }
 
-    console.log('🎨 Generando PDF tipo Aleluya con desglose completo...');
+    // Usar datos de empresa reales o fallback
+    const companyData = company || {
+      razon_social: 'Mi Empresa S.A.S.',
+      nit: '900123456-1',
+      direccion: 'Calle 123 # 45-67, Bogotá'
+    };
+
+    console.log('🎨 Generando PDF tipo Aleluya con datos reales...');
+    console.log('🏢 Empresa:', companyData.razon_social);
+    console.log('👤 Empleado:', employee.name);
+    console.log('📅 Período:', period.startDate, '-', period.endDate);
+    console.log('💰 Salario base:', employee.baseSalary);
+    console.log('📊 Días trabajados:', employee.workedDays);
     
     const converter = new AleluyaHTMLToPDFConverter();
-    const pdfBytes = converter.convertHTMLToPDF(employee, period);
+    const pdfBytes = converter.convertHTMLToPDF(employee, period, companyData);
     
-    console.log(`✅ PDF tipo Aleluya generado - Tamaño: ${pdfBytes.length} bytes`);
+    console.log(`✅ PDF tipo Aleluya CORREGIDO generado - Tamaño: ${pdfBytes.length} bytes`);
     
     // Validaciones mejoradas
     if (pdfBytes.length < 2000) {
@@ -1022,9 +1088,9 @@ serve(async (req) => {
       throw new Error(`Header PDF inválido: ${pdfString}`);
     }
     
-    console.log('✅ PDF tipo Aleluya validado correctamente');
+    console.log('✅ PDF tipo Aleluya CORREGIDO validado correctamente');
     console.log(`🔍 Header verificado: ${pdfString.slice(0, 8)}`);
-    console.log('🎨 Detalles incluidos: diseño tipo Aleluya, devengados, deducciones exactas, horas extra');
+    console.log('🎨 Correcciones aplicadas: datos reales de empresa, cédula correcta, cálculos proporcionales, encoding UTF-8');
     
     const fileName = `comprobante-aleluya-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
     
@@ -1042,7 +1108,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('💥 ERROR en generador tipo Aleluya:', error);
+    console.error('💥 ERROR en generador tipo Aleluya CORREGIDO:', error);
     console.error('💥 Stack:', error.stack);
     
     return new Response(

@@ -1,25 +1,19 @@
-import React, { useState } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Plus, 
-  Trash2, 
-  MoreHorizontal,
-  Edit3
-} from 'lucide-react';
 import { PayrollEmployee } from '@/types/payroll';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Download, FileText, Edit, Trash2, Plus } from 'lucide-react';
 import { NovedadUnifiedModal } from './novedades/NovedadUnifiedModal';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
-import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
+import { CompanyConfigurationService } from '@/services/CompanyConfigurationService';
 
 interface PayrollTableNewProps {
   employees: PayrollEmployee[];
   onRemoveEmployee: (employeeId: string) => void;
-  onCreateNovedad: (employeeId: string, data: CreateNovedadData) => void;
-  onRecalculate?: () => Promise<void>; // ✅ Nuevo prop para recálculo
+  onCreateNovedad: (employeeId: string, novedadData: any) => void;
+  onRecalculate: (employeeId: string) => void;
   periodId: string;
   canEdit: boolean;
   selectedEmployees: string[];
@@ -27,243 +21,326 @@ interface PayrollTableNewProps {
   onToggleAll: () => void;
 }
 
-export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
-  employees,
-  onRemoveEmployee,
-  onCreateNovedad,
-  onRecalculate, // ✅ Nuevo prop
+export const PayrollTableNew = ({ 
+  employees, 
+  onRemoveEmployee, 
+  onCreateNovedad, 
+  onRecalculate,
   periodId,
   canEdit,
   selectedEmployees,
   onToggleEmployee,
   onToggleAll
-}) => {
-  const [showNovedadModal, setShowNovedadModal] = useState(false);
-  const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<PayrollEmployee | null>(null);
-  const [isRecalculating, setIsRecalculating] = useState(false); // ✅ Estado para indicador
+}: PayrollTableNewProps) => {
+  const { toast } = useToast();
+  const [isGeneratingVoucher, setIsGeneratingVoucher] = useState<string | null>(null);
+  const [novedadModalOpen, setNovedadModalOpen] = useState(false);
+  const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<string | null>(null);
+  const [companyData, setCompanyData] = useState<any>(null);
+
+  // Cargar datos de la empresa al montar el componente
+  useEffect(() => {
+    const loadCompanyData = async () => {
+      try {
+        const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+        if (companyId) {
+          const company = await CompanyConfigurationService.getCompanyData(companyId);
+          if (company) {
+            setCompanyData(company);
+            console.log('✅ Datos de empresa cargados:', company);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading company data:', error);
+      }
+    };
+
+    loadCompanyData();
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
-      minimumFractionDigits: 0,
+      minimumFractionDigits: 0
     }).format(amount);
   };
 
-  const handleOpenNovedadModal = (employee: PayrollEmployee) => {
-    setSelectedEmployeeForNovedad(employee);
-    setShowNovedadModal(true);
-  };
-
-  const handleCreateNovedad = async (data: CreateNovedadData) => {
-    if (selectedEmployeeForNovedad) {
-      await onCreateNovedad(selectedEmployeeForNovedad.id, data);
-      setShowNovedadModal(false);
-      setSelectedEmployeeForNovedad(null);
-      
-      // ✅ Recalcular automáticamente después de crear novedad
-      if (onRecalculate) {
-        setIsRecalculating(true);
-        try {
-          await onRecalculate();
-        } finally {
-          setIsRecalculating(false);
-        }
-      }
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'valid':
+        return 'bg-green-100 text-green-800';
+      case 'warning':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'error':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  // ✅ Nuevo callback para cuando se modifiquen/eliminen novedades
-  const handleNovedadChange = async () => {
-    if (onRecalculate) {
-      setIsRecalculating(true);
-      console.log('🔄 Recalculando liquidación tras cambio en novedades...');
-      try {
-        await onRecalculate();
-        console.log('✅ Recálculo completado');
-      } catch (error) {
-        console.error('❌ Error en recálculo:', error);
-      } finally {
-        setIsRecalculating(false);
-      }
+  const handleGenerateVoucher = async (employee: PayrollEmployee, period: any) => {
+    if (!companyData) {
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos de la empresa",
+        variant: "destructive"
+      });
+      return;
     }
-  };
 
-  const calculateSuggestedValue = (
-    tipo: string,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ): number | null => {
-    if (!selectedEmployeeForNovedad) return null;
-    
-    console.log('🧮 PayrollTableNew - Calculating suggested value:', {
-      tipo,
-      subtipo,
-      horas,
-      dias,
-      employeeSalary: selectedEmployeeForNovedad.baseSalary
-    });
+    setIsGeneratingVoucher(employee.id);
     
     try {
-      const fechaPeriodo = new Date();
-      const result = calcularValorNovedadEnhanced(
-        tipo as any,
-        subtipo,
-        selectedEmployeeForNovedad.baseSalary,
-        dias,
-        horas,
-        fechaPeriodo
-      );
-      
-      console.log(`💰 Calculation result: $${Math.round(result.valor).toLocaleString()}`);
-      return Math.round(result.valor);
+      console.log('🎨 Generando comprobante con datos reales...');
+      console.log('🏢 Empresa:', companyData.razon_social);
+      console.log('👤 Empleado:', employee.name);
+      console.log('💰 Salario:', employee.baseSalary);
+      console.log('📊 Días trabajados:', employee.workedDays);
+
+      const voucherData = {
+        employee: {
+          id: employee.id,
+          name: employee.name,
+          cedula: employee.cedula || employee.id, // Usar cédula real
+          tipo_documento: employee.tipo_documento || 'CC',
+          position: employee.position || 'Empleado',
+          baseSalary: employee.baseSalary,
+          workedDays: employee.workedDays || 30,
+          grossPay: employee.grossPay,
+          deductions: employee.deductions,
+          netPay: employee.netPay,
+          transportAllowance: employee.transportAllowance || 0,
+          bonuses: employee.bonuses || 0,
+          extraHours: employee.extraHours || 0
+        },
+        period: {
+          startDate: period?.startDate || new Date().toISOString().split('T')[0],
+          endDate: period?.endDate || new Date().toISOString().split('T')[0],
+          type: period?.type || 'mensual'
+        },
+        company: {
+          razon_social: companyData.razon_social,
+          nit: companyData.nit,
+          direccion: companyData.direccion || 'Dirección no especificada',
+          telefono: companyData.telefono,
+          email: companyData.email
+        }
+      };
+
+      console.log('📋 Datos enviados a la edge function:', voucherData);
+
+      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+        body: voucherData
+      });
+
+      if (error) {
+        console.error('❌ Error en edge function:', error);
+        throw error;
+      }
+
+      // Crear blob para descarga
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "✅ Comprobante generado",
+        description: `Comprobante de ${employee.name} descargado correctamente`,
+      });
+
     } catch (error) {
-      console.error('❌ Error calculating suggested value:', error);
-      return null;
+      console.error('❌ Error generando comprobante:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo generar el comprobante. Intenta nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingVoucher(null);
+    }
+  };
+
+  const handleOpenNovedadModal = (employeeId: string) => {
+    setSelectedEmployeeForNovedad(employeeId);
+    setNovedadModalOpen(true);
+  };
+
+  const handleCreateNovedad = async (novedadData: any) => {
+    if (selectedEmployeeForNovedad) {
+      await onCreateNovedad(selectedEmployeeForNovedad, novedadData);
+      setNovedadModalOpen(false);
+      setSelectedEmployeeForNovedad(null);
     }
   };
 
   const allSelected = employees.length > 0 && selectedEmployees.length === employees.length;
   const someSelected = selectedEmployees.length > 0 && selectedEmployees.length < employees.length;
 
-  return (
-    <>
-      <div className="border rounded-lg overflow-hidden bg-white">
-        {/* ✅ Indicador de recálculo */}
-        {isRecalculating && (
-          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
-            <div className="flex items-center gap-2 text-blue-700">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <span className="text-sm">Recalculando liquidación...</span>
-            </div>
-          </div>
-        )}
+  if (employees.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <FileText className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-medium text-gray-900">Sin empleados</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          No hay empleados en este período de nómina.
+        </p>
+      </div>
+    );
+  }
 
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50">
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={onToggleAll}
-                  ref={(el) => {
-                    if (el) {
-                      const input = el.querySelector('input[type="checkbox"]') as HTMLInputElement;
-                      if (input) {
-                        input.indeterminate = someSelected;
-                      }
-                    }
-                  }}
-                />
-              </TableHead>
-              <TableHead>Empleado</TableHead>
-              <TableHead className="text-right">Salario Base</TableHead>
-              <TableHead className="text-center">Novedades</TableHead>
-              <TableHead className="text-right">Neto a Pagar</TableHead>
-              <TableHead className="text-center">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {employees.map((employee) => (
-              <TableRow key={employee.id} className="hover:bg-gray-50">
-                <TableCell>
+  return (
+    <div className="space-y-4">
+      <div className="bg-white shadow-sm rounded-lg border">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left">
                   <Checkbox
-                    checked={selectedEmployees.includes(employee.id)}
-                    onCheckedChange={() => onToggleEmployee(employee.id)}
+                    checked={allSelected}
+                    onCheckedChange={onToggleAll}
+                    ref={(input) => {
+                      if (input) input.indeterminate = someSelected;
+                    }}
                   />
-                </TableCell>
-                
-                <TableCell>
-                  <div>
-                    <p className="font-medium text-gray-900">{employee.name}</p>
-                    <p className="text-sm text-gray-500">{employee.position}</p>
-                  </div>
-                </TableCell>
-                
-                <TableCell className="text-right">
-                  <span className="font-medium">
-                    {formatCurrency(employee.baseSalary)}
-                  </span>
-                </TableCell>
-                
-                <TableCell className="text-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenNovedadModal(employee)}
-                    className="h-8 w-8 p-0 rounded-full border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                  >
-                    <Plus className="h-4 w-4 text-blue-500" />
-                  </Button>
-                </TableCell>
-                
-                <TableCell className="text-right">
-                  <div className="text-right">
-                    <div className="font-semibold text-gray-900">
-                      {formatCurrency(employee.netPay)}
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Empleado
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Salario Base
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Días Trab.
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Devengado
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Deducciones
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Neto
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Estado
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {employees.map((employee) => (
+                <tr key={employee.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <Checkbox
+                      checked={selectedEmployees.includes(employee.id)}
+                      onCheckedChange={() => onToggleEmployee(employee.id)}
+                    />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{employee.name}</div>
+                        <div className="text-sm text-gray-500">{employee.cedula || employee.id}</div>
+                      </div>
                     </div>
-                    {employee.bonuses > 0 && (
-                      <div className="text-xs text-green-600">
-                        +{formatCurrency(employee.bonuses)}
-                      </div>
-                    )}
-                    {employee.deductions > 0 && (
-                      <div className="text-xs text-red-600">
-                        -{formatCurrency(employee.deductions)}
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                
-                <TableCell className="text-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleOpenNovedadModal(employee)}
-                      >
-                        <Edit3 className="h-4 w-4 mr-2" />
-                        Gestionar Novedades
-                      </DropdownMenuItem>
-                      {canEdit && (
-                        <DropdownMenuItem
-                          onClick={() => onRemoveEmployee(employee.id)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Quitar del período
-                        </DropdownMenuItem>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatCurrency(employee.baseSalary)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {employee.workedDays || 30}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatCurrency(employee.grossPay)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatCurrency(employee.deductions)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {formatCurrency(employee.netPay)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Badge className={getStatusColor(employee.status || 'valid')}>
+                      {employee.status === 'valid' ? 'Válido' : 
+                       employee.status === 'warning' ? 'Advertencia' : 
+                       employee.status === 'error' ? 'Error' : 'Válido'}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleGenerateVoucher(employee, { 
+                        startDate: new Date().toISOString().split('T')[0],
+                        endDate: new Date().toISOString().split('T')[0],
+                        type: 'mensual'
+                      })}
+                      disabled={isGeneratingVoucher === employee.id}
+                    >
+                      {isGeneratingVoucher === employee.id ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      ) : (
+                        <Download className="h-4 w-4" />
                       )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                    </Button>
+                    
+                    {canEdit && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenNovedadModal(employee.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onRecalculate(employee.id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onRemoveEmployee(employee.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {selectedEmployeeForNovedad && (
-        <NovedadUnifiedModal
-          isOpen={showNovedadModal}
-          onClose={() => {
-            setShowNovedadModal(false);
-            setSelectedEmployeeForNovedad(null);
-          }}
-          employeeName={selectedEmployeeForNovedad.name}
-          employeeId={selectedEmployeeForNovedad.id}
-          employeeSalary={selectedEmployeeForNovedad.baseSalary}
-          periodId={periodId}
-          onCreateNovedad={handleCreateNovedad}
-          onNovedadChange={handleNovedadChange} // ✅ Nuevo callback
-          calculateSuggestedValue={calculateSuggestedValue}
-        />
-      )}
-    </>
+      {/* Modal de Novedad */}
+      <NovedadUnifiedModal
+        isOpen={novedadModalOpen}
+        onClose={() => {
+          setNovedadModalOpen(false);
+          setSelectedEmployeeForNovedad(null);
+        }}
+        onSubmit={handleCreateNovedad}
+        employeeId={selectedEmployeeForNovedad || ''}
+        periodId={periodId}
+      />
+    </div>
   );
 };
