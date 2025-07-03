@@ -13,6 +13,12 @@ interface PayrollPeriodHeaderProps {
   periodStatus: PeriodStatus | null;
   onCreateNewPeriod: () => Promise<void>;
   onRefreshPeriod: (retryCount?: number) => Promise<void>;
+  canClosePeriod?: boolean;
+  isProcessing?: boolean;
+  onClosePeriod?: () => Promise<void>;
+  onRecalculateAll?: () => Promise<void>;
+  selectedCount?: number;
+  totalCount?: number;
 }
 
 const statusConfig = {
@@ -42,7 +48,13 @@ export const PayrollPeriodHeader = ({
   period, 
   periodStatus,
   onCreateNewPeriod,
-  onRefreshPeriod
+  onRefreshPeriod,
+  canClosePeriod = false,
+  isProcessing = false,
+  onClosePeriod,
+  onRecalculateAll,
+  selectedCount = 0,
+  totalCount = 0
 }: PayrollPeriodHeaderProps) => {
   if (!period && periodStatus?.action === 'suggest_next') {
     return (
@@ -93,7 +105,7 @@ export const PayrollPeriodHeader = ({
   };
 
   return (
-    <div className="px-6 py-6">
+    <div className="px-6 py-6 border-b">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-semibold text-gray-900">Liquidación de Nómina</h1>
@@ -102,11 +114,45 @@ export const PayrollPeriodHeader = ({
             <span className="text-sm font-medium">{config.label}</span>
           </Badge>
         </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center space-x-3">
+          {onRecalculateAll && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRecalculateAll}
+              disabled={isProcessing}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Recalcular todos
+            </Button>
+          )}
+
+          {canClosePeriod && onClosePeriod && (
+            <Button
+              onClick={onClosePeriod}
+              disabled={isProcessing}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Liquidar nómina
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center space-x-4">
-        <Calendar className="h-5 w-5 text-gray-400" />
-        <span className="text-lg font-medium text-gray-900">{formatPeriod()}</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Calendar className="h-5 w-5 text-gray-400" />
+          <span className="text-lg font-medium text-gray-900">{formatPeriod()}</span>
+        </div>
+
+        {selectedCount > 0 && totalCount > 0 && (
+          <div className="text-sm text-gray-500">
+            {selectedCount}/{totalCount} empleados seleccionados
+          </div>
+        )}
       </div>
     </div>
   );

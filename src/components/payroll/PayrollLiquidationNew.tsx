@@ -3,7 +3,6 @@ import React from 'react';
 import { PayrollTableNew } from './PayrollTableNew';
 import { PayrollSummaryPanel } from './liquidation/PayrollSummaryPanel';
 import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
-import { PayrollActions } from './liquidation/PayrollActions';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
 
@@ -18,7 +17,7 @@ export const PayrollLiquidationNew = () => {
     periodStatus,
     removeEmployeeFromPeriod,
     createNovedadForEmployee,
-    recalculateAfterNovedadChange, // ✅ Usar la función específica
+    recalculateAfterNovedadChange,
     toggleEmployeeSelection,
     toggleAllEmployees,
     recalculateAll,
@@ -58,6 +57,12 @@ export const PayrollLiquidationNew = () => {
         periodStatus={periodStatus}
         onCreateNewPeriod={createNewPeriod}
         onRefreshPeriod={refreshPeriod}
+        canClosePeriod={canClosePeriod}
+        isProcessing={isProcessing}
+        onClosePeriod={closePeriod}
+        onRecalculateAll={recalculateAll}
+        selectedCount={selectedEmployees.length}
+        totalCount={employees.length}
       />
 
       {hasEmployees && (
@@ -72,21 +77,12 @@ export const PayrollLiquidationNew = () => {
             employees={employees}
             onRemoveEmployee={removeEmployeeFromPeriod}
             onCreateNovedad={createNovedadForEmployee}
-            onRecalculate={recalculateAfterNovedadChange} // ✅ Pasar callback específico
+            onRecalculate={recalculateAfterNovedadChange}
             periodId={currentPeriod?.id || ''}
             canEdit={currentPeriod?.estado === 'borrador'}
             selectedEmployees={selectedEmployees}
             onToggleEmployee={toggleEmployeeSelection}
             onToggleAll={toggleAllEmployees}
-          />
-
-          <PayrollActions
-            canClosePeriod={canClosePeriod}
-            isProcessing={isProcessing}
-            onClosePeriod={closePeriod}
-            onRecalculateAll={recalculateAll}
-            selectedCount={selectedEmployees.length}
-            totalCount={employees.length}
           />
         </>
       )}

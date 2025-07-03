@@ -1,7 +1,7 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, DollarSign, Minus, Calculator, CheckCircle, TrendingUp } from 'lucide-react';
+import { Users, DollarSign, Minus, TrendingUp } from 'lucide-react';
 import { PayrollSummary } from '@/types/payroll';
 
 interface PayrollSummaryPanelProps {
@@ -61,22 +61,7 @@ export const PayrollSummaryPanel = ({ summary, selectedCount, totalCount }: Payr
       value: formatCurrency(summary.totalNetPay),
       icon: DollarSign,
       color: 'text-purple-600',
-      bgColor: 'bg-purple-50'
-    },
-    {
-      title: 'Aportes Empleador',
-      value: formatCurrency(summary.employerContributions),
-      icon: CheckCircle,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50'
-    },
-    {
-      title: 'Costo Total',
-      value: formatCurrency(summary.totalPayrollCost),
-      subtitle: 'Incluye neto + aportes',
-      icon: Calculator,
-      color: 'text-gray-900',
-      bgColor: 'bg-gray-50',
+      bgColor: 'bg-purple-50',
       highlight: true
     }
   ];
@@ -87,14 +72,14 @@ export const PayrollSummaryPanel = ({ summary, selectedCount, totalCount }: Payr
         <h3 className="text-lg font-semibold text-gray-900">Resumen de Nómina</h3>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (
             <Card 
               key={index} 
               className={`relative overflow-hidden transition-all duration-200 hover:shadow-md ${
-                card.highlight ? 'ring-2 ring-gray-300 shadow-md' : 'shadow-sm'
+                card.highlight ? 'ring-2 ring-purple-200 shadow-md' : 'shadow-sm'
               }`}
             >
               <CardContent className="p-4">
