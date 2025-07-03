@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,7 +20,9 @@ interface VoucherData {
   netPay: number;
   salaryDetails: {
     baseSalary: number;
+    workedDays: number;
     extraHours: number;
+    extraHoursPay: number;
     nightSurcharge: number;
     sundaySurcharge: number;
     transportAllowance: number;
@@ -34,7 +37,6 @@ interface VoucherData {
 }
 
 const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promise<Uint8Array> => {
-  // Importar jsPDF dinámicamente
   const { jsPDF } = await import("https://esm.sh/jspdf@2.5.1");
   
   const formatCurrency = (amount: number) => {
@@ -45,225 +47,252 @@ const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promis
     }).format(amount);
   };
 
-  // Crear nuevo documento PDF
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
   });
 
-  // Configurar fuente
   doc.setFont('helvetica');
   
-  let yPosition = 20;
+  let yPosition = 15;
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
+  const margin = 15;
   const contentWidth = pageWidth - (margin * 2);
 
-  // ENCABEZADO
-  // Logo/Inicial de la empresa
-  doc.setFillColor(102, 126, 234);
-  doc.rect(margin, yPosition, 15, 15, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
+  // HEADER PRINCIPAL
+  doc.setFillColor(41, 128, 185);
+  doc.rect(margin, yPosition, contentWidth, 25, 'F');
+  
+  // Logo/Inicial empresa
+  doc.setFillColor(255, 255, 255);
+  doc.circle(margin + 12, yPosition + 12.5, 8, 'F');
+  doc.setTextColor(41, 128, 185);
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   const logoLetter = companyInfo?.razon_social ? companyInfo.razon_social.charAt(0).toUpperCase() : 'E';
-  doc.text(logoLetter, margin + 7.5, yPosition + 10, { align: 'center' });
+  doc.text(logoLetter, margin + 12, yPosition + 16, { align: 'center' });
 
-  // Información de la empresa
-  doc.setTextColor(0, 0, 0);
+  // Información empresa
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(companyInfo?.razon_social || 'EMPRESA', margin + 25, yPosition + 10);
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`NIT: ${companyInfo?.nit || 'No especificado'}`, margin + 25, yPosition + 16);
+  doc.text(`${companyInfo?.direccion || 'Dirección no especificada'}`, margin + 25, yPosition + 21);
+
+  // Título documento
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(companyInfo?.razon_social || 'Empresa', margin + 20, yPosition + 6);
-  
+  doc.text('COMPROBANTE DE PAGO', pageWidth - margin - 5, yPosition + 12, { align: 'right' });
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`NIT: ${companyInfo?.nit || 'No especificado'}`, margin + 20, yPosition + 12);
-  doc.text(`${companyInfo?.direccion || 'No especificada'}`, margin + 20, yPosition + 16);
+  doc.text(`Período: ${voucher.periodo}`, pageWidth - margin - 5, yPosition + 18, { align: 'right' });
 
-  // Título del documento
-  doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
-  doc.text('COMPROBANTE DE NÓMINA', pageWidth - margin, yPosition + 6, { align: 'right' });
-  
-  // Información del período
-  doc.setFillColor(248, 249, 255);
-  doc.rect(pageWidth - margin - 60, yPosition + 10, 60, 15, 'F');
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Período: ${voucher.periodo}`, pageWidth - margin - 58, yPosition + 15);
-  doc.text(`Desde: ${new Date(voucher.startDate).toLocaleDateString('es-CO')}`, pageWidth - margin - 58, yPosition + 19);
-  doc.text(`Hasta: ${new Date(voucher.endDate).toLocaleDateString('es-CO')}`, pageWidth - margin - 58, yPosition + 23);
-
-  yPosition += 40;
+  yPosition += 35;
 
   // INFORMACIÓN DEL EMPLEADO
-  doc.setFillColor(249, 250, 251);
-  doc.rect(margin, yPosition, contentWidth, 25, 'F');
-  
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(55, 65, 81);
-  doc.text('👤 Información del Empleado', margin + 5, yPosition + 8);
-
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(107, 114, 128);
-  
-  // Primera columna
-  doc.text('NOMBRE COMPLETO', margin + 5, yPosition + 15);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(31, 41, 55);
-  doc.text(voucher.employeeName, margin + 5, yPosition + 19);
-
-  // Segunda columna
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(107, 114, 128);
-  doc.text('DOCUMENTO', margin + 70, yPosition + 15);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(31, 41, 55);
-  doc.text(voucher.employeeCedula, margin + 70, yPosition + 19);
-
-  // Tercera columna
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(107, 114, 128);
-  doc.text('CARGO', margin + 120, yPosition + 15);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(31, 41, 55);
-  doc.text(voucher.employeePosition || 'No especificado', margin + 120, yPosition + 19);
-
-  yPosition += 35;
-
-  // TABLA DE DEVENGOS
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(31, 41, 55);
-  doc.text('💰 Devengos', margin, yPosition);
-  yPosition += 10;
-
-  // Encabezados de tabla
-  doc.setFillColor(249, 250, 251);
-  doc.rect(margin, yPosition, contentWidth, 8, 'F');
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(55, 65, 81);
-  doc.text('Concepto', margin + 3, yPosition + 5);
-  doc.text('Valor', pageWidth - margin - 25, yPosition + 5, { align: 'right' });
-  yPosition += 8;
-
-  // Filas de devengos
-  const earnings = [
-    { label: 'Salario Base', value: voucher.salaryDetails.baseSalary },
-    { label: 'Horas Extra', value: voucher.salaryDetails.extraHours, show: voucher.salaryDetails.extraHours > 0 },
-    { label: 'Recargo Nocturno', value: voucher.salaryDetails.nightSurcharge, show: voucher.salaryDetails.nightSurcharge > 0 },
-    { label: 'Recargo Dominical', value: voucher.salaryDetails.sundaySurcharge, show: voucher.salaryDetails.sundaySurcharge > 0 },
-    { label: 'Auxilio de Transporte', value: voucher.salaryDetails.transportAllowance, show: voucher.salaryDetails.transportAllowance > 0 },
-    { label: 'Bonificaciones', value: voucher.salaryDetails.bonuses, show: voucher.salaryDetails.bonuses > 0 }
-  ];
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  
-  for (const earning of earnings) {
-    if (earning.show !== false) {
-      doc.setTextColor(31, 41, 55);
-      doc.text(earning.label, margin + 3, yPosition + 4);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(34, 197, 94);
-      doc.text(formatCurrency(earning.value), pageWidth - margin - 3, yPosition + 4, { align: 'right' });
-      doc.setFont('helvetica', 'normal');
-      yPosition += 6;
-    }
-  }
-
-  yPosition += 5;
-
-  // TABLA DE DEDUCCIONES
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(31, 41, 55);
-  doc.text('📉 Deducciones', margin, yPosition);
-  yPosition += 10;
-
-  // Encabezados de tabla
-  doc.setFillColor(249, 250, 251);
-  doc.rect(margin, yPosition, contentWidth, 8, 'F');
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(55, 65, 81);
-  doc.text('Concepto', margin + 3, yPosition + 5);
-  doc.text('Valor', pageWidth - margin - 25, yPosition + 5, { align: 'right' });
-  yPosition += 8;
-
-  // Filas de deducciones
-  const deductions = [
-    { label: 'Salud (4%)', value: voucher.salaryDetails.healthContribution, show: voucher.salaryDetails.healthContribution > 0 },
-    { label: 'Pensión (4%)', value: voucher.salaryDetails.pensionContribution, show: voucher.salaryDetails.pensionContribution > 0 },
-    { label: 'Retención en la Fuente', value: voucher.salaryDetails.withholdingTax, show: voucher.salaryDetails.withholdingTax > 0 },
-    { label: 'Otras Deducciones', value: voucher.salaryDetails.otherDeductions, show: voucher.salaryDetails.otherDeductions > 0 }
-  ];
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  
-  for (const deduction of deductions) {
-    if (deduction.show !== false) {
-      doc.setTextColor(31, 41, 55);
-      doc.text(deduction.label, margin + 3, yPosition + 4);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(239, 68, 68);
-      doc.text(formatCurrency(deduction.value), pageWidth - margin - 3, yPosition + 4, { align: 'right' });
-      doc.setFont('helvetica', 'normal');
-      yPosition += 6;
-    }
-  }
-
-  yPosition += 10;
-
-  // TOTALES
-  doc.setFillColor(102, 126, 234);
-  doc.rect(margin, yPosition, contentWidth, 25, 'F');
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-  
-  doc.text('Total Devengado:', margin + 5, yPosition + 8);
-  doc.text(formatCurrency(voucher.salaryDetails.totalEarnings), pageWidth - margin - 5, yPosition + 8, { align: 'right' });
-  
-  doc.text('Total Deducciones:', margin + 5, yPosition + 14);
-  doc.text(formatCurrency(voucher.salaryDetails.totalDeductions), pageWidth - margin - 5, yPosition + 14, { align: 'right' });
-  
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('NETO A PAGAR:', margin + 5, yPosition + 21);
-  doc.text(formatCurrency(voucher.netPay), pageWidth - margin - 5, yPosition + 21, { align: 'right' });
-
-  yPosition += 35;
-
-  // NETO A PAGAR DESTACADO
-  doc.setFillColor(16, 185, 129);
+  doc.setFillColor(245, 245, 245);
   doc.rect(margin, yPosition, contentWidth, 20, 'F');
   
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(52, 73, 94);
   doc.setFontSize(12);
-  doc.setFont('helvetica', 'normal');
-  doc.text('💵 NETO A PAGAR', pageWidth / 2, yPosition + 8, { align: 'center' });
-  
-  doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text(formatCurrency(voucher.netPay), pageWidth / 2, yPosition + 16, { align: 'center' });
+  doc.text('INFORMACIÓN DEL EMPLEADO', margin + 5, yPosition + 8);
+
+  // Datos empleado en dos columnas
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(85, 85, 85);
+  
+  // Columna izquierda
+  doc.text('NOMBRE:', margin + 5, yPosition + 14);
+  doc.setFont('helvetica', 'bold');
+  doc.text(voucher.employeeName, margin + 25, yPosition + 14);
+  
+  // Columna derecha
+  doc.setFont('helvetica', 'normal');
+  doc.text('DOCUMENTO:', margin + 105, yPosition + 14);
+  doc.setFont('helvetica', 'bold');
+  doc.text(voucher.employeeCedula, margin + 135, yPosition + 14);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.text('CARGO:', margin + 105, yPosition + 18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(voucher.employeePosition || 'No especificado', margin + 125, yPosition + 18);
 
   yPosition += 30;
 
-  // FOOTER
-  doc.setDrawColor(240, 240, 240);
-  doc.line(margin, yPosition, pageWidth - margin, yPosition);
-  yPosition += 10;
+  // RESUMEN DEL PAGO (Destacado)
+  doc.setFillColor(46, 204, 113);
+  doc.rect(margin, yPosition, contentWidth, 25, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('RESUMEN DEL PAGO', pageWidth / 2, yPosition + 8, { align: 'center' });
+  
+  doc.setFontSize(20);
+  doc.text(formatCurrency(voucher.netPay), pageWidth / 2, yPosition + 18, { align: 'center' });
 
-  doc.setTextColor(107, 114, 128);
+  yPosition += 35;
+
+  // TABLA: HORAS EXTRAS, ORDINARIAS Y RECARGOS
+  doc.setTextColor(52, 73, 94);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('HORAS EXTRAS, ORDINARIAS Y RECARGOS', margin, yPosition);
+  yPosition += 8;
+
+  // Encabezado tabla
+  doc.setFillColor(189, 195, 199);
+  doc.rect(margin, yPosition, contentWidth, 8, 'F');
+  doc.setTextColor(44, 62, 80);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CONCEPTO', margin + 2, yPosition + 5);
+  doc.text('HORAS/DÍAS', margin + 60, yPosition + 5);
+  doc.text('VALOR UNITARIO', margin + 100, yPosition + 5);
+  doc.text('TOTAL', pageWidth - margin - 20, yPosition + 5, { align: 'right' });
+  yPosition += 8;
+
+  // Filas de conceptos
+  const horasConceptos = [
+    { concepto: 'Salario Básico', cantidad: voucher.salaryDetails.workedDays + ' días', unitario: Math.round(voucher.salaryDetails.baseSalary / 30), total: voucher.salaryDetails.baseSalary },
+    { concepto: 'Horas Extra 25%', cantidad: voucher.salaryDetails.extraHours + ' hrs', unitario: Math.round(voucher.salaryDetails.extraHoursPay / Math.max(voucher.salaryDetails.extraHours, 1)), total: voucher.salaryDetails.extraHoursPay || 0, show: voucher.salaryDetails.extraHours > 0 },
+    { concepto: 'Recargo Nocturno', cantidad: '0 hrs', unitario: 0, total: voucher.salaryDetails.nightSurcharge || 0, show: voucher.salaryDetails.nightSurcharge > 0 },
+    { concepto: 'Recargo Dominical', cantidad: '0 hrs', unitario: 0, total: voucher.salaryDetails.sundaySurcharge || 0, show: voucher.salaryDetails.sundaySurcharge > 0 },
+    { concepto: 'Auxilio de Transporte', cantidad: voucher.salaryDetails.workedDays + ' días', unitario: Math.round(voucher.salaryDetails.transportAllowance / Math.max(voucher.salaryDetails.workedDays, 1)), total: voucher.salaryDetails.transportAllowance || 0, show: voucher.salaryDetails.transportAllowance > 0 },
+    { concepto: 'Bonificaciones', cantidad: '1', unitario: voucher.salaryDetails.bonuses, total: voucher.salaryDetails.bonuses || 0, show: voucher.salaryDetails.bonuses > 0 }
+  ];
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(85, 85, 85);
+
+  for (const concepto of horasConceptos) {
+    if (concepto.show !== false) {
+      doc.text(concepto.concepto, margin + 2, yPosition + 4);
+      doc.text(concepto.cantidad, margin + 60, yPosition + 4);
+      doc.text(formatCurrency(concepto.unitario), margin + 100, yPosition + 4);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(46, 125, 50);
+      doc.text(formatCurrency(concepto.total), pageWidth - margin - 2, yPosition + 4, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(85, 85, 85);
+      yPosition += 6;
+    }
+  }
+
+  // Total devengado
+  yPosition += 3;
+  doc.setFillColor(232, 245, 233);
+  doc.rect(margin, yPosition, contentWidth, 8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(27, 94, 32);
+  doc.setFontSize(10);
+  doc.text('TOTAL DEVENGADO', margin + 2, yPosition + 5);
+  doc.text(formatCurrency(voucher.salaryDetails.totalEarnings), pageWidth - margin - 2, yPosition + 5, { align: 'right' });
+
+  yPosition += 15;
+
+  // TABLA: RETENCIONES Y DEDUCCIONES
+  doc.setTextColor(52, 73, 94);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('RETENCIONES Y DEDUCCIONES', margin, yPosition);
+  yPosition += 8;
+
+  // Encabezado tabla
+  doc.setFillColor(189, 195, 199);
+  doc.rect(margin, yPosition, contentWidth, 8, 'F');
+  doc.setTextColor(44, 62, 80);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CONCEPTO', margin + 2, yPosition + 5);
+  doc.text('BASE', margin + 70, yPosition + 5);
+  doc.text('%', margin + 110, yPosition + 5);
+  doc.text('VALOR', pageWidth - margin - 20, yPosition + 5, { align: 'right' });
+  yPosition += 8;
+
+  // Filas deducciones
+  const baseCalculation = voucher.salaryDetails.baseSalary + (voucher.salaryDetails.extraHoursPay || 0) + (voucher.salaryDetails.bonuses || 0);
+  const deduccionesConceptos = [
+    { concepto: 'Salud (4%)', base: baseCalculation, porcentaje: '4.00%', valor: voucher.salaryDetails.healthContribution, show: voucher.salaryDetails.healthContribution > 0 },
+    { concepto: 'Pensión (4%)', base: baseCalculation, porcentaje: '4.00%', valor: voucher.salaryDetails.pensionContribution, show: voucher.salaryDetails.pensionContribution > 0 },
+    { concepto: 'Retención Fuente', base: baseCalculation, porcentaje: 'Var', valor: voucher.salaryDetails.withholdingTax || 0, show: voucher.salaryDetails.withholdingTax > 0 },
+    { concepto: 'Otras Deducciones', base: 0, porcentaje: '-', valor: voucher.salaryDetails.otherDeductions || 0, show: voucher.salaryDetails.otherDeductions > 0 }
+  ];
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(85, 85, 85);
+
+  for (const deduccion of deduccionesConceptos) {
+    if (deduccion.show !== false) {
+      doc.text(deduccion.concepto, margin + 2, yPosition + 4);
+      doc.text(deduccion.base > 0 ? formatCurrency(deduccion.base) : '-', margin + 62, yPosition + 4);
+      doc.text(deduccion.porcentaje, margin + 110, yPosition + 4);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(211, 47, 47);
+      doc.text(formatCurrency(deduccion.valor), pageWidth - margin - 2, yPosition + 4, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(85, 85, 85);
+      yPosition += 6;
+    }
+  }
+
+  // Total deducciones
+  yPosition += 3;
+  doc.setFillColor(255, 235, 238);
+  doc.rect(margin, yPosition, contentWidth, 8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(183, 28, 28);
+  doc.setFontSize(10);
+  doc.text('TOTAL DEDUCCIONES', margin + 2, yPosition + 5);
+  doc.text(formatCurrency(voucher.salaryDetails.totalDeductions), pageWidth - margin - 2, yPosition + 5, { align: 'right' });
+
+  yPosition += 15;
+
+  // NETO A PAGAR FINAL
+  doc.setFillColor(41, 128, 185);
+  doc.rect(margin, yPosition, contentWidth, 20, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('NETO A PAGAR', margin + 5, yPosition + 10);
+  doc.setFontSize(18);
+  doc.text(formatCurrency(voucher.netPay), pageWidth - margin - 5, yPosition + 10, { align: 'right' });
+
+  yPosition += 30;
+
+  // FIRMAS
+  const firmaWidth = 60;
+  const espacioFirmas = (contentWidth - (firmaWidth * 2)) / 3;
+  
+  // Líneas para firmas
+  doc.setDrawColor(150, 150, 150);
+  doc.line(margin + espacioFirmas, yPosition, margin + espacioFirmas + firmaWidth, yPosition);
+  doc.line(pageWidth - margin - espacioFirmas - firmaWidth, yPosition, pageWidth - margin - espacioFirmas, yPosition);
+  
+  // Etiquetas firmas
+  doc.setTextColor(85, 85, 85);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
+  doc.text('EMPLEADO', margin + espacioFirmas + (firmaWidth / 2), yPosition + 5, { align: 'center' });
+  doc.text('EMPLEADOR', pageWidth - margin - espacioFirmas - (firmaWidth / 2), yPosition + 5, { align: 'center' });
+
+  yPosition += 15;
+
+  // FOOTER LEGAL
+  doc.setFillColor(250, 250, 250);
+  doc.rect(margin, yPosition, contentWidth, 15, 'F');
+  doc.setTextColor(120, 120, 120);
+  doc.setFontSize(7);
+  doc.text('Este comprobante de pago es válido sin firma autógrafa • Generado electrónicamente', pageWidth / 2, yPosition + 5, { align: 'center' });
   
   const generationDate = new Date().toLocaleDateString('es-CO', {
     year: 'numeric',
@@ -272,23 +301,8 @@ const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promis
     hour: '2-digit',
     minute: '2-digit'
   });
-  
-  doc.text(`Fecha de generación: ${generationDate}`, pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 6;
-  
-  doc.setFillColor(254, 243, 199);
-  doc.rect(margin, yPosition, contentWidth, 12, 'F');
-  doc.setTextColor(146, 64, 14);
-  doc.setFontSize(7);
-  doc.text('⚠️ IMPORTANTE: Este comprobante es un documento informativo y no reemplaza la nómina electrónica oficial.', margin + 2, yPosition + 4);
-  doc.text('Para consultas sobre este comprobante, contacte al departamento de recursos humanos.', margin + 2, yPosition + 8);
-  
-  yPosition += 18;
-  doc.setTextColor(107, 114, 128);
-  doc.setFontSize(6);
-  doc.text('Comprobante generado electrónicamente • Válido sin firma autógrafa', pageWidth / 2, yPosition, { align: 'center' });
+  doc.text(`Fecha de generación: ${generationDate}`, pageWidth / 2, yPosition + 10, { align: 'center' });
 
-  // Convertir a buffer
   const pdfBuffer = doc.output('arraybuffer');
   return new Uint8Array(pdfBuffer);
 };
@@ -304,7 +318,7 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const requestBody = await req.json();
-    const { voucherId, regenerate = false, employee, period } = requestBody;
+    const { voucherId, employee, period } = requestBody;
 
     console.log('Generating voucher PDF for:', { voucherId, employee: employee?.name, period: period?.startDate });
 
@@ -318,20 +332,7 @@ const handler = async (req: Request): Promise<Response> => {
         .select(`
           *,
           employees (nombre, apellido, cedula, email, cargo),
-          payrolls (
-            salario_base, 
-            total_devengado, 
-            total_deducciones, 
-            salud_empleado, 
-            pension_empleado, 
-            retencion_fuente, 
-            bonificaciones,
-            horas_extra,
-            recargo_nocturno,
-            recargo_dominical,
-            auxilio_transporte,
-            otras_deducciones
-          )
+          payrolls (*)
         `)
         .eq('id', voucherId)
         .single();
@@ -341,9 +342,6 @@ const handler = async (req: Request): Promise<Response> => {
         throw new Error('Comprobante no encontrado');
       }
 
-      console.log('Voucher found:', voucher.id);
-
-      // Obtener información de la empresa
       const { data: companyData } = await supabase
         .from('companies')
         .select('*')
@@ -365,7 +363,9 @@ const handler = async (req: Request): Promise<Response> => {
         netPay: voucher.net_pay,
         salaryDetails: {
           baseSalary: voucher.payrolls?.salario_base || voucher.net_pay,
+          workedDays: voucher.payrolls?.dias_trabajados || 30,
           extraHours: voucher.payrolls?.horas_extra || 0,
+          extraHoursPay: Math.round((voucher.payrolls?.horas_extra || 0) * (voucher.payrolls?.salario_base || 0) / 192 * 1.25),
           nightSurcharge: voucher.payrolls?.recargo_nocturno || 0,
           sundaySurcharge: voucher.payrolls?.recargo_dominical || 0,
           transportAllowance: voucher.payrolls?.auxilio_transporte || 0,
@@ -382,42 +382,54 @@ const handler = async (req: Request): Promise<Response> => {
       // Direct generation from employee and period data
       console.log('Generating voucher from direct employee data');
       
-      // Get current user's company
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
-      const { data: userCompany } = await supabase
-        .from('user_company_assignments')
+      const { data: profile } = await supabase
+        .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
 
-      if (!userCompany) throw new Error('Usuario sin empresa asignada');
+      if (!profile?.company_id) throw new Error('Usuario sin empresa asignada');
 
       const { data: companyData } = await supabase
         .from('companies')
         .select('*')
-        .eq('id', userCompany.company_id)
+        .eq('id', profile.company_id)
         .single();
 
       company = companyData;
 
-      // Get employee details from database
       const { data: employeeData } = await supabase
         .from('employees')
         .select('nombre, apellido, cedula, cargo')
         .eq('id', employee.id)
         .single();
 
-      const transportAllowance = employee.baseSalary <= 2600000 ? 200000 : 0;
-      const healthContribution = employee.baseSalary * 0.04;
-      const pensionContribution = employee.baseSalary * 0.04;
+      // Calcular valores usando los datos del empleado
+      const baseSalary = employee.baseSalary || 0;
+      const workedDays = employee.workedDays || 30;
+      const extraHours = employee.extraHours || 0;
+      const bonuses = employee.bonuses || 0;
+      
+      // Calcular horas extra pay
+      const hourlyRate = baseSalary / 192; // Aproximación mensual
+      const extraHoursPay = extraHours * hourlyRate * 1.25;
+      
+      // Calcular auxilio de transporte
+      const transportAllowance = baseSalary <= 2600000 ? Math.round(200000 * (workedDays / 30)) : 0;
+      
+      // Calcular deducciones
+      const baseForDeductions = baseSalary + extraHoursPay + bonuses;
+      const healthContribution = Math.round(baseForDeductions * 0.04);
+      const pensionContribution = Math.round(baseForDeductions * 0.04);
       const totalDeductions = healthContribution + pensionContribution + (employee.deductions || 0);
-      const totalEarnings = employee.baseSalary + transportAllowance + (employee.bonuses || 0);
+      const totalEarnings = baseSalary + extraHoursPay + transportAllowance + bonuses;
 
       voucherData = {
         voucherId: 'temp-' + Date.now(),
-        companyId: userCompany.company_id,
+        companyId: profile.company_id,
         employeeName: employeeData ? `${employeeData.nombre} ${employeeData.apellido}` : employee.name,
         employeeId: employee.id,
         employeeCedula: employeeData?.cedula || 'Sin documento',
@@ -425,19 +437,21 @@ const handler = async (req: Request): Promise<Response> => {
         periodo: `${period.startDate} - ${period.endDate}`,
         startDate: period.startDate,
         endDate: period.endDate,
-        netPay: employee.netPay || totalEarnings - totalDeductions,
+        netPay: employee.netPay || (totalEarnings - totalDeductions),
         salaryDetails: {
-          baseSalary: employee.baseSalary,
-          extraHours: employee.extraHours || 0,
+          baseSalary,
+          workedDays,
+          extraHours,
+          extraHoursPay: Math.round(extraHoursPay),
           nightSurcharge: 0,
           sundaySurcharge: 0,
           transportAllowance,
-          bonuses: employee.bonuses || 0,
+          bonuses,
           totalEarnings,
           healthContribution,
           pensionContribution,
           withholdingTax: 0,
-          otherDeductions: (employee.deductions || 0) - healthContribution - pensionContribution,
+          otherDeductions: Math.max(0, (employee.deductions || 0) - healthContribution - pensionContribution),
           totalDeductions
         }
       };
@@ -446,12 +460,11 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log('Company found:', company?.razon_social);
+    console.log('Voucher data:', JSON.stringify(voucherData, null, 2));
 
-    // Generar PDF buffer
     const pdfBuffer = await generatePDFBuffer(voucherData, company);
     
-    // Update voucher status only if it's an existing voucher
-    if (voucherId && voucherId !== 'temp-' + Date.now()) {
+    if (voucherId && !voucherId.startsWith('temp-')) {
       await supabase
         .from('payroll_vouchers')
         .update({ 

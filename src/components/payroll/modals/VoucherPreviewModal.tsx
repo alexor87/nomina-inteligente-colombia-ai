@@ -34,6 +34,18 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
     setIsGenerating(true);
     try {
+      console.log('🔄 Generando comprobante para:', employee.name);
+      console.log('📋 Datos del empleado:', {
+        id: employee.id,
+        baseSalary: employee.baseSalary,
+        workedDays: employee.workedDays,
+        extraHours: employee.extraHours,
+        bonuses: employee.bonuses,
+        grossPay: employee.grossPay,
+        deductions: employee.deductions,
+        netPay: employee.netPay
+      });
+
       const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
         body: {
           employee: {
@@ -59,7 +71,12 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error en la función:', error);
+        throw error;
+      }
+
+      console.log('✅ PDF generado exitosamente');
 
       // Create blob and download
       const blob = new Blob([data], { type: 'application/pdf' });
@@ -78,10 +95,10 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         className: "border-green-200 bg-green-50"
       });
     } catch (error) {
-      console.error('Error generating voucher:', error);
+      console.error('💥 Error generando comprobante:', error);
       toast({
         title: "Error al generar comprobante",
-        description: "No se pudo generar el comprobante de pago",
+        description: "No se pudo generar el comprobante de pago. Verifica los datos e intenta nuevamente.",
         variant: "destructive"
       });
     } finally {
@@ -185,6 +202,10 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
               <div className="flex justify-between py-2 border-b">
                 <span>Bonificaciones</span>
                 <span className="font-semibold">{formatCurrency(employee.bonuses)}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span>Auxilio de Transporte</span>
+                <span className="font-semibold">{formatCurrency(employee.transportAllowance)}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span>Incapacidades</span>

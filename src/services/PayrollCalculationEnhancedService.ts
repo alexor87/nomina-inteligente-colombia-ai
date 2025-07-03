@@ -160,14 +160,14 @@ export class PayrollCalculationEnhancedService {
     const jornadaLegal = getJornadaLegal(periodDate);
     const hourlyDivisor = getHourlyDivisor(periodDate);
     
-    // Determinar días del período según la configuración
+    // CORRECCIÓN CRÍTICA: Determinar divisores correctos según período
     let periodDays: number;
     let monthlyDivisor: number;
     
     switch (input.periodType) {
       case 'quincenal':
         periodDays = 15;
-        monthlyDivisor = 30;
+        monthlyDivisor = 60; // 30 días × 2 quincenas por mes
         break;
       case 'mensual':
         periodDays = 30;
@@ -178,7 +178,7 @@ export class PayrollCalculationEnhancedService {
         monthlyDivisor = 30;
     }
     
-    // Cálculo del salario base proporcional
+    // Cálculo del salario base proporcional CORREGIDO
     const dailySalary = input.baseSalary / monthlyDivisor;
     const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
     const regularPay = effectiveWorkedDays * dailySalary;
@@ -188,13 +188,16 @@ export class PayrollCalculationEnhancedService {
     const valorHoraOrdinaria = hourlyRate;
     const extraPay = input.extraHours * hourlyRate * 1.25;
 
-    // Auxilio de transporte
+    // Auxilio de transporte CORREGIDO por período
     let transportAllowance = 0;
     if (input.baseSalary <= (config.salarioMinimo * 2)) {
+      const baseTransportAllowance = config.auxilioTransporte;
       if (input.periodType === 'quincenal') {
-        transportAllowance = Math.round((config.auxilioTransporte / 2) * (input.workedDays / periodDays));
+        // Para quincenal: auxilio completo dividido por 2, luego proporcional a días trabajados
+        transportAllowance = Math.round((baseTransportAllowance / 2) * (input.workedDays / periodDays));
       } else {
-        transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / periodDays));
+        // Para mensual: auxilio completo proporcional a días trabajados
+        transportAllowance = Math.round(baseTransportAllowance * (input.workedDays / periodDays));
       }
     }
 

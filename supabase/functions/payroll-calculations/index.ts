@@ -198,13 +198,14 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const jornadaLegal = getJornadaLegal(periodDate);
   const hourlyDivisor = getHourlyDivisor(periodDate);
   
+  // CORRECCIÓN CRÍTICA: Calcular divisores correctos según período
   let periodDays: number;
   let monthlyDivisor: number;
   
   switch (input.periodType) {
     case 'quincenal':
       periodDays = 15;
-      monthlyDivisor = 30;
+      monthlyDivisor = 60; // 30 días × 2 quincenas por mes
       break;
     case 'mensual':
       periodDays = 30;
@@ -223,6 +224,7 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const hourlyRate = input.baseSalary / hourlyDivisor;
   const extraPay = input.extraHours * hourlyRate * 1.25;
 
+  // CORRECCIÓN: Auxilio de transporte proporcional por período
   let transportAllowance = 0;
   if (input.baseSalary <= (config.salarioMinimo * 2)) {
     if (input.periodType === 'quincenal') {
