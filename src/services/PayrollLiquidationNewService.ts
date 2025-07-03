@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
@@ -385,8 +386,8 @@ export class PayrollLiquidationNewService {
     try {
       console.log(`🔐 ALELUYA - Cerrando período: ${period.periodo}`);
       
-      // ✅ CORRECCIÓN ALELUYA: Guardar valores PROPORCIONALES calculados
-      console.log(`💾 ALELUYA - Guardando ${employees.length} registros proporcionales...`);
+      // ✅ CORRECCIÓN PARA DEDUCCIONES SEPARADAS
+      console.log(`💾 ALELUYA - Guardando ${employees.length} registros con deducciones separadas...`);
       
       let successfulRecords = 0;
       const failedRecords: string[] = [];
@@ -394,24 +395,51 @@ export class PayrollLiquidationNewService {
       for (const employee of employees) {
         if (employee.status === 'valid') {
           try {
-            // ✅ ALELUYA: Guardar valores proporcionales, NO mensuales
+            // ✅ CÁLCULO CORRECTO DE DEDUCCIONES SEPARADAS
+            const proportionalSalary = Math.round((employee.baseSalary / 30) * employee.workedDays);
+            
+            // Deducciones separadas sobre salario proporcional
+            const healthDeduction = Math.round(proportionalSalary * 0.04); // 4%
+            const pensionDeduction = Math.round(proportionalSalary * 0.04); // 4%
+            
+            // Deducciones adicionales de novedades (si las hay)
+            const additionalDeductions = employee.deductions - (healthDeduction + pensionDeduction);
+            
+            console.log(`💰 DEDUCCIONES SEPARADAS para ${employee.name}:`, {
+              proportionalSalary: proportionalSalary,
+              healthDeduction: healthDeduction,
+              pensionDeduction: pensionDeduction,
+              additionalDeductions: Math.max(0, additionalDeductions),
+              totalDeductions: employee.deductions
+            });
+
+            // ✅ ALELUYA: Guardar con deducciones separadas
             const payrollData = {
               company_id: period.company_id,
               employee_id: employee.id,
               periodo: period.periodo,
               period_id: period.id,
-              salario_base: employee.baseSalary, // Referencia mensual
-              dias_trabajados: employee.workedDays, // Días del período
+              salario_base: employee.baseSalary,
+              dias_trabajados: employee.workedDays,
               horas_extra: employee.extraHours,
               bonificaciones: employee.bonuses,
-              auxilio_transporte: employee.transportAllowance, // PROPORCIONAL
-              total_devengado: employee.grossPay, // PROPORCIONAL
-              total_deducciones: employee.deductions, // PROPORCIONAL
-              neto_pagado: employee.netPay, // PROPORCIONAL
+              auxilio_transporte: employee.transportAllowance,
+              total_devengado: employee.grossPay,
+              // ✅ DEDUCCIONES SEPARADAS - CORRECCIÓN PRINCIPAL
+              salud_empleado: healthDeduction,
+              pension_empleado: pensionDeduction,
+              otras_deducciones: Math.max(0, additionalDeductions),
+              total_deducciones: employee.deductions,
+              neto_pagado: employee.netPay,
               estado: 'procesada'
             };
 
-            console.log(`💾 ALELUYA - Guardando datos proporcionales para ${employee.name}:`, payrollData);
+            console.log(`💾 ALELUYA - Guardando con deducciones separadas para ${employee.name}:`, {
+              salud_empleado: payrollData.salud_empleado,
+              pension_empleado: payrollData.pension_empleado,
+              otras_deducciones: payrollData.otras_deducciones,
+              total_deducciones: payrollData.total_deducciones
+            });
 
             const { error: payrollError } = await supabase
               .from('payrolls')
@@ -425,7 +453,7 @@ export class PayrollLiquidationNewService {
               failedRecords.push(employee.name);
             } else {
               successfulRecords++;
-              console.log(`✅ ALELUYA - Datos proporcionales guardados para ${employee.name}`);
+              console.log(`✅ ALELUYA - Deducciones separadas guardadas para ${employee.name}`);
             }
           } catch (error) {
             console.error(`❌ Error crítico guardando empleado ${employee.name}:`, error);
@@ -448,7 +476,7 @@ export class PayrollLiquidationNewService {
         .update({ 
           estado: 'cerrado',
           empleados_count: successfulRecords,
-          total_devengado: totalDevengado, // Totales proporcionales
+          total_devengado: totalDevengado,
           total_deducciones: totalDeducciones,
           total_neto: totalNeto
         })
@@ -460,8 +488,8 @@ export class PayrollLiquidationNewService {
       }
 
       const message = failedRecords.length > 0 
-        ? `Período ${period.periodo} cerrado con ${successfulRecords} empleados. ${failedRecords.length} empleados fallaron al guardar.`
-        : `Período ${period.periodo} cerrado exitosamente con ${successfulRecords} empleados procesados`;
+        ? `Período ${period.periodo} cerrado con deducciones separadas. ${successfulRecords} empleados procesados, ${failedRecords.length} fallaron.`
+        : `Período ${period.periodo} cerrado exitosamente con deducciones separadas para ${successfulRecords} empleados`;
 
       console.log(`✅ ALELUYA - ${message}`);
       return message;
