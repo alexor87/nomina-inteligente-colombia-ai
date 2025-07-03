@@ -1,17 +1,23 @@
 
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Save, Lock } from 'lucide-react';
+import { RefreshCw, Save, Lock, CheckCircle } from 'lucide-react';
 
 interface PayrollActionsProps {
-  onRecalculate: () => void;
-  onToggleSummary: () => void;
-  showSummary: boolean;
-  canEdit?: boolean;
+  canClosePeriod: boolean;
+  isProcessing: boolean;
+  onClosePeriod: () => Promise<void>;
+  onRecalculateAll: () => Promise<void>;
+  selectedCount: number;
+  totalCount: number;
 }
 
 export const PayrollActions = ({ 
-  onRecalculate,
-  canEdit = true
+  canClosePeriod,
+  isProcessing,
+  onClosePeriod,
+  onRecalculateAll,
+  selectedCount,
+  totalCount
 }: PayrollActionsProps) => {
   return (
     <div className="bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -19,26 +25,34 @@ export const PayrollActions = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={onRecalculate}
-          disabled={!canEdit}
+          onClick={onRecalculateAll}
+          disabled={isProcessing}
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Recalcular todos
         </Button>
 
         <div className="flex items-center text-sm text-gray-600">
-          {canEdit ? (
-            <>
-              <Save className="h-4 w-4 mr-1" />
-              Guardado automático
-            </>
-          ) : (
-            <>
-              <Lock className="h-4 w-4 mr-1" />
-              Período bloqueado para edición
-            </>
-          )}
+          <Save className="h-4 w-4 mr-1" />
+          Guardado automático
         </div>
+
+        <div className="text-sm text-gray-500">
+          {selectedCount}/{totalCount} empleados seleccionados
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-3">
+        {canClosePeriod && (
+          <Button
+            onClick={onClosePeriod}
+            disabled={isProcessing}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Cerrar Período
+          </Button>
+        )}
       </div>
     </div>
   );
