@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,6 +60,19 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
     return count;
   };
 
+  const getStepDescription = () => {
+    switch (currentStep) {
+      case 1:
+        return "Configure si desea regenerar el archivo PILA con los cambios realizados en el período.";
+      case 2:
+        return "Configure si desea actualizar y regenerar los comprobantes de pago para reflejar los cambios.";
+      case 3:
+        return "Revise las acciones que se realizarán antes de confirmar el procesamiento del período editado.";
+      default:
+        return "Asistente para procesar un período de nómina que ha sido editado.";
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
@@ -69,6 +81,9 @@ export const EditWizard = ({ isOpen, onClose, onConfirm, isProcessing }: EditWiz
             <AlertTriangle className="h-5 w-5 text-yellow-600" />
             <span>Procesar Período Editado</span>
           </DialogTitle>
+          <DialogDescription>
+            {getStepDescription()}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
