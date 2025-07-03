@@ -14,17 +14,30 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔄 INICIANDO GENERACIÓN DE PDF - VERSIÓN ROBUSTA');
+    console.log('📄 INICIANDO GENERACIÓN DE PDF CORREGIDO');
     
     const requestBody = await req.json();
     console.log('📋 Datos recibidos:', JSON.stringify(requestBody, null, 2));
 
     const { employee, period } = requestBody;
 
+    // Validación de datos de entrada
     if (!employee || !period) {
       console.error('❌ Faltan datos del empleado o período');
       return new Response(
         JSON.stringify({ error: 'Faltan datos del empleado o período' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Validar datos críticos del empleado
+    if (!employee.name || !employee.baseSalary || !employee.netPay) {
+      console.error('❌ Datos del empleado incompletos');
+      return new Response(
+        JSON.stringify({ error: 'Datos del empleado incompletos' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -91,10 +104,10 @@ serve(async (req) => {
     console.log('🏢 Información de empresa obtenida:', companyInfo?.razon_social || 'No disponible');
     console.log('👤 Información de empleado completada:', employeeComplete.name);
 
-    // Generar PDF usando pdf-lib (más estable que jsPDF)
-    const pdfContent = await generateRobustVoucherPDF(employeeComplete, period, companyInfo);
+    // Generar PDF usando pdf-lib con funciones de formateo personalizadas
+    const pdfContent = await generateCompatibleVoucherPDF(employeeComplete, period, companyInfo);
 
-    console.log('✅ PDF GENERADO EXITOSAMENTE');
+    console.log('✅ PDF GENERADO EXITOSAMENTE - TAMAÑO:', pdfContent.length, 'bytes');
 
     return new Response(pdfContent, {
       headers: {
@@ -120,12 +133,59 @@ serve(async (req) => {
   }
 });
 
-// FUNCIÓN ROBUSTA: Generar PDF usando pdf-lib
-async function generateRobustVoucherPDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
-  console.log('📄 GENERANDO PDF CON LIBRERÍA ROBUSTA...');
+// FUNCIONES DE FORMATEO PERSONALIZADAS COMPATIBLES CON DENO
+function formatCurrencyCustom(amount: number): string {
+  // Función personalizada que no depende de Intl
+  if (typeof amount !== 'number' || isNaN(amount)) {
+    return '$0';
+  }
+  
+  const formatted = Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `$${formatted}`;
+}
+
+function formatDateCustom(dateString: string): string {
+  // Función personalizada que no depende de toLocaleDateString
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    console.error('Error formateando fecha:', error);
+    return 'Fecha inválida';
+  }
+}
+
+function getCurrentDateTimeCustom(): string {
+  // Función personalizada para fecha y hora actual
+  try {
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const year = now.getFullYear();
+    const hour = now.getHours().toString().padStart(2, '0');
+    const minute = now.getMinutes().toString().padStart(2, '0');
+    
+    return `${day}/${month}/${year} ${hour}:${minute}`;
+  } catch (error) {
+    console.error('Error obteniendo fecha actual:', error);
+    return 'Fecha actual';
+  }
+}
+
+// FUNCIÓN PRINCIPAL: Generar PDF compatible y sin elementos problemáticos
+async function generateCompatibleVoucherPDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
+  console.log('📄 GENERANDO PDF COMPATIBLE...');
   
   try {
-    // Importar pdf-lib desde esm.sh (más estable para Deno)
+    // Importar pdf-lib desde esm.sh
     const { PDFDocument, StandardFonts, rgb } = await import('https://esm.sh/pdf-lib@1.17.1');
     
     // Crear documento PDF
@@ -136,44 +196,36 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
-    // Colores
+    // Colores seguros
     const primaryColor = rgb(0.12, 0.25, 0.69); // Azul corporativo
     const grayColor = rgb(0.4, 0.4, 0.4);
     const blackColor = rgb(0, 0, 0);
     
-    // Función auxiliar para formatear moneda
-    const formatCurrency = (amount: number) => {
-      return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0
-      }).format(amount);
-    };
-
-    // Función auxiliar para formatear fecha
-    const formatDate = (dateString: string) => {
-      return new Date(dateString).toLocaleDateString('es-CO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-    };
-
-    // Cálculos detallados
-    const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
-    const saludEmpleado = Math.round(employee.baseSalary * 0.04);
-    const pensionEmpleado = Math.round(employee.baseSalary * 0.04);
-    const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0;
-    const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25);
-    const totalHorasExtra = employee.extraHours * valorHoraExtra;
+    // Validar y limpiar datos
+    const safeName = String(employee.name || 'Empleado').substring(0, 50);
+    const safeSalary = Number(employee.baseSalary) || 0;
+    const safeNetPay = Number(employee.netPay) || 0;
+    const safeWorkedDays = Number(employee.workedDays) || 30;
+    const safeExtraHours = Number(employee.extraHours) || 0;
+    const safeBonuses = Number(employee.bonuses) || 0;
+    const safeDeductions = Number(employee.deductions) || 0;
+    const safeTransportAllowance = Number(employee.transportAllowance) || 0;
+    
+    // Cálculos seguros
+    const salarioProporcional = Math.round((safeSalary / 30) * safeWorkedDays);
+    const saludEmpleado = Math.round(safeSalary * 0.04);
+    const pensionEmpleado = Math.round(safeSalary * 0.04);
+    const fondoSolidaridad = safeSalary > 4000000 ? Math.round(safeSalary * 0.01) : 0;
+    const valorHoraExtra = Math.round((safeSalary / 240) * 1.25);
+    const totalHorasExtra = safeExtraHours * valorHoraExtra;
 
     const documento = employee.documento || employee.cedula || employee.id?.slice(0, 8) || 'N/A';
     const tipoDocumento = employee.tipo_documento || 'CC';
 
     let yPosition = 800;
 
-    // TÍTULO PRINCIPAL
-    page.drawText('COMPROBANTE DE NÓMINA', {
+    // TÍTULO PRINCIPAL - SIN EMOJIS
+    page.drawText('COMPROBANTE DE NOMINA', {
       x: 50,
       y: yPosition,
       size: 20,
@@ -192,7 +244,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: primaryColor,
     });
     
-    page.drawText(companyInfo?.razon_social || 'Mi Empresa', {
+    page.drawText(String(companyInfo?.razon_social || 'Mi Empresa').substring(0, 40), {
       x: 50,
       y: yPosition - 20,
       size: 11,
@@ -200,7 +252,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: blackColor,
     });
     
-    page.drawText(`NIT: ${companyInfo?.nit || 'N/A'}`, {
+    page.drawText(`NIT: ${String(companyInfo?.nit || 'N/A').substring(0, 20)}`, {
       x: 50,
       y: yPosition - 40,
       size: 10,
@@ -217,7 +269,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: primaryColor,
     });
     
-    page.drawText(employee.name, {
+    page.drawText(safeName, {
       x: 200,
       y: yPosition - 20,
       size: 11,
@@ -225,7 +277,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: blackColor,
     });
     
-    page.drawText(`${tipoDocumento}: ${documento}`, {
+    page.drawText(`${tipoDocumento}: ${String(documento).substring(0, 15)}`, {
       x: 200,
       y: yPosition - 40,
       size: 10,
@@ -234,7 +286,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
     });
 
     // PERÍODO DE PAGO
-    page.drawText('PERÍODO DE PAGO', {
+    page.drawText('PERIODO DE PAGO', {
       x: 350,
       y: yPosition,
       size: 12,
@@ -242,7 +294,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: primaryColor,
     });
     
-    page.drawText(`${formatDate(period.startDate)} - ${formatDate(period.endDate)}`, {
+    page.drawText(`${formatDateCustom(period.startDate)} - ${formatDateCustom(period.endDate)}`, {
       x: 350,
       y: yPosition - 20,
       size: 10,
@@ -250,7 +302,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: blackColor,
     });
     
-    page.drawText(`Días trabajados: ${employee.workedDays}`, {
+    page.drawText(`Dias trabajados: ${safeWorkedDays}`, {
       x: 350,
       y: yPosition - 40,
       size: 9,
@@ -260,8 +312,8 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
 
     yPosition -= 80;
 
-    // RESUMEN DEL PAGO
-    page.drawText('💵 RESUMEN DEL PAGO', {
+    // RESUMEN DEL PAGO - SIN EMOJIS
+    page.drawText('RESUMEN DEL PAGO', {
       x: 50,
       y: yPosition,
       size: 14,
@@ -271,37 +323,104 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
 
     yPosition -= 30;
 
-    // Tabla de conceptos
-    const conceptos = [
-      ['Salario Proporcional', formatCurrency(salarioProporcional)],
-      ...(employee.transportAllowance > 0 ? [['Subsidio de Transporte', formatCurrency(employee.transportAllowance)]] : []),
-      ...(employee.bonuses > 0 ? [['Bonificaciones', formatCurrency(employee.bonuses)]] : []),
-      ...(totalHorasExtra > 0 ? [['Horas Extras y Recargos', formatCurrency(totalHorasExtra)]] : []),
-      ...(employee.deductions > 0 ? [['Deducciones', `-${formatCurrency(employee.deductions)}`]] : []),
-    ];
+    // Conceptos básicos - evitando estructuras complejas
+    page.drawText('Salario Proporcional', {
+      x: 70,
+      y: yPosition,
+      size: 10,
+      font: font,
+      color: blackColor,
+    });
+    
+    page.drawText(formatCurrencyCustom(salarioProporcional), {
+      x: 400,
+      y: yPosition,
+      size: 10,
+      font: font,
+      color: blackColor,
+    });
+    
+    yPosition -= 20;
 
-    conceptos.forEach((concepto, index) => {
-      const isTotal = index === conceptos.length - 1 && concepto[0] === 'Deducciones';
-      const textColor = isTotal ? rgb(0.86, 0.15, 0.15) : blackColor;
-      
-      page.drawText(concepto[0], {
+    if (safeTransportAllowance > 0) {
+      page.drawText('Subsidio de Transporte', {
         x: 70,
         y: yPosition,
         size: 10,
         font: font,
-        color: textColor,
+        color: blackColor,
       });
       
-      page.drawText(concepto[1], {
+      page.drawText(formatCurrencyCustom(safeTransportAllowance), {
         x: 400,
         y: yPosition,
         size: 10,
         font: font,
-        color: textColor,
+        color: blackColor,
       });
       
       yPosition -= 20;
-    });
+    }
+
+    if (safeBonuses > 0) {
+      page.drawText('Bonificaciones', {
+        x: 70,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: blackColor,
+      });
+      
+      page.drawText(formatCurrencyCustom(safeBonuses), {
+        x: 400,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: blackColor,
+      });
+      
+      yPosition -= 20;
+    }
+
+    if (totalHorasExtra > 0) {
+      page.drawText('Horas Extras y Recargos', {
+        x: 70,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: blackColor,
+      });
+      
+      page.drawText(formatCurrencyCustom(totalHorasExtra), {
+        x: 400,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: blackColor,
+      });
+      
+      yPosition -= 20;
+    }
+
+    if (safeDeductions > 0) {
+      page.drawText('Deducciones', {
+        x: 70,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: rgb(0.86, 0.15, 0.15),
+      });
+      
+      page.drawText(`-${formatCurrencyCustom(safeDeductions)}`, {
+        x: 400,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: rgb(0.86, 0.15, 0.15),
+      });
+      
+      yPosition -= 20;
+    }
 
     // TOTAL NETO DESTACADO
     page.drawRectangle({
@@ -320,7 +439,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: primaryColor,
     });
     
-    page.drawText(formatCurrency(employee.netPay), {
+    page.drawText(formatCurrencyCustom(safeNetPay), {
       x: 400,
       y: yPosition,
       size: 12,
@@ -330,7 +449,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
 
     yPosition -= 50;
 
-    // FIRMAS
+    // FIRMAS - solo si hay espacio
     if (yPosition > 150) {
       page.drawText('_________________________', {
         x: 80,
@@ -364,7 +483,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
         color: grayColor,
       });
 
-      page.drawText(employee.name, {
+      page.drawText(safeName, {
         x: 100,
         y: yPosition - 40,
         size: 10,
@@ -372,7 +491,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
         color: blackColor,
       });
       
-      page.drawText(companyInfo?.razon_social || 'Mi Empresa', {
+      page.drawText(String(companyInfo?.razon_social || 'Mi Empresa').substring(0, 30), {
         x: 320,
         y: yPosition - 40,
         size: 10,
@@ -381,8 +500,8 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       });
     }
 
-    // FOOTER CON MARCA FINPPI
-    page.drawText('Este documento fue generado con Finppi – Software de Nómina', {
+    // FOOTER CON INFORMACIÓN
+    page.drawText('Este documento fue generado con Finppi - Software de Nomina', {
       x: 50,
       y: 50,
       size: 8,
@@ -390,7 +509,7 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: grayColor,
     });
 
-    page.drawText(`Generado el ${new Date().toLocaleString('es-CO')}`, {
+    page.drawText(`Generado el ${getCurrentDateTimeCustom()}`, {
       x: 50,
       y: 35,
       size: 7,
@@ -398,68 +517,92 @@ async function generateRobustVoucherPDF(employee: any, period: any, companyInfo:
       color: grayColor,
     });
 
-    // Serializar el PDF
+    // Serializar el PDF con validación
+    console.log('🔄 Serializando PDF...');
     const pdfBytes = await pdfDoc.save();
-    console.log('✅ PDF serialized successfully, size:', pdfBytes.length);
     
-    return new Uint8Array(pdfBytes);
+    if (!pdfBytes || pdfBytes.length === 0) {
+      throw new Error('PDF serializado está vacío');
+    }
+    
+    console.log('✅ PDF serializado exitosamente, tamaño:', pdfBytes.length, 'bytes');
+    
+    // Verificar que es un PDF válido (comienza con %PDF)
+    const pdfBuffer = new Uint8Array(pdfBytes);
+    const header = String.fromCharCode(...pdfBuffer.slice(0, 4));
+    if (!header.startsWith('%PDF')) {
+      throw new Error('PDF generado no tiene header válido');
+    }
+    
+    return pdfBuffer;
     
   } catch (error) {
-    console.error('❌ Error en generateRobustVoucherPDF:', error);
+    console.error('❌ Error en generateCompatibleVoucherPDF:', error);
     console.error('Stack trace:', error.stack);
     
-    // Fallback: generar PDF simple en caso de error
-    return await generateSimpleFallbackPDF(employee, period, companyInfo);
+    // Fallback: generar PDF ultra simple
+    return await generateUltraSimplePDF(employee, period, companyInfo);
   }
 }
 
-// FALLBACK: PDF simple si falla la versión principal
-async function generateSimpleFallbackPDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
-  console.log('🔄 Generando PDF fallback simple...');
+// FALLBACK ULTRA SIMPLE: PDF básico garantizado
+async function generateUltraSimplePDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
+  console.log('🔄 Generando PDF ultra simple como fallback...');
   
   try {
     const { PDFDocument, StandardFonts } = await import('https://esm.sh/pdf-lib@1.17.1');
     
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage();
+    const page = pdfDoc.addPage([595, 842]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     
-    // Contenido básico
-    page.drawText('COMPROBANTE DE NÓMINA', {
+    // Datos seguros
+    const safeName = String(employee.name || 'Empleado');
+    const safeNetPay = Number(employee.netPay) || 0;
+    
+    // Contenido ultra básico
+    page.drawText('COMPROBANTE DE NOMINA', {
       x: 50,
       y: 750,
       size: 18,
       font: font,
     });
     
-    page.drawText(`Empleado: ${employee.name}`, {
+    page.drawText(`Empleado: ${safeName}`, {
       x: 50,
       y: 700,
       size: 12,
       font: font,
     });
     
-    page.drawText(`Período: ${period.startDate} - ${period.endDate}`, {
+    page.drawText(`Periodo: ${formatDateCustom(period.startDate)} - ${formatDateCustom(period.endDate)}`, {
       x: 50,
       y: 680,
       size: 12,
       font: font,
     });
     
-    page.drawText(`Total Neto: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(employee.netPay)}`, {
+    page.drawText(`Total Neto: ${formatCurrencyCustom(safeNetPay)}`, {
       x: 50,
       y: 650,
       size: 14,
       font: font,
     });
     
+    page.drawText(`Generado el ${getCurrentDateTimeCustom()}`, {
+      x: 50,
+      y: 50,
+      size: 8,
+      font: font,
+    });
+    
     const pdfBytes = await pdfDoc.save();
-    console.log('✅ Fallback PDF generated successfully');
+    console.log('✅ PDF ultra simple generado exitosamente');
     
     return new Uint8Array(pdfBytes);
     
   } catch (fallbackError) {
-    console.error('❌ Error en fallback PDF:', fallbackError);
-    throw new Error('No se pudo generar el PDF: ' + fallbackError.message);
+    console.error('❌ Error crítico en fallback PDF:', fallbackError);
+    throw new Error('No se pudo generar el PDF ni con fallback: ' + fallbackError.message);
   }
 }
