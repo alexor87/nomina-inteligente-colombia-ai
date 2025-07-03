@@ -106,13 +106,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       // Verificar si el registro está completo
-      const isComplete = await this.verifyUserRegistrationComplete(currentUser.id);
+      const isComplete = await verifyUserRegistrationComplete(currentUser.id);
       
       if (!isComplete) {
         console.warn('⚠️ User registration incomplete, attempting to fix...');
-        await this.fixIncompleteRegistration(currentUser.email!);
-        // Esperar un momento y reintentar
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (currentUser.email) {
+          await fixIncompleteRegistration(currentUser.email);
+          // Esperar un momento y reintentar
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
 
       // Fetch profile
@@ -215,7 +217,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
 
-      if (data?.success) {
+      // Type guard for the response data
+      if (data && typeof data === 'object' && 'success' in data && data.success) {
         console.log('✅ Registration fixed successfully');
       }
     } catch (error) {

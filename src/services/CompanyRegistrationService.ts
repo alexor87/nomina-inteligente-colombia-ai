@@ -19,6 +19,9 @@ export interface CompanyRegistrationWithUser extends CompanyRegistrationData {
 }
 
 export class CompanyRegistrationService {
+  // Exportar supabase para uso externo
+  static supabase = supabase;
+
   // Crear nueva empresa con usuario (para registro completo)
   static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
     try {
@@ -146,11 +149,12 @@ export class CompanyRegistrationService {
         throw error;
       }
 
-      if (data?.success) {
-        console.log('✅ Registration completed successfully:', data.company_id);
-        return data.company_id;
+      // Type guard for the response data
+      if (data && typeof data === 'object' && 'success' in data && data.success) {
+        console.log('✅ Registration completed successfully:', (data as any).company_id);
+        return (data as any).company_id;
       } else {
-        throw new Error(data?.message || 'Error completing registration');
+        throw new Error((data as any)?.message || 'Error completing registration');
       }
     } catch (error) {
       console.error('💥 Error in completeIncompleteRegistration:', error);
