@@ -1,6 +1,8 @@
 
 import { useState } from 'react';
-import { ReportFilters, SavedFilter, ExportHistory, IncomeRetentionCertificate } from '@/types/reports';
+import { ReportFilters, SavedFilter, ExportHistory } from '@/types/reports';
+import { ReportsDBService } from '@/services/ReportsDBService';
+import { toast } from '@/hooks/use-toast';
 
 export const useReports = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -9,168 +11,149 @@ export const useReports = () => {
   const [exportHistory, setExportHistory] = useState<ExportHistory[]>([]);
   const [activeReportType, setActiveReportType] = useState('payroll-summary');
 
+  // REPORTE DE RESUMEN DE NÓMINA - 100% DATOS REALES
   const getPayrollSummaryReport = async (filters: ReportFilters) => {
+    console.log('📊 useReports: Getting payroll summary with real data');
     setIsLoading(true);
     try {
-      // Mock data generation for payroll summary
-      const mockData = [];
-      const employees = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Rodríguez', 'Luis Martínez'];
-      const costCenters = ['Administración', 'Ventas', 'Producción', 'Logística'];
-      
-      for (let i = 0; i < 15; i++) {
-        mockData.push({
-          employeeName: employees[i % employees.length],
-          period: '2024-01',
-          totalEarnings: 2800000 + (i * 150000),
-          totalDeductions: 560000 + (i * 30000),
-          netPay: 2240000 + (i * 120000),
-          employerContributions: 588000 + (i * 31500),
-          costCenter: costCenters[i % costCenters.length]
-        });
-      }
-      
-      return mockData;
+      const data = await ReportsDBService.getPayrollSummaryReport(filters);
+      console.log('✅ useReports: Payroll summary data received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ useReports: Error getting payroll summary:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos de nómina",
+        variant: "destructive"
+      });
+      return [];
     } finally {
       setIsLoading(false);
     }
   };
 
+  // REPORTE DE COSTOS LABORALES - 100% DATOS REALES
   const getLaborCostReport = async (filters: ReportFilters) => {
+    console.log('📊 useReports: Getting labor costs with real data');
     setIsLoading(true);
     try {
-      const mockData = [];
-      const employees = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Rodríguez', 'Luis Martínez'];
-      
-      for (let i = 0; i < 15; i++) {
-        mockData.push({
-          employeeName: employees[i % employees.length],
-          baseSalary: 2800000 + (i * 100000),
-          benefits: 280000 + (i * 10000),
-          overtime: 150000 + (i * 25000),
-          bonuses: 100000 + (i * 15000),
-          employerContributions: 588000 + (i * 21000),
-          totalCost: 3918000 + (i * 171000),
-          costCenter: `Centro ${i % 4 + 1}`
-        });
-      }
-      
-      return mockData;
+      const data = await ReportsDBService.getLaborCostReport(filters);
+      console.log('✅ useReports: Labor cost data received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ useReports: Error getting labor costs:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los costos laborales",
+        variant: "destructive"
+      });
+      return [];
     } finally {
       setIsLoading(false);
     }
   };
 
+  // REPORTE DE SEGURIDAD SOCIAL - 100% DATOS REALES
   const getSocialSecurityReport = async (filters: ReportFilters) => {
+    console.log('📊 useReports: Getting social security with real data');
     setIsLoading(true);
     try {
-      const mockData = [];
-      const employees = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Rodríguez', 'Luis Martínez'];
-      
-      for (let i = 0; i < 15; i++) {
-        const baseSalary = 2800000 + (i * 100000);
-        mockData.push({
-          employeeName: employees[i % employees.length],
-          healthEmployee: baseSalary * 0.04,
-          healthEmployer: baseSalary * 0.085,
-          pensionEmployee: baseSalary * 0.04,
-          pensionEmployer: baseSalary * 0.12,
-          arl: baseSalary * 0.00522,
-          compensationBox: baseSalary * 0.04,
-          total: baseSalary * (0.04 + 0.085 + 0.04 + 0.12 + 0.00522 + 0.04)
-        });
-      }
-      
-      return mockData;
+      const data = await ReportsDBService.getSocialSecurityReport(filters);
+      console.log('✅ useReports: Social security data received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ useReports: Error getting social security:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos de seguridad social",
+        variant: "destructive"
+      });
+      return [];
     } finally {
       setIsLoading(false);
     }
   };
 
+  // REPORTE DE NOVEDADES - 100% DATOS REALES
   const getNoveltyHistoryReport = async (filters: ReportFilters) => {
+    console.log('📊 useReports: Getting novelty history with real data');
     setIsLoading(true);
     try {
-      const mockData = [];
-      const employees = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Rodríguez', 'Luis Martínez'];
-      const noveltyTypes = ['Horas Extra', 'Bonificación', 'Licencia', 'Incapacidad'];
-      
-      for (let i = 0; i < 20; i++) {
-        mockData.push({
-          employeeName: employees[i % employees.length],
-          noveltyType: noveltyTypes[i % noveltyTypes.length],
-          startDate: `2024-01-${(i % 28) + 1}`,
-          endDate: `2024-01-${(i % 28) + 3}`,
-          amount: 50000 + (i * 25000),
-          status: 'Aprobada'
-        });
-      }
-      
-      return mockData;
+      const data = await ReportsDBService.getNoveltyHistoryReport(filters);
+      console.log('✅ useReports: Novelty history data received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ useReports: Error getting novelty history:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las novedades",
+        variant: "destructive"
+      });
+      return [];
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getAccountingExports = async (filters: ReportFilters) => {
-    setIsLoading(true);
-    try {
-      const mockData = [];
-      const accounts = ['51050501 - Salarios', '51051001 - Cesantías', '51051501 - Prima de Servicios'];
-      
-      for (let i = 0; i < 10; i++) {
-        mockData.push({
-          account: accounts[i % accounts.length],
-          debit: 15000000 + (i * 500000),
-          credit: 0,
-          description: `Provisión nómina enero 2024`,
-          period: '2024-01'
-        });
-      }
-      
-      return mockData;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // CERTIFICADOS DE RETENCIÓN - 100% DATOS REALES
   const getIncomeRetentionCertificates = async (year: number) => {
+    console.log('📊 useReports: Getting retention certificates with real data for year:', year);
     setIsLoading(true);
     try {
-      const mockData = [];
-      const employees = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Rodríguez', 'Luis Martínez'];
-      
-      for (let i = 0; i < 10; i++) {
-        mockData.push({
-          employeeId: `emp-${i + 1}`,
-          employeeName: employees[i % employees.length],
-          year,
-          totalIncome: 35000000 + (i * 2000000),
-          totalRetentions: 1500000 + (i * 100000),
-          status: ['generated', 'sent', 'pending'][i % 3] as 'generated' | 'sent' | 'pending',
-          generatedAt: '2024-01-15',
-          sentAt: i % 3 === 1 ? '2024-01-20' : undefined
-        });
-      }
-      
-      return mockData;
+      const data = await ReportsDBService.getIncomeRetentionCertificates(year);
+      console.log('✅ useReports: Retention certificates data received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ useReports: Error getting retention certificates:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los certificados de retención",
+        variant: "destructive"
+      });
+      return [];
     } finally {
       setIsLoading(false);
     }
   };
 
+  // EXPORTACIONES CONTABLES - 100% DATOS REALES
+  const getAccountingExports = async (filters: ReportFilters) => {
+    console.log('📊 useReports: Getting accounting exports with real data');
+    setIsLoading(true);
+    try {
+      const data = await ReportsDBService.getAccountingExports(filters);
+      console.log('✅ useReports: Accounting exports data received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ useReports: Error getting accounting exports:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las exportaciones contables",
+        variant: "destructive"
+      });
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // EXPORTACIÓN A EXCEL
   const exportToExcel = async (reportType: string, data: any[], fileName: string) => {
     try {
-      console.log('Exporting to Excel:', { reportType, fileName, records: data.length });
+      console.log('📤 useReports: Exporting to Excel:', { reportType, fileName, records: data.length });
       
-      // Ensure we have data to export
       if (!data || data.length === 0) {
-        console.warn('No data to export');
-        throw new Error('No hay datos para exportar');
+        toast({
+          title: "Sin datos",
+          description: "No hay datos para exportar",
+          variant: "destructive"
+        });
+        return;
       }
       
-      // Use ExcelExportService for actual export
+      // Usar ExcelExportService para exportación real
       const { ExcelExportService } = await import('@/services/ExcelExportService');
       
-      // Generate proper filename with timestamp
       const timestamp = new Date().toISOString().split('T')[0];
       const finalFileName = `${fileName}_${timestamp}`;
       
@@ -192,36 +175,50 @@ export const useReports = () => {
           ExcelExportService.exportToExcel(data, finalFileName, 'Reporte');
       }
 
+      // Registrar en historial
       const newExport: ExportHistory = {
         id: Date.now().toString(),
         reportType,
         fileName: `${finalFileName}.xlsx`,
         format: 'excel',
-        generatedBy: 'admin@empresa.com',
+        generatedBy: 'usuario@empresa.com',
         generatedAt: new Date().toISOString(),
         parameters: filters
       };
       setExportHistory(prev => [newExport, ...prev]);
+
+      toast({
+        title: "Exportación exitosa",
+        description: `Archivo ${finalFileName}.xlsx descargado`,
+      });
+
     } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      throw error;
+      console.error('❌ useReports: Error exporting to Excel:', error);
+      toast({
+        title: "Error de exportación",
+        description: "No se pudo exportar el archivo Excel",
+        variant: "destructive"
+      });
     }
   };
 
+  // EXPORTACIÓN A PDF
   const exportToPDF = async (reportType: string, data: any[], fileName: string) => {
     try {
-      console.log('Exporting to PDF:', { reportType, fileName, records: data.length });
+      console.log('📤 useReports: Exporting to PDF:', { reportType, fileName, records: data.length });
       
-      // Ensure we have data to export
       if (!data || data.length === 0) {
-        console.warn('No data to export');
-        throw new Error('No hay datos para exportar');
+        toast({
+          title: "Sin datos",
+          description: "No hay datos para exportar",
+          variant: "destructive"
+        });
+        return;
       }
       
-      // Use PDFExportService for actual export
+      // Usar PDFExportService para exportación real
       const { PDFExportService } = await import('@/services/PDFExportService');
       
-      // Generate proper filename with timestamp
       const timestamp = new Date().toISOString().split('T')[0];
       const finalFileName = `${fileName}_${timestamp}`;
       
@@ -248,22 +245,34 @@ export const useReports = () => {
           ]);
       }
 
+      // Registrar en historial
       const newExport: ExportHistory = {
         id: Date.now().toString(),
         reportType,
         fileName: `${finalFileName}.pdf`,
         format: 'pdf',
-        generatedBy: 'admin@empresa.com',
+        generatedBy: 'usuario@empresa.com',
         generatedAt: new Date().toISOString(),
         parameters: filters
       };
       setExportHistory(prev => [newExport, ...prev]);
+
+      toast({
+        title: "Exportación exitosa",
+        description: `Archivo ${finalFileName}.pdf descargado`,
+      });
+
     } catch (error) {
-      console.error('Error exporting to PDF:', error);
-      throw error;
+      console.error('❌ useReports: Error exporting to PDF:', error);
+      toast({
+        title: "Error de exportación",
+        description: "No se pudo exportar el archivo PDF",
+        variant: "destructive"
+      });
     }
   };
 
+  // GUARDAR FILTRO
   const saveFilter = async (name: string, reportType: string) => {
     const newFilter: SavedFilter = {
       id: Date.now().toString(),
@@ -274,11 +283,22 @@ export const useReports = () => {
       createdAt: new Date().toISOString()
     };
     setSavedFilters(prev => [...prev, newFilter]);
+    
+    toast({
+      title: "Filtro guardado",
+      description: `El filtro "${name}" ha sido guardado exitosamente`,
+    });
   };
 
+  // APLICAR FILTRO
   const applyFilter = (filter: SavedFilter) => {
     setFilters(filter.filters);
     setActiveReportType(filter.reportType);
+    
+    toast({
+      title: "Filtro aplicado",
+      description: `Se ha aplicado el filtro "${filter.name}"`,
+    });
   };
 
   return {

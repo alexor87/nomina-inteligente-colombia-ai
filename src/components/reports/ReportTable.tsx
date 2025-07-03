@@ -38,7 +38,8 @@ export const ReportTable: React.FC<ReportTableProps> = ({
     getLaborCostReport,
     getSocialSecurityReport,
     getNoveltyHistoryReport,
-    getAccountingExports
+    getAccountingExports,
+    getIncomeRetentionCertificates
   } = useReports();
 
   const pagination = usePagination(data, {
@@ -52,93 +53,86 @@ export const ReportTable: React.FC<ReportTableProps> = ({
   }, [reportType, filters]);
 
   const loadReportData = async () => {
+    console.log('🔄 ReportTable: Loading real data for:', reportType);
     setIsLoading(true);
     setError(null);
     
     try {
       let reportData = [];
       
+      // CARGAR DATOS REALES SEGÚN EL TIPO DE REPORTE
       switch (reportType) {
         case 'payroll-summary':
         case 'cost-centers':
+        case 'employee-detail':
+        case 'employee-detail-hr':
+          console.log('📊 Loading payroll summary data...');
           reportData = await getPayrollSummaryReport(filters);
           break;
+          
         case 'labor-costs':
+          console.log('📊 Loading labor costs data...');
           reportData = await getLaborCostReport(filters);
           break;
+          
         case 'social-security':
         case 'ugpp-social-security':
+          console.log('📊 Loading social security data...');
           reportData = await getSocialSecurityReport(filters);
           break;
+          
         case 'novelty-report':
         case 'hr-novelties':
         case 'ugpp-novelties':
+          console.log('📊 Loading novelty history data...');
           reportData = await getNoveltyHistoryReport(filters);
           break;
-        case 'employee-detail':
-        case 'employee-detail-hr':
-          reportData = await getPayrollSummaryReport(filters);
-          break;
+          
         case 'accounting-provisions':
+          console.log('📊 Loading accounting exports data...');
           reportData = await getAccountingExports(filters);
           break;
+
+        case 'contracts':
+        case 'ugpp-contracts':
+          console.log('📊 Loading contracts data from employees...');
+          // Usar datos de empleados para contratos
+          reportData = await getEmployeeContractsData();
+          break;
+          
+        case 'absences':
+        case 'hr-absences':
+          console.log('📊 Loading absences data from novelties...');
+          // Filtrar novedades por tipos de ausencias
+          const absenceFilters = {
+            ...filters,
+            noveltyTypes: ['incapacidad', 'licencia', 'vacaciones']
+          };
+          reportData = await getNoveltyHistoryReport(absenceFilters);
+          break;
+          
         default:
-          // Generate mock data for other report types
-          reportData = generateMockData(reportType);
+          console.warn('⚠️ Unknown report type:', reportType);
+          reportData = [];
       }
       
+      console.log('✅ ReportTable: Data loaded successfully:', reportData.length, 'records');
       setData(reportData);
+      
     } catch (err) {
-      console.error('Error loading report data:', err);
+      console.error('❌ ReportTable: Error loading report data:', err);
       setError('Error al cargar los datos del reporte');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const generateMockData = (type: string) => {
-    // Generate appropriate mock data based on report type
-    const mockData = [];
-    const employees = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Rodríguez', 'Luis Martínez'];
-    
-    for (let i = 0; i < 20; i++) {
-      switch (type) {
-        case 'contracts':
-        case 'ugpp-contracts':
-          mockData.push({
-            employeeId: `EMP-${i + 1}`,
-            employeeName: employees[i % employees.length],
-            contractType: ['indefinido', 'termino_fijo', 'obra_labor'][i % 3],
-            startDate: `2024-${(i % 12) + 1}-01`,
-            status: ['activo', 'inactivo'][i % 2],
-            salary: 1500000 + (i * 100000)
-          });
-          break;
-          
-        case 'absences':
-        case 'hr-absences':
-          mockData.push({
-            employeeId: `EMP-${i + 1}`,
-            employeeName: employees[i % employees.length],
-            absenceType: ['licencia', 'incapacidad', 'vacaciones'][i % 3],
-            startDate: `2024-01-${(i % 28) + 1}`,
-            endDate: `2024-01-${(i % 28) + 5}`,
-            days: (i % 10) + 1,
-            status: 'aprobada'
-          });
-          break;
-          
-        default:
-          mockData.push({
-            id: i + 1,
-            name: `Registro ${i + 1}`,
-            value: Math.random() * 1000000,
-            date: `2024-01-${(i % 28) + 1}`
-          });
-      }
-    }
-    
-    return mockData;
+  // Función auxiliar para datos de contratos desde empleados
+  const getEmployeeContractsData = async () => {
+    // Esto sería implementado usando ReportsDBService en una versión futura
+    // Por ahora retornamos array vacío para evitar errores
+    console.log('📝 Contract data would be loaded from employees table');
+    return [];
   };
 
   const getReportTitle = () => {
@@ -172,9 +166,9 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           <TableRow>
             <TableHead>Empleado</TableHead>
             <TableHead>Período</TableHead>
-            <TableHead>Total Devengado</TableHead>
-            <TableHead>Total Deducciones</TableHead>
-            <TableHead>Neto Pagado</TableHead>
+            <TableHead className="text-right">Total Devengado</TableHead>
+            <TableHead className="text-right">Total Deducciones</TableHead>
+            <TableHead className="text-right">Neto Pagado</TableHead>
             <TableHead>Centro de Costo</TableHead>
           </TableRow>
         );
@@ -183,11 +177,11 @@ export const ReportTable: React.FC<ReportTableProps> = ({
         return (
           <TableRow>
             <TableHead>Empleado</TableHead>
-            <TableHead>Salario Base</TableHead>
-            <TableHead>Beneficios</TableHead>
-            <TableHead>Horas Extra</TableHead>
-            <TableHead>Aportes Patronales</TableHead>
-            <TableHead>Costo Total</TableHead>
+            <TableHead className="text-right">Salario Base</TableHead>
+            <TableHead className="text-right">Beneficios</TableHead>
+            <TableHead className="text-right">Horas Extra</TableHead>
+            <TableHead className="text-right">Aportes Patronales</TableHead>
+            <TableHead className="text-right">Costo Total</TableHead>
           </TableRow>
         );
         
@@ -196,36 +190,28 @@ export const ReportTable: React.FC<ReportTableProps> = ({
         return (
           <TableRow>
             <TableHead>Empleado</TableHead>
-            <TableHead>Salud Empleado</TableHead>
-            <TableHead>Salud Empleador</TableHead>
-            <TableHead>Pensión Empleado</TableHead>
-            <TableHead>Pensión Empleador</TableHead>
-            <TableHead>ARL</TableHead>
-            <TableHead>Total</TableHead>
+            <TableHead className="text-right">Salud Empleado</TableHead>
+            <TableHead className="text-right">Salud Empleador</TableHead>
+            <TableHead className="text-right">Pensión Empleado</TableHead>
+            <TableHead className="text-right">Pensión Empleador</TableHead>
+            <TableHead className="text-right">ARL</TableHead>
+            <TableHead className="text-right">Total</TableHead>
           </TableRow>
         );
-        
-      case 'contracts':
-      case 'ugpp-contracts':
-        return (
-          <TableRow>
-            <TableHead>Empleado</TableHead>
-            <TableHead>Tipo Contrato</TableHead>
-            <TableHead>Fecha Inicio</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Salario</TableHead>
-          </TableRow>
-        );
-        
+
+      case 'novelty-report':
+      case 'hr-novelties':
+      case 'ugpp-novelties':
       case 'absences':
       case 'hr-absences':
         return (
           <TableRow>
             <TableHead>Empleado</TableHead>
-            <TableHead>Tipo Ausencia</TableHead>
-            <TableHead>Fecha Inicio</TableHead>
-            <TableHead>Fecha Fin</TableHead>
-            <TableHead>Días</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Descripción</TableHead>
+            <TableHead className="text-right">Monto</TableHead>
+            <TableHead className="text-right">Horas</TableHead>
+            <TableHead>Fecha</TableHead>
             <TableHead>Estado</TableHead>
           </TableRow>
         );
@@ -235,7 +221,7 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           <TableRow>
             <TableHead>ID</TableHead>
             <TableHead>Descripción</TableHead>
-            <TableHead>Valor</TableHead>
+            <TableHead className="text-right">Valor</TableHead>
             <TableHead>Fecha</TableHead>
           </TableRow>
         );
@@ -253,11 +239,13 @@ export const ReportTable: React.FC<ReportTableProps> = ({
             <TableRow key={index}>
               <TableCell className="font-medium">{item.employeeName}</TableCell>
               <TableCell>{item.period}</TableCell>
-              <TableCell>{formatCurrency(item.totalEarnings)}</TableCell>
-              <TableCell>{formatCurrency(item.totalDeductions)}</TableCell>
-              <TableCell className="font-semibold">{formatCurrency(item.netPay)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.totalEarnings)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.totalDeductions)}</TableCell>
+              <TableCell className="text-right font-semibold">{formatCurrency(item.netPay)}</TableCell>
               <TableCell>
-                <Badge variant="outline">{item.costCenter}</Badge>
+                {item.costCenter && (
+                  <Badge variant="outline">{item.costCenter}</Badge>
+                )}
               </TableCell>
             </TableRow>
           );
@@ -266,11 +254,11 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           return (
             <TableRow key={index}>
               <TableCell className="font-medium">{item.employeeName}</TableCell>
-              <TableCell>{formatCurrency(item.baseSalary)}</TableCell>
-              <TableCell>{formatCurrency(item.benefits)}</TableCell>
-              <TableCell>{formatCurrency(item.overtime)}</TableCell>
-              <TableCell>{formatCurrency(item.employerContributions)}</TableCell>
-              <TableCell className="font-semibold">{formatCurrency(item.totalCost)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.baseSalary)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.benefits)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.overtime)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.employerContributions)}</TableCell>
+              <TableCell className="text-right font-semibold">{formatCurrency(item.totalCost)}</TableCell>
             </TableRow>
           );
           
@@ -279,44 +267,34 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           return (
             <TableRow key={index}>
               <TableCell className="font-medium">{item.employeeName}</TableCell>
-              <TableCell>{formatCurrency(item.healthEmployee)}</TableCell>
-              <TableCell>{formatCurrency(item.healthEmployer)}</TableCell>
-              <TableCell>{formatCurrency(item.pensionEmployee)}</TableCell>
-              <TableCell>{formatCurrency(item.pensionEmployer)}</TableCell>
-              <TableCell>{formatCurrency(item.arl)}</TableCell>
-              <TableCell className="font-semibold">{formatCurrency(item.total)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.healthEmployee)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.healthEmployer)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.pensionEmployee)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.pensionEmployer)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.arl)}</TableCell>
+              <TableCell className="text-right font-semibold">{formatCurrency(item.total)}</TableCell>
             </TableRow>
           );
-          
-        case 'contracts':
-        case 'ugpp-contracts':
-          return (
-            <TableRow key={index}>
-              <TableCell className="font-medium">{item.employeeName}</TableCell>
-              <TableCell>
-                <Badge variant="outline">{item.contractType}</Badge>
-              </TableCell>
-              <TableCell>{new Date(item.startDate).toLocaleDateString('es-ES')}</TableCell>
-              <TableCell>
-                <Badge variant={item.status === 'activo' ? 'default' : 'secondary'}>
-                  {item.status}
-                </Badge>
-              </TableCell>
-              <TableCell>{formatCurrency(item.salary)}</TableCell>
-            </TableRow>
-          );
-          
+
+        case 'novelty-report':
+        case 'hr-novelties':
+        case 'ugpp-novelties':
         case 'absences':
         case 'hr-absences':
           return (
             <TableRow key={index}>
               <TableCell className="font-medium">{item.employeeName}</TableCell>
               <TableCell>
-                <Badge variant="outline">{item.absenceType}</Badge>
+                <Badge variant="outline">{item.type}</Badge>
               </TableCell>
-              <TableCell>{new Date(item.startDate).toLocaleDateString('es-ES')}</TableCell>
-              <TableCell>{new Date(item.endDate).toLocaleDateString('es-ES')}</TableCell>
-              <TableCell>{item.days}</TableCell>
+              <TableCell>{item.description}</TableCell>
+              <TableCell className="text-right">
+                {item.amount ? formatCurrency(item.amount) : '-'}
+              </TableCell>
+              <TableCell className="text-right">
+                {item.hours ? `${item.hours}h` : '-'}
+              </TableCell>
+              <TableCell>{new Date(item.date).toLocaleDateString('es-ES')}</TableCell>
               <TableCell>
                 <Badge variant="default">{item.status}</Badge>
               </TableCell>
@@ -327,9 +305,9 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           return (
             <TableRow key={index}>
               <TableCell>{item.id}</TableCell>
-              <TableCell>{item.name}</TableCell>
-              <TableCell>{formatCurrency(item.value)}</TableCell>
-              <TableCell>{item.date}</TableCell>
+              <TableCell>{item.name || item.description || 'Sin descripción'}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.value || item.amount || 0)}</TableCell>
+              <TableCell>{item.date ? new Date(item.date).toLocaleDateString('es-ES') : '-'}</TableCell>
             </TableRow>
           );
       }
@@ -361,7 +339,7 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           </CardTitle>
           
           <div className="flex items-center space-x-2">
-            <Badge variant="outline">{data.length} registros</Badge>
+            <Badge variant="outline">{data.length} registros reales</Badge>
             <Button
               variant="outline"
               size="sm"
@@ -388,13 +366,13 @@ export const ReportTable: React.FC<ReportTableProps> = ({
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin mr-2" />
-            <span>Cargando datos del reporte...</span>
+            <span>Cargando datos reales del reporte...</span>
           </div>
         ) : data.length === 0 ? (
           <div className="text-center py-8">
             <FileText className="h-8 w-8 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hay datos disponibles</h3>
-            <p className="text-gray-600">No se encontraron registros para los filtros seleccionados.</p>
+            <p className="text-gray-600">No se encontraron registros reales para los filtros seleccionados.</p>
           </div>
         ) : (
           <div className="space-y-4">
