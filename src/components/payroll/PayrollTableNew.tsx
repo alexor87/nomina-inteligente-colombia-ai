@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -37,6 +38,7 @@ export const PayrollTableNew = ({
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
   const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<string | null>(null);
   const [companyData, setCompanyData] = useState<any>(null);
+  const checkboxRef = useRef<HTMLInputElement>(null);
 
   // Cargar datos de la empresa al montar el componente
   useEffect(() => {
@@ -102,7 +104,7 @@ export const PayrollTableNew = ({
         employee: {
           id: employee.id,
           name: employee.name,
-          cedula: employee.cedula || employee.id, // Usar cédula real
+          cedula: employee.cedula || employee.id,
           tipo_documento: employee.tipo_documento || 'CC',
           position: employee.position || 'Empleado',
           baseSalary: employee.baseSalary,
@@ -183,6 +185,13 @@ export const PayrollTableNew = ({
   const allSelected = employees.length > 0 && selectedEmployees.length === employees.length;
   const someSelected = selectedEmployees.length > 0 && selectedEmployees.length < employees.length;
 
+  // Update checkbox indeterminate state
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
   if (employees.length === 0) {
     return (
       <div className="text-center py-8">
@@ -204,11 +213,9 @@ export const PayrollTableNew = ({
               <tr>
                 <th className="px-6 py-3 text-left">
                   <Checkbox
+                    ref={checkboxRef}
                     checked={allSelected}
                     onCheckedChange={onToggleAll}
-                    ref={(input) => {
-                      if (input) input.indeterminate = someSelected;
-                    }}
                   />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -273,7 +280,8 @@ export const PayrollTableNew = ({
                     <Badge className={getStatusColor(employee.status || 'valid')}>
                       {employee.status === 'valid' ? 'Válido' : 
                        employee.status === 'warning' ? 'Advertencia' : 
-                       employee.status === 'error' ? 'Error' : 'Válido'}
+                       employee.status === 'error' ? 'Error' : 
+                       employee.status === 'incomplete' ? 'Incompleto' : 'Válido'}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
@@ -337,8 +345,10 @@ export const PayrollTableNew = ({
           setNovedadModalOpen(false);
           setSelectedEmployeeForNovedad(null);
         }}
-        onSubmit={handleCreateNovedad}
+        onCreateNovedad={handleCreateNovedad}
         employeeId={selectedEmployeeForNovedad || ''}
+        employeeName={employees.find(emp => emp.id === selectedEmployeeForNovedad)?.name || ''}
+        employeeSalary={employees.find(emp => emp.id === selectedEmployeeForNovedad)?.baseSalary || 0}
         periodId={periodId}
       />
     </div>
