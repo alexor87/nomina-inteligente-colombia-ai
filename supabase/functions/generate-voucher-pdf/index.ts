@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🚀 INICIANDO GENERACIÓN PDF PROFESIONAL');
+    console.log('🚀 INICIANDO GENERACIÓN PDF DEFINITIVA');
     
     const requestBody = await req.json();
     console.log('📋 Datos recibidos:', JSON.stringify(requestBody, null, 2));
@@ -32,31 +32,46 @@ serve(async (req) => {
       );
     }
 
-    // Generar PDF profesional
-    const pdfBuffer = await generateProfessionalPDF(employee, period);
+    // Generar PDF usando solo pdf-lib (compatible con Deno)
+    const pdfBuffer = await generateDenoPDF(employee, period);
 
-    console.log('✅ PDF PROFESIONAL GENERADO - TAMAÑO:', pdfBuffer.byteLength, 'bytes');
+    console.log('✅ PDF GENERADO EXITOSAMENTE - TAMAÑO:', pdfBuffer.length, 'bytes');
 
-    // CRÍTICO: Respuesta binaria correcta para PDFs
+    // Verificar que el PDF es válido
+    if (pdfBuffer.length < 100) {
+      throw new Error('PDF generado está vacío o corrupto');
+    }
+
+    // Verificar header PDF
+    const pdfHeader = String.fromCharCode(...pdfBuffer.slice(0, 4));
+    if (pdfHeader !== '%PDF') {
+      throw new Error('Buffer generado no es un PDF válido');
+    }
+
+    console.log('✅ PDF VALIDADO CORRECTAMENTE');
+
+    // Respuesta binaria optimizada para PDFs
     return new Response(pdfBuffer, {
       status: 200,
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/pdf',
-        'Content-Length': pdfBuffer.byteLength.toString(),
+        'Content-Length': pdfBuffer.length.toString(),
         'Content-Disposition': `attachment; filename="comprobante-${employee.name.replace(/\s+/g, '-')}.pdf"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
-        'Expires': '0'
+        'Expires': '0',
+        'Accept-Ranges': 'bytes'
       }
     });
 
   } catch (error) {
-    console.error('💥 ERROR CRÍTICO:', error);
+    console.error('💥 ERROR CRÍTICO EN PDF:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Error interno del servidor',
-        stack: error.stack
+        details: error.stack,
+        timestamp: new Date().toISOString()
       }),
       { 
         status: 500,
@@ -66,468 +81,287 @@ serve(async (req) => {
   }
 });
 
-async function generateProfessionalPDF(employee: any, period: any): Promise<ArrayBuffer> {
-  console.log('📄 Generando PDF profesional con Puppeteer...');
+async function generateDenoPDF(employee: any, period: any): Promise<Uint8Array> {
+  console.log('📄 Generando PDF con pdf-lib compatible con Deno...');
   
   try {
-    // Crear HTML profesional para el comprobante
-    const htmlContent = generateProfessionalHTML(employee, period);
-    
-    // Usar Puppeteer para generar PDF desde HTML
-    const puppeteer = await import('https://deno.land/x/puppeteer@16.2.0/mod.ts');
-    
-    console.log('🔄 Iniciando navegador...');
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu'
-      ]
-    });
-    
-    const page = await browser.newPage();
-    
-    // Configurar página para PDF
-    await page.setContent(htmlContent, {
-      waitUntil: 'networkidle0'
-    });
-    
-    console.log('📊 Generando PDF...');
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '20mm',
-        right: '15mm',
-        bottom: '20mm',
-        left: '15mm'
-      }
-    });
-    
-    await browser.close();
-    console.log('✅ PDF generado exitosamente');
-    
-    return pdfBuffer;
-    
-  } catch (error) {
-    console.error('❌ Error generando PDF profesional:', error);
-    
-    // FALLBACK: Usar método simple si Puppeteer falla
-    console.log('🔄 Usando fallback simple...');
-    return await generateSimplePDFFallback(employee, period);
-  }
-}
-
-function generateProfessionalHTML(employee: any, period: any): string {
-  // Datos seguros
-  const nombre = String(employee.name || 'Empleado');
-  const salarioNeto = Number(employee.netPay) || 0;
-  const salarioBase = Number(employee.baseSalary) || 0;
-  const diasTrabajados = Number(employee.workedDays) || 30;
-  const deducciones = Number(employee.deductions) || 0;
-  const bonificaciones = Number(employee.bonuses) || 0;
-  const auxilioTransporte = Number(employee.transportAllowance) || 0;
-  
-  // Formatear números
-  const formatCurrency = (valor: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(valor);
-  };
-  
-  // Formatear fechas
-  const formatDate = (fecha: string) => {
-    try {
-      return new Date(fecha).toLocaleDateString('es-CO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-    } catch {
-      return fecha;
-    }
-  };
-
-  return `
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comprobante de Nómina</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Arial', sans-serif;
-            line-height: 1.4;
-            color: #333;
-            background: white;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #2563eb;
-            padding-bottom: 20px;
-        }
-        
-        .title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2563eb;
-            margin-bottom: 10px;
-        }
-        
-        .company-info {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .info-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 15px;
-            background: #f8fafc;
-        }
-        
-        .info-card h3 {
-            font-size: 12px;
-            color: #6b7280;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-        
-        .info-card p {
-            font-size: 14px;
-            color: #111827;
-            font-weight: 500;
-        }
-        
-        .info-card .small {
-            font-size: 12px;
-            color: #6b7280;
-            margin-top: 4px;
-        }
-        
-        .section {
-            margin-bottom: 25px;
-        }
-        
-        .section-title {
-            font-size: 16px;
-            font-weight: bold;
-            color: #2563eb;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 5px;
-        }
-        
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
-        }
-        
-        .table th,
-        .table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        
-        .table th {
-            background: #f1f5f9;
-            font-weight: 600;
-            color: #374151;
-            font-size: 12px;
-            text-transform: uppercase;
-        }
-        
-        .table td {
-            font-size: 14px;
-        }
-        
-        .table .amount {
-            text-align: right;
-            font-weight: 500;
-        }
-        
-        .total-row {
-            background: #eff6ff !important;
-            font-weight: bold;
-        }
-        
-        .total-row td {
-            color: #2563eb;
-            font-size: 16px;
-        }
-        
-        .footer {
-            margin-top: 40px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
-        }
-        
-        .signature {
-            text-align: center;
-            padding: 20px 0;
-        }
-        
-        .signature-line {
-            border-top: 1px solid #374151;
-            margin-bottom: 10px;
-            padding-top: 10px;
-        }
-        
-        .signature p {
-            font-size: 12px;
-            color: #6b7280;
-            margin-bottom: 5px;
-        }
-        
-        .signature .name {
-            font-size: 14px;
-            color: #111827;
-            font-weight: 600;
-        }
-        
-        .footer-info {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            font-size: 11px;
-            color: #6b7280;
-        }
-        
-        .footer-info .brand {
-            color: #2563eb;
-            font-weight: 600;
-        }
-        
-        @media print {
-            body { -webkit-print-color-adjust: exact; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1 class="title">Comprobante de Nómina</h1>
-        </div>
-
-        <!-- Company and Employee Info -->
-        <div class="company-info">
-            <div class="info-card">
-                <h3>Empresa</h3>
-                <p>Mi Empresa</p>
-                <p class="small">NIT: N/A</p>
-            </div>
-            
-            <div class="info-card">
-                <h3>Empleado</h3>
-                <p>${nombre}</p>
-                <p class="small">CC: ${employee.id?.slice(0, 8) || 'N/A'}</p>
-            </div>
-            
-            <div class="info-card">
-                <h3>Período de Pago</h3>
-                <p>${formatDate(period.startDate)} - ${formatDate(period.endDate)}</p>
-                <p class="small">Días trabajados: ${diasTrabajados}</p>
-            </div>
-        </div>
-
-        <!-- Payment Summary -->
-        <div class="section">
-            <h2 class="section-title">💵 Resumen del Pago</h2>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Concepto</th>
-                        <th>Valor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Salario Base</td>
-                        <td class="amount">${formatCurrency(salarioBase)}</td>
-                    </tr>
-                    ${auxilioTransporte > 0 ? `
-                    <tr>
-                        <td>Subsidio de Transporte</td>
-                        <td class="amount">${formatCurrency(auxilioTransporte)}</td>
-                    </tr>
-                    ` : ''}
-                    ${bonificaciones > 0 ? `
-                    <tr>
-                        <td>Bonificaciones</td>
-                        <td class="amount">${formatCurrency(bonificaciones)}</td>
-                    </tr>
-                    ` : ''}
-                    ${deducciones > 0 ? `
-                    <tr>
-                        <td style="color: #dc2626;">Deducciones</td>
-                        <td class="amount" style="color: #dc2626;">-${formatCurrency(deducciones)}</td>
-                    </tr>
-                    ` : ''}
-                    <tr class="total-row">
-                        <td><strong>Total Neto a Pagar</strong></td>
-                        <td class="amount"><strong>${formatCurrency(salarioNeto)}</strong></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Signatures -->
-        <div class="footer">
-            <div class="signature">
-                <div class="signature-line"></div>
-                <p>Firma del Empleado</p>
-                <p class="name">${nombre}</p>
-                <p>CC: ${employee.id?.slice(0, 8) || 'N/A'}</p>
-            </div>
-            <div class="signature">
-                <div class="signature-line"></div>
-                <p>Firma del Representante Legal</p>
-                <p class="name">Mi Empresa</p>
-                <p>NIT: N/A</p>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer-info">
-            <p>Este documento fue generado con <span class="brand">Finppi</span> – Software de Nómina y Seguridad Social</p>
-            <p><a href="https://www.finppi.com" style="color: #2563eb;">www.finppi.com</a></p>
-            <p>Generado el ${new Date().toLocaleString('es-CO')}</p>
-        </div>
-    </div>
-</body>
-</html>
-  `;
-}
-
-async function generateSimplePDFFallback(employee: any, period: any): Promise<Uint8Array> {
-  console.log('📄 Generando PDF simple como fallback...');
-  
-  try {
-    // Importar pdf-lib como fallback
-    const { PDFDocument, StandardFonts } = await import('https://esm.sh/pdf-lib@1.17.1');
+    // Importar pdf-lib de forma segura
+    const { PDFDocument, StandardFonts, rgb } = await import('https://esm.sh/pdf-lib@1.17.1');
     
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]); // A4
+    const page = pdfDoc.addPage([595, 842]); // A4 en points
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
-    const nombre = String(employee.name || 'Empleado');
+    // Extraer y limpiar datos
+    const nombre = String(employee.name || 'Empleado').substring(0, 50);
+    const salarioBase = Number(employee.baseSalary) || 0;
     const salarioNeto = Number(employee.netPay) || 0;
-    const fechaInicio = period.startDate || '';
-    const fechaFin = period.endDate || '';
+    const diasTrabajados = Number(employee.workedDays) || 30;
+    const deducciones = Number(employee.deductions) || 0;
+    const bonificaciones = Number(employee.bonuses) || 0;
+    const auxilioTransporte = Number(employee.transportAllowance) || 0;
+    const horasExtra = Number(employee.extraHours) || 0;
     
-    const formatCurrency = (valor: number) => {
-      return '$' + Math.round(valor).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    console.log('📊 Datos procesados:', { nombre, salarioBase, salarioNeto, diasTrabajados });
+    
+    // Función para formatear moneda (sin Intl para compatibilidad Deno)
+    const formatCurrency = (valor: number): string => {
+      const rounded = Math.round(valor);
+      const formatted = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return `$${formatted}`;
     };
     
-    const formatDate = (fecha: string) => {
+    // Función para formatear fechas (sin toLocaleDateString)
+    const formatDate = (fecha: string): string => {
       try {
         const date = new Date(fecha);
-        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+        const day = date.getUTCDate().toString().padStart(2, '0');
+        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+        const year = date.getUTCFullYear();
+        return `${day}/${month}/${year}`;
       } catch {
-        return fecha;
+        return fecha.substring(0, 10);
       }
     };
-
-    let yPos = 750;
     
-    // Título
-    page.drawText('COMPROBANTE DE NOMINA', {
-      x: 50,
+    const fechaInicio = formatDate(period.startDate);
+    const fechaFin = formatDate(period.endDate);
+    const fechaGeneracion = formatDate(new Date().toISOString());
+    
+    // Colores
+    const azulTitulo = rgb(0.15, 0.4, 0.8);
+    const grisTexto = rgb(0.3, 0.3, 0.3);
+    const azulFondo = rgb(0.95, 0.97, 1);
+    
+    let yPos = 750;
+    const margenIzq = 50;
+    const margenDer = 545;
+    
+    // TÍTULO PRINCIPAL
+    page.drawText('COMPROBANTE DE NÓMINA', {
+      x: margenIzq,
       y: yPos,
-      size: 18,
+      size: 20,
+      font: boldFont,
+      color: azulTitulo,
+    });
+    
+    yPos -= 50;
+    
+    // INFORMACIÓN DE LA EMPRESA Y EMPLEADO
+    page.drawRectangle({
+      x: margenIzq - 10,
+      y: yPos - 30,
+      width: 510,
+      height: 80,
+      color: azulFondo,
+    });
+    
+    // Empresa
+    page.drawText('EMPRESA:', {
+      x: margenIzq,
+      y: yPos,
+      size: 10,
+      font: boldFont,
+      color: grisTexto,
+    });
+    
+    page.drawText('Mi Empresa', {
+      x: margenIzq,
+      y: yPos - 15,
+      size: 12,
+      font: font,
+    });
+    
+    page.drawText('NIT: N/A', {
+      x: margenIzq,
+      y: yPos - 30,
+      size: 10,
+      font: font,
+      color: grisTexto,
+    });
+    
+    // Empleado
+    page.drawText('EMPLEADO:', {
+      x: 300,
+      y: yPos,
+      size: 10,
+      font: boldFont,
+      color: grisTexto,
+    });
+    
+    page.drawText(nombre, {
+      x: 300,
+      y: yPos - 15,
+      size: 12,
+      font: font,
+    });
+    
+    page.drawText(`CC: ${employee.id?.slice(0, 8) || 'N/A'}`, {
+      x: 300,
+      y: yPos - 30,
+      size: 10,
+      font: font,
+      color: grisTexto,
+    });
+    
+    yPos -= 100;
+    
+    // PERÍODO
+    page.drawText('PERÍODO DE PAGO:', {
+      x: margenIzq,
+      y: yPos,
+      size: 12,
+      font: boldFont,
+      color: azulTitulo,
+    });
+    
+    page.drawText(`${fechaInicio} - ${fechaFin}`, {
+      x: margenIzq,
+      y: yPos - 20,
+      size: 11,
+      font: font,
+    });
+    
+    page.drawText(`Días trabajados: ${diasTrabajados}`, {
+      x: 300,
+      y: yPos - 20,
+      size: 11,
       font: font,
     });
     
     yPos -= 60;
     
-    // Empleado
-    page.drawText(`Empleado: ${nombre}`, {
-      x: 50,
+    // RESUMEN DE PAGO
+    page.drawText('RESUMEN DEL PAGO', {
+      x: margenIzq,
       y: yPos,
-      size: 12,
-      font: font,
+      size: 14,
+      font: boldFont,
+      color: azulTitulo,
     });
     
     yPos -= 30;
     
-    // Período
-    page.drawText(`Periodo: ${formatDate(fechaInicio)} - ${formatDate(fechaFin)}`, {
-      x: 50,
-      y: yPos,
-      size: 12,
-      font: font,
-    });
+    // Tabla de conceptos
+    const conceptos = [
+      ['Salario Base', formatCurrency(salarioBase)],
+      ...(auxilioTransporte > 0 ? [['Subsidio de Transporte', formatCurrency(auxilioTransporte)]] : []),
+      ...(bonificaciones > 0 ? [['Bonificaciones', formatCurrency(bonificaciones)]] : []),
+      ...(horasExtra > 0 ? [['Horas Extras', formatCurrency(horasExtra * ((salarioBase / 240) * 1.25))]] : []),
+      ...(deducciones > 0 ? [['Deducciones', `-${formatCurrency(deducciones)}`]] : []),
+    ];
     
-    yPos -= 30;
-    
-    // Salario base
-    if (employee.baseSalary) {
-      page.drawText(`Salario Base: ${formatCurrency(employee.baseSalary)}`, {
-        x: 50,
+    // Dibujar tabla
+    for (const [concepto, valor] of conceptos) {
+      page.drawText(concepto, {
+        x: margenIzq,
         y: yPos,
-        size: 12,
+        size: 10,
         font: font,
       });
-      yPos -= 30;
+      
+      page.drawText(valor, {
+        x: margenDer - valor.length * 6,
+        y: yPos,
+        size: 10,
+        font: font,
+      });
+      
+      yPos -= 20;
     }
     
-    yPos -= 20;
+    yPos -= 10;
     
-    // Total neto
-    page.drawText(`TOTAL NETO: ${formatCurrency(salarioNeto)}`, {
-      x: 50,
+    // Línea separadora
+    page.drawLine({
+      start: { x: margenIzq, y: yPos },
+      end: { x: margenDer, y: yPos },
+      thickness: 1,
+      color: grisTexto,
+    });
+    
+    yPos -= 25;
+    
+    // TOTAL NETO
+    page.drawRectangle({
+      x: margenIzq - 10,
+      y: yPos - 15,
+      width: 510,
+      height: 30,
+      color: azulFondo,
+    });
+    
+    page.drawText('TOTAL NETO A PAGAR:', {
+      x: margenIzq,
       y: yPos,
-      size: 16,
-      font: font,
+      size: 14,
+      font: boldFont,
+      color: azulTitulo,
+    });
+    
+    const totalNeto = formatCurrency(salarioNeto);
+    page.drawText(totalNeto, {
+      x: margenDer - totalNeto.length * 8,
+      y: yPos,
+      size: 14,
+      font: boldFont,
+      color: azulTitulo,
     });
     
     yPos -= 80;
     
-    // Fecha de generación
-    const ahora = new Date();
-    const fechaGeneracion = `${ahora.getDate().toString().padStart(2, '0')}/${(ahora.getMonth() + 1).toString().padStart(2, '0')}/${ahora.getFullYear()}`;
-    
-    page.drawText(`Generado: ${fechaGeneracion}`, {
-      x: 50,
+    // FIRMAS
+    page.drawText('Firma del Empleado', {
+      x: margenIzq,
       y: yPos,
       size: 10,
       font: font,
+      color: grisTexto,
     });
     
+    page.drawLine({
+      start: { x: margenIzq, y: yPos + 20 },
+      end: { x: margenIzq + 150, y: yPos + 20 },
+      thickness: 1,
+      color: grisTexto,
+    });
+    
+    page.drawText('Firma del Empleador', {
+      x: 350,
+      y: yPos,
+      size: 10,
+      font: font,
+      color: grisTexto,
+    });
+    
+    page.drawLine({
+      start: { x: 350, y: yPos + 20 },
+      end: { x: 500, y: yPos + 20 },
+      thickness: 1,
+      color: grisTexto,
+    });
+    
+    yPos -= 60;
+    
+    // PIE DE PÁGINA
+    page.drawText(`Generado el ${fechaGeneracion} con Finppi - www.finppi.com`, {
+      x: margenIzq,
+      y: yPos,
+      size: 8,
+      font: font,
+      color: grisTexto,
+    });
+    
+    // Generar PDF
     const pdfBytes = await pdfDoc.save();
-    console.log('✅ PDF fallback generado, tamaño:', pdfBytes.length);
+    console.log('✅ PDF generado exitosamente, tamaño:', pdfBytes.length);
     
     return new Uint8Array(pdfBytes);
     
   } catch (error) {
-    console.error('❌ Error en fallback:', error);
-    throw new Error('No se pudo generar el PDF: ' + error.message);
+    console.error('❌ Error en generación PDF:', error);
+    throw new Error(`Error generando PDF: ${error.message}`);
   }
 }
