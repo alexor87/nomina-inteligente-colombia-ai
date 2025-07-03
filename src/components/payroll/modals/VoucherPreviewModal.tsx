@@ -146,7 +146,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         </CustomModalTitle>
       </CustomModalHeader>
 
-      {/* Preview con el mismo diseño que el PDF */}
+      {/* Preview con el mismo diseño profesional que el PDF */}
       <div className="bg-white p-8 space-y-6" style={{ fontFamily: '"Open Sans", sans-serif' }}>
         
         {/* Título */}
@@ -154,9 +154,9 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           Comprobante de Nómina
         </h1>
 
-        {/* Cards de Información General */}
+        {/* Cards de Información General - Layout de 3 columnas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-l-4 border-l-blue-500 bg-slate-50">
             <CardContent className="pt-4">
               <h3 className="text-sm font-semibold text-gray-600 mb-2">EMPRESA</h3>
               <p className="font-semibold text-gray-900">Mi Empresa</p>
@@ -164,7 +164,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
             </CardContent>
           </Card>
           
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-l-4 border-l-blue-500 bg-slate-50">
             <CardContent className="pt-4">
               <h3 className="text-sm font-semibold text-gray-600 mb-2">EMPLEADO</h3>
               <p className="font-semibold text-gray-900">{employee.name}</p>
@@ -173,7 +173,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
             </CardContent>
           </Card>
           
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-l-4 border-l-blue-500 bg-slate-50">
             <CardContent className="pt-4">
               <h3 className="text-sm font-semibold text-gray-600 mb-2">PERÍODO DE PAGO</h3>
               <p className="font-semibold text-gray-900">{formatDate(period.startDate)} - {formatDate(period.endDate)}</p>
@@ -183,7 +183,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </Card>
         </div>
 
-        {/* Resumen del Pago */}
+        {/* Resumen del Pago - Diseño profesional con tabla estilizada */}
         <div className="space-y-3">
           <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
             💵 Resumen del Pago
@@ -234,7 +234,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </div>
         </div>
 
-        {/* Horas Extras */}
+        {/* Horas Extras - Solo si tiene horas extra */}
         {employee.extraHours > 0 && (
           <div className="space-y-3">
             <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
@@ -265,7 +265,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </div>
         )}
 
-        {/* Deducciones */}
+        {/* Deducciones - Solo si tiene deducciones */}
         {employee.deductions > 0 && (
           <div className="space-y-3">
             <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
@@ -319,7 +319,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </div>
         )}
 
-        {/* Footer con Firmas */}
+        {/* Footer con Firmas - Diseño profesional */}
         <div className="mt-12 pt-6 border-t-2 border-gray-200">
           <div className="flex justify-between items-center mb-8">
             <div className="text-center">
