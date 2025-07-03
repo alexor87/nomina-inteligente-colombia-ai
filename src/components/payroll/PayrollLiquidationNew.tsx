@@ -1,12 +1,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from '@/components/ui/button';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, Users, Plus } from 'lucide-react';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
+import { EmployeeService } from '@/services/EmployeeService';
 import { PayrollHistoryEmployee } from '@/types/payroll-history';
 import { toast } from '@/hooks/use-toast';
 
@@ -26,13 +28,33 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
+// Empty state when no employees exist in the company
+const NoEmployeesEmptyState = ({ onCreateEmployee }: { onCreateEmployee: () => void }) => {
+  return (
+    <div className="text-center py-12">
+      <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+      <h3 className="text-lg font-medium text-gray-900 mb-2">No hay empleados registrados</h3>
+      <p className="text-gray-600 mb-4">
+        Para procesar nómina necesitas tener empleados registrados en tu empresa
+      </p>
+      <Button onClick={onCreateEmployee} className="bg-blue-600 hover:bg-blue-700">
+        <Plus className="h-4 w-4 mr-2" />
+        Crear Empleado
+      </Button>
+    </div>
+  );
+};
+
 export const PayrollLiquidationNew = ({ 
   periodId, 
   onCalculationComplete, 
   onEmployeeSelect 
 }: PayrollLiquidationNewProps) => {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState<PayrollHistoryEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCheckingEmployees, setIsCheckingEmployees] = useState(false);
+  const [hasCompanyEmployees, setHasCompanyEmployees] = useState<boolean | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +63,25 @@ export const PayrollLiquidationNew = ({
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
   };
+
+  // Verificar si hay empleados en la empresa
+  const checkCompanyEmployees = useCallback(async () => {
+    if (hasCompanyEmployees !== null) return; // Ya verificado
+    
+    setIsCheckingEmployees(true);
+    try {
+      console.log('🔍 Checking if company has employees...');
+      const allEmployees = await EmployeeService.getAllEmployees();
+      const hasEmployees = allEmployees && allEmployees.length > 0;
+      setHasCompanyEmployees(hasEmployees);
+      console.log(`✅ Company has employees: ${hasEmployees} (${allEmployees?.length || 0} employees)`);
+    } catch (error) {
+      console.error('❌ Error checking company employees:', error);
+      setHasCompanyEmployees(true); // Assume has employees to avoid blocking UX
+    } finally {
+      setIsCheckingEmployees(false);
+    }
+  }, [hasCompanyEmployees]);
 
   const loadEmployees = useCallback(async () => {
     // Validar periodId antes de hacer la consulta
@@ -79,13 +120,27 @@ export const PayrollLiquidationNew = ({
     }
   }, [periodId]);
 
+  // Verificar empleados de la empresa al montar el componente
   useEffect(() => {
-    loadEmployees();
-  }, [loadEmployees]);
+    checkCompanyEmployees();
+  }, [checkCompanyEmployees]);
+
+  // Cargar empleados del período después de verificar que hay empleados en la empresa
+  useEffect(() => {
+    if (hasCompanyEmployees === true) {
+      loadEmployees();
+    } else if (hasCompanyEmployees === false) {
+      setIsLoading(false);
+    }
+  }, [hasCompanyEmployees, loadEmployees]);
 
   const handleEmployeeSelect = (employeeId: string) => {
     setSelectedEmployeeId(employeeId);
     onEmployeeSelect?.(employeeId);
+  };
+
+  const handleCreateEmployee = () => {
+    navigate('/app/employees/create');
   };
 
   const handleRecalculateEmployee = useCallback(async (employeeId: string) => {
@@ -113,6 +168,44 @@ export const PayrollLiquidationNew = ({
       });
     }
   }, [loadEmployees, onCalculationComplete, periodId]);
+
+  // Mostrar loading inicial
+  if (isCheckingEmployees || (isLoading && hasCompanyEmployees === null)) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Liquidación de Nómina</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-[250px]" />
+                  <Skeleton className="h-4 w-[200px]" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Si no hay empleados en la empresa, mostrar estado vacío para crear empleados
+  if (hasCompanyEmployees === false) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Liquidación de Nómina</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <NoEmployeesEmptyState onCreateEmployee={handleCreateEmployee} />
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Si hay error, mostrar mensaje de error
   if (error && !isLoading) {
@@ -162,7 +255,7 @@ export const PayrollLiquidationNew = ({
             <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">No hay empleados en este período</p>
             <p className="text-sm text-gray-500 mt-2">
-              Asegúrate de que hay empleados activos en la empresa
+              Los empleados pueden no estar asignados a este período específico
             </p>
           </div>
         ) : (
