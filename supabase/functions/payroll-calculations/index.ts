@@ -15,7 +15,7 @@ interface PayrollCalculationInput {
   bonuses: number;
   absences: number;
   periodType: 'quincenal' | 'mensual' | 'semanal';
-  periodDate?: string; // Nueva propiedad para jornada legal dinámica
+  periodDate?: string;
 }
 
 interface PayrollConfiguration {
@@ -215,41 +215,53 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const jornadaLegal = getJornadaLegal(periodDate);
   const hourlyDivisor = getHourlyDivisor(periodDate);
   
-  // ✅ CORRECCIÓN ALELUYA: Usar siempre divisor 30 y luego proporcional por días
-  console.log(`🔧 CÁLCULO ALELUYA EDGE - Período: ${input.periodType}, Días: ${input.workedDays}`);
+  console.log(`🔧 EDGE FUNCTION ALELUYA - Período: ${input.periodType}, Días: ${input.workedDays}`);
   
-  // Cálculo del salario base proporcional COMO ALELUYA: (salario / 30) × días
+  // ✅ CORRECCIÓN ALELUYA: Cálculo proporcional exacto
   const dailySalary = input.baseSalary / 30; // Siempre usar 30 como Aleluya
   const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
-  const regularPay = dailySalary * effectiveWorkedDays;
+  const regularPay = Math.round(dailySalary * effectiveWorkedDays);
 
   // Usar divisor horario dinámico basado en jornada legal
   const hourlyRate = input.baseSalary / hourlyDivisor;
-  const extraPay = input.extraHours * hourlyRate * 1.25;
+  const extraPay = Math.round(input.extraHours * hourlyRate * 1.25);
 
   // ✅ CORRECCIÓN ALELUYA: Auxilio de transporte proporcional
   let transportAllowance = 0;
   if (input.baseSalary <= (config.salarioMinimo * 2)) {
-    // COMO ALELUYA: (auxilio_mensual / 30) × días_trabajados
     const dailyTransportAllowance = config.auxilioTransporte / 30;
     transportAllowance = Math.round(dailyTransportAllowance * input.workedDays);
   }
 
-  const payrollBase = regularPay + extraPay + input.bonuses;
+  // Total devengado
+  const grossPay = regularPay + extraPay + input.bonuses + transportAllowance;
 
-  const healthDeduction = payrollBase * config.porcentajes.saludEmpleado;
-  const pensionDeduction = payrollBase * config.porcentajes.pensionEmpleado;
+  // ✅ CORRECCIÓN ALELUYA: Deducciones solo sobre salario proporcional (sin auxilio)
+  const payrollBase = regularPay + extraPay + input.bonuses; // Sin auxilio de transporte
+  const healthDeduction = Math.round(payrollBase * config.porcentajes.saludEmpleado);
+  const pensionDeduction = Math.round(payrollBase * config.porcentajes.pensionEmpleado);
   const totalDeductions = healthDeduction + pensionDeduction;
 
-  const grossPay = payrollBase + transportAllowance;
   const netPay = grossPay - totalDeductions;
 
-  const employerHealth = payrollBase * config.porcentajes.saludEmpleador;
-  const employerPension = payrollBase * config.porcentajes.pensionEmpleador;
-  const employerArl = payrollBase * config.porcentajes.arl;
-  const employerCaja = payrollBase * config.porcentajes.cajaCompensacion;
-  const employerIcbf = payrollBase * config.porcentajes.icbf;
-  const employerSena = payrollBase * config.porcentajes.sena;
+  console.log(`💰 EDGE FUNCTION ALELUYA - Resultado:`, {
+    regularPay,
+    transportAllowance,
+    grossPay,
+    payrollBase,
+    healthDeduction,
+    pensionDeduction,
+    totalDeductions,
+    netPay
+  });
+
+  // Aportes del empleador (sobre base sin auxilio)
+  const employerHealth = Math.round(payrollBase * config.porcentajes.saludEmpleador);
+  const employerPension = Math.round(payrollBase * config.porcentajes.pensionEmpleador);
+  const employerArl = Math.round(payrollBase * config.porcentajes.arl);
+  const employerCaja = Math.round(payrollBase * config.porcentajes.cajaCompensacion);
+  const employerIcbf = Math.round(payrollBase * config.porcentajes.icbf);
+  const employerSena = Math.round(payrollBase * config.porcentajes.sena);
 
   const employerContributions = employerHealth + employerPension + employerArl + 
                                 employerCaja + employerIcbf + employerSena;
@@ -257,22 +269,22 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const totalPayrollCost = netPay + employerContributions;
 
   return {
-    regularPay: Math.round(regularPay),
-    extraPay: Math.round(extraPay),
-    transportAllowance: Math.round(transportAllowance),
-    grossPay: Math.round(grossPay),
-    healthDeduction: Math.round(healthDeduction),
-    pensionDeduction: Math.round(pensionDeduction),
-    totalDeductions: Math.round(totalDeductions),
-    netPay: Math.round(netPay),
-    employerHealth: Math.round(employerHealth),
-    employerPension: Math.round(employerPension),
-    employerArl: Math.round(employerArl),
-    employerCaja: Math.round(employerCaja),
-    employerIcbf: Math.round(employerIcbf),
-    employerSena: Math.round(employerSena),
-    employerContributions: Math.round(employerContributions),
-    totalPayrollCost: Math.round(totalPayrollCost),
+    regularPay,
+    extraPay,
+    transportAllowance,
+    grossPay,
+    healthDeduction,
+    pensionDeduction,
+    totalDeductions,
+    netPay,
+    employerHealth,
+    employerPension,
+    employerArl,
+    employerCaja,
+    employerIcbf,
+    employerSena,
+    employerContributions,
+    totalPayrollCost,
     // Información adicional sobre jornada legal
     jornadaInfo: {
       horasSemanales: jornadaLegal.horasSemanales,

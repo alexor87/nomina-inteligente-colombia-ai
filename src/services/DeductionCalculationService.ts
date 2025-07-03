@@ -1,6 +1,8 @@
+
 /**
  * Servicio de cálculo de deducciones según normativa colombiana
  * Incluye cálculo correcto de IBC, retención en la fuente y novedades
+ * CORREGIDO PARA IGUALAR ALELUYA: IBC sin auxilio de transporte
  */
 
 import { ConfigurationService } from './ConfigurationService';
@@ -125,18 +127,35 @@ export class DeductionCalculationService {
   static async calculateDeductions(input: DeductionInput): Promise<DeductionResult> {
     const config = ConfigurationService.getConfiguration('2025');
     
-    // 1. Calcular IBC (Ingreso Base de Cotización)
-    // NOTE: IBC calculation is independent of period type
-    const baseIbc = input.totalDevengado; // No incluir auxilio de transporte para IBC
+    console.log('🔧 CORRECCIÓN ALELUYA - Cálculo de deducciones:', {
+      totalDevengado: input.totalDevengado,
+      auxilioTransporte: input.auxilioTransporte,
+      periodType: input.periodType
+    });
+    
+    // ✅ CORRECCIÓN CRÍTICA ALELUYA: IBC sin auxilio de transporte
+    const baseIbc = input.totalDevengado - input.auxilioTransporte; // Solo el salario proporcional
     const topeIbc = config.salarioMinimo * 25; // Tope de 25 SMMLV
     const ibcFinal = Math.min(baseIbc, topeIbc);
+    
+    console.log('💰 IBC corregido (sin auxilio):', {
+      baseIbc,
+      ibcFinal,
+      auxilioDescontado: input.auxilioTransporte
+    });
 
-    // 2. Calcular deducciones obligatorias
+    // 2. Calcular deducciones obligatorias sobre IBC correcto
     const saludEmpleado = Math.round(ibcFinal * config.porcentajes.saludEmpleado);
     const pensionEmpleado = Math.round(ibcFinal * config.porcentajes.pensionEmpleado);
 
-    // 3. Calcular retención en la fuente
-    const baseRetencion = input.totalDevengado - saludEmpleado - pensionEmpleado;
+    console.log('🏥 Deducciones calculadas:', {
+      saludEmpleado,
+      pensionEmpleado,
+      base: ibcFinal
+    });
+
+    // 3. Calcular retención en la fuente sobre base sin deducciones
+    const baseRetencion = ibcFinal - saludEmpleado - pensionEmpleado;
     const retencionFuente = this.calculateRetencionFuente(baseRetencion, config);
 
     // 4. Obtener novedades de deducciones si se proporcionan los IDs
@@ -151,6 +170,18 @@ export class DeductionCalculationService {
 
     // 5. Calcular total de deducciones
     const totalDeducciones = saludEmpleado + pensionEmpleado + retencionFuente + novedadesDeducciones;
+
+    console.log('📊 RESULTADO FINAL ALELUYA:', {
+      totalDevengado: input.totalDevengado,
+      totalDeducciones,
+      netoPagar: input.totalDevengado - totalDeducciones,
+      desglose: {
+        salud: saludEmpleado,
+        pension: pensionEmpleado,
+        retencion: retencionFuente,
+        novedades: novedadesDeducciones
+      }
+    });
 
     return {
       ibcSalud: ibcFinal,
