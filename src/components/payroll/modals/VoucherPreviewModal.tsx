@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
@@ -38,8 +39,9 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     }
 
     setIsGenerating(true);
+    
     try {
-      console.log('🚀 INICIANDO DESCARGA PDF DEFINITIVA para:', employee.name);
+      console.log('🚀 INICIANDO DESCARGA PDF ULTRA-SIMPLE para:', employee.name);
       
       const requestBody = {
         employee: {
@@ -65,11 +67,14 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         }
       };
 
-      console.log('📤 Enviando request optimizado:', requestBody);
+      console.log('📤 Enviando request ultra-simple:', requestBody);
 
-      // Usar fetch directo con timeout para máximo control
+      // Timeout de 45 segundos para dar tiempo suficiente
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        console.error('❌ Timeout en la request');
+      }, 45000);
 
       const response = await fetch(
         'https://xrmolrlkakwujyozgmilf.supabase.co/functions/v1/generate-voucher-pdf',
@@ -90,79 +95,106 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
       console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
-        throw new Error(`Error del servidor (${response.status}): ${errorText}`);
+        let errorMessage = `Error del servidor (${response.status})`;
+        
+        try {
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
+          
+          // Intentar parsear como JSON
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // Si no es JSON, usar el texto plano
+          errorMessage = errorText || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      // Obtener el ArrayBuffer con validación
+      console.log('✅ Response OK, obteniendo ArrayBuffer...');
+
+      // Obtener el ArrayBuffer
       const arrayBuffer = await response.arrayBuffer();
       console.log('📋 ArrayBuffer recibido, tamaño:', arrayBuffer.byteLength);
 
+      // Validación básica del tamaño
       if (arrayBuffer.byteLength === 0) {
-        throw new Error('El PDF recibido está vacío');
+        throw new Error('El PDF recibido está vacío (0 bytes)');
       }
 
-      // Validación estricta del PDF
+      if (arrayBuffer.byteLength < 1000) {
+        throw new Error(`El PDF recibido es muy pequeño (${arrayBuffer.byteLength} bytes)`);
+      }
+
+      // Validación del header PDF
       const uint8Array = new Uint8Array(arrayBuffer);
       const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 4));
       
+      console.log('🔍 Validando header PDF:', pdfHeader);
+      
       if (pdfHeader !== '%PDF') {
-        console.error('❌ Header inválido:', pdfHeader);
-        console.error('❌ Primeros 50 bytes:', Array.from(uint8Array.slice(0, 50)));
-        throw new Error(`Archivo recibido no es un PDF válido (header: ${pdfHeader})`);
+        console.error('❌ Header inválido recibido:', pdfHeader);
+        console.error('❌ Primeros 20 bytes:', Array.from(uint8Array.slice(0, 20)));
+        throw new Error(`Archivo recibido no es un PDF válido. Header: "${pdfHeader}"`);
       }
 
-      console.log('✅ PDF VALIDADO - Header correcto:', pdfHeader);
+      console.log('✅ PDF VALIDADO CORRECTAMENTE - Header:', pdfHeader, 'Tamaño:', arrayBuffer.byteLength);
 
-      // Crear blob con tipo MIME específico
+      // Crear blob y descargar
       const blob = new Blob([arrayBuffer], { 
         type: 'application/pdf'
       });
       
       console.log('📋 Blob creado, tamaño:', blob.size);
 
-      // Crear URL y descargar
-      const url = window.URL.createObjectURL(blob);
+      // Crear URL temporal y descargar
+      const url = URL.createObjectURL(blob);
       const fileName = `comprobante-${employee.name.replace(/\s+/g, '-')}-${period.startDate.replace(/\//g, '-')}.pdf`;
       
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.style.display = 'none';
+      // Crear elemento anchor para descarga
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
       
-      document.body.appendChild(a);
-      a.click();
+      // Agregar al DOM, hacer click, y limpiar
+      document.body.appendChild(link);
+      link.click();
       
       // Cleanup inmediato
       setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        console.log('🧹 Cleanup completado');
       }, 100);
 
-      console.log('✅ PDF DESCARGADO EXITOSAMENTE:', fileName);
+      console.log('✅ DESCARGA COMPLETADA:', fileName);
 
       toast({
-        title: "✅ Comprobante generado",
-        description: `El comprobante de ${employee.name} se ha descargado exitosamente`,
+        title: "✅ PDF generado exitosamente",
+        description: `El comprobante de ${employee.name} se ha descargado correctamente`,
         className: "border-green-200 bg-green-50"
       });
       
     } catch (error: any) {
       console.error('💥 ERROR EN DESCARGA:', error);
+      console.error('💥 Error stack:', error.stack);
       
       let errorMessage = "Error desconocido al generar el comprobante";
       
       if (error.name === 'AbortError') {
-        errorMessage = "Tiempo de espera agotado. Intenta nuevamente.";
+        errorMessage = "La generación del PDF tardó demasiado. Intenta nuevamente.";
       } else if (error.message?.includes('fetch')) {
-        errorMessage = "Error de conexión. Verifica tu internet.";
+        errorMessage = "Error de conexión. Verifica tu internet e intenta nuevamente.";
+      } else if (error.message?.includes('PDF')) {
+        errorMessage = `Error en el PDF: ${error.message}`;
       } else if (error.message) {
         errorMessage = error.message;
       }
       
       toast({
-        title: "Error al generar comprobante",
+        title: "❌ Error al generar PDF",
         description: errorMessage,
         variant: "destructive"
       });
@@ -411,11 +443,16 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         </Button>
         <Button onClick={handleDownloadVoucher} disabled={isGenerating}>
           {isGenerating ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generando PDF...
+            </>
           ) : (
-            <Download className="h-4 w-4 mr-2" />
+            <>
+              <Download className="h-4 w-4 mr-2" />
+              Descargar PDF
+            </>
           )}
-          {isGenerating ? 'Generando PDF...' : 'Descargar PDF'}
         </Button>
       </div>
     </CustomModal>

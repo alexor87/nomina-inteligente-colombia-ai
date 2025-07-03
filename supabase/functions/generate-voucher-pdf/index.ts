@@ -7,22 +7,20 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  console.log('🚀 PDF Generator - Iniciando versión ultra-simple');
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('🚀 INICIANDO GENERACIÓN PDF DEFINITIVA');
-    
     const requestBody = await req.json();
-    console.log('📋 Datos recibidos:', JSON.stringify(requestBody, null, 2));
+    console.log('📋 Request recibido:', JSON.stringify(requestBody, null, 2));
 
     const { employee, period } = requestBody;
 
-    // Validación básica
     if (!employee || !period) {
-      console.error('❌ Faltan datos del empleado o período');
+      console.error('❌ Datos faltantes');
       return new Response(
         JSON.stringify({ error: 'Faltan datos del empleado o período' }),
         { 
@@ -32,44 +30,258 @@ serve(async (req) => {
       );
     }
 
-    // Generar PDF usando solo pdf-lib (compatible con Deno)
-    const pdfBuffer = await generateDenoPDF(employee, period);
-
-    console.log('✅ PDF GENERADO EXITOSAMENTE - TAMAÑO:', pdfBuffer.length, 'bytes');
-
-    // Verificar que el PDF es válido
-    if (pdfBuffer.length < 100) {
-      throw new Error('PDF generado está vacío o corrupto');
+    console.log('📄 Generando PDF ultra-simple...');
+    
+    // Usar pdf-lib compatible con Deno
+    const { PDFDocument, StandardFonts, rgb } = await import('https://cdn.skypack.dev/pdf-lib@1.17.1?dts');
+    
+    console.log('✅ pdf-lib importado correctamente');
+    
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595, 842]); // A4
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    console.log('✅ Documento PDF creado');
+    
+    // Extraer datos básicos
+    const nombre = String(employee.name || 'Empleado');
+    const salarioBase = Number(employee.baseSalary) || 0;
+    const salarioNeto = Number(employee.netPay) || 0;
+    const diasTrabajados = Number(employee.workedDays) || 30;
+    
+    console.log(`✅ Datos extraídos: ${nombre}, Salario: ${salarioBase}`);
+    
+    // Formatear moneda manualmente (sin Intl)
+    const formatMoney = (amount) => {
+      const rounded = Math.round(amount);
+      const str = rounded.toString();
+      return '$' + str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+    
+    // Formatear fecha manualmente
+    const formatSimpleDate = (dateStr) => {
+      try {
+        const date = new Date(dateStr);
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const year = date.getUTCFullYear();
+        return `${day}/${month}/${year}`;
+      } catch {
+        return dateStr;
+      }
+    };
+    
+    console.log('✅ Funciones de formateo creadas');
+    
+    let yPos = 750;
+    const leftMargin = 50;
+    
+    // TÍTULO
+    page.drawText('COMPROBANTE DE NOMINA', {
+      x: leftMargin,
+      y: yPos,
+      size: 18,
+      font: boldFont,
+      color: rgb(0.2, 0.2, 0.8),
+    });
+    
+    yPos -= 50;
+    
+    // INFORMACIÓN EMPLEADO
+    page.drawText('EMPLEADO:', {
+      x: leftMargin,
+      y: yPos,
+      size: 12,
+      font: boldFont,
+    });
+    
+    page.drawText(nombre, {
+      x: leftMargin,
+      y: yPos - 20,
+      size: 11,
+      font: font,
+    });
+    
+    yPos -= 60;
+    
+    // PERÍODO
+    page.drawText('PERIODO:', {
+      x: leftMargin,
+      y: yPos,
+      size: 12,
+      font: boldFont,
+    });
+    
+    const fechaInicio = formatSimpleDate(period.startDate);
+    const fechaFin = formatSimpleDate(period.endDate);
+    
+    page.drawText(`${fechaInicio} - ${fechaFin}`, {
+      x: leftMargin,
+      y: yPos - 20,
+      size: 11,
+      font: font,
+    });
+    
+    page.drawText(`Dias trabajados: ${diasTrabajados}`, {
+      x: leftMargin,
+      y: yPos - 40,
+      size: 10,
+      font: font,
+    });
+    
+    yPos -= 80;
+    
+    // CONCEPTOS DE PAGO
+    page.drawText('RESUMEN DE PAGO', {
+      x: leftMargin,
+      y: yPos,
+      size: 14,
+      font: boldFont,
+      color: rgb(0.2, 0.2, 0.8),
+    });
+    
+    yPos -= 30;
+    
+    // Salario Base
+    page.drawText('Salario Base:', {
+      x: leftMargin,
+      y: yPos,
+      size: 10,
+      font: font,
+    });
+    
+    page.drawText(formatMoney(salarioBase), {
+      x: 400,
+      y: yPos,
+      size: 10,
+      font: font,
+    });
+    
+    yPos -= 20;
+    
+    // Subsidio transporte (si existe)
+    if (employee.transportAllowance > 0) {
+      page.drawText('Subsidio Transporte:', {
+        x: leftMargin,
+        y: yPos,
+        size: 10,
+        font: font,
+      });
+      
+      page.drawText(formatMoney(employee.transportAllowance), {
+        x: 400,
+        y: yPos,
+        size: 10,
+        font: font,
+      });
+      
+      yPos -= 20;
     }
-
-    // Verificar header PDF
-    const pdfHeader = String.fromCharCode(...pdfBuffer.slice(0, 4));
-    if (pdfHeader !== '%PDF') {
-      throw new Error('Buffer generado no es un PDF válido');
+    
+    // Deducciones (si existen)
+    if (employee.deductions > 0) {
+      page.drawText('Deducciones:', {
+        x: leftMargin,
+        y: yPos,
+        size: 10,
+        font: font,
+        color: rgb(0.8, 0.2, 0.2),
+      });
+      
+      page.drawText('-' + formatMoney(employee.deductions), {
+        x: 400,
+        y: yPos,
+        size: 10,
+        font: font,
+        color: rgb(0.8, 0.2, 0.2),
+      });
+      
+      yPos -= 20;
     }
-
-    console.log('✅ PDF VALIDADO CORRECTAMENTE');
-
-    // Respuesta binaria optimizada para PDFs
-    return new Response(pdfBuffer, {
+    
+    yPos -= 20;
+    
+    // Línea separadora
+    page.drawLine({
+      start: { x: leftMargin, y: yPos },
+      end: { x: 500, y: yPos },
+      thickness: 1,
+      color: rgb(0.3, 0.3, 0.3),
+    });
+    
+    yPos -= 30;
+    
+    // TOTAL NETO
+    page.drawText('TOTAL NETO:', {
+      x: leftMargin,
+      y: yPos,
+      size: 14,
+      font: boldFont,
+      color: rgb(0.2, 0.6, 0.2),
+    });
+    
+    page.drawText(formatMoney(salarioNeto), {
+      x: 350,
+      y: yPos,
+      size: 14,
+      font: boldFont,
+      color: rgb(0.2, 0.6, 0.2),
+    });
+    
+    yPos -= 80;
+    
+    // PIE DE PÁGINA
+    page.drawText('Generado con Finppi - Sistema de Nomina', {
+      x: leftMargin,
+      y: yPos,
+      size: 8,
+      font: font,
+      color: rgb(0.5, 0.5, 0.5),
+    });
+    
+    console.log('✅ Contenido del PDF agregado');
+    
+    // Generar el PDF
+    const pdfBytes = await pdfDoc.save();
+    console.log(`✅ PDF generado - Tamaño: ${pdfBytes.length} bytes`);
+    
+    // Validar que el PDF tenga contenido
+    if (pdfBytes.length < 1000) {
+      throw new Error(`PDF muy pequeño: ${pdfBytes.length} bytes`);
+    }
+    
+    // Validar header PDF
+    const pdfArray = new Uint8Array(pdfBytes);
+    const header = String.fromCharCode(...pdfArray.slice(0, 4));
+    
+    if (header !== '%PDF') {
+      console.error('❌ Header inválido:', header);
+      throw new Error(`Header PDF inválido: ${header}`);
+    }
+    
+    console.log('✅ PDF validado correctamente - Header:', header);
+    
+    // Respuesta optimizada
+    return new Response(pdfArray, {
       status: 200,
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/pdf',
-        'Content-Length': pdfBuffer.length.toString(),
-        'Content-Disposition': `attachment; filename="comprobante-${employee.name.replace(/\s+/g, '-')}.pdf"`,
+        'Content-Length': pdfArray.length.toString(),
+        'Content-Disposition': `attachment; filename="comprobante-${nombre.replace(/\s+/g, '-')}.pdf"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
         'Accept-Ranges': 'bytes'
       }
     });
 
   } catch (error) {
-    console.error('💥 ERROR CRÍTICO EN PDF:', error);
+    console.error('💥 ERROR CRÍTICO:', error);
+    console.error('💥 Stack:', error.stack);
+    
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Error interno del servidor',
+        error: `Error generando PDF: ${error.message}`,
         details: error.stack,
         timestamp: new Date().toISOString()
       }),
@@ -80,288 +292,3 @@ serve(async (req) => {
     );
   }
 });
-
-async function generateDenoPDF(employee: any, period: any): Promise<Uint8Array> {
-  console.log('📄 Generando PDF con pdf-lib compatible con Deno...');
-  
-  try {
-    // Importar pdf-lib de forma segura
-    const { PDFDocument, StandardFonts, rgb } = await import('https://esm.sh/pdf-lib@1.17.1');
-    
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]); // A4 en points
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
-    // Extraer y limpiar datos
-    const nombre = String(employee.name || 'Empleado').substring(0, 50);
-    const salarioBase = Number(employee.baseSalary) || 0;
-    const salarioNeto = Number(employee.netPay) || 0;
-    const diasTrabajados = Number(employee.workedDays) || 30;
-    const deducciones = Number(employee.deductions) || 0;
-    const bonificaciones = Number(employee.bonuses) || 0;
-    const auxilioTransporte = Number(employee.transportAllowance) || 0;
-    const horasExtra = Number(employee.extraHours) || 0;
-    
-    console.log('📊 Datos procesados:', { nombre, salarioBase, salarioNeto, diasTrabajados });
-    
-    // Función para formatear moneda (sin Intl para compatibilidad Deno)
-    const formatCurrency = (valor: number): string => {
-      const rounded = Math.round(valor);
-      const formatted = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      return `$${formatted}`;
-    };
-    
-    // Función para formatear fechas (sin toLocaleDateString)
-    const formatDate = (fecha: string): string => {
-      try {
-        const date = new Date(fecha);
-        const day = date.getUTCDate().toString().padStart(2, '0');
-        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-        const year = date.getUTCFullYear();
-        return `${day}/${month}/${year}`;
-      } catch {
-        return fecha.substring(0, 10);
-      }
-    };
-    
-    const fechaInicio = formatDate(period.startDate);
-    const fechaFin = formatDate(period.endDate);
-    const fechaGeneracion = formatDate(new Date().toISOString());
-    
-    // Colores
-    const azulTitulo = rgb(0.15, 0.4, 0.8);
-    const grisTexto = rgb(0.3, 0.3, 0.3);
-    const azulFondo = rgb(0.95, 0.97, 1);
-    
-    let yPos = 750;
-    const margenIzq = 50;
-    const margenDer = 545;
-    
-    // TÍTULO PRINCIPAL
-    page.drawText('COMPROBANTE DE NÓMINA', {
-      x: margenIzq,
-      y: yPos,
-      size: 20,
-      font: boldFont,
-      color: azulTitulo,
-    });
-    
-    yPos -= 50;
-    
-    // INFORMACIÓN DE LA EMPRESA Y EMPLEADO
-    page.drawRectangle({
-      x: margenIzq - 10,
-      y: yPos - 30,
-      width: 510,
-      height: 80,
-      color: azulFondo,
-    });
-    
-    // Empresa
-    page.drawText('EMPRESA:', {
-      x: margenIzq,
-      y: yPos,
-      size: 10,
-      font: boldFont,
-      color: grisTexto,
-    });
-    
-    page.drawText('Mi Empresa', {
-      x: margenIzq,
-      y: yPos - 15,
-      size: 12,
-      font: font,
-    });
-    
-    page.drawText('NIT: N/A', {
-      x: margenIzq,
-      y: yPos - 30,
-      size: 10,
-      font: font,
-      color: grisTexto,
-    });
-    
-    // Empleado
-    page.drawText('EMPLEADO:', {
-      x: 300,
-      y: yPos,
-      size: 10,
-      font: boldFont,
-      color: grisTexto,
-    });
-    
-    page.drawText(nombre, {
-      x: 300,
-      y: yPos - 15,
-      size: 12,
-      font: font,
-    });
-    
-    page.drawText(`CC: ${employee.id?.slice(0, 8) || 'N/A'}`, {
-      x: 300,
-      y: yPos - 30,
-      size: 10,
-      font: font,
-      color: grisTexto,
-    });
-    
-    yPos -= 100;
-    
-    // PERÍODO
-    page.drawText('PERÍODO DE PAGO:', {
-      x: margenIzq,
-      y: yPos,
-      size: 12,
-      font: boldFont,
-      color: azulTitulo,
-    });
-    
-    page.drawText(`${fechaInicio} - ${fechaFin}`, {
-      x: margenIzq,
-      y: yPos - 20,
-      size: 11,
-      font: font,
-    });
-    
-    page.drawText(`Días trabajados: ${diasTrabajados}`, {
-      x: 300,
-      y: yPos - 20,
-      size: 11,
-      font: font,
-    });
-    
-    yPos -= 60;
-    
-    // RESUMEN DE PAGO
-    page.drawText('RESUMEN DEL PAGO', {
-      x: margenIzq,
-      y: yPos,
-      size: 14,
-      font: boldFont,
-      color: azulTitulo,
-    });
-    
-    yPos -= 30;
-    
-    // Tabla de conceptos
-    const conceptos = [
-      ['Salario Base', formatCurrency(salarioBase)],
-      ...(auxilioTransporte > 0 ? [['Subsidio de Transporte', formatCurrency(auxilioTransporte)]] : []),
-      ...(bonificaciones > 0 ? [['Bonificaciones', formatCurrency(bonificaciones)]] : []),
-      ...(horasExtra > 0 ? [['Horas Extras', formatCurrency(horasExtra * ((salarioBase / 240) * 1.25))]] : []),
-      ...(deducciones > 0 ? [['Deducciones', `-${formatCurrency(deducciones)}`]] : []),
-    ];
-    
-    // Dibujar tabla
-    for (const [concepto, valor] of conceptos) {
-      page.drawText(concepto, {
-        x: margenIzq,
-        y: yPos,
-        size: 10,
-        font: font,
-      });
-      
-      page.drawText(valor, {
-        x: margenDer - valor.length * 6,
-        y: yPos,
-        size: 10,
-        font: font,
-      });
-      
-      yPos -= 20;
-    }
-    
-    yPos -= 10;
-    
-    // Línea separadora
-    page.drawLine({
-      start: { x: margenIzq, y: yPos },
-      end: { x: margenDer, y: yPos },
-      thickness: 1,
-      color: grisTexto,
-    });
-    
-    yPos -= 25;
-    
-    // TOTAL NETO
-    page.drawRectangle({
-      x: margenIzq - 10,
-      y: yPos - 15,
-      width: 510,
-      height: 30,
-      color: azulFondo,
-    });
-    
-    page.drawText('TOTAL NETO A PAGAR:', {
-      x: margenIzq,
-      y: yPos,
-      size: 14,
-      font: boldFont,
-      color: azulTitulo,
-    });
-    
-    const totalNeto = formatCurrency(salarioNeto);
-    page.drawText(totalNeto, {
-      x: margenDer - totalNeto.length * 8,
-      y: yPos,
-      size: 14,
-      font: boldFont,
-      color: azulTitulo,
-    });
-    
-    yPos -= 80;
-    
-    // FIRMAS
-    page.drawText('Firma del Empleado', {
-      x: margenIzq,
-      y: yPos,
-      size: 10,
-      font: font,
-      color: grisTexto,
-    });
-    
-    page.drawLine({
-      start: { x: margenIzq, y: yPos + 20 },
-      end: { x: margenIzq + 150, y: yPos + 20 },
-      thickness: 1,
-      color: grisTexto,
-    });
-    
-    page.drawText('Firma del Empleador', {
-      x: 350,
-      y: yPos,
-      size: 10,
-      font: font,
-      color: grisTexto,
-    });
-    
-    page.drawLine({
-      start: { x: 350, y: yPos + 20 },
-      end: { x: 500, y: yPos + 20 },
-      thickness: 1,
-      color: grisTexto,
-    });
-    
-    yPos -= 60;
-    
-    // PIE DE PÁGINA
-    page.drawText(`Generado el ${fechaGeneracion} con Finppi - www.finppi.com`, {
-      x: margenIzq,
-      y: yPos,
-      size: 8,
-      font: font,
-      color: grisTexto,
-    });
-    
-    // Generar PDF
-    const pdfBytes = await pdfDoc.save();
-    console.log('✅ PDF generado exitosamente, tamaño:', pdfBytes.length);
-    
-    return new Uint8Array(pdfBytes);
-    
-  } catch (error) {
-    console.error('❌ Error en generación PDF:', error);
-    throw new Error(`Error generando PDF: ${error.message}`);
-  }
-}
