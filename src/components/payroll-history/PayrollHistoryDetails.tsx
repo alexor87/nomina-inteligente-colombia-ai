@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PayrollHistoryDetails as PayrollHistoryDetailsType } from '@/types/payroll-history';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   ArrowLeft, 
   Calendar, 
