@@ -13,36 +13,31 @@ import {
   Calculator, 
   FileText,
   TrendingUp,
-  Calendar,
-  Bell,
   BarChart3,
   DollarSign,
-  Building2,
   Clock,
-  Plus,
-  Settings
+  Plus
 } from 'lucide-react';
 
-// Importar los componentes simplificados
+// Importar los nuevos componentes con datos reales
 import { QuickActions } from './QuickActions';
-import { ComplianceCalendar } from './ComplianceCalendar';
-import { PayrollAnalytics } from './PayrollAnalytics';
-import { NotificationCenter } from './NotificationCenter';
-import { FinancialSummary } from './FinancialSummary';
+import { RealPayrollTrends } from './RealPayrollTrends';
+import { SalaryAnalytics } from './SalaryAnalytics';
+import { EfficiencyMetrics } from './EfficiencyMetrics';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { companyId } = useCurrentCompany();
   const {
     metrics,
-    alerts,
     recentEmployees,
     recentActivity,
+    payrollTrends,
+    salaryDistribution,
+    efficiencyMetrics,
     loading,
     refreshing,
-    refreshDashboard,
-    dismissAlert,
-    highPriorityAlerts
+    refreshDashboard
   } = useDashboard();
 
   const [greeting, setGreeting] = useState('');
@@ -105,77 +100,63 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* Alertas Críticas - Solo si existen */}
-      {highPriorityAlerts.length > 0 && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-4">
-            <div className="space-y-2">
-              {highPriorityAlerts.slice(0, 2).map(alert => (
-                <div key={alert.id} className="flex items-center justify-between p-3 bg-white rounded border border-red-200">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-lg">{alert.icon}</span>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{alert.title}</p>
-                      <p className="text-xs text-gray-600">{alert.description}</p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => dismissAlert(alert.id)}>
-                    Revisar
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Métricas Principales - Grid Simple */}
       {metrics && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
+          <Card className="hover:shadow-lg transition-shadow duration-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Empleados</p>
-                  <p className="text-2xl font-bold">{metrics.totalEmpleados}</p>
+                  <p className="text-sm font-medium text-gray-600">Empleados Activos</p>
+                  <p className="text-2xl font-bold text-gray-900">{metrics.totalEmpleados}</p>
                 </div>
-                <Users className="h-8 w-8 text-blue-600" />
+                <div className="p-3 rounded-lg bg-blue-50">
+                  <Users className="h-6 w-6 text-blue-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="hover:shadow-lg transition-shadow duration-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Nóminas</p>
-                  <p className="text-2xl font-bold">{metrics.nominasProcesadas}</p>
+                  <p className="text-sm font-medium text-gray-600">Nóminas Procesadas</p>
+                  <p className="text-2xl font-bold text-gray-900">{metrics.nominasProcesadas}</p>
                 </div>
-                <FileText className="h-8 w-8 text-green-600" />
+                <div className="p-3 rounded-lg bg-green-50">
+                  <FileText className="h-6 w-6 text-green-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="hover:shadow-lg transition-shadow duration-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Alertas</p>
-                  <p className="text-2xl font-bold">{metrics.alertasLegales}</p>
+                  <p className="text-sm font-medium text-gray-600">Costo Total</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ${(metrics.gastosNomina / 1000000).toFixed(1)}M
+                  </p>
                 </div>
-                <Bell className="h-8 w-8 text-yellow-600" />
+                <div className="p-3 rounded-lg bg-purple-50">
+                  <DollarSign className="h-6 w-6 text-purple-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
-          
-          <Card>
+
+          <Card className="hover:shadow-lg transition-shadow duration-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Gastos</p>
-                  <p className="text-2xl font-bold">${(metrics.gastosNomina / 1000000).toFixed(1)}M</p>
+                  <p className="text-sm font-medium text-gray-600">Tendencia</p>
+                  <p className="text-2xl font-bold text-gray-900">+{metrics.tendenciaMensual}%</p>
                 </div>
-                <DollarSign className="h-8 w-8 text-purple-600" />
+                <div className="p-3 rounded-lg bg-yellow-50">
+                  <TrendingUp className="h-6 w-6 text-yellow-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -183,34 +164,26 @@ export const Dashboard = () => {
       )}
 
       {/* Contenido Principal con Tabs Simplificados */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Resumen
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview" className="flex items-center space-x-2">
+            <BarChart3 className="h-4 w-4" />
+            <span>Resumen</span>
           </TabsTrigger>
-          <TabsTrigger value="financial">
-            <DollarSign className="h-4 w-4 mr-2" />
-            Financiero
-          </TabsTrigger>
-          <TabsTrigger value="payroll">
-            <Calculator className="h-4 w-4 mr-2" />
-            Nómina
-          </TabsTrigger>
-          <TabsTrigger value="compliance">
-            <Calendar className="h-4 w-4 mr-2" />
-            Obligaciones
+          <TabsTrigger value="analytics" className="flex items-center space-x-2">
+            <TrendingUp className="h-4 w-4" />
+            <span>Análisis</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
+          {/* Métricas de Eficiencia */}
+          <EfficiencyMetrics data={efficiencyMetrics} loading={loading} />
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <QuickActions />
-            <NotificationCenter />
-          </div>
 
-          {/* Empleados y Actividad Simplificados */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Empleados y Actividad Simplificados */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -220,37 +193,47 @@ export const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {recentEmployees.map((employee) => (
-                    <div key={employee.id} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-sm font-semibold">
-                          {employee.name.split(' ').map(n => n[0]).join('')}
+                  {recentEmployees.length > 0 ? (
+                    recentEmployees.map((employee) => (
+                      <div key={employee.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-sm font-semibold">
+                            {employee.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{employee.name}</p>
+                            <p className="text-xs text-gray-500">{employee.position}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{employee.name}</p>
-                          <p className="text-xs text-gray-500">{employee.position}</p>
-                        </div>
+                        <Badge variant={employee.status === 'activo' ? 'default' : 'secondary'}>
+                          {employee.status}
+                        </Badge>
                       </div>
-                      <Badge variant={employee.status === 'activo' ? 'default' : 'secondary'}>
-                        {employee.status}
-                      </Badge>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No hay empleados recientes</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
+          </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 text-green-600" />
-                  <span>Actividad Reciente</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentActivity.slice(0, 5).map((activity) => (
-                    <div key={activity.id} className="flex items-center space-x-3">
+          {/* Actividad Reciente */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-green-600" />
+                <span>Actividad Reciente</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentActivity.length > 0 ? (
+                  recentActivity.slice(0, 8).map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
                       <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">
                         {activity.type === 'payroll' ? '💰' :
                          activity.type === 'employee' ? '👤' :
@@ -267,23 +250,24 @@ export const Dashboard = () => {
                         })}
                       </p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No hay actividad reciente</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="financial">
-          <FinancialSummary />
-        </TabsContent>
-
-        <TabsContent value="payroll">
-          <PayrollAnalytics />
-        </TabsContent>
-
-        <TabsContent value="compliance">
-          <ComplianceCalendar />
+        <TabsContent value="analytics" className="space-y-6">
+          {/* Tendencias de Nómina con Datos Reales */}
+          <RealPayrollTrends data={payrollTrends} loading={loading} />
+          
+          {/* Análisis Salarial con Datos Reales */}
+          <SalaryAnalytics data={salaryDistribution} loading={loading} />
         </TabsContent>
       </Tabs>
     </div>

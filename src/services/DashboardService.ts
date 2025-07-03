@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardMetrics } from '@/types';
 
@@ -27,6 +28,30 @@ export interface DashboardActivity {
   user: string;
   timestamp: string;
   type: 'payroll' | 'employee' | 'report' | 'payment';
+}
+
+export interface MonthlyPayrollTrend {
+  month: string;
+  year: number;
+  totalDevengado: number;
+  totalDeducciones: number;
+  totalNeto: number;
+  employeesCount: number;
+}
+
+export interface SalaryDistribution {
+  position: string;
+  averageSalary: number;
+  employeeCount: number;
+  minSalary: number;
+  maxSalary: number;
+}
+
+export interface EfficiencyMetric {
+  metric: string;
+  value: number;
+  change: number;
+  unit: string;
 }
 
 export class DashboardService {
@@ -73,7 +98,6 @@ export class DashboardService {
           monthlyPayrollTotal: 0,
           complianceScore: 0,
           alerts: 0,
-          // Legacy Spanish names for compatibility
           totalEmpleados: 0,
           nominasProcesadas: 0,
           alertasLegales: 0,
@@ -82,21 +106,21 @@ export class DashboardService {
         };
       }
 
-      // Obtener total de empleados activos para la empresa actual
+      // Obtener total de empleados activos
       const { count: totalEmpleados } = await supabase
         .from('employees')
         .select('*', { count: 'exact', head: true })
         .eq('company_id', companyId)
         .eq('estado', 'activo');
 
-      // Obtener total de nóminas procesadas para la empresa actual
+      // Obtener total de nóminas procesadas
       const { count: nominasProcesadas } = await supabase
         .from('payrolls')
         .select('*', { count: 'exact', head: true })
         .eq('company_id', companyId)
         .in('estado', ['procesada', 'pagada']);
 
-      // Obtener alertas de alta prioridad para la empresa actual
+      // Obtener alertas de alta prioridad
       const { count: alertasLegales } = await supabase
         .from('dashboard_alerts')
         .select('*', { count: 'exact', head: true })
@@ -129,7 +153,6 @@ export class DashboardService {
         monthlyPayrollTotal: gastosNomina,
         complianceScore: 85,
         alerts: alertasLegalesCount,
-        // Legacy Spanish names for compatibility
         totalEmpleados: totalEmpleadosCount,
         nominasProcesadas: nominasProcesadasCount,
         alertasLegales: alertasLegalesCount,
@@ -145,44 +168,12 @@ export class DashboardService {
         monthlyPayrollTotal: 0,
         complianceScore: 0,
         alerts: 0,
-        // Legacy Spanish names for compatibility
         totalEmpleados: 0,
         nominasProcesadas: 0,
         alertasLegales: 0,
         gastosNomina: 0,
         tendenciaMensual: 0
       };
-    }
-  }
-
-  static async getDashboardAlerts(): Promise<DashboardAlert[]> {
-    try {
-      const companyId = await this.getCurrentCompanyId();
-      if (!companyId) return [];
-
-      const { data, error } = await supabase
-        .from('dashboard_alerts')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('dismissed', false)
-        .order('priority', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      return data?.map(alert => ({
-        id: alert.id,
-        type: alert.type as 'warning' | 'error' | 'info',
-        title: alert.title,
-        description: alert.description,
-        priority: alert.priority as 'high' | 'medium' | 'low',
-        icon: alert.icon || '⚠️',
-        actionRequired: alert.action_required || false,
-        dueDate: alert.due_date || undefined
-      })) || [];
-    } catch (error) {
-      console.error('Error fetching dashboard alerts:', error);
-      return [];
     }
   }
 
@@ -260,7 +251,6 @@ export class DashboardService {
         });
       });
 
-      // Sort by timestamp
       return activities
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 8);
@@ -271,60 +261,157 @@ export class DashboardService {
     }
   }
 
-  static async getPayrollSummary(): Promise<{
-    totalPaid: number;
-    employeesPaid: number;
-    pendingPayments: number;
-    totalDeductions: number;
-  }> {
+  // NUEVAS FUNCIONES CON DATOS REALES
+
+  static async getMonthlyPayrollTrends(): Promise<MonthlyPayrollTrend[]> {
     try {
+      const companyId = await this.getCurrentCompanyId();
+      if (!companyId) return [];
+
       const { data, error } = await supabase
         .from('payrolls')
-        .select('neto_pagado, total_deducciones, estado');
+        .select('periodo, total_devengado, total_deducciones, neto_pagado, created_at')
+        .eq('company_id', companyId)
+        .in('estado', ['procesada', 'pagada'])
+        .order('created_at', { ascending: false })
+        .limit(12);
 
       if (error) throw error;
 
-      const totalPaid = data?.reduce((sum, payroll) => 
-        sum + (parseFloat(payroll.neto_pagado?.toString() || '0')), 0) || 0;
-      
-      const totalDeductions = data?.reduce((sum, payroll) => 
-        sum + (parseFloat(payroll.total_deducciones?.toString() || '0')), 0) || 0;
+      // Group by period and calculate totals
+      const groupedData = data?.reduce((acc, payroll) => {
+        const period = payroll.periodo;
+        if (!acc[period]) {
+          acc[period] = {
+            month: period,
+            year: new Date(payroll.created_at).getFullYear(),
+            totalDevengado: 0,
+            totalDeducciones: 0,
+            totalNeto: 0,
+            employeesCount: 0
+          };
+        }
+        
+        acc[period].totalDevengado += parseFloat(payroll.total_devengado?.toString() || '0');
+        acc[period].totalDeducciones += parseFloat(payroll.total_deducciones?.toString() || '0');
+        acc[period].totalNeto += parseFloat(payroll.neto_pagado?.toString() || '0');
+        acc[period].employeesCount += 1;
+        
+        return acc;
+      }, {} as Record<string, MonthlyPayrollTrend>);
 
-      const employeesPaid = data?.filter(p => p.estado === 'pagada').length || 0;
-      const pendingPayments = data?.filter(p => p.estado === 'procesada').length || 0;
-
-      return {
-        totalPaid,
-        employeesPaid,
-        pendingPayments,
-        totalDeductions
-      };
+      return Object.values(groupedData || {}).slice(0, 6);
     } catch (error) {
-      console.error('Error fetching payroll summary:', error);
-      return {
-        totalPaid: 0,
-        employeesPaid: 0,
-        pendingPayments: 0,
-        totalDeductions: 0
-      };
+      console.error('Error fetching monthly payroll trends:', error);
+      return [];
     }
   }
 
-  static async getComplianceStatus(): Promise<{
-    socialSecurityUpToDate: boolean;
-    taxDeclarationsUpToDate: boolean;
-    laborCertificatesUpToDate: boolean;
-    nextDeadline: string;
-    nextDeadlineType: string;
-  }> {
-    // Por ahora devolvemos datos estáticos, pero se puede implementar lógica real
-    return {
-      socialSecurityUpToDate: true,
-      taxDeclarationsUpToDate: false,
-      laborCertificatesUpToDate: true,
-      nextDeadline: '2025-02-15',
-      nextDeadlineType: 'Declaración de retenciones'
-    };
+  static async getSalaryDistributionByPosition(): Promise<SalaryDistribution[]> {
+    try {
+      const companyId = await this.getCurrentCompanyId();
+      if (!companyId) return [];
+
+      const { data, error } = await supabase
+        .from('employees')
+        .select('cargo, salario_base')
+        .eq('company_id', companyId)
+        .eq('estado', 'activo')
+        .not('cargo', 'is', null);
+
+      if (error) throw error;
+
+      // Group by position and calculate statistics
+      const groupedData = data?.reduce((acc, employee) => {
+        const position = employee.cargo || 'Sin cargo';
+        const salary = parseFloat(employee.salario_base?.toString() || '0');
+        
+        if (!acc[position]) {
+          acc[position] = {
+            position,
+            salaries: [],
+            employeeCount: 0
+          };
+        }
+        
+        acc[position].salaries.push(salary);
+        acc[position].employeeCount += 1;
+        
+        return acc;
+      }, {} as Record<string, any>);
+
+      return Object.values(groupedData || {}).map((group: any) => ({
+        position: group.position,
+        averageSalary: group.salaries.reduce((sum: number, sal: number) => sum + sal, 0) / group.salaries.length,
+        employeeCount: group.employeeCount,
+        minSalary: Math.min(...group.salaries),
+        maxSalary: Math.max(...group.salaries)
+      })).slice(0, 5);
+    } catch (error) {
+      console.error('Error fetching salary distribution:', error);
+      return [];
+    }
+  }
+
+  static async getEfficiencyMetrics(): Promise<EfficiencyMetric[]> {
+    try {
+      const companyId = await this.getCurrentCompanyId();
+      if (!companyId) return [];
+
+      // Get current month data
+      const currentMonth = new Date();
+      currentMonth.setDate(1);
+      
+      const { data: currentData } = await supabase
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado')
+        .eq('company_id', companyId)
+        .gte('created_at', currentMonth.toISOString())
+        .in('estado', ['procesada', 'pagada']);
+
+      // Get previous month data
+      const previousMonth = new Date(currentMonth);
+      previousMonth.setMonth(previousMonth.getMonth() - 1);
+      
+      const { data: previousData } = await supabase
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado')
+        .eq('company_id', companyId)
+        .gte('created_at', previousMonth.toISOString())
+        .lt('created_at', currentMonth.toISOString())
+        .in('estado', ['procesada', 'pagada']);
+
+      const currentTotal = currentData?.reduce((sum, p) => sum + parseFloat(p.neto_pagado?.toString() || '0'), 0) || 0;
+      const previousTotal = previousData?.reduce((sum, p) => sum + parseFloat(p.neto_pagado?.toString() || '0'), 0) || 0;
+      const change = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
+
+      const avgSalaryChange = currentData && previousData ? 
+        ((currentTotal / currentData.length) - (previousTotal / previousData.length)) / (previousTotal / previousData.length) * 100 : 0;
+
+      return [
+        {
+          metric: 'Costo Total Nómina',
+          value: currentTotal,
+          change: change,
+          unit: 'COP'
+        },
+        {
+          metric: 'Salario Promedio',
+          value: currentData?.length ? currentTotal / currentData.length : 0,
+          change: avgSalaryChange,
+          unit: 'COP'
+        },
+        {
+          metric: 'Empleados Procesados',
+          value: currentData?.length || 0,
+          change: ((currentData?.length || 0) - (previousData?.length || 0)) / Math.max(previousData?.length || 1, 1) * 100,
+          unit: 'empleados'
+        }
+      ];
+    } catch (error) {
+      console.error('Error fetching efficiency metrics:', error);
+      return [];
+    }
   }
 
   static async dismissAlert(alertId: string): Promise<void> {
@@ -338,28 +425,6 @@ export class DashboardService {
     } catch (error) {
       console.error('Error dismissing alert:', error);
       throw error;
-    }
-  }
-
-  static async logActivity(action: string, type: 'payroll' | 'employee' | 'report' | 'payment'): Promise<void> {
-    try {
-      const companyId = await this.getCurrentCompanyId();
-      const user = (await supabase.auth.getUser()).data.user;
-      
-      if (!companyId || !user) return;
-
-      const { error } = await supabase
-        .from('dashboard_activity')
-        .insert({
-          company_id: companyId,
-          user_email: user.email || 'Unknown',
-          action,
-          type
-        });
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error logging activity:', error);
     }
   }
 }
