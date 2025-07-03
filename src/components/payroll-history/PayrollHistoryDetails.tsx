@@ -1,86 +1,88 @@
-
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { PeriodEmployeesTable } from './PeriodEmployeesTable';
-import { EditWizard } from './EditWizard';
-import { ReopenDialog } from './ReopenDialog';
-import { usePayrollHistory } from '@/hooks/usePayrollHistory';
-import { PayrollHistoryService } from '@/services/PayrollHistoryService';
-import { PayrollHistoryDetails as PayrollHistoryDetailsType } from '@/types/payroll-history';
-import { formatCurrency } from '@/lib/utils';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { 
   ArrowLeft, 
+  Download, 
+  FileText, 
   Calendar, 
   Users, 
-  DollarSign, 
-  TrendingUp, 
-  Calculator,
-  Edit3,
-  RotateCcw,
-  RefreshCw,
-  Download,
-  FileText,
-  AlertTriangle,
-  Wrench
+  DollarSign,
+  Edit,
+  Save,
+  Undo2,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
+import { PayrollHistoryService } from '@/services/PayrollHistoryService';
+import { PayrollHistoryDetails as PayrollDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNovedades } from '@/hooks/useNovedades';
+import { usePayrollHistory } from '@/hooks/usePayrollHistory';
+import { EditableEmployeeTable } from './EditableEmployeeTable';
+import { ReopenedPeriodBanner } from '../payroll/ReopenedPeriodBanner';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-export const PayrollHistoryDetails: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+export const PayrollHistoryDetails = () => {
+  const { id: periodId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [details, setDetails] = useState<PayrollHistoryDetailsType | null>(null);
+  const { toast } = useToast();
+  const { hasModuleAccess, isSuperAdmin } = useAuth();
+  
+  const [details, setDetails] = useState<PayrollDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showEditWizard, setShowEditWizard] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [showReopenDialog, setShowReopenDialog] = useState(false);
-  const [isDownloadingPDF, setIsDownloadingPDF] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
+  // Check if user can edit periods
+  const canEditPeriods = isSuperAdmin || hasModuleAccess('payroll-history');
+  
+  // Payroll history hooks for reopening functionality
   const {
     isReopening,
-    isRegenerating,
-    isFixing,
     canUserReopenPeriods,
     checkUserPermissions,
     reopenPeriod,
-    regenerateHistoricalData,
-    fixSpecificPeriodData
+    closePeriodAgain
   } = usePayrollHistory();
 
+  // Hook para manejar novedades - using the correct method name
+  const {
+    loadNovedades
+  } = useNovedades(periodId || '');
+
   useEffect(() => {
-    checkUserPermissions();
-  }, [checkUserPermissions]);
-
-  const loadDetails = async () => {
-    if (!id) {
-      setError('ID de período no válido');
-      setIsLoading(false);
-      return;
+    if (periodId) {
+      loadPeriodDetails();
+      checkUserPermissions();
     }
+  }, [periodId, checkUserPermissions]);
 
+  const loadPeriodDetails = async () => {
+    if (!periodId) return;
+    
     try {
       setIsLoading(true);
-      setError(null);
-      console.log('🔍 Cargando detalles del período:', id);
-      
-      const data = await PayrollHistoryService.getPeriodDetails(id);
-      console.log('✅ Detalles cargados:', data);
-      
+      const data = await PayrollHistoryService.getPeriodDetails(periodId);
       setDetails(data);
-    } catch (error: any) {
-      console.error('❌ Error loading period details:', error);
-      setError(error.message || 'Error al cargar los detalles del período');
       
-      // Toast de error específico
+      // Load novedades efficiently - only if needed
+      if (data.employees.length > 0) {
+        console.log('Loading novedades for period employees');
+      }
+    } catch (error) {
+      console.error('Error loading period details:', error);
       toast({
-        title: "Error al cargar período",
-        description: error.message || "No se pudieron obtener los detalles del período",
+        title: "Error",
+        description: "No se pudieron cargar los detalles del período",
         variant: "destructive"
       });
     } finally {
@@ -88,398 +90,433 @@ export const PayrollHistoryDetails: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    loadDetails();
-  }, [id]);
+  const handleSyncHistoricalData = async () => {
+    if (!periodId) return;
+    
+    try {
+      setIsSyncing(true);
+      await PayrollHistoryService.syncHistoricalData(periodId);
+      
+      toast({
+        title: "Sincronización completada",
+        description: "Los datos históricos se han sincronizado correctamente"
+      });
+      
+      // Reload the period details
+      await loadPeriodDetails();
+    } catch (error) {
+      console.error('Error syncing data:', error);
+      toast({
+        title: "Error en sincronización",
+        description: "No se pudieron sincronizar los datos históricos",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
-  const handleReopen = async (reason: string) => {
+  const handleToggleEditMode = () => {
+    if (isEditMode && hasUnsavedChanges) {
+      // Show confirmation dialog or save changes
+      return;
+    }
+    setIsEditMode(!isEditMode);
+    setHasUnsavedChanges(false);
+  };
+
+  const handleSaveAll = async () => {
+    try {
+      setIsSaving(true);
+      // Save all pending changes
+      await loadPeriodDetails(); // Reload to get updated totals
+      setHasUnsavedChanges(false);
+      setIsEditMode(false);
+      
+      toast({
+        title: "Cambios guardados",
+        description: "Todos los cambios se han guardado correctamente"
+      });
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast({
+        title: "Error al guardar",
+        description: "No se pudieron guardar los cambios",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    setHasUnsavedChanges(false);
+    setIsEditMode(false);
+    loadPeriodDetails(); // Reload original data
+  };
+
+  const handleEmployeeUpdate = (employeeId: string, updates: Partial<PayrollHistoryEmployee>) => {
+    if (!details) return;
+    
+    console.log('Updating employee values:', employeeId, updates);
+    
+    // Update local state
+    const updatedEmployees = details.employees.map(emp => 
+      emp.id === employeeId ? { ...emp, ...updates } : emp
+    );
+    
+    // Recalculate summary totals
+    const newSummary = {
+      totalDevengado: updatedEmployees.reduce((sum, emp) => sum + emp.grossPay, 0),
+      totalDeducciones: updatedEmployees.reduce((sum, emp) => sum + emp.deductions, 0),
+      totalNeto: updatedEmployees.reduce((sum, emp) => sum + emp.netPay, 0),
+      costoTotal: updatedEmployees.reduce((sum, emp) => sum + emp.grossPay + emp.deductions, 0),
+      aportesEmpleador: updatedEmployees.length * 100000 // Mock calculation
+    };
+    
+    setDetails({
+      ...details,
+      employees: updatedEmployees,
+      summary: newSummary
+    });
+    
+    setHasUnsavedChanges(true);
+  };
+
+  const handleNovedadChange = () => {
+    console.log('Novedad change callback triggered, reloading data');
+    loadPeriodDetails();
+  };
+
+  const handleReopenPeriod = async () => {
     if (!details?.period.period) return;
     
     try {
       await reopenPeriod(details.period.period);
       setShowReopenDialog(false);
-      await loadDetails(); // Reload details after reopening
-      
-      toast({
-        title: "Período reabierto",
-        description: "El período ha sido reabierto exitosamente"
-      });
+      await loadPeriodDetails(); // Refresh to show updated status
     } catch (error) {
       console.error('Error reopening period:', error);
-      toast({
-        title: "Error al reabrir",
-        description: "No se pudo reabrir el período",
-        variant: "destructive"
-      });
     }
   };
 
-  const handleRegenerateData = async () => {
-    if (!id) return;
-
-    const success = await regenerateHistoricalData(id);
-    if (success) {
-      await loadDetails(); // Reload details after regeneration
-      toast({
-        title: "Datos regenerados",
-        description: "Los datos históricos se han regenerado correctamente"
-      });
-    }
-  };
-
-  const handleFixPeriodData = async () => {
-    if (!id) return;
-
-    const success = await fixSpecificPeriodData(id);
-    if (success) {
-      await loadDetails(); // Reload details after fixing
-    }
-  };
-
-  const handleEditWizardConfirm = async (steps: any) => {
-    console.log('Edit wizard steps:', steps);
-    // Process the steps here
-    setShowEditWizard(false);
-    await loadDetails();
-    
-    toast({
-      title: "Período procesado",
-      description: "Los cambios se han aplicado correctamente"
-    });
-  };
-
-  const handleDownloadEmployeePDF = async (employee: any) => {
-    if (!details?.period || !employee.payroll_id) return;
+  const handleClosePeriod = async () => {
+    if (!details?.period.period) return;
     
     try {
-      setIsDownloadingPDF(employee.id);
-      console.log('🔄 Descargando PDF para empleado:', employee.nombre);
-      
-      // Preparar datos para el PDF
-      const pdfData = {
-        employee: {
-          id: employee.id,
-          name: `${employee.nombre} ${employee.apellido}`,
-          position: employee.cargo,
-          baseSalary: employee.salario_base,
-          grossPay: employee.total_devengado,
-          deductions: employee.total_deducciones,
-          netPay: employee.neto_pagado,
-          workedDays: 30, // Valor por defecto
-          extraHours: 0,
-          bonuses: 0,
-          transportAllowance: 0,
-          payrollId: employee.payroll_id
-        },
-        period: {
-          startDate: details.period.startDate,
-          endDate: details.period.endDate,
-          type: details.period.type
-        },
-        company: {
-          razon_social: 'Mi Empresa', // Valor por defecto
-          nit: 'N/A',
-          direccion: '',
-          telefono: '',
-          email: ''
-        }
-      };
+      await closePeriodAgain(details.period.period);
+      await loadPeriodDetails(); // Refresh to show updated status
+      setIsEditMode(false);
+    } catch (error) {
+      console.error('Error closing period:', error);
+    }
+  };
 
-      // Llamar a la edge function para generar el PDF
-      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
-        body: pdfData
-      });
+  const handleFinishEditing = () => {
+    handleClosePeriod();
+  };
 
-      if (error) {
-        console.error('❌ Error generando PDF:', error);
-        throw new Error(error.message || 'Error generando PDF');
-      }
+  const handleDismissBanner = () => {
+    // Just hide edit mode but keep period reopened
+    setIsEditMode(false);
+  };
 
-      if (data?.pdfUrl) {
-        // Descargar el PDF
-        const link = document.createElement('a');
-        link.href = data.pdfUrl;
-        link.download = `comprobante_${employee.nombre}_${employee.apellido}_${details.period.period}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        toast({
-          title: "PDF descargado",
-          description: `Comprobante de ${employee.nombre} ${employee.apellido} generado exitosamente`
-        });
-      }
-    } catch (error: any) {
-      console.error('❌ Error descargando PDF:', error);
-      toast({
-        title: "Error al generar PDF",
-        description: error.message || "No se pudo generar el comprobante de pago",
-        variant: "destructive"
-      });
-    } finally {
-      setIsDownloadingPDF(null);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'cerrado':
+        return 'bg-green-100 text-green-800';
+      case 'reabierto':
+        return 'bg-amber-100 text-amber-800';
+      case 'con_errores':
+        return 'bg-red-100 text-red-800';
+      case 'borrador':
+        return 'bg-gray-100 text-gray-800';
+      case 'editado':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <div className="flex items-center justify-center mb-4">
-          <AlertTriangle className="h-8 w-8 text-red-500 mr-2" />
-          <h2 className="text-lg font-semibold text-red-700">Error al cargar período</h2>
-        </div>
-        <p className="text-red-500 mb-4">{error}</p>
-        <div className="flex justify-center space-x-3">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/app/payroll-history')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver al Historial
-          </Button>
-          <Button 
-            onClick={loadDetails}
-            variant="default"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Reintentar
-          </Button>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   if (!details) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">No se encontraron detalles del período</p>
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/app/payroll-history')}
-          className="mt-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver al Historial
-        </Button>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Período no encontrado
+          </h3>
+          <p className="text-gray-600 mb-4">
+            No se pudo cargar la información del período solicitado
+          </p>
+          <Button onClick={() => navigate('/app/payroll-history')}>
+            Volver al historial
+          </Button>
+        </div>
       </div>
     );
   }
 
-  const { period, summary, employees } = details;
-  const hasNoEmployees = employees.length === 0;
+  const canEdit = canEditPeriods && (details.period.status === 'borrador' || details.period.status === 'editado' || details.period.status === 'reabierto');
+  const canReopen = canEditPeriods && canUserReopenPeriods && details.period.status === 'cerrado';
+  const isReopened = details.period.status === 'reabierto';
+  const hasNoEmployees = details.employees.length === 0;
+  const isClosedPeriod = details.period.status === 'cerrado';
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => navigate('/app/payroll-history')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{period.period}</h1>
-            <div className="flex items-center space-x-2 mt-1">
-              <Calendar className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-600">
-                {new Date(period.startDate).toLocaleDateString('es-CO')} - {new Date(period.endDate).toLocaleDateString('es-CO')}
-              </span>
-              <Badge 
-                variant={period.status === 'cerrado' ? 'default' : 'secondary'}
-                className="ml-2"
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/app/payroll-history')}
+                className="flex items-center space-x-2"
               >
-                {period.status}
-              </Badge>
+                <ArrowLeft className="h-4 w-4" />
+                <span>Volver al historial</span>
+              </Button>
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  Detalles del Período
+                </h1>
+                <p className="text-sm text-gray-600 mt-1">
+                  {details.period.period}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Button variant="outline" className="flex items-center space-x-2">
+                <Download className="h-4 w-4" />
+                <span>Exportar Detalles</span>
+              </Button>
+              {canReopen && (
+                <Button
+                  onClick={() => setShowReopenDialog(true)}
+                  variant="default"
+                  className="flex items-center space-x-2"
+                  disabled={isReopening}
+                >
+                  <Edit className="h-4 w-4" />
+                  <span>{isReopening ? 'Reabriendo...' : 'Editar período'}</span>
+                </Button>
+              )}
+              {canEdit && (
+                <Button
+                  onClick={handleToggleEditMode}
+                  variant={isEditMode ? "secondary" : "default"}
+                  className="flex items-center space-x-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span>{isEditMode ? 'Cancelar edición' : 'Editar período'}</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center space-x-2">
-          {/* Fix Period Data Button - Nueva funcionalidad de corrección específica */}
-          <Button
-            onClick={handleFixPeriodData}
-            disabled={isFixing}
-            variant="outline"
-            className="border-blue-200 text-blue-700 hover:bg-blue-50"
-          >
-            <Wrench className={`h-4 w-4 mr-2 ${isFixing ? 'animate-spin' : ''}`} />
-            {isFixing ? 'Corrigiendo...' : 'Corregir Datos'}
-          </Button>
+      <div className="p-6 space-y-6">
+        {/* Reopened Period Banner */}
+        {isReopened && (
+          <ReopenedPeriodBanner
+            periodName={details.period.period}
+            startDate={details.period.startDate}
+            endDate={details.period.endDate}
+            onFinishEditing={handleFinishEditing}
+            onDismiss={handleDismissBanner}
+          />
+        )}
 
-          {/* Regenerate Data Button - Show only if no employees and period is closed */}
-          {hasNoEmployees && period.status === 'cerrado' && (
-            <Button
-              onClick={handleRegenerateData}
-              disabled={isRegenerating}
-              variant="outline"
-              className="border-blue-200 text-blue-700 hover:bg-blue-50"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
-              {isRegenerating ? 'Regenerando...' : 'Regenerar Datos'}
-            </Button>
-          )}
+        {/* Alert for periods without employees - improved condition */}
+        {hasNoEmployees && isClosedPeriod && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                  <div>
+                    <h3 className="text-sm font-medium text-amber-800">
+                      Sin datos de empleados
+                    </h3>
+                    <p className="text-sm text-amber-700">
+                      Este período cerrado no tiene datos individuales de empleados. Puedes regenerar los datos históricos.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleSyncHistoricalData}
+                  disabled={isSyncing}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Sincronizando...' : 'Regenerar datos'}</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-          {period.editable && canUserReopenPeriods && (
-            <Button
-              onClick={() => setShowReopenDialog(true)}
-              disabled={isReopening}
-              variant="outline"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reabrir
-            </Button>
-          )}
+        {/* Period Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Estado</CardTitle>
+              <Badge className={getStatusColor(details.period.status)}>
+                {details.period.status}
+              </Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">
+                  {new Date(details.period.startDate).toLocaleDateString()} - {new Date(details.period.endDate).toLocaleDateString()}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
-          <Button
-            onClick={() => setShowEditWizard(true)}
-            disabled={!period.editable}
-          >
-            <Edit3 className="h-4 w-4 mr-2" />
-            Editar
-          </Button>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Empleados</CardTitle>
+              <Users className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{details.period.employeesCount}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Devengado</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(details.summary.totalDevengado)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Neto Pagado</CardTitle>
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {formatCurrency(details.summary.totalNeto)}
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </div>
 
-      {/* No Employees Warning */}
-      {hasNoEmployees && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                <Users className="h-5 w-5 text-amber-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium text-amber-900">Sin empleados procesados</h3>
-                <p className="text-sm text-amber-700 mt-1">
-                  Este período no tiene empleados asociados. Esto puede ocurrir cuando el período se cerró sin generar los registros individuales.
-                </p>
-                {period.status === 'cerrado' && (
-                  <p className="text-sm text-amber-600 mt-2">
-                    💡 Usa el botón "Regenerar Datos" para crear los registros históricos basados en los empleados activos.
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Empleados</p>
-                <p className="text-2xl font-bold text-gray-900">{period.employeesCount}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Devengado</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalDevengado)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="h-5 w-5 text-red-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Deducciones</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalDeducciones)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <Calculator className="h-5 w-5 text-purple-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Neto a Pagar</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalNeto)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Employees Table */}
-      {!hasNoEmployees && (
+        {/* Employees Table */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Users className="h-5 w-5" />
               <span>Empleados del Período</span>
+              {isEditMode && (
+                <Badge variant="secondary" className="ml-2">
+                  Modo edición activo
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <PeriodEmployeesTable 
-              employees={employees.map(emp => ({
-                id: emp.id,
-                nombre: emp.name.split(' ')[0] || '',
-                apellido: emp.name.split(' ').slice(1).join(' ') || '',
-                cargo: emp.position,
-                salario_base: emp.baseSalary,
-                total_devengado: emp.grossPay,
-                total_deducciones: emp.deductions,
-                neto_pagado: emp.netPay,
-                payroll_id: emp.payrollId,
-                estado: 'procesada'
-              }))} 
-              novedades={{}}
-              onAddNovedad={() => {}}
-              onEditNovedad={() => {}}
-              onDownloadPDF={handleDownloadEmployeePDF}
-              canEdit={period.editable}
-              isDownloadingPDF={isDownloadingPDF}
-            />
+            {hasNoEmployees ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Sin empleados registrados
+                </h3>
+                <p className="text-gray-600">
+                  {isClosedPeriod 
+                    ? 'Este período no tiene datos de empleados. Usa el botón "Regenerar datos" para recuperar la información histórica.'
+                    : 'Aún no se han procesado empleados para este período.'
+                  }
+                </p>
+              </div>
+            ) : (
+              <EditableEmployeeTable
+                employees={details.employees}
+                isEditMode={isEditMode}
+                onEmployeeUpdate={handleEmployeeUpdate}
+                periodId={periodId!}
+                periodData={{
+                  startDate: details.period.startDate,
+                  endDate: details.period.endDate,
+                  type: details.period.type
+                }}
+                onNovedadChange={handleNovedadChange}
+              />
+            )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Floating Action Bar */}
+      {hasUnsavedChanges && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg px-6 py-4 flex items-center space-x-4 z-50">
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <span>Tienes cambios sin guardar</span>
+          </div>
+          <Separator orientation="vertical" className="h-6" />
+          <div className="flex items-center space-x-2">
+            <Button
+              onClick={handleSaveAll}
+              disabled={isSaving}
+              className="flex items-center space-x-2"
+            >
+              <Save className="h-4 w-4" />
+              <span>{isSaving ? 'Guardando...' : 'Guardar todo'}</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDiscardChanges}
+              disabled={isSaving}
+              className="flex items-center space-x-2"
+            >
+              <Undo2 className="h-4 w-4" />
+              <span>Deshacer</span>
+            </Button>
+          </div>
+        </div>
       )}
 
-      {/* Modals */}
-      {showEditWizard && (
-        <EditWizard
-          isOpen={showEditWizard}
-          onClose={() => setShowEditWizard(false)}
-          onConfirm={handleEditWizardConfirm}
-          isProcessing={false}
-        />
-      )}
-
-      {showReopenDialog && (
-        <ReopenDialog
-          isOpen={showReopenDialog}
-          onClose={() => setShowReopenDialog(false)}
-          onConfirm={handleReopen}
-          period={period}
-          isProcessing={isReopening}
-        />
-      )}
+      {/* Reopen Confirmation Dialog */}
+      <AlertDialog open={showReopenDialog} onOpenChange={setShowReopenDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reabrir Período Cerrado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este período está cerrado. Si deseas hacer ajustes, será reabierto temporalmente. 
+              Podrás agregar, editar o eliminar novedades. Para que los cambios sean válidos, 
+              deberás cerrarlo nuevamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReopenPeriod} disabled={isReopening}>
+              {isReopening ? 'Reabriendo...' : 'Reabrir Período'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -191,50 +192,65 @@ export const EditableEmployeeTable = ({
   };
 
   const handleDownloadVoucher = async (employee: PayrollHistoryEmployee) => {
+    if (!periodData) {
+      toast({
+        title: "Error",
+        description: "Información del período no disponible",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setDownloadingEmployees(prev => new Set(prev).add(employee.id));
     
     try {
-      console.log('🚀 Descargando comprobante HISTÓRICO para:', employee.name);
-      console.log('📋 Enviando datos HISTÓRICOS:', {
-        employee_id: employee.id,
-        period_id: periodId
-      });
-
-      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+      const response = await supabase.functions.invoke('generate-voucher-pdf', {
         body: {
-          employee_id: employee.id,
-          period_id: periodId
+          employee: {
+            id: employee.id,
+            name: employee.name,
+            position: employee.position || 'Sin cargo',
+            baseSalary: employee.baseSalary,
+            workedDays: 30, // Default for history
+            extraHours: 0,
+            bonuses: 0,
+            disabilities: 0,
+            grossPay: employee.grossPay,
+            deductions: employee.deductions,
+            netPay: employee.netPay,
+            eps: '', // These might not be available in history
+            afp: ''
+          },
+          period: periodData
         }
       });
 
-      if (error) {
-        console.error('❌ Error en edge function:', error);
-        throw error;
-      }
+      if (response.error) throw response.error;
 
-      console.log('✅ PDF histórico generado exitosamente');
-
-      // Crear blob y descargar
-      const blob = new Blob([data], { type: 'application/pdf' });
+      // The response.data should be the PDF buffer
+      const pdfData = response.data;
+      
+      // Convert buffer to blob
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `comprobante-historico-${employee.name.replace(/\s+/g, '-')}.pdf`;
+      a.download = `comprobante-${employee.name.replace(/\s+/g, '-')}-${periodData.startDate}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
       toast({
-        title: "✅ Comprobante histórico descargado",
-        description: `Comprobante con datos almacenados de ${employee.name} descargado correctamente`,
+        title: "✅ Comprobante descargado",
+        description: "El comprobante de pago se ha descargado exitosamente",
         className: "border-green-200 bg-green-50"
       });
     } catch (error) {
-      console.error('❌ Error descargando comprobante histórico:', error);
+      console.error('Error downloading voucher:', error);
       toast({
         title: "Error al descargar",
-        description: "No se pudo descargar el comprobante histórico",
+        description: "No se pudo descargar el comprobante",
         variant: "destructive"
       });
     } finally {
@@ -247,6 +263,15 @@ export const EditableEmployeeTable = ({
   };
 
   const handleResendVoucher = async (employee: PayrollHistoryEmployee) => {
+    if (!periodData) {
+      toast({
+        title: "Error",
+        description: "Información del período no disponible",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // For now, we'll ask for email in a simple prompt
     // In a real implementation, you might want to create a modal for this
     const email = prompt(`Ingresa el email para enviar el comprobante de ${employee.name}:`);
@@ -267,11 +292,25 @@ export const EditableEmployeeTable = ({
     setSendingEmployees(prev => new Set(prev).add(employee.id));
 
     try {
-      // First generate the voucher using historical data
+      // First generate the voucher
       const { data: voucherData, error: voucherError } = await supabase.functions.invoke('generate-voucher-pdf', {
         body: {
-          employee_id: employee.id,
-          period_id: periodId
+          employee: {
+            id: employee.id,
+            name: employee.name,
+            position: employee.position,
+            baseSalary: employee.baseSalary,
+            workedDays: 30,
+            extraHours: 0,
+            bonuses: 0,
+            disabilities: 0,
+            grossPay: employee.grossPay,
+            deductions: employee.deductions,
+            netPay: employee.netPay,
+            eps: '',
+            afp: ''
+          },
+          period: periodData
         }
       });
 
@@ -291,15 +330,15 @@ export const EditableEmployeeTable = ({
       if (emailError) throw emailError;
 
       toast({
-        title: "✅ Comprobante histórico enviado",
-        description: `El comprobante histórico se ha enviado exitosamente a ${email}`,
+        title: "✅ Comprobante enviado",
+        description: `El comprobante se ha enviado exitosamente a ${email}`,
         className: "border-green-200 bg-green-50"
       });
     } catch (error) {
-      console.error('Error sending historical voucher:', error);
+      console.error('Error sending voucher:', error);
       toast({
         title: "Error al enviar",
-        description: "No se pudo enviar el comprobante histórico por email",
+        description: "No se pudo enviar el comprobante por email",
         variant: "destructive"
       });
     } finally {
@@ -392,9 +431,9 @@ export const EditableEmployeeTable = ({
                         variant="outline"
                         size="sm"
                         onClick={() => handleDownloadVoucher(employee)}
-                        disabled={downloadingEmployees.has(employee.id)}
+                        disabled={downloadingEmployees.has(employee.id) || !periodData}
                         className="h-8 w-8 p-0 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                        title="Descargar comprobante histórico"
+                        title="Descargar comprobante"
                       >
                         {downloadingEmployees.has(employee.id) ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -408,9 +447,9 @@ export const EditableEmployeeTable = ({
                         variant="outline"
                         size="sm"
                         onClick={() => handleResendVoucher(employee)}
-                        disabled={sendingEmployees.has(employee.id)}
+                        disabled={sendingEmployees.has(employee.id) || !periodData}
                         className="h-8 w-8 p-0 border-green-300 text-green-600 hover:border-green-500 hover:text-green-700 hover:bg-green-50"
-                        title="Reenviar comprobante histórico por correo"
+                        title="Reenviar por correo"
                       >
                         {sendingEmployees.has(employee.id) ? (
                           <Loader2 className="h-4 w-4 animate-spin" />

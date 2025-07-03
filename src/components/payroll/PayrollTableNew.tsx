@@ -1,19 +1,25 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Plus, 
+  Trash2, 
+  MoreHorizontal,
+  Edit3
+} from 'lucide-react';
 import { PayrollEmployee } from '@/types/payroll';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Download, FileText, Edit, Trash2, Plus } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { NovedadUnifiedModal } from './novedades/NovedadUnifiedModal';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 
 interface PayrollTableNewProps {
   employees: PayrollEmployee[];
   onRemoveEmployee: (employeeId: string) => void;
-  onCreateNovedad: (employeeId: string, novedadData: any) => void;
-  onRecalculate: (employeeId: string) => void;
+  onCreateNovedad: (employeeId: string, data: CreateNovedadData) => void;
+  onRecalculate?: () => Promise<void>; // ✅ Nuevo prop para recálculo
   periodId: string;
   canEdit: boolean;
   selectedEmployees: string[];
@@ -21,276 +27,243 @@ interface PayrollTableNewProps {
   onToggleAll: () => void;
 }
 
-export const PayrollTableNew = ({ 
-  employees, 
-  onRemoveEmployee, 
-  onCreateNovedad, 
-  onRecalculate,
+export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
+  employees,
+  onRemoveEmployee,
+  onCreateNovedad,
+  onRecalculate, // ✅ Nuevo prop
   periodId,
   canEdit,
   selectedEmployees,
   onToggleEmployee,
   onToggleAll
-}: PayrollTableNewProps) => {
-  const { toast } = useToast();
-  const [isGeneratingVoucher, setIsGeneratingVoucher] = useState<string | null>(null);
-  const [novedadModalOpen, setNovedadModalOpen] = useState(false);
-  const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<string | null>(null);
-  const checkboxRef = useRef<HTMLButtonElement>(null);
+}) => {
+  const [showNovedadModal, setShowNovedadModal] = useState(false);
+  const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<PayrollEmployee | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false); // ✅ Estado para indicador
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
-      minimumFractionDigits: 0
+      minimumFractionDigits: 0,
     }).format(amount);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'valid':
-        return 'bg-green-100 text-green-800';
-      case 'warning':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'error':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const handleOpenNovedadModal = (employee: PayrollEmployee) => {
+    setSelectedEmployeeForNovedad(employee);
+    setShowNovedadModal(true);
+  };
+
+  const handleCreateNovedad = async (data: CreateNovedadData) => {
+    if (selectedEmployeeForNovedad) {
+      await onCreateNovedad(selectedEmployeeForNovedad.id, data);
+      setShowNovedadModal(false);
+      setSelectedEmployeeForNovedad(null);
+      
+      // ✅ Recalcular automáticamente después de crear novedad
+      if (onRecalculate) {
+        setIsRecalculating(true);
+        try {
+          await onRecalculate();
+        } finally {
+          setIsRecalculating(false);
+        }
+      }
     }
   };
 
-  const handleGenerateVoucher = async (employee: PayrollEmployee) => {
-    setIsGeneratingVoucher(employee.id);
+  // ✅ Nuevo callback para cuando se modifiquen/eliminen novedades
+  const handleNovedadChange = async () => {
+    if (onRecalculate) {
+      setIsRecalculating(true);
+      console.log('🔄 Recalculando liquidación tras cambio en novedades...');
+      try {
+        await onRecalculate();
+        console.log('✅ Recálculo completado');
+      } catch (error) {
+        console.error('❌ Error en recálculo:', error);
+      } finally {
+        setIsRecalculating(false);
+      }
+    }
+  };
+
+  const calculateSuggestedValue = (
+    tipo: string,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ): number | null => {
+    if (!selectedEmployeeForNovedad) return null;
+    
+    console.log('🧮 PayrollTableNew - Calculating suggested value:', {
+      tipo,
+      subtipo,
+      horas,
+      dias,
+      employeeSalary: selectedEmployeeForNovedad.baseSalary
+    });
     
     try {
-      console.log('🎨 Generando comprobante HISTÓRICO usando datos almacenados...');
-      console.log('👤 Empleado:', employee.name);
-      console.log('📅 Período:', periodId);
-
-      // Enviar employee_id y period_id para consultar datos históricos
-      const voucherData = {
-        employee_id: employee.id,
-        period_id: periodId
-      };
-
-      console.log('📋 Datos enviados a la edge function HISTÓRICA:', voucherData);
-
-      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
-        body: voucherData
-      });
-
-      if (error) {
-        console.error('❌ Error en edge function:', error);
-        throw error;
-      }
-
-      // Crear blob para descarga
-      const blob = new Blob([data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `comprobante-historico-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "✅ Comprobante HISTÓRICO generado",
-        description: `Comprobante con datos almacenados de ${employee.name} descargado correctamente`,
-      });
-
+      const fechaPeriodo = new Date();
+      const result = calcularValorNovedadEnhanced(
+        tipo as any,
+        subtipo,
+        selectedEmployeeForNovedad.baseSalary,
+        dias,
+        horas,
+        fechaPeriodo
+      );
+      
+      console.log(`💰 Calculation result: $${Math.round(result.valor).toLocaleString()}`);
+      return Math.round(result.valor);
     } catch (error) {
-      console.error('❌ Error generando comprobante histórico:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo generar el comprobante histórico. Intenta nuevamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsGeneratingVoucher(null);
-    }
-  };
-
-  const handleOpenNovedadModal = (employeeId: string) => {
-    setSelectedEmployeeForNovedad(employeeId);
-    setNovedadModalOpen(true);
-  };
-
-  const handleCreateNovedad = async (novedadData: any) => {
-    if (selectedEmployeeForNovedad) {
-      await onCreateNovedad(selectedEmployeeForNovedad, novedadData);
-      setNovedadModalOpen(false);
-      setSelectedEmployeeForNovedad(null);
+      console.error('❌ Error calculating suggested value:', error);
+      return null;
     }
   };
 
   const allSelected = employees.length > 0 && selectedEmployees.length === employees.length;
   const someSelected = selectedEmployees.length > 0 && selectedEmployees.length < employees.length;
 
-  // Update checkbox indeterminate state
-  useEffect(() => {
-    if (checkboxRef.current) {
-      (checkboxRef.current as any).indeterminate = someSelected;
-    }
-  }, [someSelected]);
-
-  if (employees.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <FileText className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-medium text-gray-900">Sin empleados</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          No hay empleados en este período de nómina.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="bg-white shadow-sm rounded-lg border">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left">
+    <>
+      <div className="border rounded-lg overflow-hidden bg-white">
+        {/* ✅ Indicador de recálculo */}
+        {isRecalculating && (
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
+            <div className="flex items-center gap-2 text-blue-700">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="text-sm">Recalculando liquidación...</span>
+            </div>
+          </div>
+        )}
+
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-50">
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={onToggleAll}
+                  ref={(el) => {
+                    if (el) {
+                      const input = el.querySelector('input[type="checkbox"]') as HTMLInputElement;
+                      if (input) {
+                        input.indeterminate = someSelected;
+                      }
+                    }
+                  }}
+                />
+              </TableHead>
+              <TableHead>Empleado</TableHead>
+              <TableHead className="text-right">Salario Base</TableHead>
+              <TableHead className="text-center">Novedades</TableHead>
+              <TableHead className="text-right">Neto a Pagar</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {employees.map((employee) => (
+              <TableRow key={employee.id} className="hover:bg-gray-50">
+                <TableCell>
                   <Checkbox
-                    ref={checkboxRef}
-                    checked={allSelected}
-                    onCheckedChange={onToggleAll}
+                    checked={selectedEmployees.includes(employee.id)}
+                    onCheckedChange={() => onToggleEmployee(employee.id)}
                   />
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Empleado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Salario Base
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Días Trab.
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Devengado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Deducciones
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Neto
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {employees.map((employee) => (
-                <tr key={employee.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <Checkbox
-                      checked={selectedEmployees.includes(employee.id)}
-                      onCheckedChange={() => onToggleEmployee(employee.id)}
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{employee.name}</div>
-                        <div className="text-sm text-gray-500">{employee.cedula || employee.id}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                </TableCell>
+                
+                <TableCell>
+                  <div>
+                    <p className="font-medium text-gray-900">{employee.name}</p>
+                    <p className="text-sm text-gray-500">{employee.position}</p>
+                  </div>
+                </TableCell>
+                
+                <TableCell className="text-right">
+                  <span className="font-medium">
                     {formatCurrency(employee.baseSalary)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {employee.workedDays || 30}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatCurrency(employee.grossPay)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatCurrency(employee.deductions)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {formatCurrency(employee.netPay)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge className={getStatusColor(employee.status || 'valid')}>
-                      {employee.status === 'valid' ? 'Válido' : 
-                       employee.status === 'warning' ? 'Advertencia' : 
-                       employee.status === 'error' ? 'Error' : 
-                       employee.status === 'incomplete' ? 'Incompleto' : 'Válido'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleGenerateVoucher(employee)}
-                      disabled={isGeneratingVoucher === employee.id}
-                      title="Generar comprobante con datos históricos almacenados"
-                    >
-                      {isGeneratingVoucher === employee.id ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                      ) : (
-                        <Download className="h-4 w-4" />
-                      )}
-                    </Button>
-                    
-                    {canEdit && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenNovedadModal(employee.id)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onRecalculate(employee.id)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onRemoveEmployee(employee.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
+                  </span>
+                </TableCell>
+                
+                <TableCell className="text-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenNovedadModal(employee)}
+                    className="h-8 w-8 p-0 rounded-full border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  >
+                    <Plus className="h-4 w-4 text-blue-500" />
+                  </Button>
+                </TableCell>
+                
+                <TableCell className="text-right">
+                  <div className="text-right">
+                    <div className="font-semibold text-gray-900">
+                      {formatCurrency(employee.netPay)}
+                    </div>
+                    {employee.bonuses > 0 && (
+                      <div className="text-xs text-green-600">
+                        +{formatCurrency(employee.bonuses)}
+                      </div>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    {employee.deductions > 0 && (
+                      <div className="text-xs text-red-600">
+                        -{formatCurrency(employee.deductions)}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                
+                <TableCell className="text-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleOpenNovedadModal(employee)}
+                      >
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Gestionar Novedades
+                      </DropdownMenuItem>
+                      {canEdit && (
+                        <DropdownMenuItem
+                          onClick={() => onRemoveEmployee(employee.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Quitar del período
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
-      {/* Modal de Novedad */}
-      <NovedadUnifiedModal
-        isOpen={novedadModalOpen}
-        onClose={() => {
-          setNovedadModalOpen(false);
-          setSelectedEmployeeForNovedad(null);
-        }}
-        onCreateNovedad={handleCreateNovedad}
-        employeeId={selectedEmployeeForNovedad || ''}
-        employeeName={employees.find(emp => emp.id === selectedEmployeeForNovedad)?.name || ''}
-        employeeSalary={employees.find(emp => emp.id === selectedEmployeeForNovedad)?.baseSalary || 0}
-        periodId={periodId}
-      />
-    </div>
+      {selectedEmployeeForNovedad && (
+        <NovedadUnifiedModal
+          isOpen={showNovedadModal}
+          onClose={() => {
+            setShowNovedadModal(false);
+            setSelectedEmployeeForNovedad(null);
+          }}
+          employeeName={selectedEmployeeForNovedad.name}
+          employeeId={selectedEmployeeForNovedad.id}
+          employeeSalary={selectedEmployeeForNovedad.baseSalary}
+          periodId={periodId}
+          onCreateNovedad={handleCreateNovedad}
+          onNovedadChange={handleNovedadChange} // ✅ Nuevo callback
+          calculateSuggestedValue={calculateSuggestedValue}
+        />
+      )}
+    </>
   );
 };

@@ -30,14 +30,12 @@ export interface PayrollEmployee {
   grossPay: number;
   deductions: number;
   netPay: number;
-  status: 'valid' | 'error' | 'incomplete' | 'warning';
+  status: 'valid' | 'error' | 'incomplete';
   errors: string[];
   eps?: string;
   afp?: string;
   transportAllowance: number;
   employerContributions: number;
-  cedula?: string;
-  tipo_documento?: string;
 }
 
 export interface PayrollSummary {

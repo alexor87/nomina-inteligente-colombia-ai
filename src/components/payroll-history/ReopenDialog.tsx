@@ -1,5 +1,6 @@
+
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -38,9 +39,6 @@ export const ReopenDialog = ({ isOpen, onClose, onConfirm, period, isProcessing 
             <AlertTriangle className="h-5 w-5 text-yellow-600" />
             <span>Reabrir Período</span>
           </DialogTitle>
-          <DialogDescription>
-            Esta acción permitirá editar un período cerrado. Se requiere justificación y quedará registrada en el historial de auditoría.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

@@ -1,21 +1,19 @@
-
 import React from 'react';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle, Calendar, Users, DollarSign, TrendingUp, Calculator, BarChart3, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Calendar, Users, DollarSign, TrendingUp, Calculator, BarChart3 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollSummary } from '@/types/payroll';
+import { useNavigate } from 'react-router-dom';
 
 interface PayrollSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onReturn: () => void; // New prop for return to liquidation
   periodData: {
     startDate: string;
     endDate: string;
     type: string;
-    period: string;
   };
   summary: PayrollSummary;
 }
@@ -23,16 +21,22 @@ interface PayrollSuccessModalProps {
 export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
   isOpen,
   onClose,
-  onReturn,
   periodData,
   summary
 }) => {
+  const navigate = useNavigate();
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  const handleGoToHistory = () => {
+    onClose();
+    navigate('/app/payroll-history');
   };
 
   const summaryCards = [
@@ -71,39 +75,44 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
       isOpen={isOpen} 
       onClose={onClose}
       className="max-w-2xl"
-      closeOnEscape={false}
-      closeOnBackdrop={false}
+      closeOnEscape={true}
+      closeOnBackdrop={true}
     >
       <div className="text-center">
         {/* Success Icon */}
-        <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-6">
-          <CheckCircle className="h-12 w-12 text-green-600" />
+        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6 animate-scale-in">
+          <CheckCircle className="h-10 w-10 text-green-600" />
         </div>
 
         {/* Title */}
-        <CustomModalHeader className="border-none pb-4">
-          <CustomModalTitle className="text-3xl font-bold text-center text-green-800">
+        <CustomModalHeader className="border-none pb-2">
+          <CustomModalTitle className="text-2xl font-bold text-center">
             ¡Nómina liquidada exitosamente!
           </CustomModalTitle>
         </CustomModalHeader>
 
         {/* Period Info */}
-        <div className="mb-8 bg-green-50 rounded-lg p-6">
-          <div className="flex items-center justify-center gap-2 text-green-700 mb-3">
-            <Calendar className="h-5 w-5" />
-            <span className="text-lg font-semibold">Período liquidado</span>
+        <div className="mb-6">
+          <div className="flex items-center justify-center gap-2 text-gray-600 mb-2">
+            <Calendar className="h-4 w-4" />
+            <span className="text-sm font-medium">Período liquidado</span>
           </div>
-          <div className="text-2xl font-bold text-green-800 mb-2">
-            {periodData.period}
-          </div>
-          <div className="text-green-600">
+          <div className="text-lg font-semibold text-gray-900">
             {formatDate(periodData.startDate)} - {formatDate(periodData.endDate)}
+          </div>
+          <div className="text-sm text-gray-500 capitalize">
+            Período {periodData.type}
           </div>
         </div>
 
         {/* Summary Cards */}
-        <div className="mb-8">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-4 mb-6">
+          <div className="flex items-center gap-2 justify-center text-gray-600 mb-3">
+            <BarChart3 className="h-4 w-4" />
+            <span className="text-sm font-medium">Resumen de liquidación</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
             {summaryCards.map((card, index) => {
               const Icon = card.icon;
               return (
@@ -111,11 +120,11 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
                   <CardContent className="p-4">
                     <div className="flex items-center space-x-3">
                       <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                        <Icon className={`h-5 w-5 ${card.color}`} />
+                        <Icon className={`h-4 w-4 ${card.color}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-600 mb-1">{card.label}</p>
-                        <p className="text-lg font-semibold text-gray-900">{card.value}</p>
+                        <p className="text-xs font-medium text-gray-600 mb-1">{card.label}</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">{card.value}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -125,34 +134,22 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
           </div>
         </div>
 
-        {/* Success Message */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-          <div className="flex items-center justify-center mb-3">
-            <BarChart3 className="h-5 w-5 text-blue-600 mr-2" />
-            <span className="text-blue-800 font-semibold">¡Proceso completado!</span>
-          </div>
-          <p className="text-blue-700">
-            El período ha sido liquidado y cerrado exitosamente. Los comprobantes de pago están disponibles 
-            en el historial de nómina. Ahora puedes crear el siguiente período de nómina.
+        {/* Info Message */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <p className="text-sm text-blue-800">
+            Los comprobantes de pago han sido generados automáticamente. 
+            Puedes consultar el período procesado y gestionar los comprobantes desde el Historial de Nómina.
           </p>
         </div>
 
-        {/* Action Buttons - Aleluya Style */}
-        <div className="flex gap-4 justify-center">
-          <Button 
-            onClick={onReturn}
-            className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg"
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Regresar a Liquidación
+        {/* Action Buttons */}
+        <div className="flex gap-3 justify-center">
+          <Button variant="outline" onClick={onClose}>
+            Continuar trabajando
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={onClose}
-            className="px-8 py-3 text-lg"
-          >
-            <BarChart3 className="h-5 w-5 mr-2" />
-            Ver Historial
+          <Button onClick={handleGoToHistory} className="bg-primary hover:bg-primary/90">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Ver historial de nómina
           </Button>
         </div>
       </div>

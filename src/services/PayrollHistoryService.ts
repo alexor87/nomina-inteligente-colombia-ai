@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PAYROLL_STATES, STATE_MAPPING } from '@/constants/payrollStates';
 import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
-import { PayrollConfigurationService } from './payroll-intelligent/PayrollConfigurationService';
+import { PayrollHistoricalRecoveryService } from './PayrollHistoricalRecoveryService';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -16,12 +16,6 @@ export interface PayrollHistoryRecord {
   fechaCreacion: string;
   editable: boolean;
   reportado_dian: boolean;
-}
-
-interface RegenerateResult {
-  success: boolean;
-  message: string;
-  records_created?: number;
 }
 
 export class PayrollHistoryService {
@@ -103,27 +97,22 @@ export class PayrollHistoryService {
 
       console.log('🔍 Obteniendo detalles del período:', periodId);
 
-      // Get period details with better error handling
+      // Get period details
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('id', periodId)
         .eq('company_id', companyId)
-        .maybeSingle();
+        .single();
 
       if (periodError) {
         console.error('❌ Error obteniendo período:', periodError);
-        throw new Error(`Error obteniendo período: ${periodError.message}`);
-      }
-
-      if (!period) {
-        console.warn('⚠️ Período no encontrado para ID:', periodId);
-        throw new Error('Período no encontrado');
+        throw periodError;
       }
 
       console.log('📊 Período encontrado:', period);
 
-      // Get employees for this period using period_id relationship with better fallback
+      // Get employees for this period using period_id relationship
       let { data: payrolls, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
@@ -139,10 +128,8 @@ export class PayrollHistoryService {
         .eq('period_id', periodId);
 
       if (payrollsError) {
-        console.error('❌ Error obteniendo payrolls con period_id:', payrollsError);
-        
-        // Fallback: try with periodo text
-        console.log('🔄 Intentando fallback con periodo texto:', period.periodo);
+        console.error('❌ Error obteniendo payrolls:', payrollsError);
+        // If period_id relationship fails, try fallback with periodo text
         const { data: fallbackPayrolls, error: fallbackError } = await supabase
           .from('payrolls')
           .select(`
@@ -157,19 +144,41 @@ export class PayrollHistoryService {
           .eq('company_id', companyId)
           .eq('periodo', period.periodo);
 
-        if (fallbackError) {
-          console.error('❌ Error en fallback:', fallbackError);
-          payrolls = [];
-        } else {
-          payrolls = fallbackPayrolls || [];
-        }
+        if (fallbackError) throw fallbackError;
+        payrolls = fallbackPayrolls;
       }
 
       console.log('👥 Empleados encontrados:', payrolls?.length || 0);
 
-      // CORREGIR CÁLCULO DE DÍAS TRABAJADOS BASADO EN FECHAS REALES
-      const periodDays = this.calculatePeriodDays(period.fecha_inicio, period.fecha_fin);
-      console.log('📅 Días calculados para el período:', periodDays);
+      // Si no hay empleados y el período está cerrado, intentar sincronización tradicional
+      if ((!payrolls || payrolls.length === 0) && period.estado === 'cerrado') {
+        console.log('🔄 Período cerrado sin empleados, intentando sincronización tradicional...');
+        
+        try {
+          await this.syncHistoricalData(periodId);
+          
+          // Reintentar obtener los empleados después de la sincronización
+          const { data: syncedPayrolls } = await supabase
+            .from('payrolls')
+            .select(`
+              *,
+              employees (
+                id,
+                nombre,
+                apellido,
+                cargo
+              )
+            `)
+            .eq('company_id', companyId)
+            .eq('period_id', periodId);
+          
+          payrolls = syncedPayrolls;
+          console.log('✅ Empleados sincronizados:', payrolls?.length || 0);
+        } catch (syncError) {
+          console.error('❌ Error en sincronización:', syncError);
+          // Continuar sin sincronización si falla
+        }
+      }
 
       const employees: PayrollHistoryEmployee[] = payrolls?.map(payroll => ({
         id: payroll.employee_id,
@@ -231,333 +240,24 @@ export class PayrollHistoryService {
     }
   }
 
-  /**
-   * NUEVA FUNCIÓN: Calcular días reales de un período
-   */
-  static calculatePeriodDays(startDate: string, endDate: string): number {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    console.log(`📅 Período ${startDate} - ${endDate} = ${days} días`);
-    return days;
-  }
-
-  /**
-   * NUEVA FUNCIÓN: Corregir datos específicos de un período usando SQL directo
-   */
-  static async fixSpecificPeriodData(periodId: string): Promise<{ success: boolean; message: string; details?: any }> {
+  static async syncHistoricalData(periodId: string): Promise<void> {
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        return {
-          success: false,
-          message: 'No se encontró información de la empresa'
-        };
-      }
-
-      console.log('🔧 Corrigiendo datos específicos del período:', periodId);
-
-      // Usar SQL directo ya que la función aún no existe en los tipos
-      const { data: result, error } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('id', periodId)
-        .eq('company_id', companyId)
-        .single();
-
-      if (error) {
-        console.error('❌ Error obteniendo período:', error);
-        return {
-          success: false,
-          message: `Error obteniendo período: ${error.message}`
-        };
-      }
-
-      if (!result) {
-        return {
-          success: false,
-          message: 'Período no encontrado'
-        };
-      }
-
-      // Calcular días reales del período
-      const periodDays = this.calculatePeriodDays(result.fecha_inicio, result.fecha_fin);
+      console.log('🔄 Sincronizando datos históricos para período:', periodId);
       
-      // Obtener empleados y sus payrolls para este período
-      const { data: payrolls, error: payrollsError } = await supabase
-        .from('payrolls')
-        .select(`
-          *,
-          employees (
-            salario_base
-          )
-        `)
-        .eq('company_id', companyId)
-        .or(`period_id.eq.${periodId},periodo.eq.${result.periodo}`);
-
-      if (payrollsError) {
-        console.error('❌ Error obteniendo payrolls:', payrollsError);
-        return {
-          success: false,
-          message: 'Error obteniendo registros de nómina'
-        };
-      }
-
-      let recordsUpdated = 0;
-
-      // Actualizar cada payroll con valores corregidos
-      for (const payroll of payrolls || []) {
-        const baseSalary = Number(payroll.employees?.salario_base || payroll.salario_base || 0);
-        const proportionalSalary = (baseSalary / 30.0) * periodDays;
-        const proportionalDeductions = proportionalSalary * 0.08;
-        const proportionalNet = proportionalSalary - proportionalDeductions;
-
-        const { error: updateError } = await supabase
-          .from('payrolls')
-          .update({
-            dias_trabajados: periodDays,
-            total_devengado: proportionalSalary,
-            total_deducciones: proportionalDeductions,
-            neto_pagado: proportionalNet,
-            period_id: periodId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', payroll.id);
-
-        if (!updateError) {
-          recordsUpdated++;
-        }
-      }
-
-      // Actualizar totales del período
-      const { data: updatedPayrolls } = await supabase
-        .from('payrolls')
-        .select('total_devengado, total_deducciones, neto_pagado')
-        .eq('period_id', periodId);
-
-      if (updatedPayrolls) {
-        const totals = updatedPayrolls.reduce((acc, p) => ({
-          totalDevengado: acc.totalDevengado + Number(p.total_devengado || 0),
-          totalDeducciones: acc.totalDeducciones + Number(p.total_deducciones || 0),
-          totalNeto: acc.totalNeto + Number(p.neto_pagado || 0)
-        }), { totalDevengado: 0, totalDeducciones: 0, totalNeto: 0 });
-
-        await supabase
-          .from('payroll_periods_real')
-          .update({
-            empleados_count: updatedPayrolls.length,
-            total_devengado: totals.totalDevengado,
-            total_deducciones: totals.totalDeducciones,
-            total_neto: totals.totalNeto,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', periodId);
-      }
-
-      console.log('✅ Corrección completada:', { recordsUpdated, periodDays });
-      
-      return {
-        success: true,
-        message: `Período corregido: ${recordsUpdated} registros actualizados con ${periodDays} días`,
-        details: { records_updated: recordsUpdated, period_days: periodDays }
-      };
-
-    } catch (error) {
-      console.error('💥 Error crítico corrigiendo período:', error);
-      return {
-        success: false,
-        message: 'Error crítico durante la corrección'
-      };
-    }
-  }
-
-  static async regenerateHistoricalData(periodId: string): Promise<RegenerateResult> {
-    try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) throw new Error('No company ID found');
-
-      console.log('🔄 Regenerando datos históricos para período:', periodId);
-
-      // OBTENER CONFIGURACIÓN DINÁMICA PARA CÁLCULOS CORRECTOS
-      const settings = await PayrollConfigurationService.getCompanySettingsForceRefresh(companyId);
-      const periodicity = settings?.periodicity || 'mensual';
-      const customDays = settings?.custom_period_days;
-      
-      console.log('⚙️ Configuración para regeneración:', { periodicity, customDays });
-
-      // PRIMERO: Intentar corregir datos existentes
-      const fixResult = await this.fixSpecificPeriodData(periodId);
-      
-      if (fixResult.success) {
-        console.log('✅ Corrección directa exitosa:', fixResult.message);
-        return {
-          success: true,
-          message: fixResult.message,
-          records_created: fixResult.details?.records_updated || 0
-        };
-      }
-
-      // FALLBACK: Regeneración completa si la corrección falla
-      const { data: result, error } = await supabase.rpc(
-        'sync_historical_payroll_data',
-        { 
-          p_period_id: periodId, 
-          p_company_id: companyId 
-        }
-      );
-
-      if (error) {
-        console.error('❌ Error regenerando datos:', error);
-        return {
-          success: false,
-          message: `Error regenerando datos: ${error.message}`
-        };
-      }
-
-      console.log('✅ Regeneración completada:', result);
-      
-      // CORREGIR DÍAS TRABAJADOS DESPUÉS DE LA REGENERACIÓN
-      await this.correctWorkedDaysForPeriod(periodId, companyId);
-      
-      // Type guard to safely access properties
-      if (result && typeof result === 'object' && 'success' in result) {
-        const typedResult = result as any;
-        return {
-          success: typedResult.success,
-          message: typedResult.message,
-          records_created: typedResult.records_created
-        };
-      }
-
-      return {
-        success: true,
-        message: 'Datos históricos regenerados y corregidos correctamente'
-      };
-
-    } catch (error) {
-      console.error('💥 Error crítico regenerando datos:', error);
-      return {
-        success: false,
-        message: 'Error crítico regenerando datos históricos'
-      };
-    }
-  }
-
-  /**
-   * MEJORADA: Corregir días trabajados usando cálculo real de fechas
-   */
-  static async correctWorkedDaysForPeriod(periodId: string, companyId: string): Promise<void> {
-    try {
-      console.log('🔧 Corrigiendo días trabajados para período:', periodId);
-
-      // Obtener datos del período
-      const { data: period } = await supabase
-        .from('payroll_periods_real')
-        .select('fecha_inicio, fecha_fin, periodo')
-        .eq('id', periodId)
-        .single();
-
-      if (!period) return;
-
-      // Calcular días reales del período
-      const realDays = this.calculatePeriodDays(period.fecha_inicio, period.fecha_fin);
-      
-      console.log(`📅 Corrigiendo días trabajados a ${realDays} para período ${period.periodo}`);
-
-      // Actualizar todos los payrolls de este período con días reales
-      const { error: updateError } = await supabase
-        .from('payrolls')
-        .update({ 
-          dias_trabajados: realDays,
-          updated_at: new Date().toISOString()
-        })
-        .eq('period_id', periodId)
-        .eq('company_id', companyId);
-
-      if (updateError) {
-        console.error('❌ Error actualizando días trabajados:', updateError);
-      } else {
-        console.log('✅ Días trabajados corregidos exitosamente');
-      }
-
-    } catch (error) {
-      console.error('❌ Error en corrección de días trabajados:', error);
-    }
-  }
-
-  /**
-   * NUEVA FUNCIÓN: Limpiar duplicados en historial
-   */
-  static async cleanDuplicatePayrollRecords(companyId: string): Promise<{ success: boolean; message: string; removedCount: number }> {
-    try {
-      console.log('🧹 Limpiando registros duplicados para empresa:', companyId);
-
-      // Buscar y eliminar duplicados en payrolls (mantener el más reciente)
-      const { data: duplicates, error: findError } = await supabase
-        .from('payrolls')
-        .select('employee_id, periodo, period_id, id, created_at')
-        .eq('company_id', companyId)
-        .order('employee_id', { ascending: true })
-        .order('periodo', { ascending: true })
-        .order('created_at', { ascending: false });
-
-      if (findError) throw findError;
-
-      if (!duplicates || duplicates.length === 0) {
-        return { success: true, message: 'No se encontraron duplicados', removedCount: 0 };
-      }
-
-      // Agrupar por employee_id + periodo/period_id y mantener solo el más reciente
-      const toDelete: string[] = [];
-      const seen = new Set<string>();
-
-      duplicates.forEach(record => {
-        const key = `${record.employee_id}-${record.period_id || record.periodo}`;
-        
-        if (seen.has(key)) {
-          // Este es un duplicado, marcarlo para eliminación
-          toDelete.push(record.id);
-        } else {
-          seen.add(key);
-        }
+      const { data, error } = await supabase.rpc('sync_historical_payroll_data', {
+        p_period_id: periodId
       });
 
-      if (toDelete.length > 0) {
-        console.log(`🗑️ Eliminando ${toDelete.length} registros duplicados`);
-        
-        const { error: deleteError } = await supabase
-          .from('payrolls')
-          .delete()
-          .in('id', toDelete);
-
-        if (deleteError) throw deleteError;
+      if (error) {
+        console.error('❌ Error en sincronización:', error);
+        throw error;
       }
 
-      return {
-        success: true,
-        message: `Limpieza completada: ${toDelete.length} duplicados eliminados`,
-        removedCount: toDelete.length
-      };
-
+      console.log('✅ Sincronización completada:', data);
     } catch (error) {
-      console.error('❌ Error limpiando duplicados:', error);
-      return {
-        success: false,
-        message: 'Error durante la limpieza de duplicados',
-        removedCount: 0
-      };
+      console.error('❌ Error crítico en sincronización:', error);
+      throw error;
     }
-  }
-
-  static mapPeriodType(tipoPeriodo: string): 'semanal' | 'quincenal' | 'mensual' | 'personalizado' {
-    const typeMap: Record<string, 'semanal' | 'quincenal' | 'mensual' | 'personalizado'> = {
-      'semanal': 'semanal',
-      'quincenal': 'quincenal',
-      'mensual': 'mensual',
-      'personalizado': 'personalizado'
-    };
-    
-    return typeMap[tipoPeriodo] || 'mensual';
   }
 
   static async updateEmployeeValues(periodId: string, employeeId: string, updates: Partial<PayrollHistoryEmployee>): Promise<void> {
@@ -645,31 +345,22 @@ export class PayrollHistoryService {
     }
   }
 
-  static async recalculateEmployeeTotalsWithNovelties(employeeId: string, periodId: string): Promise<void> {
+  static mapPeriodType(tipoPeriodo: string): 'semanal' | 'quincenal' | 'mensual' | 'personalizado' {
+    const typeMap: Record<string, 'semanal' | 'quincenal' | 'mensual' | 'personalizado'> = {
+      'semanal': 'semanal',
+      'quincenal': 'quincenal',
+      'mensual': 'mensual',
+      'personalizado': 'personalizado'
+    };
+    
+    return typeMap[tipoPeriodo] || 'mensual';
+  }
+
+  static async recalculateEmployeeTotalsWithNovedades(employeeId: string, periodId: string): Promise<void> {
     try {
       console.log('Recalculating totals for employee:', employeeId, 'period:', periodId);
     } catch (error) {
       console.error('Error recalculating employee totals:', error);
-      throw error;
-    }
-  }
-
-  static async syncHistoricalData(periodId: string): Promise<void> {
-    try {
-      console.log('🔄 Sincronizando datos históricos para período:', periodId);
-      
-      const { data, error } = await supabase.rpc('sync_historical_payroll_data', {
-        p_period_id: periodId
-      });
-
-      if (error) {
-        console.error('❌ Error en sincronización:', error);
-        throw error;
-      }
-
-      console.log('✅ Sincronización completada:', data);
-    } catch (error) {
-      console.error('❌ Error crítico en sincronización:', error);
       throw error;
     }
   }

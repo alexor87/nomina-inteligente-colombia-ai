@@ -1,10 +1,9 @@
 
 import React from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Eye, Edit, Calendar, Users, DollarSign } from 'lucide-react';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Eye, Edit } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface PayrollHistoryTableProps {
@@ -22,137 +21,155 @@ export const PayrollHistoryTable: React.FC<PayrollHistoryTableProps> = ({
   onEditPeriod,
   canUserEditPeriods
 }) => {
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'cerrado':
-        return 'default';
-      case 'borrador':
-        return 'secondary';
-      case 'editado':
-        return 'outline';
-      case 'reabierto':
-        return 'destructive';
-      case 'con_errores':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      borrador: { 
+        variant: 'secondary' as const, 
+        className: 'bg-gray-100 text-gray-800 border-gray-200',
+        label: 'Borrador' 
+      },
+      cerrado: { 
+        variant: 'default' as const, 
+        className: 'bg-green-100 text-green-800 border-green-200',
+        label: 'Cerrado' 
+      },
+      con_errores: { 
+        variant: 'destructive' as const, 
+        className: 'bg-red-100 text-red-800 border-red-200',
+        label: 'Con Errores' 
+      },
+      editado: { 
+        variant: 'outline' as const, 
+        className: 'bg-blue-100 text-blue-800 border-blue-200',
+        label: 'Editado' 
+      },
+      reabierto: { 
+        variant: 'outline' as const, 
+        className: 'bg-orange-100 text-orange-800 border-orange-200',
+        label: 'Reabierto' 
+      }
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.borrador;
+    
+    return (
+      <Badge variant={config.variant} className={config.className}>
+        {config.label}
+      </Badge>
+    );
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'cerrado':
-        return 'text-green-700 bg-green-50 border-green-200';
-      case 'borrador':
-        return 'text-gray-700 bg-gray-50 border-gray-200';
-      case 'editado':
-        return 'text-blue-700 bg-blue-50 border-blue-200';
-      case 'reabierto':
-        return 'text-orange-700 bg-orange-50 border-orange-200';
-      case 'con_errores':
-        return 'text-red-700 bg-red-50 border-red-200';
-      default:
-        return 'text-gray-700 bg-gray-50 border-gray-200';
-    }
+  const getTypeBadge = (type: string) => {
+    const typeLabels = {
+      semanal: 'Semanal',
+      quincenal: 'Quincenal', 
+      mensual: 'Mensual',
+      personalizado: 'Personalizado'
+    };
+    
+    return (
+      <Badge variant="outline" className="text-xs">
+        {typeLabels[type as keyof typeof typeLabels] || type}
+      </Badge>
+    );
   };
 
   if (periods.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="flex flex-col items-center">
-          <Calendar className="h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay períodos de nómina</h3>
-          <p className="text-gray-500">Aún no se han procesado períodos de nómina en tu empresa.</p>
+        <div className="text-gray-500 mb-4">
+          <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
         </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No hay períodos de nómina</h3>
+        <p className="text-gray-500">Aún no se han procesado períodos de nómina para mostrar en el historial.</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[200px]">Período</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className="text-center">Empleados</TableHead>
-            <TableHead className="text-right">Total Devengado</TableHead>
-            <TableHead className="text-right">Total Neto</TableHead>
-            <TableHead className="text-center">Fecha Creación</TableHead>
-            <TableHead className="text-center">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {periods.map((period) => (
-            <TableRow 
-              key={period.id}
-              className="cursor-pointer hover:bg-gray-50/80 transition-colors"
-              onClick={() => onPeriodClick(period)}
-            >
-              <TableCell className="font-medium">
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-gray-900">
-                    {period.period}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(period.startDate).toLocaleDateString('es-CO')} - {new Date(period.endDate).toLocaleDateString('es-CO')}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge 
-                  className={`${getStatusColor(period.status)} font-medium`}
-                >
-                  {period.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-center">
-                <div className="flex items-center justify-center">
-                  <Users className="h-4 w-4 text-gray-400 mr-1" />
-                  <span className="font-medium">{period.employeesCount}</span>
-                </div>
-              </TableCell>
-              <TableCell className="text-right font-mono">
-                {formatCurrency(period.totalGrossPay)}
-              </TableCell>
-              <TableCell className="text-right font-mono font-semibold">
-                {formatCurrency(period.totalNetPay)}
-              </TableCell>
-              <TableCell className="text-center text-sm text-gray-500">
-                {new Date(period.createdAt).toLocaleDateString('es-CO')}
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center justify-center space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onViewDetails(period);
-                    }}
-                    className="h-8 w-8 p-0"
+    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Período
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Empleados
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total Devengado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Neto Pagado
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {periods.map((period) => (
+              <tr key={period.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <button
+                    onClick={() => onPeriodClick(period)}
+                    className="text-left"
                   >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  {canUserEditPeriods && period.editable && (
+                    <div className="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer">
+                      {period.period}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(period.startDate).toLocaleDateString('es-ES')} - {new Date(period.endDate).toLocaleDateString('es-ES')}
+                    </div>
+                  </button>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {period.employeesCount}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getStatusBadge(period.status)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {formatCurrency(period.totalGrossPay)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {formatCurrency(period.totalNetPay)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div className="flex items-center justify-end space-x-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditPeriod(period);
-                      }}
-                      className="h-8 w-8 p-0"
+                      onClick={() => onViewDetails(period)}
+                      className="text-gray-600 hover:text-gray-900"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Eye className="h-4 w-4" />
                     </Button>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                    
+                    {canUserEditPeriods && period.editable && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEditPeriod(period)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
