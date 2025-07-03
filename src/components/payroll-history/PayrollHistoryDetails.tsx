@@ -15,8 +15,7 @@ import {
   Save,
   Undo2,
   AlertCircle,
-  RefreshCw,
-  CheckCircle
+  RefreshCw
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
@@ -42,7 +41,6 @@ export const PayrollHistoryDetails = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showReopenDialog, setShowReopenDialog] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [wasRecovered, setWasRecovered] = useState(false); // Nueva state para tracking de recuperación
 
   // Check if user can edit periods
   const canEditPeriods = isSuperAdmin || hasModuleAccess('payroll-history');
@@ -75,20 +73,6 @@ export const PayrollHistoryDetails = () => {
       setIsLoading(true);
       const data = await PayrollHistoryService.getPeriodDetails(periodId);
       setDetails(data);
-      
-      // Detectar si se aplicó recuperación automática basado en la presencia de empleados
-      // donde antes no había ninguno (esto es una inferencia basada en el comportamiento)
-      const hasEmployeesNow = data.employees.length > 0;
-      const wasClosedWithoutEmployees = data.period.status === 'cerrado' && hasEmployeesNow;
-      
-      if (wasClosedWithoutEmployees) {
-        setWasRecovered(true);
-        toast({
-          title: "✅ Recuperación automática aplicada",
-          description: "Se han recuperado los detalles individuales de este período utilizando distribución proporcional.",
-          duration: 5000
-        });
-      }
       
       // Load novedades efficiently - only if needed
       if (data.employees.length > 0) {
@@ -354,28 +338,8 @@ export const PayrollHistoryDetails = () => {
           />
         )}
 
-        {/* NUEVO: Banner de Recuperación Automática */}
-        {wasRecovered && (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <CheckCircle className="h-5 w-5 text-blue-600" />
-                <div>
-                  <h3 className="text-sm font-medium text-blue-800">
-                    Detalles recuperados automáticamente
-                  </h3>
-                  <p className="text-sm text-blue-700">
-                    Este período tenía totales pero no registros individuales. Se han distribuido proporcionalmente 
-                    basándose en los salarios base de los empleados activos en esa fecha.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Empty Employees Alert for Closed Periods (updated condition) */}
-        {hasNoEmployees && isClosedPeriod && !wasRecovered && (
+        {/* Alert for periods without employees - improved condition */}
+        {hasNoEmployees && isClosedPeriod && (
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -468,11 +432,6 @@ export const PayrollHistoryDetails = () => {
               {isEditMode && (
                 <Badge variant="secondary" className="ml-2">
                   Modo edición activo
-                </Badge>
-              )}
-              {wasRecovered && (
-                <Badge variant="outline" className="ml-2 text-blue-700 border-blue-300">
-                  Datos recuperados
                 </Badge>
               )}
             </CardTitle>
