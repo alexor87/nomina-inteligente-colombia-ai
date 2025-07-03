@@ -3,10 +3,56 @@ import { supabase } from '@/integrations/supabase/client';
 
 export class BiWeeklyPeriodService {
   /**
-   * LÓGICA PROFESIONAL PARA PERÍODOS QUINCENALES CONSECUTIVOS
-   * Reglas estrictas: 1-15 y 16-fin de mes (incluyendo febrero)
+   * LÓGICA PROFESIONAL CORREGIDA - PERÍODOS QUINCENALES CONSECUTIVOS
+   * Siempre genera el siguiente período basado en el último período CERRADO de la empresa
    */
   
+  static async generateNextConsecutivePeriodFromDatabase(companyId: string): Promise<{
+    startDate: string;
+    endDate: string;
+  }> {
+    console.log('🔄 Generando siguiente período quincenal consecutivo desde BD para empresa:', companyId);
+    
+    try {
+      // Buscar el último período cerrado quincenal de la empresa
+      const { data: lastPeriod, error } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('tipo_periodo', 'quincenal')
+        .neq('estado', 'borrador')
+        .order('fecha_fin', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error obteniendo último período:', error);
+        // Si hay error, generar primer período del mes actual
+        return this.generateCurrentBiWeeklyPeriod();
+      }
+
+      if (!lastPeriod) {
+        console.log('No hay períodos previos, generando primer período quincenal (1-15)');
+        return this.generateFirstBiWeeklyPeriod();
+      }
+
+      console.log('Último período encontrado:', lastPeriod.fecha_inicio, '-', lastPeriod.fecha_fin);
+
+      // Generar siguiente período consecutivo basado en el último
+      const nextPeriod = this.generateNextConsecutivePeriod(lastPeriod.fecha_fin);
+      
+      console.log('✅ Siguiente período quincenal profesional generado:', nextPeriod);
+      return nextPeriod;
+
+    } catch (error) {
+      console.error('Error generando período quincenal desde BD:', error);
+      return this.generateCurrentBiWeeklyPeriod();
+    }
+  }
+
+  /**
+   * Generar siguiente período consecutivo basado en fecha de fin del anterior
+   */
   static generateNextConsecutivePeriod(lastPeriodEndDate: string): {
     startDate: string;
     endDate: string;
@@ -26,18 +72,20 @@ export class BiWeeklyPeriodService {
     let startDate: Date;
     let endDate: Date;
     
-    // APLICAR REGLAS ESTRICTAS DE PERÍODOS QUINCENALES
+    // APLICAR REGLAS ESTRICTAS PROFESIONALES
     if (day === 1) {
-      // Primera quincena (1-15)
+      // Si empieza el 1, es primera quincena (1-15)
       startDate = new Date(year, month, 1);
       endDate = new Date(year, month, 15);
+      console.log('✅ Generando primera quincena:', startDate.toISOString().split('T')[0], '-', endDate.toISOString().split('T')[0]);
     } else if (day === 16) {
-      // Segunda quincena (16-fin de mes)
+      // Si empieza el 16, es segunda quincena (16-fin del mes)
       startDate = new Date(year, month, 16);
       endDate = new Date(year, month + 1, 0); // Último día del mes
+      console.log('✅ Generando segunda quincena:', startDate.toISOString().split('T')[0], '-', endDate.toISOString().split('T')[0]);
     } else {
       // CORRECCIÓN AUTOMÁTICA para fechas irregulares
-      console.log('⚠️ Corrigiendo período irregular. Día:', day);
+      console.log('⚠️ Corrigiendo período irregular. Día de inicio:', day);
       
       if (day <= 15) {
         // Forzar a primera quincena
@@ -57,8 +105,29 @@ export class BiWeeklyPeriodService {
       endDate: endDate.toISOString().split('T')[0]
     };
     
-    console.log('✅ Período quincenal generado correctamente:', result);
+    console.log('✅ Período quincenal consecutivo generado:', result);
     return result;
+  }
+  
+  /**
+   * Generar primer período quincenal (1-15 del mes actual)
+   */
+  static generateFirstBiWeeklyPeriod(): {
+    startDate: string;
+    endDate: string;
+  } {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    
+    // Siempre empezar con la primera quincena del mes actual
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month, 15);
+    
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    };
   }
   
   static generateCurrentBiWeeklyPeriod(): {

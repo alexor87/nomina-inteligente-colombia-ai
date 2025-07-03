@@ -70,11 +70,8 @@ serve(async (req) => {
 
     console.log('🏢 Información de empresa obtenida:', companyInfo?.razon_social || 'No disponible');
 
-    // Generar HTML profesional del comprobante
-    const professionalHTML = generateProfessionalVoucherHTML(employee, period, companyInfo);
-    
-    // Convertir HTML a PDF usando lógica simplificada pero profesional
-    const pdfContent = await generateProfessionalPDF(professionalHTML, employee);
+    // Generar PDF profesional usando jsPDF
+    const pdfContent = await generateProfessionalPDFWithJsPDF(employee, period, companyInfo);
 
     console.log('✅ PDF profesional generado exitosamente');
 
@@ -98,8 +95,20 @@ serve(async (req) => {
   }
 });
 
-// Función para generar HTML profesional del comprobante
-function generateProfessionalVoucherHTML(employee: any, period: any, companyInfo: any): string {
+// Función para generar PDF profesional usando jsPDF con AutoTable
+async function generateProfessionalPDFWithJsPDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
+  console.log('📄 Generando PDF profesional con jsPDF...');
+  
+  // Importar jsPDF y AutoTable desde CDN
+  const jsPDFModule = await import('https://esm.sh/jspdf@2.5.1');
+  const autoTableModule = await import('https://esm.sh/jspdf-autotable@3.5.31');
+  
+  const { jsPDF } = jsPDFModule.default;
+  
+  // Crear nueva instancia de PDF
+  const doc = new jsPDF();
+  
+  // Función auxiliar para formatear moneda
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -108,6 +117,7 @@ function generateProfessionalVoucherHTML(employee: any, period: any, companyInfo
     }).format(amount);
   };
 
+  // Función auxiliar para formatear fecha
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CO', {
       year: 'numeric',
@@ -116,445 +126,179 @@ function generateProfessionalVoucherHTML(employee: any, period: any, companyInfo
     });
   };
 
+  // Configurar fuente
+  doc.setFont('helvetica');
+  
+  // ENCABEZADO PROFESIONAL CON COLORES
+  // Fondo azul para el encabezado
+  doc.setFillColor(30, 64, 175); // #1e40af
+  doc.rect(0, 0, 210, 40, 'F');
+  
+  // Texto del encabezado en blanco
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(companyInfo?.razon_social || 'MI EMPRESA', 20, 15);
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  if (companyInfo?.nit) doc.text(`NIT: ${companyInfo.nit}`, 20, 22);
+  if (companyInfo?.telefono) doc.text(`Tel: ${companyInfo.telefono}`, 20, 27);
+  if (companyInfo?.email) doc.text(`Email: ${companyInfo.email}`, 20, 32);
+  
+  // Título del documento
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('COMPROBANTE DE PAGO DE NÓMINA', 105, 20, { align: 'center' });
+  
+  // Información del período
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Período: ${formatDate(period.startDate)} - ${formatDate(period.endDate)}`, 105, 27, { align: 'center' });
+  doc.text(`Tipo: ${period.type.toUpperCase()}`, 105, 32, { align: 'center' });
+  
+  // Resetear color de texto a negro
+  doc.setTextColor(0, 0, 0);
+  
+  // INFORMACIÓN DEL EMPLEADO CON FONDO GRIS
+  let yPosition = 50;
+  
+  doc.setFillColor(248, 250, 252); // #f8fafc
+  doc.rect(15, yPosition, 180, 25, 'F');
+  doc.setDrawColor(226, 232, 240); // #e2e8f0
+  doc.rect(15, yPosition, 180, 25, 'S');
+  
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 64, 175); // #1e40af
+  doc.text('📋 INFORMACIÓN DEL EMPLEADO', 20, yPosition + 8);
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0);
+  
+  // Datos del empleado en dos columnas
+  doc.text(`Nombre: ${employee.name}`, 20, yPosition + 15);
+  doc.text(`Cargo: ${employee.position || 'No especificado'}`, 110, yPosition + 15);
+  doc.text(`EPS: ${employee.eps || 'No asignada'}`, 20, yPosition + 20);
+  doc.text(`AFP: ${employee.afp || 'No asignada'}`, 110, yPosition + 20);
+  
+  yPosition += 35;
+  
+  // TABLA DE CONCEPTOS CON AUTOTABLE
   const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Comprobante de Pago - ${employee.name}</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: 'Arial', sans-serif;
-            font-size: 11px;
-            line-height: 1.4;
-            color: #333;
-            background-color: #fff;
-            padding: 20px;
-        }
-        
-        .voucher-container {
-            max-width: 800px;
-            margin: 0 auto;
-            border: 2px solid #2563eb;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #1e40af, #2563eb);
-            padding: 20px;
-            color: white;
-            text-align: center;
-        }
-        
-        .company-name {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-        
-        .company-details {
-            font-size: 10px;
-            opacity: 0.9;
-            margin-bottom: 15px;
-        }
-        
-        .document-title {
-            font-size: 16px;
-            font-weight: bold;
-            background: rgba(255,255,255,0.2);
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-        }
-        
-        .period-info {
-            font-size: 10px;
-            background: rgba(255,255,255,0.1);
-            padding: 8px;
-            border-radius: 3px;
-        }
-        
-        .content {
-            padding: 20px;
-        }
-        
-        .employee-section {
-            background: #f8fafc;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border-left: 4px solid #2563eb;
-        }
-        
-        .section-title {
-            font-size: 13px;
-            font-weight: bold;
-            color: #1e40af;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-        }
-        
-        .employee-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-        
-        .employee-field {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            border-bottom: 1px dotted #e2e8f0;
-        }
-        
-        .field-label {
-            font-weight: bold;
-            color: #475569;
-        }
-        
-        .payment-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            border-radius: 5px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .payment-table th {
-            background: #1e40af;
-            color: white;
-            padding: 12px 8px;
-            text-align: left;
-            font-weight: bold;
-            font-size: 11px;
-        }
-        
-        .payment-table td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #e2e8f0;
-            background: #fff;
-        }
-        
-        .payment-table tr:nth-child(even) td {
-            background: #f8fafc;
-        }
-        
-        .amount-cell {
-            text-align: right;
-            font-weight: bold;
-            color: #059669;
-        }
-        
-        .deduction-amount {
-            color: #dc2626;
-        }
-        
-        .totals-section {
-            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        
-        .totals-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 15px;
-            text-align: center;
-        }
-        
-        .total-item {
-            padding: 15px;
-            border-radius: 5px;
-            border: 2px solid;
-        }
-        
-        .total-devengado {
-            background: #dcfce7;
-            border-color: #22c55e;
-            color: #15803d;
-        }
-        
-        .total-deducciones {
-            background: #fee2e2;
-            border-color: #ef4444;
-            color: #dc2626;
-        }
-        
-        .total-neto {
-            background: #dbeafe;
-            border-color: #3b82f6;
-            color: #1d4ed8;
-        }
-        
-        .total-label {
-            font-size: 10px;
-            font-weight: bold;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-        }
-        
-        .total-amount {
-            font-size: 16px;
-            font-weight: bold;
-        }
-        
-        .footer {
-            background: #f8fafc;
-            padding: 15px;
-            text-align: center;
-            color: #64748b;
-            font-size: 9px;
-            border-top: 1px solid #e2e8f0;
-        }
-        
-        .signature-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 50px;
-            margin: 30px 0;
-        }
-        
-        .signature-box {
-            text-align: center;
-            padding-top: 40px;
-            border-top: 1px solid #94a3b8;
-        }
-    </style>
-</head>
-<body>
-    <div class="voucher-container">
-        <div class="header">
-            <div class="company-name">${companyInfo?.razon_social || 'Mi Empresa'}</div>
-            <div class="company-details">
-                ${companyInfo?.nit ? `NIT: ${companyInfo.nit} | ` : ''}
-                ${companyInfo?.telefono ? `Tel: ${companyInfo.telefono} | ` : ''}
-                ${companyInfo?.email || ''}
-            </div>
-            <div class="document-title">COMPROBANTE DE PAGO DE NÓMINA</div>
-            <div class="period-info">
-                Período: ${formatDate(period.startDate)} - ${formatDate(period.endDate)} | 
-                Tipo: ${period.type.toUpperCase()} | 
-                Generado: ${formatDate(new Date().toISOString())}
-            </div>
-        </div>
-        
-        <div class="content">
-            <div class="employee-section">
-                <div class="section-title">📋 Información del Empleado</div>
-                <div class="employee-grid">
-                    <div class="employee-field">
-                        <span class="field-label">Nombre:</span>
-                        <span>${employee.name}</span>
-                    </div>
-                    <div class="employee-field">
-                        <span class="field-label">Cargo:</span>
-                        <span>${employee.position || 'No especificado'}</span>
-                    </div>
-                    <div class="employee-field">
-                        <span class="field-label">EPS:</span>
-                        <span>${employee.eps || 'No asignada'}</span>
-                    </div>
-                    <div class="employee-field">
-                        <span class="field-label">AFP:</span>
-                        <span>${employee.afp || 'No asignada'}</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="section-title">💰 Detalle de Pagos</div>
-            <table class="payment-table">
-                <thead>
-                    <tr>
-                        <th>Concepto</th>
-                        <th style="text-align: center;">Cantidad</th>
-                        <th style="text-align: right;">Valor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Salario Base (Mensual)</td>
-                        <td style="text-align: center;">-</td>
-                        <td class="amount-cell">${formatCurrency(employee.baseSalary)}</td>
-                    </tr>
-                    <tr>
-                        <td>Salario Proporcional</td>
-                        <td style="text-align: center;">${employee.workedDays} días</td>
-                        <td class="amount-cell">${formatCurrency(salarioProporcional)}</td>
-                    </tr>
-                    <tr>
-                        <td>Horas Extra</td>
-                        <td style="text-align: center;">${employee.extraHours} hrs</td>
-                        <td class="amount-cell">${formatCurrency(0)}</td>
-                    </tr>
-                    <tr>
-                        <td>Bonificaciones</td>
-                        <td style="text-align: center;">-</td>
-                        <td class="amount-cell">${formatCurrency(employee.bonuses)}</td>
-                    </tr>
-                    <tr>
-                        <td>Auxilio de Transporte</td>
-                        <td style="text-align: center;">-</td>
-                        <td class="amount-cell">${formatCurrency(employee.transportAllowance)}</td>
-                    </tr>
-                    ${employee.disabilities > 0 ? `
-                    <tr>
-                        <td>Incapacidades</td>
-                        <td style="text-align: center;">-</td>
-                        <td class="amount-cell deduction-amount">-${formatCurrency(employee.disabilities)}</td>
-                    </tr>` : ''}
-                </tbody>
-            </table>
-            
-            <div class="totals-section">
-                <div class="totals-grid">
-                    <div class="total-item total-devengado">
-                        <div class="total-label">Total Devengado</div>
-                        <div class="total-amount">${formatCurrency(employee.grossPay)}</div>
-                    </div>
-                    
-                    <div class="total-item total-deducciones">
-                        <div class="total-label">Total Deducciones</div>
-                        <div class="total-amount">-${formatCurrency(employee.deductions)}</div>
-                    </div>
-                    
-                    <div class="total-item total-neto">
-                        <div class="total-label">Neto a Pagar</div>
-                        <div class="total-amount">${formatCurrency(employee.netPay)}</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="signature-section">
-                <div class="signature-box">
-                    <div>Elaboró</div>
-                </div>
-                <div class="signature-box">
-                    <div>Empleado</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>Este documento fue generado electrónicamente el ${new Date().toLocaleString('es-CO')}</p>
-            <p>Comprobante de pago válido según normativa laboral colombiana</p>
-        </div>
-    </div>
-</body>
-</html>`;
-}
-
-// Función para generar PDF profesional desde HTML
-async function generateProfessionalPDF(htmlContent: string, employee: any): Promise<Uint8Array> {
-  console.log('📄 Generando PDF profesional desde HTML...');
   
-  // Crear estructura básica de PDF con el HTML
-  const textEncoder = new TextEncoder();
+  const tableData = [
+    ['Salario Base (Mensual)', '-', formatCurrency(employee.baseSalary)],
+    ['Salario Proporcional', `${employee.workedDays} días`, formatCurrency(salarioProporcional)],
+    ['Horas Extra', `${employee.extraHours} hrs`, formatCurrency(0)],
+    ['Bonificaciones', '-', formatCurrency(employee.bonuses)],
+    ['Auxilio de Transporte', '-', formatCurrency(employee.transportAllowance)]
+  ];
   
-  // Convertir HTML a texto estructurado para PDF
-  const cleanContent = htmlContent
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  if (employee.disabilities > 0) {
+    tableData.push(['Incapacidades', '-', `-${formatCurrency(employee.disabilities)}`]);
+  }
   
-  const pdfHeader = '%PDF-1.4\n';
+  // Usar AutoTable para crear tabla profesional
+  (doc as any).autoTable({
+    startY: yPosition,
+    head: [['Concepto', 'Cantidad', 'Valor']],
+    body: tableData,
+    theme: 'striped',
+    headStyles: {
+      fillColor: [30, 64, 175], // #1e40af
+      textColor: [255, 255, 255],
+      fontSize: 11,
+      fontStyle: 'bold'
+    },
+    bodyStyles: {
+      fontSize: 10,
+      textColor: [0, 0, 0]
+    },
+    columnStyles: {
+      0: { cellWidth: 80 },
+      1: { cellWidth: 40, halign: 'center' },
+      2: { cellWidth: 50, halign: 'right', fontStyle: 'bold' }
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252] // #f8fafc
+    },
+    margin: { left: 15, right: 15 }
+  });
   
-  const pdfStructure = `%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
-
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
-
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
-/Resources <<
-/Font <<
-/F1 5 0 R
->>
->>
->>
-endobj
-
-4 0 obj
-<<
-/Length ${cleanContent.length + 500}
->>
-stream
-BT
-/F1 12 Tf
-50 750 Td
-(═══════════════════════════════════════════════════════════════════) Tj 0 -20 Td
-(                    COMPROBANTE DE PAGO PROFESIONAL                    ) Tj 0 -20 Td
-(═══════════════════════════════════════════════════════════════════) Tj 0 -30 Td
-(EMPLEADO: ${employee.name}) Tj 0 -20 Td
-(CARGO: ${employee.position || 'No especificado'}) Tj 0 -20 Td
-(EPS: ${employee.eps || 'No asignada'}) Tj 0 -15 Td
-(AFP: ${employee.afp || 'No asignada'}) Tj 0 -30 Td
-(───────────────────────────────────────────────────────────────────) Tj 0 -20 Td
-(                           DETALLES DE PAGO                           ) Tj 0 -20 Td
-(───────────────────────────────────────────────────────────────────) Tj 0 -20 Td
-(Salario Base: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(employee.baseSalary)}) Tj 0 -15 Td
-(Dias Trabajados: ${employee.workedDays}) Tj 0 -15 Td
-(Horas Extra: ${employee.extraHours}) Tj 0 -15 Td
-(Bonificaciones: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(employee.bonuses)}) Tj 0 -15 Td
-(Auxilio Transporte: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(employee.transportAllowance)}) Tj 0 -30 Td
-(═══════════════════════════════════════════════════════════════════) Tj 0 -20 Td
-(TOTAL DEVENGADO: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(employee.grossPay)}) Tj 0 -15 Td
-(TOTAL DEDUCCIONES: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(employee.deductions)}) Tj 0 -15 Td
-(NETO A PAGAR: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(employee.netPay)}) Tj 0 -30 Td
-(═══════════════════════════════════════════════════════════════════) Tj 0 -30 Td
-(Generado: ${new Date().toLocaleDateString('es-CO')}) Tj 0 -15 Td
-(Documento valido segun normativa laboral colombiana) Tj 0 -30 Td
-(                    _______________    _______________                ) Tj 0 -20 Td
-(                        Elaboro           Empleado                    ) Tj 0 -15 Td
-ET
-endstream
-endobj
-
-5 0 obj
-<<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Helvetica
->>
-endobj
-
-xref
-0 6
-0000000000 65535 f 
-0000000010 00000 n 
-0000000079 00000 n 
-0000000136 00000 n 
-0000000301 00000 n 
-0000002000 00000 n 
-trailer
-<<
-/Size 6
-/Root 1 0 R
->>
-startxref
-2100
-%%EOF`;
-
-  return textEncoder.encode(pdfStructure);
+  // Obtener posición Y después de la tabla
+  yPosition = (doc as any).lastAutoTable.finalY + 15;
+  
+  // TOTALES EN RECUADROS CON COLORES
+  const boxWidth = 55;
+  const boxHeight = 20;
+  const spacing = 10;
+  const startX = 15;
+  
+  // Total Devengado (Verde)
+  doc.setFillColor(220, 252, 231); // #dcfce7
+  doc.setDrawColor(34, 197, 94); // #22c55e
+  doc.rect(startX, yPosition, boxWidth, boxHeight, 'FD');
+  
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(21, 128, 61); // #15803d
+  doc.text('TOTAL DEVENGADO', startX + boxWidth/2, yPosition + 6, { align: 'center' });
+  doc.setFontSize(12);
+  doc.text(formatCurrency(employee.grossPay), startX + boxWidth/2, yPosition + 14, { align: 'center' });
+  
+  // Total Deducciones (Rojo)
+  const deduccionesX = startX + boxWidth + spacing;
+  doc.setFillColor(254, 226, 226); // #fee2e2
+  doc.setDrawColor(239, 68, 68); // #ef4444
+  doc.rect(deduccionesX, yPosition, boxWidth, boxHeight, 'FD');
+  
+  doc.setTextColor(220, 38, 38); // #dc2626
+  doc.setFontSize(8);
+  doc.text('TOTAL DEDUCCIONES', deduccionesX + boxWidth/2, yPosition + 6, { align: 'center' });
+  doc.setFontSize(12);
+  doc.text(`-${formatCurrency(employee.deductions)}`, deduccionesX + boxWidth/2, yPosition + 14, { align: 'center' });
+  
+  // Neto a Pagar (Azul) - Más grande
+  const netoX = deduccionesX + boxWidth + spacing;
+  const netoWidth = 65;
+  doc.setFillColor(219, 234, 254); // #dbeafe
+  doc.setDrawColor(59, 130, 246); // #3b82f6
+  doc.rect(netoX, yPosition, netoWidth, boxHeight, 'FD');
+  
+  doc.setTextColor(29, 78, 216); // #1d4ed8
+  doc.setFontSize(8);
+  doc.text('NETO A PAGAR', netoX + netoWidth/2, yPosition + 6, { align: 'center' });
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text(formatCurrency(employee.netPay), netoX + netoWidth/2, yPosition + 14, { align: 'center' });
+  
+  yPosition += 35;
+  
+  // FIRMAS
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  
+  // Líneas para firmas
+  doc.line(30, yPosition + 20, 80, yPosition + 20);
+  doc.line(130, yPosition + 20, 180, yPosition + 20);
+  
+  doc.text('Elaboró', 55, yPosition + 25, { align: 'center' });
+  doc.text('Empleado', 155, yPosition + 25, { align: 'center' });
+  
+  // PIE DE PÁGINA
+  yPosition += 40;
+  doc.setFillColor(248, 250, 252); // #f8fafc
+  doc.rect(0, yPosition, 210, 15, 'F');
+  
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139); // #64748b
+  doc.text(`Documento generado electrónicamente el ${new Date().toLocaleString('es-CO')}`, 105, yPosition + 6, { align: 'center' });
+  doc.text('Comprobante de pago válido según normativa laboral colombiana', 105, yPosition + 10, { align: 'center' });
+  
+  // Convertir a Uint8Array
+  const pdfBuffer = doc.output('arraybuffer');
+  return new Uint8Array(pdfBuffer);
 }

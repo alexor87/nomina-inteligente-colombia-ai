@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollPeriod } from '@/types/payroll';
 import { BiWeeklyPeriodService } from './payroll-intelligent/BiWeeklyPeriodService';
+import { PayrollPeriodCalculationService } from './payroll-intelligent/PayrollPeriodCalculationService';
 
 export interface CompanySettings {
   id: string;
@@ -73,9 +74,28 @@ export class PayrollPeriodService {
     }
   }
 
-  // Generar rango de fechas según periodicidad - CORREGIDO RADICALMENTE
+  // Generar rango de fechas según periodicidad - VERSIÓN PROFESIONAL CON BD
+  static async generatePeriodDatesFromDatabase(periodicity: string, companyId?: string): Promise<{ startDate: string; endDate: string }> {
+    console.log('📅 Generando fechas DESDE BASE DE DATOS para periodicidad:', periodicity);
+    
+    const currentCompanyId = companyId || await this.getCurrentUserCompanyId();
+    if (!currentCompanyId) {
+      console.warn('No se pudo obtener company_id, usando lógica de respaldo');
+      return this.generatePeriodDates(periodicity);
+    }
+    
+    try {
+      // Usar el nuevo servicio que consulta la BD
+      return await PayrollPeriodCalculationService.calculateNextPeriodFromDatabase(periodicity, currentCompanyId);
+    } catch (error) {
+      console.error('Error generando período desde BD, usando respaldo:', error);
+      return this.generatePeriodDates(periodicity);
+    }
+  }
+
+  // Generar rango de fechas según periodicidad - MÉTODO DE RESPALDO CORREGIDO
   static generatePeriodDates(periodicity: string, referenceDate: Date = new Date()): { startDate: string; endDate: string } {
-    console.log('📅 Generando fechas para periodicidad:', periodicity);
+    console.log('📅 Generando fechas de respaldo para periodicidad:', periodicity);
     
     switch (periodicity) {
       case 'mensual':
@@ -90,7 +110,7 @@ export class PayrollPeriodService {
         };
 
       case 'quincenal':
-        console.log('📅 Generando periodo quincenal PROFESIONAL');
+        console.log('📅 Generando periodo quincenal PROFESIONAL de respaldo');
         return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
 
       case 'semanal':
@@ -123,7 +143,7 @@ export class PayrollPeriodService {
     }
   }
 
-  // Generar siguiente período quincenal consecutivo - LÓGICA PROFESIONAL
+  // Generar siguiente período quincenal consecutivo - LÓGICA PROFESIONAL ACTUALIZADA
   static async generateNextBiWeeklyPeriod(): Promise<{ startDate: string; endDate: string }> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -132,34 +152,9 @@ export class PayrollPeriodService {
         return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
       }
 
-      // Buscar el último período cerrado para generar el siguiente consecutivo
-      const { data: lastPeriod, error } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('tipo_periodo', 'quincenal')
-        .neq('estado', 'borrador')
-        .order('fecha_fin', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error obteniendo último período:', error);
-        return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
-      }
-
-      if (!lastPeriod) {
-        console.log('No hay períodos anteriores, generando primer período quincenal');
-        return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
-      }
-
-      console.log('Último período encontrado:', lastPeriod.fecha_inicio, '-', lastPeriod.fecha_fin);
-
-      // Usar servicio profesional para generar siguiente período consecutivo
-      const nextPeriod = BiWeeklyPeriodService.generateNextConsecutivePeriod(lastPeriod.fecha_fin);
-      
-      console.log('✅ Siguiente período quincenal profesional generado:', nextPeriod);
-      return nextPeriod;
+      // Usar nuevo servicio que consulta la BD para períodos consecutivos
+      console.log('📅 Generando siguiente período quincenal consecutivo desde BD');
+      return await BiWeeklyPeriodService.generateNextConsecutivePeriodFromDatabase(companyId);
 
     } catch (error) {
       console.error('Error generando período quincenal:', error);
@@ -205,7 +200,7 @@ export class PayrollPeriodService {
     }
   }
 
-  // Crear un nuevo período de nómina con validaciones completas
+  // Crear un nuevo período de nómina con validaciones completas - ACTUALIZADO
   static async createPayrollPeriod(startDate: string, endDate: string, periodType: string): Promise<PayrollPeriod | null> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
