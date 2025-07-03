@@ -49,15 +49,23 @@ export class PayrollPeriodIntelligentService {
     try {
       console.log('🎯 DETECCIÓN UNIFICADA CON SERVICIOS INTELIGENTES...');
       
+      // ✅ CORRECCIÓN: Obtener company_id ANTES de la detección
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo determinar la empresa del usuario');
+      }
+      
+      console.log('🏢 Company ID obtenido:', companyId);
+      
       // Usar el nuevo servicio inteligente
       const detection = await SmartPeriodDetectionService.detectCurrentPeriod();
       
-      // Convertir a formato esperado
+      // ✅ CORRECCIÓN: Convertir a formato esperado con company_id REAL
       const status: PeriodStatus = {
         hasActivePeriod: detection.action === 'resume',
         currentPeriod: detection.existing_period || detection.active_period ? {
           id: (detection.existing_period || detection.active_period)!.id,
-          company_id: '', // Se llenará automáticamente por RLS
+          company_id: companyId, // ✅ USAR COMPANY_ID REAL
           fecha_inicio: (detection.existing_period || detection.active_period)!.fecha_inicio,
           fecha_fin: (detection.existing_period || detection.active_period)!.fecha_fin,
           estado: (detection.existing_period || detection.active_period)!.estado as any,
@@ -80,6 +88,8 @@ export class PayrollPeriodIntelligentService {
       };
       
       console.log('✅ DETECCIÓN UNIFICADA COMPLETADA:', status);
+      console.log('🏢 Company ID en período:', status.currentPeriod?.company_id);
+      
       return status;
       
     } catch (error) {
