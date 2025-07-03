@@ -39,8 +39,7 @@ export const PayrollLiquidationNew = () => {
     action: robustPeriodStatus.action === 'diagnose' || robustPeriodStatus.action === 'emergency' 
       ? 'suggest_next' as const
       : robustPeriodStatus.action as 'resume' | 'create',
-    message: robustPeriodStatus.message,
-    diagnostic: robustPeriodStatus.diagnostic
+    message: robustPeriodStatus.message
   } : null;
 
   if (isLoading) {
