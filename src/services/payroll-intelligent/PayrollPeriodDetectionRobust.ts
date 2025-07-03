@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { PayrollPeriodDetectionEnhanced } from './PayrollPeriodDetectionEnhanced';
 import { UNIFIED_PAYROLL_STATES, ACTIVE_STATES, CLOSED_STATES, isValidPayrollState } from '@/constants/payrollStatesUnified';
 import { PayrollDiagnosticService } from './PayrollDiagnosticService';
 import { PeriodNameUnifiedService } from './PeriodNameUnifiedService';
@@ -294,5 +295,13 @@ export class PayrollPeriodDetectionRobust {
       console.error('Error getting company ID:', error);
       return null;
     }
+  }
+
+  /**
+   * Método mejorado que usa la detección enhanced
+   */
+  static async detectCurrentPeriodStatusEnhanced() {
+    console.log('🔄 Using enhanced period detection...');
+    return await PayrollPeriodDetectionEnhanced.detectCurrentPeriodStatus();
   }
 }
