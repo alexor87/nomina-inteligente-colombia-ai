@@ -329,11 +329,6 @@ export const PayrollLiquidationNew = () => {
         {hasEmployees ? (
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Users className="h-5 w-5 mr-2" />
-                Empleados ({employees.length})
-              </h3>
-              
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <TrendingUp className="h-4 w-4" />
                 <span>{summary.validEmployees} empleados válidos</span>
