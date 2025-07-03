@@ -241,11 +241,26 @@ export class PayrollLiquidationNewService {
     } catch (error) {
       console.error('❌ Error en cálculo de nómina:', error);
       
-      // **CORRECCIÓN: Retornar cálculo básico CON PERIODICIDAD CORRECTA**
+      // **CORRECCIÓN ALELUYA: Retornar cálculo básico USANDO LÓGICA ALELUYA**
       const baseSalary = Number(employee.salario_base) || 0;
       const workedDays = this.validateWorkedDays(employee.dias_trabajo, periodicity);
       
-      console.log(`🚨 Fallback para ${employee.nombre}: días=${workedDays}, periodicidad=${periodicity}`);
+      console.log(`🚨 Fallback ALELUYA para ${employee.nombre}: días=${workedDays}, periodicidad=${periodicity}`);
+      
+      // ✅ USAR LÓGICA ALELUYA: (salario / 30) × días
+      const dailySalary = baseSalary / 30; // Siempre usar 30 como Aleluya
+      const proportionalSalary = dailySalary * workedDays;
+      
+      // Auxilio de transporte como Aleluya si aplica
+      let transportAllowance = 0;
+      if (baseSalary <= (1300000 * 2)) { // Si aplica auxilio
+        const dailyTransport = 200000 / 30; // Auxilio diario
+        transportAllowance = Math.round(dailyTransport * workedDays);
+      }
+      
+      const grossPay = proportionalSalary + transportAllowance;
+      const deductions = proportionalSalary * 0.08; // 8% aproximado
+      const netPay = grossPay - deductions;
       
       return {
         id: employee.id,
@@ -257,14 +272,14 @@ export class PayrollLiquidationNewService {
         disabilities: 0,
         bonuses: 0,
         absences: 0,
-        grossPay: baseSalary * (workedDays / 30), // Proporcional según días reales
-        deductions: baseSalary * (workedDays / 30) * 0.08, // 8% aproximado proporcional
-        netPay: baseSalary * (workedDays / 30) * 0.92, // Proporcional
+        grossPay: Math.round(grossPay),
+        deductions: Math.round(deductions),
+        netPay: Math.round(netPay),
         status: 'incomplete',
-        errors: ['Cálculo simplificado - revisar manualmente'],
+        errors: ['Cálculo simplificado con lógica Aleluya - revisar manualmente'],
         eps: employee.eps || '',
         afp: employee.afp || '',
-        transportAllowance: 0,
+        transportAllowance: Math.round(transportAllowance),
         employerContributions: this.calculateEmployerContributions(baseSalary)
       };
     }

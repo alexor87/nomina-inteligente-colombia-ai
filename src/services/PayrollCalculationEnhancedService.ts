@@ -2,6 +2,7 @@
 /**
  * Servicio de cálculo de nómina mejorado con soporte para jornada legal dinámica
  * según la Ley 2101 de 2021 y cálculo correcto de deducciones
+ * CORREGIDO: Usa lógica de Aleluya (valor_mensual / 30) × días_trabajados
  */
 
 import { ConfigurationService, PayrollConfiguration } from './ConfigurationService';
@@ -187,63 +188,35 @@ export class PayrollCalculationEnhancedService {
     const jornadaLegal = getJornadaLegal(periodDate);
     const hourlyDivisor = getHourlyDivisor(periodDate);
     
-    // CORRECCIÓN CRÍTICA: Determinar divisores correctos según período
-    let periodDays: number;
-    let monthlyDivisor: number;
+    // ✅ CORRECCIÓN ALELUYA: Usar siempre divisor 30 y luego proporcional por días
+    console.log(`🔧 CÁLCULO ALELUYA - Período: ${input.periodType}, Días: ${input.workedDays}`);
     
-    switch (input.periodType) {
-      case 'semanal':
-        periodDays = 7;
-        monthlyDivisor = 120; // 30 días × 4 semanas por mes
-        break;
-      case 'quincenal':
-        periodDays = 15;
-        monthlyDivisor = 30; // Divisor como Aleluya para 15 días
-        break;
-      case 'mensual':
-        periodDays = 30;
-        monthlyDivisor = 30;
-        break;
-      default:
-        periodDays = 30;
-        monthlyDivisor = 30;
-    }
-    
-    // Cálculo del salario base proporcional CORREGIDO (como Aleluya)
-    const dailySalary = input.baseSalary / monthlyDivisor;
+    // Cálculo del salario base proporcional COMO ALELUYA: (salario / 30) × días
+    const dailySalary = input.baseSalary / 30; // Siempre usar 30 como Aleluya
     const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
-    const regularPay = effectiveWorkedDays * dailySalary;
+    const regularPay = dailySalary * effectiveWorkedDays;
+    
+    console.log(`💰 Salario diario: $${dailySalary.toFixed(2)}, Días efectivos: ${effectiveWorkedDays}, Salario regular: $${regularPay.toFixed(2)}`);
 
     // Cálculo de horas extra usando jornada legal dinámica
     const hourlyRate = input.baseSalary / hourlyDivisor; // Usar divisor dinámico
     const valorHoraOrdinaria = hourlyRate;
     const extraPay = input.extraHours * hourlyRate * 1.25;
 
-    // Auxilio de transporte CORREGIDO por período
+    // ✅ CORRECCIÓN ALELUYA: Auxilio de transporte proporcional
     let transportAllowance = 0;
     if (input.baseSalary <= (config.salarioMinimo * 2)) {
-      const baseTransportAllowance = config.auxilioTransporte;
+      // COMO ALELUYA: (auxilio_mensual / 30) × días_trabajados
+      const dailyTransportAllowance = config.auxilioTransporte / 30;
+      transportAllowance = Math.round(dailyTransportAllowance * input.workedDays);
       
-      switch (input.periodType) {
-        case 'semanal':
-          // Para semanal: auxilio completo dividido por 4, luego proporcional a días trabajados
-          transportAllowance = Math.round((baseTransportAllowance / 4) * (input.workedDays / periodDays));
-          break;
-        case 'quincenal':
-          // Para quincenal: auxilio completo dividido por 2, luego proporcional a días trabajados
-          transportAllowance = Math.round((baseTransportAllowance / 2) * (input.workedDays / periodDays));
-          break;
-        case 'mensual':
-          // Para mensual: auxilio completo proporcional a días trabajados
-          transportAllowance = Math.round(baseTransportAllowance * (input.workedDays / periodDays));
-          break;
-        default:
-          transportAllowance = Math.round(baseTransportAllowance * (input.workedDays / periodDays));
-      }
+      console.log(`🚌 Auxilio diario: $${dailyTransportAllowance.toFixed(2)}, Auxilio total: $${transportAllowance}`);
     }
 
     // Total devengado
     const grossPay = regularPay + extraPay + input.bonuses + transportAllowance;
+    
+    console.log(`📊 Total devengado: $${grossPay.toFixed(2)} (Regular: ${regularPay.toFixed(2)} + Extra: ${extraPay.toFixed(2)} + Bonos: ${input.bonuses} + Auxilio: ${transportAllowance})`);
 
     // Calcular deducciones correctamente usando el nuevo servicio
     const deductionResult = await DeductionCalculationService.calculateDeductions({
@@ -257,6 +230,8 @@ export class PayrollCalculationEnhancedService {
 
     // Neto pagado
     const netPay = grossPay - deductionResult.totalDeducciones;
+    
+    console.log(`💳 Neto a pagar: $${netPay.toFixed(2)} (Devengado: ${grossPay.toFixed(2)} - Deducciones: ${deductionResult.totalDeducciones.toFixed(2)})`);
 
     // Base para aportes patronales (sin auxilio de transporte)
     const payrollBase = regularPay + extraPay + input.bonuses;

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -214,52 +215,24 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const jornadaLegal = getJornadaLegal(periodDate);
   const hourlyDivisor = getHourlyDivisor(periodDate);
   
-  // CORRECCIÓN CRÍTICA: Calcular divisores correctos según período
-  let periodDays: number;
-  let monthlyDivisor: number;
+  // ✅ CORRECCIÓN ALELUYA: Usar siempre divisor 30 y luego proporcional por días
+  console.log(`🔧 CÁLCULO ALELUYA EDGE - Período: ${input.periodType}, Días: ${input.workedDays}`);
   
-  switch (input.periodType) {
-    case 'semanal':
-      periodDays = 7;
-      monthlyDivisor = 120; // 30 días × 4 semanas por mes
-      break;
-    case 'quincenal':
-      periodDays = 15;
-      monthlyDivisor = 30; // Divisor como Aleluya para 15 días
-      break;
-    case 'mensual':
-      periodDays = 30;
-      monthlyDivisor = 30;
-      break;
-    default:
-      periodDays = 30;
-      monthlyDivisor = 30;
-  }
-  
-  const dailySalary = input.baseSalary / monthlyDivisor;
+  // Cálculo del salario base proporcional COMO ALELUYA: (salario / 30) × días
+  const dailySalary = input.baseSalary / 30; // Siempre usar 30 como Aleluya
   const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
-  const regularPay = effectiveWorkedDays * dailySalary;
+  const regularPay = dailySalary * effectiveWorkedDays;
 
   // Usar divisor horario dinámico basado en jornada legal
   const hourlyRate = input.baseSalary / hourlyDivisor;
   const extraPay = input.extraHours * hourlyRate * 1.25;
 
-  // CORRECCIÓN: Auxilio de transporte proporcional por período
+  // ✅ CORRECCIÓN ALELUYA: Auxilio de transporte proporcional
   let transportAllowance = 0;
   if (input.baseSalary <= (config.salarioMinimo * 2)) {
-    switch (input.periodType) {
-      case 'semanal':
-        transportAllowance = Math.round((config.auxilioTransporte / 4) * (input.workedDays / periodDays));
-        break;
-      case 'quincenal':
-        transportAllowance = Math.round((config.auxilioTransporte / 2) * (input.workedDays / periodDays));
-        break;
-      case 'mensual':
-        transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / periodDays));
-        break;
-      default:
-        transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / periodDays));
-    }
+    // COMO ALELUYA: (auxilio_mensual / 30) × días_trabajados
+    const dailyTransportAllowance = config.auxilioTransporte / 30;
+    transportAllowance = Math.round(dailyTransportAllowance * input.workedDays);
   }
 
   const payrollBase = regularPay + extraPay + input.bonuses;
