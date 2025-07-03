@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,7 +37,7 @@ export const PayrollTableNew = ({
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
   const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<string | null>(null);
   const [companyData, setCompanyData] = useState<any>(null);
-  const checkboxRef = useRef<HTMLInputElement>(null);
+  const checkboxRef = useRef<HTMLButtonElement>(null);
 
   // Cargar datos de la empresa al montar el componente
   useEffect(() => {
@@ -188,7 +187,7 @@ export const PayrollTableNew = ({
   // Update checkbox indeterminate state
   useEffect(() => {
     if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = someSelected;
+      (checkboxRef.current as any).indeterminate = someSelected;
     }
   }, [someSelected]);
 
