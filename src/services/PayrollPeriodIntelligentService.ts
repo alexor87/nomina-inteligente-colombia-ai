@@ -75,8 +75,8 @@ export class PayrollPeriodIntelligentService {
         const isCurrentPeriod = this.isPeriodCurrent(activePeriod, actualCurrentPeriodDates);
         
         if (isCurrentPeriod) {
-          console.log('✅ Período activo ES el período actual, validando nombre...');
-          await this.validatePeriodNameConsistency(activePeriod);
+          console.log('✅ Período activo ES el período actual, FORZANDO corrección de nombre...');
+          await this.forceCorrectPeriodName(activePeriod);
           
           return {
             hasActivePeriod: true,
@@ -114,7 +114,7 @@ export class PayrollPeriodIntelligentService {
           }
         }
         
-        await this.validatePeriodNameConsistency(existingCurrentPeriod);
+        await this.forceCorrectPeriodName(existingCurrentPeriod);
         
         return {
           hasActivePeriod: true,
@@ -142,6 +142,44 @@ export class PayrollPeriodIntelligentService {
     } catch (error) {
       console.error('❌ ERROR CRÍTICO EN DETECCIÓN CORREGIDA:', error);
       throw error;
+    }
+  }
+
+  /**
+   * NUEVA FUNCIÓN: Forzar corrección del nombre del período
+   */
+  static async forceCorrectPeriodName(period: PayrollPeriod): Promise<void> {
+    try {
+      console.log('🔧 FORZANDO CORRECCIÓN DE NOMBRE DEL PERÍODO:', period.id);
+      
+      const { getPeriodNameFromDates } = await import('@/utils/periodDateUtils');
+      const correctName = getPeriodNameFromDates(period.fecha_inicio, period.fecha_fin);
+      
+      console.log(`📝 COMPARANDO NOMBRES: "${period.periodo}" vs "${correctName}"`);
+      
+      if (correctName !== period.periodo) {
+        console.log(`🚨 NOMBRE INCORRECTO DETECTADO - FORZANDO CORRECCIÓN: "${period.periodo}" → "${correctName}"`);
+        
+        // Actualizar FORZOSAMENTE el nombre del período
+        const { error } = await supabase
+          .from('payroll_periods_real')
+          .update({ 
+            periodo: correctName,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', period.id);
+
+        if (error) {
+          console.error('❌ Error forzando corrección de nombre:', error);
+        } else {
+          console.log('✅ NOMBRE FORZOSAMENTE CORREGIDO');
+          period.periodo = correctName; // Actualizar en memoria
+        }
+      } else {
+        console.log('✅ Nombre ya es correcto:', correctName);
+      }
+    } catch (error) {
+      console.error('❌ Error en corrección forzada:', error);
     }
   }
 

@@ -1,3 +1,4 @@
+
 /**
  * Utility functions for parsing and formatting period dates - CORREGIDO PROFESIONALMENTE
  */
@@ -170,33 +171,34 @@ export const formatPeriodDateRange = (startDate: string, endDate: string): strin
 };
 
 /**
- * FUNCIÓN CORREGIDA: Get the period name from a date range
+ * FUNCIÓN COMPLETAMENTE REESCRITA: Get the period name from a date range - SIN BUGS DE FECHAS
  */
 export const getPeriodNameFromDates = (startDate: string, endDate: string): string => {
-  console.log('🏷️ GENERANDO NOMBRE CORREGIDO:', { startDate, endDate });
+  console.log('🏷️ GENERANDO NOMBRE CORREGIDO DEFINITIVO:', { startDate, endDate });
   
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  // CORRECCIÓN CRÍTICA: Parsear fechas de manera consistente y robusta
+  const startParts = startDate.split('-'); // [year, month, day]
+  const endParts = endDate.split('-');     // [year, month, day]
+  
+  const startYear = parseInt(startParts[0]);
+  const startMonth = parseInt(startParts[1]) - 1; // JS months are 0-indexed
+  const startDay = parseInt(startParts[2]);
+  
+  const endYear = parseInt(endParts[0]);
+  const endMonth = parseInt(endParts[1]) - 1; // JS months are 0-indexed  
+  const endDay = parseInt(endParts[2]);
+  
+  console.log('📊 DATOS PARSEADOS CORRECTAMENTE:', { 
+    startYear, startMonth: startMonth + 1, startDay,
+    endYear, endMonth: endMonth + 1, endDay,
+    sameMonth: startMonth === endMonth,
+    sameYear: startYear === endYear
+  });
   
   const monthNames = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
-  
-  const startDay = start.getDate();
-  const endDay = end.getDate();
-  const startMonth = start.getMonth();
-  const endMonth = end.getMonth();
-  const startYear = start.getFullYear();
-  const endYear = end.getFullYear();
-  
-  console.log('📊 DATOS DE FECHAS:', { 
-    startDay, endDay, 
-    startMonth: monthNames[startMonth], endMonth: monthNames[endMonth], 
-    startYear, endYear,
-    sameMonth: startMonth === endMonth,
-    sameYear: startYear === endYear
-  });
   
   // LÓGICA CORREGIDA: Verificar si son del mismo mes y año
   if (startMonth === endMonth && startYear === endYear) {
@@ -234,7 +236,7 @@ export const getPeriodNameFromDates = (startDate: string, endDate: string): stri
     return result;
   }
   
-  // CORRECCIÓN: Rango entre meses diferentes
+  // CORRECCIÓN: Rango entre meses diferentes - usar formatPeriodDateRange
   const result = formatPeriodDateRange(startDate, endDate);
   console.log('✅ RANGO MULTI-MES GENERADO:', result);
   return result;
