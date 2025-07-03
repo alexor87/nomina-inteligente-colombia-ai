@@ -32,6 +32,7 @@ export const PayrollHistoryDetails: React.FC = () => {
   const navigate = useNavigate();
   const [details, setDetails] = useState<PayrollHistoryDetailsType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showEditWizard, setShowEditWizard] = useState(false);
   const [showReopenDialog, setShowReopenDialog] = useState(false);
 
@@ -49,14 +50,24 @@ export const PayrollHistoryDetails: React.FC = () => {
   }, [checkUserPermissions]);
 
   const loadDetails = async () => {
-    if (!periodId) return;
+    if (!periodId) {
+      setError('ID de período no válido');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       setIsLoading(true);
+      setError(null);
+      console.log('🔍 Cargando detalles del período:', periodId);
+      
       const data = await PayrollHistoryService.getPeriodDetails(periodId);
+      console.log('✅ Detalles cargados:', data);
+      
       setDetails(data);
-    } catch (error) {
-      console.error('Error loading period details:', error);
+    } catch (error: any) {
+      console.error('❌ Error loading period details:', error);
+      setError(error.message || 'Error al cargar los detalles del período');
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +102,22 @@ export const PayrollHistoryDetails: React.FC = () => {
     return (
       <div className="flex justify-center items-center h-64">
         <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-500 mb-4">{error}</p>
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/app/payroll-history')}
+          className="mt-4"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver al Historial
+        </Button>
       </div>
     );
   }

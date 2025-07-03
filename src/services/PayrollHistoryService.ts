@@ -112,7 +112,11 @@ export class PayrollHistoryService {
 
       if (periodError) {
         console.error('❌ Error obteniendo período:', periodError);
-        throw periodError;
+        throw new Error(`Error obteniendo período: ${periodError.message}`);
+      }
+
+      if (!period) {
+        throw new Error('Período no encontrado');
       }
 
       console.log('📊 Período encontrado:', period);
@@ -133,8 +137,10 @@ export class PayrollHistoryService {
         .eq('period_id', periodId);
 
       if (payrollsError) {
-        console.error('❌ Error obteniendo payrolls:', payrollsError);
-        // If period_id relationship fails, try fallback with periodo text
+        console.error('❌ Error obteniendo payrolls con period_id:', payrollsError);
+        
+        // Fallback: try with periodo text
+        console.log('🔄 Intentando fallback con periodo texto:', period.periodo);
         const { data: fallbackPayrolls, error: fallbackError } = await supabase
           .from('payrolls')
           .select(`
@@ -149,50 +155,16 @@ export class PayrollHistoryService {
           .eq('company_id', companyId)
           .eq('periodo', period.periodo);
 
-        if (fallbackError) throw fallbackError;
-        payrolls = fallbackPayrolls;
+        if (fallbackError) {
+          console.error('❌ Error en fallback:', fallbackError);
+          // Don't throw here, just continue with empty payrolls
+          payrolls = [];
+        } else {
+          payrolls = fallbackPayrolls || [];
+        }
       }
 
       console.log('👥 Empleados encontrados:', payrolls?.length || 0);
-
-      // Si no hay empleados y el período está cerrado, intentar sincronización histórica
-      if ((!payrolls || payrolls.length === 0) && period.estado === 'cerrado') {
-        console.log('🔄 Período cerrado sin empleados, intentando sincronización histórica...');
-        
-        try {
-          const { data: syncResult, error: syncError } = await supabase.rpc(
-            'sync_historical_payroll_data',
-            { p_period_id: periodId, p_company_id: companyId }
-          );
-          
-          if (syncError) {
-            console.error('❌ Error en sincronización:', syncError);
-          } else {
-            console.log('✅ Resultado sincronización:', syncResult);
-            
-            // Reintentar obtener los empleados después de la sincronización
-            const { data: syncedPayrolls } = await supabase
-              .from('payrolls')
-              .select(`
-                *,
-                employees (
-                  id,
-                  nombre,
-                  apellido,
-                  cargo
-                )
-              `)
-              .eq('company_id', companyId)
-              .eq('period_id', periodId);
-            
-            payrolls = syncedPayrolls;
-            console.log('✅ Empleados sincronizados:', payrolls?.length || 0);
-          }
-        } catch (syncError) {
-          console.error('❌ Error en sincronización:', syncError);
-          // Continuar sin sincronización si falla
-        }
-      }
 
       const employees: PayrollHistoryEmployee[] = payrolls?.map(payroll => ({
         id: payroll.employee_id,
