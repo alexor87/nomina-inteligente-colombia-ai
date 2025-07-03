@@ -73,9 +73,9 @@ export class PayrollLiquidationNewService {
           let payrollEmployee: PayrollEmployee;
 
           if (existingPayroll) {
-            // Usar datos de nómina existente
-            console.log(`✅ Usando nómina existente para: ${employee.nombre}`);
-            payrollEmployee = this.mapExistingPayrollToEmployee(employee, existingPayroll);
+            // Usar datos de nómina existente CON CORRECCIÓN DE PERIODICIDAD
+            console.log(`✅ Usando nómina existente para: ${employee.nombre} con periodicidad: ${companyPeriodicity}`);
+            payrollEmployee = this.mapExistingPayrollToEmployee(employee, existingPayroll, companyPeriodicity);
           } else {
             // **USAR PayrollCalculationEnhancedService con periodicidad correcta**
             console.log(`🔄 Calculando nueva nómina para: ${employee.nombre} con periodicidad: ${companyPeriodicity}`);
@@ -91,13 +91,13 @@ export class PayrollLiquidationNewService {
         } catch (error) {
           console.error(`❌ Error procesando empleado ${employee.nombre}:`, error);
           
-          // Crear entrada con error
+          // Crear entrada con error CORRIGIENDO PERIODICIDAD
           processedEmployees.push({
             id: employee.id,
             name: `${employee.nombre} ${employee.apellido}`,
             position: employee.cargo || 'Sin cargo',
             baseSalary: Number(employee.salario_base) || 0,
-            workedDays: 30,
+            workedDays: this.getDefaultWorkedDays(companyPeriodicity), // CORRECCIÓN AQUÍ
             extraHours: 0,
             disabilities: 0,
             bonuses: 0,
@@ -130,13 +130,49 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  private static mapExistingPayrollToEmployee(employee: any, payroll: any): PayrollEmployee {
+  // **NUEVA FUNCIÓN PARA OBTENER DÍAS TRABAJADOS POR DEFECTO SEGÚN PERIODICIDAD**
+  private static getDefaultWorkedDays(periodicity: 'quincenal' | 'mensual' | 'semanal'): number {
+    switch (periodicity) {
+      case 'semanal':
+        return 7;
+      case 'quincenal':
+        return 15;
+      case 'mensual':
+        return 30;
+      default:
+        return 30;
+    }
+  }
+
+  // **FUNCIÓN CORREGIDA: Validar días trabajados según periodicidad**
+  private static validateWorkedDays(workedDays: number, periodicity: 'quincenal' | 'mensual' | 'semanal'): number {
+    const maxDays = this.getDefaultWorkedDays(periodicity);
+    
+    if (workedDays > maxDays) {
+      console.warn(`⚠️  Días trabajados (${workedDays}) exceden máximo para período ${periodicity} (${maxDays}). Ajustando a ${maxDays}.`);
+      return maxDays;
+    }
+    
+    return workedDays || maxDays;
+  }
+
+  // **FUNCIÓN CORREGIDA: Mapear nómina existente respetando periodicidad**
+  private static mapExistingPayrollToEmployee(
+    employee: any, 
+    payroll: any, 
+    periodicity: 'quincenal' | 'mensual' | 'semanal'
+  ): PayrollEmployee {
+    const rawWorkedDays = payroll.dias_trabajados || employee.dias_trabajo;
+    const validatedWorkedDays = this.validateWorkedDays(rawWorkedDays, periodicity);
+    
+    console.log(`📊 Empleado ${employee.nombre}: días originales=${rawWorkedDays}, días validados=${validatedWorkedDays}, periodicidad=${periodicity}`);
+    
     return {
       id: employee.id,
       name: `${employee.nombre} ${employee.apellido}`,
       position: employee.cargo || 'Sin cargo',
       baseSalary: Number(payroll.salario_base) || 0,
-      workedDays: payroll.dias_trabajados || 30,
+      workedDays: validatedWorkedDays, // CORRECCIÓN CRÍTICA AQUÍ
       extraHours: Number(payroll.horas_extra) || 0,
       disabilities: 0, // Calcular desde novedades si es necesario
       bonuses: Number(payroll.bonificaciones) || 0,
@@ -162,26 +198,16 @@ export class PayrollLiquidationNewService {
     try {
       const baseSalary = Number(employee.salario_base) || 0;
       
-      // Determinar días trabajados según periodicidad
-      let workedDays: number;
-      switch (periodicity) {
-        case 'semanal':
-          workedDays = employee.dias_trabajo || 7;
-          break;
-        case 'quincenal':
-          workedDays = employee.dias_trabajo || 15;
-          break;
-        case 'mensual':
-          workedDays = employee.dias_trabajo || 30;
-          break;
-        default:
-          workedDays = employee.dias_trabajo || 30;
-      }
+      // **CORRECCIÓN: Determinar días trabajados según periodicidad real**
+      const rawWorkedDays = employee.dias_trabajo;
+      const workedDays = this.validateWorkedDays(rawWorkedDays, periodicity);
+      
+      console.log(`🔢 Empleado ${employee.nombre}: salario=${baseSalary}, días=${workedDays}, periodicidad=${periodicity}`);
       
       // **USAR PayrollCalculationEnhancedService con periodicidad correcta**
       const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
         baseSalary,
-        workedDays,
+        workedDays, // USAR DÍAS VALIDADOS
         extraHours: 0, // Se puede agregar desde novedades
         disabilities: 0,
         bonuses: 0,
@@ -197,7 +223,7 @@ export class PayrollLiquidationNewService {
         name: `${employee.nombre} ${employee.apellido}`,
         position: employee.cargo || 'Sin cargo',
         baseSalary,
-        workedDays,
+        workedDays, // USAR DÍAS VALIDADOS
         extraHours: calculation.extraPay > 0 ? Math.round(calculation.extraPay / (baseSalary / 192 * 1.25)) : 0,
         disabilities: 0,
         bonuses: 0,
@@ -215,21 +241,25 @@ export class PayrollLiquidationNewService {
     } catch (error) {
       console.error('❌ Error en cálculo de nómina:', error);
       
-      // Retornar cálculo básico en caso de error
+      // **CORRECCIÓN: Retornar cálculo básico CON PERIODICIDAD CORRECTA**
       const baseSalary = Number(employee.salario_base) || 0;
+      const workedDays = this.validateWorkedDays(employee.dias_trabajo, periodicity);
+      
+      console.log(`🚨 Fallback para ${employee.nombre}: días=${workedDays}, periodicidad=${periodicity}`);
+      
       return {
         id: employee.id,
         name: `${employee.nombre} ${employee.apellido}`,
         position: employee.cargo || 'Sin cargo',
         baseSalary,
-        workedDays: employee.dias_trabajo || 30,
+        workedDays, // CORRECCIÓN CRÍTICA AQUÍ
         extraHours: 0,
         disabilities: 0,
         bonuses: 0,
         absences: 0,
-        grossPay: baseSalary,
-        deductions: baseSalary * 0.08, // 8% aproximado para deducciones básicas
-        netPay: baseSalary * 0.92,
+        grossPay: baseSalary * (workedDays / 30), // Proporcional según días reales
+        deductions: baseSalary * (workedDays / 30) * 0.08, // 8% aproximado proporcional
+        netPay: baseSalary * (workedDays / 30) * 0.92, // Proporcional
         status: 'incomplete',
         errors: ['Cálculo simplificado - revisar manualmente'],
         eps: employee.eps || '',
