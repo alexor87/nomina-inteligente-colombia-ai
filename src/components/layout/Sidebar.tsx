@@ -64,7 +64,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 min-h-[60px] flex-shrink-0">
         {!collapsed && (
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 flex items-center justify-center">
+            <div className="w-10 h-10 flex items-center justify-center">
               <img 
                 src="/lovable-uploads/b727a0b1-b3cc-4682-a86d-29eb5e60af4a.png" 
                 alt="Nómina Logo" 
@@ -139,7 +139,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       {!collapsed && (
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
           <div className="text-xs text-gray-500 text-center">
-            <span className="font-medium">Nómina</span>
+            <span className="font-medium">Finppi</span>
             <div className="mt-1">Gestión de nómina</div>
           </div>
         </div>
