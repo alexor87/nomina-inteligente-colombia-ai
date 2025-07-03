@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
 import { FileText, Download, X, Loader2 } from 'lucide-react';
@@ -41,20 +41,8 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
     setIsGenerating(true);
     try {
-      console.log('🔄 Generando comprobante para:', employee.name);
-      console.log('📋 Datos del empleado:', {
-        id: employee.id,
-        name: employee.name,
-        baseSalary: employee.baseSalary,
-        workedDays: employee.workedDays,
-        extraHours: employee.extraHours,
-        bonuses: employee.bonuses,
-        grossPay: employee.grossPay,
-        deductions: employee.deductions,
-        netPay: employee.netPay,
-        transportAllowance: employee.transportAllowance
-      });
-
+      console.log('🔄 Generando comprobante profesional para:', employee.name);
+      
       const requestBody = {
         employee: {
           id: employee.id,
@@ -79,7 +67,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         }
       };
 
-      console.log('📤 Enviando request:', requestBody);
+      console.log('📤 Enviando request para PDF profesional:', requestBody);
 
       const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
         body: requestBody
@@ -94,7 +82,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         throw new Error('No se recibieron datos del PDF');
       }
 
-      console.log('✅ PDF generado exitosamente');
+      console.log('✅ PDF profesional generado exitosamente');
 
       // Crear blob y descargar
       const blob = new Blob([data], { type: 'application/pdf' });
@@ -128,128 +116,234 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
     });
   };
+
+  // Cálculos detallados igual que en el PDF
+  const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
+  const saludEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
+  const pensionEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
+  const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0; // 1%
+  const otrasDeduccionesCalculadas = Math.max(0, employee.deductions - saludEmpleado - pensionEmpleado - fondoSolidaridad);
+  const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25);
+  const totalHorasExtra = employee.extraHours * valorHoraExtra;
 
   return (
     <CustomModal 
       isOpen={isOpen} 
       onClose={onClose}
-      className="max-w-3xl max-h-[90vh] overflow-y-auto"
+      className="max-w-4xl max-h-[90vh] overflow-y-auto"
       closeOnEscape={false}
       closeOnBackdrop={false}
     >
       <CustomModalHeader>
         <CustomModalTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Vista Previa - Comprobante de Pago
+          Vista Previa - Comprobante de Nómina
         </CustomModalTitle>
       </CustomModalHeader>
 
-      <div className="space-y-4">
-        {/* Información del Período */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Información del Período</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm text-gray-600">Período</div>
-                <div className="font-semibold">
-                  {formatDate(period.startDate)} - {formatDate(period.endDate)}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Tipo</div>
-                <div className="font-semibold capitalize">{period.type}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Preview con el mismo diseño que el PDF */}
+      <div className="bg-white p-8 space-y-6" style={{ fontFamily: '"Open Sans", sans-serif' }}>
+        
+        {/* Título */}
+        <h1 className="text-2xl font-semibold text-center text-blue-800 mb-8">
+          Comprobante de Nómina
+        </h1>
 
-        {/* Información del Empleado */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Información del Empleado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm text-gray-600">Nombre</div>
-                <div className="font-semibold">{employee.name}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Cargo</div>
-                <div className="font-semibold">{employee.position}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">EPS</div>
-                <div className="font-semibold">{employee.eps || 'No asignada'}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">AFP</div>
-                <div className="font-semibold">{employee.afp || 'No asignada'}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Cards de Información General */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="pt-4">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">EMPRESA</h3>
+              <p className="font-semibold text-gray-900">Mi Empresa</p>
+              <p className="text-sm text-gray-700">NIT: N/A</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="pt-4">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">EMPLEADO</h3>
+              <p className="font-semibold text-gray-900">{employee.name}</p>
+              <p className="text-sm text-gray-700">CC: {employee.id?.slice(0, 8) || 'N/A'}</p>
+              {employee.position && <p className="text-sm text-gray-700">Cargo: {employee.position}</p>}
+            </CardContent>
+          </Card>
+          
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="pt-4">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">PERÍODO DE PAGO</h3>
+              <p className="font-semibold text-gray-900">{formatDate(period.startDate)} - {formatDate(period.endDate)}</p>
+              <p className="text-sm text-gray-700">Días trabajados: {employee.workedDays}</p>
+              <p className="text-sm text-gray-700">Salario Base: {formatCurrency(employee.baseSalary)}</p>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Detalles de Pago */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Detalles de Pago</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between py-2 border-b">
-                <span>Salario Base (Mensual)</span>
-                <span className="font-semibold">{formatCurrency(employee.baseSalary)}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span>Días Trabajados</span>
-                <span className="font-semibold">{employee.workedDays}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span>Salario Proporcional</span>
-                <span className="font-semibold">{formatCurrency(Math.round((employee.baseSalary / 30) * employee.workedDays))}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span>Horas Extra</span>
-                <span className="font-semibold">{employee.extraHours}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span>Bonificaciones</span>
-                <span className="font-semibold">{formatCurrency(employee.bonuses)}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span>Auxilio de Transporte</span>
-                <span className="font-semibold">{formatCurrency(employee.transportAllowance)}</span>
-              </div>
-              {employee.disabilities > 0 && (
-                <div className="flex justify-between py-2 border-b">
-                  <span>Incapacidades</span>
-                  <span className="font-semibold text-red-600">-{formatCurrency(employee.disabilities)}</span>
-                </div>
-              )}
-              <div className="flex justify-between py-2 border-b bg-blue-50 px-3 rounded">
-                <span className="font-semibold">Total Devengado</span>
-                <span className="font-bold">{formatCurrency(employee.grossPay)}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b bg-red-50 px-3 rounded">
-                <span className="font-semibold">Total Deducciones</span>
-                <span className="font-bold text-red-600">-{formatCurrency(employee.deductions)}</span>
-              </div>
-              <div className="flex justify-between py-3 bg-green-50 px-3 rounded">
-                <span className="font-bold text-lg">Neto a Pagar</span>
-                <span className="font-bold text-lg text-green-600">{formatCurrency(employee.netPay)}</span>
-              </div>
+        {/* Resumen del Pago */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
+            💵 Resumen del Pago
+          </h2>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Concepto</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Valor</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                <tr>
+                  <td className="px-4 py-3 text-sm text-gray-900">Salario Proporcional</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(salarioProporcional)}</td>
+                </tr>
+                {employee.transportAllowance > 0 && (
+                  <tr>
+                    <td className="px-4 py-3 text-sm text-gray-900">Subsidio de Transporte</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(employee.transportAllowance)}</td>
+                  </tr>
+                )}
+                {employee.bonuses > 0 && (
+                  <tr>
+                    <td className="px-4 py-3 text-sm text-gray-900">Bonificaciones</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(employee.bonuses)}</td>
+                  </tr>
+                )}
+                {totalHorasExtra > 0 && (
+                  <tr>
+                    <td className="px-4 py-3 text-sm text-gray-900">Horas Extras y Recargos</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(totalHorasExtra)}</td>
+                  </tr>
+                )}
+                {employee.deductions > 0 && (
+                  <tr>
+                    <td className="px-4 py-3 text-sm text-red-600">Deducciones</td>
+                    <td className="px-4 py-3 text-sm text-red-600 text-right">-{formatCurrency(employee.deductions)}</td>
+                  </tr>
+                )}
+                <tr className="bg-blue-50">
+                  <td className="px-4 py-3 text-sm font-semibold text-blue-800">Total Neto a Pagar</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-blue-800 text-right">{formatCurrency(employee.netPay)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Horas Extras */}
+        {employee.extraHours > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
+              ⏱ Horas Extras, Ordinarias y Recargos
+            </h2>
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Concepto</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Cantidad</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Valor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  <tr>
+                    <td className="px-4 py-3 text-sm text-gray-900">Hora Extra Ordinaria</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{employee.extraHours} horas</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(totalHorasExtra)}</td>
+                  </tr>
+                  <tr className="bg-blue-50">
+                    <td className="px-4 py-3 text-sm font-semibold text-blue-800" colSpan={2}>Total pago por horas</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-blue-800 text-right">{formatCurrency(totalHorasExtra)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
+
+        {/* Deducciones */}
+        {employee.deductions > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
+              💸 Retenciones y Deducciones
+            </h2>
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Concepto</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">%</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Valor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {saludEmpleado > 0 && (
+                    <tr>
+                      <td className="px-4 py-3 text-sm text-gray-900">Salud</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-center">4%</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(saludEmpleado)}</td>
+                    </tr>
+                  )}
+                  {pensionEmpleado > 0 && (
+                    <tr>
+                      <td className="px-4 py-3 text-sm text-gray-900">Pensión</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-center">4%</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(pensionEmpleado)}</td>
+                    </tr>
+                  )}
+                  {fondoSolidaridad > 0 && (
+                    <tr>
+                      <td className="px-4 py-3 text-sm text-gray-900">Fondo de Solidaridad</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-center">1%</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(fondoSolidaridad)}</td>
+                    </tr>
+                  )}
+                  {otrasDeduccionesCalculadas > 0 && (
+                    <tr>
+                      <td className="px-4 py-3 text-sm text-gray-900">Otros</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-center">-</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(otrasDeduccionesCalculadas)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-blue-50">
+                    <td className="px-4 py-3 text-sm font-semibold text-blue-800" colSpan={2}>Total Retenciones y Deducciones</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-blue-800 text-right">{formatCurrency(employee.deductions)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Footer con Firmas */}
+        <div className="mt-12 pt-6 border-t-2 border-gray-200">
+          <div className="flex justify-between items-center mb-8">
+            <div className="text-center">
+              <div className="border-t border-gray-400 pt-2 mb-2 w-64">
+                <p className="text-xs text-gray-600">Firma del Empleado</p>
+              </div>
+              <p className="font-semibold text-sm">{employee.name}</p>
+              <p className="text-xs text-gray-600">CC: {employee.id?.slice(0, 8) || 'N/A'}</p>
+            </div>
+            <div className="text-center">
+              <div className="border-t border-gray-400 pt-2 mb-2 w-64">
+                <p className="text-xs text-gray-600">Firma del Representante Legal</p>
+              </div>
+              <p className="font-semibold text-sm">Mi Empresa</p>
+              <p className="text-xs text-gray-600">NIT: N/A</p>
+            </div>
+          </div>
+          
+          <div className="text-center text-xs text-gray-600 space-y-1">
+            <p>Este documento fue generado con <span className="font-semibold text-blue-800">Finppi</span> – Software de Nómina y Seguridad Social</p>
+            <p><a href="https://www.finppi.com" className="text-blue-600 hover:underline">www.finppi.com</a></p>
+            <p className="mt-2">Generado el {new Date().toLocaleString('es-CO')}</p>
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-4 border-t">

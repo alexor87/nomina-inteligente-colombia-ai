@@ -1,161 +1,69 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { PayrollEmployee } from '@/types/payroll';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+export interface CompanyInfo {
+  razon_social?: string;
+  nit?: string;
+  direccion?: string;
+  telefono?: string;
+  email?: string;
 }
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+export interface VoucherData {
+  employee: PayrollEmployee & {
+    documento?: string;
+    tipo_documento?: string;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+    type: string;
+  };
+  company: CompanyInfo;
+}
 
-  try {
-    console.log('🔄 INICIANDO GENERACIÓN DE PDF PROFESIONAL REFACTORIZADO');
+export class PayrollVoucherService {
+  /**
+   * SERVICIO PROFESIONAL DE COMPROBANTES TIPO ALELUYA
+   * Diseño limpio, profesional y optimizado para Finppi
+   */
+  
+  static generateProfessionalVoucherHTML(data: VoucherData): string {
+    const { employee, period, company } = data;
     
-    const requestBody = await req.json();
-    console.log('📋 Datos recibidos:', JSON.stringify(requestBody, null, 2));
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0
+      }).format(amount);
+    };
 
-    const { employee, period } = requestBody;
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString('es-CO', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    };
 
-    if (!employee || !period) {
-      console.error('❌ Faltan datos del empleado o período');
-      return new Response(
-        JSON.stringify({ error: 'Faltan datos del empleado o período' }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
+    // Cálculos detallados
+    const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
+    
+    // Deducciones calculadas
+    const saludEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
+    const pensionEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
+    const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0; // 1% si > 4 SMMLV
+    const otrasDeduccionesCalculadas = Math.max(0, employee.deductions - saludEmpleado - pensionEmpleado - fondoSolidaridad);
+    
+    // Horas extra calculadas (ejemplo con valor por hora)
+    const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25); // Hora extra ordinaria
+    const totalHorasExtra = employee.extraHours * valorHoraExtra;
 
-    // Inicializar Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const documento = employee.documento || employee.id?.slice(0, 8) || 'N/A';
+    const tipoDocumento = employee.tipo_documento || 'CC';
 
-    // Obtener información completa del empleado y empresa
-    let companyInfo = null;
-    let employeeComplete = employee;
-
-    try {
-      const authHeader = req.headers.get('Authorization');
-      if (authHeader) {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user } } = await supabase.auth.getUser(token);
-        
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (profile?.company_id) {
-            // Obtener información de la empresa
-            const { data: company } = await supabase
-              .from('companies')
-              .select('*')
-              .eq('id', profile.company_id)
-              .single();
-            
-            companyInfo = company;
-
-            // Obtener información completa del empleado (incluyendo documento)
-            const { data: employeeData } = await supabase
-              .from('employees')
-              .select('*')
-              .eq('id', employee.id)
-              .eq('company_id', profile.company_id)
-              .single();
-            
-            if (employeeData) {
-              employeeComplete = {
-                ...employee,
-                documento: employeeData.cedula,
-                tipo_documento: employeeData.tipo_documento || 'CC',
-                position: employeeData.cargo
-              };
-            }
-          }
-        }
-      }
-    } catch (authError) {
-      console.log('ℹ️ No se pudo obtener información completa:', authError.message);
-    }
-
-    console.log('🏢 Información de empresa obtenida:', companyInfo?.razon_social || 'No disponible');
-    console.log('👤 Información de empleado completada:', employeeComplete.name);
-
-    // Generar PDF usando nuevo template profesional
-    const pdfContent = await generateProfessionalVoucherPDF(employeeComplete, period, companyInfo);
-
-    console.log('✅ PDF PROFESIONAL TIPO ALELUYA GENERADO EXITOSAMENTE');
-
-    return new Response(pdfContent, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="comprobante-${employeeComplete.name.replace(/\s+/g, '-')}.pdf"`
-      }
-    });
-
-  } catch (error) {
-    console.error('💥 ERROR CRÍTICO GENERANDO PDF:', error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'Error interno del servidor' }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-  }
-});
-
-// FUNCIÓN PRINCIPAL: Generar PDF profesional tipo Aleluya
-async function generateProfessionalVoucherPDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
-  console.log('📄 GENERANDO PDF PROFESIONAL TIPO ALELUYA...');
-  
-  // Función auxiliar para formatear moneda
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
-  // Función auxiliar para formatear fecha
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  // Cálculos detallados profesionales
-  const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
-  
-  // Deducciones calculadas detalladamente
-  const saludEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
-  const pensionEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
-  const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0; // 1% si > 4 SMMLV
-  const otrasDeduccionesCalculadas = Math.max(0, employee.deductions - saludEmpleado - pensionEmpleado - fondoSolidaridad);
-  
-  // Horas extra calculadas con valor real
-  const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25); // Hora extra ordinaria
-  const totalHorasExtra = employee.extraHours * valorHoraExtra;
-
-  const documento = employee.documento || employee.cedula || employee.id?.slice(0, 8) || 'N/A';
-  const tipoDocumento = employee.tipo_documento || 'CC';
-
-  // PLANTILLA HTML PROFESIONAL TIPO ALELUYA CON TU DISEÑO
-  const htmlContent = `
+    return `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -329,9 +237,9 @@ async function generateProfessionalVoucherPDF(employee: any, period: any, compan
     <div class="info-grid">
       <div class="info-card">
         <h3>EMPRESA</h3>
-        <p><strong>${companyInfo?.razon_social || 'Mi Empresa'}</strong></p>
-        <p>NIT: ${companyInfo?.nit || 'N/A'}</p>
-        ${companyInfo?.direccion ? `<p>${companyInfo.direccion}</p>` : ''}
+        <p><strong>${company.razon_social || 'Mi Empresa'}</strong></p>
+        <p>NIT: ${company.nit || 'N/A'}</p>
+        ${company.direccion ? `<p>${company.direccion}</p>` : ''}
       </div>
       
       <div class="info-card">
@@ -412,8 +320,8 @@ async function generateProfessionalVoucherPDF(employee: any, period: any, compan
         </div>
         <div class="signature-box">
           <div class="signature-line">Firma del Representante Legal</div>
-          <p><strong>${companyInfo?.razon_social || 'Mi Empresa'}</strong></p>
-          <p>NIT: ${companyInfo?.nit || 'N/A'}</p>
+          <p><strong>${company.razon_social || 'Mi Empresa'}</strong></p>
+          <p>NIT: ${company.nit || 'N/A'}</p>
         </div>
       </div>
       
@@ -426,89 +334,38 @@ async function generateProfessionalVoucherPDF(employee: any, period: any, compan
   </div>
 </body>
 </html>`;
+  }
 
-  // Convertir HTML a PDF usando conversión mejorada
-  try {
-    console.log('📄 HTML PROFESIONAL TIPO ALELUYA GENERADO CORRECTAMENTE');
-    
-    // Por ahora, crear un PDF básico mejorado con la estructura
-    const pdfHeader = '%PDF-1.4\n';
-    const pdfContent = `1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
+  /**
+   * Calcula deducciones detalladas por concepto
+   */
+  static calculateDetailedDeductions(baseSalary: number, totalDeductions: number) {
+    const salud = Math.round(baseSalary * 0.04); // 4%
+    const pension = Math.round(baseSalary * 0.04); // 4%
+    const fondoSolidaridad = baseSalary > 4000000 ? Math.round(baseSalary * 0.01) : 0; // 1% si > 4 SMMLV
+    const otros = Math.max(0, totalDeductions - salud - pension - fondoSolidaridad);
 
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
+    return {
+      salud,
+      pension,
+      fondoSolidaridad,
+      otros,
+      total: totalDeductions
+    };
+  }
 
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
->>
-endobj
+  /**
+   * Calcula horas extra con valores reales
+   */
+  static calculateExtraHours(baseSalary: number, extraHours: number) {
+    const valorHoraOrdinaria = baseSalary / 240; // 240 horas mensuales
+    const valorHoraExtra = valorHoraOrdinaria * 1.25; // 25% recargo
+    const totalValue = Math.round(extraHours * valorHoraExtra);
 
-4 0 obj
-<<
-/Length 500
->>
-stream
-BT
-/F1 14 Tf
-50 750 Td
-(COMPROBANTE DE NOMINA - FINPPI) Tj
-0 -30 Td
-(Empleado: ${employee.name}) Tj
-0 -20 Td
-(Documento: ${tipoDocumento} ${documento}) Tj
-0 -20 Td
-(Periodo: ${formatDate(period.startDate)} - ${formatDate(period.endDate)}) Tj
-0 -30 Td
-(Salario Base: ${formatCurrency(employee.baseSalary)}) Tj
-0 -20 Td
-(Dias Trabajados: ${employee.workedDays}) Tj
-0 -20 Td
-(Total Devengado: ${formatCurrency(employee.grossPay)}) Tj
-0 -20 Td
-(Total Deducciones: ${formatCurrency(employee.deductions)}) Tj
-0 -30 Td
-(NETO A PAGAR: ${formatCurrency(employee.netPay)}) Tj
-0 -50 Td
-(Generado con Finppi - www.finppi.com) Tj
-ET
-endstream
-endobj
-
-xref
-0 5
-0000000000 65535 f 
-0000000010 00000 n 
-0000000079 00000 n 
-0000000136 00000 n 
-0000000227 00000 n 
-trailer
-<<
-/Size 5
-/Root 1 0 R
->>
-startxref
-800
-%%EOF`;
-    
-    const fullPdf = pdfHeader + pdfContent;
-    return new TextEncoder().encode(fullPdf);
-    
-  } catch (error) {
-    console.error('❌ Error generando PDF:', error);
-    throw error;
+    return {
+      hours: extraHours,
+      valuePerHour: valorHoraExtra,
+      totalValue
+    };
   }
 }
