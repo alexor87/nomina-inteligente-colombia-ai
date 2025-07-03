@@ -7,7 +7,6 @@ import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
 import { FileText, Download, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 interface VoucherPreviewModalProps {
   isOpen: boolean;
@@ -41,7 +40,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
     setIsGenerating(true);
     try {
-      console.log('🔄 Generando comprobante profesional para:', employee.name);
+      console.log('🚀 Generando comprobante profesional para:', employee.name);
       
       const requestBody = {
         employee: {
@@ -69,37 +68,68 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
       console.log('📤 Enviando request para PDF profesional:', requestBody);
 
-      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
-        body: requestBody
-      });
+      // SOLUCIÓN: Usar fetch directo en lugar de supabase.functions.invoke para control total del binary
+      const response = await fetch(
+        'https://xrmolrlkakwujyozgmilf.supabase.co/functions/v1/generate-voucher-pdf',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhybW9ybGtha3d1anlvemdtaWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1NzMxNDYsImV4cCI6MjA2NjE0OTE0Nn0.JSKbniDUkbNEAVCxCkrG_J5NQTt0yHc7W5PPheJ8X_U`
+          },
+          body: JSON.stringify(requestBody)
+        }
+      );
 
-      if (error) {
-        console.error('❌ Error en la función:', error);
-        throw new Error(error.message || 'Error al generar el comprobante');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error en la respuesta:', response.status, errorText);
+        throw new Error(`Error del servidor: ${response.status} - ${errorText}`);
       }
 
-      if (!data) {
-        throw new Error('No se recibieron datos del PDF');
+      // CLAVE: Manejar la respuesta como ArrayBuffer para preservar los datos binarios
+      const arrayBuffer = await response.arrayBuffer();
+      console.log('✅ PDF recibido como ArrayBuffer, tamaño:', arrayBuffer.byteLength);
+
+      if (arrayBuffer.byteLength === 0) {
+        throw new Error('El PDF está vacío');
       }
 
-      console.log('✅ PDF profesional generado exitosamente');
+      // Verificar que es un PDF válido (debe empezar con %PDF)
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 4));
+      if (pdfHeader !== '%PDF') {
+        console.error('❌ Respuesta no es un PDF válido:', pdfHeader);
+        const textContent = new TextDecoder().decode(uint8Array);
+        console.error('Contenido recibido:', textContent.substring(0, 200));
+        throw new Error('La respuesta no es un PDF válido');
+      }
 
-      // Crear blob y descargar
-      const blob = new Blob([data], { type: 'application/pdf' });
+      console.log('✅ PDF válido confirmado');
+
+      // Crear blob correctamente con los datos binarios
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
+      
+      // Crear enlace de descarga
       const a = document.createElement('a');
       a.href = url;
       a.download = `comprobante-${employee.name.replace(/\s+/g, '-')}-${period.startDate}.pdf`;
       document.body.appendChild(a);
       a.click();
+      
+      // Limpiar
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+
+      console.log('✅ PDF descargado exitosamente');
 
       toast({
         title: "✅ Comprobante generado",
         description: "El comprobante de pago se ha descargado exitosamente",
         className: "border-green-200 bg-green-50"
       });
+      
     } catch (error: any) {
       console.error('💥 Error generando comprobante:', error);
       toast({
@@ -124,9 +154,9 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
   // Cálculos detallados igual que en el PDF
   const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
-  const saludEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
-  const pensionEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
-  const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0; // 1%
+  const saludEmpleado = Math.round(employee.baseSalary * 0.04);
+  const pensionEmpleado = Math.round(employee.baseSalary * 0.04);
+  const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0;
   const otrasDeduccionesCalculadas = Math.max(0, employee.deductions - saludEmpleado - pensionEmpleado - fondoSolidaridad);
   const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25);
   const totalHorasExtra = employee.extraHours * valorHoraExtra;
@@ -149,12 +179,10 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
       {/* Preview con el mismo diseño profesional que el PDF */}
       <div className="bg-white p-8 space-y-6" style={{ fontFamily: '"Open Sans", sans-serif' }}>
         
-        {/* Título */}
         <h1 className="text-2xl font-semibold text-center text-blue-800 mb-8">
           Comprobante de Nómina
         </h1>
 
-        {/* Cards de Información General - Layout de 3 columnas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
           <Card className="border-l-4 border-l-blue-500 bg-slate-50">
             <CardContent className="pt-4">
@@ -183,7 +211,6 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </Card>
         </div>
 
-        {/* Resumen del Pago - Diseño profesional con tabla estilizada */}
         <div className="space-y-3">
           <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
             💵 Resumen del Pago
@@ -265,7 +292,6 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </div>
         )}
 
-        {/* Deducciones - Solo si tiene deducciones */}
         {employee.deductions > 0 && (
           <div className="space-y-3">
             <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
@@ -319,7 +345,6 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </div>
         )}
 
-        {/* Footer con Firmas - Diseño profesional */}
         <div className="mt-12 pt-6 border-t-2 border-gray-200">
           <div className="flex justify-between items-center mb-8">
             <div className="text-center">
