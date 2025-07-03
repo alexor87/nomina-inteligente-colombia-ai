@@ -258,17 +258,43 @@ export class PayrollPeriodDetectionService {
     }
   }
 
+  // Calcular siguiente período con lógica consecutiva corregida
   private static calculateNextPeriodDates(periodicity: string, lastPeriod?: PayrollPeriod | null): { startDate: string; endDate: string } {
     if (lastPeriod) {
-      // Calcular siguiente período basado en el último
+      // Calcular siguiente período basado en el último - CORREGIDO
       const lastEndDate = new Date(lastPeriod.fecha_fin);
       const nextStartDate = new Date(lastEndDate);
       nextStartDate.setDate(nextStartDate.getDate() + 1);
 
       let nextEndDate: Date;
+      
       if (periodicity === 'quincenal') {
+        // Lógica quincenal corregida para seguir patrón 1-15, 16-fin
+        const startDay = nextStartDate.getDate();
+        
+        if (startDay === 1) {
+          // Primera quincena (1-15)
+          nextEndDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth(), 15);
+        } else if (startDay === 16) {
+          // Segunda quincena (16-fin de mes)
+          nextEndDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth() + 1, 0);
+        } else {
+          // Corregir fechas irregulares
+          console.log('⚠️ Corrigiendo fecha irregular en período quincenal');
+          
+          if (startDay <= 15) {
+            // Ajustar a primera quincena
+            nextStartDate.setDate(1);
+            nextEndDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth(), 15);
+          } else {
+            // Ajustar a segunda quincena
+            nextStartDate.setDate(16);
+            nextEndDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth() + 1, 0);
+          }
+        }
+      } else if (periodicity === 'semanal') {
         nextEndDate = new Date(nextStartDate);
-        nextEndDate.setDate(nextEndDate.getDate() + 14);
+        nextEndDate.setDate(nextEndDate.getDate() + 6);
       } else { // mensual
         nextEndDate = new Date(nextStartDate);
         nextEndDate.setMonth(nextEndDate.getMonth() + 1);

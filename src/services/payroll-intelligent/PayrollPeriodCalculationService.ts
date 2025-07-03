@@ -1,7 +1,8 @@
+
 import { PayrollPeriod } from '@/types/payroll';
 
 export class PayrollPeriodCalculationService {
-  // Calcular siguiente período basado en el período cerrado real
+  // Calcular siguiente período basado en el período cerrado real - CORREGIDO
   static calculateNextPeriod(periodicity: string, closedPeriod: PayrollPeriod): {
     startDate: string;
     endDate: string;
@@ -20,19 +21,44 @@ export class PayrollPeriodCalculationService {
     startDate.setDate(startDate.getDate() + 1);
     
     // Calcular fecha fin según periodicidad
-    const endDate = new Date(startDate);
+    let endDate = new Date(startDate);
     
     switch (periodicity) {
       case 'quincenal':
-        endDate.setDate(endDate.getDate() + 14); // 15 días
+        // Corregir lógica quincenal para seguir patrón 1-15, 16-fin
+        const startDay = startDate.getDate();
+        
+        if (startDay === 1) {
+          // Primera quincena (1-15)
+          endDate = new Date(startDate.getFullYear(), startDate.getMonth(), 15);
+        } else if (startDay === 16) {
+          // Segunda quincena (16-fin de mes)
+          endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+        } else {
+          // Corregir fechas irregulares
+          console.log('⚠️ Corrigiendo fecha irregular en período quincenal');
+          
+          if (startDay <= 15) {
+            // Ajustar a primera quincena
+            startDate.setDate(1);
+            endDate = new Date(startDate.getFullYear(), startDate.getMonth(), 15);
+          } else {
+            // Ajustar a segunda quincena
+            startDate.setDate(16);
+            endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+          }
+        }
         break;
+        
       case 'mensual':
         endDate.setMonth(endDate.getMonth() + 1);
         endDate.setDate(endDate.getDate() - 1); // Último día del mes
         break;
+        
       case 'semanal':
         endDate.setDate(endDate.getDate() + 6); // 7 días
         break;
+        
       default:
         // Por defecto mensual
         endDate.setMonth(endDate.getMonth() + 1);

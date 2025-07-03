@@ -72,40 +72,29 @@ export class PayrollPeriodService {
     }
   }
 
-  // Generar rango de fechas según periodicidad
+  // Generar rango de fechas según periodicidad - CORREGIDO para períodos consecutivos
   static generatePeriodDates(periodicity: string, referenceDate: Date = new Date()): { startDate: string; endDate: string } {
     console.log('📅 Generando fechas para periodicidad:', periodicity);
-    const today = new Date(referenceDate);
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const day = today.getDate();
-
+    
     switch (periodicity) {
       case 'mensual':
         console.log('📅 Generando periodo mensual');
+        const monthlyDate = new Date(referenceDate);
+        const year = monthlyDate.getFullYear();
+        const month = monthlyDate.getMonth();
+        
         return {
           startDate: new Date(year, month, 1).toISOString().split('T')[0],
           endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
         };
 
       case 'quincenal':
-        console.log('📅 Generando periodo quincenal');
-        if (day <= 15) {
-          // Primera quincena del mes
-          return {
-            startDate: new Date(year, month, 1).toISOString().split('T')[0],
-            endDate: new Date(year, month, 15).toISOString().split('T')[0]
-          };
-        } else {
-          // Segunda quincena del mes
-          return {
-            startDate: new Date(year, month, 16).toISOString().split('T')[0],
-            endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
-          };
-        }
+        console.log('📅 Generando periodo quincenal consecutivo');
+        return this.generateNextBiWeeklyPeriod();
 
       case 'semanal':
         console.log('📅 Generando periodo semanal');
+        const today = new Date(referenceDate);
         const dayOfWeek = today.getDay();
         const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Lunes = 1
         const monday = new Date(today);
@@ -122,10 +111,127 @@ export class PayrollPeriodService {
       case 'personalizado':
       default:
         console.log('📅 Periodicidad personalizada o no reconocida, usando mensual como fallback');
+        const fallbackDate = new Date(referenceDate);
+        const fallbackYear = fallbackDate.getFullYear();
+        const fallbackMonth = fallbackDate.getMonth();
+        
         return {
-          startDate: new Date(year, month, 1).toISOString().split('T')[0],
-          endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+          startDate: new Date(fallbackYear, fallbackMonth, 1).toISOString().split('T')[0],
+          endDate: new Date(fallbackYear, fallbackMonth + 1, 0).toISOString().split('T')[0]
         };
+    }
+  }
+
+  // Generar siguiente período quincenal consecutivo
+  static async generateNextBiWeeklyPeriod(): Promise<{ startDate: string; endDate: string }> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        console.warn('No company ID found, using current date fallback');
+        return this.getFallbackBiWeeklyPeriod();
+      }
+
+      // Buscar el último período cerrado para la empresa
+      const { data: lastPeriod, error } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .neq('estado', 'borrador')
+        .order('fecha_fin', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error obteniendo último período:', error);
+        return this.getFallbackBiWeeklyPeriod();
+      }
+
+      if (!lastPeriod) {
+        console.log('No hay períodos anteriores, generando primer período quincenal');
+        return this.getFirstBiWeeklyPeriod();
+      }
+
+      console.log('Último período encontrado:', lastPeriod.fecha_inicio, '-', lastPeriod.fecha_fin);
+
+      // Calcular siguiente período basado en el último
+      const lastEndDate = new Date(lastPeriod.fecha_fin);
+      const nextStartDate = new Date(lastEndDate);
+      nextStartDate.setDate(nextStartDate.getDate() + 1);
+
+      // Determinar si es primera o segunda quincena
+      const startDay = nextStartDate.getDate();
+      let endDate: Date;
+
+      if (startDay === 1) {
+        // Primera quincena del mes (1-15)
+        endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth(), 15);
+      } else if (startDay === 16) {
+        // Segunda quincena del mes (16-fin de mes)
+        endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth() + 1, 0);
+      } else {
+        // Corregir fechas irregulares - forzar al patrón correcto
+        console.log('⚠️ Fecha irregular detectada, corrigiendo al patrón 1-15, 16-fin');
+        
+        if (startDay <= 15) {
+          // Ajustar a primera quincena
+          nextStartDate.setDate(1);
+          endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth(), 15);
+        } else {
+          // Ajustar a segunda quincena
+          nextStartDate.setDate(16);
+          endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth() + 1, 0);
+        }
+      }
+
+      const result = {
+        startDate: nextStartDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      };
+
+      console.log('✅ Siguiente período quincenal generado:', result);
+      return result;
+
+    } catch (error) {
+      console.error('Error generando período quincenal:', error);
+      return this.getFallbackBiWeeklyPeriod();
+    }
+  }
+
+  // Obtener primer período quincenal (1-15 del mes actual)
+  static getFirstBiWeeklyPeriod(): { startDate: string; endDate: string } {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    
+    // Siempre empezar con la primera quincena
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month, 15);
+    
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    };
+  }
+
+  // Fallback para período quincenal basado en fecha actual
+  static getFallbackBiWeeklyPeriod(): { startDate: string; endDate: string } {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const day = today.getDate();
+    
+    if (day <= 15) {
+      // Primera quincena (1-15)
+      return {
+        startDate: new Date(year, month, 1).toISOString().split('T')[0],
+        endDate: new Date(year, month, 15).toISOString().split('T')[0]
+      };
+    } else {
+      // Segunda quincena (16-fin de mes)
+      return {
+        startDate: new Date(year, month, 16).toISOString().split('T')[0],
+        endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+      };
     }
   }
 
