@@ -14,18 +14,23 @@ export class PeriodNameUnifiedService {
   }
 
   /**
-   * Generar nombre de período unificado - MÉTODO PRINCIPAL
+   * Generar nombre de período unificado - MÉTODO PRINCIPAL CORREGIDO
    */
   static generateUnifiedPeriodName(params: {
     startDate: string;
     endDate: string;
     periodicity: 'mensual' | 'quincenal' | 'semanal';
   }): string {
-    return this.generateNormalizedPeriodName(
+    console.log('🚀 GENERANDO NOMBRE UNIFICADO:', params);
+    
+    const result = this.generateNormalizedPeriodName(
       params.startDate,
       params.endDate,
       params.periodicity
     );
+    
+    console.log('✅ NOMBRE GENERADO:', result);
+    return result;
   }
 
   /**
@@ -33,7 +38,7 @@ export class PeriodNameUnifiedService {
    */
   static async normalizeExistingPeriods(companyId: string): Promise<void> {
     try {
-      console.log('🔄 Normalizando períodos existentes para empresa:', companyId);
+      console.log('🔄 NORMALIZANDO PERÍODOS EXISTENTES para empresa:', companyId);
 
       const { data: periods, error } = await supabase
         .from('payroll_periods_real')
@@ -50,7 +55,7 @@ export class PeriodNameUnifiedService {
         return;
       }
 
-      console.log(`📊 Procesando ${periods.length} períodos para normalización`);
+      console.log(`📊 PROCESANDO ${periods.length} períodos para normalización`);
 
       for (const period of periods) {
         // Generar nombre normalizado basado en fechas reales
@@ -62,7 +67,7 @@ export class PeriodNameUnifiedService {
 
         // Solo actualizar si el nombre cambió
         if (normalizedName !== period.periodo) {
-          console.log(`📝 Actualizando período: "${period.periodo}" → "${normalizedName}"`);
+          console.log(`📝 ACTUALIZANDO PERÍODO: "${period.periodo}" → "${normalizedName}"`);
           
           const { error: updateError } = await supabase
             .from('payroll_periods_real')
@@ -77,55 +82,27 @@ export class PeriodNameUnifiedService {
         }
       }
 
-      console.log('✅ Normalización de períodos completada');
+      console.log('✅ NORMALIZACIÓN DE PERÍODOS COMPLETADA');
     } catch (error) {
       console.error('💥 Error crítico en normalización de períodos:', error);
     }
   }
 
   /**
-   * Generar nombre de período normalizado basado en fechas y tipo - PROFESIONAL
+   * Generar nombre de período normalizado basado en fechas y tipo - CORREGIDO PROFESIONALMENTE
    */
   private static generateNormalizedPeriodName(
     startDate: string,
     endDate: string,
     tipoPeriodo: string
   ): string {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    // Para períodos quincenales, usar formato específico PROFESIONAL
-    if (tipoPeriodo === 'quincenal') {
-      const startDay = start.getDate();
-      const endDay = end.getDate();
-      const monthNames = [
-        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-      ];
-      
-      const monthName = monthNames[start.getMonth()];
-      const year = start.getFullYear();
-      
-      // Aplicar reglas PROFESIONALES para períodos quincenales
-      if (startDay === 1 && endDay === 15) {
-        return `${startDay} - ${endDay} ${monthName} ${year}`;
-      } else if (startDay === 16) {
-        // Para segunda quincena, usar el último día real del mes
-        const lastDay = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-        return `${startDay} - ${lastDay} ${monthName} ${year}`;
-      } else {
-        // Formato genérico para fechas que serán corregidas
-        return `${startDay} - ${endDay} ${monthName} ${year}`;
-      }
-    }
-
-    // Para períodos mensuales
-    if (tipoPeriodo === 'mensual') {
-      return getPeriodNameFromDates(startDate, endDate);
-    }
-
-    // Para otros tipos, usar lógica general
-    return getPeriodNameFromDates(startDate, endDate);
+    console.log('🔧 GENERANDO NOMBRE NORMALIZADO:', { startDate, endDate, tipoPeriodo });
+    
+    // USAR LA FUNCIÓN CORREGIDA DE UTILS
+    const result = getPeriodNameFromDates(startDate, endDate);
+    
+    console.log('✅ NOMBRE NORMALIZADO GENERADO:', result);
+    return result;
   }
 
   /**
@@ -136,7 +113,12 @@ export class PeriodNameUnifiedService {
     endDate: string,
     tipoPeriodo: string = 'mensual'
   ): string {
-    return this.generateNormalizedPeriodName(startDate, endDate, tipoPeriodo);
+    console.log('🆕 GENERANDO NOMBRE PARA NUEVO PERÍODO:', { startDate, endDate, tipoPeriodo });
+    
+    const result = this.generateNormalizedPeriodName(startDate, endDate, tipoPeriodo);
+    
+    console.log('✅ NOMBRE PARA NUEVO PERÍODO:', result);
+    return result;
   }
 
   /**
@@ -147,6 +129,8 @@ export class PeriodNameUnifiedService {
     companyId: string
   ): Promise<boolean> {
     try {
+      console.log('🔍 VALIDANDO Y CORRIGIENDO NOMBRE DE PERÍODO:', { periodId, companyId });
+      
       const { data: period, error } = await supabase
         .from('payroll_periods_real')
         .select('*')
@@ -166,7 +150,7 @@ export class PeriodNameUnifiedService {
       );
 
       if (correctName !== period.periodo) {
-        console.log(`📝 Corrigiendo nombre de período: "${period.periodo}" → "${correctName}"`);
+        console.log(`📝 CORRIGIENDO NOMBRE: "${period.periodo}" → "${correctName}"`);
         
         const { error: updateError } = await supabase
           .from('payroll_periods_real')
@@ -178,10 +162,11 @@ export class PeriodNameUnifiedService {
           return false;
         }
 
-        console.log('✅ Nombre de período corregido exitosamente');
+        console.log('✅ NOMBRE DE PERÍODO CORREGIDO EXITOSAMENTE');
         return true;
       }
 
+      console.log('✅ NOMBRE DE PERÍODO YA ES CORRECTO');
       return true;
     } catch (error) {
       console.error('💥 Error validando nombre de período:', error);

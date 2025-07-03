@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { DataMigrationService } from '@/services/payroll-intelligent/DataMigrationService';
 import { PayrollPeriodCalculationService } from '@/services/payroll-intelligent/PayrollPeriodCalculationService';
+import { PeriodNameUnifiedService } from '@/services/payroll-intelligent/PeriodNameUnifiedService';
 import { useToast } from '@/hooks/use-toast';
 
 export const usePeriodValidation = () => {
@@ -14,6 +15,10 @@ export const usePeriodValidation = () => {
       console.log('🚀 EJECUTANDO CORRECCIÓN INTEGRAL PROFESIONAL...');
       
       const result = await DataMigrationService.executeIntegralCorrection(companyId);
+      
+      // NUEVA FUNCIÓN: Normalizar nombres de períodos después de la corrección
+      console.log('🏷️ NORMALIZANDO NOMBRES DE PERÍODOS...');
+      await PeriodNameUnifiedService.normalizeExistingPeriods(companyId);
       
       // Exponer funciones globales para testing
       (window as any).testPeriodGeneration = async () => {
@@ -66,6 +71,26 @@ export const usePeriodValidation = () => {
           
         } catch (error) {
           console.error('❌ Error en validación:', error);
+        }
+      };
+
+      // NUEVA FUNCIÓN: Normalizar solo nombres de períodos
+      (window as any).normalizeNames = async () => {
+        console.log('🏷️ NORMALIZANDO NOMBRES DE PERÍODOS...');
+        
+        try {
+          // Obtener companyId dinámicamente (esto se debe mejorar)
+          const companyId = 'tu-company-id';
+          await PeriodNameUnifiedService.normalizeExistingPeriods(companyId);
+          
+          toast({
+            title: "🏷️ Nombres Normalizados",
+            description: "Los nombres de períodos han sido corregidos",
+            className: "border-purple-200 bg-purple-50"
+          });
+          
+        } catch (error) {
+          console.error('❌ Error normalizando nombres:', error);
         }
       };
       

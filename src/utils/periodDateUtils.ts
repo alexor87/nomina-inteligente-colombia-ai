@@ -143,15 +143,17 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
 };
 
 /**
- * Format a date range for display
+ * Format a date range for display - CORREGIDO PARA PERÍODOS QUINCENALES
  */
 export const formatPeriodDateRange = (startDate: string, endDate: string): string => {
+  console.log('🔍 FORMATEO DE FECHAS:', { startDate, endDate });
+  
   const start = new Date(startDate);
   const end = new Date(endDate);
   
   const monthNames = [
-    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-    'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
   
   const startDay = start.getDate();
@@ -161,19 +163,27 @@ export const formatPeriodDateRange = (startDate: string, endDate: string): strin
   const startYear = start.getFullYear();
   const endYear = end.getFullYear();
   
-  // If same month and year, show "16 - 30 /Jun/ 2025"
+  console.log('📅 DÍAS CALCULADOS:', { startDay, endDay, startMonth, endMonth, startYear, endYear });
+  
+  // Si es el mismo mes y año, mostrar formato quincenal
   if (start.getMonth() === end.getMonth() && startYear === endYear) {
-    return `${startDay} - ${endDay} /${startMonth}/ ${startYear}`;
+    const result = `${startDay} - ${endDay} ${startMonth} ${startYear}`;
+    console.log('✅ FORMATO QUINCENAL:', result);
+    return result;
   }
   
-  // If different months or years, show full range "16/Jun/2025 - 30/Jul/2025"
-  return `${startDay}/${startMonth}/${startYear} - ${endDay}/${endMonth}/${endYear}`;
+  // Si son diferentes meses o años, mostrar rango completo
+  const result = `${startDay} ${startMonth} ${startYear} - ${endDay} ${endMonth} ${endYear}`;
+  console.log('✅ FORMATO RANGO COMPLETO:', result);
+  return result;
 };
 
 /**
- * Get the period name from a date range
+ * Get the period name from a date range - MEJORADO PARA QUINCENALES
  */
 export const getPeriodNameFromDates = (startDate: string, endDate: string): string => {
+  console.log('🏷️ GENERANDO NOMBRE DE PERÍODO:', { startDate, endDate });
+  
   const start = new Date(startDate);
   const end = new Date(endDate);
   
@@ -182,13 +192,55 @@ export const getPeriodNameFromDates = (startDate: string, endDate: string): stri
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
   
-  // If it's a full month
-  if (start.getDate() === 1 && 
-      end.getDate() === new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate() &&
-      start.getMonth() === end.getMonth()) {
-    return `${monthNames[start.getMonth()]} ${start.getFullYear()}`;
+  const startDay = start.getDate();
+  const endDay = end.getDate();
+  const startMonth = start.getMonth();
+  const endMonth = end.getMonth();
+  const startYear = start.getFullYear();
+  const endYear = end.getFullYear();
+  
+  console.log('📊 ANÁLISIS DE FECHAS:', { 
+    startDay, endDay, startMonth, endMonth, startYear, endYear,
+    sameMonth: startMonth === endMonth,
+    sameYear: startYear === endYear
+  });
+  
+  // DETECCIÓN ESPECÍFICA DE PERÍODOS QUINCENALES
+  if (startMonth === endMonth && startYear === endYear) {
+    const monthName = monthNames[startMonth];
+    const lastDayOfMonth = new Date(startYear, startMonth + 1, 0).getDate();
+    
+    // Primera quincena (1-15)
+    if (startDay === 1 && endDay === 15) {
+      const result = `1 - 15 ${monthName} ${startYear}`;
+      console.log('✅ PRIMERA QUINCENA DETECTADA:', result);
+      return result;
+    }
+    
+    // Segunda quincena (16-fin de mes)
+    if (startDay === 16 && endDay === lastDayOfMonth) {
+      const result = `16 - ${lastDayOfMonth} ${monthName} ${startYear}`;
+      console.log('✅ SEGUNDA QUINCENA DETECTADA:', result);
+      return result;
+    }
+    
+    // Período personalizado dentro del mismo mes
+    const result = `${startDay} - ${endDay} ${monthName} ${startYear}`;
+    console.log('✅ PERÍODO PERSONALIZADO MISMO MES:', result);
+    return result;
   }
   
-  // Custom range
-  return formatPeriodDateRange(startDate, endDate);
+  // Si es un mes completo
+  if (startDay === 1 && 
+      endDay === new Date(endYear, endMonth + 1, 0).getDate() &&
+      startMonth === endMonth && startYear === endYear) {
+    const result = `${monthNames[startMonth]} ${startYear}`;
+    console.log('✅ MES COMPLETO DETECTADO:', result);
+    return result;
+  }
+  
+  // Rango personalizado entre meses diferentes
+  const result = formatPeriodDateRange(startDate, endDate);
+  console.log('✅ RANGO PERSONALIZADO:', result);
+  return result;
 };
