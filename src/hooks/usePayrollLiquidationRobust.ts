@@ -24,30 +24,34 @@ export const usePayrollLiquidationRobust = () => {
   });
   const { toast } = useToast();
 
-  // **CORRECCIÓN PROFESIONAL**: Inicialización robusta con diagnóstico
+  // **ARQUITECTURA MEJORADA**: Inicialización con validación previa de consistencia
   const initializeWithDiagnosis = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 INICIALIZACIÓN ROBUSTA CON DIAGNÓSTICO...');
+      console.log('🚀 INICIALIZACIÓN ROBUSTA CON VALIDACIÓN PREVIA...');
+      
+      // **CAMBIO ARQUITECTÓNICO**: Primero esperamos que la auto-corrección universal termine
+      // Este pequeño delay permite que usePeriodsAutoCorrection complete su trabajo
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       const status = await PayrollPeriodDetectionRobust.detectWithDiagnosis();
       setPeriodStatus(status);
       setDiagnostic(status.diagnostic);
       
-      console.log('📊 Estado detectado:', status.action);
-      console.log('💬 Mensaje:', status.message);
+      console.log('📊 Estado detectado después de auto-corrección:', status.action);
+      console.log('💬 Mensaje del sistema:', status.message);
       
       if (status.currentPeriod) {
         setCurrentPeriod(status.currentPeriod);
         await loadEmployeesForPeriod(status.currentPeriod);
       }
       
-      // **CORRECCIÓN PROFESIONAL**: Mostrar diagnóstico en consola si está disponible
+      // **LOGGING MEJORADO**: Mostrar diagnóstico detallado si está disponible
       if (status.diagnostic) {
-        console.log('🔍 DIAGNÓSTICO DETALLADO:');
+        console.log('🔍 DIAGNÓSTICO POST AUTO-CORRECCIÓN:');
         console.log('- Total períodos:', status.diagnostic.totalPeriods);
-        console.log('- Problemas:', status.diagnostic.issues);
-        console.log('- Recomendaciones:', status.diagnostic.recommendations);
+        console.log('- Problemas detectados:', status.diagnostic.issues);
+        console.log('- Recomendaciones del sistema:', status.diagnostic.recommendations);
       }
       
     } catch (error) {
@@ -190,18 +194,18 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, [toast]);
 
-  // **CORRECCIÓN PROFESIONAL**: Función de refresh que ejecuta auto-corrección
+  // **FUNCIÓN MEJORADA**: Refresh que trabaja con el sistema de auto-corrección universal
   const refreshDiagnosis = useCallback(async () => {
     try {
       setIsProcessing(true);
-      console.log('🔄 REFRESH CON AUTO-CORRECCIÓN...');
+      console.log('🔄 REFRESH CON VALIDACIÓN DE CONSISTENCIA...');
       
-      // **CORRECCIÓN PROFESIONAL**: Re-ejecutar detección completa que incluye auto-corrección
+      // **ARQUITECTURA MEJORADA**: Re-ejecutar detección después de que auto-corrección haya terminado
       await initializeWithDiagnosis();
       
       toast({
         title: "🔄 Diagnóstico Actualizado",
-        description: "Estado actualizado con auto-correcciones aplicadas",
+        description: "Estado actualizado con validaciones aplicadas",
         className: "border-blue-200 bg-blue-50"
       });
       
@@ -217,12 +221,17 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, [initializeWithDiagnosis, toast]);
 
-  // Inicializar al montar
+  // **INICIALIZACIÓN MEJORADA**: Esperar a que auto-corrección termine antes de detectar
   useEffect(() => {
-    initializeWithDiagnosis();
+    // Pequeño delay para permitir que el sistema de auto-corrección universal termine
+    const timer = setTimeout(() => {
+      initializeWithDiagnosis();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [initializeWithDiagnosis]);
 
-  // **CORRECCIÓN PROFESIONAL**: Debug logging mejorado para monitorear cambios de estado
+  // **LOGGING MEJORADO**: Monitorear cambios de estado para debugging
   useEffect(() => {
     console.log('🔄 usePayrollLiquidationRobust - Estado actualizado:', {
       isLoading,
@@ -233,7 +242,7 @@ export const usePayrollLiquidationRobust = () => {
       periodStatus: periodStatus?.action,
       summaryTotalEmployees: summary.totalEmployees,
       hasActivePeriod: periodStatus?.hasActivePeriod,
-      correctionMessage: periodStatus?.message
+      systemMessage: periodStatus?.message
     });
   }, [isLoading, isProcessing, employees.length, currentPeriod, periodStatus, summary.totalEmployees]);
 
@@ -250,7 +259,7 @@ export const usePayrollLiquidationRobust = () => {
     // Acciones principales
     createSuggestedPeriod,
     runManualDiagnosis,
-    refreshDiagnosis, // **CORRECCIÓN PROFESIONAL**: Función mejorada con auto-corrección
+    refreshDiagnosis,
     
     // Estados calculados
     canCreatePeriod: periodStatus?.action === 'create' && periodStatus?.nextPeriod,

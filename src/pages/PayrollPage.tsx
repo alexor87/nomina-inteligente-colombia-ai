@@ -4,13 +4,13 @@ import { PayrollLiquidationNew } from '@/components/payroll/PayrollLiquidationNe
 import { usePeriodsAutoCorrection } from '@/hooks/usePeriodsAutoCorrection';
 
 const PayrollPage = () => {
-  // **NUEVO**: Integración del sistema de auto-corrección universal
+  // **INTEGRACIÓN UNIVERSAL**: Sistema de auto-corrección que funciona en TODAS las páginas
   const { correctionsMade, periodsFixed } = usePeriodsAutoCorrection();
 
-  // Log silencioso para debugging
+  // Log silencioso para debugging - El usuario no ve esto, es para troubleshooting
   React.useEffect(() => {
     if (correctionsMade > 0) {
-      console.log(`✅ PÁGINA NÓMINA: Auto-corrección completada - ${correctionsMade} período(s) corregido(s):`, periodsFixed);
+      console.log(`✅ PÁGINA LIQUIDACIÓN: Auto-corrección completada - ${correctionsMade} período(s) corregido(s):`, periodsFixed);
     }
   }, [correctionsMade, periodsFixed]);
 

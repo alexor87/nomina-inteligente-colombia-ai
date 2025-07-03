@@ -20,7 +20,7 @@ export class PayrollPeriodDetectionRobust {
   
   static async detectWithDiagnosis(): Promise<RobustPeriodStatus> {
     try {
-      console.log('🔍 DETECCIÓN ROBUSTA CON DIAGNÓSTICO INICIADA...');
+      console.log('🔍 DETECCIÓN ROBUSTA DESPUÉS DE AUTO-CORRECCIÓN...');
       
       // Paso 1: Obtener company ID
       const companyId = await this.getCurrentUserCompanyId();
@@ -31,10 +31,10 @@ export class PayrollPeriodDetectionRobust {
 
       console.log('🏢 Company ID:', companyId);
 
-      // Paso 2: Ejecutar diagnóstico completo
+      // Paso 2: Ejecutar diagnóstico completo DESPUÉS de auto-corrección
       const diagnostic = await PayrollDiagnosticService.generateCompleteDiagnostic(companyId);
       
-      // Paso 3: Analizar diagnóstico y decidir acción
+      // Paso 3: Analizar diagnóstico y decidir acción basándose en datos ya corregidos
       return this.analyzeAndDecide(companyId, diagnostic);
 
     } catch (error) {
@@ -44,18 +44,18 @@ export class PayrollPeriodDetectionRobust {
   }
 
   private static async analyzeAndDecide(companyId: string, diagnostic: any): Promise<RobustPeriodStatus> {
-    console.log('🧠 ANALIZANDO DIAGNÓSTICO...');
+    console.log('🧠 ANALIZANDO DIAGNÓSTICO POST AUTO-CORRECCIÓN...');
     
-    // **SIMPLIFICADO**: El sistema de auto-corrección universal ahora maneja todas las inconsistencias
-    // Solo necesitamos analizar el estado actual después de que el sistema universal haya actuado
+    // **SIMPLIFICADO**: El sistema de auto-corrección universal ya corrigió las inconsistencias
+    // Solo necesitamos analizar el estado actual después de las correcciones
     
-    // Análisis 1: ¿Hay período activo?
+    // Análisis 1: ¿Hay período activo después de correcciones?
     const activePeriods = diagnostic.periodsReal.filter((p: any) => 
       ACTIVE_STATES.includes(p.estado)
     );
 
     if (activePeriods.length === 1) {
-      console.log('✅ Período activo único encontrado:', activePeriods[0].periodo);
+      console.log('✅ Período activo único encontrado después de corrección:', activePeriods[0].periodo);
       return {
         hasActivePeriod: true,
         currentPeriod: activePeriods[0],
@@ -66,7 +66,7 @@ export class PayrollPeriodDetectionRobust {
     }
 
     if (activePeriods.length > 1) {
-      console.log('⚠️ Múltiples períodos activos - requiere intervención');
+      console.log('⚠️ Múltiples períodos activos después de corrección - requiere intervención');
       return {
         hasActivePeriod: false,
         action: 'diagnose',
