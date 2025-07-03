@@ -4,7 +4,7 @@ import { PayrollTableNew } from './PayrollTableNew';
 import { PayrollSummaryPanel } from './liquidation/PayrollSummaryPanel';
 import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
+import { usePayrollLiquidationRobust } from '@/hooks/usePayrollLiquidationRobust';
 
 export const PayrollLiquidationNew = () => {
   const {
@@ -27,7 +27,7 @@ export const PayrollLiquidationNew = () => {
     canClosePeriod,
     isValidPeriod,
     hasEmployees
-  } = usePayrollLiquidationNew();
+  } = usePayrollLiquidationRobust();
 
   if (isLoading) {
     return (
