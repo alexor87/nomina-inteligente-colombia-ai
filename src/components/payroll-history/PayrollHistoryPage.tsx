@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
@@ -6,9 +5,10 @@ import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Search, Filter, Calendar, Users, CheckCircle, AlertCircle, Clock, FileText, Edit } from 'lucide-react';
+import { Download, Search, Filter, Calendar, Users, CheckCircle, AlertCircle, Clock, FileText, Edit, RefreshCw } from 'lucide-react';
 import { PayrollHistoryPeriod, PayrollHistoryFilters as FiltersType } from '@/types/payroll-history';
 import { usePayrollHistory } from '@/hooks/usePayrollHistory';
+import { usePeriodsAutoCorrection } from '@/hooks/usePeriodsAutoCorrection';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { toast } from '@/hooks/use-toast';
 
@@ -34,10 +34,21 @@ export const PayrollHistoryPage = () => {
     exportToExcel
   } = usePayrollHistory();
 
+  // **NUEVO**: Integración del sistema de auto-corrección universal
+  const { correctionsMade, periodsFixed, isRunning, runAutoCorrection } = usePeriodsAutoCorrection();
+
   useEffect(() => {
     loadPayrollHistory();
     checkUserPermissions();
   }, [checkUserPermissions]);
+
+  // **NUEVO**: Recargar datos cuando se hagan correcciones
+  useEffect(() => {
+    if (correctionsMade > 0) {
+      console.log(`🔄 HISTORIAL: Auto-corrección detectada (${correctionsMade} períodos), recargando datos...`);
+      loadPayrollHistory();
+    }
+  }, [correctionsMade]);
 
   useEffect(() => {
     applyFilters();
@@ -79,6 +90,11 @@ export const PayrollHistoryPage = () => {
         variant: "destructive"
       });
     }
+  };
+
+  // **NUEVO**: Función para ejecutar auto-corrección manual
+  const handleManualCorrection = async () => {
+    await runAutoCorrection(false);
   };
 
   const applyFilters = () => {
@@ -170,9 +186,25 @@ export const PayrollHistoryPage = () => {
               <h1 className="text-2xl font-semibold text-gray-900">Historial de Nómina</h1>
               <p className="text-sm text-gray-600 mt-1">
                 Gestiona y consulta el historial de períodos de nómina procesados
+                {correctionsMade > 0 && (
+                  <span className="ml-2 text-blue-600 font-medium">
+                    • {correctionsMade} período(s) auto-corregido(s)
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center space-x-3">
+              {/* **NUEVO**: Botón de auto-corrección manual */}
+              <Button 
+                onClick={handleManualCorrection}
+                disabled={isRunning}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
+                {isRunning ? 'Corrigiendo...' : 'Verificar Estados'}
+              </Button>
+              
               <Button 
                 onClick={handleExportToExcel}
                 disabled={isExporting}

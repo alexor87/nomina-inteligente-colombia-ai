@@ -46,19 +46,11 @@ export class PayrollPeriodDetectionRobust {
   private static async analyzeAndDecide(companyId: string, diagnostic: any): Promise<RobustPeriodStatus> {
     console.log('🧠 ANALIZANDO DIAGNÓSTICO...');
     
-    // **CORRECCIÓN PROFESIONAL**: Detección y corrección automática de inconsistencias
-    console.log('🤖 SISTEMA INTELIGENTE: Detectando inconsistencias de estado...');
-    const correctionResult = await this.detectAndCorrectStateInconsistencies(companyId, diagnostic.periodsReal);
-    
-    // **CORRECCIÓN PROFESIONAL**: Si se hicieron correcciones, re-ejecutar diagnóstico
-    let finalDiagnostic = diagnostic;
-    if (correctionResult.correctionsMade > 0) {
-      console.log('🔄 Re-ejecutando diagnóstico después de auto-correcciones...');
-      finalDiagnostic = await PayrollDiagnosticService.generateCompleteDiagnostic(companyId);
-    }
+    // **SIMPLIFICADO**: El sistema de auto-corrección universal ahora maneja todas las inconsistencias
+    // Solo necesitamos analizar el estado actual después de que el sistema universal haya actuado
     
     // Análisis 1: ¿Hay período activo?
-    const activePeriods = finalDiagnostic.periodsReal.filter((p: any) => 
+    const activePeriods = diagnostic.periodsReal.filter((p: any) => 
       ACTIVE_STATES.includes(p.estado)
     );
 
@@ -69,7 +61,7 @@ export class PayrollPeriodDetectionRobust {
         currentPeriod: activePeriods[0],
         action: 'resume',
         message: `Continuando con período activo: ${activePeriods[0].periodo}`,
-        diagnostic: finalDiagnostic
+        diagnostic
       };
     }
 
@@ -79,12 +71,12 @@ export class PayrollPeriodDetectionRobust {
         hasActivePeriod: false,
         action: 'diagnose',
         message: `Se encontraron ${activePeriods.length} períodos activos. Requiere revisión manual.`,
-        diagnostic: finalDiagnostic
+        diagnostic
       };
     }
 
     // Análisis 2: ¿Hay períodos cerrados para calcular siguiente?
-    const closedPeriods = finalDiagnostic.periodsReal.filter((p: any) => 
+    const closedPeriods = diagnostic.periodsReal.filter((p: any) => 
       CLOSED_STATES.includes(p.estado)
     ).sort((a: any, b: any) => new Date(b.fecha_fin).getTime() - new Date(a.fecha_fin).getTime());
 
@@ -100,13 +92,13 @@ export class PayrollPeriodDetectionRobust {
           nextPeriod,
           action: 'create',
           message: `Crear siguiente período: ${nextPeriod.startDate} - ${nextPeriod.endDate}`,
-          diagnostic: finalDiagnostic
+          diagnostic
         };
       }
     }
 
     // Análisis 3: No hay períodos - crear el primero
-    if (finalDiagnostic.periodsReal.length === 0) {
+    if (diagnostic.periodsReal.length === 0) {
       console.log('🆕 No hay períodos - crear el primero');
       
       const firstPeriod = await this.calculateFirstPeriod(companyId);
@@ -116,7 +108,7 @@ export class PayrollPeriodDetectionRobust {
         nextPeriod: firstPeriod,
         action: 'create',
         message: 'Crear primer período de nómina',
-        diagnostic: finalDiagnostic
+        diagnostic
       };
     }
 
@@ -126,153 +118,8 @@ export class PayrollPeriodDetectionRobust {
       hasActivePeriod: false,
       action: 'diagnose',
       message: 'Situación compleja detectada. Revisar diagnóstico.',
-      diagnostic: finalDiagnostic
+      diagnostic
     };
-  }
-
-  /**
-   * 🤖 SISTEMA INTELIGENTE CORREGIDO: Detección automática de inconsistencias de estado
-   * Detecta períodos en estado "borrador" que tienen nóminas ya procesadas
-   */
-  private static async detectAndCorrectStateInconsistencies(companyId: string, periods: any[]): Promise<{correctionsMade: number, errors: string[]}> {
-    try {
-      console.log('🔍 INTELIGENCIA: Iniciando detección de inconsistencias...');
-      
-      let correctionsMade = 0;
-      const errors: string[] = [];
-      
-      // **CORRECCIÓN PROFESIONAL**: Filtrar períodos en estado borrador
-      const draftPeriods = periods.filter(p => p.estado === 'borrador');
-      
-      if (draftPeriods.length === 0) {
-        console.log('✅ INTELIGENCIA: No hay períodos en borrador para verificar');
-        return { correctionsMade: 0, errors: [] };
-      }
-
-      console.log(`🔍 INTELIGENCIA: Verificando ${draftPeriods.length} período(s) en borrador...`);
-      
-      for (const period of draftPeriods) {
-        try {
-          console.log(`🔍 INTELIGENCIA: Analizando período "${period.periodo}"...`);
-          
-          // **CORRECCIÓN PROFESIONAL**: Verificar si tiene nóminas procesadas
-          const { data: payrolls, error } = await supabase
-            .from('payrolls')
-            .select('id, estado, employee_id, total_devengado, total_deducciones, neto_pagado')
-            .eq('company_id', companyId)
-            .eq('period_id', period.id);
-
-          if (error) {
-            console.error(`❌ INTELIGENCIA: Error consultando nóminas para período ${period.periodo}:`, error);
-            errors.push(`Error consultando nóminas para ${period.periodo}: ${error.message}`);
-            continue;
-          }
-
-          if (!payrolls || payrolls.length === 0) {
-            console.log(`ℹ️ INTELIGENCIA: Período "${period.periodo}" sin nóminas - Estado borrador correcto`);
-            continue;
-          }
-
-          // **CORRECCIÓN PROFESIONAL**: Verificar estados de las nóminas
-          const processedPayrolls = payrolls.filter(p => 
-            p.estado === 'procesada' || p.estado === 'cerrada' || p.estado === 'pagada'
-          );
-
-          if (processedPayrolls.length > 0) {
-            console.log(`🚨 INTELIGENCIA: INCONSISTENCIA DETECTADA en "${period.periodo}"`);
-            console.log(`   - Estado del período: ${period.estado}`);
-            console.log(`   - Nóminas procesadas: ${processedPayrolls.length}/${payrolls.length}`);
-            
-            // **CORRECCIÓN PROFESIONAL**: Auto-corrección inteligente
-            const correctionSuccess = await this.silentStateCorrection(period, payrolls);
-            if (correctionSuccess) {
-              correctionsMade++;
-            } else {
-              errors.push(`Error corrigiendo período ${period.periodo}`);
-            }
-          } else {
-            console.log(`✅ INTELIGENCIA: Período "${period.periodo}" consistente (borrador con nóminas borrador)`);
-          }
-        } catch (periodError) {
-          console.error(`❌ INTELIGENCIA: Error procesando período ${period.periodo}:`, periodError);
-          errors.push(`Error procesando período ${period.periodo}: ${periodError.message}`);
-        }
-      }
-      
-      console.log(`✅ INTELIGENCIA: Detección completada - ${correctionsMade} correcciones, ${errors.length} errores`);
-      return { correctionsMade, errors };
-      
-    } catch (error) {
-      console.error('❌ INTELIGENCIA: Error crítico en detección de inconsistencias:', error);
-      return { correctionsMade: 0, errors: [`Error crítico: ${error.message}`] };
-    }
-  }
-
-  /**
-   * 🤖 SISTEMA INTELIGENTE CORREGIDO: Auto-corrección silenciosa de estados inconsistentes
-   * Corrige automáticamente períodos con estados inconsistentes de manera transparente
-   */
-  private static async silentStateCorrection(period: any, payrolls: any[]): Promise<boolean> {
-    try {
-      console.log(`🔧 INTELIGENCIA: Iniciando auto-corrección silenciosa para "${period.periodo}"`);
-      
-      // **CORRECCIÓN PROFESIONAL**: Calcular totales directamente desde los payrolls pasados
-      const validPayrolls = payrolls.filter(p => p.estado !== 'borrador');
-      
-      if (validPayrolls.length === 0) {
-        console.log(`ℹ️ INTELIGENCIA: No hay nóminas válidas para corregir "${period.periodo}"`);
-        return false;
-      }
-
-      // **CORRECCIÓN PROFESIONAL**: Calcular totales de manera robusta
-      const totalDevengado = validPayrolls.reduce((sum, p) => sum + (Number(p.total_devengado) || 0), 0);
-      const totalDeducciones = validPayrolls.reduce((sum, p) => sum + (Number(p.total_deducciones) || 0), 0);
-      const totalNeto = validPayrolls.reduce((sum, p) => sum + (Number(p.neto_pagado) || 0), 0);
-
-      console.log(`💰 INTELIGENCIA: Totales calculados para "${period.periodo}":`, {
-        empleados: validPayrolls.length,
-        totalDevengado,
-        totalDeducciones,
-        totalNeto
-      });
-
-      // **CORRECCIÓN PROFESIONAL**: Validar datos antes de actualizar
-      if (totalDevengado < 0 || totalDeducciones < 0 || totalNeto < 0) {
-        console.error(`❌ INTELIGENCIA: Datos inválidos para "${period.periodo}" - totales negativos`);
-        return false;
-      }
-
-      // **CORRECCIÓN PROFESIONAL**: Transacción atómica para corrección de estado
-      const { error: updateError } = await supabase
-        .from('payroll_periods_real')
-        .update({
-          estado: 'cerrado',
-          empleados_count: validPayrolls.length,
-          total_devengado: totalDevengado,
-          total_deducciones: totalDeducciones,
-          total_neto: totalNeto,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', period.id);
-
-      if (updateError) {
-        console.error(`❌ INTELIGENCIA: Error en auto-corrección para "${period.periodo}":`, updateError);
-        return false;
-      }
-
-      console.log(`✅ INTELIGENCIA: Auto-corrección completada exitosamente para "${period.periodo}"`);
-      console.log(`   ├─ Estado: borrador → cerrado`);
-      console.log(`   ├─ Empleados: ${validPayrolls.length}`);
-      console.log(`   ├─ Total devengado: $${totalDevengado.toLocaleString()}`);
-      console.log(`   ├─ Total deducciones: $${totalDeducciones.toLocaleString()}`);
-      console.log(`   └─ Total neto: $${totalNeto.toLocaleString()}`);
-
-      return true;
-      
-    } catch (error) {
-      console.error(`💥 INTELIGENCIA: Error crítico en auto-corrección para "${period.periodo}":`, error);
-      return false;
-    }
   }
 
   private static async calculateNextPeriod(companyId: string, lastPeriod: any): Promise<{startDate: string; endDate: string; type: string} | null> {
