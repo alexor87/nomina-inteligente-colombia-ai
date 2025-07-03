@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollPeriodDetectionRobust } from '@/services/payroll-intelligent/PayrollPeriodDetectionRobust';
@@ -27,13 +28,23 @@ export const usePayrollLiquidationRobust = () => {
   });
   const { toast } = useToast();
 
+  // Helper function to get company ID
+  const getCurrentUserCompanyId = useCallback(async () => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+      .single();
+    return profile?.company_id;
+  }, []);
+
   // Simplified initialization
   const initializeSystem = useCallback(async () => {
     try {
       setIsLoading(true);
       console.log('🚀 INICIALIZANDO SISTEMA DE LIQUIDACIÓN...');
       
-      const companyId = await PayrollPeriodDetectionRobust.getCurrentUserCompanyId();
+      const companyId = await getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('No se encontró información de la empresa');
       }
@@ -93,7 +104,7 @@ export const usePayrollLiquidationRobust = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, getCurrentUserCompanyId]);
 
   const loadEmployeesForPeriod = useCallback(async (period: any) => {
     try {
@@ -283,7 +294,7 @@ export const usePayrollLiquidationRobust = () => {
       
       if (!periodStatus?.nextPeriod) return;
       
-      const companyId = await PayrollPeriodDetectionRobust.getCurrentUserCompanyId();
+      const companyId = await getCurrentUserCompanyId();
       if (!companyId) return;
       
       const result = await FuturePeriodService.createFuturePeriod(companyId, periodStatus.nextPeriod);
@@ -322,9 +333,18 @@ export const usePayrollLiquidationRobust = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [periodStatus, loadEmployeesForPeriod, toast]);
+  }, [periodStatus, loadEmployeesForPeriod, toast, getCurrentUserCompanyId]);
 
   const refreshPeriod = useCallback(async () => {
+    await initializeSystem();
+  }, [initializeSystem]);
+
+  // Add missing functions for PayrollLiquidationRobust
+  const createSuggestedPeriod = useCallback(async () => {
+    await createNewPeriod();
+  }, [createNewPeriod]);
+
+  const refreshDiagnosis = useCallback(async () => {
     await initializeSystem();
   }, [initializeSystem]);
 
@@ -332,7 +352,7 @@ export const usePayrollLiquidationRobust = () => {
     try {
       setIsProcessing(true);
       
-      const companyId = await PayrollPeriodDetectionRobust.getCurrentUserCompanyId();
+      const companyId = await getCurrentUserCompanyId();
       if (companyId) {
         await PayrollDiagnosticService.runDiagnosticAndLog(companyId);
         
@@ -352,7 +372,7 @@ export const usePayrollLiquidationRobust = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [toast]);
+  }, [toast, getCurrentUserCompanyId]);
 
   // Initialize on mount
   useEffect(() => {
@@ -383,6 +403,8 @@ export const usePayrollLiquidationRobust = () => {
     
     // Acciones adicionales
     runManualDiagnosis,
+    createSuggestedPeriod,
+    refreshDiagnosis,
     
     // Estados calculados
     canCreatePeriod: periodStatus?.action === 'create' && periodStatus?.nextPeriod,

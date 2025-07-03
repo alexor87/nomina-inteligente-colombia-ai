@@ -7,6 +7,7 @@ export interface UnifiedPeriodStatus {
     startDate: string;
     endDate: string;
     type: string;
+    period: string;
   };
   action: 'resume' | 'create' | 'suggest_next' | 'diagnose' | 'emergency';
   message: string;
