@@ -21,34 +21,40 @@ export interface PeriodGenerationStrategy {
 }
 
 /**
- * ESTRATEGIA QUINCENAL PROFESIONAL - LÓGICA ESTRICTA UNIFICADA
+ * ESTRATEGIA QUINCENAL CORREGIDA - DETECCIÓN PRECISA DE PERÍODO ACTUAL
  */
 export class BiWeeklyPeriodStrategy implements PeriodGenerationStrategy {
   generateCurrentPeriod(): PeriodDates {
-    console.log('📅 GENERANDO PERÍODO QUINCENAL ACTUAL ESTRICTO');
+    console.log('📅 GENERANDO PERÍODO QUINCENAL ACTUAL CORREGIDO');
     
     const today = new Date();
     const day = today.getDate();
     const month = today.getMonth();
     const year = today.getFullYear();
     
+    console.log('🔍 FECHA ACTUAL:', { day, month: month + 1, year });
+    
     if (day <= 15) {
       // Primera quincena (1-15)
-      return {
+      const period = {
         startDate: new Date(year, month, 1).toISOString().split('T')[0],
         endDate: new Date(year, month, 15).toISOString().split('T')[0]
       };
+      console.log('✅ PRIMERA QUINCENA DETECTADA:', period);
+      return period;
     } else {
       // Segunda quincena (16-fin de mes)
-      return {
+      const period = {
         startDate: new Date(year, month, 16).toISOString().split('T')[0],
         endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
       };
+      console.log('✅ SEGUNDA QUINCENA DETECTADA:', period);
+      return period;
     }
   }
 
   generateNextConsecutivePeriod(lastPeriodEndDate: string): PeriodDates {
-    console.log('📅 GENERANDO PERÍODO QUINCENAL CONSECUTIVO ESTRICTO desde:', lastPeriodEndDate);
+    console.log('📅 GENERANDO PERÍODO QUINCENAL CONSECUTIVO desde:', lastPeriodEndDate);
     
     const lastEnd = new Date(lastPeriodEndDate);
     const nextStart = new Date(lastEnd);
@@ -58,37 +64,34 @@ export class BiWeeklyPeriodStrategy implements PeriodGenerationStrategy {
     const month = nextStart.getMonth();
     const year = nextStart.getFullYear();
     
-    console.log('🔍 ANÁLISIS: Día de inicio calculado:', startDay);
+    console.log('🔍 ANÁLISIS CONSECUTIVO: Día de inicio calculado:', startDay);
     
-    // REGLAS ABSOLUTAS - CORRECCIÓN AUTOMÁTICA FORZADA
     if (startDay === 1) {
       // Primera quincena (1-15)
-      console.log('✅ PRIMERA QUINCENA ESTRICTA (1-15)');
+      console.log('✅ SIGUIENTE: PRIMERA QUINCENA (1-15)');
       return {
         startDate: new Date(year, month, 1).toISOString().split('T')[0],
         endDate: new Date(year, month, 15).toISOString().split('T')[0]
       };
     } else if (startDay === 16) {
       // Segunda quincena (16-fin del mes)
-      console.log('✅ SEGUNDA QUINCENA ESTRICTA (16-fin de mes)');
+      console.log('✅ SIGUIENTE: SEGUNDA QUINCENA (16-fin de mes)');
       return {
         startDate: new Date(year, month, 16).toISOString().split('T')[0],
         endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
       };
     } else {
-      // CORRECCIÓN AUTOMÁTICA FORZADA
-      console.log('⚠️ FECHA IRREGULAR DETECTADA - APLICANDO CORRECCIÓN AUTOMÁTICA FORZADA');
+      // Ajustar automáticamente a la quincena más cercana
+      console.log('⚠️ FECHA IRREGULAR - AJUSTANDO A QUINCENA MÁS CERCANA');
       
       if (startDay <= 15) {
-        // Forzar a primera quincena
-        console.log('🔧 CORREGIDO FORZADAMENTE A PRIMERA QUINCENA (1-15)');
+        console.log('🔧 AJUSTADO A PRIMERA QUINCENA (1-15)');
         return {
           startDate: new Date(year, month, 1).toISOString().split('T')[0],
           endDate: new Date(year, month, 15).toISOString().split('T')[0]
         };
       } else {
-        // Forzar a segunda quincena
-        console.log('🔧 CORREGIDO FORZADAMENTE A SEGUNDA QUINCENA (16-fin de mes)');
+        console.log('🔧 AJUSTADO A SEGUNDA QUINCENA (16-fin de mes)');
         return {
           startDate: new Date(year, month, 16).toISOString().split('T')[0],
           endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
@@ -98,17 +101,8 @@ export class BiWeeklyPeriodStrategy implements PeriodGenerationStrategy {
   }
 
   generateFirstPeriod(): PeriodDates {
-    console.log('🆕 GENERANDO PRIMER PERÍODO QUINCENAL ESTRICTO: 1-15 del mes actual');
-    
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    
-    // SIEMPRE empezar con la primera quincena del mes actual
-    return {
-      startDate: new Date(year, month, 1).toISOString().split('T')[0],
-      endDate: new Date(year, month, 15).toISOString().split('T')[0]
-    };
+    console.log('🆕 GENERANDO PRIMER PERÍODO QUINCENAL: Usar período actual');
+    return this.generateCurrentPeriod();
   }
 
   validateAndCorrectPeriod(startDate: string, endDate: string): {
@@ -140,17 +134,25 @@ export class BiWeeklyPeriodStrategy implements PeriodGenerationStrategy {
       };
     }
     
-    // CORRECCIÓN AUTOMÁTICA FORZADA
+    // Solo corregir si es realmente necesario (diferencias críticas)
+    const isDifferenceMinor = Math.abs(startDay - 1) <= 2 || Math.abs(startDay - 16) <= 2;
+    
+    if (isDifferenceMinor) {
+      return {
+        isValid: false,
+        message: `⚠️ Período con fechas irregulares pero válidas: ${startDate}-${endDate}. No se requiere corrección automática.`
+      };
+    }
+    
+    // Solo para casos críticos, sugerir corrección
     let correctedPeriod: PeriodDates;
     
     if (startDay <= 15) {
-      // Corregir a primera quincena
       correctedPeriod = {
         startDate: new Date(start.getFullYear(), start.getMonth(), 1).toISOString().split('T')[0],
         endDate: new Date(start.getFullYear(), start.getMonth(), 15).toISOString().split('T')[0]
       };
     } else {
-      // Corregir a segunda quincena
       correctedPeriod = {
         startDate: new Date(start.getFullYear(), start.getMonth(), 16).toISOString().split('T')[0],
         endDate: new Date(start.getFullYear(), start.getMonth() + 1, 0).toISOString().split('T')[0]
@@ -160,7 +162,7 @@ export class BiWeeklyPeriodStrategy implements PeriodGenerationStrategy {
     return {
       isValid: false,
       correctedPeriod,
-      message: `🔧 Período irregular corregido automáticamente: ${startDate}-${endDate} → ${correctedPeriod.startDate}-${correctedPeriod.endDate}`
+      message: `🔧 Período crítico detectado, corrección sugerida: ${startDate}-${endDate} → ${correctedPeriod.startDate}-${correctedPeriod.endDate}`
     };
   }
 }
@@ -274,8 +276,6 @@ export class WeeklyPeriodStrategy implements PeriodGenerationStrategy {
     correctedPeriod?: PeriodDates;
     message: string;
   } {
-    // Para simplicidad, asumimos que los períodos semanales son válidos
-    // Se puede implementar validación más específica si es necesario
     return {
       isValid: true,
       message: '✅ Período semanal válido'

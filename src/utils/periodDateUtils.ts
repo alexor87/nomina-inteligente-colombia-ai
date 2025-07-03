@@ -1,6 +1,5 @@
-
 /**
- * Utility functions for parsing and formatting period dates
+ * Utility functions for parsing and formatting period dates - CORREGIDO PROFESIONALMENTE
  */
 
 export interface PeriodDateRange {
@@ -10,13 +9,10 @@ export interface PeriodDateRange {
 
 /**
  * Parse a period string and return the actual date range
- * Examples: "Enero 2024", "2024-01", "Enero de 2024", "16 Jul - 30 Jul 2025"
  */
 export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
-  // Clean up the period string
   const cleanPeriod = periodo.trim();
-  
-  console.log('Parsing period:', cleanPeriod);
+  console.log('🔍 PARSEANDO PERÍODO:', cleanPeriod);
   
   // Pattern 1: Date range format like "16 Jul - 30 Jul 2025" or "16/06/2025 - 30/06/2025"
   const dateRangeMatch = cleanPeriod.match(/(\d{1,2})[\s\/](\w{3}|\d{1,2})[\s\/]?(\d{4})?\s*-\s*(\d{1,2})[\s\/](\w{3}|\d{1,2})[\s\/](\d{4})/);
@@ -30,7 +26,6 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
     
     let startMonthNum, endMonthNum;
     
-    // Check if month is text (Jul) or number (07)
     if (isNaN(parseInt(startMonth))) {
       startMonthNum = monthMap[startMonth.toLowerCase()] || '01';
     } else {
@@ -47,19 +42,15 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
     const startDateFormatted = `${year}-${startMonthNum}-${startDay.padStart(2, '0')}`;
     const endDateFormatted = `${endYear}-${endMonthNum}-${endDay.padStart(2, '0')}`;
     
-    console.log('Parsed date range:', { startDateFormatted, endDateFormatted });
-    
-    return {
-      startDate: startDateFormatted,
-      endDate: endDateFormatted
-    };
+    console.log('✅ RANGO PARSEADO:', { startDateFormatted, endDateFormatted });
+    return { startDate: startDateFormatted, endDate: endDateFormatted };
   }
   
   // Pattern 2: ISO date range like "2025-07-16 - 2025-07-30"
   const isoRangeMatch = cleanPeriod.match(/(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/);
   if (isoRangeMatch) {
     const [, startDate, endDate] = isoRangeMatch;
-    console.log('Parsed ISO date range:', { startDate, endDate });
+    console.log('✅ ISO RANGO PARSEADO:', { startDate, endDate });
     return { startDate, endDate };
   }
   
@@ -90,7 +81,7 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
         endDate: endDate.toISOString().split('T')[0]
       };
       
-      console.log('Parsed month-year format:', result);
+      console.log('✅ MES-AÑO PARSEADO:', result);
       return result;
     }
   }
@@ -109,7 +100,7 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
       endDate: endDate.toISOString().split('T')[0]
     };
     
-    console.log('Parsed year-month format:', result);
+    console.log('✅ AÑO-MES PARSEADO:', result);
     return result;
   }
   
@@ -122,7 +113,7 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
       endDate: `${year}-12-31`
     };
     
-    console.log('Parsed year format:', result);
+    console.log('✅ AÑO PARSEADO:', result);
     return result;
   }
   
@@ -134,7 +125,7 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
   const startDate = new Date(currentYear, currentMonth, 1);
   const endDate = new Date(currentYear, currentMonth + 1, 0);
   
-  console.warn(`Could not parse period "${periodo}", using current month as fallback`);
+  console.warn(`⚠️ No se pudo parsear "${periodo}", usando mes actual como fallback`);
   
   return {
     startDate: startDate.toISOString().split('T')[0],
@@ -143,10 +134,10 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
 };
 
 /**
- * Format a date range for display - CORREGIDO PARA PERÍODOS QUINCENALES
+ * Format a date range for display - FUNCIÓN CORREGIDA
  */
 export const formatPeriodDateRange = (startDate: string, endDate: string): string => {
-  console.log('🔍 FORMATEO DE FECHAS:', { startDate, endDate });
+  console.log('🔍 FORMATEANDO RANGO:', { startDate, endDate });
   
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -163,26 +154,26 @@ export const formatPeriodDateRange = (startDate: string, endDate: string): strin
   const startYear = start.getFullYear();
   const endYear = end.getFullYear();
   
-  console.log('📅 DÍAS CALCULADOS:', { startDay, endDay, startMonth, endMonth, startYear, endYear });
+  console.log('📅 COMPONENTES DE FORMATO:', { startDay, endDay, startMonth, endMonth, startYear, endYear });
   
-  // Si es el mismo mes y año, mostrar formato quincenal
+  // CORRECCIÓN: Si es el mismo mes y año, mostrar formato quincenal
   if (start.getMonth() === end.getMonth() && startYear === endYear) {
     const result = `${startDay} - ${endDay} ${startMonth} ${startYear}`;
-    console.log('✅ FORMATO QUINCENAL:', result);
+    console.log('✅ FORMATO MISMO MES:', result);
     return result;
   }
   
-  // Si son diferentes meses o años, mostrar rango completo
+  // CORRECCIÓN: Si son diferentes meses o años, mostrar rango completo
   const result = `${startDay} ${startMonth} ${startYear} - ${endDay} ${endMonth} ${endYear}`;
   console.log('✅ FORMATO RANGO COMPLETO:', result);
   return result;
 };
 
 /**
- * Get the period name from a date range - MEJORADO PARA QUINCENALES
+ * FUNCIÓN CORREGIDA: Get the period name from a date range
  */
 export const getPeriodNameFromDates = (startDate: string, endDate: string): string => {
-  console.log('🏷️ GENERANDO NOMBRE DE PERÍODO:', { startDate, endDate });
+  console.log('🏷️ GENERANDO NOMBRE CORREGIDO:', { startDate, endDate });
   
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -199,48 +190,52 @@ export const getPeriodNameFromDates = (startDate: string, endDate: string): stri
   const startYear = start.getFullYear();
   const endYear = end.getFullYear();
   
-  console.log('📊 ANÁLISIS DE FECHAS:', { 
-    startDay, endDay, startMonth, endMonth, startYear, endYear,
+  console.log('📊 DATOS DE FECHAS:', { 
+    startDay, endDay, 
+    startMonth: monthNames[startMonth], endMonth: monthNames[endMonth], 
+    startYear, endYear,
     sameMonth: startMonth === endMonth,
     sameYear: startYear === endYear
   });
   
-  // DETECCIÓN ESPECÍFICA DE PERÍODOS QUINCENALES
+  // LÓGICA CORREGIDA: Verificar si son del mismo mes y año
   if (startMonth === endMonth && startYear === endYear) {
     const monthName = monthNames[startMonth];
     const lastDayOfMonth = new Date(startYear, startMonth + 1, 0).getDate();
     
-    // Primera quincena (1-15)
+    console.log(`📅 MISMO MES: ${monthName} ${startYear}, último día: ${lastDayOfMonth}`);
+    
+    // CORRECCIÓN: Primera quincena (1-15)
     if (startDay === 1 && endDay === 15) {
       const result = `1 - 15 ${monthName} ${startYear}`;
-      console.log('✅ PRIMERA QUINCENA DETECTADA:', result);
+      console.log('✅ PRIMERA QUINCENA GENERADA:', result);
       return result;
     }
     
-    // Segunda quincena (16-fin de mes)
+    // CORRECCIÓN: Segunda quincena (16-fin de mes)
     if (startDay === 16 && endDay === lastDayOfMonth) {
       const result = `16 - ${lastDayOfMonth} ${monthName} ${startYear}`;
-      console.log('✅ SEGUNDA QUINCENA DETECTADA:', result);
+      console.log('✅ SEGUNDA QUINCENA GENERADA:', result);
       return result;
     }
     
-    // Período personalizado dentro del mismo mes
+    // CORRECCIÓN: Período personalizado dentro del mismo mes
     const result = `${startDay} - ${endDay} ${monthName} ${startYear}`;
     console.log('✅ PERÍODO PERSONALIZADO MISMO MES:', result);
     return result;
   }
   
-  // Si es un mes completo
+  // CORRECCIÓN: Si es un mes completo
   if (startDay === 1 && 
       endDay === new Date(endYear, endMonth + 1, 0).getDate() &&
       startMonth === endMonth && startYear === endYear) {
     const result = `${monthNames[startMonth]} ${startYear}`;
-    console.log('✅ MES COMPLETO DETECTADO:', result);
+    console.log('✅ MES COMPLETO GENERADO:', result);
     return result;
   }
   
-  // Rango personalizado entre meses diferentes
+  // CORRECCIÓN: Rango entre meses diferentes
   const result = formatPeriodDateRange(startDate, endDate);
-  console.log('✅ RANGO PERSONALIZADO:', result);
+  console.log('✅ RANGO MULTI-MES GENERADO:', result);
   return result;
 };

@@ -4,15 +4,14 @@ import { PeriodStrategyFactory, PeriodGenerationStrategy } from './PeriodGenerat
 
 export class PayrollPeriodCalculationService {
   /**
-   * ARQUITECTURA PROFESIONAL MEJORADA - COORDINADOR PRINCIPAL SIN RETROCESOS AUTOMÁTICOS
-   * Usa Strategy pattern y NO modifica períodos que están correctos
+   * COORDINADOR CORREGIDO - NO MODIFICA PERÍODOS VÁLIDOS
    */
   
   static async calculateNextPeriodFromDatabase(periodicity: string, companyId: string): Promise<{
     startDate: string;
     endDate: string;
   }> {
-    console.log('📅 CALCULANDO SIGUIENTE PERÍODO SIN RETROCESOS AUTOMÁTICOS:', {
+    console.log('📅 CALCULANDO SIGUIENTE PERÍODO CONSERVADOR:', {
       periodicity,
       companyId
     });
@@ -39,29 +38,14 @@ export class PayrollPeriodCalculationService {
         return strategy.generateFirstPeriod();
       }
 
-      // MEJORADO: Solo considerar períodos genuinamente válidos, no hacer correcciones automáticas
-      const validPeriods = periods.filter(period => {
-        const validation = strategy.validateAndCorrectPeriod(period.fecha_inicio, period.fecha_fin);
-        if (!validation.isValid) {
-          console.warn('⚠️ PERÍODO CON FECHAS IRREGULARES (NO SE MODIFICA AUTOMÁTICAMENTE):', {
-            id: period.id,
-            periodo: period.periodo,
-            fechas: `${period.fecha_inicio} - ${period.fecha_fin}`,
-            problema: validation.message
-          });
-          // NO retornamos false aquí - dejamos que el período se use tal como está
-          return true;
-        }
-        return true;
-      });
-
-      const lastValidPeriod = validPeriods[0];
-      console.log('✅ Último período encontrado (sin modificar):', lastValidPeriod.fecha_inicio, '-', lastValidPeriod.fecha_fin);
+      // CORREGIDO: No hacer correcciones automáticas, solo usar el último período válido
+      const lastPeriod = periods[0];
+      console.log('✅ Último período encontrado:', lastPeriod.fecha_inicio, '-', lastPeriod.fecha_fin);
 
       // Generar siguiente período basado en el último período encontrado
-      const nextPeriod = strategy.generateNextConsecutivePeriod(lastValidPeriod.fecha_fin);
+      const nextPeriod = strategy.generateNextConsecutivePeriod(lastPeriod.fecha_fin);
       
-      console.log('✅ Siguiente período generado correctamente:', nextPeriod);
+      console.log('✅ Siguiente período generado:', nextPeriod);
       return nextPeriod;
 
     } catch (error) {
@@ -71,15 +55,14 @@ export class PayrollPeriodCalculationService {
   }
 
   /**
-   * MEJORADO: Corrección automática SOLO de períodos genuinamente corruptos
-   * NO modifica períodos que simplemente tienen fechas irregulares pero válidas
+   * CORREGIDO: Corrección SOLO de períodos críticos
    */
   static async autoCorrectCorruptPeriods(companyId: string, periodicity: string = 'quincenal'): Promise<{
     correctedCount: number;
     errors: string[];
     summary: string;
   }> {
-    console.log('🔧 INICIANDO CORRECCIÓN CONSERVADORA DE PERÍODOS CORRUPTOS para:', companyId);
+    console.log('🔧 CORRECCIÓN CRÍTICA ÚNICAMENTE para:', companyId);
     
     const strategy = PeriodStrategyFactory.createStrategy(periodicity);
     let correctedCount = 0;
@@ -99,15 +82,14 @@ export class PayrollPeriodCalculationService {
         return { correctedCount: 0, errors: [], summary: 'No hay períodos para corregir' };
       }
 
-      console.log(`📊 ANALIZANDO ${periods.length} períodos (corrección conservadora)`);
+      console.log(`📊 ANALIZANDO ${periods.length} períodos (solo errores críticos)`);
 
-      // NUEVO: Solo corregir períodos que tienen errores CRÍTICOS, no irregularidades menores
       for (const period of periods) {
         const validation = strategy.validateAndCorrectPeriod(period.fecha_inicio, period.fecha_fin);
         
-        // Solo corregir si hay errores CRÍTICOS (no solo irregularidades)
+        // CORREGIDO: Solo corregir si es crítico Y tiene corrección sugerida
         if (!validation.isValid && validation.correctedPeriod && this.isCriticalError(validation.message)) {
-          console.log('📝 CORRECCIÓN CRÍTICA NECESARIA:', validation.message);
+          console.log('🚨 ERROR CRÍTICO DETECTADO:', validation.message);
           
           const { error: updateError } = await supabase
             .from('payroll_periods_real')
@@ -123,43 +105,47 @@ export class PayrollPeriodCalculationService {
             console.error('❌', errorMsg);
             errors.push(errorMsg);
           } else {
-            console.log(`✅ Período ${period.id} CORREGIDO: ${period.fecha_inicio}-${period.fecha_fin} → ${validation.correctedPeriod.startDate}-${validation.correctedPeriod.endDate}`);
+            console.log(`✅ ERROR CRÍTICO CORREGIDO: ${period.id}`);
             correctedCount++;
           }
         } else if (!validation.isValid) {
-          console.log(`ℹ️ Período ${period.id} tiene fechas irregulares pero válidas - NO se modifica automáticamente`);
+          console.log(`ℹ️ Período ${period.id} irregular pero no crítico - NO se modifica`);
         }
       }
 
-      const summary = `✅ Corrección conservadora completada: ${correctedCount} períodos corregidos, ${errors.length} errores`;
+      const summary = `✅ Corrección crítica completada: ${correctedCount} períodos corregidos, ${errors.length} errores`;
       console.log(summary);
       
       return { correctedCount, errors, summary };
 
     } catch (error) {
-      console.error('❌ Error en corrección automática:', error);
+      console.error('❌ Error en corrección crítica:', error);
       return {
         correctedCount: 0,
         errors: [`Error general: ${error.message}`],
-        summary: '❌ Error en corrección automática'
+        summary: '❌ Error en corrección crítica'
       };
     }
   }
 
   /**
-   * NUEVO: Determinar si un error es crítico y requiere corrección automática
+   * CORREGIDO: Determinar si un error es crítico
    */
   private static isCriticalError(message: string): boolean {
-    const criticalErrors = [
+    const criticalKeywords = [
+      'crítico detectado',
       'fecha de fin anterior a fecha de inicio',
       'período de duración cero',
       'fechas nulas o inválidas',
       'superposición crítica'
     ];
 
-    return criticalErrors.some(criticalError => 
-      message.toLowerCase().includes(criticalError.toLowerCase())
+    const isCritical = criticalKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword.toLowerCase())
     );
+    
+    console.log(`🔍 ¿Es crítico? "${message}" → ${isCritical}`);
+    return isCritical;
   }
 
   /**
@@ -201,14 +187,13 @@ export class PayrollPeriodCalculationService {
     corrected: number;
     errors: string[];
   }> {
-    console.log('🔧 INICIANDO CORRECCIÓN CONSERVADORA DE PERÍODOS para empresa:', companyId);
+    console.log('🔧 CORRECCIÓN CONSERVADORA para empresa:', companyId);
     
     const strategy = PeriodStrategyFactory.createStrategy(periodicity);
     let corrected = 0;
     const errors: string[] = [];
 
     try {
-      // Obtener todos los períodos de la empresa
       const { data: periods, error } = await supabase
         .from('payroll_periods_real')
         .select('*')
@@ -223,14 +208,14 @@ export class PayrollPeriodCalculationService {
         return { corrected: 0, errors: [] };
       }
 
-      console.log(`📊 CORRIGIENDO ${periods.length} períodos con enfoque conservador`);
+      console.log(`📊 REVISANDO ${periods.length} períodos conservadoramente`);
 
       for (const period of periods) {
         const validation = strategy.validateAndCorrectPeriod(period.fecha_inicio, period.fecha_fin);
         
         // Solo corregir errores críticos
         if (!validation.isValid && validation.correctedPeriod && this.isCriticalError(validation.message)) {
-          console.log('📝 CORRECCIÓN CRÍTICA:', validation.message);
+          console.log('🚨 CORRECCIÓN CRÍTICA:', validation.message);
           
           const { error: updateError } = await supabase
             .from('payroll_periods_real')
