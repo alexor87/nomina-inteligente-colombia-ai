@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollPeriod } from '@/types/payroll';
+import { BiWeeklyPeriodService } from './payroll-intelligent/BiWeeklyPeriodService';
 
 export interface CompanySettings {
   id: string;
@@ -73,7 +73,7 @@ export class PayrollPeriodService {
     }
   }
 
-  // Generar rango de fechas según periodicidad - CORREGIDO para períodos consecutivos
+  // Generar rango de fechas según periodicidad - CORREGIDO RADICALMENTE
   static generatePeriodDates(periodicity: string, referenceDate: Date = new Date()): { startDate: string; endDate: string } {
     console.log('📅 Generando fechas para periodicidad:', periodicity);
     
@@ -90,14 +90,14 @@ export class PayrollPeriodService {
         };
 
       case 'quincenal':
-        console.log('📅 Generando periodo quincenal consecutivo');
-        return this.getNextBiWeeklyPeriod();
+        console.log('📅 Generando periodo quincenal PROFESIONAL');
+        return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
 
       case 'semanal':
         console.log('📅 Generando periodo semanal');
         const today = new Date(referenceDate);
         const dayOfWeek = today.getDay();
-        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Lunes = 1
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
         const monday = new Date(today);
         monday.setDate(today.getDate() + mondayOffset);
         
@@ -123,43 +123,21 @@ export class PayrollPeriodService {
     }
   }
 
-  // Generar siguiente período quincenal consecutivo - CORREGIDO para ser síncrono
-  static getNextBiWeeklyPeriod(): { startDate: string; endDate: string } {
-    // Para la generación inicial, usar lógica basada en la fecha actual
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const day = today.getDate();
-    
-    if (day <= 15) {
-      // Primera quincena (1-15)
-      return {
-        startDate: new Date(year, month, 1).toISOString().split('T')[0],
-        endDate: new Date(year, month, 15).toISOString().split('T')[0]
-      };
-    } else {
-      // Segunda quincena (16-fin de mes)
-      return {
-        startDate: new Date(year, month, 16).toISOString().split('T')[0],
-        endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
-      };
-    }
-  }
-
-  // Generar siguiente período quincenal consecutivo - VERSIÓN ASYNC para servicios avanzados
+  // Generar siguiente período quincenal consecutivo - LÓGICA PROFESIONAL
   static async generateNextBiWeeklyPeriod(): Promise<{ startDate: string; endDate: string }> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
-        console.warn('No company ID found, using current date fallback');
-        return this.getFallbackBiWeeklyPeriod();
+        console.warn('No company ID found, usando período actual');
+        return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
       }
 
-      // Buscar el último período cerrado para la empresa
+      // Buscar el último período cerrado para generar el siguiente consecutivo
       const { data: lastPeriod, error } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
+        .eq('tipo_periodo', 'quincenal')
         .neq('estado', 'borrador')
         .order('fecha_fin', { ascending: false })
         .limit(1)
@@ -167,57 +145,25 @@ export class PayrollPeriodService {
 
       if (error) {
         console.error('Error obteniendo último período:', error);
-        return this.getFallbackBiWeeklyPeriod();
+        return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
       }
 
       if (!lastPeriod) {
         console.log('No hay períodos anteriores, generando primer período quincenal');
-        return this.getFirstBiWeeklyPeriod();
+        return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
       }
 
       console.log('Último período encontrado:', lastPeriod.fecha_inicio, '-', lastPeriod.fecha_fin);
 
-      // Calcular siguiente período basado en el último
-      const lastEndDate = new Date(lastPeriod.fecha_fin);
-      const nextStartDate = new Date(lastEndDate);
-      nextStartDate.setDate(nextStartDate.getDate() + 1);
-
-      // Determinar si es primera o segunda quincena
-      const startDay = nextStartDate.getDate();
-      let endDate: Date;
-
-      if (startDay === 1) {
-        // Primera quincena del mes (1-15)
-        endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth(), 15);
-      } else if (startDay === 16) {
-        // Segunda quincena del mes (16-fin de mes)
-        endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth() + 1, 0);
-      } else {
-        // Corregir fechas irregulares - forzar al patrón correcto
-        console.log('⚠️ Fecha irregular detectada, corrigiendo al patrón 1-15, 16-fin');
-        
-        if (startDay <= 15) {
-          // Ajustar a primera quincena
-          nextStartDate.setDate(1);
-          endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth(), 15);
-        } else {
-          // Ajustar a segunda quincena
-          nextStartDate.setDate(16);
-          endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth() + 1, 0);
-        }
-      }
-
-      const result = {
-        startDate: nextStartDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0]
-      };
-
-      console.log('✅ Siguiente período quincenal generado:', result);
-      return result;
+      // Usar servicio profesional para generar siguiente período consecutivo
+      const nextPeriod = BiWeeklyPeriodService.generateNextConsecutivePeriod(lastPeriod.fecha_fin);
+      
+      console.log('✅ Siguiente período quincenal profesional generado:', nextPeriod);
+      return nextPeriod;
 
     } catch (error) {
       console.error('Error generando período quincenal:', error);
-      return this.getFallbackBiWeeklyPeriod();
+      return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
     }
   }
 

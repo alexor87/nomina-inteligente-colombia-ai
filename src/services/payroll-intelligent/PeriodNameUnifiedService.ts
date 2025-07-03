@@ -84,7 +84,7 @@ export class PeriodNameUnifiedService {
   }
 
   /**
-   * Generar nombre de período normalizado basado en fechas y tipo
+   * Generar nombre de período normalizado basado en fechas y tipo - PROFESIONAL
    */
   private static generateNormalizedPeriodName(
     startDate: string,
@@ -94,7 +94,7 @@ export class PeriodNameUnifiedService {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // Para períodos quincenales, usar formato específico
+    // Para períodos quincenales, usar formato específico PROFESIONAL
     if (tipoPeriodo === 'quincenal') {
       const startDay = start.getDate();
       const endDay = end.getDate();
@@ -106,15 +106,15 @@ export class PeriodNameUnifiedService {
       const monthName = monthNames[start.getMonth()];
       const year = start.getFullYear();
       
-      // Determinar si es primera o segunda quincena
+      // Aplicar reglas PROFESIONALES para períodos quincenales
       if (startDay === 1 && endDay === 15) {
         return `${startDay} - ${endDay} ${monthName} ${year}`;
       } else if (startDay === 16) {
-        // Para segunda quincena, usar el último día del mes
+        // Para segunda quincena, usar el último día real del mes
         const lastDay = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
         return `${startDay} - ${lastDay} ${monthName} ${year}`;
       } else {
-        // Formato genérico para fechas irregulares
+        // Formato genérico para fechas que serán corregidas
         return `${startDay} - ${endDay} ${monthName} ${year}`;
       }
     }

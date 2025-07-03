@@ -1,77 +1,64 @@
-
 import { PayrollPeriod } from '@/types/payroll';
+import { BiWeeklyPeriodService } from './BiWeeklyPeriodService';
 
 export class PayrollPeriodCalculationService {
-  // Calcular siguiente período basado en el período cerrado real - CORREGIDO
+  // Calcular siguiente período basado en el período cerrado real - CORREGIDO PROFESIONALMENTE
   static calculateNextPeriod(periodicity: string, closedPeriod: PayrollPeriod): {
     startDate: string;
     endDate: string;
   } {
-    console.log('📅 Calculando siguiente período:', {
+    console.log('📅 Calculando siguiente período PROFESIONAL:', {
       periodicity,
       closedPeriodEnd: closedPeriod.fecha_fin,
       closedPeriodType: closedPeriod.tipo_periodo
     });
 
-    // Usar la fecha fin del período cerrado como base
-    const baseDate = new Date(closedPeriod.fecha_fin);
-    
-    // El siguiente período inicia el día después del cierre
-    const startDate = new Date(baseDate);
-    startDate.setDate(startDate.getDate() + 1);
-    
-    // Calcular fecha fin según periodicidad
-    let endDate = new Date(startDate);
-    
     switch (periodicity) {
       case 'quincenal':
-        // Corregir lógica quincenal para seguir patrón 1-15, 16-fin
-        const startDay = startDate.getDate();
-        
-        if (startDay === 1) {
-          // Primera quincena (1-15)
-          endDate = new Date(startDate.getFullYear(), startDate.getMonth(), 15);
-        } else if (startDay === 16) {
-          // Segunda quincena (16-fin de mes)
-          endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-        } else {
-          // Corregir fechas irregulares
-          console.log('⚠️ Corrigiendo fecha irregular en período quincenal');
-          
-          if (startDay <= 15) {
-            // Ajustar a primera quincena
-            startDate.setDate(1);
-            endDate = new Date(startDate.getFullYear(), startDate.getMonth(), 15);
-          } else {
-            // Ajustar a segunda quincena
-            startDate.setDate(16);
-            endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-          }
-        }
-        break;
+        // Usar servicio profesional para períodos quincenales
+        console.log('📅 Calculando siguiente período quincenal PROFESIONAL');
+        return BiWeeklyPeriodService.generateNextConsecutivePeriod(closedPeriod.fecha_fin);
         
       case 'mensual':
-        endDate.setMonth(endDate.getMonth() + 1);
-        endDate.setDate(endDate.getDate() - 1); // Último día del mes
-        break;
+        // Usar lógica mensual
+        const baseDate = new Date(closedPeriod.fecha_fin);
+        const startDate = new Date(baseDate);
+        startDate.setDate(startDate.getDate() + 1);
+        
+        const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+        
+        return {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0]
+        };
         
       case 'semanal':
-        endDate.setDate(endDate.getDate() + 6); // 7 días
-        break;
+        // Usar lógica semanal
+        const weekBaseDate = new Date(closedPeriod.fecha_fin);
+        const weekStartDate = new Date(weekBaseDate);
+        weekStartDate.setDate(weekStartDate.getDate() + 1);
+        
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekStartDate.getDate() + 6);
+        
+        return {
+          startDate: weekStartDate.toISOString().split('T')[0],
+          endDate: weekEndDate.toISOString().split('T')[0]
+        };
         
       default:
         // Por defecto mensual
-        endDate.setMonth(endDate.getMonth() + 1);
-        endDate.setDate(endDate.getDate() - 1);
+        const defaultBaseDate = new Date(closedPeriod.fecha_fin);
+        const defaultStartDate = new Date(defaultBaseDate);
+        defaultStartDate.setDate(defaultStartDate.getDate() + 1);
+        
+        const defaultEndDate = new Date(defaultStartDate.getFullYear(), defaultStartDate.getMonth() + 1, 0);
+        
+        return {
+          startDate: defaultStartDate.toISOString().split('T')[0],
+          endDate: defaultEndDate.toISOString().split('T')[0]
+        };
     }
-
-    const result = {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0]
-    };
-
-    console.log('✅ Fechas calculadas para siguiente período:', result);
-    return result;
   }
 
   // Validar que las fechas calculadas no se superpongan con períodos existentes
