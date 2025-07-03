@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
+import { Button } from '@/components/ui/button';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PayrollHistoryEmployee } from '@/types/payroll-history';
 import { toast } from '@/hooks/use-toast';
@@ -32,14 +34,41 @@ export const PayrollLiquidationNew = ({
   const [employees, setEmployees] = useState<PayrollHistoryEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Validar UUID
+  const isValidUUID = (uuid: string) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  };
 
   const loadEmployees = useCallback(async () => {
+    // Validar periodId antes de hacer la consulta
+    if (!periodId || !isValidUUID(periodId)) {
+      setError('ID de período inválido');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
+    setError(null);
+    
     try {
+      console.log('🔄 Loading employees for period:', periodId);
       const periodDetails = await PayrollHistoryService.getPeriodDetails(periodId);
+      
+      if (!periodDetails || !periodDetails.employees) {
+        console.warn('⚠️ Period details or employees not found');
+        setEmployees([]);
+        setError('No se encontraron empleados para este período');
+        return;
+      }
+      
       setEmployees(periodDetails.employees);
+      console.log('✅ Employees loaded successfully:', periodDetails.employees.length);
     } catch (error) {
-      console.error('Error loading employees:', error);
+      console.error('❌ Error loading employees:', error);
+      setError('No se pudieron cargar los empleados del período');
       toast({
         title: "Error",
         description: "No se pudieron cargar los empleados",
@@ -85,6 +114,31 @@ export const PayrollLiquidationNew = ({
     }
   }, [loadEmployees, onCalculationComplete, periodId]);
 
+  // Si hay error, mostrar mensaje de error
+  if (error && !isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            Error de Liquidación
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button 
+            onClick={loadEmployees}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Reintentar
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -102,6 +156,14 @@ export const PayrollLiquidationNew = ({
                 </div>
               </div>
             ))}
+          </div>
+        ) : employees.length === 0 ? (
+          <div className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No hay empleados en este período</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Asegúrate de que hay empleados activos en la empresa
+            </p>
           </div>
         ) : (
           <Accordion type="single" collapsible>
