@@ -9,6 +9,7 @@ interface UsePayrollHistoryReturn {
   isLoading: boolean;
   isReopening: boolean;
   isExporting: boolean;
+  isRegenerating: boolean;
   canUserReopenPeriods: boolean;
   checkUserPermissions: () => Promise<void>;
   reopenPeriod: (periodo: string) => Promise<void>;
@@ -18,12 +19,14 @@ interface UsePayrollHistoryReturn {
   exportToExcel: (periods: PayrollHistoryPeriod[]) => Promise<void>;
   downloadFile: (fileUrl: string, fileName: string) => Promise<void>;
   createAuditLog: (log: Omit<AuditLog, 'id' | 'timestamp'>) => Promise<void>;
+  regenerateHistoricalData: (periodId: string) => Promise<boolean>;
 }
 
 export const usePayrollHistory = (): UsePayrollHistoryReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const [isReopening, setIsReopening] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [canUserReopenPeriods, setCanUserReopenPeriods] = useState(false);
 
   const checkUserPermissions = useCallback(async () => {
@@ -245,10 +248,46 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
     }
   }, []);
 
+  const regenerateHistoricalData = useCallback(async (periodId: string): Promise<boolean> => {
+    setIsRegenerating(true);
+    try {
+      console.log('🔄 Iniciando regeneración de datos históricos para:', periodId);
+      
+      const result = await PayrollHistoryService.regenerateHistoricalData(periodId);
+      
+      if (result.success) {
+        toast({
+          title: "✅ Datos regenerados exitosamente",
+          description: result.message,
+          className: "border-green-200 bg-green-50"
+        });
+        return true;
+      } else {
+        toast({
+          title: "❌ Error regenerando datos",
+          description: result.message,
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error: any) {
+      console.error('❌ Error en regeneración:', error);
+      toast({
+        title: "Error regenerando datos",
+        description: error.message || "No se pudieron regenerar los datos históricos",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, []);
+
   return {
     isLoading,
     isReopening,
     isExporting,
+    isRegenerating,
     canUserReopenPeriods,
     checkUserPermissions,
     reopenPeriod,
@@ -257,6 +296,7 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
     closePeriodWithWizard,
     exportToExcel,
     downloadFile,
-    createAuditLog
+    createAuditLog,
+    regenerateHistoricalData
   };
 };

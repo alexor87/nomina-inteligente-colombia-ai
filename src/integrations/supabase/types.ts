@@ -1534,6 +1534,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      generate_payroll_records_for_period: {
+        Args: { p_period_id: string }
+        Returns: Json
+      }
       get_current_user_company_id: {
         Args: Record<PropertyKey, never>
         Returns: string

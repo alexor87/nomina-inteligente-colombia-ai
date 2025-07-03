@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PAYROLL_STATES, STATE_MAPPING } from '@/constants/payrollStates';
@@ -150,30 +149,39 @@ export class PayrollHistoryService {
 
       console.log('👥 Empleados encontrados:', payrolls?.length || 0);
 
-      // Si no hay empleados y el período está cerrado, intentar sincronización tradicional
+      // Si no hay empleados y el período está cerrado, intentar sincronización histórica
       if ((!payrolls || payrolls.length === 0) && period.estado === 'cerrado') {
-        console.log('🔄 Período cerrado sin empleados, intentando sincronización tradicional...');
+        console.log('🔄 Período cerrado sin empleados, intentando sincronización histórica...');
         
         try {
-          await this.syncHistoricalData(periodId);
+          const { data: syncResult, error: syncError } = await supabase.rpc(
+            'sync_historical_payroll_data',
+            { p_period_id: periodId, p_company_id: companyId }
+          );
           
-          // Reintentar obtener los empleados después de la sincronización
-          const { data: syncedPayrolls } = await supabase
-            .from('payrolls')
-            .select(`
-              *,
-              employees (
-                id,
-                nombre,
-                apellido,
-                cargo
-              )
-            `)
-            .eq('company_id', companyId)
-            .eq('period_id', periodId);
-          
-          payrolls = syncedPayrolls;
-          console.log('✅ Empleados sincronizados:', payrolls?.length || 0);
+          if (syncError) {
+            console.error('❌ Error en sincronización:', syncError);
+          } else {
+            console.log('✅ Resultado sincronización:', syncResult);
+            
+            // Reintentar obtener los empleados después de la sincronización
+            const { data: syncedPayrolls } = await supabase
+              .from('payrolls')
+              .select(`
+                *,
+                employees (
+                  id,
+                  nombre,
+                  apellido,
+                  cargo
+                )
+              `)
+              .eq('company_id', companyId)
+              .eq('period_id', periodId);
+            
+            payrolls = syncedPayrolls;
+            console.log('✅ Empleados sincronizados:', payrolls?.length || 0);
+          }
         } catch (syncError) {
           console.error('❌ Error en sincronización:', syncError);
           // Continuar sin sincronización si falla
@@ -362,6 +370,43 @@ export class PayrollHistoryService {
     } catch (error) {
       console.error('Error recalculating employee totals:', error);
       throw error;
+    }
+  }
+
+  static async regenerateHistoricalData(periodId: string): Promise<{ success: boolean; message: string; employeesCreated?: number }> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) throw new Error('No company ID found');
+
+      console.log('🔄 Regenerando datos históricos para período:', periodId);
+
+      const { data: result, error } = await supabase.rpc(
+        'sync_historical_payroll_data',
+        { p_period_id: periodId, p_company_id: companyId }
+      );
+
+      if (error) {
+        console.error('❌ Error regenerando datos:', error);
+        return {
+          success: false,
+          message: `Error regenerando datos: ${error.message}`
+        };
+      }
+
+      console.log('✅ Regeneración completada:', result);
+      
+      return {
+        success: result.success,
+        message: result.message,
+        employeesCreated: result.records_created
+      };
+
+    } catch (error) {
+      console.error('💥 Error crítico regenerando datos:', error);
+      return {
+        success: false,
+        message: 'Error crítico regenerando datos históricos'
+      };
     }
   }
 }

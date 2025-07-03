@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollPeriodDetectionRobust } from '@/services/payroll-intelligent/PayrollPeriodDetectionRobust';
@@ -258,7 +257,21 @@ export const usePayrollLiquidationRobust = () => {
       
       console.log('🔒 Cerrando período:', currentPeriod.periodo);
       
-      // Close the period
+      // STEP 1: Generate payroll records BEFORE closing if they don't exist
+      console.log('📝 Generando registros de payroll antes del cierre...');
+      const { data: generateResult, error: generateError } = await supabase.rpc(
+        'generate_payroll_records_for_period',
+        { p_period_id: currentPeriod.id }
+      );
+
+      if (generateError) {
+        console.error('❌ Error generando payrolls:', generateError);
+        // Continue with closure even if generation fails - we'll sync later
+      } else {
+        console.log('✅ Resultado generación payrolls:', generateResult);
+      }
+
+      // STEP 2: Close the period
       const { error } = await supabase
         .from('payroll_periods_real')
         .update({ 
