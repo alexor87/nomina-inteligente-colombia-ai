@@ -1,7 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PAYROLL_STATES } from '@/constants/payrollStates';
-import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
-import { PayrollPeriodCalculationService } from './payroll-intelligent/PayrollPeriodCalculationService';
+import { SmartPeriodDetectionService } from './payroll-intelligent/SmartPeriodDetectionService';
 
 interface CompanySettings {
   id: string;
@@ -42,384 +42,48 @@ export interface PeriodStatus {
 
 export class PayrollPeriodIntelligentService {
   /**
-   * DETECCIÓN CORREGIDA - PRIORIDAD ABSOLUTA AL PERÍODO ACTUAL DE JULIO 2025
+   * DETECCIÓN UNIFICADA CON SERVICIOS INTELIGENTES
+   * Utiliza el nuevo SmartPeriodDetectionService
    */
   static async detectCurrentPeriod(): Promise<PeriodStatus> {
     try {
-      console.log('🎯 DETECCIÓN CORREGIDA - FORZANDO PERÍODO ACTUAL JULIO 2025...');
+      console.log('🎯 DETECCIÓN UNIFICADA CON SERVICIOS INTELIGENTES...');
       
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se encontró información de la empresa');
-      }
-
-      console.log('🏢 Company ID detectado:', companyId);
-
-      // PASO 1: ASEGURAR CONFIGURACIÓN DE EMPRESA
-      const settings = await this.ensureCompanySettings(companyId);
-      const periodicity = settings.periodicity;
+      // Usar el nuevo servicio inteligente
+      const detection = await SmartPeriodDetectionService.detectCurrentPeriod();
       
-      console.log('⚙️ Configuración asegurada - periodicidad:', periodicity);
-      
-      // PASO 2: GENERAR PERÍODO ACTUAL FORZADO (JULIO 2025)
-      const actualCurrentPeriodDates = await this.generateTodaysPeriodDates(periodicity);
-      console.log('📊 PERÍODO ACTUAL REAL CALCULADO:', actualCurrentPeriodDates);
-
-      // PASO 3: Buscar período activo existente
-      const activePeriod = await this.findActivePeriod(companyId);
-      
-      if (activePeriod) {
-        console.log('🔍 Período activo encontrado:', activePeriod.periodo);
-        
-        // VALIDACIÓN CRÍTICA: Verificar si el período activo corresponde al período actual
-        const isCurrentPeriod = this.isPeriodCurrent(activePeriod, actualCurrentPeriodDates);
-        
-        if (isCurrentPeriod) {
-          console.log('✅ Período activo ES el período actual, FORZANDO corrección de nombre...');
-          await this.forceCorrectPeriodName(activePeriod);
-          
-          return {
-            hasActivePeriod: true,
-            currentPeriod: activePeriod,
-            action: 'resume',
-            message: `Continuando con el período actual ${activePeriod.periodo}`
-          };
-        } else {
-          console.log('⚠️ Período activo NO es el período actual, creando período correcto...');
-          // Cerrar período obsoleto y crear el correcto
-          await this.closeObsoletePeriod(activePeriod);
-        }
-      }
-
-      // PASO 4: Verificar si ya existe el período actual correcto
-      const existingCurrentPeriod = await this.findPeriodByDates(
-        companyId, 
-        actualCurrentPeriodDates.startDate, 
-        actualCurrentPeriodDates.endDate
-      );
-      
-      if (existingCurrentPeriod) {
-        console.log('✅ Período actual correcto ya existe:', existingCurrentPeriod.periodo);
-        
-        // Asegurar que esté en estado borrador
-        if (existingCurrentPeriod.estado !== 'borrador') {
-          console.log('🔄 Convirtiendo período a borrador...');
-          const { error } = await supabase
-            .from('payroll_periods_real')
-            .update({ estado: 'borrador' })
-            .eq('id', existingCurrentPeriod.id);
-            
-          if (!error) {
-            existingCurrentPeriod.estado = 'borrador';
-          }
-        }
-        
-        await this.forceCorrectPeriodName(existingCurrentPeriod);
-        
-        return {
-          hasActivePeriod: true,
-          currentPeriod: existingCurrentPeriod,
-          action: 'resume',
-          message: `Continuando con el período actual ${existingCurrentPeriod.periodo}`
-        };
-      }
-
-      // PASO 5: CREAR PERÍODO ACTUAL AUTOMÁTICAMENTE
-      console.log('🆕 CREANDO PERÍODO ACTUAL AUTOMÁTICAMENTE...');
-      const newCurrentPeriod = await this.createAutomaticPeriod(
-        companyId, 
-        actualCurrentPeriodDates, 
-        periodicity
-      );
-      
-      return {
-        hasActivePeriod: true,
-        currentPeriod: newCurrentPeriod,
-        action: 'create',
-        message: `Período actual creado automáticamente: ${newCurrentPeriod.periodo}`
-      };
-
-    } catch (error) {
-      console.error('❌ ERROR CRÍTICO EN DETECCIÓN CORREGIDA:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * NUEVA FUNCIÓN: Forzar corrección del nombre del período
-   */
-  static async forceCorrectPeriodName(period: PayrollPeriod): Promise<void> {
-    try {
-      console.log('🔧 FORZANDO CORRECCIÓN DE NOMBRE DEL PERÍODO:', period.id);
-      
-      const { getPeriodNameFromDates } = await import('@/utils/periodDateUtils');
-      const correctName = getPeriodNameFromDates(period.fecha_inicio, period.fecha_fin);
-      
-      console.log(`📝 COMPARANDO NOMBRES: "${period.periodo}" vs "${correctName}"`);
-      
-      if (correctName !== period.periodo) {
-        console.log(`🚨 NOMBRE INCORRECTO DETECTADO - FORZANDO CORRECCIÓN: "${period.periodo}" → "${correctName}"`);
-        
-        // Actualizar FORZOSAMENTE el nombre del período
-        const { error } = await supabase
-          .from('payroll_periods_real')
-          .update({ 
-            periodo: correctName,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', period.id);
-
-        if (error) {
-          console.error('❌ Error forzando corrección de nombre:', error);
-        } else {
-          console.log('✅ NOMBRE FORZOSAMENTE CORREGIDO');
-          period.periodo = correctName; // Actualizar en memoria
-        }
-      } else {
-        console.log('✅ Nombre ya es correcto:', correctName);
-      }
-    } catch (error) {
-      console.error('❌ Error en corrección forzada:', error);
-    }
-  }
-
-  /**
-   * NUEVO: Verificar si un período corresponde al período actual
-   */
-  static isPeriodCurrent(period: PayrollPeriod, currentDates: { startDate: string; endDate: string }): boolean {
-    const matches = period.fecha_inicio === currentDates.startDate && 
-                   period.fecha_fin === currentDates.endDate;
-    
-    console.log('🔍 VERIFICANDO SI ES PERÍODO ACTUAL:', {
-      period: `${period.fecha_inicio} - ${period.fecha_fin}`,
-      current: `${currentDates.startDate} - ${currentDates.endDate}`,
-      matches
-    });
-    
-    return matches;
-  }
-
-  /**
-   * NUEVO: Cerrar período obsoleto
-   */
-  static async closeObsoletePeriod(period: PayrollPeriod): Promise<void> {
-    try {
-      console.log('🔒 CERRANDO PERÍODO OBSOLETO:', period.periodo);
-      
-      const { error } = await supabase
-        .from('payroll_periods_real')
-        .update({ 
-          estado: 'cerrado',
+      // Convertir a formato esperado
+      const status: PeriodStatus = {
+        hasActivePeriod: detection.action === 'resume',
+        currentPeriod: detection.existing_period || detection.active_period ? {
+          id: (detection.existing_period || detection.active_period)!.id,
+          company_id: '', // Se llenará automáticamente por RLS
+          fecha_inicio: (detection.existing_period || detection.active_period)!.fecha_inicio,
+          fecha_fin: (detection.existing_period || detection.active_period)!.fecha_fin,
+          estado: (detection.existing_period || detection.active_period)!.estado as any,
+          tipo_periodo: detection.calculated_period.type as any,
+          periodo: (detection.existing_period || detection.active_period)!.periodo,
+          empleados_count: 0,
+          total_devengado: 0,
+          total_deducciones: 0,
+          total_neto: 0,
+          created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        })
-        .eq('id', period.id);
-
-      if (error) {
-        console.error('❌ Error cerrando período obsoleto:', error);
-      } else {
-        console.log('✅ Período obsoleto cerrado exitosamente');
-      }
-    } catch (error) {
-      console.error('❌ Error en cierre de período obsoleto:', error);
-    }
-  }
-
-  /**
-   * CORREGIDO: Generar fechas del período ACTUAL basado en la fecha de HOY
-   */
-  static async generateTodaysPeriodDates(periodicity: string): Promise<{ startDate: string; endDate: string }> {
-    try {
-      console.log('📅 GENERANDO PERÍODO ACTUAL CORREGIDO para periodicidad:', periodicity);
-      
-      const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
-      const strategy = PeriodStrategyFactory.createStrategy(periodicity);
-      
-      // CORRECCIÓN: Usar método corregido para período actual
-      const currentPeriod = strategy.generateCurrentPeriod();
-      console.log('✅ PERÍODO ACTUAL CORREGIDO GENERADO:', currentPeriod);
-      
-      return currentPeriod;
-    } catch (error) {
-      console.error('❌ Error generando período actual corregido:', error);
-      // Fallback corregido
-      const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
-      const strategy = PeriodStrategyFactory.createStrategy('quincenal');
-      const fallback = strategy.generateCurrentPeriod();
-      console.log('🔄 FALLBACK GENERADO:', fallback);
-      return fallback;
-    }
-  }
-
-  /**
-   * CORREGIDO: Validar consistencia entre nombre del período y fechas almacenadas
-   */
-  static async validatePeriodNameConsistency(period: PayrollPeriod): Promise<void> {
-    try {
-      const { getPeriodNameFromDates } = await import('@/utils/periodDateUtils');
-      const correctName = getPeriodNameFromDates(period.fecha_inicio, period.fecha_fin);
-      
-      if (correctName !== period.periodo) {
-        console.log(`🔧 CORRECCIÓN DE NOMBRE: "${period.periodo}" → "${correctName}"`);
-        
-        // Corregir el nombre automáticamente
-        const { error } = await supabase
-          .from('payroll_periods_real')
-          .update({ 
-            periodo: correctName,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', period.id);
-
-        if (error) {
-          console.error('❌ Error corrigiendo nombre:', error);
-        } else {
-          console.log('✅ Nombre corregido automáticamente');
-          period.periodo = correctName; // Actualizar en memoria
-        }
-      } else {
-        console.log('✅ Nombre ya es consistente:', correctName);
-      }
-    } catch (error) {
-      console.error('❌ Error validando consistencia:', error);
-    }
-  }
-
-  static async findPeriodByDates(companyId: string, startDate: string, endDate: string): Promise<PayrollPeriod | null> {
-    try {
-      console.log('🔍 Buscando período por fechas exactas:', startDate, '-', endDate);
-      
-      const { data, error } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('fecha_inicio', startDate)
-        .eq('fecha_fin', endDate)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('❌ Error buscando período por fechas:', error);
-        return null;
-      }
-      
-      if (data) {
-        console.log('✅ Período encontrado por fechas:', data.periodo);
-      } else {
-        console.log('ℹ️ No se encontró período para las fechas especificadas');
-      }
-      
-      return data as PayrollPeriod;
-    } catch (error) {
-      console.error('❌ Error en búsqueda por fechas:', error);
-      return null;
-    }
-  }
-
-  static async handleClosedCurrentPeriod(companyId: string, periodicity: string, closedPeriod: PayrollPeriod): Promise<PeriodStatus> {
-    try {
-      console.log('🔒 Manejando período actual cerrado, calculando siguiente...');
-      
-      const nextPeriodDates = await PayrollPeriodCalculationService.calculateNextPeriodFromDatabase(
-        periodicity, 
-        companyId
-      );
-
-      return {
-        hasActivePeriod: false,
-        nextPeriod: {
-          startDate: nextPeriodDates.startDate,
-          endDate: nextPeriodDates.endDate,
-          type: periodicity
-        },
-        action: 'suggest_next',
-        message: `Período actual (${closedPeriod.periodo}) ya cerrado. Listo para crear siguiente: ${nextPeriodDates.startDate} - ${nextPeriodDates.endDate}`
+        } : undefined,
+        nextPeriod: detection.action === 'create' ? {
+          startDate: detection.calculated_period.start_date,
+          endDate: detection.calculated_period.end_date,
+          type: detection.calculated_period.type
+        } : undefined,
+        action: detection.action === 'resume' ? 'resume' : 'suggest_next',
+        message: detection.message
       };
-    } catch (error) {
-      console.error('❌ Error manejando período cerrado:', error);
-      throw error;
-    }
-  }
-
-  static async findLastClosedPeriodRobust(companyId: string, maxRetries: number = 5): Promise<PayrollPeriod | null> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`🔍 Búsqueda robusta de período cerrado (intento ${attempt}/${maxRetries})`);
-        
-        const { data, error } = await supabase
-          .from('payroll_periods_real')
-          .select('*')
-          .eq('company_id', companyId)
-          .in('estado', [PAYROLL_STATES.CERRADO, PAYROLL_STATES.PROCESADA, PAYROLL_STATES.PAGADA])
-          .order('fecha_fin', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (error) {
-          console.error(`❌ Error en intento ${attempt}:`, error);
-          if (attempt === maxRetries) throw error;
-          continue;
-        }
-        
-        if (data) {
-          console.log(`✅ Período cerrado encontrado en intento ${attempt}:`, data.periodo);
-          return data as PayrollPeriod;
-        } else {
-          console.log(`ℹ️ No se encontró período cerrado en intento ${attempt}`);
-        }
-        
-        if (attempt < maxRetries) {
-          console.log(`⏰ Esperando ${1000 * attempt}ms antes del siguiente intento...`);
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
-        
-      } catch (error) {
-        console.error(`❌ Error en intento ${attempt}:`, error);
-        if (attempt === maxRetries) {
-          console.error('❌ Todos los intentos fallaron');
-          return null;
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-      }
-    }
-    
-    return null;
-  }
-
-  static async ensureCompanySettings(companyId: string): Promise<CompanySettings> {
-    try {
-      console.log('⚙️ Verificando configuración de empresa...');
       
-      let { data: settings, error } = await supabase
-        .from('company_settings')
-        .select('*')
-        .eq('company_id', companyId)
-        .single();
-
-      if (error && error.code === 'PGRST116') {
-        console.log('🆕 Creando configuración por defecto...');
-        
-        const { data: newSettings, error: insertError } = await supabase
-          .from('company_settings')
-          .insert({
-            company_id: companyId,
-            periodicity: 'quincenal'
-          })
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        
-        console.log('✅ Configuración creada exitosamente');
-        settings = newSettings;
-      } else if (error) {
-        throw error;
-      }
-
-      console.log('📊 Configuración obtenida:', settings?.periodicity);
-      return settings as CompanySettings;
+      console.log('✅ DETECCIÓN UNIFICADA COMPLETADA:', status);
+      return status;
+      
     } catch (error) {
-      console.error('❌ Error asegurando configuración:', error);
+      console.error('❌ ERROR EN DETECCIÓN UNIFICADA:', error);
       throw error;
     }
   }
@@ -463,66 +127,53 @@ export class PayrollPeriodIntelligentService {
 
   static async createAutomaticPeriod(companyId: string, dates: { startDate: string; endDate: string }, periodicity: string): Promise<PayrollPeriod> {
     try {
-      const { getPeriodNameFromDates } = await import('@/utils/periodDateUtils');
-      const periodName = getPeriodNameFromDates(dates.startDate, dates.endDate);
+      // Usar el servicio inteligente para crear períodos
+      const detection = await SmartPeriodDetectionService.detectCurrentPeriod();
+      const newPeriod = await SmartPeriodDetectionService.createPeriodFromDetection(detection);
       
-      console.log('🆕 CREANDO PERÍODO AUTOMÁTICO:', {
-        companyId,
-        dates,
-        periodicity,
-        periodName
-      });
-      
-      const { data, error } = await supabase
-        .from('payroll_periods_real')
-        .insert({
-          company_id: companyId,
-          fecha_inicio: dates.startDate,
-          fecha_fin: dates.endDate,
-          tipo_periodo: periodicity,
-          periodo: periodName,
-          estado: 'borrador'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      console.log('✅ Período automático creado exitosamente:', data);
-      return data as PayrollPeriod;
+      console.log('✅ Período automático creado exitosamente:', newPeriod);
+      return newPeriod as PayrollPeriod;
     } catch (error) {
       console.error('❌ Error creating automatic period:', error);
       throw error;
     }
   }
 
-  static async validatePeriodRules(companyId: string, startDate: string, endDate: string): Promise<{ isValid: boolean; errors: string[] }> {
-    const errors: string[] = [];
+  static async ensureCompanySettings(companyId: string): Promise<CompanySettings> {
+    try {
+      console.log('⚙️ Verificando configuración de empresa...');
+      
+      let { data: settings, error } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('company_id', companyId)
+        .single();
 
-    const { data: overlapping } = await supabase
-      .from('payroll_periods_real')
-      .select('*')
-      .eq('company_id', companyId)
-      .neq('estado', 'cancelado')
-      .or(`fecha_inicio.lte.${endDate},fecha_fin.gte.${startDate}`);
+      if (error && error.code === 'PGRST116') {
+        console.log('🆕 Creando configuración por defecto...');
+        
+        const { data: newSettings, error: insertError } = await supabase
+          .from('company_settings')
+          .insert({
+            company_id: companyId,
+            periodicity: 'quincenal'
+          })
+          .select()
+          .single();
 
-    if (overlapping && overlapping.length > 0) {
-      errors.push('Existe superposición con períodos existentes');
+        if (insertError) throw insertError;
+        
+        console.log('✅ Configuración creada exitosamente');
+        settings = newSettings;
+      } else if (error) {
+        throw error;
+      }
+
+      console.log('📊 Configuración obtenida:', settings?.periodicity);
+      return settings as CompanySettings;
+    } catch (error) {
+      console.error('❌ Error asegurando configuración:', error);
+      throw error;
     }
-
-    const { data: openPeriods } = await supabase
-      .from('payroll_periods_real')
-      .select('*')
-      .eq('company_id', companyId)
-      .eq('estado', 'borrador');
-
-    if (openPeriods && openPeriods.length > 1) {
-      errors.push('Solo se permite un período abierto por empresa');
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
   }
 }

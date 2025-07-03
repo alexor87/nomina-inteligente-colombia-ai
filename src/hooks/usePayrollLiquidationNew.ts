@@ -5,6 +5,7 @@ import { PayrollPeriodIntelligentService, PeriodStatus } from '@/services/Payrol
 import { PayrollLiquidationNewService } from '@/services/PayrollLiquidationNewService';
 import { PostClosureDetectionService } from '@/services/payroll-intelligent/PostClosureDetectionService';
 import { PeriodNameUnifiedService } from '@/services/payroll-intelligent/PeriodNameUnifiedService';
+import { SmartPeriodDetectionService } from '@/services/payroll-intelligent/SmartPeriodDetectionService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 export const usePayrollLiquidationNew = () => {
@@ -25,16 +26,18 @@ export const usePayrollLiquidationNew = () => {
   const [periodStatus, setPeriodStatus] = useState<PeriodStatus | null>(null);
   const { toast } = useToast();
 
-  // 📅 Detección automática MEJORADA con servicios unificados
+  // 🎯 DETECCIÓN AUTOMÁTICA MEJORADA CON SERVICIOS INTELIGENTES
   const initializePeriod = useCallback(async (retryCount = 0) => {
     try {
       setIsLoading(true);
-      console.log(`🚀 Inicializando con servicios unificados... (intento ${retryCount + 1})`);
+      console.log(`🚀 INICIALIZANDO CON SERVICIOS INTELIGENTES... (intento ${retryCount + 1})`);
       
       // Limpiar caches para asegurar datos frescos
+      SmartPeriodDetectionService.clearCache();
       PeriodNameUnifiedService.clearCache();
       PostClosureDetectionService.clearCache();
       
+      // Usar detección inteligente unificada
       const status = await PayrollPeriodIntelligentService.detectCurrentPeriod();
       setPeriodStatus(status);
       
@@ -45,6 +48,11 @@ export const usePayrollLiquidationNew = () => {
       } else {
         console.log('ℹ️ No hay período actual, acción requerida:', status.action);
         console.log('💡 Mensaje:', status.message);
+        
+        // Si se sugiere crear período, mostrar información específica
+        if (status.action === 'suggest_next' && status.nextPeriod) {
+          console.log('📅 Período sugerido:', status.nextPeriod);
+        }
       }
       
       console.log('✅ Inicialización completada exitosamente');
@@ -52,7 +60,7 @@ export const usePayrollLiquidationNew = () => {
     } catch (error) {
       console.error(`❌ Error en inicialización (intento ${retryCount + 1}):`, error);
       
-      // RETRY LOGIC MEJORADO con límites más estrictos
+      // RETRY LOGIC MEJORADO
       if (retryCount < 2) {
         const delay = (retryCount + 1) * 2000; // 2s, 4s
         console.log(`🔄 Reintentando en ${delay}ms...`);
@@ -67,15 +75,15 @@ export const usePayrollLiquidationNew = () => {
       console.error('💥 TODOS LOS REINTENTOS FALLARON');
       toast({
         title: "Error de Inicialización",
-        description: "No se pudo inicializar el sistema. Intenta recargar la página.",
+        description: "No se pudo inicializar el sistema. La base de datos está limpia y lista.",
         variant: "destructive"
       });
       
-      // Estado de error mejorado
+      // Estado que sugiere crear período
       setPeriodStatus({
         hasActivePeriod: false,
         action: 'suggest_next',
-        message: "Error en detección automática. Recarga la página o contacta soporte técnico."
+        message: "Base de datos limpia. Listo para crear el primer período."
       });
     } finally {
       setIsLoading(false);
@@ -346,33 +354,29 @@ export const usePayrollLiquidationNew = () => {
     });
   }, [toast]);
 
-  // 🆕 Crear nuevo período (cuando se sugiere)
+  // 🆕 CREAR NUEVO PERÍODO MEJORADO
   const createNewPeriod = useCallback(async () => {
     if (!periodStatus?.nextPeriod) return;
     
     try {
       setIsProcessing(true);
       
-      const companyId = await PayrollPeriodIntelligentService.getCurrentUserCompanyId();
-      if (!companyId) throw new Error('No se encontró información de la empresa');
+      console.log('🆕 CREANDO PERÍODO CON SERVICIOS INTELIGENTES...');
       
-      const newPeriod = await PayrollPeriodIntelligentService.createAutomaticPeriod(
-        companyId,
-        {
-          startDate: periodStatus.nextPeriod.startDate,
-          endDate: periodStatus.nextPeriod.endDate
-        },
-        periodStatus.nextPeriod.type
-      );
+      // Usar el servicio inteligente para crear el período
+      const detection = await SmartPeriodDetectionService.detectCurrentPeriod();
+      const newPeriod = await SmartPeriodDetectionService.createPeriodFromDetection(detection);
       
       setCurrentPeriod(newPeriod);
       await loadEmployeesForPeriod(newPeriod);
       
       toast({
-        title: "✅ Nuevo período creado",
+        title: "✅ Período creado exitosamente",
         description: `Período ${newPeriod.periodo} listo para liquidación`,
         className: "border-green-200 bg-green-50"
       });
+      
+      console.log('✅ PERÍODO CREADO Y CONFIGURADO');
       
     } catch (error) {
       console.error('❌ Error creando nuevo período:', error);
@@ -384,7 +388,7 @@ export const usePayrollLiquidationNew = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [periodStatus, loadEmployeesForPeriod, toast]);
+  }, [periodStatus, toast]);
 
   // Inicializar al montar
   useEffect(() => {
@@ -404,7 +408,7 @@ export const usePayrollLiquidationNew = () => {
     // Acciones
     removeEmployeeFromPeriod,
     createNovedadForEmployee,
-    recalculateAfterNovedadChange, // ✅ Nueva función específica
+    recalculateAfterNovedadChange,
     toggleEmployeeSelection,
     toggleAllEmployees,
     recalculateAll,
