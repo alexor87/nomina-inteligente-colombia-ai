@@ -391,111 +391,182 @@ export class PayrollLiquidationNewService {
       
       let successfulRecords = 0;
       const failedRecords: string[] = [];
+      const createdPayrollIds: string[] = [];
 
-      for (const employee of employees) {
-        if (employee.status === 'valid') {
-          try {
-            // ✅ CÁLCULO CORRECTO DE DEDUCCIONES SEPARADAS
-            const proportionalSalary = Math.round((employee.baseSalary / 30) * employee.workedDays);
-            
-            // Deducciones separadas sobre salario proporcional
-            const healthDeduction = Math.round(proportionalSalary * 0.04); // 4%
-            const pensionDeduction = Math.round(proportionalSalary * 0.04); // 4%
-            
-            // Deducciones adicionales de novedades (si las hay)
-            const additionalDeductions = employee.deductions - (healthDeduction + pensionDeduction);
-            
-            console.log(`💰 DEDUCCIONES SEPARADAS para ${employee.name}:`, {
-              proportionalSalary: proportionalSalary,
-              healthDeduction: healthDeduction,
-              pensionDeduction: pensionDeduction,
-              additionalDeductions: Math.max(0, additionalDeductions),
-              totalDeductions: employee.deductions
-            });
-
-            // ✅ ALELUYA: Guardar con deducciones separadas
-            const payrollData = {
-              company_id: period.company_id,
-              employee_id: employee.id,
-              periodo: period.periodo,
-              period_id: period.id,
-              salario_base: employee.baseSalary,
-              dias_trabajados: employee.workedDays,
-              horas_extra: employee.extraHours,
-              bonificaciones: employee.bonuses,
-              auxilio_transporte: employee.transportAllowance,
-              total_devengado: employee.grossPay,
-              // ✅ DEDUCCIONES SEPARADAS - CORRECCIÓN PRINCIPAL
-              salud_empleado: healthDeduction,
-              pension_empleado: pensionDeduction,
-              otras_deducciones: Math.max(0, additionalDeductions),
-              total_deducciones: employee.deductions,
-              neto_pagado: employee.netPay,
-              estado: 'procesada'
-            };
-
-            console.log(`💾 ALELUYA - Guardando con deducciones separadas para ${employee.name}:`, {
-              salud_empleado: payrollData.salud_empleado,
-              pension_empleado: payrollData.pension_empleado,
-              otras_deducciones: payrollData.otras_deducciones,
-              total_deducciones: payrollData.total_deducciones
-            });
-
-            const { error: payrollError } = await supabase
-              .from('payrolls')
-              .upsert(payrollData, {
-                onConflict: 'company_id,employee_id,period_id',
-                ignoreDuplicates: false
+      try {
+        // Paso 1: Guardar todas las nóminas
+        for (const employee of employees) {
+          if (employee.status === 'valid') {
+            try {
+              // ✅ CÁLCULO CORRECTO DE DEDUCCIONES SEPARADAS
+              const proportionalSalary = Math.round((employee.baseSalary / 30) * employee.workedDays);
+              
+              // Deducciones separadas sobre salario proporcional
+              const healthDeduction = Math.round(proportionalSalary * 0.04); // 4%
+              const pensionDeduction = Math.round(proportionalSalary * 0.04); // 4%
+              
+              // Deducciones adicionales de novedades (si las hay)
+              const additionalDeductions = employee.deductions - (healthDeduction + pensionDeduction);
+              
+              console.log(`💰 DEDUCCIONES SEPARADAS para ${employee.name}:`, {
+                proportionalSalary: proportionalSalary,
+                healthDeduction: healthDeduction,
+                pensionDeduction: pensionDeduction,
+                additionalDeductions: Math.max(0, additionalDeductions),
+                totalDeductions: employee.deductions
               });
 
-            if (payrollError) {
-              console.error(`❌ Error guardando nómina para empleado ${employee.name}:`, payrollError);
+              // ✅ ALELUYA: Guardar con deducciones separadas
+              const payrollData = {
+                company_id: period.company_id,
+                employee_id: employee.id,
+                periodo: period.periodo,
+                period_id: period.id,
+                salario_base: employee.baseSalary,
+                dias_trabajados: employee.workedDays,
+                horas_extra: employee.extraHours,
+                bonificaciones: employee.bonuses,
+                auxilio_transporte: employee.transportAllowance,
+                total_devengado: employee.grossPay,
+                // ✅ DEDUCCIONES SEPARADAS - CORRECCIÓN PRINCIPAL
+                salud_empleado: healthDeduction,
+                pension_empleado: pensionDeduction,
+                otras_deducciones: Math.max(0, additionalDeductions),
+                total_deducciones: employee.deductions,
+                neto_pagado: employee.netPay,
+                estado: 'procesada'
+              };
+
+              console.log(`💾 ALELUYA - Guardando con deducciones separadas para ${employee.name}:`, {
+                salud_empleado: payrollData.salud_empleado,
+                pension_empleado: payrollData.pension_empleado,
+                otras_deducciones: payrollData.otras_deducciones,
+                total_deducciones: payrollData.total_deducciones
+              });
+
+              const { data: payrollResult, error: payrollError } = await supabase
+                .from('payrolls')
+                .upsert(payrollData, {
+                  onConflict: 'company_id,employee_id,period_id',
+                  ignoreDuplicates: false
+                })
+                .select('id')
+                .single();
+
+              if (payrollError) {
+                console.error(`❌ Error guardando nómina para empleado ${employee.name}:`, payrollError);
+                failedRecords.push(employee.name);
+                throw payrollError; // Esto causará rollback automático
+              } else {
+                successfulRecords++;
+                if (payrollResult?.id) {
+                  createdPayrollIds.push(payrollResult.id);
+                }
+                console.log(`✅ ALELUYA - Deducciones separadas guardadas para ${employee.name}`);
+              }
+            } catch (error) {
+              console.error(`❌ Error crítico guardando empleado ${employee.name}:`, error);
               failedRecords.push(employee.name);
-            } else {
-              successfulRecords++;
-              console.log(`✅ ALELUYA - Deducciones separadas guardadas para ${employee.name}`);
+              throw error; // Esto causará rollback
             }
-          } catch (error) {
-            console.error(`❌ Error crítico guardando empleado ${employee.name}:`, error);
-            failedRecords.push(employee.name);
           }
         }
-      }
 
-      console.log(`📊 ALELUYA - Resultados: ${successfulRecords} exitosos, ${failedRecords.length} fallidos`);
+        console.log(`📊 ALELUYA - Nóminas guardadas: ${successfulRecords} exitosos, ${failedRecords.length} fallidos`);
 
-      // Calcular totales basados en registros válidos
-      const validEmployees = employees.filter(emp => emp.status === 'valid');
-      const totalDevengado = validEmployees.reduce((sum, emp) => sum + emp.grossPay, 0);
-      const totalDeducciones = validEmployees.reduce((sum, emp) => sum + emp.deductions, 0);
-      const totalNeto = validEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
+        // Paso 2: Calcular totales basados en registros válidos
+        const validEmployees = employees.filter(emp => emp.status === 'valid');
+        const totalDevengado = validEmployees.reduce((sum, emp) => sum + emp.grossPay, 0);
+        const totalDeducciones = validEmployees.reduce((sum, emp) => sum + emp.deductions, 0);
+        const totalNeto = validEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
 
-      // Actualizar estado del período con totales PROPORCIONALES
-      const { error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .update({ 
+        // Paso 3: ✅ ACTUALIZACIÓN CRÍTICA: Actualizar estado del período a CERRADO
+        console.log(`🔄 ALELUYA - Actualizando estado del período ${period.periodo} a CERRADO`);
+        
+        const periodUpdateData = { 
           estado: 'cerrado',
           empleados_count: successfulRecords,
           total_devengado: totalDevengado,
           total_deducciones: totalDeducciones,
-          total_neto: totalNeto
-        })
-        .eq('id', period.id);
+          total_neto: totalNeto,
+          updated_at: new Date().toISOString()
+        };
 
-      if (periodError) {
-        console.error('❌ Error actualizando período:', periodError);
-        throw periodError;
+        console.log(`📋 ALELUYA - Datos de actualización del período:`, periodUpdateData);
+
+        const { error: periodError } = await supabase
+          .from('payroll_periods_real')
+          .update(periodUpdateData)
+          .eq('id', period.id);
+
+        if (periodError) {
+          console.error('❌ ERROR CRÍTICO actualizando período:', periodError);
+          console.error('📋 Detalles completos del error:', {
+            error: periodError,
+            periodId: period.id,
+            updateData: periodUpdateData
+          });
+          throw new Error(`Error actualizando estado del período: ${periodError.message}`);
+        }
+
+        console.log(`✅ ALELUYA - Período ${period.periodo} CERRADO EXITOSAMENTE`);
+
+        // Verificar que el período se cerró correctamente
+        const { data: verificationData, error: verificationError } = await supabase
+          .from('payroll_periods_real')
+          .select('estado, updated_at')
+          .eq('id', period.id)
+          .single();
+
+        if (verificationError) {
+          console.warn('⚠️ No se pudo verificar el estado del período:', verificationError);
+        } else {
+          console.log(`✅ VERIFICACIÓN - Período estado: ${verificationData.estado}, actualizado: ${verificationData.updated_at}`);
+        }
+
+        const message = failedRecords.length > 0 
+          ? `Período ${period.periodo} cerrado con deducciones separadas. ${successfulRecords} empleados procesados, ${failedRecords.length} fallaron.`
+          : `Período ${period.periodo} cerrado exitosamente con deducciones separadas para ${successfulRecords} empleados`;
+
+        console.log(`✅ ALELUYA - ${message}`);
+        return message;
+
+      } catch (innerError) {
+        console.error('❌ Error durante el proceso de cierre, limpiando datos parciales:', innerError);
+        
+        // Cleanup: Eliminar nóminas creadas si hay error
+        if (createdPayrollIds.length > 0) {
+          console.log(`🧹 Limpiando ${createdPayrollIds.length} nóminas creadas...`);
+          
+          const { error: cleanupError } = await supabase
+            .from('payrolls')
+            .delete()
+            .in('id', createdPayrollIds);
+          
+          if (cleanupError) {
+            console.error('❌ Error durante limpieza:', cleanupError);
+          } else {
+            console.log('✅ Limpieza completada');
+          }
+        }
+        
+        throw innerError;
       }
 
-      const message = failedRecords.length > 0 
-        ? `Período ${period.periodo} cerrado con deducciones separadas. ${successfulRecords} empleados procesados, ${failedRecords.length} fallaron.`
-        : `Período ${period.periodo} cerrado exitosamente con deducciones separadas para ${successfulRecords} empleados`;
-
-      console.log(`✅ ALELUYA - ${message}`);
-      return message;
     } catch (error) {
       console.error('❌ Error cerrando período:', error);
-      throw error;
+      
+      // Log detallado del error para debugging
+      console.error('📋 Detalles del error:', {
+        periodo: period?.periodo,
+        periodId: period?.id,
+        employeesCount: employees?.length,
+        errorMessage: error?.message,
+        errorStack: error?.stack,
+        fullError: error
+      });
+      
+      throw new Error(`Error cerrando período ${period?.periodo}: ${error?.message || 'Error desconocido'}`);
     }
   }
 }
