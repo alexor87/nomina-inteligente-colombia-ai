@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ interface PayrollTableNewProps {
   employees: PayrollEmployee[];
   onRemoveEmployee: (employeeId: string) => void;
   onCreateNovedad: (employeeId: string, data: CreateNovedadData) => void;
+  onRecalculate?: () => Promise<void>; // ✅ Nuevo prop para recálculo
   periodId: string;
   canEdit: boolean;
   selectedEmployees: string[];
@@ -31,6 +31,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
   employees,
   onRemoveEmployee,
   onCreateNovedad,
+  onRecalculate, // ✅ Nuevo prop
   periodId,
   canEdit,
   selectedEmployees,
@@ -39,6 +40,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
 }) => {
   const [showNovedadModal, setShowNovedadModal] = useState(false);
   const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<PayrollEmployee | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false); // ✅ Estado para indicador
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -58,6 +60,32 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
       await onCreateNovedad(selectedEmployeeForNovedad.id, data);
       setShowNovedadModal(false);
       setSelectedEmployeeForNovedad(null);
+      
+      // ✅ Recalcular automáticamente después de crear novedad
+      if (onRecalculate) {
+        setIsRecalculating(true);
+        try {
+          await onRecalculate();
+        } finally {
+          setIsRecalculating(false);
+        }
+      }
+    }
+  };
+
+  // ✅ Nuevo callback para cuando se modifiquen/eliminen novedades
+  const handleNovedadChange = async () => {
+    if (onRecalculate) {
+      setIsRecalculating(true);
+      console.log('🔄 Recalculando liquidación tras cambio en novedades...');
+      try {
+        await onRecalculate();
+        console.log('✅ Recálculo completado');
+      } catch (error) {
+        console.error('❌ Error en recálculo:', error);
+      } finally {
+        setIsRecalculating(false);
+      }
     }
   };
 
@@ -102,6 +130,16 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
   return (
     <>
       <div className="border rounded-lg overflow-hidden bg-white">
+        {/* ✅ Indicador de recálculo */}
+        {isRecalculating && (
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
+            <div className="flex items-center gap-2 text-blue-700">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="text-sm">Recalculando liquidación...</span>
+            </div>
+          </div>
+        )}
+
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
@@ -222,6 +260,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
           employeeSalary={selectedEmployeeForNovedad.baseSalary}
           periodId={periodId}
           onCreateNovedad={handleCreateNovedad}
+          onNovedadChange={handleNovedadChange} // ✅ Nuevo callback
           calculateSuggestedValue={calculateSuggestedValue}
         />
       )}

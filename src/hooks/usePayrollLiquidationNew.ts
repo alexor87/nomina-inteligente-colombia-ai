@@ -172,8 +172,6 @@ export const usePayrollLiquidationNew = () => {
         periodo_id: currentPeriod.id
       });
       
-      await loadEmployeesForPeriod(currentPeriod);
-      
       toast({
         title: "✅ Novedad creada",
         description: "La novedad ha sido registrada exitosamente",
@@ -190,7 +188,16 @@ export const usePayrollLiquidationNew = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [currentPeriod, loadEmployeesForPeriod, toast]);
+  }, [currentPeriod, toast]);
+
+  // ✅ Función específica para recálculo tras cambios en novedades
+  const recalculateAfterNovedadChange = useCallback(async () => {
+    if (!currentPeriod) return;
+    
+    console.log('🔄 Recalculando liquidación tras cambio en novedades...');
+    await loadEmployeesForPeriod(currentPeriod);
+    console.log('✅ Recálculo completado tras cambio en novedades');
+  }, [currentPeriod, loadEmployeesForPeriod]);
 
   // 🔄 Selección de empleados
   const toggleEmployeeSelection = useCallback((employeeId: string) => {
@@ -397,6 +404,7 @@ export const usePayrollLiquidationNew = () => {
     // Acciones
     removeEmployeeFromPeriod,
     createNovedadForEmployee,
+    recalculateAfterNovedadChange, // ✅ Nueva función específica
     toggleEmployeeSelection,
     toggleAllEmployees,
     recalculateAll,

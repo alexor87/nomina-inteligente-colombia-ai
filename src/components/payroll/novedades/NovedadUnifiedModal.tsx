@@ -25,6 +25,7 @@ interface NovedadUnifiedModalProps {
   employeeSalary: number;
   periodId: string;
   onCreateNovedad: (data: CreateNovedadData) => Promise<void>;
+  onNovedadChange?: () => Promise<void>; // ✅ Nuevo callback para cambios
   calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number, dias?: number) => number | null;
 }
 
@@ -48,6 +49,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   employeeSalary,
   periodId,
   onCreateNovedad,
+  onNovedadChange, // ✅ Nuevo prop
   calculateSuggestedValue
 }) => {
   const [currentView, setCurrentView] = useState<ModalView>('consolidated');
@@ -123,6 +125,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const updatedNovedades = await loadNovedades(employeeId);
       setExistingNovedades(updatedNovedades);
       
+      // ✅ Notificar cambio para recálculo
+      if (onNovedadChange) {
+        await onNovedadChange();
+      }
+      
       // Go back to consolidated view
       setCurrentView('consolidated');
     } catch (error) {
@@ -163,6 +170,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const updatedNovedades = await loadNovedades(employeeId);
       setExistingNovedades(updatedNovedades);
       
+      // ✅ Notificar cambio para recálculo
+      if (onNovedadChange) {
+        await onNovedadChange();
+      }
+      
       // Go back to consolidated view
       setCurrentView('consolidated');
     } catch (error) {
@@ -175,12 +187,22 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const handleDeleteNovedad = async (novedadId: string) => {
     if (window.confirm('¿Está seguro de que desea eliminar esta novedad?')) {
       try {
+        console.log('🗑️ Eliminando novedad:', novedadId);
         await deleteNovedad(novedadId);
+        
         // Reload existing novedades
         const updatedNovedades = await loadNovedades(employeeId);
         setExistingNovedades(updatedNovedades);
+        
+        // ✅ Notificar cambio para recálculo automático
+        console.log('🔄 Notificando cambio para recálculo...');
+        if (onNovedadChange) {
+          await onNovedadChange();
+        }
+        
+        console.log('✅ Novedad eliminada y recálculo completado');
       } catch (error) {
-        console.error('Error deleting novedad:', error);
+        console.error('❌ Error deleting novedad:', error);
       }
     }
   };
