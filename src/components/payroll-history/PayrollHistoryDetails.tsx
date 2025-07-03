@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -37,6 +36,7 @@ export const PayrollHistoryDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showEditWizard, setShowEditWizard] = useState(false);
   const [showReopenDialog, setShowReopenDialog] = useState(false);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState<string | null>(null);
 
   const {
     isReopening,
@@ -131,6 +131,79 @@ export const PayrollHistoryDetails: React.FC = () => {
       title: "Período procesado",
       description: "Los cambios se han aplicado correctamente"
     });
+  };
+
+  const handleDownloadEmployeePDF = async (employee: any) => {
+    if (!details?.period || !employee.payroll_id) return;
+    
+    try {
+      setIsDownloadingPDF(employee.id);
+      console.log('🔄 Descargando PDF para empleado:', employee.nombre);
+      
+      // Preparar datos para el PDF
+      const pdfData = {
+        employee: {
+          id: employee.id,
+          name: `${employee.nombre} ${employee.apellido}`,
+          position: employee.cargo,
+          baseSalary: employee.salario_base,
+          grossPay: employee.total_devengado,
+          deductions: employee.total_deducciones,
+          netPay: employee.neto_pagado,
+          workedDays: 30, // Valor por defecto
+          extraHours: 0,
+          bonuses: 0,
+          transportAllowance: 0,
+          payrollId: employee.payroll_id
+        },
+        period: {
+          startDate: details.period.startDate,
+          endDate: details.period.endDate,
+          type: details.period.type
+        },
+        company: {
+          razon_social: 'Mi Empresa', // Valor por defecto
+          nit: 'N/A',
+          direccion: '',
+          telefono: '',
+          email: ''
+        }
+      };
+
+      // Llamar a la edge function para generar el PDF
+      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+        body: pdfData
+      });
+
+      if (error) {
+        console.error('❌ Error generando PDF:', error);
+        throw new Error(error.message || 'Error generando PDF');
+      }
+
+      if (data?.pdfUrl) {
+        // Descargar el PDF
+        const link = document.createElement('a');
+        link.href = data.pdfUrl;
+        link.download = `comprobante_${employee.nombre}_${employee.apellido}_${details.period.period}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast({
+          title: "PDF descargado",
+          description: `Comprobante de ${employee.nombre} ${employee.apellido} generado exitosamente`
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Error descargando PDF:', error);
+      toast({
+        title: "Error al generar PDF",
+        description: error.message || "No se pudo generar el comprobante de pago",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDownloadingPDF(null);
+    }
   };
 
   if (isLoading) {
@@ -354,7 +427,9 @@ export const PayrollHistoryDetails: React.FC = () => {
               novedades={{}}
               onAddNovedad={() => {}}
               onEditNovedad={() => {}}
+              onDownloadPDF={handleDownloadEmployeePDF}
               canEdit={period.editable}
+              isDownloadingPDF={isDownloadingPDF}
             />
           </CardContent>
         </Card>
