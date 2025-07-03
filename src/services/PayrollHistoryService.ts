@@ -242,7 +242,7 @@ export class PayrollHistoryService {
   }
 
   /**
-   * NUEVA FUNCIÓN: Corregir datos específicos de un período
+   * NUEVA FUNCIÓN: Corregir datos específicos de un período usando SQL directo
    */
   static async fixSpecificPeriodData(periodId: string): Promise<{ success: boolean; message: string; details?: any }> {
     try {
@@ -256,25 +256,109 @@ export class PayrollHistoryService {
 
       console.log('🔧 Corrigiendo datos específicos del período:', periodId);
 
-      // Llamar a la función de base de datos para corregir el período
-      const { data: result, error } = await supabase.rpc('fix_specific_period_data', {
-        p_period_id: periodId
-      });
+      // Usar SQL directo ya que la función aún no existe en los tipos
+      const { data: result, error } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .eq('company_id', companyId)
+        .single();
 
       if (error) {
-        console.error('❌ Error corrigiendo período específico:', error);
+        console.error('❌ Error obteniendo período:', error);
         return {
           success: false,
-          message: `Error corrigiendo período: ${error.message}`
+          message: `Error obteniendo período: ${error.message}`
         };
       }
 
-      console.log('✅ Corrección completada:', result);
+      if (!result) {
+        return {
+          success: false,
+          message: 'Período no encontrado'
+        };
+      }
+
+      // Calcular días reales del período
+      const periodDays = this.calculatePeriodDays(result.fecha_inicio, result.fecha_fin);
+      
+      // Obtener empleados y sus payrolls para este período
+      const { data: payrolls, error: payrollsError } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees (
+            salario_base
+          )
+        `)
+        .eq('company_id', companyId)
+        .or(`period_id.eq.${periodId},periodo.eq.${result.periodo}`);
+
+      if (payrollsError) {
+        console.error('❌ Error obteniendo payrolls:', payrollsError);
+        return {
+          success: false,
+          message: 'Error obteniendo registros de nómina'
+        };
+      }
+
+      let recordsUpdated = 0;
+
+      // Actualizar cada payroll con valores corregidos
+      for (const payroll of payrolls || []) {
+        const baseSalary = Number(payroll.employees?.salario_base || payroll.salario_base || 0);
+        const proportionalSalary = (baseSalary / 30.0) * periodDays;
+        const proportionalDeductions = proportionalSalary * 0.08;
+        const proportionalNet = proportionalSalary - proportionalDeductions;
+
+        const { error: updateError } = await supabase
+          .from('payrolls')
+          .update({
+            dias_trabajados: periodDays,
+            total_devengado: proportionalSalary,
+            total_deducciones: proportionalDeductions,
+            neto_pagado: proportionalNet,
+            period_id: periodId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', payroll.id);
+
+        if (!updateError) {
+          recordsUpdated++;
+        }
+      }
+
+      // Actualizar totales del período
+      const { data: updatedPayrolls } = await supabase
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado')
+        .eq('period_id', periodId);
+
+      if (updatedPayrolls) {
+        const totals = updatedPayrolls.reduce((acc, p) => ({
+          totalDevengado: acc.totalDevengado + Number(p.total_devengado || 0),
+          totalDeducciones: acc.totalDeducciones + Number(p.total_deducciones || 0),
+          totalNeto: acc.totalNeto + Number(p.neto_pagado || 0)
+        }), { totalDevengado: 0, totalDeducciones: 0, totalNeto: 0 });
+
+        await supabase
+          .from('payroll_periods_real')
+          .update({
+            empleados_count: updatedPayrolls.length,
+            total_devengado: totals.totalDevengado,
+            total_deducciones: totals.totalDeducciones,
+            total_neto: totals.totalNeto,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', periodId);
+      }
+
+      console.log('✅ Corrección completada:', { recordsUpdated, periodDays });
       
       return {
-        success: result?.success || true,
-        message: result?.message || 'Período corregido exitosamente',
-        details: result
+        success: true,
+        message: `Período corregido: ${recordsUpdated} registros actualizados con ${periodDays} días`,
+        details: { records_updated: recordsUpdated, period_days: periodDays }
       };
 
     } catch (error) {
@@ -308,7 +392,7 @@ export class PayrollHistoryService {
         return {
           success: true,
           message: fixResult.message,
-          records_created: fixResult.details?.records_created || 0
+          records_created: fixResult.details?.records_updated || 0
         };
       }
 
