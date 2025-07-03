@@ -24,7 +24,7 @@ export const usePayrollLiquidationRobust = () => {
   });
   const { toast } = useToast();
 
-  // Inicialización robusta con diagnóstico
+  // **CORRECCIÓN PROFESIONAL**: Inicialización robusta con diagnóstico
   const initializeWithDiagnosis = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -42,7 +42,7 @@ export const usePayrollLiquidationRobust = () => {
         await loadEmployeesForPeriod(status.currentPeriod);
       }
       
-      // Mostrar diagnóstico en consola si está disponible
+      // **CORRECCIÓN PROFESIONAL**: Mostrar diagnóstico en consola si está disponible
       if (status.diagnostic) {
         console.log('🔍 DIAGNÓSTICO DETALLADO:');
         console.log('- Total períodos:', status.diagnostic.totalPeriods);
@@ -190,21 +190,50 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, [toast]);
 
+  // **CORRECCIÓN PROFESIONAL**: Función de refresh que ejecuta auto-corrección
+  const refreshDiagnosis = useCallback(async () => {
+    try {
+      setIsProcessing(true);
+      console.log('🔄 REFRESH CON AUTO-CORRECCIÓN...');
+      
+      // **CORRECCIÓN PROFESIONAL**: Re-ejecutar detección completa que incluye auto-corrección
+      await initializeWithDiagnosis();
+      
+      toast({
+        title: "🔄 Diagnóstico Actualizado",
+        description: "Estado actualizado con auto-correcciones aplicadas",
+        className: "border-blue-200 bg-blue-50"
+      });
+      
+    } catch (error) {
+      console.error('❌ Error en refresh de diagnóstico:', error);
+      toast({
+        title: "Error",
+        description: "Error actualizando diagnóstico",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [initializeWithDiagnosis, toast]);
+
   // Inicializar al montar
   useEffect(() => {
     initializeWithDiagnosis();
   }, [initializeWithDiagnosis]);
 
-  // Debug logging para monitorear cambios de estado
+  // **CORRECCIÓN PROFESIONAL**: Debug logging mejorado para monitorear cambios de estado
   useEffect(() => {
     console.log('🔄 usePayrollLiquidationRobust - Estado actualizado:', {
       isLoading,
       isProcessing,
       employeesCount: employees.length,
       currentPeriodId: currentPeriod?.id,
+      currentPeriodState: currentPeriod?.estado,
       periodStatus: periodStatus?.action,
       summaryTotalEmployees: summary.totalEmployees,
-      hasActivePeriod: periodStatus?.hasActivePeriod
+      hasActivePeriod: periodStatus?.hasActivePeriod,
+      correctionMessage: periodStatus?.message
     });
   }, [isLoading, isProcessing, employees.length, currentPeriod, periodStatus, summary.totalEmployees]);
 
@@ -221,7 +250,7 @@ export const usePayrollLiquidationRobust = () => {
     // Acciones principales
     createSuggestedPeriod,
     runManualDiagnosis,
-    refreshDiagnosis: initializeWithDiagnosis,
+    refreshDiagnosis, // **CORRECCIÓN PROFESIONAL**: Función mejorada con auto-corrección
     
     // Estados calculados
     canCreatePeriod: periodStatus?.action === 'create' && periodStatus?.nextPeriod,
