@@ -6,11 +6,11 @@ import { Calendar, CheckCircle, AlertCircle, Edit, Save, X, Users, DollarSign, L
 import { PayrollPeriod } from '@/types/payroll';
 import { PayrollPeriodService } from '@/services/PayrollPeriodService';
 import { Input } from '@/components/ui/input';
-import { PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
+import { UnifiedPeriodStatus } from '@/types/period-unified';
 
 interface PayrollPeriodHeaderProps {
   period: PayrollPeriod | null;
-  periodStatus: PeriodStatus | null;
+  periodStatus: UnifiedPeriodStatus | null;
   onCreateNewPeriod: () => Promise<void>;
   onRefreshPeriod: (retryCount?: number) => Promise<void>;
   canClosePeriod?: boolean;
@@ -56,7 +56,8 @@ export const PayrollPeriodHeader = ({
   selectedCount = 0,
   totalCount = 0
 }: PayrollPeriodHeaderProps) => {
-  if (!period && periodStatus?.action === 'suggest_next') {
+  // Handle suggest_next action (which includes diagnose and emergency)
+  if (!period && (periodStatus?.action === 'suggest_next' || periodStatus?.action === 'create')) {
     return (
       <div className="px-6 py-6 bg-blue-50 border-b">
         <div className="flex items-center justify-between">
@@ -68,15 +69,17 @@ export const PayrollPeriodHeader = ({
             <Button
               onClick={onCreateNewPeriod}
               className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isProcessing}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Crear Período
+              {isProcessing ? 'Creando...' : 'Crear Período'}
             </Button>
             <Button
               onClick={() => onRefreshPeriod()}
               variant="outline"
+              disabled={isProcessing}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-spin' : ''}`} />
               Actualizar
             </Button>
           </div>
@@ -124,7 +127,7 @@ export const PayrollPeriodHeader = ({
               onClick={onRecalculateAll}
               disabled={isProcessing}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-spin' : ''}`} />
               Recalcular todos
             </Button>
           )}

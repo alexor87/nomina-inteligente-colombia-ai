@@ -5,7 +5,6 @@ import { PayrollSummaryPanel } from './liquidation/PayrollSummaryPanel';
 import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePayrollLiquidationRobust } from '@/hooks/usePayrollLiquidationRobust';
-import { PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
 
 export const PayrollLiquidationNew = () => {
   const {
@@ -15,7 +14,7 @@ export const PayrollLiquidationNew = () => {
     employees,
     selectedEmployees,
     summary,
-    periodStatus: robustPeriodStatus,
+    periodStatus,
     removeEmployeeFromPeriod,
     createNovedadForEmployee,
     recalculateAfterNovedadChange,
@@ -29,18 +28,6 @@ export const PayrollLiquidationNew = () => {
     isValidPeriod,
     hasEmployees
   } = usePayrollLiquidationRobust();
-
-  // Mapear RobustPeriodStatus a PeriodStatus para compatibilidad con UI existente
-  const periodStatus: PeriodStatus | null = robustPeriodStatus ? {
-    hasActivePeriod: robustPeriodStatus.hasActivePeriod,
-    currentPeriod: robustPeriodStatus.currentPeriod,
-    nextPeriod: robustPeriodStatus.nextPeriod,
-    // Mapear acciones del sistema robusto a acciones esperadas por UI
-    action: robustPeriodStatus.action === 'diagnose' || robustPeriodStatus.action === 'emergency' 
-      ? 'suggest_next' as const
-      : robustPeriodStatus.action as 'resume' | 'create',
-    message: robustPeriodStatus.message
-  } : null;
 
   if (isLoading) {
     return (
