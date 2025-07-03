@@ -1519,6 +1519,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      clean_specific_duplicate_periods: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
       create_company_with_setup: {
         Args: {
           p_nit: string
@@ -1533,6 +1537,14 @@ export type Database = {
           p_last_name?: string
         }
         Returns: string
+      }
+      detect_smart_current_period: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
+      diagnose_duplicate_periods: {
+        Args: { p_company_id?: string }
+        Returns: Json
       }
       ensure_admin_role_for_company_users: {
         Args: Record<PropertyKey, never>

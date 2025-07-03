@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollPeriodDuplicateService } from '../PayrollPeriodDuplicateService';
-import { addDays, format, startOfMonth, endOfMonth, addMonths, subDays } from 'date-fns';
+import { SmartPeriodDetectionService, SmartPeriodDetectionResult } from './SmartPeriodDetectionService';
 
 export interface EnhancedPeriodDetectionResult {
   hasActivePeriod: boolean;
@@ -24,9 +24,14 @@ export class PayrollPeriodDetectionEnhanced {
    */
   static async detectCurrentPeriodStatus(): Promise<EnhancedPeriodDetectionResult> {
     try {
-      console.log('🔍 Starting enhanced period detection...');
+      console.log('🔍 Starting enhanced period detection with smart logic...');
 
-      // PASO 1: Diagnosticar y limpiar duplicados automáticamente
+      // PASO 1: Usar el nuevo servicio inteligente
+      const smartResult: SmartPeriodDetectionResult = await SmartPeriodDetectionService.detectCurrentPeriod();
+      
+      console.log('🎯 Smart detection result:', smartResult);
+
+      // PASO 2: Diagnosticar y limpiar duplicados si es necesario
       const diagnosis = await PayrollPeriodDuplicateService.diagnoseDuplicatePeriods();
       let cleanupResult = null;
 
@@ -36,61 +41,31 @@ export class PayrollPeriodDetectionEnhanced {
         console.log('✅ Duplicates cleaned:', cleanupResult);
       }
 
-      // PASO 2: Obtener períodos actuales después de la limpieza
-      const { data: periods, error } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .order('fecha_fin', { ascending: false })
-        .limit(10);
-
-      if (error) {
-        console.error('❌ Error fetching periods:', error);
-        throw error;
-      }
-
-      console.log('📊 Periods after cleanup:', periods);
-
-      // PASO 3: Buscar período activo (borrador o en_proceso)
-      const activePeriod = periods?.find(p => ['borrador', 'en_proceso'].includes(p.estado));
-
-      if (activePeriod) {
-        console.log('✅ Active period found:', activePeriod);
+      // PASO 3: Analizar resultado del sistema inteligente
+      if (smartResult.action === 'resume' && smartResult.existingPeriod) {
         return {
           hasActivePeriod: true,
-          currentPeriod: activePeriod,
+          currentPeriod: smartResult.existingPeriod,
           action: 'resume',
-          message: `Continuar con el período ${activePeriod.periodo}`,
+          message: `Continuar con el período ${smartResult.existingPeriod.periodo}`,
           duplicatesFound: diagnosis.duplicates_found,
           cleanupResult
         };
       }
 
-      // PASO 4: Determinar siguiente período basado en el último cerrado
-      const lastClosedPeriod = periods?.find(p => p.estado === 'cerrado');
-      
-      if (!lastClosedPeriod) {
-        // No hay períodos previos, sugerir el primer período
-        const nextPeriod = this.generateFirstPeriod();
-        return {
-          hasActivePeriod: false,
-          nextPeriod,
-          action: 'create',
-          message: 'Crear el primer período de nómina',
-          duplicatesFound: diagnosis.duplicates_found,
-          cleanupResult
-        };
-      }
-
-      // PASO 5: Generar siguiente período basado en el último cerrado
-      const nextPeriod = this.generateNextPeriod(lastClosedPeriod);
-      
-      console.log('🎯 Next period suggested:', nextPeriod);
+      // PASO 4: Sugerir creación del período inteligente
+      const nextPeriod = {
+        startDate: smartResult.suggestedPeriod.startDate,
+        endDate: smartResult.suggestedPeriod.endDate,
+        type: smartResult.suggestedPeriod.type,
+        period: smartResult.suggestedPeriod.periodName
+      };
 
       return {
         hasActivePeriod: false,
         nextPeriod,
         action: 'create',
-        message: `Crear nuevo período: ${nextPeriod.period}`,
+        message: `Crear período inteligente: ${smartResult.suggestedPeriod.periodName}`,
         duplicatesFound: diagnosis.duplicates_found,
         cleanupResult
       };
@@ -107,56 +82,9 @@ export class PayrollPeriodDetectionEnhanced {
   }
 
   /**
-   * Genera el primer período quincenal del mes actual
-   */
-  private static generateFirstPeriod() {
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endDate = new Date(now.getFullYear(), now.getMonth(), 15);
-
-    return {
-      startDate: format(startDate, 'yyyy-MM-dd'),
-      endDate: format(endDate, 'yyyy-MM-dd'),
-      type: 'quincenal',
-      period: `1 - 15 ${format(now, 'MMMM yyyy')}`
-    };
-  }
-
-  /**
-   * Genera el siguiente período basado en el último período cerrado
-   */
-  private static generateNextPeriod(lastPeriod: any) {
-    const lastEndDate = new Date(lastPeriod.fecha_fin);
-    const nextStartDate = addDays(lastEndDate, 1);
-    
-    // Determinar si es primera o segunda quincena
-    const dayOfMonth = nextStartDate.getDate();
-    
-    if (dayOfMonth === 1) {
-      // Primera quincena del mes
-      const endDate = new Date(nextStartDate.getFullYear(), nextStartDate.getMonth(), 15);
-      return {
-        startDate: format(nextStartDate, 'yyyy-MM-dd'),
-        endDate: format(endDate, 'yyyy-MM-dd'),
-        type: 'quincenal',
-        period: `1 - 15 ${format(nextStartDate, 'MMMM yyyy')}`
-      };
-    } else {
-      // Segunda quincena del mes
-      const endDate = endOfMonth(nextStartDate);
-      return {
-        startDate: format(nextStartDate, 'yyyy-MM-dd'),
-        endDate: format(endDate, 'yyyy-MM-dd'),
-        type: 'quincenal',
-        period: `16 - ${endDate.getDate()} ${format(nextStartDate, 'MMMM yyyy')}`
-      };
-    }
-  }
-
-  /**
-   * Valida que un nuevo período no cause duplicados
+   * Valida que un nuevo período no cause duplicados usando el sistema inteligente
    */
   static async validatePeriodCreation(periodo: string, fechaInicio: string, fechaFin: string): Promise<boolean> {
-    return await PayrollPeriodDuplicateService.validateNewPeriod(periodo, fechaInicio, fechaFin);
+    return await SmartPeriodDetectionService.validatePeriodCreation(periodo, fechaInicio, fechaFin);
   }
 }

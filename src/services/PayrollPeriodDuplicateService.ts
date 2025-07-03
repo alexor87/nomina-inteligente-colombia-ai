@@ -27,15 +27,24 @@ export class PayrollPeriodDuplicateService {
    */
   static async diagnoseDuplicatePeriods(): Promise<DuplicatePeriodDiagnosis> {
     try {
-      const { data, error } = await supabase.rpc('diagnose_duplicate_periods');
+      // Use the correct RPC function name from the database
+      const result = await supabase.rpc('diagnose_duplicate_periods');
       
-      if (error) {
-        console.error('❌ Error diagnosing duplicate periods:', error);
-        throw error;
+      if (result.error) {
+        console.error('❌ Error diagnosing duplicate periods:', result.error);
+        throw result.error;
       }
       
-      console.log('🔍 Diagnosis result:', data);
-      return data;
+      console.log('🔍 Diagnosis result:', result.data);
+      
+      // Parse the JSON response to match our interface
+      const data = result.data as any;
+      return {
+        success: data.success || false,
+        duplicates_found: data.duplicates_found || 0,
+        company_id: data.company_id || '',
+        duplicate_periods: data.duplicate_periods || []
+      };
     } catch (error) {
       console.error('❌ Error in diagnoseDuplicatePeriods:', error);
       throw error;
@@ -47,15 +56,24 @@ export class PayrollPeriodDuplicateService {
    */
   static async cleanSpecificDuplicatePeriods(): Promise<DuplicateCleanupResult> {
     try {
-      const { data, error } = await supabase.rpc('clean_specific_duplicate_periods');
+      // Use the correct RPC function name from the database
+      const result = await supabase.rpc('clean_specific_duplicate_periods');
       
-      if (error) {
-        console.error('❌ Error cleaning duplicate periods:', error);
-        throw error;
+      if (result.error) {
+        console.error('❌ Error cleaning duplicate periods:', result.error);
+        throw result.error;
       }
       
-      console.log('🧹 Cleanup result:', data);
-      return data;
+      console.log('🧹 Cleanup result:', result.data);
+      
+      // Parse the JSON response to match our interface
+      const data = result.data as any;
+      return {
+        success: data.success || false,
+        periods_deleted: data.periods_deleted || 0,
+        payrolls_updated: data.payrolls_updated || 0,
+        company_id: data.company_id || ''
+      };
     } catch (error) {
       console.error('❌ Error in cleanSpecificDuplicatePeriods:', error);
       throw error;
@@ -67,10 +85,24 @@ export class PayrollPeriodDuplicateService {
    */
   static async validateNewPeriod(periodo: string, fechaInicio: string, fechaFin: string): Promise<boolean> {
     try {
+      // Get current user's company ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      const companyId = profile?.company_id;
+      if (!companyId) return false;
+
       // Verificar duplicados por nombre
       const { data: existingByName, error: nameError } = await supabase
         .from('payroll_periods_real')
         .select('id, periodo, estado')
+        .eq('company_id', companyId)
         .eq('periodo', periodo);
 
       if (nameError) {
@@ -87,6 +119,7 @@ export class PayrollPeriodDuplicateService {
       const { data: overlapping, error: dateError } = await supabase
         .from('payroll_periods_real')
         .select('id, periodo, fecha_inicio, fecha_fin')
+        .eq('company_id', companyId)
         .or(
           `and(fecha_inicio.lte.${fechaInicio},fecha_fin.gte.${fechaInicio}),` +
           `and(fecha_inicio.lte.${fechaFin},fecha_fin.gte.${fechaFin}),` +
