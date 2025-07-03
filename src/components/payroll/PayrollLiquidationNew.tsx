@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,9 +12,7 @@ import {
   CheckCircle, 
   RefreshCw,
   AlertCircle,
-  TrendingUp,
-  Wrench,
-  FileText
+  TrendingUp
 } from 'lucide-react';
 import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
 import { usePeriodValidation } from '@/hooks/usePeriodValidation';
@@ -50,30 +49,6 @@ export const PayrollLiquidationNew = () => {
   const handleRefreshPeriod = () => refreshPeriod(0);
   const handleRetryInitialization = () => refreshPeriod(0);
   const handleForceRefresh = () => refreshPeriod(0);
-
-  // Función para ejecutar corrección integral CON REFRESH AUTOMÁTICO
-  const handlePeriodCorrection = async () => {
-    if (!currentPeriod?.company_id) return;
-    
-    await executeIntegralCorrection(currentPeriod.company_id);
-    
-    // Refrescar automáticamente los datos después de la corrección
-    setTimeout(() => {
-      refreshPeriod(0);
-    }, 1000);
-  };
-
-  // NUEVA: Función para corregir SOLO nombres
-  const handleNameOnlyCorrection = async () => {
-    if (!currentPeriod?.company_id) return;
-    
-    await executeNameOnlyCorrection(currentPeriod.company_id);
-    
-    // Refrescar automáticamente los datos después de la corrección
-    setTimeout(() => {
-      refreshPeriod(0);
-    }, 1000);
-  };
 
   // Loading inicial
   if (isLoading) {
@@ -250,28 +225,6 @@ export const PayrollLiquidationNew = () => {
               Recalcular Todo
             </Button>
 
-            {/* NUEVO: Botón de Corrección SOLO de Nombres */}
-            <Button
-              variant="outline"
-              onClick={handleNameOnlyCorrection}
-              disabled={isValidating || !currentPeriod}
-              className="border-blue-200 text-blue-700 hover:bg-blue-50"
-            >
-              <FileText className={`h-4 w-4 mr-2 ${isValidating ? 'animate-spin' : ''}`} />
-              {isValidating ? 'Corrigiendo...' : 'Corregir Nombres'}
-            </Button>
-
-            {/* Botón de Corrección Integral */}
-            <Button
-              variant="outline"
-              onClick={handlePeriodCorrection}
-              disabled={isValidating || !currentPeriod}
-              className="border-orange-200 text-orange-700 hover:bg-orange-50"
-            >
-              <Wrench className={`h-4 w-4 mr-2 ${isValidating ? 'animate-spin' : ''}`} />
-              {isValidating ? 'Corrigiendo...' : 'Corrección Integral'}
-            </Button>
-
             {canClosePeriod && (
               <Button
                 onClick={closePeriod}
@@ -294,9 +247,6 @@ export const PayrollLiquidationNew = () => {
                   <Calendar className="h-6 w-6 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    {currentPeriod.periodo}
-                  </h3>
                   <p className="text-gray-600">
                     {currentPeriod.fecha_inicio} - {currentPeriod.fecha_fin}
                   </p>
@@ -378,7 +328,7 @@ export const PayrollLiquidationNew = () => {
           <Card className="p-4 bg-green-50 border-green-200">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-green-100 rounded-full">
-                <FileText className="h-4 w-4 text-green-600 animate-pulse" />
+                <CheckCircle className="h-4 w-4 text-green-600 animate-pulse" />
               </div>
               <div>
                 <p className="text-green-800 font-medium">Corrección en Proceso</p>
