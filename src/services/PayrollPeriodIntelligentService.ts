@@ -42,13 +42,13 @@ export interface PeriodStatus {
 
 export class PayrollPeriodIntelligentService {
   /**
-   * NUEVA ARQUITECTURA PROFESIONAL - DETECCIÓN UNIFICADA
-   * Eliminada dependencia de PostClosureDetectionService
-   * Usa únicamente PayrollPeriodCalculationService con Strategy pattern
+   * NUEVA ARQUITECTURA PROFESIONAL - DETECCIÓN CON PRIORIDAD DE PERÍODO ACTUAL
+   * Primero busca/crea período actual basado en fecha de hoy
+   * Solo como fallback usa la lógica de "siguiente período"
    */
   static async detectCurrentPeriod(): Promise<PeriodStatus> {
     try {
-      console.log('🔍 INICIANDO DETECCIÓN CON ARQUITECTURA UNIFICADA...');
+      console.log('🔍 INICIANDO DETECCIÓN CON PRIORIDAD DE PERÍODO ACTUAL...');
       
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
@@ -76,50 +76,130 @@ export class PayrollPeriodIntelligentService {
         };
       }
 
-      console.log('📋 No hay período activo, buscando último período cerrado...');
+      console.log('📅 No hay período activo, detectando período ACTUAL basado en fecha de hoy...');
 
-      // PASO 3: BUSCAR ÚLTIMO PERÍODO CERRADO
-      const lastClosedPeriod = await this.findLastClosedPeriodRobust(companyId);
+      // PASO 3: NUEVO - DETECTAR PERÍODO ACTUAL BASADO EN FECHA DE HOY
+      const currentPeriodDates = await this.generateCurrentPeriodDates(periodicity);
+      console.log('📊 Fechas del período actual calculadas:', currentPeriodDates);
+
+      // Verificar si ya existe un período que coincida con las fechas actuales
+      const existingCurrentPeriod = await this.findPeriodByDates(companyId, currentPeriodDates.startDate, currentPeriodDates.endDate);
       
-      if (lastClosedPeriod) {
-        console.log('🔒 Último período cerrado encontrado:', lastClosedPeriod.periodo);
+      if (existingCurrentPeriod) {
+        console.log('✅ Período actual existente encontrado:', existingCurrentPeriod.periodo);
         
-        // USAR ARQUITECTURA UNIFICADA DIRECTAMENTE
-        const nextPeriodDates = await PayrollPeriodCalculationService.calculateNextPeriodFromDatabase(
-          periodicity, 
-          companyId
-        );
-
-        return {
-          hasActivePeriod: false,
-          nextPeriod: {
-            startDate: nextPeriodDates.startDate,
-            endDate: nextPeriodDates.endDate,
-            type: periodicity
-          },
-          action: 'suggest_next',
-          message: `Listo para crear siguiente período: ${nextPeriodDates.startDate} - ${nextPeriodDates.endDate}`
-        };
+        if (existingCurrentPeriod.estado === 'borrador') {
+          return {
+            hasActivePeriod: true,
+            currentPeriod: existingCurrentPeriod,
+            action: 'resume',
+            message: `Continuando con el período actual ${existingCurrentPeriod.periodo}`
+          };
+        } else {
+          // Si el período actual ya está cerrado, buscar el siguiente
+          console.log('📋 Período actual ya cerrado, buscando siguiente...');
+          return await this.handleClosedCurrentPeriod(companyId, periodicity, existingCurrentPeriod);
+        }
       }
 
-      // PASO 4: Si no hay períodos previos, crear el primer período
-      console.log('🆕 No hay períodos previos, creando primer período...');
-      const firstPeriodDates = await PayrollPeriodCalculationService.calculateNextPeriodFromDatabase(
-        periodicity, 
-        companyId
-      );
-      
-      const newPeriod = await this.createAutomaticPeriod(companyId, firstPeriodDates, periodicity);
+      // PASO 4: Si no existe período actual, crearlo automáticamente
+      console.log('🆕 Creando período actual automáticamente...');
+      const newCurrentPeriod = await this.createAutomaticPeriod(companyId, currentPeriodDates, periodicity);
       
       return {
         hasActivePeriod: true,
-        currentPeriod: newPeriod,
+        currentPeriod: newCurrentPeriod,
         action: 'create',
-        message: `Primer período creado: ${newPeriod.periodo}`
+        message: `Período actual creado: ${newCurrentPeriod.periodo}`
       };
 
     } catch (error) {
       console.error('❌ ERROR CRÍTICO EN DETECCIÓN:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * NUEVO: Generar fechas del período actual basado en la fecha de hoy
+   */
+  static async generateCurrentPeriodDates(periodicity: string): Promise<{ startDate: string; endDate: string }> {
+    try {
+      const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
+      const strategy = PeriodStrategyFactory.createStrategy(periodicity);
+      
+      const currentPeriod = strategy.generateCurrentPeriod();
+      console.log('📅 Período actual generado:', currentPeriod);
+      
+      return currentPeriod;
+    } catch (error) {
+      console.error('❌ Error generando período actual:', error);
+      // Fallback: usar lógica de primer período
+      const { PeriodStrategyFactory } = await import('./payroll-intelligent/PeriodGenerationStrategy');
+      const strategy = PeriodStrategyFactory.createStrategy(periodicity);
+      return strategy.generateFirstPeriod();
+    }
+  }
+
+  /**
+   * NUEVO: Buscar período por fechas exactas
+   */
+  static async findPeriodByDates(companyId: string, startDate: string, endDate: string): Promise<PayrollPeriod | null> {
+    try {
+      console.log('🔍 Buscando período por fechas exactas:', startDate, '-', endDate);
+      
+      const { data, error } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('fecha_inicio', startDate)
+        .eq('fecha_fin', endDate)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ Error buscando período por fechas:', error);
+        return null;
+      }
+      
+      if (data) {
+        console.log('✅ Período encontrado por fechas:', data.periodo);
+      } else {
+        console.log('ℹ️ No se encontró período para las fechas especificadas');
+      }
+      
+      return data as PayrollPeriod;
+    } catch (error) {
+      console.error('❌ Error en búsqueda por fechas:', error);
+      return null;
+    }
+  }
+
+  /**
+   * NUEVO: Manejar cuando el período actual ya está cerrado
+   */
+  static async handleClosedCurrentPeriod(companyId: string, periodicity: string, closedPeriod: PayrollPeriod): Promise<PeriodStatus> {
+    try {
+      console.log('🔒 Manejando período actual cerrado, calculando siguiente...');
+      
+      // Calcular siguiente período basado en el período actual cerrado
+      const nextPeriodDates = await PayrollPeriodCalculationService.calculateNextPeriodFromDatabase(
+        periodicity, 
+        companyId
+      );
+
+      return {
+        hasActivePeriod: false,
+        nextPeriod: {
+          startDate: nextPeriodDates.startDate,
+          endDate: nextPeriodDates.endDate,
+          type: periodicity
+        },
+        action: 'suggest_next',
+        message: `Período actual (${closedPeriod.periodo}) ya cerrado. Listo para crear siguiente: ${nextPeriodDates.startDate} - ${nextPeriodDates.endDate}`
+      };
+    } catch (error) {
+      console.error('❌ Error manejando período cerrado:', error);
       throw error;
     }
   }
