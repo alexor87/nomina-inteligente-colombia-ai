@@ -1,4 +1,3 @@
-
 /**
  * Servicio de cálculo de deducciones según normativa colombiana
  * Incluye cálculo correcto de IBC, retención en la fuente y novedades
@@ -11,7 +10,7 @@ export interface DeductionInput {
   salarioBase: number;
   totalDevengado: number;
   auxilioTransporte: number;
-  periodType: 'quincenal' | 'mensual';
+  periodType: 'quincenal' | 'mensual' | 'semanal';
   empleadoId?: string;
   periodoId?: string;
 }
@@ -127,6 +126,7 @@ export class DeductionCalculationService {
     const config = ConfigurationService.getConfiguration('2025');
     
     // 1. Calcular IBC (Ingreso Base de Cotización)
+    // NOTE: IBC calculation is independent of period type
     const baseIbc = input.totalDevengado; // No incluir auxilio de transporte para IBC
     const topeIbc = config.salarioMinimo * 25; // Tope de 25 SMMLV
     const ibcFinal = Math.min(baseIbc, topeIbc);
