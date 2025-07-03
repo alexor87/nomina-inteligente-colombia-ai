@@ -265,7 +265,18 @@ export const PayrollHistoryDetails: React.FC = () => {
           </CardHeader>
           <CardContent>
             <PeriodEmployeesTable 
-              employees={employees} 
+              employees={employees.map(emp => ({
+                id: emp.id,
+                nombre: emp.name.split(' ')[0] || '',
+                apellido: emp.name.split(' ').slice(1).join(' ') || '',
+                cargo: emp.position,
+                salario_base: emp.baseSalary,
+                total_devengado: emp.grossPay,
+                total_deducciones: emp.deductions,
+                neto_pagado: emp.netPay,
+                payroll_id: emp.payrollId,
+                estado: 'procesada'
+              }))} 
               isEditable={period.editable}
             />
           </CardContent>
@@ -277,7 +288,8 @@ export const PayrollHistoryDetails: React.FC = () => {
         <EditWizard
           isOpen={showEditWizard}
           onClose={() => setShowEditWizard(false)}
-          period={period}
+          onConfirm={async () => {}}
+          isProcessing={false}
         />
       )}
 
@@ -286,8 +298,8 @@ export const PayrollHistoryDetails: React.FC = () => {
           isOpen={showReopenDialog}
           onClose={() => setShowReopenDialog(false)}
           onConfirm={handleReopen}
-          periodName={period.period}
-          isLoading={isReopening}
+          period={period}
+          isProcessing={isReopening}
         />
       )}
     </div>

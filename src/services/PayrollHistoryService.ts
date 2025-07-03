@@ -17,6 +17,12 @@ export interface PayrollHistoryRecord {
   reportado_dian: boolean;
 }
 
+interface RegenerateResult {
+  success: boolean;
+  message: string;
+  records_created?: number;
+}
+
 export class PayrollHistoryService {
   static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
@@ -373,7 +379,7 @@ export class PayrollHistoryService {
     }
   }
 
-  static async regenerateHistoricalData(periodId: string): Promise<{ success: boolean; message: string; employeesCreated?: number }> {
+  static async regenerateHistoricalData(periodId: string): Promise<RegenerateResult> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('No company ID found');
@@ -395,10 +401,19 @@ export class PayrollHistoryService {
 
       console.log('✅ Regeneración completada:', result);
       
+      // Type guard to safely access properties
+      if (result && typeof result === 'object' && 'success' in result) {
+        const typedResult = result as any;
+        return {
+          success: typedResult.success,
+          message: typedResult.message,
+          employeesCreated: typedResult.records_created
+        };
+      }
+
       return {
-        success: result.success,
-        message: result.message,
-        employeesCreated: result.records_created
+        success: false,
+        message: 'Error regenerando datos históricos'
       };
 
     } catch (error) {
