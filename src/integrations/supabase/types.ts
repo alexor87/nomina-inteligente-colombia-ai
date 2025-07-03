@@ -1523,6 +1523,10 @@ export type Database = {
         Args: { p_company_id?: string }
         Returns: Json
       }
+      complete_incomplete_registration: {
+        Args: { p_user_email: string; p_company_name?: string; p_nit?: string }
+        Returns: Json
+      }
       create_company_with_setup: {
         Args: {
           p_nit: string

@@ -54,23 +54,37 @@ export const CompanyRegistrationPage = () => {
         last_name: registrationData.last_name,
       });
 
-      // Usar createCompanyWithUser para registro completo
+      // Usar createCompanyWithUser para registro completo con manejo de errores mejorado
       const companyId = await CompanyRegistrationService.createCompanyWithUser(registrationData);
       
       console.log('Company and user created successfully:', companyId);
       
+      // Esperar más tiempo para que se procesen todos los cambios
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
       // Refresh user data to ensure roles and profile are loaded
       await refreshUserData();
+      
+      // Verificar que el usuario esté completamente configurado
+      const { data: { user } } = await CompanyRegistrationService.supabase.auth.getUser();
+      if (user) {
+        const isComplete = await CompanyRegistrationService.verifyRegistrationComplete(user.id);
+        if (!isComplete) {
+          console.warn('⚠️ Registration still not complete after creation');
+          await CompanyRegistrationService.completeIncompleteRegistration(data.userEmail);
+          await refreshUserData();
+        }
+      }
       
       toast({
         title: "¡Bienvenido a NóminaFácil!",
         description: "Tu cuenta y empresa han sido creadas exitosamente. ¡Comienza tu prueba gratuita!",
       });
 
-      // Navigate to dashboard
+      // Navigate to dashboard with longer delay
       setTimeout(() => {
         navigate('/app/dashboard');
-      }, 1500);
+      }, 2000);
       
     } catch (error: any) {
       console.error('Error creating company with user:', error);
@@ -103,6 +117,7 @@ export const CompanyRegistrationPage = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Creando tu cuenta y empresa...</p>
+          <p className="text-sm text-gray-500 mt-2">Esto puede tomar unos momentos</p>
         </div>
       </div>
     );
