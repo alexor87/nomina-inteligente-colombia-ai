@@ -258,6 +258,11 @@ export const usePayrollLiquidationRobust = () => {
     await initializeSystem();
   }, [initializeSystem]);
 
+  // Add the missing refreshDiagnosis function
+  const refreshDiagnosis = useCallback(async () => {
+    await initializeSystem();
+  }, [initializeSystem]);
+
   const createSuggestedPeriod = useCallback(async () => {
     if (!periodStatus?.nextPeriod) return;
     
@@ -368,6 +373,7 @@ export const usePayrollLiquidationRobust = () => {
     // Acciones adicionales
     createSuggestedPeriod,
     runManualDiagnosis,
+    refreshDiagnosis, // Add the missing function
     
     // Estados calculados
     canCreatePeriod: periodStatus?.action === 'create' && periodStatus?.nextPeriod,
