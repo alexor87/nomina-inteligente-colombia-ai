@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
-import { FileText, Download, X, Loader2 } from 'lucide-react';
+import { FileText, Download, X, Loader2, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface VoucherPreviewModalProps {
@@ -25,6 +25,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
   period
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
   const { toast } = useToast();
 
   const handleDownloadVoucher = async () => {
@@ -38,9 +39,10 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     }
 
     setIsGenerating(true);
+    setDownloadSuccess(false);
     
     try {
-      console.log('🚀 INICIANDO DESCARGA PDF ULTRA-SIMPLE para:', employee.name);
+      console.log('🚀 INICIANDO DESCARGA PDF NATIVO para:', employee.name);
       
       const requestBody = {
         employee: {
@@ -66,14 +68,14 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         }
       };
 
-      console.log('📤 Enviando request ultra-simple:', requestBody);
+      console.log('📤 Enviando request al generador nativo:', requestBody);
 
-      // Timeout de 45 segundos para dar tiempo suficiente
+      // Timeout optimizado para el generador nativo
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-        console.error('❌ Timeout en la request');
-      }, 45000);
+        console.error('❌ Timeout en generador nativo');
+      }, 30000); // 30 segundos es suficiente para generador nativo
 
       const response = await fetch(
         'https://xrmolrlkakwujyozgmilf.supabase.co/functions/v1/generate-voucher-pdf',
@@ -90,7 +92,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
       clearTimeout(timeoutId);
 
-      console.log('📊 Response status:', response.status);
+      console.log('📊 Response status del generador nativo:', response.status);
       console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
@@ -100,12 +102,10 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           const errorText = await response.text();
           console.error('❌ Error response:', errorText);
           
-          // Intentar parsear como JSON
           try {
             const errorData = JSON.parse(errorText);
             errorMessage = errorData.error || errorMessage;
           } catch {
-            // Si no es JSON, usar el texto plano
             errorMessage = errorText || errorMessage;
           }
         } catch (textError) {
@@ -115,41 +115,40 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         throw new Error(errorMessage);
       }
 
-      console.log('✅ Response OK, obteniendo ArrayBuffer...');
+      console.log('✅ Response OK del generador nativo, obteniendo ArrayBuffer...');
 
-      // Obtener el ArrayBuffer
       const arrayBuffer = await response.arrayBuffer();
-      console.log('📋 ArrayBuffer recibido, tamaño:', arrayBuffer.byteLength);
+      console.log('📋 ArrayBuffer recibido del generador nativo, tamaño:', arrayBuffer.byteLength);
 
-      // Validación básica del tamaño
+      // Validaciones mejoradas para el generador nativo
       if (arrayBuffer.byteLength === 0) {
-        throw new Error('El PDF recibido está vacío (0 bytes)');
+        throw new Error('El PDF generado está vacío (0 bytes)');
       }
 
-      if (arrayBuffer.byteLength < 1000) {
-        throw new Error(`El PDF recibido es muy pequeño (${arrayBuffer.byteLength} bytes)`);
+      if (arrayBuffer.byteLength < 500) {
+        throw new Error(`El PDF generado es muy pequeño (${arrayBuffer.byteLength} bytes)`);
       }
 
-      // Validación del header PDF
+      // Validación del header PDF nativo
       const uint8Array = new Uint8Array(arrayBuffer);
-      const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 4));
+      const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 5));
       
-      console.log('🔍 Validando header PDF:', pdfHeader);
+      console.log('🔍 Validando header PDF nativo:', pdfHeader);
       
-      if (pdfHeader !== '%PDF') {
-        console.error('❌ Header inválido recibido:', pdfHeader);
+      if (!pdfHeader.startsWith('%PDF-')) {
+        console.error('❌ Header inválido del generador nativo:', pdfHeader);
         console.error('❌ Primeros 20 bytes:', Array.from(uint8Array.slice(0, 20)));
-        throw new Error(`Archivo recibido no es un PDF válido. Header: "${pdfHeader}"`);
+        throw new Error(`Archivo generado no es un PDF válido. Header: "${pdfHeader}"`);
       }
 
-      console.log('✅ PDF VALIDADO CORRECTAMENTE - Header:', pdfHeader, 'Tamaño:', arrayBuffer.byteLength);
+      console.log('✅ PDF NATIVO VALIDADO CORRECTAMENTE - Header:', pdfHeader, 'Tamaño:', arrayBuffer.byteLength);
 
       // Crear blob y descargar
       const blob = new Blob([arrayBuffer], { 
         type: 'application/pdf'
       });
       
-      console.log('📋 Blob creado, tamaño:', blob.size);
+      console.log('📋 Blob creado del PDF nativo, tamaño:', blob.size);
 
       // Crear URL temporal y descargar
       const url = URL.createObjectURL(blob);
@@ -165,39 +164,41 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
       document.body.appendChild(link);
       link.click();
       
-      // Cleanup inmediato
+      // Cleanup
       setTimeout(() => {
         URL.revokeObjectURL(url);
         document.body.removeChild(link);
         console.log('🧹 Cleanup completado');
       }, 100);
 
-      console.log('✅ DESCARGA COMPLETADA:', fileName);
+      console.log('✅ DESCARGA COMPLETADA CON GENERADOR NATIVO:', fileName);
+
+      setDownloadSuccess(true);
 
       toast({
         title: "✅ PDF generado exitosamente",
-        description: `El comprobante de ${employee.name} se ha descargado correctamente`,
+        description: `El comprobante de ${employee.name} se ha descargado correctamente con el generador nativo`,
         className: "border-green-200 bg-green-50"
       });
       
     } catch (error: any) {
-      console.error('💥 ERROR EN DESCARGA:', error);
+      console.error('💥 ERROR EN GENERADOR NATIVO:', error);
       console.error('💥 Error stack:', error.stack);
       
-      let errorMessage = "Error desconocido al generar el comprobante";
+      let errorMessage = "Error desconocido en el generador PDF nativo";
       
       if (error.name === 'AbortError') {
-        errorMessage = "La generación del PDF tardó demasiado. Intenta nuevamente.";
+        errorMessage = "La generación del PDF tardó demasiado. El generador nativo optimizado debería ser más rápido.";
       } else if (error.message?.includes('fetch')) {
-        errorMessage = "Error de conexión. Verifica tu internet e intenta nuevamente.";
+        errorMessage = "Error de conexión con el generador nativo. Verifica tu internet.";
       } else if (error.message?.includes('PDF')) {
-        errorMessage = `Error en el PDF: ${error.message}`;
+        errorMessage = `Error en el PDF nativo: ${error.message}`;
       } else if (error.message) {
         errorMessage = error.message;
       }
       
       toast({
-        title: "❌ Error al generar PDF",
+        title: "❌ Error en generador PDF nativo",
         description: errorMessage,
         variant: "destructive"
       });
@@ -240,7 +241,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
       <CustomModalHeader>
         <CustomModalTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Vista Previa - Comprobante de Nómina
+          Vista Previa - Comprobante de Nómina (Generador Nativo)
         </CustomModalTitle>
       </CustomModalHeader>
 
@@ -281,7 +282,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
         <div className="space-y-3">
           <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
-            💵 Resumen del Pago
+            💵 Resumen del Pago (Generador Nativo)
           </h2>
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
             <table className="w-full">
@@ -434,7 +435,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           <div className="text-center text-xs text-gray-600 space-y-1">
             <p>Este documento fue generado con <span className="font-semibold text-blue-800">Finppi</span> – Software de Nómina y Seguridad Social</p>
             <p><a href="https://www.finppi.com" className="text-blue-600 hover:underline">www.finppi.com</a></p>
-            <p className="mt-2">Generado el {new Date().toLocaleString('es-CO')}</p>
+            <p className="mt-2">Generado el {new Date().toLocaleString('es-CO')} - <span className="text-green-600 font-semibold">Generador PDF Nativo</span></p>
           </div>
         </div>
       </div>
@@ -444,16 +445,21 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           <X className="h-4 w-4 mr-2" />
           Cerrar
         </Button>
-        <Button onClick={handleDownloadVoucher} disabled={isGenerating}>
+        <Button onClick={handleDownloadVoucher} disabled={isGenerating} className="relative">
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generando PDF...
+              Generando PDF Nativo...
+            </>
+          ) : downloadSuccess ? (
+            <>
+              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+              PDF Descargado ✓
             </>
           ) : (
             <>
               <Download className="h-4 w-4 mr-2" />
-              Descargar PDF
+              Descargar PDF Nativo
             </>
           )}
         </Button>
