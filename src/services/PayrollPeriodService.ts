@@ -374,10 +374,28 @@ export class PayrollPeriodService {
     }
   }
 
-  // Formatear período para mostrar
+  // Formatear período para mostrar - CORREGIDO PARA EVITAR PROBLEMAS DE ZONA HORARIA
   static formatPeriodText(startDate: string, endDate: string): string {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    console.log('🔧 CORRIGIENDO FORMATEO DE FECHAS:', { startDate, endDate });
+    
+    // ✅ CORRECCIÓN: Parsear fechas ISO manualmente para evitar problemas de zona horaria
+    const parseISODateSafely = (isoDateString: string): Date => {
+      const parts = isoDateString.split('-');
+      const year = parseInt(parts[0]);
+      const month = parseInt(parts[1]) - 1; // Los meses en JS son 0-indexados
+      const day = parseInt(parts[2]);
+      
+      console.log('📅 Parseando fecha:', { isoDateString, year, month: month + 1, day });
+      return new Date(year, month, day);
+    };
+    
+    const start = parseISODateSafely(startDate);
+    const end = parseISODateSafely(endDate);
+    
+    console.log('📅 Fechas parseadas correctamente:', {
+      start: start.toLocaleDateString('es-CO'),
+      end: end.toLocaleDateString('es-CO')
+    });
     
     const startFormatted = start.toLocaleDateString('es-CO', {
       day: 'numeric',
@@ -390,7 +408,10 @@ export class PayrollPeriodService {
       year: 'numeric'
     });
 
-    return `del ${startFormatted} al ${endFormatted}`;
+    const result = `del ${startFormatted} al ${endFormatted}`;
+    console.log('✅ Formato final corregido:', result);
+    
+    return result;
   }
 
   // Validar si el período es válido
