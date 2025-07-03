@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,10 +51,16 @@ export const PayrollLiquidationNew = () => {
   const handleRetryInitialization = () => refreshPeriod(0);
   const handleForceRefresh = () => refreshPeriod(0);
 
-  // Nueva función para ejecutar corrección integral
+  // Nueva función para ejecutar corrección integral CON REFRESH AUTOMÁTICO
   const handlePeriodCorrection = async () => {
     if (!currentPeriod?.company_id) return;
+    
     await executeIntegralCorrection(currentPeriod.company_id);
+    
+    // Refrescar automáticamente los datos después de la corrección
+    setTimeout(() => {
+      refreshPeriod(0);
+    }, 1000);
   };
 
   // Loading inicial
