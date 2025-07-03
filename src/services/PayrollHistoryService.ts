@@ -1,8 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PAYROLL_STATES, STATE_MAPPING } from '@/constants/payrollStates';
 import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
+import { PayrollHistoricalRecoveryService } from './PayrollHistoricalRecoveryService';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -149,9 +149,43 @@ export class PayrollHistoryService {
 
       console.log('👥 Empleados encontrados:', payrolls?.length || 0);
 
-      // Si no hay empleados y el período está cerrado, intentar sincronización
+      // **NUEVA LÓGICA: Detectar y recuperar períodos mal cerrados automáticamente**
+      if ((!payrolls || payrolls.length === 0) && this.isBadlyClosedPeriod(period)) {
+        console.log('🔄 Período mal cerrado detectado, iniciando recuperación automática...');
+        
+        try {
+          const recoveryResult = await PayrollHistoricalRecoveryService.recoverBadlyClosedPeriod(periodId);
+          
+          if (recoveryResult.success) {
+            console.log('✅ Recuperación automática exitosa:', recoveryResult.message);
+            
+            // Reintentar obtener los empleados después de la recuperación
+            const { data: recoveredPayrolls } = await supabase
+              .from('payrolls')
+              .select(`
+                *,
+                employees (
+                  id,
+                  nombre,
+                  apellido,
+                  cargo
+                )
+              `)
+              .eq('company_id', companyId)
+              .eq('period_id', periodId);
+            
+            payrolls = recoveredPayrolls;
+            console.log('✅ Empleados recuperados:', payrolls?.length || 0);
+          }
+        } catch (recoveryError) {
+          console.error('❌ Error en recuperación automática:', recoveryError);
+          // Continuar sin recuperación si falla
+        }
+      }
+
+      // Si aún no hay empleados y el período está cerrado, intentar sincronización tradicional
       if ((!payrolls || payrolls.length === 0) && period.estado === 'cerrado') {
-        console.log('🔄 Período cerrado sin empleados, intentando sincronización...');
+        console.log('🔄 Período cerrado sin empleados, intentando sincronización tradicional...');
         
         try {
           await this.syncHistoricalData(periodId);
@@ -237,6 +271,17 @@ export class PayrollHistoryService {
       console.error('💥 Error obteniendo detalles del período:', error);
       throw error;
     }
+  }
+
+  /**
+   * Detecta si un período está mal cerrado (nueva función)
+   */
+  private static isBadlyClosedPeriod(period: any): boolean {
+    return (
+      period.estado === 'cerrado' &&
+      period.empleados_count === 0 &&
+      (period.total_devengado > 0 || period.total_deducciones > 0 || period.total_neto > 0)
+    );
   }
 
   static async syncHistoricalData(periodId: string): Promise<void> {
