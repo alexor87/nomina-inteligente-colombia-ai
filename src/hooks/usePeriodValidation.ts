@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { BiWeeklyPeriodService } from '@/services/payroll-intelligent/BiWeeklyPeriodService';
+import { PayrollPeriodCalculationService } from '@/services/payroll-intelligent/PayrollPeriodCalculationService';
+import { DataMigrationService } from '@/services/payroll-intelligent/DataMigrationService';
 import { PeriodNameUnifiedService } from '@/services/payroll-intelligent/PeriodNameUnifiedService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,27 +13,36 @@ export const usePeriodValidation = () => {
   const validateBiWeeklyPeriods = async (companyId: string) => {
     try {
       setIsValidating(true);
-      console.log('🔍 INICIANDO VALIDACIÓN PROFESIONAL ESTRICTA de períodos...');
+      console.log('🔍 INICIANDO VALIDACIÓN PROFESIONAL CON ARQUITECTURA UNIFICADA...');
       
-      // 1. Normalizar períodos irregulares automáticamente con LÓGICA ESTRICTA
-      await BiWeeklyPeriodService.normalizeAllBiWeeklyPeriods(companyId);
+      // 1. Analizar períodos incorrectos
+      const analysis = await DataMigrationService.analyzeIncorrectPeriods(companyId);
+      console.log('📊 ANÁLISIS:', analysis);
       
-      // 2. Normalizar nombres de períodos para consistencia
+      // 2. Corregir automáticamente períodos irregulares
+      const correction = await DataMigrationService.correctAllBiWeeklyPeriods(companyId);
+      console.log('🔧 CORRECCIÓN:', correction);
+      
+      // 3. Normalizar nombres de períodos para consistencia
       await PeriodNameUnifiedService.normalizeExistingPeriods(companyId);
       
+      // 4. Verificar integridad post-corrección
+      const integrity = await DataMigrationService.verifyIntegrityAfterCorrection(companyId);
+      console.log('🔍 INTEGRIDAD:', integrity);
+      
       toast({
-        title: "✅ Validación Estricta Completada",
-        description: "Los períodos quincenales han sido validados y corregidos con reglas estrictas (1-15, 16-fin de mes)",
+        title: "✅ Validación Profesional Completada",
+        description: `${correction.summary}. ${integrity.summary}`,
         className: "border-green-200 bg-green-50"
       });
       
-      console.log('✅ VALIDACIÓN ESTRICTA PROFESIONAL COMPLETADA EXITOSAMENTE');
+      console.log('✅ VALIDACIÓN PROFESIONAL COMPLETADA EXITOSAMENTE');
       
     } catch (error) {
-      console.error('❌ Error en validación estricta de períodos:', error);
+      console.error('❌ Error en validación profesional:', error);
       toast({
-        title: "Error en Validación Estricta",
-        description: "No se pudieron validar los períodos quincenales con reglas estrictas",
+        title: "Error en Validación Profesional",
+        description: "No se pudieron validar los períodos con la nueva arquitectura",
         variant: "destructive"
       });
     } finally {
@@ -41,46 +51,54 @@ export const usePeriodValidation = () => {
   };
 
   const testBiWeeklyGeneration = async () => {
-    console.log('🧪 PRUEBA DE GENERACIÓN DE PERÍODOS QUINCENALES ESTRICTOS:');
+    console.log('🧪 PRUEBA DE GENERACIÓN CON ARQUITECTURA UNIFICADA:');
     
     try {
-      // Probar generación de primer período estricto
-      const firstPeriod = BiWeeklyPeriodService.generateFirstStrictBiWeeklyPeriod();
-      console.log('📅 PRIMER PERÍODO ESTRICTO:', firstPeriod);
+      // Probar generación con diferentes strategies
+      const { PeriodStrategyFactory } = await import('@/services/payroll-intelligent/PeriodGenerationStrategy');
       
-      // Probar generación consecutiva estricta
-      const nextPeriod = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod(firstPeriod.endDate);
-      console.log('📅 SIGUIENTE PERÍODO ESTRICTO:', nextPeriod);
+      const biWeeklyStrategy = PeriodStrategyFactory.createStrategy('quincenal');
+      const monthlyStrategy = PeriodStrategyFactory.createStrategy('mensual');
+      const weeklyStrategy = PeriodStrategyFactory.createStrategy('semanal');
       
-      // Probar febrero (año bisiesto y normal) con LÓGICA ESTRICTA
-      const febPeriod1 = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod('2024-01-31');
-      const febPeriod2 = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod(febPeriod1.endDate);
-      console.log('📅 FEBRERO 2024 (bisiesto) 1ra quincena ESTRICTA:', febPeriod1);
-      console.log('📅 FEBRERO 2024 (bisiesto) 2da quincena ESTRICTA:', febPeriod2);
+      // Probar períodos quincenales
+      const firstPeriod = biWeeklyStrategy.generateFirstPeriod();
+      console.log('📅 PRIMER PERÍODO QUINCENAL:', firstPeriod);
       
-      const febPeriod1_2025 = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod('2025-01-31');
-      const febPeriod2_2025 = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod(febPeriod1_2025.endDate);
-      console.log('📅 FEBRERO 2025 (normal) 1ra quincena ESTRICTA:', febPeriod1_2025);
-      console.log('📅 FEBRERO 2025 (normal) 2da quincena ESTRICTA:', febPeriod2_2025);
+      const nextPeriod = biWeeklyStrategy.generateNextConsecutivePeriod(firstPeriod.endDate);
+      console.log('📅 SIGUIENTE PERÍODO QUINCENAL:', nextPeriod);
       
-      // Validar períodos con VALIDADOR ESTRICTO
-      const validation1 = BiWeeklyPeriodService.validateBiWeeklyPeriod(firstPeriod.startDate, firstPeriod.endDate);
-      const validation2 = BiWeeklyPeriodService.validateBiWeeklyPeriod('2024-02-05', '2024-02-20'); // Período irregular
+      // Probar casos complejos (febrero)
+      const febPeriod1 = biWeeklyStrategy.generateNextConsecutivePeriod('2024-01-31');
+      const febPeriod2 = biWeeklyStrategy.generateNextConsecutivePeriod(febPeriod1.endDate);
+      console.log('📅 FEBRERO 2024 (bisiesto) 1ra quincena:', febPeriod1);
+      console.log('📅 FEBRERO 2024 (bisiesto) 2da quincena:', febPeriod2);
       
-      console.log('✅ VALIDACIÓN PERÍODO ESTRICTO:', validation1);
+      // Probar validaciones
+      const validation1 = biWeeklyStrategy.validateAndCorrectPeriod(firstPeriod.startDate, firstPeriod.endDate);
+      const validation2 = biWeeklyStrategy.validateAndCorrectPeriod('2024-02-05', '2024-02-20'); // Período irregular
+      
+      console.log('✅ VALIDACIÓN PERÍODO CORRECTO:', validation1);
       console.log('⚠️ VALIDACIÓN PERÍODO IRREGULAR (será corregido):', validation2);
       
+      // Probar otros tipos de período
+      const monthlyPeriod = monthlyStrategy.generateCurrentPeriod();
+      const weeklyPeriod = weeklyStrategy.generateCurrentPeriod();
+      
+      console.log('📅 PERÍODO MENSUAL:', monthlyPeriod);
+      console.log('📅 PERÍODO SEMANAL:', weeklyPeriod);
+      
       toast({
-        title: "🧪 Prueba Estricta Completada",
-        description: "Revisa la consola para ver los resultados detallados de la prueba de períodos quincenales ESTRICTOS (1-15, 16-fin de mes)",
+        title: "🧪 Pruebas de Arquitectura Completadas",
+        description: "Revisa la consola para ver los resultados detallados de las pruebas con la nueva arquitectura unificada",
         className: "border-blue-200 bg-blue-50"
       });
       
     } catch (error) {
-      console.error('❌ Error en prueba de períodos estrictos:', error);
+      console.error('❌ Error en pruebas de arquitectura:', error);
       toast({
-        title: "Error en Prueba Estricta",
-        description: "Ocurrió un error durante la prueba de períodos quincenales estrictos",
+        title: "Error en Pruebas de Arquitectura",
+        description: "Ocurrió un error durante las pruebas de la nueva arquitectura",
         variant: "destructive"
       });
     }
