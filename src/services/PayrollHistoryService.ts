@@ -241,6 +241,51 @@ export class PayrollHistoryService {
     return days;
   }
 
+  /**
+   * NUEVA FUNCIÓN: Corregir datos específicos de un período
+   */
+  static async fixSpecificPeriodData(periodId: string): Promise<{ success: boolean; message: string; details?: any }> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        return {
+          success: false,
+          message: 'No se encontró información de la empresa'
+        };
+      }
+
+      console.log('🔧 Corrigiendo datos específicos del período:', periodId);
+
+      // Llamar a la función de base de datos para corregir el período
+      const { data: result, error } = await supabase.rpc('fix_specific_period_data', {
+        p_period_id: periodId
+      });
+
+      if (error) {
+        console.error('❌ Error corrigiendo período específico:', error);
+        return {
+          success: false,
+          message: `Error corrigiendo período: ${error.message}`
+        };
+      }
+
+      console.log('✅ Corrección completada:', result);
+      
+      return {
+        success: result?.success || true,
+        message: result?.message || 'Período corregido exitosamente',
+        details: result
+      };
+
+    } catch (error) {
+      console.error('💥 Error crítico corrigiendo período:', error);
+      return {
+        success: false,
+        message: 'Error crítico durante la corrección'
+      };
+    }
+  }
+
   static async regenerateHistoricalData(periodId: string): Promise<RegenerateResult> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -255,6 +300,19 @@ export class PayrollHistoryService {
       
       console.log('⚙️ Configuración para regeneración:', { periodicity, customDays });
 
+      // PRIMERO: Intentar corregir datos existentes
+      const fixResult = await this.fixSpecificPeriodData(periodId);
+      
+      if (fixResult.success) {
+        console.log('✅ Corrección directa exitosa:', fixResult.message);
+        return {
+          success: true,
+          message: fixResult.message,
+          records_created: fixResult.details?.records_created || 0
+        };
+      }
+
+      // FALLBACK: Regeneración completa si la corrección falla
       const { data: result, error } = await supabase.rpc(
         'sync_historical_payroll_data',
         { 
@@ -301,7 +359,7 @@ export class PayrollHistoryService {
   }
 
   /**
-   * NUEVA FUNCIÓN: Corregir días trabajados para un período específico
+   * MEJORADA: Corregir días trabajados usando cálculo real de fechas
    */
   static async correctWorkedDaysForPeriod(periodId: string, companyId: string): Promise<void> {
     try {
@@ -321,7 +379,7 @@ export class PayrollHistoryService {
       
       console.log(`📅 Corrigiendo días trabajados a ${realDays} para período ${period.periodo}`);
 
-      // Actualizar todos los payrolls de este período
+      // Actualizar todos los payrolls de este período con días reales
       const { error: updateError } = await supabase
         .from('payrolls')
         .update({ 

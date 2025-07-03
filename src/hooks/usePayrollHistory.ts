@@ -10,6 +10,7 @@ interface UsePayrollHistoryReturn {
   isReopening: boolean;
   isExporting: boolean;
   isRegenerating: boolean;
+  isFixing: boolean;
   canUserReopenPeriods: boolean;
   checkUserPermissions: () => Promise<void>;
   reopenPeriod: (periodo: string) => Promise<void>;
@@ -20,6 +21,7 @@ interface UsePayrollHistoryReturn {
   downloadFile: (fileUrl: string, fileName: string) => Promise<void>;
   createAuditLog: (log: Omit<AuditLog, 'id' | 'timestamp'>) => Promise<void>;
   regenerateHistoricalData: (periodId: string) => Promise<boolean>;
+  fixSpecificPeriodData: (periodId: string) => Promise<boolean>;
 }
 
 export const usePayrollHistory = (): UsePayrollHistoryReturn => {
@@ -27,6 +29,7 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
   const [isReopening, setIsReopening] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
   const [canUserReopenPeriods, setCanUserReopenPeriods] = useState(false);
 
   const checkUserPermissions = useCallback(async () => {
@@ -248,6 +251,41 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
     }
   }, []);
 
+  const fixSpecificPeriodData = useCallback(async (periodId: string): Promise<boolean> => {
+    setIsFixing(true);
+    try {
+      console.log('🔧 Iniciando corrección específica de período:', periodId);
+      
+      const result = await PayrollHistoryService.fixSpecificPeriodData(periodId);
+      
+      if (result.success) {
+        toast({
+          title: "✅ Período corregido exitosamente",
+          description: result.message,
+          className: "border-green-200 bg-green-50"
+        });
+        return true;
+      } else {
+        toast({
+          title: "❌ Error corrigiendo período",
+          description: result.message,
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error: any) {
+      console.error('❌ Error en corrección específica:', error);
+      toast({
+        title: "Error corrigiendo período",
+        description: error.message || "No se pudo corregir el período específico",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsFixing(false);
+    }
+  }, []);
+
   const regenerateHistoricalData = useCallback(async (periodId: string): Promise<boolean> => {
     setIsRegenerating(true);
     try {
@@ -288,6 +326,7 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
     isReopening,
     isExporting,
     isRegenerating,
+    isFixing,
     canUserReopenPeriods,
     checkUserPermissions,
     reopenPeriod,
@@ -297,6 +336,7 @@ export const usePayrollHistory = (): UsePayrollHistoryReturn => {
     exportToExcel,
     downloadFile,
     createAuditLog,
-    regenerateHistoricalData
+    regenerateHistoricalData,
+    fixSpecificPeriodData
   };
 };
