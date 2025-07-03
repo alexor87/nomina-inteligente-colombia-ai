@@ -51,11 +51,14 @@ export class SmartPeriodDetectionService {
         throw new Error('No se recibieron datos de la función de detección');
       }
       
-      console.log('✅ DETECCIÓN COMPLETADA:', data);
-      console.log('📅 Período sugerido:', data.calculated_period?.period_name);
-      console.log('🎯 Acción recomendada:', data.action);
+      // Cast the data to our interface with proper type checking
+      const detection = data as unknown as SmartPeriodDetection;
       
-      return data as SmartPeriodDetection;
+      console.log('✅ DETECCIÓN COMPLETADA:', detection);
+      console.log('📅 Período sugerido:', detection.calculated_period?.period_name);
+      console.log('🎯 Acción recomendada:', detection.action);
+      
+      return detection;
       
     } catch (error) {
       console.error('💥 ERROR EN DETECCIÓN INTELIGENTE:', error);
@@ -73,9 +76,22 @@ export class SmartPeriodDetectionService {
       
       const { calculated_period } = detection;
       
+      // Get the current user's company_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+
       const { data, error } = await supabase
         .from('payroll_periods_real')
         .insert({
+          company_id: profile.company_id,
           fecha_inicio: calculated_period.start_date,
           fecha_fin: calculated_period.end_date,
           tipo_periodo: calculated_period.type,
