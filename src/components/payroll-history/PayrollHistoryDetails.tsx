@@ -13,6 +13,7 @@ import { usePayrollHistory } from '@/hooks/usePayrollHistory';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PayrollHistoryDetails as PayrollHistoryDetailsType } from '@/types/payroll-history';
 import { formatCurrency } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -24,7 +25,8 @@ import {
   RotateCcw,
   RefreshCw,
   Download,
-  FileText
+  FileText,
+  AlertTriangle
 } from 'lucide-react';
 
 export const PayrollHistoryDetails: React.FC = () => {
@@ -77,7 +79,7 @@ export const PayrollHistoryDetails: React.FC = () => {
     loadDetails();
   }, [periodId]);
 
-  const handleReopen = async () => {
+  const handleReopen = async (reason: string) => {
     if (!details?.period.period) return;
     
     try {
@@ -98,6 +100,13 @@ export const PayrollHistoryDetails: React.FC = () => {
     }
   };
 
+  const handleEditWizardConfirm = async (steps: any) => {
+    console.log('Edit wizard steps:', steps);
+    // Process the steps here
+    setShowEditWizard(false);
+    await loadDetails();
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -109,15 +118,27 @@ export const PayrollHistoryDetails: React.FC = () => {
   if (error) {
     return (
       <div className="text-center py-8">
+        <div className="flex items-center justify-center mb-4">
+          <AlertTriangle className="h-8 w-8 text-red-500 mr-2" />
+          <h2 className="text-lg font-semibold text-red-700">Error al cargar período</h2>
+        </div>
         <p className="text-red-500 mb-4">{error}</p>
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/app/payroll-history')}
-          className="mt-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver al Historial
-        </Button>
+        <div className="flex justify-center space-x-3">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/app/payroll-history')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al Historial
+          </Button>
+          <Button 
+            onClick={loadDetails}
+            variant="default"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Reintentar
+          </Button>
+        </div>
       </div>
     );
   }
@@ -318,7 +339,7 @@ export const PayrollHistoryDetails: React.FC = () => {
         <EditWizard
           isOpen={showEditWizard}
           onClose={() => setShowEditWizard(false)}
-          onConfirm={async () => {}}
+          onConfirm={handleEditWizardConfirm}
           isProcessing={false}
         />
       )}

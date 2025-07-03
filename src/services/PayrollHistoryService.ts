@@ -2,7 +2,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryDetails, PayrollHistoryEmployee } from '@/types/payroll-history';
 import { PAYROLL_STATES, STATE_MAPPING } from '@/constants/payrollStates';
 import { PeriodNameUnifiedService } from './payroll-intelligent/PeriodNameUnifiedService';
-import { PayrollHistoricalRecoveryService } from './PayrollHistoricalRecoveryService';
 
 export interface PayrollHistoryRecord {
   id: string;
@@ -102,13 +101,13 @@ export class PayrollHistoryService {
 
       console.log('🔍 Obteniendo detalles del período:', periodId);
 
-      // Get period details
+      // Get period details with better error handling
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('id', periodId)
         .eq('company_id', companyId)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single
 
       if (periodError) {
         console.error('❌ Error obteniendo período:', periodError);
@@ -116,12 +115,13 @@ export class PayrollHistoryService {
       }
 
       if (!period) {
+        console.warn('⚠️ Período no encontrado para ID:', periodId);
         throw new Error('Período no encontrado');
       }
 
       console.log('📊 Período encontrado:', period);
 
-      // Get employees for this period using period_id relationship
+      // Get employees for this period using period_id relationship with better fallback
       let { data: payrolls, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
@@ -157,7 +157,6 @@ export class PayrollHistoryService {
 
         if (fallbackError) {
           console.error('❌ Error en fallback:', fallbackError);
-          // Don't throw here, just continue with empty payrolls
           payrolls = [];
         } else {
           payrolls = fallbackPayrolls || [];
@@ -226,24 +225,64 @@ export class PayrollHistoryService {
     }
   }
 
-  static async syncHistoricalData(periodId: string): Promise<void> {
+  static async regenerateHistoricalData(periodId: string): Promise<RegenerateResult> {
     try {
-      console.log('🔄 Sincronizando datos históricos para período:', periodId);
-      
-      const { data, error } = await supabase.rpc('sync_historical_payroll_data', {
-        p_period_id: periodId
-      });
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) throw new Error('No company ID found');
+
+      console.log('🔄 Regenerando datos históricos para período:', periodId);
+
+      const { data: result, error } = await supabase.rpc(
+        'sync_historical_payroll_data',
+        { 
+          p_period_id: periodId, 
+          p_company_id: companyId 
+        }
+      );
 
       if (error) {
-        console.error('❌ Error en sincronización:', error);
-        throw error;
+        console.error('❌ Error regenerando datos:', error);
+        return {
+          success: false,
+          message: `Error regenerando datos: ${error.message}`
+        };
       }
 
-      console.log('✅ Sincronización completada:', data);
+      console.log('✅ Regeneración completada:', result);
+      
+      // Type guard to safely access properties
+      if (result && typeof result === 'object' && 'success' in result) {
+        const typedResult = result as any;
+        return {
+          success: typedResult.success,
+          message: typedResult.message,
+          records_created: typedResult.records_created
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Datos históricos regenerados correctamente'
+      };
+
     } catch (error) {
-      console.error('❌ Error crítico en sincronización:', error);
-      throw error;
+      console.error('💥 Error crítico regenerando datos:', error);
+      return {
+        success: false,
+        message: 'Error crítico regenerando datos históricos'
+      };
     }
+  }
+
+  static mapPeriodType(tipoPeriodo: string): 'semanal' | 'quincenal' | 'mensual' | 'personalizado' {
+    const typeMap: Record<string, 'semanal' | 'quincenal' | 'mensual' | 'personalizado'> = {
+      'semanal': 'semanal',
+      'quincenal': 'quincenal',
+      'mensual': 'mensual',
+      'personalizado': 'personalizado'
+    };
+    
+    return typeMap[tipoPeriodo] || 'mensual';
   }
 
   static async updateEmployeeValues(periodId: string, employeeId: string, updates: Partial<PayrollHistoryEmployee>): Promise<void> {
@@ -331,17 +370,6 @@ export class PayrollHistoryService {
     }
   }
 
-  static mapPeriodType(tipoPeriodo: string): 'semanal' | 'quincenal' | 'mensual' | 'personalizado' {
-    const typeMap: Record<string, 'semanal' | 'quincenal' | 'mensual' | 'personalizado'> = {
-      'semanal': 'semanal',
-      'quincenal': 'quincenal',
-      'mensual': 'mensual',
-      'personalizado': 'personalizado'
-    };
-    
-    return typeMap[tipoPeriodo] || 'mensual';
-  }
-
   static async recalculateEmployeeTotalsWithNovedades(employeeId: string, periodId: string): Promise<void> {
     try {
       console.log('Recalculating totals for employee:', employeeId, 'period:', periodId);
@@ -351,49 +379,23 @@ export class PayrollHistoryService {
     }
   }
 
-  static async regenerateHistoricalData(periodId: string): Promise<RegenerateResult> {
+  static async syncHistoricalData(periodId: string): Promise<void> {
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) throw new Error('No company ID found');
-
-      console.log('🔄 Regenerando datos históricos para período:', periodId);
-
-      const { data: result, error } = await supabase.rpc(
-        'sync_historical_payroll_data',
-        { p_period_id: periodId, p_company_id: companyId }
-      );
+      console.log('🔄 Sincronizando datos históricos para período:', periodId);
+      
+      const { data, error } = await supabase.rpc('sync_historical_payroll_data', {
+        p_period_id: periodId
+      });
 
       if (error) {
-        console.error('❌ Error regenerando datos:', error);
-        return {
-          success: false,
-          message: `Error regenerando datos: ${error.message}`
-        };
+        console.error('❌ Error en sincronización:', error);
+        throw error;
       }
 
-      console.log('✅ Regeneración completada:', result);
-      
-      // Type guard to safely access properties
-      if (result && typeof result === 'object' && 'success' in result) {
-        const typedResult = result as any;
-        return {
-          success: typedResult.success,
-          message: typedResult.message,
-          records_created: typedResult.records_created
-        };
-      }
-
-      return {
-        success: false,
-        message: 'Error regenerando datos históricos'
-      };
-
+      console.log('✅ Sincronización completada:', data);
     } catch (error) {
-      console.error('💥 Error crítico regenerando datos:', error);
-      return {
-        success: false,
-        message: 'Error crítico regenerando datos históricos'
-      };
+      console.error('❌ Error crítico en sincronización:', error);
+      throw error;
     }
   }
 }
