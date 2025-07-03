@@ -6,18 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Generador PDF Nativo - Sin dependencias externas
+// Generador PDF Nativo Corregido - Estructura válida
 class NativePDFGenerator {
   private objects: string[] = [];
+  private objectPositions: number[] = [];
   private currentObjectId = 1;
 
   constructor() {
     this.objects = [''];  // El objeto 0 siempre está vacío en PDF
+    this.objectPositions = [0]; // Posición del objeto 0
   }
 
   private addObject(content: string): number {
     const id = this.currentObjectId++;
     this.objects.push(content);
+    this.objectPositions.push(0); // Se calculará después
     return id;
   }
 
@@ -44,7 +47,7 @@ class NativePDFGenerator {
   }
 
   generateVoucher(employee: any, period: any): Uint8Array {
-    console.log('🔧 Generando PDF nativo para:', employee.name);
+    console.log('🔧 Generando PDF nativo corregido para:', employee.name);
 
     // Datos calculados
     const salarioBase = Number(employee.baseSalary) || 0;
@@ -58,158 +61,159 @@ class NativePDFGenerator {
     const fechaInicio = this.formatDate(period.startDate);
     const fechaFin = this.formatDate(period.endDate);
 
-    // Crear objetos PDF
-    
-    // 1. Catálogo del documento
-    const catalogId = this.addObject(`<<
-/Type /Catalog
-/Pages 2 0 R
+    // PASO 1: Crear fuentes primero (objetos 1 y 2)
+    const fontRegularId = this.addObject(`<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
 >>`);
 
-    // 2. Páginas del documento
-    const pagesId = this.addObject(`<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
+    const fontBoldId = this.addObject(`<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica-Bold
 >>`);
 
-    // 3. Contenido de la página principal
+    // PASO 2: Crear contenido del stream
+    const contentStream = this.generateContentStream(employee, period, {
+      salarioBase, diasTrabajados, salarioNeto, deducciones,
+      horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin
+    });
+
     const contentStreamId = this.addObject(`<<
-/Length ${this.generateContentStream(employee, period, {
-  salarioBase, diasTrabajados, salarioNeto, deducciones,
-  horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin
-}).length}
+/Length ${contentStream.length}
 >>
 stream
-${this.generateContentStream(employee, period, {
-  salarioBase, diasTrabajados, salarioNeto, deducciones,
-  horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin
-})}
+${contentStream}
 endstream`);
 
-    // 4. Definición de la página
+    // PASO 3: Crear página con referencias correctas
     const pageId = this.addObject(`<<
 /Type /Page
-/Parent 2 0 R
+/Parent 5 0 R
 /MediaBox [0 0 612 792]
 /Contents ${contentStreamId} 0 R
 /Resources <<
   /Font <<
-    /F1 ${this.addObject(`<<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Helvetica
->>`)} 0 R
-    /F2 ${this.addObject(`<<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Helvetica-Bold
->>`)} 0 R
+    /F1 ${fontRegularId} 0 R
+    /F2 ${fontBoldId} 0 R
   >>
 >>
 >>`);
 
-    // Generar el archivo PDF completo
-    return this.buildPDF();
+    // PASO 4: Crear catálogo de páginas
+    const pagesId = this.addObject(`<<
+/Type /Pages
+/Kids [${pageId} 0 R]
+/Count 1
+>>`);
+
+    // PASO 5: Crear catálogo raíz
+    const catalogId = this.addObject(`<<
+/Type /Catalog
+/Pages ${pagesId} 0 R
+>>`);
+
+    // Generar el archivo PDF completo con estructura corregida
+    return this.buildPDFWithCorrectStructure(catalogId);
   }
 
   private generateContentStream(employee: any, period: any, data: any): string {
     const { salarioBase, diasTrabajados, salarioNeto, deducciones, 
             horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin } = data;
 
-    return `
-BT
+    return `BT
 /F2 18 Tf
-72 720 Td
+50 750 Td
 (${this.escapeText('COMPROBANTE DE NOMINA')}) Tj
 ET
 
 BT
 /F2 12 Tf
-72 680 Td
+50 710 Td
 (${this.escapeText('EMPRESA:')}) Tj
 ET
 
 BT
 /F1 11 Tf
-72 665 Td
-(${this.escapeText('Mi Empresa')}) Tj
+50 695 Td
+(${this.escapeText('Mi Empresa S.A.S.')}) Tj
 ET
 
 BT
 /F1 10 Tf
-72 650 Td
-(${this.escapeText('NIT: N/A')}) Tj
+50 680 Td
+(${this.escapeText('NIT: 900123456-1')}) Tj
 ET
 
 BT
 /F2 12 Tf
-250 680 Td
+200 710 Td
 (${this.escapeText('EMPLEADO:')}) Tj
 ET
 
 BT
 /F1 11 Tf
-250 665 Td
+200 695 Td
 (${this.escapeText(employee.name || 'N/A')}) Tj
 ET
 
 BT
 /F1 10 Tf
-250 650 Td
+200 680 Td
 (${this.escapeText('CC: ' + (employee.id?.slice(0, 8) || 'N/A'))}) Tj
 ET
 
 BT
 /F2 12 Tf
-450 680 Td
+400 710 Td
 (${this.escapeText('PERIODO:')}) Tj
 ET
 
 BT
 /F1 11 Tf
-450 665 Td
+400 695 Td
 (${this.escapeText(fechaInicio + ' - ' + fechaFin)}) Tj
 ET
 
 BT
 /F1 10 Tf
-450 650 Td
+400 680 Td
 (${this.escapeText('Dias: ' + diasTrabajados)}) Tj
 ET
 
-72 630 m
-540 630 l
+50 660 m
+550 660 l
 S
 
 BT
 /F2 14 Tf
-72 600 Td
-(${this.escapeText('RESUMEN DE PAGO')}) Tj
+50 630 Td
+(${this.escapeText('DETALLE DE PAGO')}) Tj
 ET
 
 BT
 /F1 10 Tf
-72 570 Td
+50 600 Td
 (${this.escapeText('Salario Base:')}) Tj
 ET
 
 BT
 /F1 10 Tf
-400 570 Td
+400 600 Td
 (${this.escapeText(this.formatCurrency(salarioBase))}) Tj
 ET
 
 ${subsidioTransporte > 0 ? `
 BT
 /F1 10 Tf
-72 550 Td
+50 580 Td
 (${this.escapeText('Subsidio Transporte:')}) Tj
 ET
 
 BT
 /F1 10 Tf
-400 550 Td
+400 580 Td
 (${this.escapeText(this.formatCurrency(subsidioTransporte))}) Tj
 ET
 ` : ''}
@@ -217,13 +221,13 @@ ET
 ${bonificaciones > 0 ? `
 BT
 /F1 10 Tf
-72 530 Td
+50 560 Td
 (${this.escapeText('Bonificaciones:')}) Tj
 ET
 
 BT
 /F1 10 Tf
-400 530 Td
+400 560 Td
 (${this.escapeText(this.formatCurrency(bonificaciones))}) Tj
 ET
 ` : ''}
@@ -231,13 +235,13 @@ ET
 ${horasExtra > 0 ? `
 BT
 /F1 10 Tf
-72 510 Td
+50 540 Td
 (${this.escapeText('Horas Extra:')}) Tj
 ET
 
 BT
 /F1 10 Tf
-400 510 Td
+400 540 Td
 (${this.escapeText(this.formatCurrency(horasExtra * Math.round((salarioBase / 240) * 1.25)))}) Tj
 ET
 ` : ''}
@@ -246,35 +250,35 @@ ${deducciones > 0 ? `
 BT
 /F1 10 Tf
 1 0 0 rg
-72 490 Td
+50 520 Td
 (${this.escapeText('Deducciones:')}) Tj
 ET
 
 BT
 /F1 10 Tf
 1 0 0 rg
-400 490 Td
+400 520 Td
 (${this.escapeText('-' + this.formatCurrency(deducciones))}) Tj
 ET
 
 0 0 0 rg
 ` : ''}
 
-72 470 m
-540 470 l
+50 500 m
+550 500 l
 S
 
 BT
 /F2 14 Tf
-0 0.4 0 rg
-72 440 Td
-(${this.escapeText('TOTAL NETO:')}) Tj
+0 0.6 0 rg
+50 470 Td
+(${this.escapeText('TOTAL NETO A PAGAR:')}) Tj
 ET
 
 BT
 /F2 14 Tf
-0 0.4 0 rg
-350 440 Td
+0 0.6 0 rg
+350 470 Td
 (${this.escapeText(this.formatCurrency(salarioNeto))}) Tj
 ET
 
@@ -282,31 +286,29 @@ ET
 
 BT
 /F1 8 Tf
-72 100 Td
-(${this.escapeText('Generado con Finppi - Sistema de Nomina')}) Tj
+50 120 Td
+(${this.escapeText('Generado con Finppi - Sistema de Nomina Profesional')}) Tj
 ET
 
 BT
 /F1 8 Tf
-72 85 Td
-(${this.escapeText('Fecha: ' + new Date().toLocaleDateString('es-CO'))}) Tj
-ET
-`;
+50 105 Td
+(${this.escapeText('Fecha de generacion: ' + new Date().toLocaleDateString('es-CO'))}) Tj
+ET`;
   }
 
-  private buildPDF(): Uint8Array {
-    console.log('🏗️ Construyendo estructura PDF nativa...');
+  private buildPDFWithCorrectStructure(catalogId: number): Uint8Array {
+    console.log('🏗️ Construyendo PDF con estructura corregida...');
 
     let pdf = '%PDF-1.4\n';
-    pdf += '%âãÏÓ\n'; // Comentario binario para compatibilidad
+    pdf += '%âãÏÓ\n'; // Comentario binario
 
-    // Tabla de referencias cruzadas
-    const xrefTable: number[] = [];
+    // Calcular posiciones exactas de cada objeto
     let currentPos = pdf.length;
 
-    // Agregar objetos
+    // Escribir objetos y registrar posiciones
     for (let i = 1; i < this.objects.length; i++) {
-      xrefTable.push(currentPos);
+      this.objectPositions[i] = currentPos;
       const objContent = `${i} 0 obj\n${this.objects[i]}\nendobj\n`;
       pdf += objContent;
       currentPos += objContent.length;
@@ -315,35 +317,38 @@ ET
     // Posición de la tabla xref
     const xrefPos = currentPos;
 
-    // Generar tabla xref
+    // Generar tabla xref con posiciones correctas
     pdf += 'xref\n';
     pdf += `0 ${this.objects.length}\n`;
-    pdf += '0000000000 65535 f \n'; // Objeto 0
+    pdf += '0000000000 65535 f \n'; // Objeto 0 (siempre libre)
 
-    for (const pos of xrefTable) {
-      pdf += String(pos).padStart(10, '0') + ' 00000 n \n';
+    for (let i = 1; i < this.objects.length; i++) {
+      const pos = String(this.objectPositions[i]).padStart(10, '0');
+      pdf += `${pos} 00000 n \n`;
     }
 
-    // Trailer
+    // Trailer corregido
     pdf += 'trailer\n';
-    pdf += `<<\n/Size ${this.objects.length}\n/Root 1 0 R\n>>\n`;
+    pdf += `<<\n/Size ${this.objects.length}\n/Root ${catalogId} 0 R\n>>\n`;
     pdf += 'startxref\n';
     pdf += `${xrefPos}\n`;
     pdf += '%%EOF\n';
 
-    console.log('✅ PDF nativo generado exitosamente');
+    console.log('✅ PDF nativo con estructura corregida generado exitosamente');
+    console.log(`📊 Objetos creados: ${this.objects.length - 1}`);
+    console.log(`📏 Posición xref: ${xrefPos}`);
     
     const encoder = new TextEncoder();
     const pdfBytes = encoder.encode(pdf);
     
-    console.log(`📋 Tamaño final: ${pdfBytes.length} bytes`);
+    console.log(`📋 Tamaño final del PDF: ${pdfBytes.length} bytes`);
     
     return pdfBytes;
   }
 }
 
 serve(async (req) => {
-  console.log('🚀 PDF Generator Nativo - Iniciando...');
+  console.log('🚀 PDF Generator Nativo Corregido - Iniciando...');
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -351,7 +356,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    console.log('📋 Request recibido para PDF nativo');
+    console.log('📋 Request recibido para PDF nativo corregido');
 
     const { employee, period } = requestBody;
 
@@ -366,24 +371,25 @@ serve(async (req) => {
       );
     }
 
-    console.log('📄 Generando PDF con generador nativo...');
+    console.log('📄 Generando PDF con estructura corregida...');
     
     const generator = new NativePDFGenerator();
     const pdfBytes = generator.generateVoucher(employee, period);
     
-    console.log(`✅ PDF nativo generado - Tamaño: ${pdfBytes.length} bytes`);
+    console.log(`✅ PDF nativo corregido generado - Tamaño: ${pdfBytes.length} bytes`);
     
-    // Validaciones de seguridad
-    if (pdfBytes.length < 500) {
-      throw new Error(`PDF muy pequeño: ${pdfBytes.length} bytes`);
+    // Validaciones de seguridad mejoradas
+    if (pdfBytes.length < 1000) {
+      throw new Error(`PDF muy pequeño: ${pdfBytes.length} bytes - posible error`);
     }
     
-    const pdfString = new TextDecoder().decode(pdfBytes.slice(0, 10));
+    const pdfString = new TextDecoder().decode(pdfBytes.slice(0, 15));
     if (!pdfString.startsWith('%PDF-')) {
       throw new Error(`Header PDF inválido: ${pdfString}`);
     }
     
-    console.log('✅ PDF nativo validado correctamente');
+    console.log('✅ PDF nativo corregido validado correctamente');
+    console.log(`🔍 Header verificado: ${pdfString.slice(0, 8)}`);
     
     const fileName = `comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
     
@@ -395,17 +401,18 @@ serve(async (req) => {
         'Content-Length': pdfBytes.length.toString(),
         'Content-Disposition': `attachment; filename="${fileName}"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Accept-Ranges': 'bytes'
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     });
 
   } catch (error) {
-    console.error('💥 ERROR en generador nativo:', error);
+    console.error('💥 ERROR en generador nativo corregido:', error);
     console.error('💥 Stack:', error.stack);
     
     return new Response(
       JSON.stringify({ 
-        error: `Error generando PDF nativo: ${error.message}`,
+        error: `Error generando PDF nativo corregido: ${error.message}`,
         details: error.stack,
         timestamp: new Date().toISOString()
       }),
