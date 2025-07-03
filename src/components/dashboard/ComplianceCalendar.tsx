@@ -7,8 +7,7 @@ import {
   Calendar, 
   AlertTriangle, 
   CheckCircle, 
-  Clock,
-  FileText
+  Clock
 } from 'lucide-react';
 
 interface ComplianceItem {
@@ -17,7 +16,6 @@ interface ComplianceItem {
   dueDate: string;
   status: 'pending' | 'completed' | 'overdue';
   priority: 'high' | 'medium' | 'low';
-  description: string;
 }
 
 export const ComplianceCalendar: React.FC = () => {
@@ -28,7 +26,6 @@ export const ComplianceCalendar: React.FC = () => {
       dueDate: '2025-02-15',
       status: 'pending',
       priority: 'high',
-      description: 'Declaración mensual de retenciones en la fuente'
     },
     {
       id: '2',
@@ -36,7 +33,6 @@ export const ComplianceCalendar: React.FC = () => {
       dueDate: '2025-02-10',
       status: 'completed',
       priority: 'high',
-      description: 'Pago mensual de seguridad social'
     },
     {
       id: '3',
@@ -44,7 +40,6 @@ export const ComplianceCalendar: React.FC = () => {
       dueDate: '2025-02-20',
       status: 'pending',
       priority: 'medium',
-      description: 'Planilla integrada de liquidación de aportes'
     },
     {
       id: '4',
@@ -52,7 +47,6 @@ export const ComplianceCalendar: React.FC = () => {
       dueDate: '2025-01-30',
       status: 'overdue',
       priority: 'high',
-      description: 'Declaración bimestral de IVA'
     },
   ];
 
@@ -78,27 +72,16 @@ export const ComplianceCalendar: React.FC = () => {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return 'border-l-red-500';
-      case 'medium':
-        return 'border-l-yellow-500';
-      default:
-        return 'border-l-green-500';
-    }
-  };
-
   const pendingItems = complianceItems.filter(item => item.status === 'pending').length;
   const overdueItems = complianceItems.filter(item => item.status === 'overdue').length;
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-blue-600" />
-            <span>Cumplimiento Legal</span>
+            <span>Obligaciones Legales</span>
           </CardTitle>
           <div className="flex space-x-2">
             {overdueItems > 0 && (
@@ -113,38 +96,27 @@ export const ComplianceCalendar: React.FC = () => {
           {complianceItems.map((item) => (
             <div
               key={item.id}
-              className={`p-3 border-l-4 bg-gray-50 rounded-r-lg ${getPriorityColor(item.priority)}`}
+              className="flex items-center justify-between p-3 border rounded"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(item.status)}
-                  <div>
-                    <h4 className="font-medium text-gray-900">{item.title}</h4>
-                    <p className="text-sm text-gray-600">{item.description}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Vence: {new Date(item.dueDate).toLocaleDateString('es-ES')}
-                    </p>
-                  </div>
+              <div className="flex items-center space-x-3">
+                {getStatusIcon(item.status)}
+                <div>
+                  <h4 className="font-medium text-gray-900">{item.title}</h4>
+                  <p className="text-xs text-gray-500">
+                    Vence: {new Date(item.dueDate).toLocaleDateString('es-ES')}
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  {getStatusBadge(item.status)}
-                  {item.status === 'pending' && (
-                    <Button size="sm" variant="outline">
-                      <FileText className="h-3 w-3 mr-1" />
-                      Procesar
-                    </Button>
-                  )}
-                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {getStatusBadge(item.status)}
+                {item.status === 'pending' && (
+                  <Button size="sm" variant="outline">
+                    Procesar
+                  </Button>
+                )}
               </div>
             </div>
           ))}
-        </div>
-        
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <Button variant="outline" className="w-full">
-            <Calendar className="h-4 w-4 mr-2" />
-            Ver Calendario Completo
-          </Button>
         </div>
       </CardContent>
     </Card>

@@ -7,95 +7,69 @@ import {
   Users, 
   Calculator, 
   FileText, 
-  Download,
-  Plus,
+  BarChart3,
   Settings,
-  CreditCard,
-  BarChart3
+  Plus
 } from 'lucide-react';
-
-interface QuickAction {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  action: () => void;
-  color: string;
-  disabled?: boolean;
-}
 
 export const QuickActions: React.FC = () => {
   const navigate = useNavigate();
 
-  const actions: QuickAction[] = [
+  const actions = [
     {
       title: 'Procesar Nómina',
-      description: 'Liquidar nómina del período actual',
       icon: <Calculator className="h-5 w-5" />,
       action: () => navigate('/app/payroll'),
-      color: 'bg-blue-500 hover:bg-blue-600',
+      color: 'bg-blue-600 hover:bg-blue-700',
     },
     {
       title: 'Nuevo Empleado',
-      description: 'Agregar empleado al sistema',
       icon: <Plus className="h-5 w-5" />,
       action: () => navigate('/app/employees/new'),
-      color: 'bg-green-500 hover:bg-green-600',
+      color: 'bg-green-600 hover:bg-green-700',
     },
     {
       title: 'Ver Empleados',
-      description: 'Gestionar empleados activos',
       icon: <Users className="h-5 w-5" />,
       action: () => navigate('/app/employees'),
-      color: 'bg-purple-500 hover:bg-purple-600',
+      color: 'bg-purple-600 hover:bg-purple-700',
     },
     {
-      title: 'Generar Reportes',
-      description: 'Crear reportes y análisis',
+      title: 'Reportes',
       icon: <BarChart3 className="h-5 w-5" />,
       action: () => navigate('/app/reports'),
-      color: 'bg-orange-500 hover:bg-orange-600',
+      color: 'bg-orange-600 hover:bg-orange-700',
     },
     {
-      title: 'Historial Nómina',
-      description: 'Ver períodos anteriores',
+      title: 'Historial',
       icon: <FileText className="h-5 w-5" />,
       action: () => navigate('/app/payroll-history'),
-      color: 'bg-teal-500 hover:bg-teal-600',
+      color: 'bg-teal-600 hover:bg-teal-700',
     },
     {
       title: 'Configuración',
-      description: 'Ajustes de empresa',
       icon: <Settings className="h-5 w-5" />,
       action: () => navigate('/app/settings'),
-      color: 'bg-gray-500 hover:bg-gray-600',
+      color: 'bg-gray-600 hover:bg-gray-700',
     },
   ];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <CreditCard className="h-5 w-5 text-blue-600" />
-          <span>Acciones Rápidas</span>
-        </CardTitle>
+        <CardTitle>Acciones Rápidas</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {actions.map((action, index) => (
             <Button
               key={index}
               variant="outline"
-              className={`h-auto p-4 flex flex-col items-center space-y-2 text-white border-0 ${action.color} transition-all duration-200 hover:scale-105`}
+              className={`h-20 flex-col space-y-2 text-white border-0 ${action.color}`}
               onClick={action.action}
-              disabled={action.disabled}
             >
-              <div className="p-2 bg-white/20 rounded-lg">
-                {action.icon}
-              </div>
-              <div className="text-center">
-                <div className="font-medium text-sm">{action.title}</div>
-                <div className="text-xs opacity-90">{action.description}</div>
-              </div>
+              {action.icon}
+              <span className="text-sm font-medium">{action.title}</span>
             </Button>
           ))}
         </div>
