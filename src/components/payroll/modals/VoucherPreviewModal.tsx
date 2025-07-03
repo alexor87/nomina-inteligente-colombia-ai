@@ -30,60 +30,78 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
   const { toast } = useToast();
 
   const handleDownloadVoucher = async () => {
-    if (!employee || !period) return;
+    if (!employee || !period) {
+      toast({
+        title: "Error",
+        description: "Faltan datos del empleado o período",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsGenerating(true);
     try {
       console.log('🔄 Generando comprobante para:', employee.name);
       console.log('📋 Datos del empleado:', {
         id: employee.id,
+        name: employee.name,
         baseSalary: employee.baseSalary,
         workedDays: employee.workedDays,
         extraHours: employee.extraHours,
         bonuses: employee.bonuses,
         grossPay: employee.grossPay,
         deductions: employee.deductions,
-        netPay: employee.netPay
+        netPay: employee.netPay,
+        transportAllowance: employee.transportAllowance
       });
 
-      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
-        body: {
-          employee: {
-            id: employee.id,
-            name: employee.name,
-            position: employee.position,
-            baseSalary: employee.baseSalary,
-            workedDays: employee.workedDays,
-            extraHours: employee.extraHours,
-            bonuses: employee.bonuses,
-            disabilities: employee.disabilities,
-            grossPay: employee.grossPay,
-            deductions: employee.deductions,
-            netPay: employee.netPay,
-            eps: employee.eps,
-            afp: employee.afp
-          },
-          period: {
-            startDate: period.startDate,
-            endDate: period.endDate,
-            type: period.type
-          }
+      const requestBody = {
+        employee: {
+          id: employee.id,
+          name: employee.name,
+          position: employee.position,
+          baseSalary: employee.baseSalary,
+          workedDays: employee.workedDays,
+          extraHours: employee.extraHours,
+          bonuses: employee.bonuses,
+          disabilities: employee.disabilities,
+          grossPay: employee.grossPay,
+          deductions: employee.deductions,
+          netPay: employee.netPay,
+          eps: employee.eps,
+          afp: employee.afp,
+          transportAllowance: employee.transportAllowance
+        },
+        period: {
+          startDate: period.startDate,
+          endDate: period.endDate,
+          type: period.type
         }
+      };
+
+      console.log('📤 Enviando request:', requestBody);
+
+      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+        body: requestBody
       });
 
       if (error) {
         console.error('❌ Error en la función:', error);
-        throw error;
+        throw new Error(error.message || 'Error al generar el comprobante');
+      }
+
+      if (!data) {
+        throw new Error('No se recibieron datos del PDF');
       }
 
       console.log('✅ PDF generado exitosamente');
 
-      // Create blob and download
+      // Crear blob y descargar
       const blob = new Blob([data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `comprobante-${employee.name.replace(/\s+/g, '-')}.pdf`;
+      a.download = `comprobante-${employee.name.replace(/\s+/g, '-')}-${period.startDate}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -94,11 +112,11 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         description: "El comprobante de pago se ha descargado exitosamente",
         className: "border-green-200 bg-green-50"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('💥 Error generando comprobante:', error);
       toast({
         title: "Error al generar comprobante",
-        description: "No se pudo generar el comprobante de pago. Verifica los datos e intenta nuevamente.",
+        description: error.message || "No se pudo generar el comprobante de pago. Verifica los datos e intenta nuevamente.",
         variant: "destructive"
       });
     } finally {
@@ -188,12 +206,16 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between py-2 border-b">
-                <span>Salario Base</span>
+                <span>Salario Base (Mensual)</span>
                 <span className="font-semibold">{formatCurrency(employee.baseSalary)}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span>Días Trabajados</span>
                 <span className="font-semibold">{employee.workedDays}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span>Salario Proporcional</span>
+                <span className="font-semibold">{formatCurrency(Math.round((employee.baseSalary / 30) * employee.workedDays))}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span>Horas Extra</span>
@@ -207,10 +229,12 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
                 <span>Auxilio de Transporte</span>
                 <span className="font-semibold">{formatCurrency(employee.transportAllowance)}</span>
               </div>
-              <div className="flex justify-between py-2 border-b">
-                <span>Incapacidades</span>
-                <span className="font-semibold text-red-600">-{formatCurrency(employee.disabilities)}</span>
-              </div>
+              {employee.disabilities > 0 && (
+                <div className="flex justify-between py-2 border-b">
+                  <span>Incapacidades</span>
+                  <span className="font-semibold text-red-600">-{formatCurrency(employee.disabilities)}</span>
+                </div>
+              )}
               <div className="flex justify-between py-2 border-b bg-blue-50 px-3 rounded">
                 <span className="font-semibold">Total Devengado</span>
                 <span className="font-bold">{formatCurrency(employee.grossPay)}</span>

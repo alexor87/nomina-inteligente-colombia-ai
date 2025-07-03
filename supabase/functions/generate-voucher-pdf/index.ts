@@ -37,7 +37,9 @@ interface VoucherData {
 }
 
 const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promise<Uint8Array> => {
-  const { jsPDF } = await import("https://esm.sh/jspdf@2.5.1");
+  // Importar jsPDF correctamente
+  const jsPDFModule = await import("https://esm.sh/jspdf@2.5.1");
+  const { jsPDF } = jsPDFModule.default || jsPDFModule;
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -140,11 +142,11 @@ const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promis
 
   yPosition += 35;
 
-  // TABLA: HORAS EXTRAS, ORDINARIAS Y RECARGOS
+  // TABLA: DEVENGOS
   doc.setTextColor(52, 73, 94);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('HORAS EXTRAS, ORDINARIAS Y RECARGOS', margin, yPosition);
+  doc.text('DEVENGOS', margin, yPosition);
   yPosition += 8;
 
   // Encabezado tabla
@@ -154,33 +156,33 @@ const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promis
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.text('CONCEPTO', margin + 2, yPosition + 5);
-  doc.text('HORAS/DÍAS', margin + 60, yPosition + 5);
-  doc.text('VALOR UNITARIO', margin + 100, yPosition + 5);
-  doc.text('TOTAL', pageWidth - margin - 20, yPosition + 5, { align: 'right' });
+  doc.text('DÍAS/HORAS', margin + 80, yPosition + 5);
+  doc.text('VALOR', pageWidth - margin - 20, yPosition + 5, { align: 'right' });
   yPosition += 8;
 
-  // Filas de conceptos
-  const horasConceptos = [
-    { concepto: 'Salario Básico', cantidad: voucher.salaryDetails.workedDays + ' días', unitario: Math.round(voucher.salaryDetails.baseSalary / 30), total: voucher.salaryDetails.baseSalary },
-    { concepto: 'Horas Extra 25%', cantidad: voucher.salaryDetails.extraHours + ' hrs', unitario: Math.round(voucher.salaryDetails.extraHoursPay / Math.max(voucher.salaryDetails.extraHours, 1)), total: voucher.salaryDetails.extraHoursPay || 0, show: voucher.salaryDetails.extraHours > 0 },
-    { concepto: 'Recargo Nocturno', cantidad: '0 hrs', unitario: 0, total: voucher.salaryDetails.nightSurcharge || 0, show: voucher.salaryDetails.nightSurcharge > 0 },
-    { concepto: 'Recargo Dominical', cantidad: '0 hrs', unitario: 0, total: voucher.salaryDetails.sundaySurcharge || 0, show: voucher.salaryDetails.sundaySurcharge > 0 },
-    { concepto: 'Auxilio de Transporte', cantidad: voucher.salaryDetails.workedDays + ' días', unitario: Math.round(voucher.salaryDetails.transportAllowance / Math.max(voucher.salaryDetails.workedDays, 1)), total: voucher.salaryDetails.transportAllowance || 0, show: voucher.salaryDetails.transportAllowance > 0 },
-    { concepto: 'Bonificaciones', cantidad: '1', unitario: voucher.salaryDetails.bonuses, total: voucher.salaryDetails.bonuses || 0, show: voucher.salaryDetails.bonuses > 0 }
+  // Calcular salario proporcional para el PDF
+  const dailySalary = voucher.salaryDetails.baseSalary / 30;
+  const proportionalSalary = Math.round(dailySalary * voucher.salaryDetails.workedDays);
+
+  // Filas de conceptos de devengos
+  const devengosConceptos = [
+    { concepto: 'Salario Básico', cantidad: voucher.salaryDetails.workedDays + ' días', valor: proportionalSalary },
+    { concepto: 'Horas Extra 25%', cantidad: voucher.salaryDetails.extraHours + ' hrs', valor: voucher.salaryDetails.extraHoursPay || 0, show: voucher.salaryDetails.extraHours > 0 },
+    { concepto: 'Auxilio de Transporte', cantidad: voucher.salaryDetails.workedDays + ' días', valor: voucher.salaryDetails.transportAllowance || 0, show: voucher.salaryDetails.transportAllowance > 0 },
+    { concepto: 'Bonificaciones', cantidad: '1', valor: voucher.salaryDetails.bonuses || 0, show: voucher.salaryDetails.bonuses > 0 }
   ];
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(85, 85, 85);
 
-  for (const concepto of horasConceptos) {
-    if (concepto.show !== false) {
+  for (const concepto of devengosConceptos) {
+    if (concepto.show !== false && concepto.valor > 0) {
       doc.text(concepto.concepto, margin + 2, yPosition + 4);
-      doc.text(concepto.cantidad, margin + 60, yPosition + 4);
-      doc.text(formatCurrency(concepto.unitario), margin + 100, yPosition + 4);
+      doc.text(concepto.cantidad, margin + 80, yPosition + 4);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(46, 125, 50);
-      doc.text(formatCurrency(concepto.total), pageWidth - margin - 2, yPosition + 4, { align: 'right' });
+      doc.text(formatCurrency(concepto.valor), pageWidth - margin - 2, yPosition + 4, { align: 'right' });
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(85, 85, 85);
       yPosition += 6;
@@ -199,11 +201,11 @@ const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promis
 
   yPosition += 15;
 
-  // TABLA: RETENCIONES Y DEDUCCIONES
+  // TABLA: DEDUCCIONES
   doc.setTextColor(52, 73, 94);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('RETENCIONES Y DEDUCCIONES', margin, yPosition);
+  doc.text('DEDUCCIONES', margin, yPosition);
   yPosition += 8;
 
   // Encabezado tabla
@@ -218,12 +220,13 @@ const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promis
   doc.text('VALOR', pageWidth - margin - 20, yPosition + 5, { align: 'right' });
   yPosition += 8;
 
-  // Filas deducciones
-  const baseCalculation = voucher.salaryDetails.baseSalary + (voucher.salaryDetails.extraHoursPay || 0) + (voucher.salaryDetails.bonuses || 0);
+  // Base para deducciones (sin auxilio de transporte)
+  const baseForDeductions = proportionalSalary + (voucher.salaryDetails.extraHoursPay || 0) + (voucher.salaryDetails.bonuses || 0);
+  
   const deduccionesConceptos = [
-    { concepto: 'Salud (4%)', base: baseCalculation, porcentaje: '4.00%', valor: voucher.salaryDetails.healthContribution, show: voucher.salaryDetails.healthContribution > 0 },
-    { concepto: 'Pensión (4%)', base: baseCalculation, porcentaje: '4.00%', valor: voucher.salaryDetails.pensionContribution, show: voucher.salaryDetails.pensionContribution > 0 },
-    { concepto: 'Retención Fuente', base: baseCalculation, porcentaje: 'Var', valor: voucher.salaryDetails.withholdingTax || 0, show: voucher.salaryDetails.withholdingTax > 0 },
+    { concepto: 'Salud (4%)', base: baseForDeductions, porcentaje: '4.00%', valor: voucher.salaryDetails.healthContribution, show: voucher.salaryDetails.healthContribution > 0 },
+    { concepto: 'Pensión (4%)', base: baseForDeductions, porcentaje: '4.00%', valor: voucher.salaryDetails.pensionContribution, show: voucher.salaryDetails.pensionContribution > 0 },
+    { concepto: 'Retención Fuente', base: baseForDeductions, porcentaje: 'Var', valor: voucher.salaryDetails.withholdingTax || 0, show: voucher.salaryDetails.withholdingTax > 0 },
     { concepto: 'Otras Deducciones', base: 0, porcentaje: '-', valor: voucher.salaryDetails.otherDeductions || 0, show: voucher.salaryDetails.otherDeductions > 0 }
   ];
 
@@ -232,7 +235,7 @@ const generatePDFBuffer = async (voucher: VoucherData, companyInfo: any): Promis
   doc.setTextColor(85, 85, 85);
 
   for (const deduccion of deduccionesConceptos) {
-    if (deduccion.show !== false) {
+    if (deduccion.show !== false && deduccion.valor > 0) {
       doc.text(deduccion.concepto, margin + 2, yPosition + 4);
       doc.text(deduccion.base > 0 ? formatCurrency(deduccion.base) : '-', margin + 62, yPosition + 4);
       doc.text(deduccion.porcentaje, margin + 110, yPosition + 4);
@@ -320,13 +323,13 @@ const handler = async (req: Request): Promise<Response> => {
     const requestBody = await req.json();
     const { voucherId, employee, period } = requestBody;
 
-    console.log('Generating voucher PDF for:', { voucherId, employee: employee?.name, period: period?.startDate });
+    console.log('🔄 Generando comprobante PDF para:', { voucherId, employee: employee?.name, period: period?.startDate });
 
     let voucherData: VoucherData;
     let company: any;
 
     if (voucherId) {
-      // Existing voucher flow
+      // Flujo de voucher existente
       const { data: voucher, error: voucherError } = await supabase
         .from('payroll_vouchers')
         .select(`
@@ -338,7 +341,7 @@ const handler = async (req: Request): Promise<Response> => {
         .single();
 
       if (voucherError || !voucher) {
-        console.error('Voucher not found:', voucherError);
+        console.error('Voucher no encontrado:', voucherError);
         throw new Error('Comprobante no encontrado');
       }
 
@@ -349,6 +352,13 @@ const handler = async (req: Request): Promise<Response> => {
         .single();
 
       company = companyData;
+
+      // Usar datos del payroll si están disponibles
+      const payrollData = voucher.payrolls;
+      const baseSalary = payrollData?.salario_base || voucher.net_pay;
+      const workedDays = payrollData?.dias_trabajados || 30;
+      const dailySalary = baseSalary / 30;
+      const proportionalSalary = Math.round(dailySalary * workedDays);
 
       voucherData = {
         voucherId: voucher.id,
@@ -362,25 +372,25 @@ const handler = async (req: Request): Promise<Response> => {
         endDate: voucher.end_date,
         netPay: voucher.net_pay,
         salaryDetails: {
-          baseSalary: voucher.payrolls?.salario_base || voucher.net_pay,
-          workedDays: voucher.payrolls?.dias_trabajados || 30,
-          extraHours: voucher.payrolls?.horas_extra || 0,
-          extraHoursPay: Math.round((voucher.payrolls?.horas_extra || 0) * (voucher.payrolls?.salario_base || 0) / 192 * 1.25),
-          nightSurcharge: voucher.payrolls?.recargo_nocturno || 0,
-          sundaySurcharge: voucher.payrolls?.recargo_dominical || 0,
-          transportAllowance: voucher.payrolls?.auxilio_transporte || 0,
-          bonuses: voucher.payrolls?.bonificaciones || 0,
-          totalEarnings: voucher.payrolls?.total_devengado || voucher.net_pay,
-          healthContribution: voucher.payrolls?.salud_empleado || 0,
-          pensionContribution: voucher.payrolls?.pension_empleado || 0,
-          withholdingTax: voucher.payrolls?.retencion_fuente || 0,
-          otherDeductions: voucher.payrolls?.otras_deducciones || 0,
-          totalDeductions: voucher.payrolls?.total_deducciones || 0
+          baseSalary: baseSalary,
+          workedDays: workedDays,
+          extraHours: payrollData?.horas_extra || 0,
+          extraHoursPay: Math.round((payrollData?.horas_extra || 0) * (baseSalary / 192) * 1.25),
+          nightSurcharge: payrollData?.recargo_nocturno || 0,
+          sundaySurcharge: payrollData?.recargo_dominical || 0,
+          transportAllowance: payrollData?.auxilio_transporte || 0,
+          bonuses: payrollData?.bonificaciones || 0,
+          totalEarnings: payrollData?.total_devengado || voucher.net_pay,
+          healthContribution: payrollData?.salud_empleado || Math.round(proportionalSalary * 0.04),
+          pensionContribution: payrollData?.pension_empleado || Math.round(proportionalSalary * 0.04),
+          withholdingTax: payrollData?.retencion_fuente || 0,
+          otherDeductions: payrollData?.otras_deducciones || 0,
+          totalDeductions: payrollData?.total_deducciones || Math.round(proportionalSalary * 0.08)
         }
       };
     } else if (employee && period) {
-      // Direct generation from employee and period data
-      console.log('Generating voucher from direct employee data');
+      // Generación directa desde datos del empleado
+      console.log('🔄 Generando comprobante desde datos directos del empleado');
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
@@ -407,25 +417,32 @@ const handler = async (req: Request): Promise<Response> => {
         .eq('id', employee.id)
         .single();
 
-      // Calcular valores usando los datos del empleado
+      // Calcular valores usando la lógica corregida
       const baseSalary = employee.baseSalary || 0;
       const workedDays = employee.workedDays || 30;
       const extraHours = employee.extraHours || 0;
       const bonuses = employee.bonuses || 0;
       
-      // Calcular horas extra pay
-      const hourlyRate = baseSalary / 192; // Aproximación mensual
-      const extraHoursPay = extraHours * hourlyRate * 1.25;
+      // Cálculo proporcional como Aleluya
+      const dailySalary = baseSalary / 30;
+      const proportionalSalary = Math.round(dailySalary * workedDays);
       
-      // Calcular auxilio de transporte
-      const transportAllowance = baseSalary <= 2600000 ? Math.round(200000 * (workedDays / 30)) : 0;
+      // Horas extra
+      const hourlyRate = baseSalary / 192;
+      const extraHoursPay = Math.round(extraHours * hourlyRate * 1.25);
       
-      // Calcular deducciones
-      const baseForDeductions = baseSalary + extraHoursPay + bonuses;
+      // Auxilio de transporte
+      const transportAllowance = baseSalary <= 2600000 ? Math.round((200000 / 30) * workedDays) : 0;
+      
+      // Total devengado
+      const totalEarnings = proportionalSalary + extraHoursPay + transportAllowance + bonuses;
+      
+      // Deducciones sobre base sin auxilio
+      const baseForDeductions = proportionalSalary + extraHoursPay + bonuses;
       const healthContribution = Math.round(baseForDeductions * 0.04);
       const pensionContribution = Math.round(baseForDeductions * 0.04);
-      const totalDeductions = healthContribution + pensionContribution + (employee.deductions || 0);
-      const totalEarnings = baseSalary + extraHoursPay + transportAllowance + bonuses;
+      const totalDeductions = healthContribution + pensionContribution;
+      const netPay = totalEarnings - totalDeductions;
 
       voucherData = {
         voucherId: 'temp-' + Date.now(),
@@ -437,12 +454,12 @@ const handler = async (req: Request): Promise<Response> => {
         periodo: `${period.startDate} - ${period.endDate}`,
         startDate: period.startDate,
         endDate: period.endDate,
-        netPay: employee.netPay || (totalEarnings - totalDeductions),
+        netPay: netPay,
         salaryDetails: {
           baseSalary,
           workedDays,
           extraHours,
-          extraHoursPay: Math.round(extraHoursPay),
+          extraHoursPay,
           nightSurcharge: 0,
           sundaySurcharge: 0,
           transportAllowance,
@@ -451,7 +468,7 @@ const handler = async (req: Request): Promise<Response> => {
           healthContribution,
           pensionContribution,
           withholdingTax: 0,
-          otherDeductions: Math.max(0, (employee.deductions || 0) - healthContribution - pensionContribution),
+          otherDeductions: 0,
           totalDeductions
         }
       };
@@ -459,8 +476,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Datos insuficientes: se requiere voucherId o employee + period');
     }
 
-    console.log('Company found:', company?.razon_social);
-    console.log('Voucher data:', JSON.stringify(voucherData, null, 2));
+    console.log('🏢 Empresa encontrada:', company?.razon_social);
+    console.log('📄 Datos del voucher:', JSON.stringify(voucherData, null, 2));
 
     const pdfBuffer = await generatePDFBuffer(voucherData, company);
     
@@ -473,7 +490,7 @@ const handler = async (req: Request): Promise<Response> => {
         })
         .eq('id', voucherId);
 
-      console.log('Voucher updated successfully');
+      console.log('✅ Voucher actualizado exitosamente');
     }
 
     const fileName = `comprobante-nomina_${voucherData.employeeCedula}_${voucherData.periodo.replace(/\s+/g, '_')}.pdf`;
@@ -487,7 +504,7 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
   } catch (error: any) {
-    console.error('Error generating PDF:', error);
+    console.error('❌ Error generando PDF:', error);
     
     return new Response(JSON.stringify({ 
       success: false,
