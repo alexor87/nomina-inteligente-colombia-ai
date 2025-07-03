@@ -9,11 +9,13 @@ export class PayrollHistoryService {
       
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
-        console.log('⚠️ No se encontró company_id');
+        console.log('⚠️ No se encontró company_id para el usuario actual');
         return [];
       }
 
-      // Consultar períodos reales únicamente
+      console.log('🏢 Company ID del usuario:', companyId);
+
+      // Consultar períodos reales únicamente con filtro estricto por empresa
       const { data: periods, error } = await supabase
         .from('payroll_periods_real')
         .select('*')
@@ -26,32 +28,45 @@ export class PayrollHistoryService {
       }
 
       if (!periods || periods.length === 0) {
-        console.log('✅ Historial limpio - No existen períodos de nómina');
+        console.log('✅ Empresa nueva - No existen períodos de nómina');
         return [];
       }
 
-      // Mapear a formato esperado
-      const mappedPeriods: PayrollHistoryPeriod[] = periods.map(period => ({
-        id: period.id,
-        period: period.periodo,
-        startDate: period.fecha_inicio,
-        endDate: period.fecha_fin,
-        type: period.tipo_periodo as any,
-        employeesCount: period.empleados_count || 0,
-        status: period.estado as any,
-        totalGrossPay: Number(period.total_devengado) || 0,
-        totalNetPay: Number(period.total_neto) || 0,
-        totalDeductions: Number(period.total_deducciones) || 0,
-        totalCost: Number(period.total_neto) || 0,
-        employerContributions: 0,
-        paymentStatus: 'pendiente' as any,
-        version: 1,
-        createdAt: period.created_at,
-        updatedAt: period.updated_at || period.created_at,
-        editable: period.estado === 'borrador'
-      }));
+      console.log(`📊 Períodos encontrados para empresa ${companyId}:`, periods.length);
 
-      console.log(`📊 Períodos encontrados: ${mappedPeriods.length}`);
+      // Validar que todos los períodos pertenecen a la empresa correcta
+      const invalidPeriods = periods.filter(p => p.company_id !== companyId);
+      if (invalidPeriods.length > 0) {
+        console.error('🚨 DATOS CORRUPTOS: Períodos con company_id incorrecto:', invalidPeriods);
+        // Filtrar solo los períodos válidos
+        const validPeriods = periods.filter(p => p.company_id === companyId);
+        console.log('✅ Filtrando a períodos válidos:', validPeriods.length);
+      }
+
+      // Mapear a formato esperado solo los períodos válidos
+      const mappedPeriods: PayrollHistoryPeriod[] = periods
+        .filter(period => period.company_id === companyId) // Filtro adicional de seguridad
+        .map(period => ({
+          id: period.id,
+          period: period.periodo,
+          startDate: period.fecha_inicio,
+          endDate: period.fecha_fin,
+          type: period.tipo_periodo as any,
+          employeesCount: period.empleados_count || 0,
+          status: period.estado as any,
+          totalGrossPay: Number(period.total_devengado) || 0,
+          totalNetPay: Number(period.total_neto) || 0,
+          totalDeductions: Number(period.total_deducciones) || 0,
+          totalCost: Number(period.total_neto) || 0,
+          employerContributions: 0,
+          paymentStatus: 'pendiente' as any,
+          version: 1,
+          createdAt: period.created_at,
+          updatedAt: period.updated_at || period.created_at,
+          editable: period.estado === 'borrador'
+        }));
+
+      console.log(`✅ Períodos válidos mapeados: ${mappedPeriods.length}`);
       return mappedPeriods;
 
     } catch (error) {
@@ -67,17 +82,32 @@ export class PayrollHistoryService {
         throw new Error('No se encontró la empresa del usuario');
       }
 
-      // Obtener período
+      console.log('🔍 Buscando detalles del período:', periodId, 'para empresa:', companyId);
+
+      // Obtener período con validación estricta de empresa
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('id', periodId)
-        .eq('company_id', companyId)
+        .eq('company_id', companyId) // Filtro estricto por empresa
         .single();
 
-      if (periodError) throw periodError;
+      if (periodError) {
+        console.error('❌ Error obteniendo período:', periodError);
+        throw periodError;
+      }
 
-      // Obtener empleados del período
+      if (!period) {
+        throw new Error('Período no encontrado o no pertenece a su empresa');
+      }
+
+      // Validar que el período pertenece a la empresa correcta
+      if (period.company_id !== companyId) {
+        console.error('🚨 INTENTO DE ACCESO NO AUTORIZADO: Período no pertenece a empresa del usuario');
+        throw new Error('No tiene permisos para acceder a este período');
+      }
+
+      // Obtener empleados del período con filtro estricto
       const { data: payrolls, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
@@ -85,22 +115,29 @@ export class PayrollHistoryService {
           employees!inner(nombre, apellido, cargo)
         `)
         .eq('period_id', periodId)
-        .eq('company_id', companyId);
+        .eq('company_id', companyId); // Filtro adicional por empresa
 
-      if (payrollsError) throw payrollsError;
+      if (payrollsError) {
+        console.error('❌ Error obteniendo empleados:', payrollsError);
+        throw payrollsError;
+      }
 
-      const employees: PayrollHistoryEmployee[] = (payrolls || []).map(payroll => ({
-        id: payroll.id,
-        periodId: periodId,
-        payrollId: payroll.id,
-        name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
-        position: payroll.employees.cargo || 'Sin cargo',
-        grossPay: Number(payroll.total_devengado) || 0,
-        deductions: Number(payroll.total_deducciones) || 0,
-        netPay: Number(payroll.neto_pagado) || 0,
-        baseSalary: Number(payroll.salario_base) || 0,
-        paymentStatus: 'pendiente' as any
-      }));
+      const employees: PayrollHistoryEmployee[] = (payrolls || [])
+        .filter(payroll => payroll.company_id === companyId) // Filtro adicional de seguridad
+        .map(payroll => ({
+          id: payroll.id,
+          periodId: periodId,
+          payrollId: payroll.id,
+          name: `${payroll.employees.nombre} ${payroll.employees.apellido}`,
+          position: payroll.employees.cargo || 'Sin cargo',
+          grossPay: Number(payroll.total_devengado) || 0,
+          deductions: Number(payroll.total_deducciones) || 0,
+          netPay: Number(payroll.neto_pagado) || 0,
+          baseSalary: Number(payroll.salario_base) || 0,
+          paymentStatus: 'pendiente' as any
+        }));
+
+      console.log(`✅ Empleados válidos encontrados: ${employees.length}`);
 
       const summary = {
         totalDevengado: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
@@ -302,18 +339,63 @@ export class PayrollHistoryService {
   static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      if (!user) {
+        console.log('❌ No hay usuario autenticado');
+        return null;
+      }
 
-      const { data: profile } = await supabase
+      console.log('👤 Usuario autenticado:', user.email);
+
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
 
-      return profile?.company_id || null;
+      if (error) {
+        console.error('❌ Error obteniendo perfil de usuario:', error);
+        return null;
+      }
+
+      if (!profile?.company_id) {
+        console.log('⚠️ Usuario sin empresa asignada');
+        return null;
+      }
+
+      console.log('🏢 Company ID obtenido:', profile.company_id);
+      return profile.company_id;
     } catch (error) {
       console.error('Error getting company ID:', error);
       return null;
+    }
+  }
+
+  // Función para limpiar datos corruptos (solo para administradores)
+  static async cleanOrphanedPeriods(): Promise<void> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se encontró la empresa del usuario');
+      }
+
+      console.log('🧹 Limpiando períodos huérfanos para empresa:', companyId);
+
+      // Eliminar períodos que no tengan payrolls asociados
+      const { error } = await supabase
+        .from('payroll_periods_real')
+        .delete()
+        .eq('company_id', companyId)
+        .eq('empleados_count', 0);
+
+      if (error) {
+        console.error('❌ Error limpiando períodos huérfanos:', error);
+        throw error;
+      }
+
+      console.log('✅ Períodos huérfanos eliminados');
+    } catch (error) {
+      console.error('Error cleaning orphaned periods:', error);
+      throw error;
     }
   }
 }
