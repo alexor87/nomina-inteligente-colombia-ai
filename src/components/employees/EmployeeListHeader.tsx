@@ -10,9 +10,7 @@ import {
   Filter, 
   RefreshCw,
   Trash2,
-  AlertTriangle,
-  Zap,
-  Settings
+  AlertTriangle
 } from 'lucide-react';
 import { DataCleanupDialog } from './DataCleanupDialog';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
@@ -45,11 +43,9 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
   onOpenImport,
   onExportToExcel,
   onCreateEmployee,
-  onRefreshData,
-  onForceCompleteRefresh
+  onRefreshData
 }) => {
   const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
-  const { companyId } = useCurrentCompany();
 
   const getEmployeeCountText = () => {
     if (searchTerm && filteredCount !== totalEmployees) {
@@ -64,29 +60,10 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
     }
   };
 
-  const handleForceRefresh = () => {
-    if (onForceCompleteRefresh) {
-      onForceCompleteRefresh();
-    }
-  };
-
   const handleCleanupComplete = () => {
-    if (onForceCompleteRefresh) {
-      onForceCompleteRefresh();
+    if (onRefreshData) {
+      onRefreshData();
     }
-  };
-
-  const activateSupportMode = () => {
-    if (companyId) {
-      const currentUrl = window.location.origin + window.location.pathname;
-      const newUrl = `${currentUrl}?support_company=${companyId}`;
-      window.location.href = newUrl;
-    }
-  };
-
-  const deactivateSupportMode = () => {
-    const currentUrl = window.location.origin + window.location.pathname;
-    window.location.href = currentUrl;
   };
 
   return (
@@ -111,30 +88,6 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Botón para activar/desactivar modo soporte */}
-          {!isSupportMode ? (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={activateSupportMode}
-              disabled={!companyId}
-              className="flex items-center gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
-            >
-              <Settings className="h-4 w-4" />
-              Modo Soporte
-            </Button>
-          ) : (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={deactivateSupportMode}
-              className="flex items-center gap-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-            >
-              <Settings className="h-4 w-4" />
-              Salir Soporte
-            </Button>
-          )}
-
           {/* Botón de refresh normal */}
           <Button 
             variant="outline" 
@@ -144,17 +97,6 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
           >
             <RefreshCw className="h-4 w-4" />
             Actualizar
-          </Button>
-
-          {/* Botón de refresh completo */}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleForceRefresh}
-            className="flex items-center gap-2 border-orange-300 text-orange-700 hover:bg-orange-50"
-          >
-            <Zap className="h-4 w-4" />
-            Recarga Total
           </Button>
 
           {/* Botón de limpieza completa (solo para soporte) */}
