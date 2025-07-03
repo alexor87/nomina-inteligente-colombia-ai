@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -14,7 +13,7 @@ interface PayrollCalculationInput {
   disabilities: number;
   bonuses: number;
   absences: number;
-  periodType: 'quincenal' | 'mensual';
+  periodType: 'quincenal' | 'mensual' | 'semanal';
   periodDate?: string; // Nueva propiedad para jornada legal dinámica
 }
 
@@ -137,6 +136,9 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
 
   let maxDays: number;
   switch (input.periodType) {
+    case 'semanal':
+      maxDays = 7;
+      break;
     case 'quincenal':
       maxDays = 15;
       break;
@@ -156,7 +158,21 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
 
   // Validación mejorada de horas extra con jornada legal dinámica
   const maxHorasExtraSemanales = jornadaLegal.horasSemanales * 0.25;
-  const horasExtraSemanalesEstimadas = input.extraHours / (input.periodType === 'quincenal' ? 2 : 4);
+  let horasExtraSemanalesEstimadas: number;
+  
+  switch (input.periodType) {
+    case 'semanal':
+      horasExtraSemanalesEstimadas = input.extraHours;
+      break;
+    case 'quincenal':
+      horasExtraSemanalesEstimadas = input.extraHours / 2;
+      break;
+    case 'mensual':
+      horasExtraSemanalesEstimadas = input.extraHours / 4;
+      break;
+    default:
+      horasExtraSemanalesEstimadas = input.extraHours / 4;
+  }
   
   if (horasExtraSemanalesEstimadas > maxHorasExtraSemanales) {
     warnings.push(`Horas extra excesivas para jornada de ${jornadaLegal.horasSemanales}h semanales (máximo recomendado: ${maxHorasExtraSemanales}h/semana)`);
@@ -203,9 +219,13 @@ function calculatePayroll(input: PayrollCalculationInput) {
   let monthlyDivisor: number;
   
   switch (input.periodType) {
+    case 'semanal':
+      periodDays = 7;
+      monthlyDivisor = 120; // 30 días × 4 semanas por mes
+      break;
     case 'quincenal':
       periodDays = 15;
-      monthlyDivisor = 60; // 30 días × 2 quincenas por mes
+      monthlyDivisor = 30; // Divisor como Aleluya para 15 días
       break;
     case 'mensual':
       periodDays = 30;
@@ -227,10 +247,18 @@ function calculatePayroll(input: PayrollCalculationInput) {
   // CORRECCIÓN: Auxilio de transporte proporcional por período
   let transportAllowance = 0;
   if (input.baseSalary <= (config.salarioMinimo * 2)) {
-    if (input.periodType === 'quincenal') {
-      transportAllowance = Math.round((config.auxilioTransporte / 2) * (input.workedDays / periodDays));
-    } else {
-      transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / periodDays));
+    switch (input.periodType) {
+      case 'semanal':
+        transportAllowance = Math.round((config.auxilioTransporte / 4) * (input.workedDays / periodDays));
+        break;
+      case 'quincenal':
+        transportAllowance = Math.round((config.auxilioTransporte / 2) * (input.workedDays / periodDays));
+        break;
+      case 'mensual':
+        transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / periodDays));
+        break;
+      default:
+        transportAllowance = Math.round(config.auxilioTransporte * (input.workedDays / periodDays));
     }
   }
 
@@ -277,7 +305,7 @@ function calculatePayroll(input: PayrollCalculationInput) {
       horasSemanales: jornadaLegal.horasSemanales,
       horasMensuales: Math.round(jornadaLegal.horasMensuales),
       divisorHorario: hourlyDivisor,
-      valorHoraOrdinaria: Math.round(hourlyRate),
+      valorHoraOrdinaria: Math.round(input.baseSalary / hourlyDivisor),
       ley: jornadaLegal.ley,
       descripcion: jornadaLegal.descripcion
     }

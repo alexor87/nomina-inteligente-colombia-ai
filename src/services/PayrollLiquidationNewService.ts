@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
-import { PayrollCalculationUnifiedService } from './PayrollCalculationUnifiedService';
+import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
 
 export class PayrollLiquidationNewService {
   static async loadEmployeesForActivePeriod(period: any): Promise<PayrollEmployee[]> {
@@ -28,6 +28,10 @@ export class PayrollLiquidationNewService {
         console.log('⚠️ No se encontraron empleados activos');
         return [];
       }
+
+      // **CRÍTICO: Obtener la periodicidad real de la empresa**
+      const companyPeriodicity = await PayrollCalculationEnhancedService.getUserConfiguredPeriodicity();
+      console.log(`⚙️ Periodicidad de la empresa: ${companyPeriodicity}`);
 
       // Buscar nóminas existentes para este período
       const { data: existingPayrolls, error: payrollsError } = await supabase
@@ -73,9 +77,14 @@ export class PayrollLiquidationNewService {
             console.log(`✅ Usando nómina existente para: ${employee.nombre}`);
             payrollEmployee = this.mapExistingPayrollToEmployee(employee, existingPayroll);
           } else {
-            // Calcular nueva nómina
-            console.log(`🔄 Calculando nueva nómina para: ${employee.nombre}`);
-            payrollEmployee = await this.calculateEmployeePayroll(employee, period, employeeNovedades);
+            // **USAR PayrollCalculationEnhancedService con periodicidad correcta**
+            console.log(`🔄 Calculando nueva nómina para: ${employee.nombre} con periodicidad: ${companyPeriodicity}`);
+            payrollEmployee = await this.calculateEmployeePayrollWithPeriodicity(
+              employee, 
+              period, 
+              employeeNovedades, 
+              companyPeriodicity
+            );
           }
 
           processedEmployees.push(payrollEmployee);
@@ -144,21 +153,43 @@ export class PayrollLiquidationNewService {
     };
   }
 
-  private static async calculateEmployeePayroll(employee: any, period: any, novedades: any[]): Promise<PayrollEmployee> {
+  private static async calculateEmployeePayrollWithPeriodicity(
+    employee: any, 
+    period: any, 
+    novedades: any[], 
+    periodicity: 'quincenal' | 'mensual' | 'semanal'
+  ): Promise<PayrollEmployee> {
     try {
       const baseSalary = Number(employee.salario_base) || 0;
       
-      // Usar el servicio de cálculo unificado
-      const calculation = await PayrollCalculationUnifiedService.calculateEmployeePayroll({
-        employee: {
-          id: employee.id,
-          name: `${employee.nombre} ${employee.apellido}`,
-          baseSalary,
-          workedDays: employee.dias_trabajo || 30,
-          // Mapear otros campos necesarios
-        },
-        period,
-        novedades
+      // Determinar días trabajados según periodicidad
+      let workedDays: number;
+      switch (periodicity) {
+        case 'semanal':
+          workedDays = employee.dias_trabajo || 7;
+          break;
+        case 'quincenal':
+          workedDays = employee.dias_trabajo || 15;
+          break;
+        case 'mensual':
+          workedDays = employee.dias_trabajo || 30;
+          break;
+        default:
+          workedDays = employee.dias_trabajo || 30;
+      }
+      
+      // **USAR PayrollCalculationEnhancedService con periodicidad correcta**
+      const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
+        baseSalary,
+        workedDays,
+        extraHours: 0, // Se puede agregar desde novedades
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        periodType: periodicity, // **CRÍTICO: Usar periodicidad real**
+        periodDate: new Date(period.fecha_inicio),
+        empleadoId: employee.id,
+        periodoId: period.id
       });
 
       return {
@@ -166,20 +197,20 @@ export class PayrollLiquidationNewService {
         name: `${employee.nombre} ${employee.apellido}`,
         position: employee.cargo || 'Sin cargo',
         baseSalary,
-        workedDays: employee.dias_trabajo || 30,
-        extraHours: calculation.extraHours || 0,
-        disabilities: calculation.disabilities || 0,
-        bonuses: calculation.bonuses || 0,
-        absences: calculation.absences || 0,
-        grossPay: calculation.grossPay || baseSalary,
-        deductions: calculation.deductions || 0,
-        netPay: calculation.netPay || baseSalary,
+        workedDays,
+        extraHours: calculation.extraPay > 0 ? Math.round(calculation.extraPay / (baseSalary / 192 * 1.25)) : 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        grossPay: calculation.grossPay,
+        deductions: calculation.totalDeductions,
+        netPay: calculation.netPay,
         status: 'valid',
         errors: [],
         eps: employee.eps || '',
         afp: employee.afp || '',
-        transportAllowance: calculation.transportAllowance || 0,
-        employerContributions: this.calculateEmployerContributions(baseSalary)
+        transportAllowance: calculation.transportAllowance,
+        employerContributions: calculation.employerContributions
       };
     } catch (error) {
       console.error('❌ Error en cálculo de nómina:', error);
