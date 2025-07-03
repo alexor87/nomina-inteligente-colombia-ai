@@ -14,6 +14,7 @@ import { PayrollEmployee } from '@/types/payroll';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { NovedadUnifiedModal } from './novedades/NovedadUnifiedModal';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 
 interface PayrollTableNewProps {
   employees: PayrollEmployee[];
@@ -57,6 +58,41 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
       await onCreateNovedad(selectedEmployeeForNovedad.id, data);
       setShowNovedadModal(false);
       setSelectedEmployeeForNovedad(null);
+    }
+  };
+
+  const calculateSuggestedValue = (
+    tipo: string,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ): number | null => {
+    if (!selectedEmployeeForNovedad) return null;
+    
+    console.log('🧮 PayrollTableNew - Calculating suggested value:', {
+      tipo,
+      subtipo,
+      horas,
+      dias,
+      employeeSalary: selectedEmployeeForNovedad.baseSalary
+    });
+    
+    try {
+      const fechaPeriodo = new Date();
+      const result = calcularValorNovedadEnhanced(
+        tipo as any,
+        subtipo,
+        selectedEmployeeForNovedad.baseSalary,
+        dias,
+        horas,
+        fechaPeriodo
+      );
+      
+      console.log(`💰 Calculation result: $${Math.round(result.valor).toLocaleString()}`);
+      return Math.round(result.valor);
+    } catch (error) {
+      console.error('❌ Error calculating suggested value:', error);
+      return null;
     }
   };
 
@@ -186,6 +222,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
           employeeSalary={selectedEmployeeForNovedad.baseSalary}
           periodId={periodId}
           onCreateNovedad={handleCreateNovedad}
+          calculateSuggestedValue={calculateSuggestedValue}
         />
       )}
     </>
