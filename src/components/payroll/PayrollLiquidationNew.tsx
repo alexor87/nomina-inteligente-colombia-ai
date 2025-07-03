@@ -1,15 +1,12 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
-import { PayrollPeriodService } from '@/services/PayrollPeriodService';
-import { Employee } from '@/types';
-import { EmployeePayrollView } from './EmployeePayrollView';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
+import { PayrollHistoryEmployee } from '@/types/payroll-history';
 import { toast } from '@/hooks/use-toast';
-import { usePayrolls } from '@/hooks/usePayrolls';
-import { useEmployeeStore } from '@/stores/employeeStore';
 
 interface PayrollLiquidationNewProps {
   periodId: string;
@@ -17,16 +14,24 @@ interface PayrollLiquidationNewProps {
   onEmployeeSelect?: (employeeId: string) => void;
 }
 
+// Simple number formatting function
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
 export const PayrollLiquidationNew = ({ 
   periodId, 
   onCalculationComplete, 
   onEmployeeSelect 
 }: PayrollLiquidationNewProps) => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<PayrollHistoryEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
-  const { updateEmployee } = useEmployeeStore();
-  const { recalculateEmployeePayroll } = usePayrolls();
 
   const loadEmployees = useCallback(async () => {
     setIsLoading(true);
@@ -80,10 +85,6 @@ export const PayrollLiquidationNew = ({
     }
   }, [loadEmployees, onCalculationComplete, periodId]);
 
-  const recalculateAfterNovedadChange = useCallback(async (employeeId: string) => {
-    await handleRecalculateEmployee(employeeId);
-  }, [handleRecalculateEmployee]);
-
   return (
     <Card className="w-full">
       <CardHeader>
@@ -114,15 +115,36 @@ export const PayrollLiquidationNew = ({
                     </div>
                   </div>
                   <Badge variant="secondary">
-                    ${PayrollPeriodService.formatNumber(employee.netPay)}
+                    {formatCurrency(employee.netPay)}
                   </Badge>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <EmployeePayrollView 
-                    employeeId={employee.id}
-                    periodId={periodId}
-                    onRecalculate={recalculateAfterNovedadChange}
-                  />
+                  <div className="p-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium">Salario Base</p>
+                        <p className="text-sm text-muted-foreground">{formatCurrency(employee.baseSalary)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Devengado</p>
+                        <p className="text-sm text-muted-foreground">{formatCurrency(employee.grossPay)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Deducciones</p>
+                        <p className="text-sm text-muted-foreground">{formatCurrency(employee.deductions)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Neto a Pagar</p>
+                        <p className="text-sm font-medium text-green-600">{formatCurrency(employee.netPay)}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRecalculateEmployee(employee.id)}
+                      className="w-full px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors"
+                    >
+                      Recalcular
+                    </button>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             ))}
