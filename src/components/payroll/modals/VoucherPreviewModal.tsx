@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
@@ -102,11 +101,15 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           console.error('❌ Error response:', errorText);
           
           // Intentar parsear como JSON
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          // Si no es JSON, usar el texto plano
-          errorMessage = errorText || errorMessage;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            // Si no es JSON, usar el texto plano
+            errorMessage = errorText || errorMessage;
+          }
+        } catch (textError) {
+          console.error('❌ Error leyendo respuesta de error:', textError);
         }
         
         throw new Error(errorMessage);
