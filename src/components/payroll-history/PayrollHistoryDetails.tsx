@@ -277,7 +277,10 @@ export const PayrollHistoryDetails: React.FC = () => {
                 payroll_id: emp.payrollId,
                 estado: 'procesada'
               }))} 
-              isEditable={period.editable}
+              novedades={{}}
+              onAddNovedad={() => {}}
+              onEditNovedad={() => {}}
+              canEdit={period.editable}
             />
           </CardContent>
         </Card>

@@ -407,7 +407,7 @@ export class PayrollHistoryService {
         return {
           success: typedResult.success,
           message: typedResult.message,
-          employeesCreated: typedResult.records_created
+          records_created: typedResult.records_created
         };
       }
 
