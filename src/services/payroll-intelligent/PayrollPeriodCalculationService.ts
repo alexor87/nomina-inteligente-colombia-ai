@@ -1,44 +1,50 @@
-
 import { PayrollPeriod } from '@/types/payroll';
 import { BiWeeklyPeriodService } from './BiWeeklyPeriodService';
 
 export class PayrollPeriodCalculationService {
-  // Calcular siguiente período basado en CONSULTA A BASE DE DATOS - VERSIÓN PROFESIONAL
+  /**
+   * LÓGICA PROFESIONAL CORREGIDA - CÁLCULO DE PERÍODOS ESTRICTO
+   * Siempre consulta BD para generar períodos consecutivos correctos
+   */
+  
   static async calculateNextPeriodFromDatabase(periodicity: string, companyId: string): Promise<{
     startDate: string;
     endDate: string;
   }> {
-    console.log('📅 Calculando siguiente período DESDE BASE DE DATOS:', {
+    console.log('📅 CALCULANDO SIGUIENTE PERÍODO ESTRICTO DESDE BD:', {
       periodicity,
       companyId
     });
 
     switch (periodicity) {
       case 'quincenal':
-        // Usar servicio profesional que consulta la BD
-        console.log('📅 Calculando siguiente período quincenal DESDE BD');
+        // Usar servicio ESTRICTO que consulta la BD
+        console.log('📅 CALCULANDO PERÍODO QUINCENAL ESTRICTO DESDE BD');
         return await BiWeeklyPeriodService.generateNextConsecutivePeriodFromDatabase(companyId);
         
       case 'mensual':
-        // Para mensual, usar lógica similar consultando BD
+        // Para mensual, usar lógica mejorada
         return await this.calculateNextMonthlyPeriodFromDatabase(companyId);
         
       case 'semanal':
-        // Para semanal, usar lógica similar consultando BD  
+        // Para semanal, usar lógica mejorada
         return await this.calculateNextWeeklyPeriodFromDatabase(companyId);
         
       default:
-        // Por defecto, usar quincenal desde BD
+        // Por defecto, usar quincenal ESTRICTO desde BD
+        console.log('📅 PERIODICIDAD NO RECONOCIDA - Usando quincenal estricto por defecto');
         return await BiWeeklyPeriodService.generateNextConsecutivePeriodFromDatabase(companyId);
     }
   }
 
-  // Método de respaldo que usa el último período cerrado (ORIGINAL CORREGIDO)
+  /**
+   * MÉTODO DE RESPALDO MEJORADO - usa último período cerrado
+   */
   static calculateNextPeriod(periodicity: string, closedPeriod: PayrollPeriod): {
     startDate: string;
     endDate: string;
   } {
-    console.log('📅 Calculando siguiente período basado en período cerrado:', {
+    console.log('📅 CALCULANDO SIGUIENTE PERÍODO BASADO EN PERÍODO CERRADO ESTRICTO:', {
       periodicity,
       closedPeriodEnd: closedPeriod.fecha_fin,
       closedPeriodType: closedPeriod.tipo_periodo
@@ -46,12 +52,12 @@ export class PayrollPeriodCalculationService {
 
     switch (periodicity) {
       case 'quincenal':
-        // Usar servicio profesional para períodos quincenales
-        console.log('📅 Calculando siguiente período quincenal PROFESIONAL');
-        return BiWeeklyPeriodService.generateNextConsecutivePeriod(closedPeriod.fecha_fin);
+        // Usar servicio ESTRICTO para períodos quincenales
+        console.log('📅 CALCULANDO PERÍODO QUINCENAL CONSECUTIVO ESTRICTO');
+        return BiWeeklyPeriodService.generateStrictNextConsecutivePeriod(closedPeriod.fecha_fin);
         
       case 'mensual':
-        // Usar lógica mensual
+        // Lógica mensual mejorada
         const baseDate = new Date(closedPeriod.fecha_fin);
         const startDate = new Date(baseDate);
         startDate.setDate(startDate.getDate() + 1);
@@ -64,7 +70,7 @@ export class PayrollPeriodCalculationService {
         };
         
       case 'semanal':
-        // Usar lógica semanal
+        // Lógica semanal mejorada
         const weekBaseDate = new Date(closedPeriod.fecha_fin);
         const weekStartDate = new Date(weekBaseDate);
         weekStartDate.setDate(weekStartDate.getDate() + 1);
@@ -78,8 +84,8 @@ export class PayrollPeriodCalculationService {
         };
         
       default:
-        // Por defecto quincenal
-        return BiWeeklyPeriodService.generateNextConsecutivePeriod(closedPeriod.fecha_fin);
+        // Por defecto quincenal ESTRICTO
+        return BiWeeklyPeriodService.generateStrictNextConsecutivePeriod(closedPeriod.fecha_fin);
     }
   }
 
@@ -139,7 +145,7 @@ export class PayrollPeriodCalculationService {
       const overlaps = newStart <= periodEnd && newEnd >= periodStart;
       
       if (overlaps) {
-        console.warn('⚠️ Superposición detectada con período:', period);
+        console.warn('⚠️ SUPERPOSICIÓN DETECTADA con período:', period);
         return { isValid: false, conflictPeriod: period };
       }
     }

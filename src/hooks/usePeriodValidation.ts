@@ -12,27 +12,27 @@ export const usePeriodValidation = () => {
   const validateBiWeeklyPeriods = async (companyId: string) => {
     try {
       setIsValidating(true);
-      console.log('🔍 Iniciando validación profesional completa de períodos...');
+      console.log('🔍 INICIANDO VALIDACIÓN PROFESIONAL ESTRICTA de períodos...');
       
-      // 1. Normalizar períodos irregulares automáticamente
+      // 1. Normalizar períodos irregulares automáticamente con LÓGICA ESTRICTA
       await BiWeeklyPeriodService.normalizeAllBiWeeklyPeriods(companyId);
       
       // 2. Normalizar nombres de períodos para consistencia
       await PeriodNameUnifiedService.normalizeExistingPeriods(companyId);
       
       toast({
-        title: "✅ Validación Completada",
-        description: "Los períodos quincenales han sido validados, corregidos y normalizados automáticamente",
+        title: "✅ Validación Estricta Completada",
+        description: "Los períodos quincenales han sido validados y corregidos con reglas estrictas (1-15, 16-fin de mes)",
         className: "border-green-200 bg-green-50"
       });
       
-      console.log('✅ Validación profesional completada exitosamente');
+      console.log('✅ VALIDACIÓN ESTRICTA PROFESIONAL COMPLETADA EXITOSAMENTE');
       
     } catch (error) {
-      console.error('❌ Error en validación de períodos:', error);
+      console.error('❌ Error en validación estricta de períodos:', error);
       toast({
-        title: "Error en Validación",
-        description: "No se pudieron validar los períodos quincenales",
+        title: "Error en Validación Estricta",
+        description: "No se pudieron validar los períodos quincenales con reglas estrictas",
         variant: "destructive"
       });
     } finally {
@@ -41,52 +41,53 @@ export const usePeriodValidation = () => {
   };
 
   const testBiWeeklyGeneration = async () => {
-    console.log('🧪 PRUEBA DE GENERACIÓN DE PERÍODOS QUINCENALES PROFESIONALES:');
+    console.log('🧪 PRUEBA DE GENERACIÓN DE PERÍODOS QUINCENALES ESTRICTOS:');
     
     try {
-      // Probar generación de período actual
-      const currentPeriod = BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
-      console.log('📅 Período actual:', currentPeriod);
+      // Probar generación de primer período estricto
+      const firstPeriod = BiWeeklyPeriodService.generateFirstStrictBiWeeklyPeriod();
+      console.log('📅 PRIMER PERÍODO ESTRICTO:', firstPeriod);
       
-      // Probar generación consecutiva
-      const nextPeriod = BiWeeklyPeriodService.generateNextConsecutivePeriod(currentPeriod.endDate);
-      console.log('📅 Siguiente período:', nextPeriod);
+      // Probar generación consecutiva estricta
+      const nextPeriod = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod(firstPeriod.endDate);
+      console.log('📅 SIGUIENTE PERÍODO ESTRICTO:', nextPeriod);
       
-      // Probar febrero (año bisiesto y normal)
-      const febPeriod1 = BiWeeklyPeriodService.generateNextConsecutivePeriod('2024-01-31');
-      const febPeriod2 = BiWeeklyPeriodService.generateNextConsecutivePeriod(febPeriod1.endDate);
-      console.log('📅 Febrero 2024 (bisiesto) 1ra quincena:', febPeriod1);
-      console.log('📅 Febrero 2024 (bisiesto) 2da quincena:', febPeriod2);
+      // Probar febrero (año bisiesto y normal) con LÓGICA ESTRICTA
+      const febPeriod1 = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod('2024-01-31');
+      const febPeriod2 = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod(febPeriod1.endDate);
+      console.log('📅 FEBRERO 2024 (bisiesto) 1ra quincena ESTRICTA:', febPeriod1);
+      console.log('📅 FEBRERO 2024 (bisiesto) 2da quincena ESTRICTA:', febPeriod2);
       
-      const febPeriod1_2025 = BiWeeklyPeriodService.generateNextConsecutivePeriod('2025-01-31');
-      const febPeriod2_2025 = BiWeeklyPeriodService.generateNextConsecutivePeriod(febPeriod1_2025.endDate);
-      console.log('📅 Febrero 2025 (normal) 1ra quincena:', febPeriod1_2025);
-      console.log('📅 Febrero 2025 (normal) 2da quincena:', febPeriod2_2025);
+      const febPeriod1_2025 = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod('2025-01-31');
+      const febPeriod2_2025 = BiWeeklyPeriodService.generateStrictNextConsecutivePeriod(febPeriod1_2025.endDate);
+      console.log('📅 FEBRERO 2025 (normal) 1ra quincena ESTRICTA:', febPeriod1_2025);
+      console.log('📅 FEBRERO 2025 (normal) 2da quincena ESTRICTA:', febPeriod2_2025);
       
-      // Validar períodos
-      const validation1 = BiWeeklyPeriodService.validateBiWeeklyPeriod(currentPeriod.startDate, currentPeriod.endDate);
+      // Validar períodos con VALIDADOR ESTRICTO
+      const validation1 = BiWeeklyPeriodService.validateBiWeeklyPeriod(firstPeriod.startDate, firstPeriod.endDate);
       const validation2 = BiWeeklyPeriodService.validateBiWeeklyPeriod('2024-02-05', '2024-02-20'); // Período irregular
       
-      console.log('✅ Validación período actual:', validation1);
-      console.log('⚠️ Validación período irregular:', validation2);
+      console.log('✅ VALIDACIÓN PERÍODO ESTRICTO:', validation1);
+      console.log('⚠️ VALIDACIÓN PERÍODO IRREGULAR (será corregido):', validation2);
       
       toast({
-        title: "🧪 Prueba Completada",
-        description: "Revisa la consola para ver los resultados detallados de la prueba de períodos quincenales profesionales",
+        title: "🧪 Prueba Estricta Completada",
+        description: "Revisa la consola para ver los resultados detallados de la prueba de períodos quincenales ESTRICTOS (1-15, 16-fin de mes)",
         className: "border-blue-200 bg-blue-50"
       });
       
     } catch (error) {
-      console.error('❌ Error en prueba de períodos:', error);
+      console.error('❌ Error en prueba de períodos estrictos:', error);
       toast({
-        title: "Error en Prueba",
-        description: "Ocurrió un error durante la prueba de períodos quincenales",
+        title: "Error en Prueba Estricta",
+        description: "Ocurrió un error durante la prueba de períodos quincenales estrictos",
         variant: "destructive"
       });
     }
   };
 
   return {
+    // Estado
     isValidating,
     validationResults,
     validateBiWeeklyPeriods,
