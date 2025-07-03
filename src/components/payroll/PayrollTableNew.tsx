@@ -39,7 +39,7 @@ export const PayrollTableNew = ({
   const [companyData, setCompanyData] = useState<any>(null);
   const checkboxRef = useRef<HTMLButtonElement>(null);
 
-  // Cargar datos de la empresa al montar el componente
+  // Cargar datos REALES de la empresa al montar el componente
   useEffect(() => {
     const loadCompanyData = async () => {
       try {
@@ -48,7 +48,13 @@ export const PayrollTableNew = ({
           const company = await CompanyConfigurationService.getCompanyData(companyId);
           if (company) {
             setCompanyData(company);
-            console.log('✅ Datos de empresa cargados:', company);
+            console.log('✅ Datos REALES de empresa cargados:', {
+              razon_social: company.razon_social,
+              nit: company.nit,
+              direccion: company.direccion,
+              telefono: company.telefono,
+              email: company.email
+            });
           }
         }
       } catch (error) {
@@ -93,9 +99,11 @@ export const PayrollTableNew = ({
     setIsGeneratingVoucher(employee.id);
     
     try {
-      console.log('🎨 Generando comprobante con datos reales...');
+      console.log('🎨 Generando comprobante CORREGIDO con datos reales...');
       console.log('🏢 Empresa:', companyData.razon_social);
+      console.log('🆔 NIT empresa:', companyData.nit);
       console.log('👤 Empleado:', employee.name);
+      console.log('🆔 Cédula empleado:', employee.cedula);
       console.log('💰 Salario:', employee.baseSalary);
       console.log('📊 Días trabajados:', employee.workedDays);
 
@@ -111,7 +119,7 @@ export const PayrollTableNew = ({
           grossPay: employee.grossPay,
           deductions: employee.deductions,
           netPay: employee.netPay,
-          transportAllowance: employee.transportAllowance || 0,
+          transportAllowance: employee.transportAllowance || 162000, // Auxilio legal 2024
           bonuses: employee.bonuses || 0,
           extraHours: employee.extraHours || 0
         },
@@ -129,7 +137,7 @@ export const PayrollTableNew = ({
         }
       };
 
-      console.log('📋 Datos enviados a la edge function:', voucherData);
+      console.log('📋 Datos REALES enviados a la edge function:', voucherData);
 
       const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
         body: voucherData
@@ -145,22 +153,22 @@ export const PayrollTableNew = ({
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
+      link.download = `comprobante-corregido-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
       toast({
-        title: "✅ Comprobante generado",
-        description: `Comprobante de ${employee.name} descargado correctamente`,
+        title: "✅ Comprobante CORREGIDO generado",
+        description: `Comprobante con datos reales de ${employee.name} descargado correctamente`,
       });
 
     } catch (error) {
-      console.error('❌ Error generando comprobante:', error);
+      console.error('❌ Error generando comprobante corregido:', error);
       toast({
         title: "Error",
-        description: "No se pudo generar el comprobante. Intenta nuevamente.",
+        description: "No se pudo generar el comprobante corregido. Intenta nuevamente.",
         variant: "destructive"
       });
     } finally {
@@ -293,6 +301,7 @@ export const PayrollTableNew = ({
                         type: 'mensual'
                       })}
                       disabled={isGeneratingVoucher === employee.id}
+                      title="Generar comprobante con datos reales"
                     >
                       {isGeneratingVoucher === employee.id ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
