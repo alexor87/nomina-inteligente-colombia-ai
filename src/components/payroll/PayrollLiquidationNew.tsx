@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,9 +11,11 @@ import {
   CheckCircle, 
   RefreshCw,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Wrench
 } from 'lucide-react';
 import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
+import { usePeriodValidation } from '@/hooks/usePeriodValidation';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PayrollTableNew } from './PayrollTableNew';
 import { PayrollSummaryStats } from './PayrollSummaryStats';
@@ -41,10 +42,19 @@ export const PayrollLiquidationNew = () => {
     hasEmployees
   } = usePayrollLiquidationNew();
 
+  // Hook para corrección de períodos
+  const { executeIntegralCorrection, isValidating } = usePeriodValidation();
+
   // Wrapper functions for button handlers
   const handleRefreshPeriod = () => refreshPeriod(0);
   const handleRetryInitialization = () => refreshPeriod(0);
   const handleForceRefresh = () => refreshPeriod(0);
+
+  // Nueva función para ejecutar corrección integral
+  const handlePeriodCorrection = async () => {
+    if (!currentPeriod?.company_id) return;
+    await executeIntegralCorrection(currentPeriod.company_id);
+  };
 
   // Loading inicial
   if (isLoading) {
@@ -221,6 +231,17 @@ export const PayrollLiquidationNew = () => {
               Recalcular Todo
             </Button>
 
+            {/* NUEVO: Botón de Corrección de Períodos */}
+            <Button
+              variant="outline"
+              onClick={handlePeriodCorrection}
+              disabled={isValidating || !currentPeriod}
+              className="border-orange-200 text-orange-700 hover:bg-orange-50"
+            >
+              <Wrench className={`h-4 w-4 mr-2 ${isValidating ? 'animate-spin' : ''}`} />
+              {isValidating ? 'Corrigiendo...' : 'Corregir Períodos'}
+            </Button>
+
             {canClosePeriod && (
               <Button
                 onClick={closePeriod}
@@ -322,6 +343,23 @@ export const PayrollLiquidationNew = () => {
               <div>
                 <p className="text-blue-800 font-medium">Sistema Inteligente Activo</p>
                 <p className="text-blue-600 text-sm">{periodStatus.message}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* NUEVO: Card informativo sobre la corrección */}
+        {isValidating && (
+          <Card className="p-4 bg-orange-50 border-orange-200">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-orange-100 rounded-full">
+                <Wrench className="h-4 w-4 text-orange-600 animate-spin" />
+              </div>
+              <div>
+                <p className="text-orange-800 font-medium">Corrección de Períodos en Proceso</p>
+                <p className="text-orange-600 text-sm">
+                  Ejecutando validación y corrección automática de fechas y nombres de períodos...
+                </p>
               </div>
             </div>
           </Card>
