@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -235,7 +236,7 @@ export const DevengoModal = ({
 
   const recalculateEmployeeTotals = async () => {
     try {
-      await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(employeeId, periodId);
+      await PayrollHistoryService.recalculateEmployeeTotalsWithNovelties(employeeId, periodId);
     } catch (error) {
       console.error('❌ Error recalculating employee totals:', error);
     }
