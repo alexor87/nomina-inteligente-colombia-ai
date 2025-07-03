@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔄 INICIANDO GENERACIÓN DE PDF PROFESIONAL');
+    console.log('🔄 INICIANDO GENERACIÓN DE PDF - VERSIÓN ROBUSTA');
     
     const requestBody = await req.json();
     console.log('📋 Datos recibidos:', JSON.stringify(requestBody, null, 2));
@@ -65,7 +65,7 @@ serve(async (req) => {
             
             companyInfo = company;
 
-            // Obtener información completa del empleado (incluyendo documento)
+            // Obtener información completa del empleado
             const { data: employeeData } = await supabase
               .from('employees')
               .select('*')
@@ -91,10 +91,10 @@ serve(async (req) => {
     console.log('🏢 Información de empresa obtenida:', companyInfo?.razon_social || 'No disponible');
     console.log('👤 Información de empleado completada:', employeeComplete.name);
 
-    // Generar PDF profesional usando una librería más confiable
-    const pdfContent = await generateProfessionalVoucherPDF(employeeComplete, period, companyInfo);
+    // Generar PDF usando pdf-lib (más estable que jsPDF)
+    const pdfContent = await generateRobustVoucherPDF(employeeComplete, period, companyInfo);
 
-    console.log('✅ PDF PROFESIONAL GENERADO EXITOSAMENTE');
+    console.log('✅ PDF GENERADO EXITOSAMENTE');
 
     return new Response(pdfContent, {
       headers: {
@@ -106,8 +106,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('💥 ERROR CRÍTICO GENERANDO PDF:', error);
+    console.error('Stack trace:', error.stack);
     return new Response(
-      JSON.stringify({ error: error.message || 'Error interno del servidor' }),
+      JSON.stringify({ 
+        error: error.message || 'Error interno del servidor',
+        stack: error.stack 
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -116,177 +120,159 @@ serve(async (req) => {
   }
 });
 
-// FUNCIÓN PRINCIPAL: Generar PDF profesional usando jsPDF optimizado
-async function generateProfessionalVoucherPDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
-  console.log('📄 GENERANDO PDF PROFESIONAL CON JSPDF AVANZADO...');
+// FUNCIÓN ROBUSTA: Generar PDF usando pdf-lib
+async function generateRobustVoucherPDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
+  console.log('📄 GENERANDO PDF CON LIBRERÍA ROBUSTA...');
   
-  // Función auxiliar para formatear moneda
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
-  // Función auxiliar para formatear fecha
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  // Cálculos detallados profesionales
-  const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
-  
-  // Deducciones calculadas detalladamente
-  const saludEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
-  const pensionEmpleado = Math.round(employee.baseSalary * 0.04); // 4%
-  const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0; // 1% si > 4 SMMLV
-  const otrasDeduccionesCalculadas = Math.max(0, employee.deductions - saludEmpleado - pensionEmpleado - fondoSolidaridad);
-  
-  // Horas extra calculadas con valor real
-  const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25); // Hora extra ordinaria
-  const totalHorasExtra = employee.extraHours * valorHoraExtra;
-
-  const documento = employee.documento || employee.cedula || employee.id?.slice(0, 8) || 'N/A';
-  const tipoDocumento = employee.tipo_documento || 'CC';
-
-  // Convertir HTML a PDF usando jsPDF avanzado
   try {
-    console.log('📄 CONVIRTIENDO A PDF PROFESIONAL MEJORADO...');
+    // Importar pdf-lib desde esm.sh (más estable para Deno)
+    const { PDFDocument, StandardFonts, rgb } = await import('https://esm.sh/pdf-lib@1.17.1');
     
-    // Importar jsPDF desde ESM
-    const jsPDFModule = await import('https://cdn.skypack.dev/jspdf@2.5.1');
-    const { jsPDF } = jsPDFModule.default || jsPDFModule;
+    // Crear documento PDF
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595, 842]); // A4 size
     
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
+    // Obtener fuentes
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    // Colores
+    const primaryColor = rgb(0.12, 0.25, 0.69); // Azul corporativo
+    const grayColor = rgb(0.4, 0.4, 0.4);
+    const blackColor = rgb(0, 0, 0);
+    
+    // Función auxiliar para formatear moneda
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0
+      }).format(amount);
+    };
+
+    // Función auxiliar para formatear fecha
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString('es-CO', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    };
+
+    // Cálculos detallados
+    const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
+    const saludEmpleado = Math.round(employee.baseSalary * 0.04);
+    const pensionEmpleado = Math.round(employee.baseSalary * 0.04);
+    const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0;
+    const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25);
+    const totalHorasExtra = employee.extraHours * valorHoraExtra;
+
+    const documento = employee.documento || employee.cedula || employee.id?.slice(0, 8) || 'N/A';
+    const tipoDocumento = employee.tipo_documento || 'CC';
+
+    let yPosition = 800;
+
+    // TÍTULO PRINCIPAL
+    page.drawText('COMPROBANTE DE NÓMINA', {
+      x: 50,
+      y: yPosition,
+      size: 20,
+      font: boldFont,
+      color: primaryColor,
+    });
+    
+    yPosition -= 40;
+
+    // INFORMACIÓN DE LA EMPRESA
+    page.drawText('EMPRESA', {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      font: boldFont,
+      color: primaryColor,
+    });
+    
+    page.drawText(companyInfo?.razon_social || 'Mi Empresa', {
+      x: 50,
+      y: yPosition - 20,
+      size: 11,
+      font: boldFont,
+      color: blackColor,
+    });
+    
+    page.drawText(`NIT: ${companyInfo?.nit || 'N/A'}`, {
+      x: 50,
+      y: yPosition - 40,
+      size: 10,
+      font: font,
+      color: grayColor,
     });
 
-    // Configurar colores y fuentes profesionales
-    const primaryColor = [30, 64, 175]; // Azul corporativo
-    const secondaryColor = [51, 130, 246]; // Azul claro
-    const grayColor = [107, 114, 128]; // Gris
-    const lightGrayColor = [243, 244, 246]; // Gris claro
-
-    let yPos = 20;
-
-    // ENCABEZADO PROFESIONAL
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(20);
-    pdf.setTextColor(...primaryColor);
-    pdf.text('COMPROBANTE DE NÓMINA', 105, yPos, { align: 'center' });
+    // INFORMACIÓN DEL EMPLEADO
+    page.drawText('EMPLEADO', {
+      x: 200,
+      y: yPosition,
+      size: 12,
+      font: boldFont,
+      color: primaryColor,
+    });
     
-    // Línea divisoria
-    pdf.setDrawColor(...secondaryColor);
-    pdf.setLineWidth(1);
-    pdf.line(20, yPos + 5, 190, yPos + 5);
+    page.drawText(employee.name, {
+      x: 200,
+      y: yPosition - 20,
+      size: 11,
+      font: boldFont,
+      color: blackColor,
+    });
     
-    yPos += 20;
-
-    // INFORMACIÓN EN TRES COLUMNAS (DISEÑO PROFESIONAL)
-    const colWidth = 56;
-    const startX = 20;
-
-    // Fondo gris claro para las tarjetas
-    pdf.setFillColor(...lightGrayColor);
-    pdf.rect(startX, yPos - 3, colWidth, 35, 'F');
-    pdf.rect(startX + colWidth + 2, yPos - 3, colWidth, 35, 'F');
-    pdf.rect(startX + (colWidth + 2) * 2, yPos - 3, colWidth, 35, 'F');
-
-    // Bordes azules para las tarjetas
-    pdf.setDrawColor(...primaryColor);
-    pdf.setLineWidth(2);
-    pdf.line(startX, yPos - 3, startX, yPos + 32); // Línea izquierda empresa
-    pdf.line(startX + colWidth + 2, yPos - 3, startX + colWidth + 2, yPos + 32); // Línea izquierda empleado
-    pdf.line(startX + (colWidth + 2) * 2, yPos - 3, startX + (colWidth + 2) * 2, yPos + 32); // Línea izquierda período
-
-    // EMPRESA
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(...primaryColor);
-    pdf.text('EMPRESA', startX + 2, yPos);
-    
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(11);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text(companyInfo?.razon_social || 'Mi Empresa', startX + 2, yPos + 8);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.setTextColor(...grayColor);
-    pdf.text(`NIT: ${companyInfo?.nit || 'N/A'}`, startX + 2, yPos + 15);
-    if (companyInfo?.direccion) {
-      pdf.text(companyInfo.direccion.substring(0, 25), startX + 2, yPos + 22);
-    }
-
-    // EMPLEADO
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(...primaryColor);
-    pdf.text('EMPLEADO', startX + colWidth + 4, yPos);
-    
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(11);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text(employee.name, startX + colWidth + 4, yPos + 8);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.setTextColor(...grayColor);
-    pdf.text(`${tipoDocumento}: ${documento}`, startX + colWidth + 4, yPos + 15);
-    if (employee.position) {
-      pdf.text(`Cargo: ${employee.position}`, startX + colWidth + 4, yPos + 22);
-    }
+    page.drawText(`${tipoDocumento}: ${documento}`, {
+      x: 200,
+      y: yPosition - 40,
+      size: 10,
+      font: font,
+      color: grayColor,
+    });
 
     // PERÍODO DE PAGO
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(...primaryColor);
-    pdf.text('PERÍODO DE PAGO', startX + (colWidth + 2) * 2 + 2, yPos);
+    page.drawText('PERÍODO DE PAGO', {
+      x: 350,
+      y: yPosition,
+      size: 12,
+      font: boldFont,
+      color: primaryColor,
+    });
     
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text(`${formatDate(period.startDate)} - ${formatDate(period.endDate)}`, startX + (colWidth + 2) * 2 + 2, yPos + 8);
+    page.drawText(`${formatDate(period.startDate)} - ${formatDate(period.endDate)}`, {
+      x: 350,
+      y: yPosition - 20,
+      size: 10,
+      font: boldFont,
+      color: blackColor,
+    });
     
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.setTextColor(...grayColor);
-    pdf.text(`Días trabajados: ${employee.workedDays}`, startX + (colWidth + 2) * 2 + 2, yPos + 15);
-    pdf.text(`Salario Base: ${formatCurrency(employee.baseSalary)}`, startX + (colWidth + 2) * 2 + 2, yPos + 22);
+    page.drawText(`Días trabajados: ${employee.workedDays}`, {
+      x: 350,
+      y: yPosition - 40,
+      size: 9,
+      font: font,
+      color: grayColor,
+    });
 
-    yPos += 45;
+    yPosition -= 80;
 
-    // RESUMEN DEL PAGO - TABLA PROFESIONAL
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(...primaryColor);
-    pdf.text('💵 RESUMEN DEL PAGO', 20, yPos);
-    yPos += 10;
+    // RESUMEN DEL PAGO
+    page.drawText('💵 RESUMEN DEL PAGO', {
+      x: 50,
+      y: yPosition,
+      size: 14,
+      font: boldFont,
+      color: primaryColor,
+    });
 
-    // Tabla con fondo y bordes profesionales
-    const tableStartY = yPos;
-    const rowHeight = 8;
-    let currentY = tableStartY;
+    yPosition -= 30;
 
-    // Encabezado de tabla
-    pdf.setFillColor(...primaryColor);
-    pdf.rect(20, currentY, 170, rowHeight, 'F');
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('CONCEPTO', 25, currentY + 5);
-    pdf.text('VALOR', 165, currentY + 5);
-    currentY += rowHeight;
-
-    // Filas de datos con alternado de colores
-    const tableData = [
+    // Tabla de conceptos
+    const conceptos = [
       ['Salario Proporcional', formatCurrency(salarioProporcional)],
       ...(employee.transportAllowance > 0 ? [['Subsidio de Transporte', formatCurrency(employee.transportAllowance)]] : []),
       ...(employee.bonuses > 0 ? [['Bonificaciones', formatCurrency(employee.bonuses)]] : []),
@@ -294,192 +280,186 @@ async function generateProfessionalVoucherPDF(employee: any, period: any, compan
       ...(employee.deductions > 0 ? [['Deducciones', `-${formatCurrency(employee.deductions)}`]] : []),
     ];
 
-    tableData.forEach((row, index) => {
-      // Alternar colores de fondo
-      if (index % 2 === 0) {
-        pdf.setFillColor(248, 250, 252);
-        pdf.rect(20, currentY, 170, rowHeight, 'F');
-      }
+    conceptos.forEach((concepto, index) => {
+      const isTotal = index === conceptos.length - 1 && concepto[0] === 'Deducciones';
+      const textColor = isTotal ? rgb(0.86, 0.15, 0.15) : blackColor;
       
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
+      page.drawText(concepto[0], {
+        x: 70,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: textColor,
+      });
       
-      if (row[0] === 'Deducciones') {
-        pdf.setTextColor(220, 38, 38); // Rojo para deducciones
-      } else {
-        pdf.setTextColor(0, 0, 0);
-      }
+      page.drawText(concepto[1], {
+        x: 400,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: textColor,
+      });
       
-      pdf.text(row[0], 25, currentY + 5);
-      pdf.text(row[1], 165, currentY + 5);
-      currentY += rowHeight;
+      yPosition -= 20;
     });
 
-    // Total neto destacado
-    pdf.setFillColor(...secondaryColor);
-    pdf.rect(20, currentY, 170, rowHeight + 2, 'F');
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(11);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('TOTAL NETO A PAGAR', 25, currentY + 6);
-    pdf.text(formatCurrency(employee.netPay), 165, currentY + 6);
-    currentY += rowHeight + 5;
+    // TOTAL NETO DESTACADO
+    page.drawRectangle({
+      x: 50,
+      y: yPosition - 10,
+      width: 495,
+      height: 25,
+      color: rgb(0.85, 0.93, 1),
+    });
 
-    yPos = currentY + 10;
+    page.drawText('TOTAL NETO A PAGAR', {
+      x: 70,
+      y: yPosition,
+      size: 12,
+      font: boldFont,
+      color: primaryColor,
+    });
+    
+    page.drawText(formatCurrency(employee.netPay), {
+      x: 400,
+      y: yPosition,
+      size: 12,
+      font: boldFont,
+      color: primaryColor,
+    });
 
-    // HORAS EXTRAS (si existen)
-    if (employee.extraHours > 0) {
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(14);
-      pdf.setTextColor(...primaryColor);
-      pdf.text('⏱ HORAS EXTRAS, ORDINARIAS Y RECARGOS', 20, yPos);
-      yPos += 10;
+    yPosition -= 50;
 
-      // Tabla de horas extra
-      pdf.setFillColor(...primaryColor);
-      pdf.rect(20, yPos, 170, rowHeight, 'F');
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text('CONCEPTO', 25, yPos + 5);
-      pdf.text('CANTIDAD', 100, yPos + 5);
-      pdf.text('VALOR', 165, yPos + 5);
-      yPos += rowHeight;
-
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(20, yPos, 170, rowHeight, 'F');
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text('Hora Extra Ordinaria', 25, yPos + 5);
-      pdf.text(`${employee.extraHours} horas`, 100, yPos + 5);
-      pdf.text(formatCurrency(totalHorasExtra), 165, yPos + 5);
-      yPos += rowHeight;
-
-      // Total horas
-      pdf.setFillColor(...secondaryColor);
-      pdf.rect(20, yPos, 170, rowHeight, 'F');
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text('Total pago por horas', 25, yPos + 5);
-      pdf.text(formatCurrency(totalHorasExtra), 165, yPos + 5);
-      yPos += rowHeight + 10;
-    }
-
-    // DEDUCCIONES DETALLADAS (si existen)
-    if (employee.deductions > 0) {
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(14);
-      pdf.setTextColor(...primaryColor);
-      pdf.text('💸 RETENCIONES Y DEDUCCIONES', 20, yPos);
-      yPos += 10;
-
-      // Tabla de deducciones
-      pdf.setFillColor(...primaryColor);
-      pdf.rect(20, yPos, 170, rowHeight, 'F');
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text('CONCEPTO', 25, yPos + 5);
-      pdf.text('%', 100, yPos + 5);
-      pdf.text('VALOR', 165, yPos + 5);
-      yPos += rowHeight;
-
-      const deductionData = [
-        ...(saludEmpleado > 0 ? [['Salud', '4%', formatCurrency(saludEmpleado)]] : []),
-        ...(pensionEmpleado > 0 ? [['Pensión', '4%', formatCurrency(pensionEmpleado)]] : []),
-        ...(fondoSolidaridad > 0 ? [['Fondo de Solidaridad', '1%', formatCurrency(fondoSolidaridad)]] : []),
-        ...(otrasDeduccionesCalculadas > 0 ? [['Otros', '-', formatCurrency(otrasDeduccionesCalculadas)]] : []),
-      ];
-
-      deductionData.forEach((row, index) => {
-        if (index % 2 === 0) {
-          pdf.setFillColor(248, 250, 252);
-          pdf.rect(20, yPos, 170, rowHeight, 'F');
-        }
-        
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9);
-        pdf.setTextColor(0, 0, 0);
-        pdf.text(row[0], 25, yPos + 5);
-        pdf.text(row[1], 100, yPos + 5);
-        pdf.text(row[2], 165, yPos + 5);
-        yPos += rowHeight;
+    // FIRMAS
+    if (yPosition > 150) {
+      page.drawText('_________________________', {
+        x: 80,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: grayColor,
+      });
+      
+      page.drawText('_________________________', {
+        x: 320,
+        y: yPosition,
+        size: 10,
+        font: font,
+        color: grayColor,
       });
 
-      // Total deducciones
-      pdf.setFillColor(...secondaryColor);
-      pdf.rect(20, yPos, 170, rowHeight, 'F');
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text('Total Retenciones y Deducciones', 25, yPos + 5);
-      pdf.text(formatCurrency(employee.deductions), 165, yPos + 5);
-      yPos += rowHeight + 10;
+      page.drawText('Firma del Empleado', {
+        x: 100,
+        y: yPosition - 20,
+        size: 9,
+        font: font,
+        color: grayColor,
+      });
+      
+      page.drawText('Firma del Representante Legal', {
+        x: 320,
+        y: yPosition - 20,
+        size: 9,
+        font: font,
+        color: grayColor,
+      });
+
+      page.drawText(employee.name, {
+        x: 100,
+        y: yPosition - 40,
+        size: 10,
+        font: boldFont,
+        color: blackColor,
+      });
+      
+      page.drawText(companyInfo?.razon_social || 'Mi Empresa', {
+        x: 320,
+        y: yPosition - 40,
+        size: 10,
+        font: boldFont,
+        color: blackColor,
+      });
     }
 
-    // FIRMAS (en la parte inferior)
-    yPos = Math.max(yPos, 240); // Asegurar que esté en la parte inferior
-
-    // Línea divisoria
-    pdf.setDrawColor(...grayColor);
-    pdf.setLineWidth(0.5);
-    pdf.line(20, yPos, 190, yPos);
-    yPos += 10;
-
-    // Espacios para firmas
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.setTextColor(...grayColor);
-    
-    // Líneas de firma
-    pdf.line(30, yPos, 80, yPos);
-    pdf.line(110, yPos, 160, yPos);
-    
-    pdf.text('Firma del Empleado', 45, yPos + 5);
-    pdf.text('Firma del Representante Legal', 115, yPos + 5);
-    
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(9);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text(employee.name, 45, yPos + 12);
-    pdf.text(companyInfo?.razon_social || 'Mi Empresa', 115, yPos + 12);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    pdf.setTextColor(...grayColor);
-    pdf.text(`${tipoDocumento}: ${documento}`, 45, yPos + 18);
-    pdf.text(`NIT: ${companyInfo?.nit || 'N/A'}`, 115, yPos + 18);
-
     // FOOTER CON MARCA FINPPI
-    yPos += 30;
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    pdf.setTextColor(...grayColor);
-    pdf.text('Este documento fue generado con ', 105, yPos, { align: 'center' });
-    
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(...primaryColor);
-    pdf.text('Finppi', 135, yPos);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(...grayColor);
-    pdf.text(' – Software de Nómina y Seguridad Social', 144, yPos);
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(...secondaryColor);
-    pdf.text('www.finppi.com', 105, yPos + 5, { align: 'center' });
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7);
-    pdf.setTextColor(...grayColor);
-    pdf.text(`Generado el ${new Date().toLocaleString('es-CO')}`, 105, yPos + 10, { align: 'center' });
+    page.drawText('Este documento fue generado con Finppi – Software de Nómina', {
+      x: 50,
+      y: 50,
+      size: 8,
+      font: font,
+      color: grayColor,
+    });
 
-    return new Uint8Array(pdf.output('arraybuffer'));
+    page.drawText(`Generado el ${new Date().toLocaleString('es-CO')}`, {
+      x: 50,
+      y: 35,
+      size: 7,
+      font: font,
+      color: grayColor,
+    });
+
+    // Serializar el PDF
+    const pdfBytes = await pdfDoc.save();
+    console.log('✅ PDF serialized successfully, size:', pdfBytes.length);
+    
+    return new Uint8Array(pdfBytes);
     
   } catch (error) {
-    console.error('❌ Error generando PDF profesional:', error);
-    throw error;
+    console.error('❌ Error en generateRobustVoucherPDF:', error);
+    console.error('Stack trace:', error.stack);
+    
+    // Fallback: generar PDF simple en caso de error
+    return await generateSimpleFallbackPDF(employee, period, companyInfo);
+  }
+}
+
+// FALLBACK: PDF simple si falla la versión principal
+async function generateSimpleFallbackPDF(employee: any, period: any, companyInfo: any): Promise<Uint8Array> {
+  console.log('🔄 Generando PDF fallback simple...');
+  
+  try {
+    const { PDFDocument, StandardFonts } = await import('https://esm.sh/pdf-lib@1.17.1');
+    
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    
+    // Contenido básico
+    page.drawText('COMPROBANTE DE NÓMINA', {
+      x: 50,
+      y: 750,
+      size: 18,
+      font: font,
+    });
+    
+    page.drawText(`Empleado: ${employee.name}`, {
+      x: 50,
+      y: 700,
+      size: 12,
+      font: font,
+    });
+    
+    page.drawText(`Período: ${period.startDate} - ${period.endDate}`, {
+      x: 50,
+      y: 680,
+      size: 12,
+      font: font,
+    });
+    
+    page.drawText(`Total Neto: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(employee.netPay)}`, {
+      x: 50,
+      y: 650,
+      size: 14,
+      font: font,
+    });
+    
+    const pdfBytes = await pdfDoc.save();
+    console.log('✅ Fallback PDF generated successfully');
+    
+    return new Uint8Array(pdfBytes);
+    
+  } catch (fallbackError) {
+    console.error('❌ Error en fallback PDF:', fallbackError);
+    throw new Error('No se pudo generar el PDF: ' + fallbackError.message);
   }
 }
