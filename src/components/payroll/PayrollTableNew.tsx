@@ -19,7 +19,7 @@ interface PayrollTableNewProps {
   employees: PayrollEmployee[];
   onRemoveEmployee: (employeeId: string) => void;
   onCreateNovedad: (employeeId: string, data: CreateNovedadData) => void;
-  onRecalculate?: () => Promise<void>; // ✅ Nuevo prop para recálculo
+  onRecalculate?: () => Promise<void>; // ✅ Fixed: no parameters needed
   periodId: string;
   canEdit: boolean;
   selectedEmployees: string[];
@@ -31,7 +31,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
   employees,
   onRemoveEmployee,
   onCreateNovedad,
-  onRecalculate, // ✅ Nuevo prop
+  onRecalculate, // ✅ Fixed signature
   periodId,
   canEdit,
   selectedEmployees,
@@ -40,7 +40,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
 }) => {
   const [showNovedadModal, setShowNovedadModal] = useState(false);
   const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<PayrollEmployee | null>(null);
-  const [isRecalculating, setIsRecalculating] = useState(false); // ✅ Estado para indicador
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -61,7 +61,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
       setShowNovedadModal(false);
       setSelectedEmployeeForNovedad(null);
       
-      // ✅ Recalcular automáticamente después de crear novedad
+      // ✅ Fixed: call without parameters
       if (onRecalculate) {
         setIsRecalculating(true);
         try {
@@ -73,7 +73,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
     }
   };
 
-  // ✅ Nuevo callback para cuando se modifiquen/eliminen novedades
+  // ✅ Fixed: call without parameters
   const handleNovedadChange = async () => {
     if (onRecalculate) {
       setIsRecalculating(true);
@@ -260,7 +260,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
           employeeSalary={selectedEmployeeForNovedad.baseSalary}
           periodId={periodId}
           onCreateNovedad={handleCreateNovedad}
-          onNovedadChange={handleNovedadChange} // ✅ Nuevo callback
+          onNovedadChange={handleNovedadChange}
           calculateSuggestedValue={calculateSuggestedValue}
         />
       )}
