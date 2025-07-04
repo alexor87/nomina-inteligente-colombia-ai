@@ -7,6 +7,7 @@ import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryActions } from './PayrollHistoryActions';
 import { PayrollHistoryPagination } from './PayrollHistoryPagination';
+import { PayrollHistoryEmptyState } from './PayrollHistoryEmptyState';
 import { PayrollHistoryExportService } from '@/services/PayrollHistoryExportService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -16,8 +17,8 @@ import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * ✅ PÁGINA SIMPLE DE HISTORIAL - FASE 3 FINALIZACIÓN
- * Incluye paginación, exportación y navegación completa
+ * ✅ PÁGINA SIMPLE DE HISTORIAL - FASE 3 COMPLETADA
+ * Incluye paginación, exportación, navegación y manejo de estados
  */
 export const PayrollHistoryPageSimple = () => {
   const navigate = useNavigate();
@@ -118,6 +119,11 @@ export const PayrollHistoryPageSimple = () => {
     }
   };
 
+  const handleCreatePeriod = () => {
+    navigate('/app/payroll');
+  };
+
+  // Estado de carga
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -126,6 +132,7 @@ export const PayrollHistoryPageSimple = () => {
     );
   }
 
+  // Estado de error
   if (error) {
     return (
       <Alert variant="destructive">
@@ -137,7 +144,7 @@ export const PayrollHistoryPageSimple = () => {
     );
   }
 
-  // ✅ MÉTRICAS DE RESUMEN
+  // Calcular métricas de resumen
   const totalGrossPay = periods.reduce((sum, p) => sum + p.totalGrossPay, 0);
   const totalNetPay = periods.reduce((sum, p) => sum + p.totalNetPay, 0);
   const totalEmployees = periods.reduce((sum, p) => sum + p.employeesCount, 0);
@@ -160,7 +167,7 @@ export const PayrollHistoryPageSimple = () => {
         {filteredCount} de {totalPeriods} períodos
       </div>
 
-      {/* ✅ MÉTRICAS DE RESUMEN */}
+      {/* Métricas de resumen */}
       {totalPeriods > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -229,15 +236,10 @@ export const PayrollHistoryPageSimple = () => {
       />
 
       {periods.length === 0 ? (
-        <div className="text-center py-12">
-          <History className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No hay períodos de nómina
-          </h3>
-          <p className="text-gray-500">
-            Los períodos de nómina aparecerán aquí una vez que sean creados y procesados.
-          </p>
-        </div>
+        <PayrollHistoryEmptyState 
+          hasFilters={!!(filters.status || filters.periodType || filters.employeeSearch || filters.dateRange.from || filters.dateRange.to)}
+          onClearFilters={clearFilters}
+        />
       ) : (
         <div className="bg-white shadow-sm rounded-lg overflow-hidden">
           <PayrollHistoryTable 

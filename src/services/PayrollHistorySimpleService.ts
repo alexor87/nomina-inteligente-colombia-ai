@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
@@ -10,14 +11,14 @@ interface PayrollHistoryResponse {
 }
 
 /**
- * ✅ SERVICIO SIMPLE DE HISTORIAL - FASE 2 REPARACIÓN CRÍTICA
+ * ✅ SERVICIO SIMPLE DE HISTORIAL - REPARACIÓN CRÍTICA FASE 3
  * Conecta directamente con la función de base de datos sincronizada
  */
 export class PayrollHistorySimpleService {
   
   static async getHistoryPeriods(): Promise<PayrollHistoryPeriod[]> {
     try {
-      console.log('📊 FASE 2 - Cargando historial desde función DB...');
+      console.log('📊 FASE 3 - Cargando historial desde función DB...');
       
       // Llamar a la función de base de datos que creamos
       const { data, error } = await supabase.rpc('get_payroll_history_periods');
@@ -27,7 +28,7 @@ export class PayrollHistorySimpleService {
         throw error;
       }
       
-      console.log('📊 FASE 2 - Respuesta de función DB:', data);
+      console.log('📊 FASE 3 - Respuesta de función DB:', data);
       
       // Type assertion correcta: primero a unknown, luego al tipo específico
       const response = data as unknown as PayrollHistoryResponse;
@@ -38,7 +39,7 @@ export class PayrollHistorySimpleService {
       }
       
       const periods = response.data || [];
-      console.log(`✅ FASE 2 - Períodos cargados: ${periods.length}`);
+      console.log(`✅ FASE 3 - Períodos cargados: ${periods.length}`);
       
       return periods.map((period: any) => ({
         id: period.id,
@@ -47,7 +48,7 @@ export class PayrollHistorySimpleService {
         endDate: period.endDate,
         type: period.type as 'semanal' | 'quincenal' | 'mensual' | 'personalizado',
         employeesCount: period.employeesCount || 0,
-        status: this.mapStatusSafely(period.status),
+        status: PayrollHistorySimpleService.mapStatusSafely(period.status),
         totalGrossPay: Number(period.totalGrossPay) || 0,
         totalNetPay: Number(period.totalNetPay) || 0,
         totalDeductions: Number(period.totalDeductions) || 0,
@@ -61,18 +62,18 @@ export class PayrollHistorySimpleService {
       }));
       
     } catch (error) {
-      console.error('💥 FASE 2 - Error crítico cargando historial:', error);
+      console.error('💥 FASE 3 - Error crítico cargando historial:', error);
       
       // ✅ FALLBACK: Si falla la función, intentar consulta directa
-      return this.getFallbackHistoryPeriods();
+      return PayrollHistorySimpleService.getFallbackHistoryPeriods();
     }
   }
   
   private static async getFallbackHistoryPeriods(): Promise<PayrollHistoryPeriod[]> {
     try {
-      console.log('🔄 FASE 2 - Ejecutando fallback directo...');
+      console.log('🔄 FASE 3 - Ejecutando fallback directo...');
       
-      const companyId = await this.getCurrentUserCompanyId();
+      const companyId = await PayrollHistorySimpleService.getCurrentUserCompanyId();
       if (!companyId) {
         console.warn('⚠️ No se pudo obtener company_id en fallback');
         return [];
@@ -89,7 +90,7 @@ export class PayrollHistorySimpleService {
         return [];
       }
       
-      console.log(`🔄 FASE 2 - Fallback exitoso: ${periods?.length || 0} períodos`);
+      console.log(`🔄 FASE 3 - Fallback exitoso: ${periods?.length || 0} períodos`);
       
       return (periods || []).map(period => ({
         id: period.id,
@@ -98,7 +99,7 @@ export class PayrollHistorySimpleService {
         endDate: period.fecha_fin,
         type: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual' | 'personalizado',
         employeesCount: period.empleados_count || 0,
-        status: this.mapStatusSafely(period.estado),
+        status: PayrollHistorySimpleService.mapStatusSafely(period.estado),
         totalGrossPay: Number(period.total_devengado) || 0,
         totalNetPay: Number(period.total_neto) || 0,
         totalDeductions: Number(period.total_deducciones) || 0,
