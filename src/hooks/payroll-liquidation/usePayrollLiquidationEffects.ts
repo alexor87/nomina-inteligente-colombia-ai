@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationFacade } from '@/services/payroll-liquidation/PayrollLiquidationFacade';
 import { PayrollLiquidationState } from '@/types/payroll-liquidation';
+import { PayrollEmployee } from '@/types/payroll';
 
 /**
  * ✅ HOOK DE EFECTOS SECUNDARIOS - CORRECCIÓN FASE 1
