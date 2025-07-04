@@ -147,4 +147,68 @@ export class PayrollLiquidationNewService {
       throw error;
     }
   }
+
+  static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
+    try {
+      console.log('🗑️ Removiendo empleado del período:', { employeeId, periodId });
+      
+      const { error } = await supabase
+        .from('payrolls')
+        .delete()
+        .eq('employee_id', employeeId)
+        .eq('period_id', periodId);
+
+      if (error) {
+        console.log('❌ Error removiendo empleado:', error);
+        throw error;
+      }
+
+      console.log('✅ Empleado removido correctamente');
+    } catch (error) {
+      console.error('💥 Error removiendo empleado del período:', error);
+      throw error;
+    }
+  }
+
+  static async closePeriod(period: any, employees: PayrollEmployee[]): Promise<string> {
+    try {
+      console.log('🔒 Cerrando período:', period.id);
+      
+      // Update period status to closed
+      const { error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .update({ 
+          estado: 'cerrado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', period.id);
+
+      if (periodError) {
+        console.log('❌ Error cerrando período:', periodError);
+        throw periodError;
+      }
+
+      // Update all payroll records for this period
+      const { error: payrollError } = await supabase
+        .from('payrolls')
+        .update({ 
+          estado: 'procesada',
+          updated_at: new Date().toISOString()
+        })
+        .eq('period_id', period.id);
+
+      if (payrollError) {
+        console.log('❌ Error actualizando nóminas:', payrollError);
+        throw payrollError;
+      }
+
+      const message = `Período ${period.periodo} cerrado exitosamente con ${employees.length} empleados`;
+      console.log('✅ Período cerrado:', message);
+      
+      return message;
+    } catch (error) {
+      console.error('💥 Error cerrando período:', error);
+      throw error;
+    }
+  }
 }
