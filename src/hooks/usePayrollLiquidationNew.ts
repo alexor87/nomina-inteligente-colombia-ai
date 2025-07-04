@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollUnifiedService } from '@/services/PayrollUnifiedService';
@@ -323,14 +324,17 @@ export const usePayrollLiquidationNew = () => {
       setCurrentPeriod(prev => ({ ...prev, estado: 'cerrado' }));
       setClosureStep('completed');
       
-      // ✅ FASE 3: Manejo seguro de null y verificación de propiedades
+      // ✅ FASE 3: Manejo seguro de null y verificación de propiedades con type guards
       if (result && typeof result === 'object' && result !== null) {
+        // Type assertion para acceso seguro a propiedades
+        const resultObj = result as any;
+        
         // Si result tiene la propiedad postClosureResult, usarla
-        if ('postClosureResult' in result && result.postClosureResult) {
-          setPostClosureResult(result.postClosureResult);
+        if ('postClosureResult' in resultObj && resultObj.postClosureResult) {
+          setPostClosureResult(resultObj.postClosureResult);
           
-          if (result.postClosureResult.nextPeriodSuggestion) {
-            const nextPeriod = result.postClosureResult.nextPeriodSuggestion;
+          if (resultObj.postClosureResult.nextPeriodSuggestion) {
+            const nextPeriod = resultObj.postClosureResult.nextPeriodSuggestion;
             console.log('📅 FASE 3 - Siguiente período sugerido:', nextPeriod);
             
             toast({
@@ -341,14 +345,14 @@ export const usePayrollLiquidationNew = () => {
           } else {
             toast({
               title: "✅ Período cerrado exitosamente",
-              description: ('message' in result && typeof result.message === 'string') ? result.message : "Cierre completado correctamente",
+              description: ('message' in resultObj && typeof resultObj.message === 'string') ? resultObj.message : "Cierre completado correctamente",
               className: "border-green-200 bg-green-50"
             });
           }
         } else {
           toast({
             title: "✅ Período cerrado exitosamente",
-            description: ('message' in result && typeof result.message === 'string') ? result.message : "Cierre completado correctamente",
+            description: ('message' in resultObj && typeof resultObj.message === 'string') ? resultObj.message : "Cierre completado correctamente",
             className: "border-green-200 bg-green-50"
           });
         }
