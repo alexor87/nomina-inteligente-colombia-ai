@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollUnifiedService } from '@/services/PayrollUnifiedService';
@@ -274,7 +275,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, loadEmployeesForPeriod, toast]);
 
-  // ✅ CIERRE TRANSACCIONAL CON DETECCIÓN POST-CIERRE - FASE 3
+  // ✅ CIERRE TRANSACCIONAL CON DETECCIÓN POST-CIERRE - FASE 3 (CORREGIDO)
   const closePeriod = useCallback(async () => {
     if (!currentPeriod) {
       toast({
@@ -323,30 +324,40 @@ export const usePayrollLiquidationNew = () => {
       setCurrentPeriod(prev => ({ ...prev, estado: 'cerrado' }));
       setClosureStep('completed');
       
-      // ✅ FASE 3: Mostrar información de detección post-cierre si está disponible
-      if (result.postClosureResult) {
-        setPostClosureResult(result.postClosureResult);
-        
-        if (result.postClosureResult.nextPeriodSuggestion) {
-          const nextPeriod = result.postClosureResult.nextPeriodSuggestion;
-          console.log('📅 FASE 3 - Siguiente período sugerido:', nextPeriod);
+      // ✅ FASE 3: Verificar si result es un objeto con propiedades
+      if (result && typeof result === 'object') {
+        // Si result tiene la propiedad postClosureResult, usarla
+        if ('postClosureResult' in result && result.postClosureResult) {
+          setPostClosureResult(result.postClosureResult);
           
-          toast({
-            title: "✅ Período cerrado exitosamente",
-            description: `Siguiente período sugerido: ${nextPeriod.startDate} - ${nextPeriod.endDate}`,
-            className: "border-green-200 bg-green-50"
-          });
+          if (result.postClosureResult.nextPeriodSuggestion) {
+            const nextPeriod = result.postClosureResult.nextPeriodSuggestion;
+            console.log('📅 FASE 3 - Siguiente período sugerido:', nextPeriod);
+            
+            toast({
+              title: "✅ Período cerrado exitosamente",
+              description: `Siguiente período sugerido: ${nextPeriod.startDate} - ${nextPeriod.endDate}`,
+              className: "border-green-200 bg-green-50"
+            });
+          } else {
+            toast({
+              title: "✅ Período cerrado exitosamente",
+              description: 'message' in result && result.message ? result.message : "Cierre completado correctamente",
+              className: "border-green-200 bg-green-50"
+            });
+          }
         } else {
           toast({
             title: "✅ Período cerrado exitosamente",
-            description: result.message || "Cierre completado correctamente",
+            description: 'message' in result && result.message ? result.message : "Cierre completado correctamente",
             className: "border-green-200 bg-green-50"
           });
         }
       } else {
+        // Si result es string o no tiene las propiedades esperadas
         toast({
           title: "✅ Período cerrado exitosamente",
-          description: result.message || "Cierre completado correctamente",
+          description: typeof result === 'string' ? result : "Cierre completado correctamente",
           className: "border-green-200 bg-green-50"
         });
       }
