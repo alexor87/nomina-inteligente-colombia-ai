@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
@@ -30,8 +29,8 @@ export class PayrollHistorySimpleService {
       
       console.log('📊 FASE 2 - Respuesta de función DB:', data);
       
-      // Type assertion para indicar el tipo correcto
-      const response = data as PayrollHistoryResponse;
+      // Type assertion correcta: primero a unknown, luego al tipo específico
+      const response = data as unknown as PayrollHistoryResponse;
       
       if (!response || !response.success) {
         console.warn('⚠️ La función no retornó datos exitosos');
