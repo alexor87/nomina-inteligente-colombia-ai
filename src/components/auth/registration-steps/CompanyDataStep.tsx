@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,9 +21,6 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
     identificationType: data.identificationType || 'NIT',
     identificationNumber: data.identificationNumber || '',
     verificationDigit: data.verificationDigit || '',
-    razonSocial: data.razonSocial || '',
-    telefono: data.telefono || '',
-    direccion: data.direccion || '',
     industry: data.industry || '',
     ciiuCode: data.ciiuCode || '',
     employeeCount: data.employeeCount || '',
@@ -62,10 +58,6 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
 
     if (!formData.identificationNumber) {
       newErrors.identificationNumber = 'Número de identificación es requerido';
-    }
-
-    if (!formData.razonSocial) {
-      newErrors.razonSocial = 'Razón social es requerida';
     }
 
     if (!formData.industry) {
@@ -129,7 +121,7 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
           </div>
 
           <div>
-            <Label htmlFor="identificationNumber">Número de identificación *</Label>
+            <Label htmlFor="identificationNumber">Número de identificación</Label>
             <Input
               id="identificationNumber"
               value={formData.identificationNumber}
@@ -155,46 +147,9 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
           )}
         </div>
 
-        {/* Company basic info */}
-        <div>
-          <Label htmlFor="razonSocial">Razón Social / Nombre de la empresa *</Label>
-          <Input
-            id="razonSocial"
-            value={formData.razonSocial}
-            onChange={(e) => setFormData(prev => ({ ...prev, razonSocial: e.target.value }))}
-            placeholder="Nombre completo de tu empresa"
-            className={errors.razonSocial ? 'border-red-500' : ''}
-          />
-          {errors.razonSocial && (
-            <p className="text-red-500 text-sm mt-1">{errors.razonSocial}</p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="telefono">Teléfono</Label>
-            <Input
-              id="telefono"
-              value={formData.telefono}
-              onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
-              placeholder="Teléfono de la empresa"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="direccion">Dirección</Label>
-            <Input
-              id="direccion"
-              value={formData.direccion}
-              onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))}
-              placeholder="Dirección de la empresa"
-            />
-          </div>
-        </div>
-
         {/* Industry */}
         <div>
-          <Label>Industria *</Label>
+          <Label>Industria</Label>
           <Select value={formData.industry} onValueChange={handleIndustrySelect}>
             <SelectTrigger className={errors.industry ? 'border-red-500' : ''}>
               <SelectValue placeholder="Selecciona tu industria" />
@@ -219,7 +174,7 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
 
         {/* Employee Count */}
         <div>
-          <Label>Número de empleados *</Label>
+          <Label>Número de empleados</Label>
           <div className="flex flex-wrap gap-2 mt-2">
             {employeeRanges.map((range) => (
               <Badge

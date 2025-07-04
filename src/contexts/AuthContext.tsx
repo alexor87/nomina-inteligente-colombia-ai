@@ -105,18 +105,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔄 Refreshing user data for:', currentUser.email);
 
     try {
-      // Verificar si el registro está completo
-      const isComplete = await verifyUserRegistrationComplete(currentUser.id);
-      
-      if (!isComplete) {
-        console.warn('⚠️ User registration incomplete, attempting to fix...');
-        if (currentUser.email) {
-          await fixIncompleteRegistration(currentUser.email);
-          // Esperar un momento y reintentar
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-
       // Fetch profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -138,34 +126,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
 
-      // Fetch roles with retry logic
-      let rolesData = null;
-      let rolesError = null;
+      // Fetch roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .rpc('get_user_companies_simple', { _user_id: currentUser.id });
       
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const result = await supabase
-          .rpc('get_user_companies_simple', { _user_id: currentUser.id });
-        
-        rolesData = result.data;
-        rolesError = result.error;
-        
-        if (!rolesError && rolesData && rolesData.length > 0) {
-          break;
-        }
-        
-        console.log(`⏳ Roles fetch attempt ${attempt + 1} failed, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      if (!rolesError && rolesData) {
-        const transformedRoles: UserRole[] = rolesData.map((role: any) => ({
+      if (!rolesError && userRoles) {
+        const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
           role: role.role_name as AppRole,
           company_id: role.company_id
         }));
         setRoles(transformedRoles);
         console.log('👥 User roles fetched:', transformedRoles.length, 'roles');
       } else {
-        console.error('❌ Error fetching user roles after retries:', rolesError);
+        console.error('❌ Error fetching user roles:', rolesError);
         setRoles([]);
       }
 
@@ -175,56 +148,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isRefreshingUserData.current = false;
     }
   }, []);
-
-  // Verificar si el registro del usuario está completo
-  const verifyUserRegistrationComplete = async (userId: string): Promise<boolean> => {
-    try {
-      // Verificar perfil
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', userId)
-        .single();
-
-      if (profileError || !profile?.company_id) {
-        return false;
-      }
-
-      // Verificar roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
-
-      return !rolesError && roles && roles.length > 0;
-    } catch (error) {
-      console.error('❌ Error verifying user registration:', error);
-      return false;
-    }
-  };
-
-  // Corregir registro incompleto
-  const fixIncompleteRegistration = async (userEmail: string): Promise<void> => {
-    try {
-      console.log('🔧 Fixing incomplete registration for:', userEmail);
-      
-      const { data, error } = await supabase.rpc('complete_incomplete_registration', {
-        p_user_email: userEmail
-      });
-
-      if (error) {
-        console.error('❌ Error fixing registration:', error);
-        throw error;
-      }
-
-      // Type guard for the response data
-      if (data && typeof data === 'object' && 'success' in data && data.success) {
-        console.log('✅ Registration fixed successfully');
-      }
-    } catch (error) {
-      console.error('❌ Failed to fix incomplete registration:', error);
-    }
-  };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -272,13 +195,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Debounce user data refresh with increased delay for registration processes
+          // Debounce user data refresh
           setTimeout(async () => {
             if (!isRefreshingUserData.current) {
               await refreshUserData();
             }
             setLoading(false);
-          }, 500);
+          }, 300);
         } else {
           setRoles([]);
           setProfile(null);
@@ -300,17 +223,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await refreshUserData();
           }
           setLoading(false);
-        }, 500);
+        }, 300);
       } else {
         setLoading(false);
       }
     });
 
-    // Increased timeout for registration processes
+    // Reduced timeout for faster loading
     loadingTimeoutRef.current = setTimeout(() => {
       console.warn('⚠️ Auth loading timeout reached, setting loading to false');
       setLoading(false);
-    }, 5000);
+    }, 3000);
 
     return () => {
       subscription.unsubscribe();

@@ -405,11 +405,11 @@ export class PayrollPeriodDetectionService {
         
         // Ordenar por fecha de creación (más reciente primero)
         const sortedHistory = payrollHistory.sort((a, b) => 
-          new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
+          new Date(b.fechaCreacion || '').getTime() - new Date(a.fechaCreacion || '').getTime()
         );
         
         const lastHistoryRecord = sortedHistory[0];
-        console.log('📊 Último período del historial:', lastHistoryRecord?.period);
+        console.log('📊 Último período del historial:', lastHistoryRecord?.periodo);
 
         if (lastHistoryRecord) {
           // Intentar encontrar este período en payroll_periods_real por coincidencia de fechas/período
@@ -425,7 +425,7 @@ export class PayrollPeriodDetectionService {
             // Buscar coincidencia por fechas o período
             const matchingPeriod = payrollPeriods.find(p => {
               const formattedPeriod = PayrollPeriodService.formatPeriodText(p.fecha_inicio, p.fecha_fin);
-              return formattedPeriod === lastHistoryRecord.period;
+              return formattedPeriod === lastHistoryRecord.periodo;
             });
 
             if (matchingPeriod) {

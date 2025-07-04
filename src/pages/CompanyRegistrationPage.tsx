@@ -1,8 +1,7 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CompanyRegistrationWizard } from '@/components/auth/CompanyRegistrationWizard';
-import { CompanyRegistrationService } from '@/services/CompanyRegistrationService';
+import { CompanyService } from '@/services/CompanyService';
 import { useCompanyRegistrationStore } from '@/components/auth/hooks/useCompanyRegistrationStore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,89 +19,59 @@ export const CompanyRegistrationPage = () => {
     try {
       console.log('Processing company registration:', data);
       
-      // Validar que tenemos todos los datos necesarios
-      if (!data.userEmail || !data.userPassword || !data.firstName || !data.lastName) {
-        throw new Error('Faltan datos del usuario');
-      }
-
-      if (!data.identificationNumber || !data.razonSocial) {
-        throw new Error('Faltan datos de la empresa');
-      }
-
-      // Convertir wizard data a formato de registro completo
+      // Convert wizard data to company registration format
       const registrationData = {
-        // Datos de la empresa
-        nit: `${data.identificationNumber}-${data.verificationDigit || ''}`,
-        razon_social: data.razonSocial,
-        email: data.userEmail, // Email del usuario será el email de contacto de la empresa
-        telefono: data.telefono || '',
+        nit: `${data.identificationNumber}-${data.verificationDigit}`,
+        razon_social: data.identificationNumber || 'Mi Empresa',
+        email: data.invitedMember?.email || 'contacto@empresa.com',
+        telefono: '',
         ciudad: 'Bogotá',
         plan: 'profesional' as const,
-        
-        // Datos del usuario
-        user_email: data.userEmail,
-        user_password: data.userPassword,
-        first_name: data.firstName,
-        last_name: data.lastName,
+        // Additional data that we'll store in company settings
+        actividad_economica: data.industry,
+        codigo_ciiu: data.ciiuCode,
+        numero_empleados: data.employeeCount,
+        frecuencia_nomina: data.payrollFrequency,
+        area_funcional: data.functionalArea,
       };
 
-      console.log('Registering company with user:', {
+      // For now, we'll create a basic company
+      // In the future, we can extend CompanyService to handle the additional data
+      const companyId = await CompanyService.createCompany({
         nit: registrationData.nit,
         razon_social: registrationData.razon_social,
-        user_email: registrationData.user_email,
-        first_name: registrationData.first_name,
-        last_name: registrationData.last_name,
+        email: registrationData.email,
+        telefono: registrationData.telefono,
+        ciudad: registrationData.ciudad,
+        plan: registrationData.plan,
       });
-
-      // Usar createCompanyWithUser para registro completo con manejo de errores mejorado
-      const companyId = await CompanyRegistrationService.createCompanyWithUser(registrationData);
       
-      console.log('Company and user created successfully:', companyId);
-      
-      // Esperar más tiempo para que se procesen todos los cambios
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('Company created successfully:', companyId);
       
       // Refresh user data to ensure roles and profile are loaded
       await refreshUserData();
       
-      // Verificar que el usuario esté completamente configurado
-      const { data: { user } } = await CompanyRegistrationService.supabase.auth.getUser();
-      if (user) {
-        const isComplete = await CompanyRegistrationService.verifyRegistrationComplete(user.id);
-        if (!isComplete) {
-          console.warn('⚠️ Registration still not complete after creation');
-          await CompanyRegistrationService.completeIncompleteRegistration(data.userEmail);
-          await refreshUserData();
-        }
-      }
-      
       toast({
         title: "¡Bienvenido a NóminaFácil!",
-        description: "Tu cuenta y empresa han sido creadas exitosamente. ¡Comienza tu prueba gratuita!",
+        description: "Tu empresa ha sido registrada exitosamente. ¡Comienza tu prueba gratuita!",
       });
 
-      // Navigate to dashboard with longer delay
+      // Navigate to dashboard
       setTimeout(() => {
         navigate('/app/dashboard');
-      }, 2000);
+      }, 1500);
       
     } catch (error: any) {
-      console.error('Error creating company with user:', error);
+      console.error('Error creating company:', error);
       
       let errorMessage = "Ha ocurrido un error inesperado";
       
-      if (error.message?.includes('already registered')) {
-        errorMessage = "Este email ya está registrado. Intenta iniciar sesión en su lugar.";
-      } else if (error.message?.includes('Invalid email')) {
-        errorMessage = "El formato del email no es válido";
-      } else if (error.message?.includes('Password')) {
-        errorMessage = "La contraseña debe tener al menos 6 caracteres";
-      } else if (error.message) {
+      if (error.message) {
         errorMessage = error.message;
       }
       
       toast({
-        title: "Error al registrar",
+        title: "Error al registrar empresa",
         description: errorMessage,
         variant: "destructive"
       });
@@ -116,8 +85,7 @@ export const CompanyRegistrationPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Creando tu cuenta y empresa...</p>
-          <p className="text-sm text-gray-500 mt-2">Esto puede tomar unos momentos</p>
+          <p className="text-gray-600">Configurando tu empresa...</p>
         </div>
       </div>
     );

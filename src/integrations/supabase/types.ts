@@ -1515,18 +1515,6 @@ export type Database = {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
       }
-      clean_duplicate_periods: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      clean_specific_duplicate_periods: {
-        Args: { p_company_id?: string }
-        Returns: Json
-      }
-      complete_incomplete_registration: {
-        Args: { p_user_email: string; p_company_name?: string; p_nit?: string }
-        Returns: Json
-      }
       create_company_with_setup: {
         Args: {
           p_nit: string
@@ -1542,25 +1530,9 @@ export type Database = {
         }
         Returns: string
       }
-      detect_current_smart_period: {
-        Args: { p_company_id?: string }
-        Returns: Json
-      }
-      detect_smart_current_period: {
-        Args: { p_company_id?: string }
-        Returns: Json
-      }
-      diagnose_duplicate_periods: {
-        Args: { p_company_id?: string }
-        Returns: Json
-      }
       ensure_admin_role_for_company_users: {
         Args: Record<PropertyKey, never>
         Returns: undefined
-      }
-      generate_payroll_records_for_period: {
-        Args: { p_period_id: string }
-        Returns: Json
       }
       get_current_user_company_id: {
         Args: Record<PropertyKey, never>

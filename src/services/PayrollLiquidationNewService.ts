@@ -10,14 +10,6 @@ export class PayrollLiquidationNewService {
 
       const companyId = period.company_id;
       
-      // ✅ VALIDACIÓN CRÍTICA: Verificar que company_id no esté vacío
-      if (!companyId || companyId === '' || typeof companyId !== 'string') {
-        console.error('❌ COMPANY_ID INVÁLIDO:', companyId);
-        throw new Error(`Company ID inválido: ${companyId}. Verifique que el período tenga un company_id válido.`);
-      }
-      
-      console.log('✅ Company ID validado:', companyId);
-      
       // Obtener empleados activos de la empresa
       const { data: employees, error: employeesError } = await supabase
         .from('employees')
@@ -27,8 +19,7 @@ export class PayrollLiquidationNewService {
 
       if (employeesError) {
         console.error('❌ Error cargando empleados:', employeesError);
-        console.error('❌ Company ID usado en query:', companyId);
-        throw new Error(`Error consultando empleados: ${employeesError.message}`);
+        throw employeesError;
       }
 
       console.log(`👥 Empleados activos encontrados: ${employees?.length || 0}`);
@@ -129,13 +120,6 @@ export class PayrollLiquidationNewService {
 
     } catch (error) {
       console.error('💥 Error crítico en loadEmployeesForActivePeriod:', error);
-      
-      // ✅ MEJORAR MENSAJE DE ERROR para debugging
-      if (error instanceof Error) {
-        console.error('💥 Mensaje de error:', error.message);
-        console.error('💥 Stack trace:', error.stack);
-      }
-      
       throw error;
     }
   }

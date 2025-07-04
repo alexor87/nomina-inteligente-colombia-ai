@@ -19,9 +19,6 @@ export interface CompanyRegistrationWithUser extends CompanyRegistrationData {
 }
 
 export class CompanyRegistrationService {
-  // Exportar supabase para uso externo
-  static supabase = supabase;
-
   // Crear nueva empresa con usuario (para registro completo)
   static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
     try {
@@ -34,13 +31,6 @@ export class CompanyRegistrationService {
         plan: data.plan,
         ciudad: data.ciudad
       });
-      
-      // Verificar si el usuario ya existe
-      const { data: existingUser } = await supabase.auth.getUser();
-      if (existingUser.user?.email === data.user_email) {
-        console.log('👤 Usuario ya existe, completando registro...');
-        return await this.completeIncompleteRegistration(data.user_email);
-      }
       
       // Primero registrar el usuario
       console.log('🔐 Attempting user signup...');
@@ -66,9 +56,6 @@ export class CompanyRegistrationService {
 
       console.log('✅ User registered successfully:', authData.user.id);
 
-      // Esperar un momento para que se procese el trigger de perfil
-      await this.delay(2000);
-
       // Intentar iniciar sesión para obtener sesión válida
       console.log('🔑 Attempting user signin...');
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -78,8 +65,7 @@ export class CompanyRegistrationService {
 
       if (signInError) {
         console.error('❌ Sign in error:', signInError);
-        // Si falla el signin, intentar completar registro con función de corrección
-        return await this.completeIncompleteRegistration(data.user_email);
+        throw signInError;
       }
 
       console.log('✅ User signed in successfully');
@@ -92,147 +78,89 @@ export class CompanyRegistrationService {
         throw new Error('Usuario no autenticado después del signin');
       }
 
-      // Esperar para que se estabilice la sesión
-      await this.delay(1000);
+      // Esperar un momento para que se estabilice la sesión
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Intentar crear empresa con función RPC mejorada
-      try {
-        const companyId = await this.createCompanyWithRPC(data, currentUser.id);
-        
-        // Verificación post-creación
-        await this.delay(2000);
-        const isComplete = await this.verifyRegistrationComplete(currentUser.id);
-        
-        if (!isComplete) {
-          console.warn('⚠️ Registration not complete, trying correction...');
-          return await this.completeIncompleteRegistration(data.user_email);
+      // Preparar parámetros para la función RPC con tipos explícitos
+      const rpcParams = {
+        p_nit: String(data.nit),
+        p_razon_social: String(data.razon_social),
+        p_email: String(data.email),
+        p_telefono: data.telefono ? String(data.telefono) : null,
+        p_ciudad: data.ciudad ? String(data.ciudad) : 'Bogotá',
+        p_plan: String(data.plan),
+        p_user_email: String(data.user_email),
+        p_user_password: String(data.user_password),
+        p_first_name: String(data.first_name),
+        p_last_name: String(data.last_name)
+      };
+
+      console.log('📤 Calling RPC with explicit params:', rpcParams);
+
+      // Llamar a la función RPC con mejor manejo de errores
+      const { data: result, error } = await supabase.rpc('create_company_with_setup', rpcParams);
+
+      console.log('📥 RPC Response:', { result, error });
+
+      if (error) {
+        console.error('❌ Company creation error:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+
+        // Proporcionar mensajes de error más específicos
+        if (error.code === '42883') {
+          throw new Error('Error de función en base de datos. La función create_company_with_setup tiene problemas de tipo de argumentos.');
+        } else if (error.message?.includes('404')) {
+          throw new Error('Función create_company_with_setup no encontrada. Verifique la configuración de la base de datos.');
+        } else {
+          throw error;
         }
-        
-        console.log('🎉 Company registration completed successfully!');
-        return companyId;
-        
-      } catch (rpcError) {
-        console.error('❌ RPC function failed, trying alternative approach:', rpcError);
-        return await this.completeIncompleteRegistration(data.user_email);
       }
+
+      if (!result) {
+        console.error('❌ No result returned from RPC function');
+        throw new Error('No se recibió respuesta de la función de creación de empresa');
+      }
+
+      console.log('✅ Company created successfully with id:', result);
+      
+      // Esperar para que se procesen los triggers de la base de datos
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Ejecutar verificación completa de roles como respaldo
+      console.log('🚀 Starting complete role verification process...');
+      const roleCheckSuccess = await performCompleteRoleCheck(signInData.user.id);
+      
+      if (!roleCheckSuccess) {
+        console.warn('⚠️ Role check failed, trying force assignment...');
+        await forceAssignAdminRole(signInData.user.id, result);
+      }
+
+      console.log('🎉 Company registration completed successfully!');
+      return result;
       
     } catch (error) {
       console.error('💥 Error creating company with user:', error);
       
-      // Si hay un error, intentar completar con función de corrección
-      if (data.user_email) {
-        console.log('🔄 Attempting to complete registration with correction function...');
-        try {
-          return await this.completeIncompleteRegistration(data.user_email);
-        } catch (correctionError) {
-          console.error('💥 Correction also failed:', correctionError);
-        }
+      // Log más detalles del error para debugging
+      if (error instanceof Error) {
+        console.error('💥 Error message:', error.message);
+        console.error('💥 Error stack:', error.stack);
+      }
+      
+      // Si es un error de Supabase, logar detalles adicionales
+      if (error && typeof error === 'object' && 'code' in error) {
+        console.error('💥 Supabase error code:', (error as any).code);
+        console.error('💥 Supabase error details:', (error as any).details);
+        console.error('💥 Supabase error hint:', (error as any).hint);
       }
       
       throw new Error(error instanceof Error ? error.message : 'Error al crear la empresa');
     }
-  }
-
-  // Función para completar registros incompletos
-  static async completeIncompleteRegistration(userEmail: string): Promise<string> {
-    try {
-      console.log('🔄 Completing incomplete registration for:', userEmail);
-      
-      const { data, error } = await supabase.rpc('complete_incomplete_registration', {
-        p_user_email: userEmail,
-        p_company_name: 'Mi Empresa',
-        p_nit: '900000000-0'
-      });
-
-      if (error) {
-        console.error('❌ Error completing registration:', error);
-        throw error;
-      }
-
-      // Type guard for the response data
-      if (data && typeof data === 'object' && 'success' in data && data.success) {
-        console.log('✅ Registration completed successfully:', (data as any).company_id);
-        return (data as any).company_id;
-      } else {
-        throw new Error((data as any)?.message || 'Error completing registration');
-      }
-    } catch (error) {
-      console.error('💥 Error in completeIncompleteRegistration:', error);
-      throw error;
-    }
-  }
-
-  // Crear empresa usando función RPC
-  static async createCompanyWithRPC(data: CompanyRegistrationWithUser, userId: string): Promise<string> {
-    const rpcParams = {
-      p_nit: String(data.nit),
-      p_razon_social: String(data.razon_social),
-      p_email: String(data.email),
-      p_telefono: data.telefono ? String(data.telefono) : null,
-      p_ciudad: data.ciudad ? String(data.ciudad) : 'Bogotá',
-      p_plan: String(data.plan),
-      p_user_email: String(data.user_email),
-      p_user_password: String(data.user_password),
-      p_first_name: String(data.first_name),
-      p_last_name: String(data.last_name)
-    };
-
-    console.log('📤 Calling RPC with params:', rpcParams);
-
-    const { data: result, error } = await supabase.rpc('create_company_with_setup', rpcParams);
-
-    if (error) {
-      console.error('❌ RPC Error:', error);
-      throw error;
-    }
-
-    if (!result) {
-      throw new Error('No se recibió respuesta de la función de creación de empresa');
-    }
-
-    return result;
-  }
-
-  // Verificar que el registro esté completo
-  static async verifyRegistrationComplete(userId: string): Promise<boolean> {
-    try {
-      console.log('🔍 Verifying registration completion for user:', userId);
-      
-      // Verificar perfil
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', userId)
-        .single();
-
-      if (profileError || !profile?.company_id) {
-        console.log('❌ Profile check failed:', profileError);
-        return false;
-      }
-
-      // Verificar roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('company_id', profile.company_id);
-
-      if (rolesError || !roles || roles.length === 0) {
-        console.log('❌ Roles check failed:', rolesError);
-        return false;
-      }
-
-      console.log('✅ Registration verification passed');
-      return true;
-    } catch (error) {
-      console.error('❌ Error verifying registration:', error);
-      return false;
-    }
-  }
-
-  // Función auxiliar para delay
-  static delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   // Crear nueva empresa (para registro desde usuario existente)

@@ -1,8 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
-import { EmptyPayrollHistoryState } from './EmptyPayrollHistoryState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +18,6 @@ export const PayrollHistoryPage = () => {
   const [filteredPeriods, setFilteredPeriods] = useState<PayrollHistoryPeriod[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [isNewCompany, setIsNewCompany] = useState(false);
   const [filters, setFilters] = useState<FiltersType>({
     dateRange: {},
     status: '',
@@ -46,35 +45,41 @@ export const PayrollHistoryPage = () => {
 
   const loadPayrollHistory = async () => {
     try {
-      console.log('🔄 Cargando historial de nómina...');
       const data = await PayrollHistoryService.getPayrollPeriods();
       
-      if (data.length === 0) {
-        console.log('✅ Empresa nueva detectada - Sin historial de nómina');
-        setIsNewCompany(true);
-        setPeriods([]);
-        return;
-      }
-
-      console.log(`📊 Historial cargado: ${data.length} períodos`);
-      setIsNewCompany(false);
-      setPeriods(data);
+      // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
+      const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
+        return {
+          id: record.id,
+          period: record.periodo || 'Sin período',
+          startDate: record.fecha_inicio || record.fechaCreacion,
+          endDate: record.fecha_fin || record.fechaCreacion,
+          type: 'mensual' as const,
+          employeesCount: record.empleados || 0,
+          status: record.estado as 'borrador' | 'cerrado' | 'con_errores' | 'editado' | 'reabierto',
+          totalGrossPay: Number(record.totalNomina || 0),
+          totalNetPay: Number(record.totalNomina || 0),
+          totalDeductions: 0,
+          totalCost: Number(record.totalNomina || 0),
+          employerContributions: 0,
+          paymentStatus: record.estado === 'pagada' ? 'pagado' as const : 'pendiente' as const,
+          version: 1,
+          createdAt: record.fechaCreacion || new Date().toISOString(),
+          updatedAt: record.fechaCreacion || new Date().toISOString(),
+          editable: record.editable !== false,
+          reportedToDian: record.reportado_dian || false
+        };
+      });
+      setPeriods(convertedPeriods);
     } catch (error) {
-      console.error('❌ Error loading payroll history:', error);
+      console.error('Error loading payroll history:', error);
       toast({
         title: "Error",
         description: "No se pudo cargar el historial de nómina",
         variant: "destructive"
       });
-      setIsNewCompany(true);
-      setPeriods([]);
     }
   };
-
-  // Si es una empresa nueva sin datos, mostrar estado vacío
-  if (isNewCompany && !isLoading) {
-    return <EmptyPayrollHistoryState />;
-  }
 
   const applyFilters = () => {
     let filtered = [...periods];
