@@ -1,12 +1,11 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollUnifiedService } from '@/services/PayrollUnifiedService';
 import { PayrollEmployee, PayrollSummary, PeriodStatus } from '@/types/payroll';
 
 /**
- * ✅ HOOK CORREGIDO PARA LIQUIDACIÓN DE NÓMINA - FASE 2
- * Integra cierre transaccional con indicadores de progreso
+ * ✅ HOOK CORREGIDO PARA LIQUIDACIÓN DE NÓMINA - FASE 3
+ * Integra cierre transaccional con detección post-cierre inteligente
  */
 export const usePayrollLiquidationNew = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -25,10 +24,11 @@ export const usePayrollLiquidationNew = () => {
   });
   const [periodStatus, setPeriodStatus] = useState<PeriodStatus | null>(null);
   
-  // ✅ FASE 2: Estados para cierre transaccional
+  // ✅ FASE 3: Estados para cierre transaccional con detección post-cierre
   const [closureStep, setClosureStep] = useState<'validation' | 'snapshot' | 'closure' | 'verification' | 'completed' | 'error'>('validation');
   const [transactionId, setTransactionId] = useState<string | undefined>();
   const [rollbackExecuted, setRollbackExecuted] = useState(false);
+  const [postClosureResult, setPostClosureResult] = useState<any>(null);
   
   const { toast } = useToast();
 
@@ -36,7 +36,7 @@ export const usePayrollLiquidationNew = () => {
   const initializePeriod = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 HOOK FASE 2 - Inicializando período...');
+      console.log('🚀 HOOK FASE 3 - Inicializando período...');
       
       const status = await PayrollUnifiedService.detectCurrentPeriodSituation();
       setPeriodStatus(status);
@@ -66,7 +66,7 @@ export const usePayrollLiquidationNew = () => {
   const loadEmployeesForPeriod = useCallback(async (period: any) => {
     try {
       setIsProcessing(true);
-      console.log('👥 HOOK FASE 2 - Cargando empleados para período:', period.periodo);
+      console.log('👥 HOOK FASE 3 - Cargando empleados para período:', period.periodo);
       
       const loadedEmployees = await PayrollUnifiedService.loadEmployeesForActivePeriod(period);
       setEmployees(loadedEmployees);
@@ -83,7 +83,7 @@ export const usePayrollLiquidationNew = () => {
       // Calcular resumen
       updateSummary(loadedEmployees);
       
-      console.log(`✅ HOOK FASE 2 - Empleados cargados: ${loadedEmployees.length}`);
+      console.log(`✅ HOOK FASE 3 - Empleados cargados: ${loadedEmployees.length}`);
       
     } catch (error) {
       console.error('❌ Error cargando empleados:', error);
@@ -120,7 +120,7 @@ export const usePayrollLiquidationNew = () => {
 
     try {
       setIsProcessing(true);
-      console.log(`🗑️ HOOK FASE 2 - Removiendo empleado: ${employeeId}`);
+      console.log(`🗑️ HOOK FASE 3 - Removiendo empleado: ${employeeId}`);
       
       await PayrollUnifiedService.removeEmployeeFromPeriod(employeeId, currentPeriod.id);
       
@@ -160,7 +160,7 @@ export const usePayrollLiquidationNew = () => {
 
     try {
       setIsProcessing(true);
-      console.log(`📋 HOOK FASE 2 - Creando novedad para empleado: ${employeeId}`);
+      console.log(`📋 HOOK FASE 3 - Creando novedad para empleado: ${employeeId}`);
       
       toast({
         title: "✅ Novedad creada",
@@ -188,7 +188,7 @@ export const usePayrollLiquidationNew = () => {
 
     try {
       setIsProcessing(true);
-      console.log(`🔄 HOOK FASE 2 - Recalculando empleado después de novedad: ${employeeId}`);
+      console.log(`🔄 HOOK FASE 3 - Recalculando empleado después de novedad: ${employeeId}`);
       
       const recalculatedEmployee = await PayrollUnifiedService.recalculateAfterNovedadChange(
         employeeId,
@@ -251,7 +251,7 @@ export const usePayrollLiquidationNew = () => {
 
     try {
       setIsProcessing(true);
-      console.log('🔄 HOOK FASE 2 - Recalculando todos los empleados...');
+      console.log('🔄 HOOK FASE 3 - Recalculando todos los empleados...');
       
       // Recargar empleados desde cero
       await loadEmployeesForPeriod(currentPeriod);
@@ -274,7 +274,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, loadEmployeesForPeriod, toast]);
 
-  // ✅ CIERRE TRANSACCIONAL - FASE 2
+  // ✅ CIERRE TRANSACCIONAL CON DETECCIÓN POST-CIERRE - FASE 3
   const closePeriod = useCallback(async () => {
     if (!currentPeriod) {
       toast({
@@ -302,8 +302,9 @@ export const usePayrollLiquidationNew = () => {
       setIsProcessing(true);
       setClosureStep('validation');
       setRollbackExecuted(false);
+      setPostClosureResult(null);
       
-      console.log('🔒 HOOK FASE 2 - Iniciando cierre transaccional...');
+      console.log('🔒 HOOK FASE 3 - Iniciando cierre transaccional...');
       
       // Simular progreso de pasos
       const steps = ['validation', 'snapshot', 'closure', 'verification'] as const;
@@ -322,11 +323,33 @@ export const usePayrollLiquidationNew = () => {
       setCurrentPeriod(prev => ({ ...prev, estado: 'cerrado' }));
       setClosureStep('completed');
       
-      toast({
-        title: "✅ Período cerrado exitosamente",
-        description: result,
-        className: "border-green-200 bg-green-50"
-      });
+      // ✅ FASE 3: Mostrar información de detección post-cierre si está disponible
+      if (result.postClosureResult) {
+        setPostClosureResult(result.postClosureResult);
+        
+        if (result.postClosureResult.nextPeriodSuggestion) {
+          const nextPeriod = result.postClosureResult.nextPeriodSuggestion;
+          console.log('📅 FASE 3 - Siguiente período sugerido:', nextPeriod);
+          
+          toast({
+            title: "✅ Período cerrado exitosamente",
+            description: `Siguiente período sugerido: ${nextPeriod.startDate} - ${nextPeriod.endDate}`,
+            className: "border-green-200 bg-green-50"
+          });
+        } else {
+          toast({
+            title: "✅ Período cerrado exitosamente",
+            description: result.message || "Cierre completado correctamente",
+            className: "border-green-200 bg-green-50"
+          });
+        }
+      } else {
+        toast({
+          title: "✅ Período cerrado exitosamente",
+          description: result.message || "Cierre completado correctamente",
+          className: "border-green-200 bg-green-50"
+        });
+      }
       
       // Reinicializar para mostrar el estado actualizado
       setTimeout(() => {
@@ -352,7 +375,7 @@ export const usePayrollLiquidationNew = () => {
   const createNewPeriod = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🆕 HOOK FASE 2 - Creando nuevo período...');
+      console.log('🆕 HOOK FASE 3 - Creando nuevo período...');
       
       const result = await PayrollUnifiedService.createNextPeriod();
       
@@ -408,10 +431,11 @@ export const usePayrollLiquidationNew = () => {
     summary,
     periodStatus,
     
-    // ✅ FASE 2: Estados de cierre transaccional
+    // ✅ FASE 3: Estados de cierre transaccional con detección post-cierre
     closureStep,
     transactionId,
     rollbackExecuted,
+    postClosureResult,
     
     // Acciones
     removeEmployeeFromPeriod,

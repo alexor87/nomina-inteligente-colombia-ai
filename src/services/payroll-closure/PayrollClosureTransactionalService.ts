@@ -1,19 +1,18 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PostClosureDetectionService } from '@/services/payroll-intelligent/PostClosureDetectionService';
 
 /**
- * ✅ SERVICIO DE CIERRE TRANSACCIONAL - FASE 2
- * Implementa cierre atómico con rollback automático
+ * ✅ SERVICIO DE CIERRE TRANSACCIONAL - FASE 3
+ * Implementa cierre atómico con rollback automático y detección post-cierre
  */
 export class PayrollClosureTransactionalService {
   private static readonly CLOSURE_TIMEOUT = 30000; // 30 segundos
   private static readonly MAX_ROLLBACK_RETRIES = 3;
 
   /**
-   * CIERRE TRANSACCIONAL PRINCIPAL
+   * CIERRE TRANSACCIONAL PRINCIPAL CON DETECCIÓN POST-CIERRE
    */
   static async executeTransactionalClosure(
     period: any,
@@ -24,9 +23,10 @@ export class PayrollClosureTransactionalService {
     message: string;
     transactionId?: string;
     rollbackExecuted?: boolean;
+    postClosureResult?: any;
   }> {
     const transactionId = this.generateTransactionId();
-    console.log(`🔒 FASE 2 - Iniciando cierre transaccional: ${transactionId}`);
+    console.log(`🔒 FASE 3 - Iniciando cierre transaccional: ${transactionId}`);
 
     try {
       // PASO 1: Validaciones pre-cierre exhaustivas
@@ -70,7 +70,8 @@ export class PayrollClosureTransactionalService {
         };
       }
 
-      // PASO 4: Verificación post-cierre
+      // PASO 4: ✅ FASE 3 - Verificación post-cierre con detección inteligente
+      console.log('🔍 FASE 3 - Iniciando verificación post-cierre...');
       const postClosureResult = await PostClosureDetectionService.verifyClosureAndDetectNext(
         period.id,
         companyId
@@ -78,14 +79,21 @@ export class PayrollClosureTransactionalService {
 
       if (!postClosureResult.success) {
         console.warn('⚠️ Verificación post-cierre falló, pero el cierre se completó');
+        console.warn('Error:', postClosureResult.error);
+      } else {
+        console.log('✅ FASE 3 - Verificación post-cierre completada exitosamente');
+        if (postClosureResult.nextPeriodSuggestion) {
+          console.log('📅 Siguiente período sugerido:', postClosureResult.nextPeriodSuggestion);
+        }
       }
 
-      console.log(`✅ FASE 2 - Cierre transaccional completado: ${transactionId}`);
+      console.log(`✅ FASE 3 - Cierre transaccional completado: ${transactionId}`);
       
       return {
         success: true,
         message: `Período ${period.periodo} cerrado exitosamente`,
-        transactionId
+        transactionId,
+        postClosureResult
       };
 
     } catch (error) {
@@ -119,7 +127,7 @@ export class PayrollClosureTransactionalService {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    console.log('🔍 FASE 2 - Ejecutando validaciones pre-cierre...');
+    console.log('🔍 FASE 3 - Ejecutando validaciones pre-cierre...');
 
     try {
       // Validación 1: Estado del período
@@ -187,7 +195,7 @@ export class PayrollClosureTransactionalService {
     companyId: string,
     transactionId: string
   ): Promise<{ success: boolean; error?: string }> {
-    console.log(`⚡ FASE 2 - Ejecutando cierre atómico: ${transactionId}`);
+    console.log(`⚡ FASE 3 - Ejecutando cierre atómico: ${transactionId}`);
 
     try {
       // Calcular totales finales
@@ -259,7 +267,7 @@ export class PayrollClosureTransactionalService {
     snapshot: any,
     transactionId: string
   ): Promise<{ executed: boolean; error?: string }> {
-    console.log(`🔄 FASE 2 - Ejecutando rollback: ${transactionId}`);
+    console.log(`🔄 FASE 3 - Ejecutando rollback: ${transactionId}`);
 
     for (let attempt = 1; attempt <= this.MAX_ROLLBACK_RETRIES; attempt++) {
       try {

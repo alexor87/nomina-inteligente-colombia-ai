@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, AlertCircle, Clock, Shield, Database, RefreshCw } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, Shield, Database, RefreshCw, Calendar, ArrowRight } from 'lucide-react';
 
 interface TransactionalClosureIndicatorProps {
   isProcessing: boolean;
@@ -10,6 +10,7 @@ interface TransactionalClosureIndicatorProps {
   transactionId?: string;
   rollbackExecuted?: boolean;
   message?: string;
+  postClosureResult?: any;
 }
 
 export const TransactionalClosureIndicator: React.FC<TransactionalClosureIndicatorProps> = ({
@@ -17,7 +18,8 @@ export const TransactionalClosureIndicator: React.FC<TransactionalClosureIndicat
   currentStep,
   transactionId,
   rollbackExecuted,
-  message
+  message,
+  postClosureResult
 }) => {
   const getStepIcon = (step: string, isActive: boolean, isCompleted: boolean) => {
     const baseClass = "h-4 w-4";
@@ -90,7 +92,7 @@ export const TransactionalClosureIndicator: React.FC<TransactionalClosureIndicat
               { key: 'validation', label: 'Validaciones Pre-cierre', description: 'Verificando integridad de datos' },
               { key: 'snapshot', label: 'Snapshot de Respaldo', description: 'Creando punto de restauración' },
               { key: 'closure', label: 'Cierre Atómico', description: 'Ejecutando operaciones transaccionales' },
-              { key: 'verification', label: 'Verificación Post-cierre', description: 'Confirmando resultado' }
+              { key: 'verification', label: 'Verificación Post-cierre', description: 'Confirmando resultado y detectando siguiente período' }
             ].map((step) => {
               const status = getStepStatus(step.key);
               const isActive = status === 'active';
@@ -130,6 +132,43 @@ export const TransactionalClosureIndicator: React.FC<TransactionalClosureIndicat
             })}
           </div>
 
+          {/* ✅ FASE 3: Información Post-Cierre */}
+          {currentStep === 'completed' && postClosureResult && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+              <div className="flex items-center space-x-2 mb-2">
+                <Calendar className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-800">
+                  Detección Post-Cierre
+                </span>
+              </div>
+              
+              {postClosureResult.nextPeriodSuggestion ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2 text-sm text-green-700">
+                    <span>Siguiente período detectado:</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="outline" className="text-green-700 border-green-300">
+                      {postClosureResult.nextPeriodSuggestion.startDate}
+                    </Badge>
+                    <span className="text-xs text-green-600">→</span>
+                    <Badge variant="outline" className="text-green-700 border-green-300">
+                      {postClosureResult.nextPeriodSuggestion.endDate}
+                    </Badge>
+                    <Badge className="bg-green-100 text-green-800 text-xs">
+                      {postClosureResult.nextPeriodSuggestion.type}
+                    </Badge>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-green-700">
+                  {postClosureResult.message || 'Verificación completada exitosamente'}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Message */}
           {message && (
             <div className={`text-sm p-3 rounded-md ${
@@ -147,6 +186,9 @@ export const TransactionalClosureIndicator: React.FC<TransactionalClosureIndicat
               <div>• Operaciones atómicas garantizadas</div>
               <div>• Rollback automático en caso de error</div>
               <div>• Sincronización BD ↔ Historial automática</div>
+              {currentStep === 'completed' && (
+                <div>• Detección inteligente del siguiente período</div>
+              )}
             </div>
           )}
         </div>

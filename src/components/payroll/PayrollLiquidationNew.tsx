@@ -3,12 +3,13 @@ import React from 'react';
 import { PayrollTableNew } from './PayrollTableNew';
 import { PayrollSummaryPanel } from './liquidation/PayrollSummaryPanel';
 import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
+import { TransactionalClosureIndicator } from './closure/TransactionalClosureIndicator';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
 
 /**
- * ✅ COMPONENTE PRINCIPAL DE LIQUIDACIÓN - FASE 1
- * Corregido para usar el hook unificado sin errores
+ * ✅ COMPONENTE PRINCIPAL DE LIQUIDACIÓN - FASE 3
+ * Integra cierre transaccional con detección post-cierre inteligente
  */
 export const PayrollLiquidationNew = () => {
   const {
@@ -19,6 +20,10 @@ export const PayrollLiquidationNew = () => {
     selectedEmployees,
     summary,
     periodStatus,
+    closureStep,
+    transactionId,
+    rollbackExecuted,
+    postClosureResult,
     removeEmployeeFromPeriod,
     createNovedadForEmployee,
     recalculateAfterNovedadChange,
@@ -69,6 +74,15 @@ export const PayrollLiquidationNew = () => {
         totalCount={employees.length}
       />
 
+      {/* ✅ FASE 3: Indicador de Cierre Transaccional con Detección Post-Cierre */}
+      <TransactionalClosureIndicator
+        isProcessing={isProcessing}
+        currentStep={closureStep}
+        transactionId={transactionId}
+        rollbackExecuted={rollbackExecuted}
+        postClosureResult={postClosureResult}
+      />
+
       {hasEmployees && (
         <>
           <PayrollSummaryPanel 
@@ -81,7 +95,7 @@ export const PayrollLiquidationNew = () => {
             employees={employees}
             onRemoveEmployee={removeEmployeeFromPeriod}
             onCreateNovedad={createNovedadForEmployee}
-            onRecalculate={recalculateAll} // ✅ Fixed: pass recalculateAll directly
+            onRecalculate={recalculateAll}
             periodId={currentPeriod?.id || ''}
             canEdit={currentPeriod?.estado === 'borrador'}
             selectedEmployees={selectedEmployees}
