@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod, PayrollHistoryEmployee, PayrollHistoryDetails } from '@/types/payroll-history';
 import { formatCurrency } from '@/lib/utils';
@@ -41,7 +40,7 @@ export class PayrollHistoryService {
           totalNetPay: Number(period.total_neto) || 0,
           totalDeductions: Number(period.total_deducciones) || 0,
           totalCost: Number(period.total_devengado) || 0,
-          employerContributions: 0, // Se puede calcular después si es necesario
+          employerContributions: 0,
           paymentStatus: 'pendiente',
           version: 1,
           createdAt: period.created_at,
@@ -58,6 +57,11 @@ export class PayrollHistoryService {
       console.error('💥 Error crítico cargando historial:', error);
       throw error;
     }
+  }
+
+  // ✅ NUEVO MÉTODO: Para compatibilidad con PayrollHistoryPage
+  static async getPayrollPeriods(): Promise<PayrollHistoryPeriod[]> {
+    return this.getHistoryPeriods();
   }
 
   // ✅ CORRECCIÓN CRÍTICA: Auto-sincronización mejorada
@@ -167,7 +171,13 @@ export class PayrollHistoryService {
       }
 
       console.log('✅ Auto-sync completado:', data);
-      return { success: true, message: data?.message || 'Sincronización completada' };
+      
+      // ✅ CORRECCIÓN: Manejo seguro de la respuesta
+      const result = data as any;
+      return { 
+        success: true, 
+        message: result?.message || 'Sincronización completada' 
+      };
 
     } catch (error) {
       console.error('❌ Error en auto-sincronización:', error);
@@ -280,6 +290,157 @@ export class PayrollHistoryService {
     } catch (error) {
       console.error('❌ Error forzando regeneración:', error);
       return { success: false, message: `Error: ${error}` };
+    }
+  }
+
+  // ✅ NUEVO MÉTODO: Recalcular totales de empleado con novedades
+  static async recalculateEmployeeTotalsWithNovedades(employeeId: string, periodId: string): Promise<void> {
+    try {
+      console.log(`🔄 Recalculando totales para empleado: ${employeeId} en período: ${periodId}`);
+      
+      // Obtener datos del empleado y período
+      const { data: payroll, error: payrollError } = await supabase
+        .from('payrolls')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('period_id', periodId)
+        .single();
+
+      if (payrollError || !payroll) {
+        console.error('❌ Error obteniendo nómina:', payrollError);
+        return;
+      }
+
+      // Obtener novedades del empleado
+      const { data: novedades, error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .select('*')
+        .eq('empleado_id', employeeId)
+        .eq('periodo_id', periodId);
+
+      if (novedadesError) {
+        console.error('❌ Error obteniendo novedades:', novedadesError);
+      }
+
+      // Calcular totales con novedades
+      let totalDevengosNovedades = 0;
+      let totalDeduccionesNovedades = 0;
+
+      (novedades || []).forEach(novedad => {
+        const valor = Number(novedad.valor) || 0;
+        
+        // Clasificar como devengo o deducción
+        const tiposDevengos = ['horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'];
+        if (tiposDevengos.includes(novedad.tipo_novedad)) {
+          totalDevengosNovedades += valor;
+        } else {
+          totalDeduccionesNovedades += valor;
+        }
+      });
+
+      // Calcular nuevos totales
+      const salarioBase = Number(payroll.salario_base) || 0;
+      const auxilioTransporte = Number(payroll.auxilio_transporte) || 0;
+      const deduccionesBase = Number(payroll.salud_empleado) + Number(payroll.pension_empleado);
+
+      const nuevoTotalDevengado = salarioBase + auxilioTransporte + totalDevengosNovedades;
+      const nuevoTotalDeducciones = deduccionesBase + totalDeduccionesNovedades;
+      const nuevoNetoAPagar = nuevoTotalDevengado - nuevoTotalDeducciones;
+
+      // Actualizar registro de nómina
+      const { error: updateError } = await supabase
+        .from('payrolls')
+        .update({
+          total_devengado: nuevoTotalDevengado,
+          total_deducciones: nuevoTotalDeducciones,
+          neto_pagado: nuevoNetoAPagar,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', payroll.id);
+
+      if (updateError) {
+        console.error('❌ Error actualizando totales:', updateError);
+        throw updateError;
+      }
+
+      console.log(`✅ Totales recalculados para empleado ${employeeId}`);
+
+    } catch (error) {
+      console.error('❌ Error recalculando totales:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NUEVO MÉTODO: Actualizar valores de empleado
+  static async updateEmployeeValues(employeeId: string, periodId: string, values: any): Promise<void> {
+    try {
+      console.log(`📝 Actualizando valores para empleado: ${employeeId}`);
+      
+      const { error } = await supabase
+        .from('payrolls')
+        .update({
+          ...values,
+          updated_at: new Date().toISOString()
+        })
+        .eq('employee_id', employeeId)
+        .eq('period_id', periodId);
+
+      if (error) {
+        console.error('❌ Error actualizando valores:', error);
+        throw error;
+      }
+
+      console.log(`✅ Valores actualizados para empleado ${employeeId}`);
+    } catch (error) {
+      console.error('❌ Error en updateEmployeeValues:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NUEVO MÉTODO: Recalcular totales del período
+  static async recalculatePeriodTotals(periodId: string): Promise<void> {
+    try {
+      console.log(`🔄 Recalculando totales del período: ${periodId}`);
+      
+      const { data: payrolls, error } = await supabase
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado')
+        .eq('period_id', periodId);
+
+      if (error) {
+        console.error('❌ Error obteniendo nóminas:', error);
+        throw error;
+      }
+
+      const totales = (payrolls || []).reduce(
+        (acc, payroll) => ({
+          totalDevengado: acc.totalDevengado + Number(payroll.total_devengado || 0),
+          totalDeducciones: acc.totalDeducciones + Number(payroll.total_deducciones || 0),
+          totalNeto: acc.totalNeto + Number(payroll.neto_pagado || 0)
+        }),
+        { totalDevengado: 0, totalDeducciones: 0, totalNeto: 0 }
+      );
+
+      const { error: updateError } = await supabase
+        .from('payroll_periods_real')
+        .update({
+          total_devengado: totales.totalDevengado,
+          total_deducciones: totales.totalDeducciones,
+          total_neto: totales.totalNeto,
+          empleados_count: payrolls?.length || 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId);
+
+      if (updateError) {
+        console.error('❌ Error actualizando totales del período:', updateError);
+        throw updateError;
+      }
+
+      console.log(`✅ Totales del período recalculados: ${periodId}`);
+    } catch (error) {
+      console.error('❌ Error en recalculatePeriodTotals:', error);
+      throw error;
     }
   }
 }

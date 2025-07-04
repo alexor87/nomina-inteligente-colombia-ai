@@ -237,6 +237,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [employees, selectedEmployees]);
 
+  // ✅ CORRECCIÓN: Función sin parámetros
   const recalculateAll = useCallback(async () => {
     if (!currentPeriod) return;
 
