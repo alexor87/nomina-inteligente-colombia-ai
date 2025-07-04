@@ -1,213 +1,488 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollEmployee, BaseEmployeeData } from '@/types/payroll';
+import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
+import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
 
 export class PayrollLiquidationNewService {
   static async loadEmployeesForActivePeriod(period: any): Promise<PayrollEmployee[]> {
     try {
-      console.log('🔍 PayrollLiquidationNewService: Iniciando carga de empleados...');
-      console.log('📅 Período recibido:', period);
+      console.log('🔍 ALELUYA - Cargando empleados para período:', period.periodo);
+      console.log('📅 Período completo:', period);
+
+      const companyId = period.company_id;
       
-      // Get current user's company ID
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('👤 Usuario actual:', user?.id);
+      // ✅ VALIDACIÓN CRÍTICA: Verificar que company_id no esté vacío
+      if (!companyId || companyId === '' || typeof companyId !== 'string') {
+        console.error('❌ COMPANY_ID INVÁLIDO:', companyId);
+        throw new Error(`Company ID inválido: ${companyId}. Verifique que el período tenga un company_id válido.`);
+      }
       
-      if (!user) {
-        console.log('❌ No hay usuario autenticado');
-        throw new Error('No hay usuario autenticado');
-      }
-
-      // Get user's company
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError) {
-        console.log('❌ Error obteniendo perfil:', profileError);
-        throw profileError;
-      }
-
-      if (!profile?.company_id) {
-        console.log('❌ Usuario no tiene empresa asignada');
-        throw new Error('Usuario no tiene empresa asignada');
-      }
-
-      console.log('🏢 Company ID:', profile.company_id);
-
-      // Load employees from the company
+      console.log('✅ Company ID validado:', companyId);
+      
+      // Obtener empleados activos de la empresa
       const { data: employees, error: employeesError } = await supabase
         .from('employees')
         .select('*')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .eq('estado', 'activo');
 
       if (employeesError) {
-        console.log('❌ Error cargando empleados:', employeesError);
-        throw employeesError;
+        console.error('❌ Error cargando empleados:', employeesError);
+        console.error('❌ Company ID usado en query:', companyId);
+        throw new Error(`Error consultando empleados: ${employeesError.message}`);
       }
 
-      console.log('📋 Empleados encontrados en BD:', employees?.length || 0);
-      console.log('👥 Lista de empleados raw:', employees?.map(emp => ({
-        id: emp.id,
-        nombre: emp.nombre,
-        apellido: emp.apellido,
-        salario_base: emp.salario_base,
-        estado: emp.estado
-      })));
+      console.log(`👥 Empleados activos encontrados: ${employees?.length || 0}`);
 
       if (!employees || employees.length === 0) {
         console.log('⚠️ No se encontraron empleados activos');
         return [];
       }
 
-      // Transform employees to PayrollEmployee format
-      const payrollEmployees: PayrollEmployee[] = employees.map(employee => {
-        const baseSalary = Number(employee.salario_base) || 0;
-        const transportAllowance = baseSalary <= 2600000 ? 140606 : 0; // 2024 transport allowance
-        const grossPay = baseSalary + transportAllowance;
-        
-        // Calculate basic deductions (health + pension)
-        const healthDeduction = baseSalary * 0.04; // 4% health
-        const pensionDeduction = baseSalary * 0.04; // 4% pension
-        const totalDeductions = healthDeduction + pensionDeduction;
-        
-        const netPay = grossPay - totalDeductions;
-        
-        // Calculate employer contributions
-        const employerHealth = baseSalary * 0.085; // 8.5% employer health
-        const employerPension = baseSalary * 0.12; // 12% employer pension
-        const employerARL = baseSalary * 0.00522; // 0.522% ARL (average)
-        const employerSENA = baseSalary * 0.02; // 2% SENA
-        const employerICBF = baseSalary * 0.03; // 3% ICBF
-        const employerCompensation = baseSalary * 0.04; // 4% Compensation fund
-        
-        const employerContributions = employerHealth + employerPension + employerARL + 
-                                     employerSENA + employerICBF + employerCompensation;
+      // **CORRECCIÓN ALELUYA: Obtener la periodicidad real de la empresa**
+      const companyPeriodicity = await PayrollCalculationEnhancedService.getUserConfiguredPeriodicity();
+      console.log(`⚙️ Periodicidad ALELUYA: ${companyPeriodicity}`);
 
-        const payrollEmployee: PayrollEmployee = {
-          id: employee.id,
-          name: `${employee.nombre} ${employee.apellido}`.trim(),
-          position: employee.cargo || 'Sin cargo',
-          baseSalary: baseSalary,
-          workedDays: 30,
-          extraHours: 0,
-          disabilities: 0,
-          bonuses: 0,
-          absences: 0,
-          grossPay: grossPay,
-          deductions: totalDeductions,
-          netPay: netPay,
-          status: 'valid',
-          errors: [],
-          eps: employee.eps,
-          afp: employee.afp,
-          transportAllowance: transportAllowance,
-          employerContributions: employerContributions
-        };
+      // Buscar nóminas existentes para este período
+      const { data: existingPayrolls, error: payrollsError } = await supabase
+        .from('payrolls')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('periodo', period.periodo);
 
-        console.log('🔄 Empleado transformado:', {
-          id: payrollEmployee.id,
-          name: payrollEmployee.name,
-          baseSalary: payrollEmployee.baseSalary,
-          grossPay: payrollEmployee.grossPay,
-          netPay: payrollEmployee.netPay
-        });
+      if (payrollsError) {
+        console.error('❌ Error consultando nóminas existentes:', payrollsError);
+      }
 
-        return payrollEmployee;
-      });
+      console.log(`💼 Nóminas existentes para período: ${existingPayrolls?.length || 0}`);
 
-      console.log('✅ Total empleados transformados:', payrollEmployees.length);
-      return payrollEmployees;
+      // Obtener novedades para el período
+      const { data: novedades, error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('periodo_id', period.id);
+
+      if (novedadesError) {
+        console.error('❌ Error cargando novedades:', novedadesError);
+      }
+
+      console.log(`📋 Novedades encontradas: ${novedades?.length || 0}`);
+
+      // Procesar cada empleado
+      const processedEmployees: PayrollEmployee[] = [];
+
+      for (const employee of employees) {
+        try {
+          // Buscar nómina existente para este empleado en este período
+          const existingPayroll = existingPayrolls?.find(p => p.employee_id === employee.id);
+          
+          // Filtrar novedades para este empleado
+          const employeeNovedades = novedades?.filter(n => n.empleado_id === employee.id) || [];
+
+          let payrollEmployee: PayrollEmployee;
+
+          if (existingPayroll) {
+            // ✅ CORRECCIÓN ALELUYA: Usar datos existentes pero con periodicidad correcta
+            console.log(`✅ Nómina existente ALELUYA para: ${employee.nombre} - Verificando valores`);
+            payrollEmployee = this.mapExistingPayrollToEmployee(employee, existingPayroll, companyPeriodicity);
+          } else {
+            // ✅ CORRECCIÓN ALELUYA: Calcular nueva nómina con lógica exacta
+            console.log(`🔄 Calculando ALELUYA para: ${employee.nombre} con periodicidad: ${companyPeriodicity}`);
+            payrollEmployee = await this.calculateEmployeePayrollAleluya(
+              employee, 
+              period, 
+              employeeNovedades, 
+              companyPeriodicity
+            );
+          }
+
+          processedEmployees.push(payrollEmployee);
+        } catch (error) {
+          console.error(`❌ Error procesando empleado ${employee.nombre}:`, error);
+          
+          // Crear entrada con error usando días correctos
+          processedEmployees.push({
+            id: employee.id,
+            name: `${employee.nombre} ${employee.apellido}`,
+            position: employee.cargo || 'Sin cargo',
+            baseSalary: Number(employee.salario_base) || 0,
+            workedDays: this.getDefaultWorkedDays(companyPeriodicity),
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            grossPay: 0,
+            deductions: 0,
+            netPay: 0,
+            status: 'error',
+            errors: [`Error procesando: ${error}`],
+            eps: employee.eps || '',
+            afp: employee.afp || '',
+            transportAllowance: 0,
+            employerContributions: 0
+          });
+        }
+      }
+
+      console.log(`✅ ALELUYA - Empleados procesados: ${processedEmployees.length}`);
+      return processedEmployees;
 
     } catch (error) {
-      console.error('💥 Error en loadEmployeesForActivePeriod:', error);
+      console.error('💥 Error crítico en loadEmployeesForActivePeriod:', error);
+      
+      // ✅ MEJORAR MENSAJE DE ERROR para debugging
+      if (error instanceof Error) {
+        console.error('💥 Mensaje de error:', error.message);
+        console.error('💥 Stack trace:', error.stack);
+      }
+      
       throw error;
     }
   }
 
+  // ✅ CORRECCIÓN ALELUYA: Días trabajados correctos según periodicidad
+  private static getDefaultWorkedDays(periodicity: 'quincenal' | 'mensual' | 'semanal'): number {
+    switch (periodicity) {
+      case 'semanal':
+        return 7;
+      case 'quincenal':
+        return 15;
+      case 'mensual':
+        return 30;
+      default:
+        return 30;
+    }
+  }
+
+  // ✅ CORRECCIÓN ALELUYA: Validar días trabajados según periodicidad
+  private static validateWorkedDays(workedDays: number, periodicity: 'quincenal' | 'mensual' | 'semanal'): number {
+    const maxDays = this.getDefaultWorkedDays(periodicity);
+    
+    if (workedDays > maxDays) {
+      console.warn(`⚠️ ALELUYA - Días trabajados (${workedDays}) exceden máximo para período ${periodicity} (${maxDays}). Ajustando.`);
+      return maxDays;
+    }
+    
+    return workedDays || maxDays;
+  }
+
+  // ✅ CORRECCIÓN ALELUYA: Mapear nómina existente respetando periodicidad
+  private static mapExistingPayrollToEmployee(
+    employee: any, 
+    payroll: any, 
+    periodicity: 'quincenal' | 'mensual' | 'semanal'
+  ): PayrollEmployee {
+    const rawWorkedDays = payroll.dias_trabajados || employee.dias_trabajo;
+    const validatedWorkedDays = this.validateWorkedDays(rawWorkedDays, periodicity);
+    
+    console.log(`📊 ALELUYA - ${employee.nombre}: días=${validatedWorkedDays}, periodicidad=${periodicity}`);
+    
+    return {
+      id: employee.id,
+      name: `${employee.nombre} ${employee.apellido}`,
+      position: employee.cargo || 'Sin cargo',
+      baseSalary: Number(payroll.salario_base) || 0,
+      workedDays: validatedWorkedDays,
+      extraHours: Number(payroll.horas_extra) || 0,
+      disabilities: 0,
+      bonuses: Number(payroll.bonificaciones) || 0,
+      absences: 0,
+      grossPay: Number(payroll.total_devengado) || 0,
+      deductions: Number(payroll.total_deducciones) || 0,
+      netPay: Number(payroll.neto_pagado) || 0,
+      status: 'valid',
+      errors: [],
+      eps: employee.eps || '',
+      afp: employee.afp || '',
+      transportAllowance: Number(payroll.auxilio_transporte) || 0,
+      employerContributions: this.calculateEmployerContributions(Number(payroll.salario_base) || 0)
+    };
+  }
+
+  // ✅ NUEVA FUNCIÓN ALELUYA: Cálculo exacto como Aleluya CON NOVEDADES
+  private static async calculateEmployeePayrollAleluya(
+    employee: any, 
+    period: any, 
+    novedades: any[], 
+    periodicity: 'quincenal' | 'mensual' | 'semanal'
+  ): Promise<PayrollEmployee> {
+    try {
+      const baseSalary = Number(employee.salario_base) || 0;
+      const workedDays = this.validateWorkedDays(employee.dias_trabajo, periodicity);
+      
+      console.log(`🔢 ALELUYA - Calculando para ${employee.nombre}:`, {
+        baseSalary,
+        workedDays,
+        periodicity,
+        novedades: novedades.length
+      });
+      
+      // ✅ CÁLCULO ALELUYA EXACTO
+      // 1. Salario proporcional: (salario_mensual / 30) × días_trabajados
+      const dailySalary = baseSalary / 30;
+      const proportionalSalary = Math.round(dailySalary * workedDays);
+      
+      // 2. Auxilio de transporte proporcional (si aplica)
+      let transportAllowance = 0;
+      if (baseSalary <= (1300000 * 2)) { // Si es beneficiario
+        const dailyTransport = 200000 / 30;
+        transportAllowance = Math.round(dailyTransport * workedDays);
+      }
+
+      // ✅ 3. PROCESAR NOVEDADES
+      let extraHours = 0;
+      let bonuses = 0;
+      let additionalDeductions = 0;
+      let additionalEarnings = 0;
+
+      console.log(`📋 Procesando ${novedades.length} novedades para ${employee.nombre}:`);
+      
+      for (const novedad of novedades) {
+        const valor = Number(novedad.valor) || 0;
+        
+        console.log(`   - ${novedad.tipo_novedad}: $${valor.toLocaleString()}`);
+        
+        // Clasificar novedades en devengos y deducciones
+        switch (novedad.tipo_novedad) {
+          case 'horas_extra':
+          case 'recargo_nocturno':
+            extraHours += valor;
+            additionalEarnings += valor;
+            break;
+          case 'bonificacion':
+          case 'comision':
+          case 'prima':
+          case 'otros_ingresos':
+            bonuses += valor;
+            additionalEarnings += valor;
+            break;
+          case 'retencion_fuente':
+          case 'prestamo':
+          case 'embargo':
+          case 'descuento_voluntario':
+          case 'fondo_solidaridad':
+            additionalDeductions += valor;
+            break;
+          // Salud y pensión no se incluyen aquí porque ya se calculan automáticamente
+          default:
+            console.log(`   ⚠️ Tipo de novedad no clasificado: ${novedad.tipo_novedad}`);
+        }
+      }
+
+      // 4. Total devengado CON NOVEDADES
+      const grossPay = proportionalSalary + transportAllowance + additionalEarnings;
+      
+      // 5. Deducciones (solo sobre salario proporcional, sin auxilio) + novedades
+      const healthDeduction = Math.round(proportionalSalary * 0.04); // 4%
+      const pensionDeduction = Math.round(proportionalSalary * 0.04); // 4%
+      const totalDeductions = healthDeduction + pensionDeduction + additionalDeductions;
+      
+      // 6. Neto a pagar
+      const netPay = grossPay - totalDeductions;
+      
+      console.log(`💰 RESULTADO ALELUYA CON NOVEDADES para ${employee.nombre}:`, {
+        proportionalSalary,
+        transportAllowance,
+        additionalEarnings,
+        extraHours,
+        bonuses,
+        grossPay,
+        totalDeductions,
+        additionalDeductions,
+        netPay
+      });
+
+      return {
+        id: employee.id,
+        name: `${employee.nombre} ${employee.apellido}`,
+        position: employee.cargo || 'Sin cargo',
+        baseSalary,
+        workedDays,
+        extraHours,
+        disabilities: 0,
+        bonuses,
+        absences: 0,
+        grossPay,
+        deductions: totalDeductions,
+        netPay,
+        status: 'valid',
+        errors: [],
+        eps: employee.eps || '',
+        afp: employee.afp || '',
+        transportAllowance,
+        employerContributions: this.calculateEmployerContributions(baseSalary)
+      };
+    } catch (error) {
+      console.error('❌ Error en cálculo ALELUYA:', error);
+      
+      // Fallback básico
+      const baseSalary = Number(employee.salario_base) || 0;
+      const workedDays = this.validateWorkedDays(employee.dias_trabajo, periodicity);
+      
+      return {
+        id: employee.id,
+        name: `${employee.nombre} ${employee.apellido}`,
+        position: employee.cargo || 'Sin cargo',
+        baseSalary,
+        workedDays,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        grossPay: 0,
+        deductions: 0,
+        netPay: 0,
+        status: 'error',
+        errors: ['Error en cálculo - usar valores por defecto'],
+        eps: employee.eps || '',
+        afp: employee.afp || '',
+        transportAllowance: 0,
+        employerContributions: 0
+      };
+    }
+  }
+
+  private static calculateEmployerContributions(baseSalary: number): number {
+    // Cálculo aproximado de aportes patronales
+    return baseSalary * 0.325;
+  }
+
   static async updateEmployeeCount(periodId: string, count: number): Promise<void> {
     try {
-      console.log('📊 Actualizando contador de empleados:', { periodId, count });
-      
       const { error } = await supabase
         .from('payroll_periods_real')
         .update({ empleados_count: count })
         .eq('id', periodId);
 
-      if (error) {
-        console.log('❌ Error actualizando contador:', error);
-        throw error;
-      }
-
-      console.log('✅ Contador actualizado correctamente');
+      if (error) throw error;
+      
+      console.log(`✅ Contador de empleados actualizado: ${count}`);
     } catch (error) {
-      console.error('💥 Error actualizando contador de empleados:', error);
-      throw error;
+      console.error('❌ Error actualizando contador de empleados:', error);
     }
   }
 
   static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
     try {
-      console.log('🗑️ Removiendo empleado del período:', { employeeId, periodId });
+      console.log(`🗑️ Removiendo empleado ${employeeId} del período ${periodId}`);
       
-      const { error } = await supabase
+      // Eliminar nómina del empleado para este período
+      const { error: payrollError } = await supabase
         .from('payrolls')
         .delete()
         .eq('employee_id', employeeId)
         .eq('period_id', periodId);
 
-      if (error) {
-        console.log('❌ Error removiendo empleado:', error);
-        throw error;
+      if (payrollError) {
+        console.error('❌ Error eliminando nómina:', payrollError);
+        throw payrollError;
       }
 
-      console.log('✅ Empleado removido correctamente');
+      // Eliminar novedades del empleado para este período
+      const { error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .delete()
+        .eq('empleado_id', employeeId)
+        .eq('periodo_id', periodId);
+
+      if (novedadesError) {
+        console.error('❌ Error eliminando novedades:', novedadesError);
+        throw novedadesError;
+      }
+
+      console.log(`✅ Empleado ${employeeId} removido del período ${periodId}`);
     } catch (error) {
-      console.error('💥 Error removiendo empleado del período:', error);
+      console.error('❌ Error removiendo empleado del período:', error);
       throw error;
     }
   }
 
   static async closePeriod(period: any, employees: PayrollEmployee[]): Promise<string> {
     try {
-      console.log('🔒 Cerrando período:', period.id);
+      console.log(`🔐 ALELUYA - Cerrando período: ${period.periodo}`);
       
-      // Update period status to closed
+      // ✅ CORRECCIÓN ALELUYA: Guardar valores PROPORCIONALES calculados
+      console.log(`💾 ALELUYA - Guardando ${employees.length} registros proporcionales...`);
+      
+      let successfulRecords = 0;
+      const failedRecords: string[] = [];
+
+      for (const employee of employees) {
+        if (employee.status === 'valid') {
+          try {
+            // ✅ ALELUYA: Guardar valores proporcionales, NO mensuales
+            const payrollData = {
+              company_id: period.company_id,
+              employee_id: employee.id,
+              periodo: period.periodo,
+              period_id: period.id,
+              salario_base: employee.baseSalary, // Referencia mensual
+              dias_trabajados: employee.workedDays, // Días del período
+              horas_extra: employee.extraHours,
+              bonificaciones: employee.bonuses,
+              auxilio_transporte: employee.transportAllowance, // PROPORCIONAL
+              total_devengado: employee.grossPay, // PROPORCIONAL
+              total_deducciones: employee.deductions, // PROPORCIONAL
+              neto_pagado: employee.netPay, // PROPORCIONAL
+              estado: 'procesada'
+            };
+
+            console.log(`💾 ALELUYA - Guardando datos proporcionales para ${employee.name}:`, payrollData);
+
+            const { error: payrollError } = await supabase
+              .from('payrolls')
+              .upsert(payrollData, {
+                onConflict: 'company_id,employee_id,period_id',
+                ignoreDuplicates: false
+              });
+
+            if (payrollError) {
+              console.error(`❌ Error guardando nómina para empleado ${employee.name}:`, payrollError);
+              failedRecords.push(employee.name);
+            } else {
+              successfulRecords++;
+              console.log(`✅ ALELUYA - Datos proporcionales guardados para ${employee.name}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error crítico guardando empleado ${employee.name}:`, error);
+            failedRecords.push(employee.name);
+          }
+        }
+      }
+
+      console.log(`📊 ALELUYA - Resultados: ${successfulRecords} exitosos, ${failedRecords.length} fallidos`);
+
+      // Calcular totales basados en registros válidos
+      const validEmployees = employees.filter(emp => emp.status === 'valid');
+      const totalDevengado = validEmployees.reduce((sum, emp) => sum + emp.grossPay, 0);
+      const totalDeducciones = validEmployees.reduce((sum, emp) => sum + emp.deductions, 0);
+      const totalNeto = validEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
+
+      // Actualizar estado del período con totales PROPORCIONALES
       const { error: periodError } = await supabase
         .from('payroll_periods_real')
         .update({ 
           estado: 'cerrado',
-          updated_at: new Date().toISOString()
+          empleados_count: successfulRecords,
+          total_devengado: totalDevengado, // Totales proporcionales
+          total_deducciones: totalDeducciones,
+          total_neto: totalNeto
         })
         .eq('id', period.id);
 
       if (periodError) {
-        console.log('❌ Error cerrando período:', periodError);
+        console.error('❌ Error actualizando período:', periodError);
         throw periodError;
       }
 
-      // Update all payroll records for this period
-      const { error: payrollError } = await supabase
-        .from('payrolls')
-        .update({ 
-          estado: 'procesada',
-          updated_at: new Date().toISOString()
-        })
-        .eq('period_id', period.id);
+      const message = failedRecords.length > 0 
+        ? `Período ${period.periodo} cerrado con ${successfulRecords} empleados. ${failedRecords.length} empleados fallaron al guardar.`
+        : `Período ${period.periodo} cerrado exitosamente con ${successfulRecords} empleados procesados`;
 
-      if (payrollError) {
-        console.log('❌ Error actualizando nóminas:', payrollError);
-        throw payrollError;
-      }
-
-      const message = `Período ${period.periodo} cerrado exitosamente con ${employees.length} empleados`;
-      console.log('✅ Período cerrado:', message);
-      
+      console.log(`✅ ALELUYA - ${message}`);
       return message;
     } catch (error) {
-      console.error('💥 Error cerrando período:', error);
+      console.error('❌ Error cerrando período:', error);
       throw error;
     }
   }
