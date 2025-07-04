@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollUnifiedService } from '@/services/PayrollUnifiedService';
@@ -324,8 +323,8 @@ export const usePayrollLiquidationNew = () => {
       setCurrentPeriod(prev => ({ ...prev, estado: 'cerrado' }));
       setClosureStep('completed');
       
-      // ✅ FASE 3: Verificar si result es un objeto con propiedades
-      if (result && typeof result === 'object') {
+      // ✅ FASE 3: Manejo seguro de null y verificación de propiedades
+      if (result && typeof result === 'object' && result !== null) {
         // Si result tiene la propiedad postClosureResult, usarla
         if ('postClosureResult' in result && result.postClosureResult) {
           setPostClosureResult(result.postClosureResult);
@@ -342,19 +341,19 @@ export const usePayrollLiquidationNew = () => {
           } else {
             toast({
               title: "✅ Período cerrado exitosamente",
-              description: 'message' in result && result.message ? result.message : "Cierre completado correctamente",
+              description: ('message' in result && typeof result.message === 'string') ? result.message : "Cierre completado correctamente",
               className: "border-green-200 bg-green-50"
             });
           }
         } else {
           toast({
             title: "✅ Período cerrado exitosamente",
-            description: 'message' in result && result.message ? result.message : "Cierre completado correctamente",
+            description: ('message' in result && typeof result.message === 'string') ? result.message : "Cierre completado correctamente",
             className: "border-green-200 bg-green-50"
           });
         }
       } else {
-        // Si result es string o no tiene las propiedades esperadas
+        // Si result es string, null o no tiene las propiedades esperadas
         toast({
           title: "✅ Período cerrado exitosamente",
           description: typeof result === 'string' ? result : "Cierre completado correctamente",
