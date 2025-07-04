@@ -4,6 +4,8 @@
  * Define interfaces claras y Result pattern para manejo seguro de errores
  */
 
+import { PayrollEmployee, PayrollSummary, PeriodStatus } from './payroll';
+
 // Result pattern para manejo consistente de errores
 export type Result<T> = {
   success: true;
@@ -69,6 +71,3 @@ export interface PayrollLiquidationActions {
   createNewPeriod: () => Promise<void>;
   refreshPeriod: () => Promise<void>;
 }
-
-// Re-export tipos existentes para mantener compatibilidad
-export type { PayrollEmployee, PayrollSummary, PeriodStatus } from './payroll';
