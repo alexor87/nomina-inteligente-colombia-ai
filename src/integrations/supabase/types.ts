@@ -1566,6 +1566,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_payroll_history_periods: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
       get_user_companies_simple: {
         Args: { _user_id?: string }
         Returns: {
