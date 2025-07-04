@@ -1,14 +1,13 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary, PeriodStatus } from '@/types/payroll';
 import { PayrollHistoryService } from './PayrollHistoryService';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
 import { PayrollCalculationUnifiedService } from './PayrollCalculationUnifiedService';
+import { PayrollClosureTransactionalService } from './payroll-closure/PayrollClosureTransactionalService';
 
 /**
- * ✅ SERVICIO UNIFICADO DE NÓMINA - FASE 1
- * Consolida toda la lógica de nómina en un solo lugar
- * Elimina duplicación y garantiza consistencia
+ * ✅ SERVICIO UNIFICADO DE NÓMINA - FASE 2
+ * Actualizado con cierre transaccional
  */
 export class PayrollUnifiedService {
   
@@ -245,78 +244,32 @@ export class PayrollUnifiedService {
     }
   }
 
-  // ✅ CIERRE DE PERÍODO CON VALIDACIONES ROBUSTAS
+  // ✅ CIERRE TRANSACCIONAL - FASE 2
   static async closePeriod(period: any, selectedEmployees: PayrollEmployee[]): Promise<string> {
     try {
-      console.log('🔐 SERVICIO UNIFICADO - Iniciando cierre de período:', period.periodo);
+      console.log('🔒 FASE 2 - Iniciando cierre transaccional:', period.periodo);
 
-      // Validaciones pre-cierre
-      const validationErrors = await this.validatePeriodForClosing(period, selectedEmployees);
-      if (validationErrors.length > 0) {
-        throw new Error(`Errores de validación: ${validationErrors.join(', ')}`);
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // Calcular totales finales
-      const totales = selectedEmployees.reduce(
-        (acc, emp) => ({
-          totalDevengado: acc.totalDevengado + emp.grossPay,
-          totalDeducciones: acc.totalDeducciones + emp.deductions,
-          totalNeto: acc.totalNeto + emp.netPay
-        }),
-        { totalDevengado: 0, totalDeducciones: 0, totalNeto: 0 }
+      // Usar el nuevo servicio de cierre transaccional
+      const closureResult = await PayrollClosureTransactionalService.executeTransactionalClosure(
+        period,
+        selectedEmployees,
+        companyId
       );
 
-      // Actualizar período a cerrado
-      const { error: updateError } = await supabase
-        .from('payroll_periods_real')
-        .update({
-          estado: 'cerrado',
-          total_devengado: totales.totalDevengado,
-          total_deducciones: totales.totalDeducciones,
-          total_neto: totales.totalNeto,
-          empleados_count: selectedEmployees.length,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', period.id);
-
-      if (updateError) {
-        throw updateError;
+      if (!closureResult.success) {
+        throw new Error(closureResult.message);
       }
 
-      // ✅ SINCRONIZACIÓN AUTOMÁTICA CON HISTORIAL
-      await this.syncPeriodToHistory(period.id);
-
-      console.log(`✅ Período ${period.periodo} cerrado exitosamente`);
-      return `Período ${period.periodo} cerrado con ${selectedEmployees.length} empleados`;
+      console.log(`✅ FASE 2 - Cierre transaccional completado: ${period.periodo}`);
+      return closureResult.message;
 
     } catch (error) {
-      console.error('❌ Error cerrando período:', error);
-      throw error;
-    }
-  }
-
-  // ✅ SINCRONIZACIÓN AUTOMÁTICA BD ↔ HISTORIAL
-  static async syncPeriodToHistory(periodId: string): Promise<void> {
-    try {
-      console.log('🔄 SINCRONIZACIÓN AUTOMÁTICA - Período → Historial');
-      
-      // Ejecutar función de sincronización de base de datos
-      const { data, error } = await supabase.rpc('sync_historical_payroll_data', {
-        p_period_id: periodId
-      });
-
-      if (error) {
-        console.error('❌ Error en sincronización automática:', error);
-        throw error;
-      }
-
-      console.log('✅ Sincronización automática completada:', data);
-      
-      // Actualizar totales del período después de la sincronización
-      await PayrollHistoryService.recalculatePeriodTotals(periodId);
-
-    } catch (error) {
-      console.error('💥 Error crítico en sincronización:', error);
+      console.error('❌ Error en cierre transaccional:', error);
       throw error;
     }
   }
@@ -420,7 +373,6 @@ export class PayrollUnifiedService {
     return months[monthIndex];
   }
 
-  // ✅ CÁLCULO CORRECTO DE DÍAS PROPORCIONALES
   private static calculateProportionalDays(period: any): number {
     if (!period.tipo_periodo) return 30;
 
@@ -438,35 +390,6 @@ export class PayrollUnifiedService {
     }
   }
 
-  private static async validatePeriodForClosing(period: any, selectedEmployees: PayrollEmployee[]): Promise<string[]> {
-    const errors: string[] = [];
-
-    // Validar empleados seleccionados
-    if (selectedEmployees.length === 0) {
-      errors.push('Debe seleccionar al menos un empleado');
-    }
-
-    // Validar empleados válidos
-    const validEmployees = selectedEmployees.filter(emp => emp.status === 'valid');
-    if (validEmployees.length === 0) {
-      errors.push('No hay empleados válidos seleccionados');
-    }
-
-    // Validar estado del período
-    if (period.estado !== 'borrador') {
-      errors.push('Solo se pueden cerrar períodos en estado borrador');
-    }
-
-    // Validar totales
-    const totalNeto = selectedEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
-    if (totalNeto <= 0) {
-      errors.push('El total neto debe ser mayor a cero');
-    }
-
-    return errors;
-  }
-
-  // ✅ MÉTODO PARA ACTUALIZAR CONTADOR DE EMPLEADOS
   static async updateEmployeeCount(periodId: string, count: number): Promise<void> {
     try {
       const { error } = await supabase
@@ -489,7 +412,6 @@ export class PayrollUnifiedService {
     }
   }
 
-  // ✅ MÉTODO PARA REMOVER EMPLEADO DEL PERÍODO
   static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
     try {
       console.log(`🗑️ Removiendo empleado ${employeeId} del período ${periodId}`);
@@ -523,7 +445,6 @@ export class PayrollUnifiedService {
     }
   }
 
-  // ✅ RECÁLCULO DESPUÉS DE CAMBIOS EN NOVEDADES
   static async recalculateAfterNovedadChange(employeeId: string, periodId: string): Promise<PayrollEmployee | null> {
     try {
       console.log(`🔄 Recalculando empleado ${employeeId} después de cambio en novedad`);

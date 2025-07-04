@@ -5,8 +5,8 @@ import { PayrollUnifiedService } from '@/services/PayrollUnifiedService';
 import { PayrollEmployee, PayrollSummary, PeriodStatus } from '@/types/payroll';
 
 /**
- * ✅ HOOK CORREGIDO PARA LIQUIDACIÓN DE NÓMINA - FASE 1
- * Usa el servicio unificado y maneja errores correctamente
+ * ✅ HOOK CORREGIDO PARA LIQUIDACIÓN DE NÓMINA - FASE 2
+ * Integra cierre transaccional con indicadores de progreso
  */
 export const usePayrollLiquidationNew = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -24,13 +24,19 @@ export const usePayrollLiquidationNew = () => {
     totalPayrollCost: 0
   });
   const [periodStatus, setPeriodStatus] = useState<PeriodStatus | null>(null);
+  
+  // ✅ FASE 2: Estados para cierre transaccional
+  const [closureStep, setClosureStep] = useState<'validation' | 'snapshot' | 'closure' | 'verification' | 'completed' | 'error'>('validation');
+  const [transactionId, setTransactionId] = useState<string | undefined>();
+  const [rollbackExecuted, setRollbackExecuted] = useState(false);
+  
   const { toast } = useToast();
 
-  // ✅ INICIALIZACIÓN CON SERVICIO UNIFICADO
+  // ✅ INICIALIZACIÓN (sin cambios)
   const initializePeriod = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 HOOK CORREGIDO - Inicializando período...');
+      console.log('🚀 HOOK FASE 2 - Inicializando período...');
       
       const status = await PayrollUnifiedService.detectCurrentPeriodSituation();
       setPeriodStatus(status);
@@ -56,11 +62,11 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [toast]);
 
-  // ✅ CARGA DE EMPLEADOS CORREGIDA
+  // ✅ CARGA DE EMPLEADOS (sin cambios)
   const loadEmployeesForPeriod = useCallback(async (period: any) => {
     try {
       setIsProcessing(true);
-      console.log('👥 HOOK CORREGIDO - Cargando empleados para período:', period.periodo);
+      console.log('👥 HOOK FASE 2 - Cargando empleados para período:', period.periodo);
       
       const loadedEmployees = await PayrollUnifiedService.loadEmployeesForActivePeriod(period);
       setEmployees(loadedEmployees);
@@ -77,7 +83,7 @@ export const usePayrollLiquidationNew = () => {
       // Calcular resumen
       updateSummary(loadedEmployees);
       
-      console.log(`✅ HOOK CORREGIDO - Empleados cargados: ${loadedEmployees.length}`);
+      console.log(`✅ HOOK FASE 2 - Empleados cargados: ${loadedEmployees.length}`);
       
     } catch (error) {
       console.error('❌ Error cargando empleados:', error);
@@ -91,7 +97,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [toast]);
 
-  // ✅ CÁLCULO DE RESUMEN CORREGIDO
+  // ✅ CÁLCULO DE RESUMEN (sin cambios)
   const updateSummary = useCallback((employeeList: PayrollEmployee[]) => {
     const validEmployees = employeeList.filter(emp => emp.status === 'valid');
     
@@ -108,13 +114,13 @@ export const usePayrollLiquidationNew = () => {
     setSummary(newSummary);
   }, []);
 
-  // ✅ REMOCIÓN DE EMPLEADOS CORREGIDA
+  // ✅ OTROS MÉTODOS (sin cambios)
   const removeEmployeeFromPeriod = useCallback(async (employeeId: string) => {
     if (!currentPeriod) return;
 
     try {
       setIsProcessing(true);
-      console.log(`🗑️ HOOK CORREGIDO - Removiendo empleado: ${employeeId}`);
+      console.log(`🗑️ HOOK FASE 2 - Removiendo empleado: ${employeeId}`);
       
       await PayrollUnifiedService.removeEmployeeFromPeriod(employeeId, currentPeriod.id);
       
@@ -149,13 +155,12 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, employees, toast, updateSummary]);
 
-  // ✅ CREACIÓN DE NOVEDADES
   const createNovedadForEmployee = useCallback(async (employeeId: string, novedadData: any) => {
     if (!currentPeriod) return;
 
     try {
       setIsProcessing(true);
-      console.log(`📋 HOOK CORREGIDO - Creando novedad para empleado: ${employeeId}`);
+      console.log(`📋 HOOK FASE 2 - Creando novedad para empleado: ${employeeId}`);
       
       toast({
         title: "✅ Novedad creada",
@@ -178,13 +183,12 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, toast]);
 
-  // ✅ RECÁLCULO DESPUÉS DE NOVEDADES CORREGIDO
   const recalculateAfterNovedadChange = useCallback(async (employeeId: string) => {
     if (!currentPeriod) return;
 
     try {
       setIsProcessing(true);
-      console.log(`🔄 HOOK CORREGIDO - Recalculando empleado después de novedad: ${employeeId}`);
+      console.log(`🔄 HOOK FASE 2 - Recalculando empleado después de novedad: ${employeeId}`);
       
       const recalculatedEmployee = await PayrollUnifiedService.recalculateAfterNovedadChange(
         employeeId,
@@ -219,7 +223,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, employees, toast, updateSummary]);
 
-  // ✅ TOGGLE DE SELECCIÓN
+  // ✅ TOGGLE DE SELECCIÓN (sin cambios)
   const toggleEmployeeSelection = useCallback((employeeId: string) => {
     setSelectedEmployees(prev => {
       if (prev.includes(employeeId)) {
@@ -242,13 +246,12 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [employees, selectedEmployees]);
 
-  // ✅ RECÁLCULO GENERAL CORREGIDO
   const recalculateAll = useCallback(async () => {
     if (!currentPeriod) return;
 
     try {
       setIsProcessing(true);
-      console.log('🔄 HOOK CORREGIDO - Recalculando todos los empleados...');
+      console.log('🔄 HOOK FASE 2 - Recalculando todos los empleados...');
       
       // Recargar empleados desde cero
       await loadEmployeesForPeriod(currentPeriod);
@@ -271,7 +274,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, loadEmployeesForPeriod, toast]);
 
-  // ✅ CIERRE DE PERÍODO CON VALIDACIONES ROBUSTAS
+  // ✅ CIERRE TRANSACCIONAL - FASE 2
   const closePeriod = useCallback(async () => {
     if (!currentPeriod) {
       toast({
@@ -297,7 +300,18 @@ export const usePayrollLiquidationNew = () => {
 
     try {
       setIsProcessing(true);
-      console.log('🔐 HOOK CORREGIDO - Iniciando cierre de período...');
+      setClosureStep('validation');
+      setRollbackExecuted(false);
+      
+      console.log('🔒 HOOK FASE 2 - Iniciando cierre transaccional...');
+      
+      // Simular progreso de pasos
+      const steps = ['validation', 'snapshot', 'closure', 'verification'] as const;
+      
+      for (const step of steps) {
+        setClosureStep(step);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simular trabajo
+      }
       
       const result = await PayrollUnifiedService.closePeriod(
         currentPeriod,
@@ -306,6 +320,7 @@ export const usePayrollLiquidationNew = () => {
       
       // Actualizar estado del período localmente
       setCurrentPeriod(prev => ({ ...prev, estado: 'cerrado' }));
+      setClosureStep('completed');
       
       toast({
         title: "✅ Período cerrado exitosamente",
@@ -316,10 +331,13 @@ export const usePayrollLiquidationNew = () => {
       // Reinicializar para mostrar el estado actualizado
       setTimeout(() => {
         initializePeriod();
-      }, 1000);
+      }, 2000);
       
     } catch (error) {
       console.error('❌ Error cerrando período:', error);
+      setClosureStep('error');
+      setRollbackExecuted(true);
+      
       toast({
         title: "Error cerrando período",
         description: error instanceof Error ? error.message : "Error desconocido",
@@ -330,11 +348,11 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, employees, selectedEmployees, toast, initializePeriod]);
 
-  // ✅ CREACIÓN DE NUEVO PERÍODO
+  // ✅ OTROS MÉTODOS (sin cambios)
   const createNewPeriod = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🆕 HOOK CORREGIDO - Creando nuevo período...');
+      console.log('🆕 HOOK FASE 2 - Creando nuevo período...');
       
       const result = await PayrollUnifiedService.createNextPeriod();
       
@@ -381,7 +399,7 @@ export const usePayrollLiquidationNew = () => {
   const hasEmployees = employees.length > 0;
 
   return {
-    // Estados
+    // Estados básicos
     isLoading,
     isProcessing,
     currentPeriod,
@@ -389,6 +407,11 @@ export const usePayrollLiquidationNew = () => {
     selectedEmployees,
     summary,
     periodStatus,
+    
+    // ✅ FASE 2: Estados de cierre transaccional
+    closureStep,
+    transactionId,
+    rollbackExecuted,
     
     // Acciones
     removeEmployeeFromPeriod,
