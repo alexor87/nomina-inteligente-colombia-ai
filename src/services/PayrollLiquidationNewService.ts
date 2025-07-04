@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
@@ -346,6 +347,7 @@ export class PayrollLiquidationNewService {
     }
   }
 
+  // ✅ CORRECCIÓN CRÍTICA: Implementar removeEmployeeFromPeriod
   static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
     try {
       console.log(`🗑️ Removiendo empleado ${employeeId} del período ${periodId}`);
@@ -381,93 +383,228 @@ export class PayrollLiquidationNewService {
     }
   }
 
+  // ✅ CORRECCIÓN CRÍTICA: Implementar closePeriod mejorado con rollback
   static async closePeriod(period: any, employees: PayrollEmployee[]): Promise<string> {
     try {
-      console.log(`🔐 ALELUYA - Cerrando período: ${period.periodo}`);
+      console.log(`🔐 ALELUYA - Iniciando cierre de período: ${period.periodo}`);
       
-      // ✅ CORRECCIÓN ALELUYA: Guardar valores PROPORCIONALES calculados
-      console.log(`💾 ALELUYA - Guardando ${employees.length} registros proporcionales...`);
+      // VALIDACIONES PRE-CIERRE
+      const validEmployees = employees.filter(emp => emp.status === 'valid');
+      if (validEmployees.length === 0) {
+        throw new Error('No hay empleados válidos para cerrar el período');
+      }
+
+      console.log(`💾 ALELUYA - Guardando ${validEmployees.length} registros válidos...`);
       
+      // TRANSACCIÓN: Usar una sola operación para consistencia
+      const payrollRecords = [];
       let successfulRecords = 0;
       const failedRecords: string[] = [];
 
-      for (const employee of employees) {
-        if (employee.status === 'valid') {
-          try {
-            // ✅ ALELUYA: Guardar valores proporcionales, NO mensuales
-            const payrollData = {
-              company_id: period.company_id,
-              employee_id: employee.id,
-              periodo: period.periodo,
-              period_id: period.id,
-              salario_base: employee.baseSalary, // Referencia mensual
-              dias_trabajados: employee.workedDays, // Días del período
-              horas_extra: employee.extraHours,
-              bonificaciones: employee.bonuses,
-              auxilio_transporte: employee.transportAllowance, // PROPORCIONAL
-              total_devengado: employee.grossPay, // PROPORCIONAL
-              total_deducciones: employee.deductions, // PROPORCIONAL
-              neto_pagado: employee.netPay, // PROPORCIONAL
-              estado: 'procesada'
-            };
+      // Preparar todos los registros
+      for (const employee of validEmployees) {
+        try {
+          const payrollData = {
+            company_id: period.company_id,
+            employee_id: employee.id,
+            periodo: period.periodo,
+            period_id: period.id,
+            salario_base: employee.baseSalary,
+            dias_trabajados: employee.workedDays,
+            horas_extra: employee.extraHours,
+            bonificaciones: employee.bonuses,
+            auxilio_transporte: employee.transportAllowance,
+            total_devengado: employee.grossPay,
+            total_deducciones: employee.deductions,
+            neto_pagado: employee.netPay,
+            estado: 'procesada',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
 
-            console.log(`💾 ALELUYA - Guardando datos proporcionales para ${employee.name}:`, payrollData);
+          console.log(`💾 ALELUYA - Preparando datos para ${employee.name}:`, {
+            grossPay: payrollData.total_devengado,
+            netPay: payrollData.neto_pagado,
+            days: payrollData.dias_trabajados
+          });
 
-            const { error: payrollError } = await supabase
-              .from('payrolls')
-              .upsert(payrollData, {
-                onConflict: 'company_id,employee_id,period_id',
-                ignoreDuplicates: false
-              });
-
-            if (payrollError) {
-              console.error(`❌ Error guardando nómina para empleado ${employee.name}:`, payrollError);
-              failedRecords.push(employee.name);
-            } else {
-              successfulRecords++;
-              console.log(`✅ ALELUYA - Datos proporcionales guardados para ${employee.name}`);
-            }
-          } catch (error) {
-            console.error(`❌ Error crítico guardando empleado ${employee.name}:`, error);
-            failedRecords.push(employee.name);
-          }
+          payrollRecords.push(payrollData);
+        } catch (error) {
+          console.error(`❌ Error preparando datos para ${employee.name}:`, error);
+          failedRecords.push(employee.name);
         }
       }
 
-      console.log(`📊 ALELUYA - Resultados: ${successfulRecords} exitosos, ${failedRecords.length} fallidos`);
+      // GUARDAR TODOS LOS REGISTROS EN LOTE
+      if (payrollRecords.length > 0) {
+        const { data, error: batchError } = await supabase
+          .from('payrolls')
+          .upsert(payrollRecords, {
+            onConflict: 'company_id,employee_id,period_id',
+            ignoreDuplicates: false
+          })
+          .select();
 
-      // Calcular totales basados en registros válidos
-      const validEmployees = employees.filter(emp => emp.status === 'valid');
+        if (batchError) {
+          console.error('❌ Error en guardado masivo:', batchError);
+          throw new Error(`Error guardando nóminas: ${batchError.message}`);
+        }
+
+        successfulRecords = data?.length || 0;
+        console.log(`✅ ALELUYA - Guardados ${successfulRecords} registros exitosamente`);
+      }
+
+      // CALCULAR TOTALES CORRECTOS
       const totalDevengado = validEmployees.reduce((sum, emp) => sum + emp.grossPay, 0);
       const totalDeducciones = validEmployees.reduce((sum, emp) => sum + emp.deductions, 0);
       const totalNeto = validEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
 
-      // Actualizar estado del período con totales PROPORCIONALES
+      console.log(`📊 ALELUYA - Totales calculados:`, {
+        totalDevengado,
+        totalDeducciones,
+        totalNeto,
+        empleados: successfulRecords
+      });
+
+      // ACTUALIZAR ESTADO DEL PERÍODO CON ROLLBACK
       const { error: periodError } = await supabase
         .from('payroll_periods_real')
         .update({ 
           estado: 'cerrado',
           empleados_count: successfulRecords,
-          total_devengado: totalDevengado, // Totales proporcionales
+          total_devengado: totalDevengado,
           total_deducciones: totalDeducciones,
-          total_neto: totalNeto
+          total_neto: totalNeto,
+          updated_at: new Date().toISOString()
         })
         .eq('id', period.id);
 
       if (periodError) {
         console.error('❌ Error actualizando período:', periodError);
-        throw periodError;
+        
+        // ROLLBACK: Eliminar registros de nómina si falló la actualización del período
+        await supabase
+          .from('payrolls')
+          .delete()
+          .eq('period_id', period.id)
+          .eq('estado', 'procesada');
+          
+        throw new Error(`Error cerrando período: ${periodError.message}`);
       }
 
       const message = failedRecords.length > 0 
-        ? `Período ${period.periodo} cerrado con ${successfulRecords} empleados. ${failedRecords.length} empleados fallaron al guardar.`
+        ? `Período ${period.periodo} cerrado con ${successfulRecords} empleados. ${failedRecords.length} empleados fallaron.`
         : `Período ${period.periodo} cerrado exitosamente con ${successfulRecords} empleados procesados`;
 
-      console.log(`✅ ALELUYA - ${message}`);
+      console.log(`✅ ALELUYA - CIERRE COMPLETADO: ${message}`);
       return message;
+
     } catch (error) {
-      console.error('❌ Error cerrando período:', error);
+      console.error('💥 Error crítico cerrando período:', error);
+      
+      // ROLLBACK COMPLETO en caso de error
+      try {
+        await supabase
+          .from('payrolls')
+          .delete()
+          .eq('period_id', period.id)
+          .eq('estado', 'procesada');
+        
+        console.log('🔄 Rollback ejecutado - datos de nómina eliminados');
+      } catch (rollbackError) {
+        console.error('❌ Error en rollback:', rollbackError);
+      }
+      
       throw error;
+    }
+  }
+
+  // ✅ NUEVO: Función para recalcular después de cambios en novedades
+  static async recalculateAfterNovedadChange(employeeId: string, periodId: string): Promise<PayrollEmployee | null> {
+    try {
+      console.log(`🔄 Recalculando empleado ${employeeId} en período ${periodId}`);
+      
+      // Obtener datos del período
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+
+      if (periodError || !period) {
+        console.error('❌ Error obteniendo período:', periodError);
+        return null;
+      }
+
+      // Obtener empleado
+      const { data: employee, error: employeeError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', employeeId)
+        .single();
+
+      if (employeeError || !employee) {
+        console.error('❌ Error obteniendo empleado:', employeeError);
+        return null;
+      }
+
+      // Obtener novedades actualizadas
+      const { data: novedades, error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .select('*')
+        .eq('empleado_id', employeeId)
+        .eq('periodo_id', periodId);
+
+      if (novedadesError) {
+        console.error('❌ Error obteniendo novedades:', novedadesError);
+      }
+
+      // Obtener periodicidad
+      const periodicity = await PayrollCalculationEnhancedService.getUserConfiguredPeriodicity();
+
+      // Recalcular empleado
+      const recalculatedEmployee = await this.calculateEmployeePayrollAleluya(
+        employee,
+        period,
+        novedades || [],
+        periodicity
+      );
+
+      // Guardar resultado actualizado
+      const payrollData = {
+        company_id: period.company_id,
+        employee_id: employee.id,
+        periodo: period.periodo,
+        period_id: period.id,
+        salario_base: recalculatedEmployee.baseSalary,
+        dias_trabajados: recalculatedEmployee.workedDays,
+        horas_extra: recalculatedEmployee.extraHours,
+        bonificaciones: recalculatedEmployee.bonuses,
+        auxilio_transporte: recalculatedEmployee.transportAllowance,
+        total_devengado: recalculatedEmployee.grossPay,
+        total_deducciones: recalculatedEmployee.deductions,
+        neto_pagado: recalculatedEmployee.netPay,
+        estado: 'borrador',
+        updated_at: new Date().toISOString()
+      };
+
+      const { error: upsertError } = await supabase
+        .from('payrolls')
+        .upsert(payrollData, {
+          onConflict: 'company_id,employee_id,period_id'
+        });
+
+      if (upsertError) {
+        console.error('❌ Error guardando recálculo:', upsertError);
+        throw upsertError;
+      }
+
+      console.log(`✅ Empleado ${employee.nombre} recalculado exitosamente`);
+      return recalculatedEmployee;
+
+    } catch (error) {
+      console.error('❌ Error en recálculo:', error);
+      return null;
     }
   }
 }
