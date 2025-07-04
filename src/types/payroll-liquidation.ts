@@ -6,15 +6,10 @@
 
 import { PayrollEmployee, PayrollSummary, PeriodStatus } from './payroll';
 
-// Result pattern para manejo consistente de errores
-export type Result<T> = {
-  success: true;
-  data: T;
-} | {
-  success: false;
-  error: string;
-  code?: string;
-};
+// Result pattern corregido para manejo consistente de errores
+export type Result<T> = 
+  | { success: true; data: T }
+  | { success: false; error: string; code?: string };
 
 // Estados específicos del proceso de cierre
 export type ClosureStep = 'validation' | 'snapshot' | 'closure' | 'verification' | 'completed' | 'error';

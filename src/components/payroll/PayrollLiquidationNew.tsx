@@ -5,11 +5,11 @@ import { PayrollSummaryPanel } from './liquidation/PayrollSummaryPanel';
 import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
 import { TransactionalClosureIndicator } from './closure/TransactionalClosureIndicator';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
+import { usePayrollLiquidationUnified } from '@/hooks/usePayrollLiquidationUnified';
 
 /**
- * ✅ COMPONENTE PRINCIPAL DE LIQUIDACIÓN - FASE 3
- * Integra cierre transaccional con detección post-cierre inteligente
+ * ✅ COMPONENTE PRINCIPAL DE LIQUIDACIÓN - CORRECCIÓN FASE 1
+ * Usa el hook unificado para liquidación de nómina
  */
 export const PayrollLiquidationNew = () => {
   const {
@@ -36,7 +36,7 @@ export const PayrollLiquidationNew = () => {
     canClosePeriod,
     isValidPeriod,
     hasEmployees
-  } = usePayrollLiquidationNew();
+  } = usePayrollLiquidationUnified();
 
   if (isLoading) {
     return (
@@ -74,7 +74,7 @@ export const PayrollLiquidationNew = () => {
         totalCount={employees.length}
       />
 
-      {/* ✅ FASE 3: Indicador de Cierre Transaccional con Detección Post-Cierre */}
+      {/* ✅ CORRECCIÓN FASE 1: Indicador de Cierre Transaccional */}
       <TransactionalClosureIndicator
         isProcessing={isProcessing}
         currentStep={closureStep}
