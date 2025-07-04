@@ -32,7 +32,6 @@ export const PayrollLiquidationRobust = () => {
     runManualDiagnosis,
     refreshDiagnosis,
     canCreatePeriod,
-    needsDiagnosis,
     isEmergency,
     hasActivePeriod,
     hasEmployees
@@ -125,63 +124,6 @@ export const PayrollLiquidationRobust = () => {
     );
   }
 
-  // Estado que requiere diagnóstico
-  if (needsDiagnosis) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto p-6">
-          <Card className="p-8 text-center border-yellow-200 bg-yellow-50">
-            <div className="space-y-6">
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
-                <Search className="h-8 w-8 text-yellow-600" />
-              </div>
-              
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  Situación Compleja Detectada
-                </h2>
-                <p className="text-gray-600">
-                  {periodStatus?.message}
-                </p>
-              </div>
-
-              {diagnostic && (
-                <div className="bg-white p-4 rounded-lg text-left">
-                  <h3 className="font-medium text-gray-900 mb-2">Resumen del Diagnóstico:</h3>
-                  <div className="space-y-2 text-sm">
-                    <p>📊 Total períodos: {diagnostic.totalPeriods}</p>
-                    <p>⚠️ Problemas: {diagnostic.issues.length}</p>
-                    <p>💡 Recomendaciones: {diagnostic.recommendations.length}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3 justify-center">
-                <Button 
-                  onClick={runManualDiagnosis}
-                  disabled={isProcessing}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Ver Diagnóstico Completo
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={refreshDiagnosis}
-                  disabled={isProcessing}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Actualizar
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   // Estado para crear período sugerido
   if (canCreatePeriod) {
     return (
@@ -244,7 +186,7 @@ export const PayrollLiquidationRobust = () => {
     );
   }
 
-  // Estado normal con período activo
+  // Estado normal con período activo - SIEMPRE SE MUESTRA
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6 space-y-6">

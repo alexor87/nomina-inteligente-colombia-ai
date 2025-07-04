@@ -24,7 +24,7 @@ export const usePayrollLiquidationRobust = () => {
   });
   const { toast } = useToast();
 
-  // Inicialización robusta con diagnóstico
+  // Inicialización robusta con diagnóstico automático
   const initializeWithDiagnosis = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -37,9 +37,20 @@ export const usePayrollLiquidationRobust = () => {
       console.log('📊 Estado detectado:', status.action);
       console.log('💬 Mensaje:', status.message);
       
+      // Si hay período actual, cargar empleados inmediatamente
       if (status.currentPeriod) {
         setCurrentPeriod(status.currentPeriod);
         await loadEmployeesForPeriod(status.currentPeriod);
+      }
+      // Si necesita crear período, crearlo automáticamente
+      else if (status.action === 'create' && status.nextPeriod) {
+        console.log('🔄 Creando período automáticamente:', status.nextPeriod);
+        await createPeriodFromSuggestion(status.nextPeriod);
+      }
+      // Si necesita diagnóstico, ejecutarlo en segundo plano
+      else if (status.action === 'diagnose') {
+        console.log('🔍 Ejecutando diagnóstico en segundo plano...');
+        await handleBackgroundDiagnosis();
       }
       
       // Mostrar diagnóstico en consola si está disponible
@@ -67,6 +78,69 @@ export const usePayrollLiquidationRobust = () => {
       
     } finally {
       setIsLoading(false);
+    }
+  }, [toast]);
+
+  // Manejar diagnóstico en segundo plano
+  const handleBackgroundDiagnosis = useCallback(async () => {
+    try {
+      console.log('🔍 Ejecutando diagnóstico en segundo plano...');
+      
+      const companyId = await PayrollPeriodDetectionRobust['getCurrentUserCompanyId']?.();
+      if (companyId) {
+        await PayrollDiagnosticService.runDiagnosticAndLog(companyId);
+        
+        // Intentar detectar período nuevamente después del diagnóstico
+        const retryStatus = await PayrollPeriodDetectionRobust.detectWithDiagnosis();
+        
+        if (retryStatus.currentPeriod) {
+          setCurrentPeriod(retryStatus.currentPeriod);
+          await loadEmployeesForPeriod(retryStatus.currentPeriod);
+          setPeriodStatus(retryStatus);
+        } else if (retryStatus.nextPeriod) {
+          await createPeriodFromSuggestion(retryStatus.nextPeriod);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error en diagnóstico de segundo plano:', error);
+    }
+  }, []);
+
+  // Crear período desde sugerencia
+  const createPeriodFromSuggestion = useCallback(async (suggestion: any) => {
+    try {
+      setIsProcessing(true);
+      console.log('🔄 Creando período desde sugerencia:', suggestion);
+      
+      const newPeriod = await PayrollPeriodDetectionRobust.createPeriodFromSuggestion(suggestion);
+      
+      setCurrentPeriod(newPeriod);
+      await loadEmployeesForPeriod(newPeriod);
+      
+      // Actualizar estado
+      setPeriodStatus({
+        hasActivePeriod: true,
+        currentPeriod: newPeriod,
+        action: 'resume',
+        message: `Período creado: ${newPeriod.periodo}`
+      });
+      
+      toast({
+        title: "✅ Período Creado",
+        description: `Nuevo período ${newPeriod.periodo} listo para liquidación`,
+        className: "border-green-200 bg-green-50"
+      });
+      
+    } catch (error) {
+      console.error('❌ Error creando período desde sugerencia:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear el período automáticamente",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
     }
   }, [toast]);
 
@@ -124,43 +198,11 @@ export const usePayrollLiquidationRobust = () => {
     }
   }, [toast]);
 
-  // Crear período sugerido
+  // Crear período sugerido manualmente
   const createSuggestedPeriod = useCallback(async () => {
     if (!periodStatus?.nextPeriod) return;
-    
-    try {
-      setIsProcessing(true);
-      
-      const newPeriod = await PayrollPeriodDetectionRobust.createPeriodFromSuggestion(periodStatus.nextPeriod);
-      
-      setCurrentPeriod(newPeriod);
-      await loadEmployeesForPeriod(newPeriod);
-      
-      // Actualizar estado
-      setPeriodStatus({
-        hasActivePeriod: true,
-        currentPeriod: newPeriod,
-        action: 'resume',
-        message: `Período creado: ${newPeriod.periodo}`
-      });
-      
-      toast({
-        title: "✅ Período Creado",
-        description: `Nuevo período ${newPeriod.periodo} listo para liquidación`,
-        className: "border-green-200 bg-green-50"
-      });
-      
-    } catch (error) {
-      console.error('❌ Error creando período sugerido:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear el período sugerido",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [periodStatus, loadEmployeesForPeriod, toast]);
+    await createPeriodFromSuggestion(periodStatus.nextPeriod);
+  }, [periodStatus, createPeriodFromSuggestion]);
 
   // Ejecutar diagnóstico manual
   const runManualDiagnosis = useCallback(async () => {
@@ -223,9 +265,9 @@ export const usePayrollLiquidationRobust = () => {
     runManualDiagnosis,
     refreshDiagnosis: initializeWithDiagnosis,
     
-    // Estados calculados
+    // Estados calculados simplificados
     canCreatePeriod: periodStatus?.action === 'create' && periodStatus?.nextPeriod,
-    needsDiagnosis: periodStatus?.action === 'diagnose',
+    needsDiagnosis: false, // Eliminado para que nunca bloquee
     isEmergency: periodStatus?.action === 'emergency',
     hasActivePeriod: periodStatus?.hasActivePeriod || false,
     hasEmployees: employees.length > 0
