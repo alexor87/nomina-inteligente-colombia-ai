@@ -45,32 +45,8 @@ export const PayrollHistoryPage = () => {
 
   const loadPayrollHistory = async () => {
     try {
-      const data = await PayrollHistoryService.getPayrollPeriods();
-      
-      // Convert PayrollHistoryRecord[] to PayrollHistoryPeriod[]
-      const convertedPeriods: PayrollHistoryPeriod[] = data.map(record => {
-        return {
-          id: record.id,
-          period: record.periodo || 'Sin período',
-          startDate: record.fecha_inicio || record.fechaCreacion,
-          endDate: record.fecha_fin || record.fechaCreacion,
-          type: 'mensual' as const,
-          employeesCount: record.empleados || 0,
-          status: record.estado as 'borrador' | 'cerrado' | 'con_errores' | 'editado' | 'reabierto',
-          totalGrossPay: Number(record.totalNomina || 0),
-          totalNetPay: Number(record.totalNomina || 0),
-          totalDeductions: 0,
-          totalCost: Number(record.totalNomina || 0),
-          employerContributions: 0,
-          paymentStatus: record.estado === 'pagada' ? 'pagado' as const : 'pendiente' as const,
-          version: 1,
-          createdAt: record.fechaCreacion || new Date().toISOString(),
-          updatedAt: record.fechaCreacion || new Date().toISOString(),
-          editable: record.editable !== false,
-          reportedToDian: record.reportado_dian || false
-        };
-      });
-      setPeriods(convertedPeriods);
+      const data = await PayrollHistoryService.getHistoryPeriods();
+      setPeriods(data);
     } catch (error) {
       console.error('Error loading payroll history:', error);
       toast({

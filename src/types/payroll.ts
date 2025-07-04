@@ -1,4 +1,3 @@
-
 export interface PayrollPeriod {
   id: string;
   company_id: string;
@@ -88,4 +87,13 @@ export interface DBPayrollPeriod {
   modificado_en?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface PeriodStatus {
+  currentPeriod: any | null;
+  needsCreation: boolean;
+  canContinue: boolean;
+  message: string;
+  suggestion: string;
+  action?: 'create' | 'resume' | 'wait';
 }

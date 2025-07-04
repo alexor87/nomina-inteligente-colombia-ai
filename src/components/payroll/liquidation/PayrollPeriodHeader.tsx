@@ -1,18 +1,17 @@
 
-import { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, AlertCircle, Edit, Save, X, Users, DollarSign, Lock, Plus, RefreshCw } from 'lucide-react';
-import { PayrollPeriod } from '@/types/payroll';
-import { PayrollPeriodService } from '@/services/PayrollPeriodService';
-import { Input } from '@/components/ui/input';
-import { PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
+import { CalendarDays, RefreshCw, Save, Calculator, Users, Plus } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
+import { PeriodStatus } from '@/types/payroll';
 
 interface PayrollPeriodHeaderProps {
-  period: PayrollPeriod | null;
+  period: any | null;
   periodStatus: PeriodStatus | null;
   onCreateNewPeriod: () => Promise<void>;
-  onRefreshPeriod: (retryCount?: number) => Promise<void>;
+  onRefreshPeriod: () => Promise<void>;
   canClosePeriod?: boolean;
   isProcessing?: boolean;
   onClosePeriod?: () => Promise<void>;
@@ -21,31 +20,8 @@ interface PayrollPeriodHeaderProps {
   totalCount?: number;
 }
 
-const statusConfig = {
-  borrador: { 
-    label: 'Borrador', 
-    color: 'bg-amber-50 text-amber-700 border-amber-200', 
-    icon: Edit
-  },
-  en_proceso: { 
-    label: 'Procesando', 
-    color: 'bg-blue-50 text-blue-700 border-blue-200', 
-    icon: AlertCircle
-  },
-  cerrado: { 
-    label: 'Cerrado', 
-    color: 'bg-gray-50 text-gray-700 border-gray-200', 
-    icon: Lock
-  },
-  aprobado: { 
-    label: 'Aprobado', 
-    color: 'bg-green-50 text-green-700 border-green-200', 
-    icon: CheckCircle
-  }
-} as const;
-
-export const PayrollPeriodHeader = ({ 
-  period, 
+export const PayrollPeriodHeader: React.FC<PayrollPeriodHeaderProps> = ({
+  period,
   periodStatus,
   onCreateNewPeriod,
   onRefreshPeriod,
@@ -55,105 +31,138 @@ export const PayrollPeriodHeader = ({
   onRecalculateAll,
   selectedCount = 0,
   totalCount = 0
-}: PayrollPeriodHeaderProps) => {
-  if (!period && periodStatus?.action === 'suggest_next') {
+}) => {
+  const getStatusBadge = (estado: string) => {
+    const statusConfig = {
+      'borrador': { label: 'Borrador', className: 'bg-gray-100 text-gray-800' },
+      'cerrado': { label: 'Cerrado', className: 'bg-green-100 text-green-800' },
+      'procesado': { label: 'Procesado', className: 'bg-blue-100 text-blue-800' },
+      'aprobado': { label: 'Aprobado', className: 'bg-emerald-100 text-emerald-800' }
+    };
+    
+    const config = statusConfig[estado as keyof typeof statusConfig] || statusConfig.borrador;
+    return <Badge className={config.className}>{config.label}</Badge>;
+  };
+
+  // Si no hay período, mostrar opción para crear
+  if (!period) {
     return (
-      <div className="px-6 py-6 bg-blue-50 border-b">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Liquidación de Nómina</h1>
-            <p className="text-blue-700 mt-2">{periodStatus.message}</p>
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center space-x-2 text-muted-foreground">
+              <CalendarDays className="h-5 w-5" />
+              <span>No hay período activo</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {periodStatus?.message || 'Crea un nuevo período para comenzar la liquidación'}
+            </p>
+            <div className="flex items-center justify-center space-x-3">
+              <Button 
+                onClick={onCreateNewPeriod}
+                disabled={isProcessing}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {periodStatus?.suggestion || 'Crear Período'}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={onRefreshPeriod}
+                disabled={isProcessing}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Actualizar
+              </Button>
+            </div>
           </div>
-          <div className="flex space-x-3">
-            <Button
-              onClick={onCreateNewPeriod}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Crear Período
-            </Button>
-            <Button
-              onClick={() => onRefreshPeriod()}
-              variant="outline"
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center space-x-3">
+              <h2 className="text-xl font-semibold">
+                Período: {period.periodo}
+              </h2>
+              {getStatusBadge(period.estado)}
+            </div>
+            
+            <div className="flex items-center space-x-6 text-sm text-muted-foreground">
+              <div className="flex items-center space-x-1">
+                <CalendarDays className="h-4 w-4" />
+                <span>{period.fecha_inicio} - {period.fecha_fin}</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <Users className="h-4 w-4" />
+                <span>{totalCount} empleados</span>
+              </div>
+              {selectedCount > 0 && (
+                <span className="text-blue-600 font-medium">
+                  {selectedCount} seleccionados
+                </span>
+              )}
+            </div>
+
+            {/* Totales del período */}
+            {period.total_devengado > 0 && (
+              <div className="flex items-center space-x-6 text-sm">
+                <span>
+                  <strong>Devengado:</strong> {formatCurrency(period.total_devengado)}
+                </span>
+                <span>
+                  <strong>Deducciones:</strong> {formatCurrency(period.total_deducciones)}
+                </span>
+                <span>
+                  <strong>Neto:</strong> {formatCurrency(period.total_neto)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-3">
+            {period.estado === 'borrador' && (
+              <>
+                {onRecalculateAll && (
+                  <Button 
+                    variant="outline" 
+                    onClick={onRecalculateAll}
+                    disabled={isProcessing}
+                  >
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Recalcular Todo
+                  </Button>
+                )}
+
+                {onClosePeriod && (
+                  <Button 
+                    onClick={onClosePeriod}
+                    disabled={!canClosePeriod || isProcessing}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {isProcessing ? 'Cerrando...' : 'Cerrar Período'}
+                  </Button>
+                )}
+              </>
+            )}
+
+            <Button 
+              variant="outline" 
+              onClick={onRefreshPeriod}
+              disabled={isProcessing}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Actualizar
             </Button>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (!period) {
-    return (
-      <div className="px-6 py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-100 rounded w-64 mb-4"></div>
-          <div className="h-4 bg-gray-100 rounded w-48"></div>
-        </div>
-      </div>
-    );
-  }
-
-  const config = statusConfig[period.estado];
-  const StatusIcon = config.icon;
-
-  const formatPeriod = () => {
-    if (!period.fecha_inicio || !period.fecha_fin) return 'Período no definido';
-    return PayrollPeriodService.formatPeriodText(period.fecha_inicio, period.fecha_fin);
-  };
-
-  return (
-    <div className="px-6 py-6 border-b">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-semibold text-gray-900">Liquidación de Nómina</h1>
-          <Badge className={`${config.color} flex items-center space-x-1 px-3 py-1 border`}>
-            <StatusIcon className="h-3 w-3" />
-            <span className="text-sm font-medium">{config.label}</span>
-          </Badge>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center space-x-3">
-          {onRecalculateAll && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRecalculateAll}
-              disabled={isProcessing}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Recalcular todos
-            </Button>
-          )}
-
-          {canClosePeriod && onClosePeriod && (
-            <Button
-              onClick={onClosePeriod}
-              disabled={isProcessing}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Liquidar nómina
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Calendar className="h-5 w-5 text-gray-400" />
-          <span className="text-lg font-medium text-gray-900">{formatPeriod()}</span>
-        </div>
-
-        {selectedCount > 0 && totalCount > 0 && (
-          <div className="text-sm text-gray-500">
-            {selectedCount}/{totalCount} empleados seleccionados
-          </div>
-        )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
