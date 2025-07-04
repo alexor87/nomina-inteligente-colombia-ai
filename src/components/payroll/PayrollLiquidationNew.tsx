@@ -6,6 +6,10 @@ import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePayrollLiquidationNew } from '@/hooks/usePayrollLiquidationNew';
 
+/**
+ * ✅ COMPONENTE PRINCIPAL DE LIQUIDACIÓN - FASE 1
+ * Corregido para usar el hook unificado sin errores
+ */
 export const PayrollLiquidationNew = () => {
   const {
     isLoading,

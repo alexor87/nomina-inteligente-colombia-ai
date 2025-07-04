@@ -1,3 +1,4 @@
+
 export interface PayrollPeriod {
   id: string;
   company_id: string;
@@ -11,7 +12,7 @@ export interface PayrollPeriod {
   total_deducciones: number;
   total_neto: number;
   created_at: string;
-  updated_at: string; // Made required instead of optional
+  updated_at: string;
   modificado_por?: string;
   modificado_en?: string;
 }
@@ -59,10 +60,25 @@ export interface BaseEmployeeData {
   absences: number;
   eps?: string;
   afp?: string;
-  additionalDeductions?: number; // Add this field for deductions from novedades
+  additionalDeductions?: number;
 }
 
-// Nuevos tipos para la funcionalidad avanzada
+// ✅ UNIFICACIÓN: Interfaces consolidadas para detección de períodos
+export interface PeriodStatus {
+  currentPeriod: any | null;
+  needsCreation: boolean;
+  canContinue: boolean;
+  message: string;
+  suggestion: string;
+  action?: 'create' | 'resume' | 'wait';
+  nextPeriod?: {
+    startDate: string;
+    endDate: string;
+    periodName: string;
+    type: 'semanal' | 'quincenal' | 'mensual';
+  };
+}
+
 export interface CompanySettings {
   id: string;
   company_id: string;
@@ -87,13 +103,4 @@ export interface DBPayrollPeriod {
   modificado_en?: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface PeriodStatus {
-  currentPeriod: any | null;
-  needsCreation: boolean;
-  canContinue: boolean;
-  message: string;
-  suggestion: string;
-  action?: 'create' | 'resume' | 'wait';
 }

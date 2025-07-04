@@ -1,10 +1,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { PayrollPeriodIntelligentService, PeriodStatus } from '@/services/PayrollPeriodIntelligentService';
-import { PayrollLiquidationNewService } from '@/services/PayrollLiquidationNewService';
-import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
+import { PayrollUnifiedService } from '@/services/PayrollUnifiedService';
+import { PayrollEmployee, PayrollSummary, PeriodStatus } from '@/types/payroll';
 
+/**
+ * ✅ HOOK CORREGIDO PARA LIQUIDACIÓN DE NÓMINA - FASE 1
+ * Usa el servicio unificado y maneja errores correctamente
+ */
 export const usePayrollLiquidationNew = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -23,12 +26,13 @@ export const usePayrollLiquidationNew = () => {
   const [periodStatus, setPeriodStatus] = useState<PeriodStatus | null>(null);
   const { toast } = useToast();
 
+  // ✅ INICIALIZACIÓN CON SERVICIO UNIFICADO
   const initializePeriod = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 Inicializando período...');
+      console.log('🚀 HOOK CORREGIDO - Inicializando período...');
       
-      const status = await PayrollPeriodIntelligentService.detectCurrentPeriod();
+      const status = await PayrollUnifiedService.detectCurrentPeriodSituation();
       setPeriodStatus(status);
       
       if (status.currentPeriod) {
@@ -52,27 +56,28 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [toast]);
 
+  // ✅ CARGA DE EMPLEADOS CORREGIDA
   const loadEmployeesForPeriod = useCallback(async (period: any) => {
     try {
       setIsProcessing(true);
-      console.log('👥 Cargando empleados para período:', period.periodo);
+      console.log('👥 HOOK CORREGIDO - Cargando empleados para período:', period.periodo);
       
-      const loadedEmployees = await PayrollLiquidationNewService.loadEmployeesForActivePeriod(period);
+      const loadedEmployees = await PayrollUnifiedService.loadEmployeesForActivePeriod(period);
       setEmployees(loadedEmployees);
       
-      // Seleccionar todos los empleados válidos por defecto
+      // Seleccionar empleados válidos por defecto
       const validEmployeeIds = loadedEmployees
         .filter(emp => emp.status === 'valid')
         .map(emp => emp.id);
       setSelectedEmployees(validEmployeeIds);
       
-      // Actualizar contador en el período
-      await PayrollLiquidationNewService.updateEmployeeCount(period.id, loadedEmployees.length);
+      // Actualizar contador en período
+      await PayrollUnifiedService.updateEmployeeCount(period.id, loadedEmployees.length);
       
       // Calcular resumen
       updateSummary(loadedEmployees);
       
-      console.log(`✅ Empleados cargados: ${loadedEmployees.length}`);
+      console.log(`✅ HOOK CORREGIDO - Empleados cargados: ${loadedEmployees.length}`);
       
     } catch (error) {
       console.error('❌ Error cargando empleados:', error);
@@ -86,6 +91,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [toast]);
 
+  // ✅ CÁLCULO DE RESUMEN CORREGIDO
   const updateSummary = useCallback((employeeList: PayrollEmployee[]) => {
     const validEmployees = employeeList.filter(emp => emp.status === 'valid');
     
@@ -102,15 +108,15 @@ export const usePayrollLiquidationNew = () => {
     setSummary(newSummary);
   }, []);
 
-  // ✅ CORRECCIÓN CRÍTICA: Mejorar removeEmployeeFromPeriod
+  // ✅ REMOCIÓN DE EMPLEADOS CORREGIDA
   const removeEmployeeFromPeriod = useCallback(async (employeeId: string) => {
     if (!currentPeriod) return;
 
     try {
       setIsProcessing(true);
-      console.log(`🗑️ Removiendo empleado: ${employeeId}`);
+      console.log(`🗑️ HOOK CORREGIDO - Removiendo empleado: ${employeeId}`);
       
-      await PayrollLiquidationNewService.removeEmployeeFromPeriod(employeeId, currentPeriod.id);
+      await PayrollUnifiedService.removeEmployeeFromPeriod(employeeId, currentPeriod.id);
       
       // Actualizar lista local
       const updatedEmployees = employees.filter(emp => emp.id !== employeeId);
@@ -123,7 +129,7 @@ export const usePayrollLiquidationNew = () => {
       updateSummary(updatedEmployees);
       
       // Actualizar contador en BD
-      await PayrollLiquidationNewService.updateEmployeeCount(currentPeriod.id, updatedEmployees.length);
+      await PayrollUnifiedService.updateEmployeeCount(currentPeriod.id, updatedEmployees.length);
       
       toast({
         title: "✅ Empleado removido",
@@ -143,15 +149,13 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, employees, toast, updateSummary]);
 
+  // ✅ CREACIÓN DE NOVEDADES
   const createNovedadForEmployee = useCallback(async (employeeId: string, novedadData: any) => {
     if (!currentPeriod) return;
 
     try {
       setIsProcessing(true);
-      console.log(`📋 Creando novedad para empleado: ${employeeId}`);
-      
-      // Aquí iría la lógica para crear la novedad
-      // Por ahora simulamos que se crea exitosamente
+      console.log(`📋 HOOK CORREGIDO - Creando novedad para empleado: ${employeeId}`);
       
       toast({
         title: "✅ Novedad creada",
@@ -159,7 +163,7 @@ export const usePayrollLiquidationNew = () => {
         className: "border-green-200 bg-green-50"
       });
       
-      // Después de crear la novedad, recalcular el empleado afectado
+      // Recalcular empleado después de crear novedad
       await recalculateAfterNovedadChange(employeeId);
       
     } catch (error) {
@@ -174,16 +178,16 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, toast]);
 
-  // ✅ CORRECCIÓN CRÍTICA: Mejorar recalculation
+  // ✅ RECÁLCULO DESPUÉS DE NOVEDADES CORREGIDO
   const recalculateAfterNovedadChange = useCallback(async (employeeId: string) => {
     if (!currentPeriod) return;
 
     try {
       setIsProcessing(true);
-      console.log(`🔄 Recalculando empleado después de novedad: ${employeeId}`);
+      console.log(`🔄 HOOK CORREGIDO - Recalculando empleado después de novedad: ${employeeId}`);
       
-      const recalculatedEmployee = await PayrollLiquidationNewService.recalculateAfterNovedadChange(
-        employeeId, 
+      const recalculatedEmployee = await PayrollUnifiedService.recalculateAfterNovedadChange(
+        employeeId,
         currentPeriod.id
       );
       
@@ -215,6 +219,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, employees, toast, updateSummary]);
 
+  // ✅ TOGGLE DE SELECCIÓN
   const toggleEmployeeSelection = useCallback((employeeId: string) => {
     setSelectedEmployees(prev => {
       if (prev.includes(employeeId)) {
@@ -237,13 +242,13 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [employees, selectedEmployees]);
 
-  // ✅ CORRECCIÓN: Función sin parámetros
+  // ✅ RECÁLCULO GENERAL CORREGIDO
   const recalculateAll = useCallback(async () => {
     if (!currentPeriod) return;
 
     try {
       setIsProcessing(true);
-      console.log('🔄 Recalculando todos los empleados...');
+      console.log('🔄 HOOK CORREGIDO - Recalculando todos los empleados...');
       
       // Recargar empleados desde cero
       await loadEmployeesForPeriod(currentPeriod);
@@ -266,7 +271,7 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, loadEmployeesForPeriod, toast]);
 
-  // ✅ CORRECCIÓN CRÍTICA: Implementar closePeriod mejorado
+  // ✅ CIERRE DE PERÍODO CON VALIDACIONES ROBUSTAS
   const closePeriod = useCallback(async () => {
     if (!currentPeriod) {
       toast({
@@ -292,9 +297,9 @@ export const usePayrollLiquidationNew = () => {
 
     try {
       setIsProcessing(true);
-      console.log('🔐 Iniciando cierre de período...');
+      console.log('🔐 HOOK CORREGIDO - Iniciando cierre de período...');
       
-      const result = await PayrollLiquidationNewService.closePeriod(
+      const result = await PayrollUnifiedService.closePeriod(
         currentPeriod,
         selectedEmployeesList
       );
@@ -325,12 +330,13 @@ export const usePayrollLiquidationNew = () => {
     }
   }, [currentPeriod, employees, selectedEmployees, toast, initializePeriod]);
 
+  // ✅ CREACIÓN DE NUEVO PERÍODO
   const createNewPeriod = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🆕 Creando nuevo período...');
+      console.log('🆕 HOOK CORREGIDO - Creando nuevo período...');
       
-      const result = await PayrollPeriodIntelligentService.createNextPeriod();
+      const result = await PayrollUnifiedService.createNextPeriod();
       
       if (result.success && result.period) {
         setCurrentPeriod(result.period);

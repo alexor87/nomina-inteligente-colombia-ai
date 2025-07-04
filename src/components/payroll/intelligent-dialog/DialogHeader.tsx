@@ -1,90 +1,53 @@
 
 import React from 'react';
-import { Badge } from "@/components/ui/badge";
-import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { 
-  Calendar, 
-  Play, 
-  Settings, 
-  AlertCircle,
-  Clock
-} from "lucide-react";
-import { PeriodStatus } from '@/services/payroll-intelligent/PayrollPeriodDetectionService';
+import { Calendar, CheckCircle, AlertCircle, Clock, Wrench } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { PeriodStatus } from '@/types/payroll';
 
 interface DialogHeaderProps {
-  periodStatus: PeriodStatus;
+  periodStatus: PeriodStatus | null;
 }
 
-export const IntelligentDialogHeader: React.FC<DialogHeaderProps> = ({
-  periodStatus
-}) => {
-  const getIcon = () => {
+export const DialogHeader: React.FC<DialogHeaderProps> = ({ periodStatus }) => {
+  const getStatusIcon = () => {
+    if (!periodStatus) return <Clock className="h-5 w-5 text-gray-500" />;
+    
     switch (periodStatus.action) {
       case 'resume':
-        return <Clock className="h-5 w-5 text-blue-600" />;
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
       case 'create':
-        return <Play className="h-5 w-5 text-green-600" />;
-      case 'configure':
-        return <Settings className="h-5 w-5 text-orange-600" />;
-      case 'view_last':
-        return <AlertCircle className="h-5 w-5 text-red-600" />;
+        return <Calendar className="h-5 w-5 text-blue-600" />;
+      case 'wait':
+        return <AlertCircle className="h-5 w-5 text-orange-600" />;
       default:
-        return <Calendar className="h-5 w-5 text-gray-600" />;
+        return <Wrench className="h-5 w-5 text-gray-600" />;
     }
   };
 
   const getStatusBadge = () => {
-    switch (periodStatus.action) {
-      case 'resume':
-        return (
-          <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50 text-xs font-medium px-2 py-0.5">
-            En curso
-          </Badge>
-        );
-      case 'create':
-        return (
-          <Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-50 text-xs font-medium px-2 py-0.5">
-            Nuevo período
-          </Badge>
-        );
-      case 'configure':
-        return (
-          <Badge className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-50 text-xs font-medium px-2 py-0.5">
-            Configuración
-          </Badge>
-        );
-      case 'view_last':
-        return (
-          <Badge variant="destructive" className="text-xs font-medium px-2 py-0.5">
-            Error
-          </Badge>
-        );
-      default:
-        return null;
-    }
+    if (!periodStatus) return null;
+    
+    const badgeConfig = {
+      resume: { text: 'Continuar', className: 'bg-green-100 text-green-800' },
+      create: { text: 'Crear', className: 'bg-blue-100 text-blue-800' },
+      wait: { text: 'Revisar', className: 'bg-orange-100 text-orange-800' }
+    };
+    
+    const config = badgeConfig[periodStatus.action as keyof typeof badgeConfig];
+    if (!config) return null;
+    
+    return <Badge className={config.className}>{config.text}</Badge>;
   };
 
   return (
-    <DialogHeader className="text-center space-y-3">
-      {/* Icon - Smaller */}
-      <div className="flex justify-center">
-        <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100">
-          {getIcon()}
-        </div>
+    <div className="flex items-center space-x-3 mb-4">
+      {getStatusIcon()}
+      <div className="flex-1">
+        <h3 className="text-lg font-semibold">
+          {periodStatus?.message || 'Cargando estado del período...'}
+        </h3>
       </div>
-      
-      {/* Title and Badge - Reduced spacing */}
-      <div className="space-y-2">
-        <DialogTitle className="text-lg font-semibold text-gray-900 leading-tight">
-          {periodStatus.title}
-        </DialogTitle>
-        
-        {getStatusBadge() && (
-          <div className="flex justify-center">
-            {getStatusBadge()}
-          </div>
-        )}
-      </div>
-    </DialogHeader>
+      {getStatusBadge()}
+    </div>
   );
 };
