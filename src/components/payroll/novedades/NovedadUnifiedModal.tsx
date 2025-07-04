@@ -27,6 +27,8 @@ interface NovedadUnifiedModalProps {
   periodId: string;
   initialNovedadType?: string | null;
   onCreateNovedad: (novedadData: any) => void;
+  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number, dias?: number) => number | null;
+  onNovedadChange?: () => Promise<void>;
 }
 
 const novedadTypeLabels: Record<string, string> = {
@@ -48,7 +50,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   employeeSalary,
   periodId,
   initialNovedadType,
-  onCreateNovedad
+  onCreateNovedad,
+  calculateSuggestedValue,
+  onNovedadChange
 }) => {
   const [currentNovedadType, setCurrentNovedadType] = useState<string | null>(null);
 
@@ -72,6 +76,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       };
       
       await onCreateNovedad(completeNovedadData);
+      
+      // Trigger change callback if provided
+      if (onNovedadChange) {
+        await onNovedadChange();
+      }
+      
       onClose();
     } catch (error) {
       console.error('Error creating novedad:', error);
@@ -79,7 +89,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   // Función de cálculo sugerido (simplificada)
-  const calculateSuggestedValue = (tipo: string, subtipo?: string, cantidad?: number): number | null => {
+  const calculateSuggestedValueInternal = (tipo: string, subtipo?: string, cantidad?: number): number | null => {
+    // Use provided calculation function if available
+    if (calculateSuggestedValue) {
+      return calculateSuggestedValue(tipo, subtipo, cantidad);
+    }
+    
+    // Fallback calculation
     const salarioDiario = employeeSalary / 30;
     const salarioHora = salarioDiario / 8;
     
@@ -133,7 +149,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onBack={handleBack}
             onSubmit={handleSubmit}
             employeeSalary={employeeSalary}
-            calculateSuggestedValue={calculateSuggestedValue}
+            calculateSuggestedValue={calculateSuggestedValueInternal}
           />
         );
       case 'incapacidad':
@@ -142,7 +158,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onBack={handleBack}
             onSubmit={handleSubmit}
             employeeSalary={employeeSalary}
-            calculateSuggestedValue={calculateSuggestedValue}
+            calculateSuggestedValue={calculateSuggestedValueInternal}
           />
         );
       case 'vacaciones':
@@ -151,7 +167,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onBack={handleBack}
             onSubmit={handleSubmit}
             employeeSalary={employeeSalary}
-            calculateSuggestedValue={calculateSuggestedValue}
+            calculateSuggestedValue={calculateSuggestedValueInternal}
           />
         );
       case 'licencias':
@@ -160,7 +176,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onBack={handleBack}
             onSubmit={handleSubmit}
             employeeSalary={employeeSalary}
-            calculateSuggestedValue={calculateSuggestedValue}
+            calculateSuggestedValue={calculateSuggestedValueInternal}
           />
         );
       case 'bonificaciones':
@@ -193,7 +209,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onBack={handleBack}
             onSubmit={handleSubmit}
             employeeSalary={employeeSalary}
-            calculateSuggestedValue={calculateSuggestedValue}
+            calculateSuggestedValue={calculateSuggestedValueInternal}
           />
         );
       default:
