@@ -3,6 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
 /**
+ * INTERFAZ PARA LA RESPUESTA DE LA FUNCIÓN DB
+ */
+interface PayrollHistoryResponse {
+  success: boolean;
+  data?: PayrollHistoryPeriod[];
+}
+
+/**
  * ✅ SERVICIO SIMPLE DE HISTORIAL - FASE 2 REPARACIÓN CRÍTICA
  * Conecta directamente con la función de base de datos sincronizada
  */
@@ -22,12 +30,15 @@ export class PayrollHistorySimpleService {
       
       console.log('📊 FASE 2 - Respuesta de función DB:', data);
       
-      if (!data || !data.success) {
+      // Type assertion para indicar el tipo correcto
+      const response = data as PayrollHistoryResponse;
+      
+      if (!response || !response.success) {
         console.warn('⚠️ La función no retornó datos exitosos');
         return [];
       }
       
-      const periods = data.data || [];
+      const periods = response.data || [];
       console.log(`✅ FASE 2 - Períodos cargados: ${periods.length}`);
       
       return periods.map((period: any) => ({
