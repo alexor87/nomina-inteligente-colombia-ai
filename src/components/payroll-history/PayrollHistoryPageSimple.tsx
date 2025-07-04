@@ -1,19 +1,28 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePayrollHistorySimple } from '@/hooks/usePayrollHistorySimple';
+import { usePayrollHistoryPagination } from '@/hooks/usePayrollHistoryPagination';
 import { PayrollHistoryFilters } from './PayrollHistoryFilters';
 import { PayrollHistoryTable } from './PayrollHistoryTable';
+import { PayrollHistoryActions } from './PayrollHistoryActions';
+import { PayrollHistoryPagination } from './PayrollHistoryPagination';
+import { PayrollHistoryExportService } from '@/services/PayrollHistoryExportService';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, History, BarChart3, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 /**
- * ✅ PÁGINA SIMPLE DE HISTORIAL - FASE 2 REPARACIÓN CRÍTICA
- * Muestra datos reales sincronizados con métricas útiles
+ * ✅ PÁGINA SIMPLE DE HISTORIAL - FASE 3 FINALIZACIÓN
+ * Incluye paginación, exportación y navegación completa
  */
 export const PayrollHistoryPageSimple = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
   const {
     periods,
     isLoading,
@@ -28,19 +37,85 @@ export const PayrollHistoryPageSimple = () => {
     draftPeriods
   } = usePayrollHistorySimple();
 
+  // Paginación
+  const {
+    currentPage,
+    totalPages,
+    paginatedItems,
+    totalItems,
+    itemsPerPage,
+    goToPage,
+    resetPage
+  } = usePayrollHistoryPagination({ 
+    items: periods, 
+    itemsPerPage: 10 
+  });
+
+  // Reset página cuando cambien los filtros
+  React.useEffect(() => {
+    resetPage();
+  }, [filters, resetPage]);
+
   const handlePeriodClick = (period: any) => {
-    console.log('Período seleccionado:', period);
-    // TODO: Implementar navegación a detalles del período
+    console.log('Navegando a detalles del período:', period.id);
+    navigate(`/app/payroll-history/${period.id}`);
   };
 
   const handleViewDetails = (period: any) => {
-    console.log('Ver detalles:', period);
-    // TODO: Implementar vista de detalles
+    navigate(`/app/payroll-history/${period.id}`);
   };
 
   const handleEditPeriod = (period: any) => {
-    console.log('Editar período:', period);
-    // TODO: Implementar edición de período
+    if (period.status === 'cerrado') {
+      toast({
+        title: "Período cerrado",
+        description: "No se puede editar un período cerrado. Debe reabrirlo primero.",
+        variant: "destructive"
+      });
+      return;
+    }
+    navigate(`/app/period-edit/${period.id}`);
+  };
+
+  const handleExport = async () => {
+    try {
+      toast({
+        title: "Exportando datos",
+        description: "Preparando archivo de exportación..."
+      });
+
+      await PayrollHistoryExportService.exportToCSV(periods, 
+        `historial-nomina-${new Date().toISOString().split('T')[0]}`
+      );
+      
+      toast({
+        title: "Exportación exitosa",
+        description: "El archivo se ha descargado correctamente."
+      });
+    } catch (error) {
+      console.error('Error exportando:', error);
+      toast({
+        title: "Error en exportación",
+        description: "No se pudo exportar el archivo.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toast({
+        title: "Datos actualizados",
+        description: "El historial se ha actualizado correctamente."
+      });
+    } catch (error) {
+      toast({
+        title: "Error actualizando",
+        description: "No se pudieron actualizar los datos.",
+        variant: "destructive"
+      });
+    }
   };
 
   if (isLoading) {
@@ -74,9 +149,15 @@ export const PayrollHistoryPageSimple = () => {
           <History className="h-6 w-6 text-blue-600" />
           <h1 className="text-2xl font-bold text-gray-900">Historial de Nómina</h1>
         </div>
-        <div className="text-sm text-gray-500">
-          {filteredCount} de {totalPeriods} períodos
-        </div>
+        <PayrollHistoryActions 
+          onRefresh={handleRefresh}
+          onExport={handleExport}
+          canCreatePeriod={true}
+        />
+      </div>
+
+      <div className="text-sm text-gray-500 mb-4">
+        {filteredCount} de {totalPeriods} períodos
       </div>
 
       {/* ✅ MÉTRICAS DE RESUMEN */}
@@ -158,13 +239,23 @@ export const PayrollHistoryPageSimple = () => {
           </p>
         </div>
       ) : (
-        <PayrollHistoryTable 
-          periods={periods}
-          onPeriodClick={handlePeriodClick}
-          onViewDetails={handleViewDetails}
-          onEditPeriod={handleEditPeriod}
-          canUserEditPeriods={true}
-        />
+        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+          <PayrollHistoryTable 
+            periods={paginatedItems}
+            onPeriodClick={handlePeriodClick}
+            onViewDetails={handleViewDetails}
+            onEditPeriod={handleEditPeriod}
+            canUserEditPeriods={true}
+          />
+          
+          <PayrollHistoryPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={goToPage}
+          />
+        </div>
       )}
     </div>
   );
