@@ -1,12 +1,12 @@
 
 /**
- * ✅ TIPOS ESTRICTOS PARA LIQUIDACIÓN DE NÓMINA - CORRECCIÓN FASE 1
+ * ✅ TIPOS ESTRICTOS PARA LIQUIDACIÓN DE NÓMINA - REPARACIÓN CRÍTICA
  * Define interfaces claras y Result pattern para manejo seguro de errores
  */
 
 import { PayrollEmployee, PayrollSummary, PeriodStatus } from './payroll';
 
-// Result pattern corregido - union type discriminado
+// ✅ CORRECCIÓN CRÍTICA: Result pattern como discriminated union
 export type Result<T> = 
   | { success: true; data: T }
   | { success: false; error: string; code?: string };
@@ -65,4 +65,13 @@ export interface PayrollLiquidationActions {
   closePeriod: () => Promise<void>;
   createNewPeriod: () => Promise<void>;
   refreshPeriod: () => Promise<void>;
+}
+
+// ✅ HELPER PARA TYPE GUARDS
+export function isResultSuccess<T>(result: Result<T>): result is { success: true; data: T } {
+  return result.success === true;
+}
+
+export function isResultError<T>(result: Result<T>): result is { success: false; error: string; code?: string } {
+  return result.success === false;
 }

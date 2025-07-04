@@ -2,11 +2,11 @@
 import { useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationFacade } from '@/services/payroll-liquidation/PayrollLiquidationFacade';
-import { PayrollLiquidationState } from '@/types/payroll-liquidation';
+import { PayrollLiquidationState, isResultError } from '@/types/payroll-liquidation';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 
 /**
- * ✅ HOOK DE LÓGICA DE NEGOCIO - CORRECCIÓN FASE 1
+ * ✅ HOOK DE LÓGICA DE NEGOCIO - REPARACIÓN CRÍTICA
  * Contiene toda la lógica de negocio sin efectos secundarios de UI
  */
 export const usePayrollLiquidationLogic = (
@@ -36,11 +36,11 @@ export const usePayrollLiquidationLogic = (
   const initializePeriod = useCallback(async () => {
     try {
       actions.setIsLoading(true);
-      console.log('🚀 CORRECCIÓN FASE 1 - Inicializando período...');
+      console.log('🚀 REPARACIÓN CRÍTICA - Inicializando período...');
       
       const result = await PayrollLiquidationFacade.detectCurrentPeriodSituation();
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
 
@@ -71,11 +71,11 @@ export const usePayrollLiquidationLogic = (
   const loadEmployeesForPeriod = useCallback(async (period: any) => {
     try {
       actions.setIsProcessing(true);
-      console.log('👥 CORRECCIÓN FASE 1 - Cargando empleados para período:', period.periodo);
+      console.log('👥 REPARACIÓN CRÍTICA - Cargando empleados para período:', period.periodo);
       
       const result = await PayrollLiquidationFacade.loadEmployeesForActivePeriod(period);
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
 
@@ -93,14 +93,14 @@ export const usePayrollLiquidationLogic = (
         result.data.length
       );
       
-      if (!updateCountResult.success) {
+      if (isResultError(updateCountResult)) {
         console.warn('⚠️ Error actualizando contador:', updateCountResult.error);
       }
       
       // Calcular resumen
       updateSummary(result.data);
       
-      console.log(`✅ CORRECCIÓN FASE 1 - Empleados cargados: ${result.data.length}`);
+      console.log(`✅ REPARACIÓN CRÍTICA - Empleados cargados: ${result.data.length}`);
       
     } catch (error) {
       console.error('❌ Error cargando empleados:', error);
@@ -118,11 +118,11 @@ export const usePayrollLiquidationLogic = (
   const createNewPeriod = useCallback(async () => {
     try {
       actions.setIsLoading(true);
-      console.log('🆕 CORRECCIÓN FASE 1 - Creando nuevo período...');
+      console.log('🆕 REPARACIÓN CRÍTICA - Creando nuevo período...');
       
       const result = await PayrollLiquidationFacade.createNextPeriod();
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
 

@@ -3,10 +3,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationFacade } from '@/services/payroll-liquidation/PayrollLiquidationFacade';
 import { PayrollEmployee, PayrollSummary, PeriodStatus } from '@/types/payroll';
-import { ClosureStep, PayrollClosureResult, PostClosureResult } from '@/types/payroll-liquidation';
+import { ClosureStep, PayrollClosureResult, PostClosureResult, isResultError } from '@/types/payroll-liquidation';
 
 /**
- * ✅ HOOK UNIFICADO DE LIQUIDACIÓN - CORRECCIÓN FASE 1
+ * ✅ HOOK UNIFICADO DE LIQUIDACIÓN - REPARACIÓN CRÍTICA
  * Reemplaza los múltiples hooks problemáticos con uno solo funcional
  */
 export const usePayrollLiquidationUnified = () => {
@@ -54,11 +54,11 @@ export const usePayrollLiquidationUnified = () => {
   const initializePeriod = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 CORRECCIÓN FASE 1 - Inicializando período...');
+      console.log('🚀 REPARACIÓN CRÍTICA - Inicializando período...');
       
       const result = await PayrollLiquidationFacade.detectCurrentPeriodSituation();
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
 
@@ -91,7 +91,7 @@ export const usePayrollLiquidationUnified = () => {
       
       const result = await PayrollLiquidationFacade.loadEmployeesForActivePeriod(period);
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
 
@@ -128,7 +128,7 @@ export const usePayrollLiquidationUnified = () => {
         currentPeriod.id
       );
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
       
@@ -167,7 +167,7 @@ export const usePayrollLiquidationUnified = () => {
         currentPeriod.id
       );
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
 
@@ -198,7 +198,7 @@ export const usePayrollLiquidationUnified = () => {
 
     try {
       setIsProcessing(true);
-      console.log(`📋 CORRECCIÓN FASE 1 - Creando novedad para empleado: ${employeeId}`);
+      console.log(`📋 REPARACIÓN CRÍTICA - Creando novedad para empleado: ${employeeId}`);
       
       // TODO: Implementar en facade cuando sea necesario
       console.log('✅ Novedad creada (placeholder)');
@@ -246,7 +246,7 @@ export const usePayrollLiquidationUnified = () => {
 
     try {
       setIsProcessing(true);
-      console.log('🔄 CORRECCIÓN FASE 1 - Recalculando todos los empleados...');
+      console.log('🔄 REPARACIÓN CRÍTICA - Recalculando todos los empleados...');
       
       await loadEmployeesForPeriod(currentPeriod);
       
@@ -306,7 +306,7 @@ export const usePayrollLiquidationUnified = () => {
         selectedEmployeesList
       );
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
       
@@ -349,7 +349,7 @@ export const usePayrollLiquidationUnified = () => {
       
       const result = await PayrollLiquidationFacade.createNextPeriod();
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
 

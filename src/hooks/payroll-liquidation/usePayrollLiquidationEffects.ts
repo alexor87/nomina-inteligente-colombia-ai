@@ -2,11 +2,11 @@
 import { useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationFacade } from '@/services/payroll-liquidation/PayrollLiquidationFacade';
-import { PayrollLiquidationState } from '@/types/payroll-liquidation';
+import { PayrollLiquidationState, isResultError } from '@/types/payroll-liquidation';
 import { PayrollEmployee } from '@/types/payroll';
 
 /**
- * ✅ HOOK DE EFECTOS SECUNDARIOS - CORRECCIÓN FASE 1
+ * ✅ HOOK DE EFECTOS SECUNDARIOS - REPARACIÓN CRÍTICA
  * Maneja operaciones que afectan el estado externo (API, base de datos)
  */
 export const usePayrollLiquidationEffects = (
@@ -22,14 +22,14 @@ export const usePayrollLiquidationEffects = (
 
     try {
       actions.setIsProcessing(true);
-      console.log(`🗑️ CORRECCIÓN FASE 1 - Removiendo empleado: ${employeeId}`);
+      console.log(`🗑️ REPARACIÓN CRÍTICA - Removiendo empleado: ${employeeId}`);
       
       const result = await PayrollLiquidationFacade.removeEmployeeFromPeriod(
         employeeId, 
         state.currentPeriod.id
       );
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
       
@@ -49,7 +49,7 @@ export const usePayrollLiquidationEffects = (
         updatedEmployees.length
       );
       
-      if (!updateCountResult.success) {
+      if (isResultError(updateCountResult)) {
         console.warn('⚠️ Error actualizando contador:', updateCountResult.error);
       }
       
@@ -77,14 +77,14 @@ export const usePayrollLiquidationEffects = (
 
     try {
       actions.setIsProcessing(true);
-      console.log(`🔄 CORRECCIÓN FASE 1 - Recalculando empleado: ${employeeId}`);
+      console.log(`🔄 REPARACIÓN CRÍTICA - Recalculando empleado: ${employeeId}`);
       
       const result = await PayrollLiquidationFacade.recalculateAfterNovedadChange(
         employeeId,
         state.currentPeriod.id
       );
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
 
@@ -146,7 +146,7 @@ export const usePayrollLiquidationEffects = (
       actions.setRollbackExecuted(false);
       actions.setPostClosureResult(null);
       
-      console.log('🔒 CORRECCIÓN FASE 1 - Iniciando cierre con tipos seguros...');
+      console.log('🔒 REPARACIÓN CRÍTICA - Iniciando cierre con tipos seguros...');
       
       // Simular progreso de pasos
       const steps = ['validation', 'snapshot', 'closure', 'verification'] as const;
@@ -161,7 +161,7 @@ export const usePayrollLiquidationEffects = (
         selectedEmployeesList
       );
       
-      if (!result.success) {
+      if (isResultError(result)) {
         throw new Error(result.error);
       }
       
@@ -175,7 +175,7 @@ export const usePayrollLiquidationEffects = (
         
         if (result.data.postClosureResult.nextPeriodSuggestion) {
           const nextPeriod = result.data.postClosureResult.nextPeriodSuggestion;
-          console.log('📅 CORRECCIÓN FASE 1 - Siguiente período sugerido:', nextPeriod);
+          console.log('📅 REPARACIÓN CRÍTICA - Siguiente período sugerido:', nextPeriod);
           
           toast({
             title: "✅ Período cerrado exitosamente",
