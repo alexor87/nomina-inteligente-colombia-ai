@@ -6,7 +6,7 @@
 
 import { PayrollEmployee, PayrollSummary, PeriodStatus } from './payroll';
 
-// Result pattern corregido para manejo consistente de errores
+// Result pattern corregido - union type discriminado
 export type Result<T> = 
   | { success: true; data: T }
   | { success: false; error: string; code?: string };

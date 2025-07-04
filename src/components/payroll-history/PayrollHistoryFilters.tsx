@@ -14,7 +14,7 @@ import { PayrollHistoryFilters as Filters } from '@/types/payroll-history';
 
 interface PayrollHistoryFiltersProps {
   filters: Filters;
-  onFiltersChange: (filters: Filters) => void;
+  onFiltersChange: (filters: Partial<Filters>) => void;
 }
 
 export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHistoryFiltersProps) => {
@@ -25,7 +25,6 @@ export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHisto
   const handleDateFromChange = (date: Date | undefined) => {
     setDateFrom(date);
     onFiltersChange({
-      ...filters,
       dateRange: {
         ...filters.dateRange,
         from: date ? format(date, 'yyyy-MM-dd') : undefined
@@ -36,7 +35,6 @@ export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHisto
   const handleDateToChange = (date: Date | undefined) => {
     setDateTo(date);
     onFiltersChange({
-      ...filters,
       dateRange: {
         ...filters.dateRange,
         to: date ? format(date, 'yyyy-MM-dd') : undefined
@@ -57,7 +55,7 @@ export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHisto
   };
 
   const hasActiveFilters = () => {
-    return !!(filters.status || filters.periodType || filters.dateRange.from || filters.dateRange.to);
+    return !!(filters.status || filters.periodType || filters.dateRange?.from || filters.dateRange?.to);
   };
 
   return (
@@ -69,7 +67,7 @@ export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHisto
           <Input
             placeholder="Buscar empleado o período..."
             value={filters.employeeSearch || ''}
-            onChange={(e) => onFiltersChange({ ...filters, employeeSearch: e.target.value || undefined })}
+            onChange={(e) => onFiltersChange({ employeeSearch: e.target.value || undefined })}
             className="pl-10"
           />
         </div>
@@ -141,7 +139,7 @@ export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHisto
                   <label className="text-sm font-medium text-gray-700">Estado</label>
                   <Select 
                     value={filters.status || 'todos'} 
-                    onValueChange={(value) => onFiltersChange({ ...filters, status: value === 'todos' ? undefined : value })}
+                    onValueChange={(value) => onFiltersChange({ status: value === 'todos' ? undefined : value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Todos" />
@@ -160,7 +158,7 @@ export const PayrollHistoryFilters = ({ filters, onFiltersChange }: PayrollHisto
                   <label className="text-sm font-medium text-gray-700">Tipo período</label>
                   <Select 
                     value={filters.periodType || 'todos'} 
-                    onValueChange={(value) => onFiltersChange({ ...filters, periodType: value === 'todos' ? undefined : value as 'quincenal' | 'mensual' })}
+                    onValueChange={(value) => onFiltersChange({ periodType: value === 'todos' ? undefined : value as 'quincenal' | 'mensual' })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Todos" />

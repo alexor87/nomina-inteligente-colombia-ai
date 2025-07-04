@@ -22,6 +22,21 @@ export const PayrollHistoryPageSimple = () => {
     refetch
   } = usePayrollHistorySimple();
 
+  const handlePeriodClick = (period: any) => {
+    console.log('Período seleccionado:', period);
+    // TODO: Implementar navegación a detalles del período
+  };
+
+  const handleViewDetails = (period: any) => {
+    console.log('Ver detalles:', period);
+    // TODO: Implementar vista de detalles
+  };
+
+  const handleEditPeriod = (period: any) => {
+    console.log('Editar período:', period);
+    // TODO: Implementar edición de período
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -56,7 +71,6 @@ export const PayrollHistoryPageSimple = () => {
       <PayrollHistoryFilters
         filters={filters}
         onFiltersChange={updateFilters}
-        onClearFilters={clearFilters}
       />
 
       {periods.length === 0 ? (
@@ -71,8 +85,11 @@ export const PayrollHistoryPageSimple = () => {
         </div>
       ) : (
         <PayrollHistoryTable 
-          periods={periods} 
-          onRefresh={refetch}
+          periods={periods}
+          onPeriodClick={handlePeriodClick}
+          onViewDetails={handleViewDetails}
+          onEditPeriod={handleEditPeriod}
+          canUserEditPeriods={true}
         />
       )}
     </div>
