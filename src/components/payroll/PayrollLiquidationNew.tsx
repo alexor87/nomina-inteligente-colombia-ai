@@ -81,7 +81,7 @@ export const PayrollLiquidationNew = () => {
             employees={employees}
             onRemoveEmployee={removeEmployeeFromPeriod}
             onCreateNovedad={createNovedadForEmployee}
-            onRecalculate={recalculateAfterNovedadChange}
+            onRecalculate={(employeeId: string) => recalculateAfterNovedadChange(employeeId)}
             periodId={currentPeriod?.id || ''}
             canEdit={currentPeriod?.estado === 'borrador'}
             selectedEmployees={selectedEmployees}
