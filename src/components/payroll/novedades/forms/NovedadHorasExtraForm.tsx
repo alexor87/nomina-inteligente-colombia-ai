@@ -5,9 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calculator, Info } from 'lucide-react';
+import { ArrowLeft, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { getJornadaLegal, getDailyHours } from '@/utils/jornadaLegal';
 
 interface NovedadHorasExtraFormProps {
   onBack: () => void;
@@ -16,13 +15,11 @@ interface NovedadHorasExtraFormProps {
   calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number) => number | null;
 }
 
-const horasExtraSubtipos = [
-  { value: 'diurnas', label: 'Diurnas (25%)', description: 'Lunes a sábado 6:00 AM - 10:00 PM' },
-  { value: 'nocturnas', label: 'Nocturnas (75%)', description: 'Lunes a sábado 10:00 PM - 6:00 AM' },
-  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', description: 'Domingos 6:00 AM - 10:00 PM' },
-  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', description: 'Domingos 10:00 PM - 6:00 AM' },
-  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', description: 'Días festivos 6:00 AM - 10:00 PM' },
-  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', description: 'Días festivos 10:00 PM - 6:00 AM' }
+const tiposHorasExtra = [
+  { value: 'diurnas', label: 'Horas Extra Diurnas', factor: '125%', descripcion: 'Lunes a sábado de 6:00 AM a 9:00 PM' },
+  { value: 'nocturnas', label: 'Horas Extra Nocturnas', factor: '175%', descripcion: 'Lunes a sábado de 9:00 PM a 6:00 AM' },
+  { value: 'dominicales', label: 'Horas Extra Dominicales', factor: '200%', descripcion: 'Domingos y festivos de 6:00 AM a 9:00 PM' },
+  { value: 'festivas', label: 'Horas Extra Festivas', factor: '200%', descripcion: 'Domingos y festivos de 9:00 PM a 6:00 AM' }
 ];
 
 export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
@@ -31,46 +28,41 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   employeeSalary,
   calculateSuggestedValue
 }) => {
-  const [subtipo, setSubtipo] = useState<string>('');
+  const [tipoHorasExtra, setTipoHorasExtra] = useState<string>('');
   const [horas, setHoras] = useState<string>('');
   const [valorCalculado, setValorCalculado] = useState<number>(0);
-  const [valorManual, setValorManual] = useState<string>('');
-  const [useManualValue, setUseManualValue] = useState(false);
   const [observacion, setObservacion] = useState<string>('');
 
-  // Get current legal workday info for display
-  const jornadaLegal = getJornadaLegal();
-  const horasPorDia = getDailyHours();
-
   useEffect(() => {
-    if (subtipo && horas && parseFloat(horas) > 0 && calculateSuggestedValue) {
-      const calculatedValue = calculateSuggestedValue('horas_extra', subtipo, parseFloat(horas));
-      if (calculatedValue && calculatedValue > 0) {
+    if (tipoHorasExtra && horas && parseFloat(horas) > 0 && calculateSuggestedValue) {
+      const tipoMapping: Record<string, string> = {
+        'diurnas': 'horas_extra_diurnas',
+        'nocturnas': 'horas_extra_nocturnas', 
+        'dominicales': 'horas_extra_dominicales',
+        'festivas': 'horas_extra_festivas'
+      };
+      
+      const calculatedValue = calculateSuggestedValue(tipoMapping[tipoHorasExtra], tipoHorasExtra, parseFloat(horas));
+      if (calculatedValue) {
         setValorCalculado(calculatedValue);
-        setUseManualValue(false);
       }
     }
-  }, [subtipo, horas, calculateSuggestedValue]);
+  }, [tipoHorasExtra, horas, calculateSuggestedValue]);
 
   const handleSubmit = () => {
-    const finalValue = useManualValue && valorManual ? parseFloat(valorManual) : valorCalculado;
+    if (!tipoHorasExtra || !horas || parseFloat(horas) <= 0) return;
 
     onSubmit({
       tipo_novedad: 'horas_extra',
-      subtipo,
+      subtipo: tipoHorasExtra,
       horas: parseFloat(horas),
-      valor: finalValue,
+      valor: valorCalculado,
       observacion
     });
   };
 
-  // More flexible validation - button enabled when basic fields are filled
-  const isValid = subtipo && horas && parseFloat(horas) > 0 && (
-    (valorCalculado > 0) || 
-    (useManualValue && valorManual && parseFloat(valorManual) > 0)
-  );
-
-  const finalValue = useManualValue && valorManual ? parseFloat(valorManual) : valorCalculado;
+  const selectedTipo = tiposHorasExtra.find(t => t.value === tipoHorasExtra);
+  const isValid = tipoHorasExtra && horas && parseFloat(horas) > 0 && valorCalculado > 0;
 
   return (
     <div className="space-y-6">
@@ -82,31 +74,20 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
-      {/* Legal workday info */}
-      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex items-start gap-2 text-blue-700">
-          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium">Jornada legal vigente: {jornadaLegal.horasSemanales} horas semanales</p>
-            <p>Horas por día: {horasPorDia.toFixed(2)} según {jornadaLegal.ley}</p>
-          </div>
-        </div>
-      </div>
-
       {/* Form */}
       <div className="space-y-4">
         <div>
-          <Label htmlFor="subtipo">Tipo de Horas Extra</Label>
-          <Select value={subtipo} onValueChange={setSubtipo}>
+          <Label htmlFor="tipo">Tipo de Horas Extra</Label>
+          <Select value={tipoHorasExtra} onValueChange={setTipoHorasExtra}>
             <SelectTrigger>
               <SelectValue placeholder="Selecciona el tipo de horas extra" />
             </SelectTrigger>
             <SelectContent>
-              {horasExtraSubtipos.map((tipo) => (
+              {tiposHorasExtra.map((tipo) => (
                 <SelectItem key={tipo.value} value={tipo.value}>
                   <div>
-                    <div className="font-medium">{tipo.label}</div>
-                    <div className="text-xs text-gray-500">{tipo.description}</div>
+                    <div className="font-medium">{tipo.label} ({tipo.factor})</div>
+                    <div className="text-xs text-gray-500">{tipo.descripcion}</div>
                   </div>
                 </SelectItem>
               ))}
@@ -127,52 +108,19 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           />
         </div>
 
-        {/* Value calculation section */}
-        <div className="space-y-3">
-          {valorCalculado > 0 && (
-            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-              <div className="flex items-center gap-2 text-green-700">
-                <Calculator className="h-4 w-4" />
-                <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
-              </div>
+        {valorCalculado > 0 && (
+          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+            <div className="flex items-center gap-2 text-green-700">
+              <Calculator className="h-4 w-4" />
+              <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
             </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="useManualValue"
-              checked={useManualValue}
-              onChange={(e) => setUseManualValue(e.target.checked)}
-              className="rounded"
-            />
-            <Label htmlFor="useManualValue" className="text-sm">
-              Usar valor manual
-            </Label>
+            {selectedTipo && (
+              <p className="text-sm text-green-600 mt-1">
+                {horas} horas × {selectedTipo.factor} = {formatCurrency(valorCalculado)}
+              </p>
+            )}
           </div>
-
-          {useManualValue && (
-            <div>
-              <Label htmlFor="valorManual">Valor Manual</Label>
-              <Input
-                id="valorManual"
-                type="number"
-                placeholder="0"
-                value={valorManual}
-                onChange={(e) => setValorManual(e.target.value)}
-                min="0"
-              />
-            </div>
-          )}
-
-          {finalValue > 0 && (
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-center gap-2 text-blue-700">
-                <span className="font-medium">Valor Final: {formatCurrency(finalValue)}</span>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
 
         <div>
           <Label htmlFor="observacion">Observaciones (Opcional)</Label>
