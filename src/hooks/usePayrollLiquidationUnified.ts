@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationFacade } from '@/services/payroll-liquidation/PayrollLiquidationFacade';
@@ -115,6 +114,57 @@ export const usePayrollLiquidationUnified = () => {
       setIsProcessing(false);
     }
   }, [toast, updateSummary]);
+
+  // ✅ NUEVA FUNCIÓN PRINCIPAL: Liquidar nómina completa
+  const liquidatePayroll = useCallback(async () => {
+    if (!currentPeriod) {
+      toast({
+        title: "Error",
+        description: "No hay período activo para liquidar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const selectedEmployeesList = employees.filter(emp => 
+      selectedEmployees.includes(emp.id) && emp.status === 'valid'
+    );
+
+    if (selectedEmployeesList.length === 0) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar al menos un empleado válido para liquidar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      console.log(`💰 LIQUIDACIÓN PRINCIPAL - Procesando ${selectedEmployeesList.length} empleados...`);
+      
+      // Recalcular todos los empleados seleccionados
+      await loadEmployeesForPeriod(currentPeriod);
+      
+      toast({
+        title: "✅ Nómina liquidada exitosamente",
+        description: `Se procesaron ${selectedEmployeesList.length} empleados correctamente`,
+        className: "border-green-200 bg-green-50"
+      });
+      
+      console.log('✅ LIQUIDACIÓN COMPLETADA');
+      
+    } catch (error) {
+      console.error('❌ Error liquidando nómina:', error);
+      toast({
+        title: "Error liquidando nómina",
+        description: error instanceof Error ? error.message : "Error desconocido",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [currentPeriod, employees, selectedEmployees, loadEmployeesForPeriod, toast]);
 
   // Remover empleado del período
   const removeEmployeeFromPeriod = useCallback(async (employeeId: string) => {
@@ -404,6 +454,7 @@ export const usePayrollLiquidationUnified = () => {
     postClosureResult,
     
     // Acciones
+    liquidatePayroll,
     removeEmployeeFromPeriod,
     createNovedadForEmployee,
     recalculateAfterNovedadChange,

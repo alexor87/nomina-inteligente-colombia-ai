@@ -3,6 +3,7 @@ import React from 'react';
 import { PayrollTableNew } from './PayrollTableNew';
 import { PayrollSummaryPanel } from './liquidation/PayrollSummaryPanel';
 import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
+import { PayrollMainActions } from './liquidation/PayrollMainActions';
 import { TransactionalClosureIndicator } from './closure/TransactionalClosureIndicator';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePayrollLiquidationUnified } from '@/hooks/usePayrollLiquidationUnified';
@@ -28,6 +29,7 @@ export const PayrollLiquidationNew = () => {
     transactionId,
     rollbackExecuted,
     postClosureResult,
+    liquidatePayroll, // ✅ NUEVA FUNCIÓN PRINCIPAL
     removeEmployeeFromPeriod,
     createNovedadForEmployee,
     recalculateAfterNovedadChange,
@@ -74,6 +76,11 @@ export const PayrollLiquidationNew = () => {
     );
   }
 
+  // Calcular si se puede liquidar
+  const canLiquidate = selectedEmployees.length > 0 && 
+                      employees.some(emp => emp.status === 'valid' && selectedEmployees.includes(emp.id)) &&
+                      currentPeriod?.estado === 'borrador';
+
   return (
     <div className="space-y-6">
       <PayrollPeriodHeader 
@@ -100,6 +107,16 @@ export const PayrollLiquidationNew = () => {
 
       {hasEmployees && (
         <>
+          {/* ✅ ACCIONES PRINCIPALES - INCLUYE BOTÓN "LIQUIDAR NÓMINA" */}
+          <PayrollMainActions
+            selectedCount={selectedEmployees.length}
+            totalCount={employees.length}
+            canLiquidate={canLiquidate}
+            isProcessing={isProcessing}
+            onLiquidate={liquidatePayroll}
+            onRecalculate={recalculateAll}
+          />
+
           <PayrollSummaryPanel 
             summary={summary}
             selectedCount={selectedEmployees.length}
