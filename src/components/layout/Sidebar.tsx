@@ -33,62 +33,26 @@ interface SidebarProps {
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
-  const { hasModuleAccess, isSuperAdmin, user, loading, roles } = useAuth();
-
-  // Debug logging
-  console.log('🔍 Sidebar Debug Info:', {
-    user: user?.email,
-    loading,
-    roles,
-    isSuperAdmin,
-    hasModuleAccessFunction: !!hasModuleAccess
-  });
+  const { hasModuleAccess, isSuperAdmin } = useAuth();
 
   // Filtrar navegación basada en permisos cuando el usuario esté autenticado
   const filteredNavigation = navigation.filter(item => {
-    // Si está cargando, mostrar todos los elementos
-    if (loading) {
-      console.log('⏳ Still loading, showing all navigation items');
-      return true;
-    }
-    
     // Si no hay usuario autenticado, no mostrar elementos
-    if (!user) {
-      console.log('❌ No user authenticated, hiding navigation');
-      return false;
-    }
+    if (!hasModuleAccess) return false;
     
     // SuperAdmin ve todo
-    if (isSuperAdmin) {
-      console.log('👑 SuperAdmin access - showing all items');
-      return true;
-    }
-    
-    // Si no hay función hasModuleAccess, mostrar todos por defecto
-    if (!hasModuleAccess) {
-      console.log('⚠️ No hasModuleAccess function, showing all items as fallback');
-      return true;
-    }
+    if (isSuperAdmin) return true;
     
     // Verificar acceso al módulo
-    const hasAccess = hasModuleAccess(item.module);
-    console.log(`🔐 Module ${item.module} access:`, hasAccess);
-    return hasAccess;
+    return hasModuleAccess(item.module);
   });
 
-  console.log('🧭 Sidebar navigation result:', {
+  console.log('🧭 Sidebar navigation filtered:', {
+    isSuperAdmin,
     totalItems: navigation.length,
     filteredItems: filteredNavigation.length,
-    showingItems: filteredNavigation.map(n => n.name)
+    filteredNavigation: filteredNavigation.map(n => n.name)
   });
-
-  // Si no hay elementos filtrados y hay un usuario, mostrar navegación básica como fallback
-  const shouldShowFallback = user && !loading && filteredNavigation.length === 0;
-  const displayNavigation = shouldShowFallback ? navigation : filteredNavigation;
-
-  if (shouldShowFallback) {
-    console.log('🔄 Using fallback navigation - showing all items');
-  }
 
   return (
     <div className={cn(
@@ -129,80 +93,46 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {loading ? (
-          // Loading skeleton
-          <div className="space-y-2">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className={cn(
-                  "h-10 bg-gray-200 rounded-lg",
-                  collapsed ? "w-10 mx-auto" : "w-full"
-                )}></div>
+        {filteredNavigation.map((item) => {
+          const isActive = location.pathname === item.href;
+          return (
+            <Link
+              key={item.name}
+              to={item.href}
+              className={cn(
+                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
+                "hover:bg-gray-50 active:scale-[0.98]",
+                isActive
+                  ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100"
+                  : "text-gray-700 hover:text-gray-900",
+                collapsed ? "justify-center" : "justify-start"
+              )}
+              title={collapsed ? item.name : undefined}
+            >
+              <div className={cn(
+                "flex items-center justify-center rounded-md transition-colors duration-200",
+                collapsed ? "w-8 h-8" : "w-6 h-6 mr-3",
+                isActive 
+                  ? "text-blue-600" 
+                  : "text-gray-500 group-hover:text-gray-700"
+              )}>
+                <item.icon className="h-4 w-4" />
               </div>
-            ))}
-          </div>
-        ) : displayNavigation.length === 0 ? (
-          // Empty state
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="text-gray-400 mb-2">
-              <Settings className="h-8 w-8 mx-auto" />
-            </div>
-            {!collapsed && (
-              <p className="text-sm text-gray-500">Cargando navegación...</p>
-            )}
-          </div>
-        ) : (
-          // Navigation items
-          displayNavigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
-                  "hover:bg-gray-50 active:scale-[0.98]",
-                  isActive
-                    ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100"
-                    : "text-gray-700 hover:text-gray-900",
-                  collapsed ? "justify-center" : "justify-start"
-                )}
-                title={collapsed ? item.name : undefined}
-              >
-                <div className={cn(
-                  "flex items-center justify-center rounded-md transition-colors duration-200",
-                  collapsed ? "w-8 h-8" : "w-6 h-6 mr-3",
-                  isActive 
-                    ? "text-blue-600" 
-                    : "text-gray-500 group-hover:text-gray-700"
-                )}>
-                  <item.icon className="h-4 w-4" />
+              
+              {!collapsed && (
+                <span className="truncate font-medium">{item.name}</span>
+              )}
+              
+              {/* Tooltip para sidebar colapsado */}
+              {collapsed && (
+                <div className="absolute left-full ml-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                  {item.name}
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 rotate-45"></div>
                 </div>
-                
-                {!collapsed && (
-                  <span className="truncate font-medium">{item.name}</span>
-                )}
-                
-                {/* Tooltip para sidebar colapsado */}
-                {collapsed && (
-                  <div className="absolute left-full ml-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                    {item.name}
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 rotate-45"></div>
-                  </div>
-                )}
-              </Link>
-            );
-          })
-        )}
-
-        {/* Debug info en desarrollo */}
-        {!collapsed && shouldShowFallback && (
-          <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-xs text-yellow-700">
-              ⚠️ Modo fallback - Verificar permisos de usuario
-            </p>
-          </div>
-        )}
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Footer con información adicional cuando está expandido */}

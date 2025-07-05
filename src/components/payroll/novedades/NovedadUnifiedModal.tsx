@@ -9,7 +9,6 @@ import { NovedadBonificacionesConsolidatedForm } from './forms/NovedadBonificaci
 import { NovedadIngresosAdicionalesConsolidatedForm } from './forms/NovedadIngresosAdicionalesConsolidatedForm';
 import { NovedadPrestamosConsolidatedForm } from './forms/NovedadPrestamosConsolidatedForm';
 import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesConsolidatedForm';
-import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { useToast } from '@/components/ui/use-toast';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
@@ -26,21 +25,6 @@ interface NovedadUnifiedModalProps {
   selectedNovedadType: NovedadType | null;
 }
 
-// Mapping from categories to specific novedad types
-const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
-  'horas_extra': 'horas_extra',
-  'recargo_nocturno': 'recargo_nocturno',
-  'vacaciones': 'vacaciones',
-  'incapacidades': 'incapacidad',
-  'licencias': 'licencia_remunerada',
-  'bonificaciones': 'bonificacion',
-  'ingresos_adicionales': 'otros_ingresos',
-  'deducciones_especiales': 'descuento_voluntario',
-  'deducciones': 'descuento_voluntario',
-  'prestamos': 'libranza',
-  'retefuente': 'retencion_fuente'
-};
-
 export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   open,
   setOpen,
@@ -50,46 +34,17 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   selectedNovedadType,
   onClose
 }) => {
-  const [currentStep, setCurrentStep] = useState<'selector' | 'form'>('selector');
-  const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
-  const [employeeName, setEmployeeName] = useState<string>('');
+  const [formStep, setFormStep] = useState<number>(1);
   const { toast } = useToast();
-
-  // Initialize step based on whether a specific type was provided
-  useEffect(() => {
-    if (selectedNovedadType) {
-      setSelectedType(selectedNovedadType);
-      setCurrentStep('form');
-    } else {
-      setCurrentStep('selector');
-      setSelectedType(null);
-    }
-  }, [selectedNovedadType, open]);
-
-  // Mock employee name - in real app this would come from props or context
-  useEffect(() => {
-    if (employeeId) {
-      // For now, we'll use a placeholder. In a real app, you'd fetch this data
-      setEmployeeName('Empleado');
-    }
-  }, [employeeId]);
 
   const handleClose = () => {
     setOpen(false);
-    setCurrentStep('selector');
-    setSelectedType(null);
+    setFormStep(1);
     onClose?.();
   };
 
-  const handleCategorySelect = (category: NovedadCategory) => {
-    const novedadType = categoryToNovedadType[category];
-    setSelectedType(novedadType);
-    setCurrentStep('form');
-  };
-
-  const handleBackToSelector = () => {
-    setCurrentStep('selector');
-    setSelectedType(null);
+  const handleBack = () => {
+    setFormStep(1);
   };
 
   const handleFormSubmit = async (formData: any) => {
@@ -106,7 +61,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       await onSubmit({
         ...formData,
         empleado_id: employeeId,
-        tipo_novedad: selectedType,
       });
       toast({
         title: "Novedad guardada",
@@ -143,16 +97,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }, [employeeSalary]);
 
   const renderNovedadForm = () => {
-    if (!selectedType || !employeeId) return null;
+    if (!selectedNovedadType || !employeeId) return null;
 
     const baseProps = {
-      onBack: handleBackToSelector,
+      onBack: handleBack,
       onSubmit: handleFormSubmit,
       employeeSalary: employeeSalary || 0,
       calculateSuggestedValue: calculateSuggestedValue
     };
 
-    switch (selectedType) {
+    switch (selectedNovedadType) {
       case 'horas_extra':
         return <NovedadHorasExtraConsolidatedForm {...baseProps} />;
       
@@ -187,7 +141,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'incapacidad':
         return (
           <NovedadIncapacidadForm
-            onBack={handleBackToSelector}
+            onBack={handleBack}
             onSubmit={handleFormSubmit}
             employeeSalary={employeeSalary || 0}
             calculateSuggestedValue={calculateSuggestedValue}
@@ -197,7 +151,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'licencia_remunerada':
         return (
           <NovedadLicenciasForm
-            onBack={handleBackToSelector}
+            onBack={handleBack}
             onSubmit={handleFormSubmit}
             employeeSalary={employeeSalary || 0}
             calculateSuggestedValue={calculateSuggestedValue}
@@ -208,7 +162,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         return (
           <div className="p-6 text-center">
             <p className="text-gray-500">Formulario no disponible para este tipo de novedad</p>
-            <Button onClick={handleBackToSelector} className="mt-4">
+            <Button onClick={handleBack} className="mt-4">
               Volver
             </Button>
           </div>
@@ -216,43 +170,25 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   };
 
-  const renderContent = () => {
-    if (currentStep === 'selector') {
-      return (
-        <NovedadTypeSelector
-          onClose={handleClose}
-          onSelectCategory={handleCategorySelect}
-          employeeName={employeeName}
-        />
-      );
-    }
-
-    return renderNovedadForm();
-  };
-
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[625px] max-h-[90vh] overflow-y-auto">
-        {currentStep === 'form' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Agregar Novedad</DialogTitle>
-              <DialogDescription>
-                Completa los campos para agregar una novedad al empleado.
-              </DialogDescription>
-            </DialogHeader>
-          </>
-        )}
+      <DialogContent className="sm:max-w-[625px]">
+        <DialogHeader>
+          <DialogTitle>Agregar Novedad</DialogTitle>
+          <DialogDescription>
+            Completa los campos para agregar una novedad al empleado.
+          </DialogDescription>
+        </DialogHeader>
 
-        {renderContent()}
+        {renderNovedadForm()}
 
-        {currentStep === 'form' && (
-          <DialogFooter>
-            <Button type="button" variant="secondary" onClick={handleBackToSelector}>
+        <DialogFooter>
+          {formStep === 2 && (
+            <Button type="button" variant="secondary" onClick={handleBack}>
               Volver
             </Button>
-          </DialogFooter>
-        )}
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

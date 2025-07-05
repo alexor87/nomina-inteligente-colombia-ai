@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -68,38 +69,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     if (roles.length === 0) {
-      console.log('🔍 hasRole: No roles available');
       return false;
     }
     
-    const result = roles.some(r => {
+    return roles.some(r => {
       const roleMatch = r.role === role;
       const companyMatch = companyId ? r.company_id === companyId : true;
       return roleMatch && companyMatch;
     });
-    
-    console.log(`🔍 hasRole(${role}${companyId ? `, ${companyId}` : ''}):`, result);
-    return result;
   }, [roles]);
 
   const hasModuleAccess = useCallback((module: string): boolean => {
-    console.log(`🔍 hasModuleAccess(${module}) called`);
-    console.log('🔍 Current roles:', roles);
-    
     if (roles.length === 0) {
-      console.log('🔍 hasModuleAccess: No roles available, returning false');
       return false;
     }
     
-    const hasAccess = roles.some(userRole => {
-      const permissions = ROLE_PERMISSIONS[userRole.role];
-      const hasPermission = permissions?.includes(module);
-      console.log(`🔍 Role ${userRole.role} permissions for ${module}:`, hasPermission);
-      return hasPermission;
+    return roles.some(userRole => {
+      return ROLE_PERMISSIONS[userRole.role]?.includes(module);
     });
-    
-    console.log(`🔍 hasModuleAccess(${module}) result:`, hasAccess);
-    return hasAccess;
   }, [roles]);
 
   const refreshUserData = useCallback(async () => {
@@ -110,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const currentUser = (await supabase.auth.getUser()).data.user;
     if (!currentUser) {
-      console.log('❌ No current user found for refresh');
+      console.log('❌ No current user found');
       return;
     }
 
@@ -133,8 +120,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (profileData.company_id) {
           console.log('🔧 Running role check for company:', profileData.company_id);
           await performCompleteRoleCheck(currentUser.id);
-        } else {
-          console.log('⚠️ User has no company assigned');
         }
       } else {
         console.error('❌ Error fetching user profile:', profileError);
@@ -151,19 +136,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           company_id: role.company_id
         }));
         setRoles(transformedRoles);
-        console.log('👥 User roles fetched:', transformedRoles.length, 'roles:', transformedRoles);
+        console.log('👥 User roles fetched:', transformedRoles.length, 'roles');
       } else {
         console.error('❌ Error fetching user roles:', rolesError);
-        console.log('🔄 Setting empty roles array as fallback');
         setRoles([]);
       }
 
     } catch (error) {
       console.error('❌ Error refreshing user data:', error);
-      setRoles([]);
     } finally {
       isRefreshingUserData.current = false;
-      console.log('✅ User data refresh completed');
     }
   }, []);
 
@@ -205,12 +187,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTimeout(loadingTimeoutRef.current);
     }
 
-    console.log('🚀 AuthProvider initializing...');
-
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state changed:', event, session?.user?.email || 'no user');
+        console.log('🔄 Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -220,11 +200,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (!isRefreshingUserData.current) {
               await refreshUserData();
             }
-            console.log('✅ Setting loading to false after user data refresh');
             setLoading(false);
           }, 300);
         } else {
-          console.log('❌ No session, clearing user data');
           setRoles([]);
           setProfile(null);
           setIsSuperAdmin(false);
@@ -235,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('🔍 Initial session check:', session?.user?.email || 'no session');
+      console.log('🔍 Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -244,11 +222,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!isRefreshingUserData.current) {
             await refreshUserData();
           }
-          console.log('✅ Setting loading to false after initial session check');
           setLoading(false);
         }, 300);
       } else {
-        console.log('✅ No initial session, setting loading to false');
         setLoading(false);
       }
     });
@@ -276,35 +252,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isSuperAdmin,
     hasRole,
     hasModuleAccess,
-    signIn: async (email: string, password: string) => {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      return { error };
-    },
-    signUp: async (email: string, password: string, firstName?: string, lastName?: string) => {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            first_name: firstName,
-            last_name: lastName
-          }
-        }
-      });
-      return { error };
-    },
-    signOut: async () => {
-      await supabase.auth.signOut();
-      setRoles([]);
-      setProfile(null);
-      setIsSuperAdmin(false);
-    },
+    signIn,
+    signUp,
+    signOut,
     refreshUserData,
   };
 
