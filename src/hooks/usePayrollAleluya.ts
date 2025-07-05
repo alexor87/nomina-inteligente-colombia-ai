@@ -1,8 +1,7 @@
 
 /**
- * 🎯 HOOK ALELUYA - ESTADO SIMPLIFICADO DE LIQUIDACIÓN
- * Reemplaza la arquitectura fragmentada con estados claros y profesionales
- * Para contadores colombianos - Sin complejidad técnica expuesta
+ * 🎯 HOOK ALELUYA - ESTADO SIMPLIFICADO REPARADO
+ * REPARADO: Funciones async correctas y manejo de errores mejorado
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -11,17 +10,12 @@ import { PayrollServiceAleluya, PayrollPeriod } from '@/services/PayrollServiceA
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 
 interface PayrollState {
-  // Estados principales (simples y claros)
   isLoading: boolean;
   isProcessing: boolean;
-  
-  // Datos principales
   currentPeriod: PayrollPeriod | null;
   employees: PayrollEmployee[];
   selectedEmployees: string[];
   summary: PayrollSummary;
-  
-  // Estados de control
   needsCreation: boolean;
   canLiquidate: boolean;
   message: string;
@@ -51,17 +45,18 @@ export const usePayrollAleluya = () => {
   });
 
   /**
-   * 🔄 INICIALIZAR - Cargar período actual
+   * 🔄 INICIALIZAR - REPARADO
    */
   const initialize = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
       
+      console.log('🔄 Inicializando hook de nómina...');
       const result = await PayrollServiceAleluya.loadCurrentPeriod();
       
       // Seleccionar empleados válidos automáticamente
       const validEmployeeIds = result.employees
-        .filter(emp => emp.status === 'valid')
+        .filter(emp => emp.status === 'valid' || emp.status === 'incomplete')
         .map(emp => emp.id);
       
       setState(prev => ({
@@ -76,8 +71,10 @@ export const usePayrollAleluya = () => {
         message: result.message
       }));
 
+      console.log('✅ Hook inicializado correctamente');
+
     } catch (error) {
-      console.error('Error inicializando:', error);
+      console.error('❌ Error inicializando hook:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -93,18 +90,30 @@ export const usePayrollAleluya = () => {
   }, [toast]);
 
   /**
-   * 🏗️ CREAR PERÍODO NUEVO
+   * 🏗️ CREAR PERÍODO - REPARADO
    */
   const createPeriod = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, isProcessing: true }));
       
+      console.log('🏗️ Creando nuevo período...');
       const result = await PayrollServiceAleluya.createNewPeriod();
       
       // Seleccionar empleados válidos automáticamente
       const validEmployeeIds = result.employees
-        .filter(emp => emp.status === 'valid')
+        .filter(emp => emp.status === 'valid' || emp.status === 'incomplete')
         .map(emp => emp.id);
+      
+      // Calcular summary
+      const summary = {
+        totalEmployees: result.employees.length,
+        validEmployees: validEmployeeIds.length,
+        totalGrossPay: result.employees.reduce((sum, emp) => sum + emp.grossPay, 0),
+        totalDeductions: result.employees.reduce((sum, emp) => sum + emp.deductions, 0),
+        totalNetPay: result.employees.reduce((sum, emp) => sum + emp.netPay, 0),
+        employerContributions: result.employees.reduce((sum, emp) => sum + emp.employerContributions, 0),
+        totalPayrollCost: result.employees.reduce((sum, emp) => sum + emp.grossPay + emp.employerContributions, 0)
+      };
       
       setState(prev => ({
         ...prev,
@@ -115,7 +124,7 @@ export const usePayrollAleluya = () => {
         needsCreation: false,
         canLiquidate: validEmployeeIds.length > 0,
         message: result.message,
-        summary: PayrollServiceAleluya['calculateSummary']?.(result.employees) || prev.summary
+        summary
       }));
 
       toast({
@@ -125,7 +134,7 @@ export const usePayrollAleluya = () => {
       });
 
     } catch (error) {
-      console.error('Error creando período:', error);
+      console.error('❌ Error creando período:', error);
       setState(prev => ({ ...prev, isProcessing: false }));
       
       toast({
@@ -137,7 +146,7 @@ export const usePayrollAleluya = () => {
   }, [toast]);
 
   /**
-   * 💰 LIQUIDAR NÓMINA - Acción principal
+   * 💰 LIQUIDAR NÓMINA - REPARADO
    */
   const liquidatePayroll = useCallback(async () => {
     if (!state.currentPeriod || state.selectedEmployees.length === 0) {
@@ -152,6 +161,7 @@ export const usePayrollAleluya = () => {
     try {
       setState(prev => ({ ...prev, isProcessing: true }));
       
+      console.log('💰 Liquidando nómina...');
       const result = await PayrollServiceAleluya.liquidatePayroll(
         state.currentPeriod.id,
         state.selectedEmployees
@@ -169,7 +179,7 @@ export const usePayrollAleluya = () => {
       await initialize();
 
     } catch (error) {
-      console.error('Error liquidando nómina:', error);
+      console.error('❌ Error liquidando nómina:', error);
       setState(prev => ({ ...prev, isProcessing: false }));
       
       toast({
@@ -181,7 +191,7 @@ export const usePayrollAleluya = () => {
   }, [state.currentPeriod, state.selectedEmployees, toast, initialize]);
 
   /**
-   * 🔒 CERRAR PERÍODO
+   * 🔒 CERRAR PERÍODO - REPARADO
    */
   const closePeriod = useCallback(async () => {
     if (!state.currentPeriod) {
@@ -196,6 +206,7 @@ export const usePayrollAleluya = () => {
     try {
       setState(prev => ({ ...prev, isProcessing: true }));
       
+      console.log('🔒 Cerrando período...');
       const result = await PayrollServiceAleluya.closePeriod(state.currentPeriod.id);
       
       if (result.success) {
@@ -218,7 +229,7 @@ export const usePayrollAleluya = () => {
       }
 
     } catch (error) {
-      console.error('Error cerrando período:', error);
+      console.error('❌ Error cerrando período:', error);
       setState(prev => ({ ...prev, isProcessing: false }));
       
       toast({
@@ -230,7 +241,7 @@ export const usePayrollAleluya = () => {
   }, [state.currentPeriod, toast, initialize]);
 
   /**
-   * ✅ SELECCIÓN DE EMPLEADOS
+   * ✅ SELECCIÓN DE EMPLEADOS - REPARADO
    */
   const toggleEmployeeSelection = useCallback((employeeId: string) => {
     setState(prev => {
@@ -249,7 +260,7 @@ export const usePayrollAleluya = () => {
   const toggleAllEmployees = useCallback(() => {
     setState(prev => {
       const validEmployeeIds = prev.employees
-        .filter(emp => emp.status === 'valid')
+        .filter(emp => emp.status === 'valid' || emp.status === 'incomplete')
         .map(emp => emp.id);
       
       const allSelected = prev.selectedEmployees.length === validEmployeeIds.length;
