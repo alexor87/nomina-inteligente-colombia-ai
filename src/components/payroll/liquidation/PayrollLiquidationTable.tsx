@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -94,7 +95,7 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
         <TableHeader>
           <TableRow>
             <TableHead>Nombre</TableHead>
-            <TableHead>Email</TableHead>
+            <TableHead>Posición</TableHead>
             <TableHead>Salario Base</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
@@ -102,16 +103,16 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
         <TableBody>
           {employees.map((employee) => (
             <TableRow key={employee.id}>
-              <TableCell>{employee.first_name} {employee.last_name}</TableCell>
-              <TableCell>{employee.email}</TableCell>
+              <TableCell>{employee.name}</TableCell>
+              <TableCell>{employee.position}</TableCell>
               <TableCell>
                 <div className="flex items-center space-x-2">
                   <Input
                     type="number"
-                    defaultValue={employee.salario_base}
+                    defaultValue={employee.baseSalary}
                     onBlur={(e) => {
                       const newSalary = parseFloat(e.target.value);
-                      if (!isNaN(newSalary) && newSalary !== employee.salario_base) {
+                      if (!isNaN(newSalary) && newSalary !== employee.baseSalary) {
                         handleSalaryChange(employee.id, newSalary);
                       }
                     }}
@@ -138,7 +139,7 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
         open={novedadModalOpen}
         setOpen={setNovedadModalOpen}
         employeeId={selectedEmployee?.id}
-        employeeSalary={selectedEmployee?.salario_base}
+        employeeSalary={selectedEmployee?.baseSalary}
         periodId={currentPeriodId}
         onSubmit={handleNovedadSubmit}
         selectedNovedadType={null}

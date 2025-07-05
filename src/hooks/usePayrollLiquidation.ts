@@ -1,9 +1,11 @@
+
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
+import { PayrollEmployee } from '@/types/payroll';
 
-interface Employee {
+interface DBEmployee {
   id: string;
   nombre: string;
   apellido: string;
@@ -28,11 +30,31 @@ interface Employee {
 }
 
 export const usePayrollLiquidation = () => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLiquidating, setIsLiquidating] = useState(false);
   const [currentPeriodId, setCurrentPeriodId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Transform DB employee to PayrollEmployee
+  const transformEmployee = (dbEmployee: DBEmployee): PayrollEmployee => ({
+    id: dbEmployee.id,
+    name: `${dbEmployee.nombre} ${dbEmployee.apellido}`,
+    position: 'Empleado', // Default position, could be enhanced later
+    baseSalary: dbEmployee.salario_base,
+    workedDays: dbEmployee.dias_trabajados,
+    extraHours: 0, // Will be calculated from novedades
+    disabilities: 0,
+    bonuses: dbEmployee.devengos,
+    absences: 0,
+    grossPay: dbEmployee.total_pagar + dbEmployee.deducciones,
+    deductions: dbEmployee.deducciones,
+    netPay: dbEmployee.total_pagar,
+    status: 'valid',
+    errors: [],
+    transportAllowance: dbEmployee.auxilio_transporte,
+    employerContributions: 0
+  });
 
   const loadEmployees = async (startDate: string, endDate: string) => {
     setIsLoading(true);
@@ -89,11 +111,13 @@ export const usePayrollLiquidation = () => {
         })
       );
       
-      setEmployees(employeesWithNovedades);
+      // Transform to PayrollEmployee format
+      const transformedEmployees = employeesWithNovedades.map(transformEmployee);
+      setEmployees(transformedEmployees);
       
       toast({
         title: "Empleados cargados",
-        description: `Se cargaron ${employeesWithNovedades.length} empleados activos con deducciones detalladas`,
+        description: `Se cargaron ${transformedEmployees.length} empleados activos con deducciones detalladas`,
       });
     } catch (error) {
       console.error('❌ usePayrollLiquidation - Error loading employees:', error);
@@ -124,49 +148,27 @@ export const usePayrollLiquidation = () => {
       
       console.log('📊 usePayrollLiquidation - New novedades totals:', novedadesTotals);
       
-      setEmployees(prev => {
-        const updatedEmployees = prev.map(emp => {
-          if (emp.id === employeeId) {
-            console.log(`🔄 usePayrollLiquidation - Updating employee ${emp.nombre} with new novedades`);
-            console.log('📊 usePayrollLiquidation - Previous employee state:', {
-              devengos: emp.devengos,
-              deducciones: emp.deducciones,
-              total_pagar: emp.total_pagar
-            });
-            
-            // Preservar las deducciones de ley y agregar las de novedades
-            const totalDeducciones = emp.salud_empleado + emp.pension_empleado + 
-                                   emp.fondo_solidaridad + emp.retencion_fuente + 
-                                   novedadesTotals.totalDeducciones;
-            
-            const salarioProporcional = (emp.salario_base / 30) * emp.dias_trabajados;
-            const totalConNovedades = salarioProporcional + emp.auxilio_transporte + 
-                                    novedadesTotals.totalDevengos - totalDeducciones;
-            
-            const updatedEmployee = {
-              ...emp,
-              devengos: novedadesTotals.totalDevengos,
-              deducciones: totalDeducciones,
-              deducciones_novedades: novedadesTotals.totalDeducciones,
-              total_pagar: totalConNovedades,
-              novedades_totals: novedadesTotals
-            };
-            
-            console.log('✅ usePayrollLiquidation - New employee state:', {
-              devengos: updatedEmployee.devengos,
-              deducciones: updatedEmployee.deducciones,
-              total_pagar: updatedEmployee.total_pagar,
-              hasNovedades: updatedEmployee.novedades_totals?.hasNovedades
-            });
-            
-            return updatedEmployee;
-          }
-          return emp;
-        });
-        
-        console.log('🔄 usePayrollLiquidation - State updated, employees array length:', updatedEmployees.length);
-        return updatedEmployees;
-      });
+      setEmployees(prev => prev.map(emp => {
+        if (emp.id === employeeId) {
+          console.log(`🔄 usePayrollLiquidation - Updating employee ${emp.name} with new novedades`);
+          
+          const updatedEmployee = {
+            ...emp,
+            bonuses: novedadesTotals.totalDevengos,
+            deductions: novedadesTotals.totalDeducciones,
+            netPay: emp.grossPay - novedadesTotals.totalDeducciones + novedadesTotals.totalDevengos
+          };
+          
+          console.log('✅ usePayrollLiquidation - New employee state:', {
+            bonuses: updatedEmployee.bonuses,
+            deductions: updatedEmployee.deductions,
+            netPay: updatedEmployee.netPay
+          });
+          
+          return updatedEmployee;
+        }
+        return emp;
+      }));
       
       console.log('✅ usePayrollLiquidation - Employee novedades refreshed successfully');
     } catch (error) {
@@ -185,7 +187,25 @@ export const usePayrollLiquidation = () => {
   const liquidatePayroll = async (startDate: string, endDate: string) => {
     setIsLiquidating(true);
     try {
-      const result = await PayrollLiquidationService.liquidatePayroll(employees, startDate, endDate);
+      // Convert PayrollEmployee back to expected format for service
+      const dbEmployees = employees.map(emp => ({
+        id: emp.id,
+        nombre: emp.name.split(' ')[0] || emp.name,
+        apellido: emp.name.split(' ').slice(1).join(' ') || '',
+        salario_base: emp.baseSalary,
+        total_pagar: emp.netPay,
+        devengos: emp.bonuses,
+        deducciones: emp.deductions,
+        dias_trabajados: emp.workedDays,
+        auxilio_transporte: emp.transportAllowance,
+        salud_empleado: 0,
+        pension_empleado: 0,
+        fondo_solidaridad: 0,
+        retencion_fuente: 0,
+        deducciones_novedades: 0
+      }));
+      
+      const result = await PayrollLiquidationService.liquidatePayroll(dbEmployees, startDate, endDate);
       
       if (result.success) {
         toast({
@@ -216,7 +236,7 @@ export const usePayrollLiquidation = () => {
     try {
       // Update employee salary in the state
       setEmployees(prev => prev.map(emp => 
-        emp.id === employeeId ? { ...emp, salario_base: newSalary } : emp
+        emp.id === employeeId ? { ...emp, baseSalary: newSalary } : emp
       ));
       
       console.log(`✅ usePayrollLiquidation - Employee salary updated: ${employeeId} -> ${newSalary}`);
