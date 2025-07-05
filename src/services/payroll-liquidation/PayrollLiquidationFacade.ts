@@ -42,16 +42,38 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ CARGA DE EMPLEADOS - CONECTADA A DOMINIO
+  // ✅ CARGA DE EMPLEADOS - CONECTADA A DOMINIO CON CONVERSIÓN DE TIPOS
   static async loadEmployeesForActivePeriod(period: any): Promise<Result<PayrollEmployee[]>> {
     try {
       console.log('👥 FACADE UNIFICADA - Cargando empleados para período:', period.periodo);
       
-      const employees = await PayrollDomainService.loadEmployeesForLiquidation(period.id);
+      const domainEmployees = await PayrollDomainService.loadEmployeesForLiquidation(period.id);
+      
+      // Convertir de PayrollDomainService.PayrollEmployee a types/payroll.PayrollEmployee
+      const convertedEmployees: PayrollEmployee[] = domainEmployees.map(emp => ({
+        id: emp.id,
+        name: emp.name,
+        position: emp.position,
+        baseSalary: emp.baseSalary,
+        workedDays: 30, // Valor por defecto
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        grossPay: emp.grossPay,
+        deductions: emp.deductions,
+        netPay: emp.netPay,
+        transportAllowance: 0, // Valor por defecto
+        employerContributions: emp.grossPay * 0.205, // 20.5% aproximado
+        status: emp.status as 'valid' | 'error' | 'incomplete',
+        errors: emp.errors,
+        eps: undefined,
+        afp: undefined
+      }));
       
       return {
         success: true,
-        data: employees
+        data: convertedEmployees
       };
       
     } catch (error) {

@@ -90,9 +90,17 @@ export class PayrollHistorySimpleService {
         throw error;
       }
 
+      // Verificar tipo de respuesta y extraer mensaje de forma segura
+      let message = 'Períodos duplicados limpiados exitosamente';
+      if (data && typeof data === 'object' && 'message' in data) {
+        message = String(data.message);
+      } else if (typeof data === 'string') {
+        message = data;
+      }
+
       return {
         success: true,
-        message: data?.message || 'Períodos duplicados limpiados exitosamente'
+        message
       };
     } catch (error) {
       console.error('❌ Error cleaning duplicate periods:', error);
