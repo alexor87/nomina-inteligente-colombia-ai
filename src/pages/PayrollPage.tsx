@@ -1,13 +1,13 @@
 
 import React from 'react';
-import { PayrollLiquidationNew } from '@/components/payroll/PayrollLiquidationNew';
+import { PayrollLiquidationUnified } from '@/components/payroll/PayrollLiquidationUnified';
 
 /**
- * ✅ PÁGINA REPARADA - FASE 2 CRÍTICA
- * Usa componente conectado con datos reales
+ * ✅ PÁGINA REPARADA - ARQUITECTURA CRÍTICA CONECTADA
+ * Ahora usa el componente unificado con nueva arquitectura
  */
 const PayrollPage = () => {
-  return <PayrollLiquidationNew />;
+  return <PayrollLiquidationUnified />;
 };
 
 export default PayrollPage;

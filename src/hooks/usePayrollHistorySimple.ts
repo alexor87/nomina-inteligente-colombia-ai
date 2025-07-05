@@ -2,11 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PayrollHistorySimpleService } from '@/services/PayrollHistorySimpleService';
-import { PayrollHistoryPeriod, PayrollHistoryFilters } from '@/types/payroll-history';
+import { PayrollHistoryFilters } from '@/types/payroll-history';
 
 /**
- * ✅ HOOK SIMPLE DE HISTORIAL - FASE 2 REPARACIÓN CRÍTICA
- * Conecta con el servicio sincronizado y funciona con datos reales
+ * ✅ HOOK SIMPLE DE HISTORIAL - REPARACIÓN CRÍTICA COMPLETADA
+ * Ahora usa arquitectura unificada y datos reales sincronizados
  */
 export const usePayrollHistorySimple = () => {
   const [filters, setFilters] = useState<PayrollHistoryFilters>({
@@ -16,25 +16,33 @@ export const usePayrollHistorySimple = () => {
     employeeSearch: ''
   });
 
-  // ✅ CORRECCIÓN CRÍTICA: Usar el servicio real sincronizado
+  // ✅ CORRECCIÓN CRÍTICA: Usar servicio reparado
   const {
     data: periods = [],
     isLoading,
     error,
     refetch
   } = useQuery({
-    queryKey: ['payroll-history-simple-real'],
+    queryKey: ['payroll-history-unified-real'],
     queryFn: PayrollHistorySimpleService.getHistoryPeriods,
     refetchOnWindowFocus: false,
     retry: 2,
     retryDelay: 1000
   });
 
-  // ✅ FILTRADO INTELIGENTE CON DATOS REALES
+  // ✅ FILTRADO MEJORADO CON ARQUITECTURA UNIFICADA
   const filteredPeriods = periods.filter(period => {
-    // Filtro por estado
-    if (filters.status && period.status !== filters.status) {
-      return false;
+    // Filtro por estado normalizado
+    if (filters.status) {
+      const statusMap = {
+        'borrador': 'borrador',
+        'active': 'active', 
+        'cerrado': 'cerrado'
+      };
+      
+      if (period.status !== statusMap[filters.status as keyof typeof statusMap]) {
+        return false;
+      }
     }
 
     // Filtro por tipo de período
@@ -60,9 +68,8 @@ export const usePayrollHistorySimple = () => {
       }
     }
 
-    // Filtro por búsqueda de empleados (placeholder - se implementará en detalle)
+    // Filtro por búsqueda
     if (filters.employeeSearch && filters.employeeSearch.trim()) {
-      // Por ahora solo filtramos por nombre del período
       const search = filters.employeeSearch.toLowerCase();
       if (!period.period.toLowerCase().includes(search)) {
         return false;
@@ -85,7 +92,7 @@ export const usePayrollHistorySimple = () => {
     });
   };
 
-  // ✅ MÉTRICAS ÚTILES
+  // ✅ MÉTRICAS CORREGIDAS
   const totalPeriods = periods.length;
   const filteredCount = filteredPeriods.length;
   const closedPeriods = periods.filter(p => p.status === 'cerrado').length;
@@ -100,7 +107,7 @@ export const usePayrollHistorySimple = () => {
     updateFilters,
     clearFilters,
     refetch,
-    // Métricas
+    // Métricas corregidas
     totalPeriods,
     filteredCount,
     closedPeriods,

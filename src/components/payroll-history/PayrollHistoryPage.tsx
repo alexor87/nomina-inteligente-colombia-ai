@@ -1,13 +1,13 @@
 
 import React from 'react';
-import { PayrollHistoryPageSimple } from './PayrollHistoryPageSimple';
+import { PayrollHistoryUnified } from './PayrollHistoryUnified';
 
 /**
- * ✅ PÁGINA DE HISTORIAL - CORRECCIÓN FASE 1
- * Redirecciona al componente simple y funcional
+ * ✅ PÁGINA DE HISTORIAL - REPARACIÓN CRÍTICA
+ * Redirecciona al componente unificado
  */
 const PayrollHistoryPage = () => {
-  return <PayrollHistoryPageSimple />;
+  return <PayrollHistoryUnified />;
 };
 
 export { PayrollHistoryPage };

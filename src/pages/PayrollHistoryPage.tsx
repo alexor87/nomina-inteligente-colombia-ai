@@ -1,9 +1,13 @@
 
 import React from 'react';
-import { PayrollHistoryPage as PayrollHistory } from '@/components/payroll-history/PayrollHistoryPage';
+import { PayrollHistoryUnified } from '@/components/payroll-history/PayrollHistoryUnified';
 
+/**
+ * ✅ PÁGINA REPARADA - ARQUITECTURA CRÍTICA CONECTADA
+ * Ahora usa el componente unificado con nueva arquitectura
+ */
 const PayrollHistoryPage = () => {
-  return <PayrollHistory />;
+  return <PayrollHistoryUnified />;
 };
 
 export default PayrollHistoryPage;
