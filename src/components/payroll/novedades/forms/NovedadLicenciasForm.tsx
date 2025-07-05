@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calculator, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -50,10 +51,9 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
           setValorCalculado(calculatedValue);
         }
       } else {
-        // Para licencias no remuneradas, el valor es negativo (descuento)
         const calculatedValue = calculateSuggestedValue('ausencia', 'licencia_no_remunerada', parseFloat(dias));
         if (calculatedValue) {
-          setValorCalculado(-calculatedValue); // Negativo porque es descuento
+          setValorCalculado(-calculatedValue);
         }
       }
     }
@@ -68,7 +68,7 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
       tipo_novedad: novedadType,
       subtipo: subtipo || tipoLicencia,
       dias: parseFloat(dias),
-      valor: Math.abs(valorCalculado), // Siempre positivo, el tipo determina si es descuento
+      valor: Math.abs(valorCalculado),
       observacion: `${observacion} (${tipoLicencia})`.trim()
     });
   };
@@ -79,38 +79,55 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b">
+      <div className="flex items-center gap-3 pb-4 border-b bg-white">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">Licencias</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Licencias</h3>
       </div>
 
-      {/* Form */}
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="tipo">Tipo de Licencia</Label>
-          <Select value={tipoLicencia} onValueChange={setTipoLicencia}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona el tipo de licencia" />
-            </SelectTrigger>
-            <SelectContent>
-              {licenciaTypes.map((tipo) => (
-                <SelectItem key={tipo.value} value={tipo.value}>
-                  <div>
-                    <div className="font-medium">{tipo.label}</div>
-                    <div className="text-xs text-gray-500">{tipo.description}</div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Main Content */}
+      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
+        <h4 className="text-blue-800 font-medium">Información de la Licencia</h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="tipo" className="text-gray-700">Tipo de Licencia</Label>
+            <Select value={tipoLicencia} onValueChange={setTipoLicencia}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona el tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {licenciaTypes.map((tipo) => (
+                  <SelectItem key={tipo.value} value={tipo.value}>
+                    <div>
+                      <div className="font-medium">{tipo.label}</div>
+                      <div className="text-xs text-gray-500">{tipo.description}</div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="dias" className="text-gray-700">Días</Label>
+            <Input
+              id="dias"
+              type="number"
+              placeholder="0"
+              value={dias}
+              onChange={(e) => setDias(e.target.value)}
+              min="0"
+              step="1"
+            />
+          </div>
         </div>
 
         {selectedType && (
           <>
             <div>
-              <Label htmlFor="subtipo">Subtipo</Label>
+              <Label htmlFor="subtipo" className="text-gray-700">Subtipo</Label>
               <Select value={subtipo} onValueChange={setSubtipo}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona el subtipo" />
@@ -125,7 +142,7 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
               </Select>
             </div>
 
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="p-3 bg-white rounded border border-blue-200">
               <div className="flex items-center gap-2 text-blue-700 mb-1">
                 <Info className="h-4 w-4" />
                 <span className="font-medium">Información</span>
@@ -135,21 +152,8 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
           </>
         )}
 
-        <div>
-          <Label htmlFor="dias">Cantidad de Días</Label>
-          <Input
-            id="dias"
-            type="number"
-            placeholder="0"
-            value={dias}
-            onChange={(e) => setDias(e.target.value)}
-            min="0"
-            step="1"
-          />
-        </div>
-
         {valorCalculado !== 0 && (
-          <div className={`p-3 rounded-lg border ${
+          <div className={`p-3 rounded border ${
             valorCalculado > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
           }`}>
             <div className={`flex items-center gap-2 ${
@@ -157,20 +161,26 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
             }`}>
               <Calculator className="h-4 w-4" />
               <span className="font-medium">
-                {valorCalculado > 0 ? 'Valor a Pagar' : 'Valor a Descontar'}: {formatCurrency(Math.abs(valorCalculado))}
+                {valorCalculado > 0 ? 'Valor a Pagar' : 'Valor a Descontar'}
               </span>
             </div>
+            <Badge variant="secondary" className={`mt-1 ${
+              valorCalculado > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+              {valorCalculado > 0 ? '+' : ''}{formatCurrency(Math.abs(valorCalculado))}
+            </Badge>
           </div>
         )}
 
         <div>
-          <Label htmlFor="observacion">Observaciones (Opcional)</Label>
+          <Label htmlFor="observacion" className="text-gray-700">Observaciones (Opcional)</Label>
           <Textarea
             id="observacion"
             placeholder="Detalles adicionales sobre la licencia..."
             value={observacion}
             onChange={(e) => setObservacion(e.target.value)}
             rows={3}
+            className="resize-none"
           />
         </div>
       </div>
@@ -178,14 +188,14 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
       {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack}>
-          Atrás
+          Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
           disabled={!isValid}
-          className="min-w-[120px]"
+          className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
         >
-          Agregar Novedad
+          Guardar Licencia
         </Button>
       </div>
     </div>
