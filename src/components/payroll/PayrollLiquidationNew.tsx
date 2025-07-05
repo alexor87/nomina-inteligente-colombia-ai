@@ -1,141 +1,44 @@
 
 import React from 'react';
-import { PayrollTableNew } from './PayrollTableNew';
-import { PayrollSummaryPanel } from './liquidation/PayrollSummaryPanel';
-import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
-import { PayrollMainActions } from './liquidation/PayrollMainActions';
-import { TransactionalClosureIndicator } from './closure/TransactionalClosureIndicator';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { usePayrollLiquidationUnified } from '@/hooks/usePayrollLiquidationUnified';
-import { useSystemInitialization } from '@/hooks/useSystemInitialization';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Construction, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 /**
- * ✅ COMPONENTE PRINCIPAL REPARADO - FASE 2 CRÍTICA
- * Usa servicios reales sin simulaciones + inicialización automática
+ * ✅ COMPONENTE ELIMINADO - REDIRIGE A PLACEHOLDER
+ * Este módulo ha sido eliminado del sistema
  */
 export const PayrollLiquidationNew = () => {
-  // ✅ Inicialización del sistema con limpieza automática
-  const { isInitializing } = useSystemInitialization();
-  
-  const {
-    isLoading,
-    isProcessing,
-    currentPeriod,
-    employees,
-    selectedEmployees,
-    summary,
-    periodStatus,
-    closureStep,
-    transactionId,
-    rollbackExecuted,
-    postClosureResult,
-    liquidatePayroll, // ✅ NUEVA FUNCIÓN PRINCIPAL
-    removeEmployeeFromPeriod,
-    createNovedadForEmployee,
-    recalculateAfterNovedadChange,
-    toggleEmployeeSelection,
-    toggleAllEmployees,
-    recalculateAll,
-    closePeriod,
-    createNewPeriod,
-    refreshPeriod,
-    canClosePeriod,
-    isValidPeriod,
-    hasEmployees
-  } = usePayrollLiquidationUnified();
-
-  // Mostrar loading durante inicialización o carga normal
-  if (isInitializing || isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center space-y-4">
-          <LoadingSpinner />
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium text-gray-900">
-              {isInitializing ? '🔧 Optimizando sistema...' : '📊 Cargando nómina...'}
-            </h3>
-            <p className="text-gray-600">
-              {isInitializing ? 'Preparando datos reales' : 'Conectando con base de datos'}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isValidPeriod) {
-    return (
-      <div className="space-y-6">
-        <PayrollPeriodHeader 
-          period={null}
-          periodStatus={periodStatus}
-          onCreateNewPeriod={createNewPeriod}
-          onRefreshPeriod={refreshPeriod}
-        />
-      </div>
-    );
-  }
-
-  // Calcular si se puede liquidar
-  const canLiquidate = selectedEmployees.length > 0 && 
-                      employees.some(emp => emp.status === 'valid' && selectedEmployees.includes(emp.id)) &&
-                      currentPeriod?.estado === 'borrador';
+  const navigate = useNavigate();
 
   return (
-    <div className="space-y-6">
-      <PayrollPeriodHeader 
-        period={currentPeriod}
-        periodStatus={periodStatus}
-        onCreateNewPeriod={createNewPeriod}
-        onRefreshPeriod={refreshPeriod}
-        canClosePeriod={canClosePeriod}
-        isProcessing={isProcessing}
-        onClosePeriod={closePeriod}
-        onRecalculateAll={recalculateAll}
-        selectedCount={selectedEmployees.length}
-        totalCount={employees.length}
-      />
-
-      {/* ✅ Indicador de Cierre Transaccional */}
-      <TransactionalClosureIndicator
-        isProcessing={isProcessing}
-        currentStep={closureStep}
-        transactionId={transactionId}
-        rollbackExecuted={rollbackExecuted}
-        postClosureResult={postClosureResult}
-      />
-
-      {hasEmployees && (
-        <>
-          {/* ✅ ACCIONES PRINCIPALES - INCLUYE BOTÓN "LIQUIDAR NÓMINA" */}
-          <PayrollMainActions
-            selectedCount={selectedEmployees.length}
-            totalCount={employees.length}
-            canLiquidate={canLiquidate}
-            isProcessing={isProcessing}
-            onLiquidate={liquidatePayroll}
-            onRecalculate={recalculateAll}
-          />
-
-          <PayrollSummaryPanel 
-            summary={summary}
-            selectedCount={selectedEmployees.length}
-            totalCount={employees.length}
-          />
-
-          <PayrollTableNew
-            employees={employees}
-            onRemoveEmployee={removeEmployeeFromPeriod}
-            onCreateNovedad={createNovedadForEmployee}
-            onRecalculate={recalculateAll}
-            periodId={currentPeriod?.id || ''}
-            canEdit={currentPeriod?.estado === 'borrador'}
-            selectedEmployees={selectedEmployees}
-            onToggleEmployee={toggleEmployeeSelection}
-            onToggleAll={toggleAllEmployees}
-          />
-        </>
-      )}
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <Card className="max-w-md w-full">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+            <Construction className="h-8 w-8 text-orange-600" />
+          </div>
+          <CardTitle className="text-xl text-gray-900">
+            Módulo Eliminado
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center space-y-4">
+          <p className="text-gray-600">
+            El módulo de liquidación ha sido eliminado del sistema.
+          </p>
+          <p className="text-sm text-gray-500">
+            Solo el módulo de novedades se ha conservado para uso futuro.
+          </p>
+          <Button 
+            onClick={() => navigate('/app/dashboard')}
+            className="w-full"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al Dashboard
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 };
