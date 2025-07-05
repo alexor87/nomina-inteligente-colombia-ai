@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
+import { ConfigurationService } from './ConfigurationService';
 import { format } from 'date-fns';
 
 interface Employee {
@@ -11,6 +12,7 @@ interface Employee {
   deducciones: number;
   total_pagar: number;
   dias_trabajados: number;
+  auxilio_transporte: number;
 }
 
 export class PayrollLiquidationService {
@@ -39,6 +41,22 @@ export class PayrollLiquidationService {
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both dates
     return Math.min(diffDays, 30); // Max 30 days per month
+  }
+
+  static calculateTransportAllowance(baseSalary: number, workedDays: number): number {
+    const currentYear = new Date().getFullYear().toString();
+    const config = ConfigurationService.getConfiguration(currentYear);
+    
+    // Calcular dos salarios mínimos legales
+    const dosSmmlv = config.salarioMinimo * 2;
+    
+    // Solo aplica auxilio de transporte si el salario es menor o igual a 2 SMMLV
+    if (baseSalary <= dosSmmlv) {
+      // Calcular auxilio proporcional según días trabajados
+      return Math.round((config.auxilioTransporte / 30) * workedDays);
+    }
+    
+    return 0;
   }
 
   static async ensurePeriodExists(startDate: string, endDate: string): Promise<string> {
@@ -120,6 +138,7 @@ export class PayrollLiquidationService {
       // Process each employee
       const processedEmployees: Employee[] = employees.map(employee => {
         const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
+        const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
         
         return {
           id: employee.id,
@@ -128,8 +147,9 @@ export class PayrollLiquidationService {
           salario_base: employee.salario_base,
           devengos: 0, // Will be calculated from novedades
           deducciones: 0, // Will be calculated from novedades
-          total_pagar: salarioProporcional, // Base calculation, will be updated with novedades
-          dias_trabajados: diasTrabajados
+          total_pagar: salarioProporcional + auxilioTransporte, // Base calculation with transport allowance
+          dias_trabajados: diasTrabajados,
+          auxilio_transporte: auxilioTransporte
         };
       });
 
@@ -161,7 +181,7 @@ export class PayrollLiquidationService {
           tipo_periodo: 'personalizado',
           estado: 'cerrado',
           empleados_count: employees.length,
-          total_devengado: employees.reduce((sum, emp) => sum + emp.salario_base + emp.devengos, 0),
+          total_devengado: employees.reduce((sum, emp) => sum + emp.salario_base + emp.devengos + emp.auxilio_transporte, 0),
           total_deducciones: employees.reduce((sum, emp) => sum + emp.deducciones, 0),
           total_neto: employees.reduce((sum, emp) => sum + emp.total_pagar, 0)
         })
@@ -183,7 +203,8 @@ export class PayrollLiquidationService {
             period_id: period.id,
             salario_base: employee.salario_base,
             dias_trabajados: employee.dias_trabajados,
-            total_devengado: employee.salario_base + employee.devengos,
+            auxilio_transporte: employee.auxilio_transporte,
+            total_devengado: employee.salario_base + employee.devengos + employee.auxilio_transporte,
             total_deducciones: employee.deducciones,
             neto_pagado: employee.total_pagar,
             estado: 'procesada'

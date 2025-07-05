@@ -13,6 +13,7 @@ interface Employee {
   deducciones: number;
   total_pagar: number;
   dias_trabajados: number;
+  auxilio_transporte: number;
   novedades_totals?: {
     totalDevengos: number;
     totalDeducciones: number;
@@ -45,9 +46,9 @@ export const usePayrollLiquidation = () => {
             periodId
           );
           
-          // Recalculate total_pagar with novedades
+          // Recalculate total_pagar with novedades and transport allowance
           const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
-          const totalConNovedades = salarioProporcional + novedadesTotals.totalDevengos - novedadesTotals.totalDeducciones;
+          const totalConNovedades = salarioProporcional + employee.auxilio_transporte + novedadesTotals.totalDevengos - novedadesTotals.totalDeducciones;
           
           return {
             ...employee,
@@ -89,7 +90,7 @@ export const usePayrollLiquidation = () => {
       setEmployees(prev => prev.map(emp => {
         if (emp.id === employeeId) {
           const salarioProporcional = (emp.salario_base / 30) * emp.dias_trabajados;
-          const totalConNovedades = salarioProporcional + novedadesTotals.totalDevengos - novedadesTotals.totalDeducciones;
+          const totalConNovedades = salarioProporcional + emp.auxilio_transporte + novedadesTotals.totalDevengos - novedadesTotals.totalDeducciones;
           
           return {
             ...emp,

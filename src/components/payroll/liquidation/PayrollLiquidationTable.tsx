@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ interface Employee {
   deducciones: number;
   total_pagar: number;
   dias_trabajados: number;
+  auxilio_transporte: number;
   novedades_totals?: {
     totalDevengos: number;
     totalDeducciones: number;
@@ -84,6 +86,7 @@ export const PayrollLiquidationTable = ({
               <th className="text-right p-4">Salario Base</th>
               <th className="text-right p-4">Días</th>
               <th className="text-right p-4">Salario Proporcional</th>
+              <th className="text-right p-4">Auxilio Transporte</th>
               <th className="text-center p-4">Novedades</th>
               <th className="text-right p-4">Total a Pagar</th>
               <th className="text-center p-4">Acciones</th>
@@ -104,6 +107,15 @@ export const PayrollLiquidationTable = ({
                   <td className="p-4 text-right">{formatCurrency(employee.salario_base)}</td>
                   <td className="p-4 text-right">{employee.dias_trabajados}</td>
                   <td className="p-4 text-right">{formatCurrency(salarioProporcional)}</td>
+                  <td className="p-4 text-right">
+                    {employee.auxilio_transporte > 0 ? (
+                      <span className="text-green-600 font-medium">
+                        {formatCurrency(employee.auxilio_transporte)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
                   <td className="p-4 text-center">
                     <div className="flex items-center justify-center space-x-2">
                       <Button
@@ -151,7 +163,7 @@ export const PayrollLiquidationTable = ({
           </tbody>
           <tfoot>
             <tr className="border-t-2 bg-gray-50">
-              <td colSpan={5} className="p-4 text-right font-bold">Total General:</td>
+              <td colSpan={6} className="p-4 text-right font-bold">Total General:</td>
               <td className="p-4 text-right font-bold text-lg">
                 {formatCurrency(totalPagar)}
               </td>
