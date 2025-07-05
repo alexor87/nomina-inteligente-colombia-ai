@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 
@@ -55,12 +56,13 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
+      // ✅ CORRECCIÓN: Cast tipo_novedad to string para evitar errores de tipo
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
         .insert({
           empleado_id: novedadData.empleado_id,
           periodo_id: novedadData.periodo_id,
-          tipo_novedad: novedadData.tipo_novedad,
+          tipo_novedad: novedadData.tipo_novedad as string, // Cast para evitar errores de tipo
           valor: novedadData.valor,
           dias: novedadData.dias,
           horas: novedadData.horas,
@@ -92,9 +94,15 @@ export class NovedadesEnhancedService {
     try {
       console.log(`🔄 Actualizando novedad ${novedadId}:`, updates);
       
+      // ✅ CORRECCIÓN: Cast tipo_novedad to string si existe
+      const updateData = {
+        ...updates,
+        tipo_novedad: updates.tipo_novedad ? updates.tipo_novedad as string : undefined
+      };
+      
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
-        .update(updates)
+        .update(updateData)
         .eq('id', novedadId)
         .select()
         .single();

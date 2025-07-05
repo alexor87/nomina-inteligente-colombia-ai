@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -449,35 +450,21 @@ export const DevengoModal = ({
       licencia_remunerada: 'Licencia Remunerada',
       incapacidad: 'Incapacidad',
       bonificacion: 'Bonificación',
-      bonificacion_salarial: 'Bonificación Salarial',
-      bonificacion_no_salarial: 'Bonificación No Salarial',
       comision: 'Comisión',
       prima: 'Prima',
       otros_ingresos: 'Otros Ingresos',
-      auxilio_conectividad: 'Auxilio de Conectividad',
-      viaticos: 'Viáticos',
-      retroactivos: 'Retroactivos',
-      compensacion_ordinaria: 'Compensación Ordinaria',
       libranza: 'Libranza',
       multa: 'Multa',
       ausencia: 'Ausencia',
       descuento_voluntario: 'Descuento Voluntario',
-      retencion_fuente: 'Retención en la Fuente',
-      fondo_solidaridad: 'Fondo de Solidaridad',
       salud: 'Salud',
-      pension: 'Pensión',
-      arl: 'ARL',
-      caja_compensacion: 'Caja de Compensación',
-      icbf: 'ICBF',
-      sena: 'SENA',
-      embargo: 'Embargo',
-      anticipo: 'Anticipo',
-      aporte_voluntario: 'Aporte Voluntario'
+      pension: 'Pensión'
     };
     return labels[tipo] || tipo;
   };
 
-  const renderConceptsList = () => {
+  // ✅ CORRECCIÓN: Definir conceptsList correctamente
+  const conceptsList = React.useMemo(() => {
     const concepts = [];
     
     // Add basic concepts for devengado
@@ -513,7 +500,7 @@ export const DevengoModal = ({
     });
     
     return concepts;
-  };
+  }, [modalType, basicConcepts, novedades]);
 
   const isFormValid = formData.valor > 0 && formData.empleado_id && formData.periodo_id && formData.company_id;
 
