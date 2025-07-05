@@ -3,34 +3,41 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calculator, Info } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Plus, Trash2, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { getJornadaLegal, getDailyHours } from '@/utils/jornadaLegal';
+import { useNovedadCalculation } from '@/hooks/useNovedadCalculation';
+import { NovedadType } from '@/types/novedades-enhanced';
+
+interface HorasExtraEntry {
+  id: string;
+  subtipo: string;
+  horas: number;
+  valor: number;
+  observacion?: string;
+}
 
 interface NovedadHorasExtraConsolidatedFormProps {
   onBack: () => void;
-  onSubmit: (data: any[]) => void;
+  onSubmit: (formDataArray: any[]) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number) => number | null;
+  calculateSuggestedValue?: (
+    tipoNovedad: NovedadType,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ) => number | null;
 }
 
-interface HorasExtraRow {
-  subtipo: string;
-  label: string;
-  description: string;
-  factor: string;
-  horas: string;
-  valor: number;
-}
-
-const horasExtraTypes: Omit<HorasExtraRow, 'horas' | 'valor'>[] = [
-  { subtipo: 'diurnas', label: 'Diurnas', description: 'Lunes a sábado 6:00 AM - 10:00 PM', factor: '1.25' },
-  { subtipo: 'nocturnas', label: 'Nocturnas', description: 'Lunes a sábado 10:00 PM - 6:00 AM', factor: '1.75' },
-  { subtipo: 'dominicales_diurnas', label: 'Dominicales Diurnas', description: 'Domingos 6:00 AM - 10:00 PM', factor: '2.05' }, // Corregido
-  { subtipo: 'dominicales_nocturnas', label: 'Dominicales Nocturnas', description: 'Domingos 10:00 PM - 6:00 AM', factor: '2.55' }, // Corregido
-  { subtipo: 'festivas_diurnas', label: 'Festivas Diurnas', description: 'Días festivos 6:00 AM - 10:00 PM', factor: '2.05' }, // Corregido
-  { subtipo: 'festivas_nocturnas', label: 'Festivas Nocturnas', description: 'Días festivos 10:00 PM - 6:00 AM', factor: '2.55' } // Corregido
+const HORAS_EXTRA_SUBTIPOS = [
+  { value: 'diurnas', label: 'Diurnas (25%)', description: '6:00 AM - 10:00 PM' },
+  { value: 'nocturnas', label: 'Nocturnas (75%)', description: '10:00 PM - 6:00 AM' },
+  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', description: 'Domingos 6:00 AM - 10:00 PM' },
+  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', description: 'Domingos 10:00 PM - 6:00 AM' },
+  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', description: 'Festivos 6:00 AM - 10:00 PM' },
+  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', description: 'Festivos 10:00 PM - 6:00 AM' }
 ];
 
 export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsolidatedFormProps> = ({
@@ -39,175 +46,239 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
   employeeSalary,
   calculateSuggestedValue
 }) => {
-  const [rows, setRows] = useState<HorasExtraRow[]>(
-    horasExtraTypes.map(type => ({
-      ...type,
-      horas: '',
-      valor: 0
-    }))
-  );
-  const [observacion, setObservacion] = useState<string>('');
+  const [entries, setEntries] = useState<HorasExtraEntry[]>([]);
+  const [currentEntry, setCurrentEntry] = useState({
+    subtipo: 'diurnas',
+    horas: '',
+    observacion: ''
+  });
 
-  // Get current legal workday info for display
-  const jornadaLegal = getJornadaLegal();
-  const horasPorDia = getDailyHours();
+  const { calculatedValue, calculateValue } = useNovedadCalculation({
+    employeeSalary,
+    calculateSuggestedValue
+  });
 
-  const updateRow = (index: number, horas: string) => {
-    const newRows = [...rows];
-    newRows[index].horas = horas;
-    
-    // Calculate value if hours are provided
-    if (horas && parseFloat(horas) > 0 && calculateSuggestedValue) {
-      const calculatedValue = calculateSuggestedValue('horas_extra', newRows[index].subtipo, parseFloat(horas));
-      newRows[index].valor = calculatedValue || 0;
+  // Calcular valor automáticamente cuando cambien horas o subtipo
+  useEffect(() => {
+    if (currentEntry.horas && parseFloat(currentEntry.horas) > 0) {
+      console.log('🔄 Calculating value for horas extra:', {
+        subtipo: currentEntry.subtipo,
+        horas: parseFloat(currentEntry.horas)
+      });
+      
+      calculateValue(
+        'horas_extra' as NovedadType,
+        currentEntry.subtipo,
+        parseFloat(currentEntry.horas),
+        undefined
+      );
     } else {
-      newRows[index].valor = 0;
+      calculateValue('horas_extra' as NovedadType, currentEntry.subtipo, 0, undefined);
     }
+  }, [currentEntry.subtipo, currentEntry.horas, calculateValue]);
+
+  const handleAddEntry = () => {
+    if (!currentEntry.horas || parseFloat(currentEntry.horas) <= 0) {
+      alert('Por favor ingrese las horas');
+      return;
+    }
+
+    if (!calculatedValue || calculatedValue <= 0) {
+      alert('Error en el cálculo del valor');
+      return;
+    }
+
+    const newEntry: HorasExtraEntry = {
+      id: Date.now().toString(),
+      subtipo: currentEntry.subtipo,
+      horas: parseFloat(currentEntry.horas),
+      valor: calculatedValue,
+      observacion: currentEntry.observacion || undefined
+    };
+
+    console.log('➕ Adding horas extra entry:', newEntry);
+    setEntries(prev => [...prev, newEntry]);
     
-    setRows(newRows);
+    // Reset form
+    setCurrentEntry({
+      subtipo: 'diurnas',
+      horas: '',
+      observacion: ''
+    });
   };
 
-  const getTotalHoras = () => {
-    return rows.reduce((total, row) => total + (parseFloat(row.horas) || 0), 0);
-  };
-
-  const getTotalValor = () => {
-    return rows.reduce((total, row) => total + row.valor, 0);
-  };
-
-  const getValidRows = () => {
-    return rows.filter(row => row.horas && parseFloat(row.horas) > 0);
+  const handleRemoveEntry = (id: string) => {
+    setEntries(prev => prev.filter(entry => entry.id !== id));
   };
 
   const handleSubmit = () => {
-    const validRows = getValidRows();
-    
-    const novedadesData = validRows.map(row => ({
+    if (entries.length === 0) {
+      alert('Agregue al menos una entrada de horas extra');
+      return;
+    }
+
+    const formDataArray = entries.map(entry => ({
       tipo_novedad: 'horas_extra',
-      subtipo: row.subtipo,
-      horas: parseFloat(row.horas),
-      valor: row.valor,
-      observacion
+      subtipo: entry.subtipo,
+      horas: entry.horas,
+      valor: entry.valor,
+      observacion: entry.observacion
     }));
 
-    onSubmit(novedadesData);
+    console.log('📤 Submitting horas extra entries:', formDataArray);
+    onSubmit(formDataArray);
   };
 
-  const isValid = getValidRows().length > 0;
+  const getTotalValue = () => {
+    return entries.reduce((sum, entry) => sum + entry.valor, 0);
+  };
+
+  const getTotalHours = () => {
+    return entries.reduce((sum, entry) => sum + entry.horas, 0);
+  };
+
+  const getSubtipoLabel = (subtipo: string) => {
+    return HORAS_EXTRA_SUBTIPOS.find(s => s.value === subtipo)?.label || subtipo;
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">Horas Extra</h3>
+        <h3 className="text-lg font-semibold">Horas Extra - Registro Consolidado</h3>
       </div>
 
-      {/* Legal workday info */}
-      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex items-start gap-2 text-blue-700">
-          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium">Jornada legal vigente: {jornadaLegal.horasSemanales} horas semanales</p>
-            <p>Horas por día: {horasPorDia.toFixed(2)} según {jornadaLegal.ley}</p>
+      {/* Formulario para nueva entrada */}
+      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
+        <h4 className="font-medium text-blue-800">Agregar Horas Extra</h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Tipo de Horas Extra</Label>
+            <Select
+              value={currentEntry.subtipo}
+              onValueChange={(value) => setCurrentEntry(prev => ({ ...prev, subtipo: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HORAS_EXTRA_SUBTIPOS.map((subtipo) => (
+                  <SelectItem key={subtipo.value} value={subtipo.value}>
+                    <div>
+                      <div className="font-medium">{subtipo.label}</div>
+                      <div className="text-xs text-gray-500">{subtipo.description}</div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Cantidad de Horas</Label>
+            <Input
+              type="number"
+              min="0"
+              max="12"
+              step="0.5"
+              value={currentEntry.horas}
+              onChange={(e) => setCurrentEntry(prev => ({ ...prev, horas: e.target.value }))}
+              placeholder="0"
+            />
           </div>
         </div>
+
+        {/* Valor calculado */}
+        {calculatedValue && calculatedValue > 0 && (
+          <div className="flex items-center justify-between bg-green-50 p-3 rounded">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-700">Valor calculado:</span>
+            </div>
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              {formatCurrency(calculatedValue)}
+            </Badge>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label>Observaciones (opcional)</Label>
+          <Textarea
+            value={currentEntry.observacion}
+            onChange={(e) => setCurrentEntry(prev => ({ ...prev, observacion: e.target.value }))}
+            placeholder="Observaciones adicionales..."
+            rows={2}
+          />
+        </div>
+
+        <Button 
+          onClick={handleAddEntry}
+          disabled={!currentEntry.horas || !calculatedValue}
+          className="w-full"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Agregar Entrada
+        </Button>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden border border-gray-200 rounded-lg">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Concepto</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">Factor</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-gray-700"># Horas</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">Valor Calculado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {rows.map((row, index) => (
-              <tr key={row.subtipo} className={`hover:bg-gray-50 ${row.horas && parseFloat(row.horas) > 0 ? 'bg-blue-50' : ''}`}>
-                <td className="px-4 py-3">
-                  <div>
-                    <div className="font-medium text-gray-900">{row.label}</div>
-                    <div className="text-xs text-gray-500">{row.description}</div>
+      {/* Lista de entradas agregadas */}
+      {entries.length > 0 && (
+        <div className="space-y-4">
+          <h4 className="font-medium">Entradas Agregadas ({entries.length})</h4>
+          
+          <div className="space-y-2">
+            {entries.map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <div className="font-medium">{getSubtipoLabel(entry.subtipo)}</div>
+                  <div className="text-sm text-gray-600">
+                    {entry.horas} horas - {formatCurrency(entry.valor)}
                   </div>
-                </td>
-                <td className="px-4 py-3 text-center font-medium text-gray-900">
-                  {row.factor}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={row.horas}
-                    onChange={(e) => updateRow(index, e.target.value)}
-                    min="0"
-                    step="0.5"
-                    className="w-20 text-center"
-                  />
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <span className={`font-medium ${row.valor > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                    {formatCurrency(row.valor)}
-                  </span>
-                </td>
-              </tr>
+                  {entry.observacion && (
+                    <div className="text-xs text-gray-500 mt-1">{entry.observacion}</div>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveEntry(entry.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             ))}
-          </tbody>
-          <tfoot className="bg-gray-100">
-            <tr>
-              <td className="px-4 py-3 font-semibold text-gray-900">TOTAL</td>
-              <td className="px-4 py-3"></td>
-              <td className="px-4 py-3 text-center font-semibold text-gray-900">
-                {getTotalHoras().toFixed(1)}
-              </td>
-              <td className="px-4 py-3 text-right font-semibold text-green-600">
-                {formatCurrency(getTotalValor())}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+          </div>
 
-      {/* Summary */}
-      {isValid && (
-        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-          <div className="flex items-center gap-2 text-green-700">
-            <Calculator className="h-4 w-4" />
-            <span className="font-medium">
-              Se crearán {getValidRows().length} novedades de horas extra por un total de {formatCurrency(getTotalValor())}
-            </span>
+          {/* Resumen total */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="font-medium">Total: {getTotalHours()} horas</div>
+                <div className="text-sm text-gray-600">{entries.length} entradas</div>
+              </div>
+              <div className="text-xl font-bold text-blue-700">
+                {formatCurrency(getTotalValue())}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Observations */}
-      <div>
-        <Label htmlFor="observacion">Observaciones (Opcional)</Label>
-        <Textarea
-          id="observacion"
-          placeholder="Detalles adicionales sobre las horas extra..."
-          value={observacion}
-          onChange={(e) => setObservacion(e.target.value)}
-          rows={3}
-        />
-      </div>
-
-      {/* Actions */}
+      {/* Botones de acción */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack}>
-          Atrás
+          Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid}
-          className="min-w-[120px]"
+          disabled={entries.length === 0}
+          className="bg-blue-600 hover:bg-blue-700"
         >
-          Agregar Novedades ({getValidRows().length})
+          Guardar Horas Extra ({entries.length})
         </Button>
       </div>
     </div>

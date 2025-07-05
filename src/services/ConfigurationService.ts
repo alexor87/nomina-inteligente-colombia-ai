@@ -1,4 +1,3 @@
-
 export interface PayrollConfiguration {
   salarioMinimo: number;
   auxilioTransporte: number;
@@ -16,6 +15,13 @@ export interface PayrollConfiguration {
     interesesCesantias: number;
     prima: number;
     vacaciones: number;
+  };
+  fondoSolidaridad: {
+    ranges: Array<{
+      minSMMLV: number;
+      maxSMMLV: number;
+      percentage: number;
+    }>;
   };
   arlRiskLevels: {
     I: number;
@@ -47,6 +53,16 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
     interesesCesantias: 0.12,
     prima: 0.0833,
     vacaciones: 0.0417,
+  },
+  fondoSolidaridad: {
+    ranges: [
+      { minSMMLV: 4, maxSMMLV: 16, percentage: 0.01 },   // 1.0%
+      { minSMMLV: 16, maxSMMLV: 17, percentage: 0.012 }, // 1.2%
+      { minSMMLV: 17, maxSMMLV: 18, percentage: 0.014 }, // 1.4%
+      { minSMMLV: 18, maxSMMLV: 19, percentage: 0.016 }, // 1.6%
+      { minSMMLV: 19, maxSMMLV: 20, percentage: 0.018 }, // 1.8%
+      { minSMMLV: 20, maxSMMLV: 999, percentage: 0.02 }  // 2.0%
+    ]
   },
   arlRiskLevels: {
     I: 0.348,

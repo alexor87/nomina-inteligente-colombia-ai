@@ -46,7 +46,7 @@ export const useAuth = () => {
   return context;
 };
 
-// Permisos por rol - SIMPLIFICADOS y ESTABLES
+// Matriz de permisos por rol
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings'],
   rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports'],
@@ -54,9 +54,6 @@ const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
   soporte: ['dashboard', 'reports', 'employees']
 };
-
-// NAVEGACIÓN BÁSICA SIEMPRE DISPONIBLE (fallback)
-const BASIC_MODULES = ['dashboard', 'employees', 'payroll', 'payroll-history', 'reports', 'settings'];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -66,59 +63,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
+  // Refs to prevent redundant calls
   const isRefreshingUserData = useRef(false);
-  const isInitialized = useRef(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
-    try {
-      if (roles.length === 0) {
-        console.log('⚠️ No roles found, allowing basic access');
-        return true; // FALLBACK: permitir acceso básico si no hay roles cargados
-      }
-      
-      return roles.some(r => {
-        const roleMatch = r.role === role;
-        const companyMatch = companyId ? r.company_id === companyId : true;
-        return roleMatch && companyMatch;
-      });
-    } catch (error) {
-      console.error('Error in hasRole:', error);
-      return true; // FALLBACK en caso de error
+    if (roles.length === 0) {
+      return false;
     }
+    
+    return roles.some(r => {
+      const roleMatch = r.role === role;
+      const companyMatch = companyId ? r.company_id === companyId : true;
+      return roleMatch && companyMatch;
+    });
   }, [roles]);
 
   const hasModuleAccess = useCallback((module: string): boolean => {
-    try {
-      // FALLBACK CRÍTICO: Si no hay usuario, denegar acceso
-      if (!user) {
-        return false;
-      }
-
-      // FALLBACK: Si no hay roles cargados, permitir módulos básicos
-      if (roles.length === 0) {
-        console.log('⚠️ No roles loaded, granting basic module access');
-        return BASIC_MODULES.includes(module);
-      }
-      
-      // Verificar permisos por rol
-      return roles.some(userRole => {
-        const permissions = ROLE_PERMISSIONS[userRole.role];
-        return permissions && permissions.includes(module);
-      });
-    } catch (error) {
-      console.error('Error in hasModuleAccess:', error);
-      // FALLBACK: En caso de error, permitir módulos básicos si hay usuario
-      return user ? BASIC_MODULES.includes(module) : false;
+    if (roles.length === 0) {
+      return false;
     }
-  }, [roles, user]);
+    
+    return roles.some(userRole => {
+      return ROLE_PERMISSIONS[userRole.role]?.includes(module);
+    });
+  }, [roles]);
 
   const refreshUserData = useCallback(async () => {
     if (isRefreshingUserData.current) {
+      console.log('🔄 User data refresh already in progress, skipping...');
       return;
     }
 
     const currentUser = (await supabase.auth.getUser()).data.user;
     if (!currentUser) {
+      console.log('❌ No current user found');
       return;
     }
 
@@ -126,65 +105,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔄 Refreshing user data for:', currentUser.email);
 
     try {
-      // Cargar perfil con timeout
-      const profilePromise = supabase
+      // Fetch profile
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', currentUser.id)
         .single();
-
-      const profileTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile timeout')), 3000)
-      );
-
-      try {
-        const { data: profileData, error: profileError } = await Promise.race([
-          profilePromise,
-          profileTimeout
-        ]) as any;
-
-        if (!profileError && profileData) {
-          setProfile(profileData);
-          console.log('✅ Profile loaded:', profileData.company_id ? 'with company' : 'no company');
-        } else {
-          console.warn('⚠️ Profile load failed:', profileError);
-          setProfile(null);
+      
+      if (!profileError && profileData) {
+        setProfile(profileData);
+        console.log('👤 User profile fetched successfully');
+        
+        // Only run role check if user has a company
+        if (profileData.company_id) {
+          console.log('🔧 Running role check for company:', profileData.company_id);
+          await performCompleteRoleCheck(currentUser.id);
         }
-      } catch (error) {
-        console.warn('⚠️ Profile timeout or error:', error);
+      } else {
+        console.error('❌ Error fetching user profile:', profileError);
         setProfile(null);
       }
 
-      // Cargar roles con timeout
-      const rolesPromise = supabase.rpc('get_user_companies_simple', { _user_id: currentUser.id });
-      const rolesTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Roles timeout')), 3000)
-      );
-
-      try {
-        const { data: userRoles, error: rolesError } = await Promise.race([
-          rolesPromise,
-          rolesTimeout
-        ]) as any;
-
-        if (!rolesError && userRoles && userRoles.length > 0) {
-          const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
-            role: role.role_name as AppRole,
-            company_id: role.company_id
-          }));
-          setRoles(transformedRoles);
-          console.log('✅ Roles loaded:', transformedRoles.length);
-        } else {
-          console.warn('⚠️ No roles found, will use fallback permissions');
-          setRoles([]); // Esto activará los fallbacks
-        }
-      } catch (error) {
-        console.warn('⚠️ Roles timeout or error:', error);
-        setRoles([]); // Fallback
+      // Fetch roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .rpc('get_user_companies_simple', { _user_id: currentUser.id });
+      
+      if (!rolesError && userRoles) {
+        const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
+          role: role.role_name as AppRole,
+          company_id: role.company_id
+        }));
+        setRoles(transformedRoles);
+        console.log('👥 User roles fetched:', transformedRoles.length, 'roles');
+      } else {
+        console.error('❌ Error fetching user roles:', rolesError);
+        setRoles([]);
       }
 
     } catch (error) {
-      console.error('❌ Error in refreshUserData:', error);
+      console.error('❌ Error refreshing user data:', error);
     } finally {
       isRefreshingUserData.current = false;
     }
@@ -223,27 +182,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    if (isInitialized.current) {
-      return;
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
     }
-    isInitialized.current = true;
 
-    console.log('🚀 AuthProvider initializing...');
-
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state change:', event, session?.user?.email);
+        console.log('🔄 Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Cargar datos del usuario
+          // Debounce user data refresh
           setTimeout(async () => {
             if (!isRefreshingUserData.current) {
               await refreshUserData();
             }
             setLoading(false);
-          }, 500);
+          }, 300);
         } else {
           setRoles([]);
           setProfile(null);
@@ -253,9 +211,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Verificar sesión inicial
+    // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('🔍 Initial session check:', session?.user?.email || 'no session');
+      console.log('🔍 Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -265,24 +223,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await refreshUserData();
           }
           setLoading(false);
-        }, 500);
+        }, 300);
       } else {
         setLoading(false);
       }
     });
 
-    // Safety timeout
-    setTimeout(() => {
-      if (loading) {
-        console.warn('⚠️ Auth timeout reached, stopping loading');
-        setLoading(false);
-      }
-    }, 5000);
+    // Reduced timeout for faster loading
+    loadingTimeoutRef.current = setTimeout(() => {
+      console.warn('⚠️ Auth loading timeout reached, setting loading to false');
+      setLoading(false);
+    }, 3000);
 
     return () => {
       subscription.unsubscribe();
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
     };
-  }, [refreshUserData, loading]);
+  }, [refreshUserData]);
 
   const value = {
     user,

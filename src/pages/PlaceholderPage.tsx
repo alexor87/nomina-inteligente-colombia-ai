@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 /**
- * ✅ COMPONENTE ELIMINADO - REDIRIGE A PLACEHOLDER
- * Este módulo ha sido eliminado del sistema
+ * ✅ PÁGINA TEMPORAL PARA RUTAS ELIMINADAS
+ * Muestra mensaje informativo sobre módulos eliminados
  */
-export const PayrollLiquidationNew = () => {
+const PlaceholderPage = () => {
   const navigate = useNavigate();
 
   return (
@@ -25,10 +25,10 @@ export const PayrollLiquidationNew = () => {
         </CardHeader>
         <CardContent className="text-center space-y-4">
           <p className="text-gray-600">
-            El módulo de liquidación ha sido eliminado del sistema.
+            Los módulos de liquidación e historial han sido eliminados del sistema.
           </p>
           <p className="text-sm text-gray-500">
-            Solo el módulo de novedades se ha conservado para uso futuro.
+            El módulo de novedades se ha conservado para uso futuro.
           </p>
           <Button 
             onClick={() => navigate('/app/dashboard')}
@@ -42,3 +42,5 @@ export const PayrollLiquidationNew = () => {
     </div>
   );
 };
+
+export default PlaceholderPage;
