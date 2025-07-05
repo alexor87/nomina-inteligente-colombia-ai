@@ -126,19 +126,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
 
-      // Fetch roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .rpc('get_user_companies_simple', { _user_id: currentUser.id });
-      
-      if (!rolesError && userRoles) {
-        const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
-          role: role.role_name as AppRole,
-          company_id: role.company_id
-        }));
-        setRoles(transformedRoles);
-        console.log('👥 User roles fetched:', transformedRoles.length, 'roles');
-      } else {
-        console.error('❌ Error fetching user roles:', rolesError);
+      // Fetch roles with fallback
+      try {
+        const { data: userRoles, error: rolesError } = await supabase
+          .rpc('get_user_companies_simple', { _user_id: currentUser.id });
+        
+        if (!rolesError && userRoles) {
+          const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
+            role: role.role_name as AppRole,
+            company_id: role.company_id
+          }));
+          setRoles(transformedRoles);
+          console.log('👥 User roles fetched:', transformedRoles.length, 'roles');
+        } else {
+          console.error('❌ Error fetching user roles via RPC, trying direct query:', rolesError);
+          
+          // Fallback: direct query to user_roles table
+          const { data: directRoles, error: directError } = await supabase
+            .from('user_roles')
+            .select('role, company_id')
+            .eq('user_id', currentUser.id);
+          
+          if (!directError && directRoles) {
+            const fallbackRoles: UserRole[] = directRoles.map((role: any) => ({
+              role: role.role as AppRole,
+              company_id: role.company_id
+            }));
+            setRoles(fallbackRoles);
+            console.log('👥 User roles fetched via fallback:', fallbackRoles.length, 'roles');
+          } else {
+            console.error('❌ Error with direct roles query:', directError);
+            setRoles([]);
+          }
+        }
+      } catch (rolesFetchError) {
+        console.error('❌ Critical error fetching roles:', rolesFetchError);
         setRoles([]);
       }
 
@@ -229,11 +251,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Reduced timeout for faster loading
+    // Timeout for safety
     loadingTimeoutRef.current = setTimeout(() => {
       console.warn('⚠️ Auth loading timeout reached, setting loading to false');
       setLoading(false);
-    }, 3000);
+    }, 5000);
 
     return () => {
       subscription.unsubscribe();

@@ -6,7 +6,7 @@ import { Sidebar } from './Sidebar';
 import Header from './Header';
 
 export const Layout = () => {
-  const { roles } = useAuth();
+  const { loading } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +49,18 @@ export const Layout = () => {
     };
   }, []);
 
+  // Mostrar loading mínimo mientras se carga la autenticación
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/30 flex">
       <div ref={sidebarRef}>
@@ -70,7 +82,7 @@ export const Layout = () => {
       </div>
       
       {/* Overlay para móvil cuando sidebar está abierto */}
-      {!sidebarCollapsed && window.innerWidth < 768 && (
+      {!sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth < 768 && (
         <div 
           className="fixed inset-0 bg-black/20 z-40 md:hidden"
           onClick={() => setSidebarCollapsed(true)}

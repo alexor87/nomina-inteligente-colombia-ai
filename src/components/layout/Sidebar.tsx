@@ -33,24 +33,38 @@ interface SidebarProps {
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
-  const { hasModuleAccess, isSuperAdmin } = useAuth();
+  const { hasModuleAccess, isSuperAdmin, roles, loading } = useAuth();
 
-  // Filtrar navegación basada en permisos cuando el usuario esté autenticado
-  const filteredNavigation = navigation.filter(item => {
-    // Si no hay usuario autenticado, no mostrar elementos
-    if (!hasModuleAccess) return false;
-    
+  // Mostrar elementos básicos mientras carga
+  const getFilteredNavigation = () => {
+    if (loading) {
+      // Mientras carga, mostrar al menos dashboard
+      return [navigation[0]]; // Solo Dashboard
+    }
+
+    if (!hasModuleAccess) {
+      // Si no hay función de acceso, mostrar navegación básica
+      return navigation.filter(item => ['dashboard', 'employees'].includes(item.module));
+    }
+
     // SuperAdmin ve todo
-    if (isSuperAdmin) return true;
-    
-    // Verificar acceso al módulo
-    return hasModuleAccess(item.module);
-  });
+    if (isSuperAdmin) {
+      return navigation;
+    }
 
-  console.log('🧭 Sidebar navigation filtered:', {
+    // Filtrar por acceso a módulos
+    return navigation.filter(item => hasModuleAccess(item.module));
+  };
+
+  const filteredNavigation = getFilteredNavigation();
+
+  console.log('🧭 Sidebar navigation state:', {
+    loading,
     isSuperAdmin,
+    rolesCount: roles.length,
     totalItems: navigation.length,
     filteredItems: filteredNavigation.length,
+    hasModuleAccessFunction: !!hasModuleAccess,
     filteredNavigation: filteredNavigation.map(n => n.name)
   });
 
@@ -93,46 +107,55 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {filteredNavigation.map((item) => {
-          const isActive = location.pathname === item.href;
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cn(
-                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
-                "hover:bg-gray-50 active:scale-[0.98]",
-                isActive
-                  ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100"
-                  : "text-gray-700 hover:text-gray-900",
-                collapsed ? "justify-center" : "justify-start"
-              )}
-              title={collapsed ? item.name : undefined}
-            >
-              <div className={cn(
-                "flex items-center justify-center rounded-md transition-colors duration-200",
-                collapsed ? "w-8 h-8" : "w-6 h-6 mr-3",
-                isActive 
-                  ? "text-blue-600" 
-                  : "text-gray-500 group-hover:text-gray-700"
-              )}>
-                <item.icon className="h-4 w-4" />
-              </div>
-              
-              {!collapsed && (
-                <span className="truncate font-medium">{item.name}</span>
-              )}
-              
-              {/* Tooltip para sidebar colapsado */}
-              {collapsed && (
-                <div className="absolute left-full ml-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                  {item.name}
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 rotate-45"></div>
+        {filteredNavigation.length > 0 ? (
+          filteredNavigation.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={cn(
+                  "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
+                  "hover:bg-gray-50 active:scale-[0.98]",
+                  isActive
+                    ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100"
+                    : "text-gray-700 hover:text-gray-900",
+                  collapsed ? "justify-center" : "justify-start"
+                )}
+                title={collapsed ? item.name : undefined}
+              >
+                <div className={cn(
+                  "flex items-center justify-center rounded-md transition-colors duration-200",
+                  collapsed ? "w-8 h-8" : "w-6 h-6 mr-3",
+                  isActive 
+                    ? "text-blue-600" 
+                    : "text-gray-500 group-hover:text-gray-700"
+                )}>
+                  <item.icon className="h-4 w-4" />
                 </div>
-              )}
-            </Link>
-          );
-        })}
+                
+                {!collapsed && (
+                  <span className="truncate font-medium">{item.name}</span>
+                )}
+                
+                {/* Tooltip para sidebar colapsado */}
+                {collapsed && (
+                  <div className="absolute left-full ml-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                    {item.name}
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 rotate-45"></div>
+                  </div>
+                )}
+              </Link>
+            );
+          })
+        ) : (
+          // Fallback cuando no hay navegación disponible
+          <div className="text-center py-8">
+            <div className="text-gray-400 text-sm">
+              {loading ? 'Cargando menú...' : 'Sin acceso a módulos'}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Footer con información adicional cuando está expandido */}
