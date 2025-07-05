@@ -6,6 +6,7 @@ import { Trash2, Plus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { useNovedades } from '@/hooks/useNovedades';
+import type { CreateNovedadData } from '@/types/novedades';
 
 interface Employee {
   id: string;
@@ -61,6 +62,12 @@ export const PayrollLiquidationTable = ({
     if (selectedEmployeeId) {
       await onEmployeeNovedadesChange(selectedEmployeeId);
     }
+  };
+
+  // Wrapper function to handle type mismatch
+  const handleCreateNovedad = async (data: CreateNovedadData): Promise<void> => {
+    await createNovedad(data);
+    await handleNovedadChange();
   };
 
   const selectedEmployee = selectedEmployeeId 
@@ -163,7 +170,7 @@ export const PayrollLiquidationTable = ({
           employeeId={selectedEmployee.id}
           employeeSalary={selectedEmployee.salario_base}
           periodId={currentPeriodId}
-          onCreateNovedad={createNovedad}
+          onCreateNovedad={handleCreateNovedad}
           onNovedadChange={handleNovedadChange}
         />
       )}
