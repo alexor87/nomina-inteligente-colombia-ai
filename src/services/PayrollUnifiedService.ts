@@ -1,13 +1,12 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary, PeriodStatus } from '@/types/payroll';
-import { PayrollHistoryService } from './PayrollHistoryService';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
-import { PayrollCalculationUnifiedService } from './PayrollCalculationUnifiedService';
-import { PayrollClosureTransactionalService } from './payroll-closure/PayrollClosureTransactionalService';
+import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
 
 /**
- * ✅ SERVICIO UNIFICADO DE NÓMINA - FASE 2
- * Actualizado con cierre transaccional
+ * ✅ SERVICIO UNIFICADO REPARADO - FASE 3 CRÍTICA
+ * Eliminadas dependencias rotas, usa servicios reales
  */
 export class PayrollUnifiedService {
   
@@ -76,6 +75,116 @@ export class PayrollUnifiedService {
     }
   }
 
+  // ✅ CARGA DE EMPLEADOS CON CÁLCULOS REALES
+  static async loadEmployeesForActivePeriod(period: any): Promise<PayrollEmployee[]> {
+    try {
+      console.log('👥 SERVICIO UNIFICADO - Cargando empleados para período:', period.periodo);
+      
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) return [];
+
+      // Obtener empleados activos
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('estado', 'activo');
+
+      if (employeesError) {
+        console.error('❌ Error obteniendo empleados:', employeesError);
+        return [];
+      }
+
+      if (!employees || employees.length === 0) {
+        console.log('⚠️ No hay empleados activos');
+        return [];
+      }
+
+      console.log(`📊 Procesando ${employees.length} empleados activos`);
+
+      // Procesar cada empleado con cálculos reales
+      const payrollEmployees: PayrollEmployee[] = [];
+
+      for (const employee of employees) {
+        try {
+          // Obtener novedades del período
+          const novedades = await NovedadesEnhancedService.getNovedadesByEmployee(
+            employee.id, 
+            period.id
+          );
+
+          // ✅ CÁLCULO REAL CON PayrollCalculationEnhancedService
+          const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
+            baseSalary: Number(employee.salario_base) || 0,
+            workedDays: this.calculateProportionalDays(period),
+            extraHours: this.extractNovedadValue(novedades, 'horas_extra'),
+            disabilities: this.extractNovedadValue(novedades, 'incapacidades'),
+            bonuses: this.extractNovedadValue(novedades, 'bonificaciones'),
+            absences: this.extractNovedadDays(novedades, 'ausencias'),
+            periodType: period.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
+            empleadoId: employee.id,
+            periodoId: period.id
+          });
+
+          const payrollEmployee: PayrollEmployee = {
+            id: employee.id,
+            name: `${employee.nombre} ${employee.apellido}`,
+            position: employee.cargo || 'Sin cargo',
+            baseSalary: Number(employee.salario_base) || 0,
+            workedDays: this.calculateProportionalDays(period),
+            extraHours: this.extractNovedadValue(novedades, 'horas_extra'),
+            disabilities: this.extractNovedadValue(novedades, 'incapacidades'),
+            bonuses: this.extractNovedadValue(novedades, 'bonificaciones'),
+            absences: this.extractNovedadDays(novedades, 'ausencias'),
+            grossPay: calculation.grossPay,
+            deductions: calculation.totalDeductions,
+            netPay: calculation.netPay,
+            transportAllowance: calculation.transportAllowance,
+            employerContributions: calculation.employerContributions,
+            status: calculation.grossPay > 0 ? 'valid' : 'error',
+            errors: calculation.grossPay <= 0 ? ['Salario base inválido'] : [],
+            eps: employee.eps,
+            afp: employee.afp
+          };
+
+          payrollEmployees.push(payrollEmployee);
+
+        } catch (employeeError) {
+          console.error(`❌ Error procesando empleado ${employee.id}:`, employeeError);
+          
+          // Empleado con error
+          payrollEmployees.push({
+            id: employee.id,
+            name: `${employee.nombre} ${employee.apellido}`,
+            position: employee.cargo || 'Sin cargo',
+            baseSalary: Number(employee.salario_base) || 0,
+            workedDays: 0,
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            grossPay: 0,
+            deductions: 0,
+            netPay: 0,
+            transportAllowance: 0,
+            employerContributions: 0,
+            status: 'error',
+            errors: [`Error procesando empleado: ${employeeError}`],
+            eps: employee.eps,
+            afp: employee.afp
+          });
+        }
+      }
+
+      console.log(`✅ ${payrollEmployees.length} empleados procesados correctamente`);
+      return payrollEmployees;
+
+    } catch (error) {
+      console.error('💥 Error crítico cargando empleados:', error);
+      return [];
+    }
+  }
+
   // ✅ CREACIÓN DE PERÍODOS INTELIGENTE
   static async createNextPeriod(): Promise<{success: boolean, period?: any, message: string}> {
     try {
@@ -140,141 +249,37 @@ export class PayrollUnifiedService {
     }
   }
 
-  // ✅ CARGA DE EMPLEADOS CON CÁLCULOS CORRECTOS
-  static async loadEmployeesForActivePeriod(period: any): Promise<PayrollEmployee[]> {
-    try {
-      console.log('👥 SERVICIO UNIFICADO - Cargando empleados para período:', period.periodo);
-      
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) return [];
+  // ✅ UTILIDADES REPARADAS
+  private static extractNovedadValue(novedades: any[], tipo: string): number {
+    const novedad = novedades.find(n => n.tipo_novedad === tipo);
+    return Number(novedad?.valor) || 0;
+  }
 
-      // Obtener empleados activos
-      const { data: employees, error: employeesError } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('estado', 'activo');
+  private static extractNovedadDays(novedades: any[], tipo: string): number {
+    const novedad = novedades.find(n => n.tipo_novedad === tipo);
+    return Number(novedad?.dias) || 0;
+  }
 
-      if (employeesError) {
-        console.error('❌ Error obteniendo empleados:', employeesError);
-        return [];
-      }
+  private static calculateProportionalDays(period: any): number {
+    if (!period.tipo_periodo) return 30;
 
-      if (!employees || employees.length === 0) {
-        console.log('⚠️ No hay empleados activos');
-        return [];
-      }
-
-      console.log(`📊 Procesando ${employees.length} empleados activos`);
-
-      // Procesar cada empleado con cálculos correctos
-      const payrollEmployees: PayrollEmployee[] = [];
-
-      for (const employee of employees) {
-        try {
-          // Obtener novedades del período
-          const novedades = await NovedadesEnhancedService.getNovedadesByEmployee(
-            employee.id, 
-            period.id
-          );
-
-          // ✅ CÁLCULO CORREGIDO CON DÍAS PROPORCIONALES
-          const calculation = await PayrollCalculationUnifiedService.calculateEmployeePayroll({
-            employee,
-            period,
-            novedades
-          });
-
-          const payrollEmployee: PayrollEmployee = {
-            id: employee.id,
-            name: `${employee.nombre} ${employee.apellido}`,
-            position: employee.cargo || 'Sin cargo',
-            baseSalary: Number(employee.salario_base) || 0,
-            workedDays: this.calculateProportionalDays(period),
-            extraHours: calculation.extraHours,
-            disabilities: calculation.disabilities,
-            bonuses: calculation.bonuses,
-            absences: calculation.absences,
-            grossPay: calculation.grossPay,
-            deductions: calculation.deductions,
-            netPay: calculation.netPay,
-            transportAllowance: calculation.transportAllowance,
-            employerContributions: calculation.grossPay * 0.2075, // 20.75% aportes patronales
-            status: calculation.grossPay > 0 ? 'valid' : 'error',
-            errors: calculation.grossPay <= 0 ? ['Salário base inválido'] : [],
-            eps: employee.eps,
-            afp: employee.afp
-          };
-
-          payrollEmployees.push(payrollEmployee);
-
-        } catch (employeeError) {
-          console.error(`❌ Error procesando empleado ${employee.id}:`, employeeError);
-          
-          // Empleado con error
-          payrollEmployees.push({
-            id: employee.id,
-            name: `${employee.nombre} ${employee.apellido}`,
-            position: employee.cargo || 'Sin cargo',
-            baseSalary: Number(employee.salario_base) || 0,
-            workedDays: 0,
-            extraHours: 0,
-            disabilities: 0,
-            bonuses: 0,
-            absences: 0,
-            grossPay: 0,
-            deductions: 0,
-            netPay: 0,
-            transportAllowance: 0,
-            employerContributions: 0,
-            status: 'error',
-            errors: [`Error procesando empleado: ${employeeError}`],
-            eps: employee.eps,
-            afp: employee.afp
-          });
+    switch (period.tipo_periodo) {
+      case 'quincenal':
+        return 15; // ✅ CORRECCIÓN: 15 días exactos para quincenales
+      case 'semanal':
+        return 7;
+      case 'mensual':
+        if (period.fecha_inicio && period.fecha_fin) {
+          const startDate = new Date(period.fecha_inicio);
+          const endDate = new Date(period.fecha_fin);
+          return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         }
-      }
-
-      console.log(`✅ ${payrollEmployees.length} empleados procesados correctamente`);
-      return payrollEmployees;
-
-    } catch (error) {
-      console.error('💥 Error crítico cargando empleados:', error);
-      return [];
+        return 30;
+      default:
+        return 30;
     }
   }
 
-  // ✅ CIERRE TRANSACCIONAL - FASE 2
-  static async closePeriod(period: any, selectedEmployees: PayrollEmployee[]): Promise<string> {
-    try {
-      console.log('🔒 FASE 2 - Iniciando cierre transaccional:', period.periodo);
-
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener la empresa del usuario');
-      }
-
-      // Usar el nuevo servicio de cierre transaccional
-      const closureResult = await PayrollClosureTransactionalService.executeTransactionalClosure(
-        period,
-        selectedEmployees,
-        companyId
-      );
-
-      if (!closureResult.success) {
-        throw new Error(closureResult.message);
-      }
-
-      console.log(`✅ FASE 2 - Cierre transaccional completado: ${period.periodo}`);
-      return closureResult.message;
-
-    } catch (error) {
-      console.error('❌ Error en cierre transaccional:', error);
-      throw error;
-    }
-  }
-
-  // ✅ UTILIDADES INTERNAS
   private static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -373,23 +378,6 @@ export class PayrollUnifiedService {
     return months[monthIndex];
   }
 
-  private static calculateProportionalDays(period: any): number {
-    if (!period.tipo_periodo) return 30;
-
-    switch (period.tipo_periodo) {
-      case 'quincenal':
-        return 15; // ✅ CORRECCIÓN: 15 días para quincenales
-      case 'semanal':
-        return 7;
-      case 'mensual':
-        const startDate = new Date(period.fecha_inicio);
-        const endDate = new Date(period.fecha_fin);
-        return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      default:
-        return 30;
-    }
-  }
-
   static async updateEmployeeCount(periodId: string, count: number): Promise<void> {
     try {
       const { error } = await supabase
@@ -477,10 +465,16 @@ export class PayrollUnifiedService {
       const novedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
 
       // Recalcular con nuevas novedades
-      const calculation = await PayrollCalculationUnifiedService.calculateEmployeePayroll({
-        employee,
-        period,
-        novedades
+      const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
+        baseSalary: Number(employee.salario_base) || 0,
+        workedDays: this.calculateProportionalDays(period),
+        extraHours: this.extractNovedadValue(novedades, 'horas_extra'),
+        disabilities: this.extractNovedadValue(novedades, 'incapacidades'),
+        bonuses: this.extractNovedadValue(novedades, 'bonificaciones'),
+        absences: this.extractNovedadDays(novedades, 'ausencias'),
+        periodType: period.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
+        empleadoId: employeeId,
+        periodoId: periodId
       });
 
       const recalculatedEmployee: PayrollEmployee = {
@@ -489,15 +483,15 @@ export class PayrollUnifiedService {
         position: employee.cargo || 'Sin cargo',
         baseSalary: Number(employee.salario_base) || 0,
         workedDays: this.calculateProportionalDays(period),
-        extraHours: calculation.extraHours,
-        disabilities: calculation.disabilities,
-        bonuses: calculation.bonuses,
-        absences: calculation.absences,
+        extraHours: this.extractNovedadValue(novedades, 'horas_extra'),
+        disabilities: this.extractNovedadValue(novedades, 'incapacidades'),
+        bonuses: this.extractNovedadValue(novedades, 'bonificaciones'),
+        absences: this.extractNovedadDays(novedades, 'ausencias'),
         grossPay: calculation.grossPay,
-        deductions: calculation.deductions,
+        deductions: calculation.totalDeductions,
         netPay: calculation.netPay,
         transportAllowance: calculation.transportAllowance,
-        employerContributions: calculation.grossPay * 0.2075,
+        employerContributions: calculation.employerContributions,
         status: calculation.grossPay > 0 ? 'valid' : 'error',
         errors: calculation.grossPay <= 0 ? ['Salário base inválido'] : [],
         eps: employee.eps,

@@ -1,32 +1,30 @@
 
 /**
- * ✅ SERVICIO DE CÁLCULOS UNIFICADO - FASE 1
- * Corrige los cálculos ALEUYA con días proporcionales correctos
+ * ✅ SERVICIO MARCADO COMO OBSOLETO - FASE 3
+ * Redirige al servicio mejorado para evitar duplicación
  */
+
+import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
+
 export class PayrollCalculationUnifiedService {
+  /**
+   * @deprecated Usar PayrollCalculationEnhancedService directamente
+   */
   static async calculateEmployeePayroll(params: {
     employee: any;
     period: any;
     novedades: any[];
   }) {
+    console.warn('⚠️ PayrollCalculationUnifiedService está obsoleto. Usar PayrollCalculationEnhancedService');
+    
     const { employee, period, novedades } = params;
-    const baseSalary = Number(employee.salario_base) || 0;
     
-    // ✅ CORRECCIÓN CRÍTICA: Calcular días correctos según tipo de período
-    const workedDays = this.calculateCorrectWorkedDays(period);
-    console.log(`💰 Calculando empleado ${employee.nombre} - Días: ${workedDays}, Tipo: ${period.tipo_periodo}`);
-    
-    // ✅ SALARIO PROPORCIONAL CORRECTO
-    const proportionalSalary = (baseSalary / 30) * workedDays;
-    
-    // Calcular valores básicos
+    // Extraer valores de novedades
     let extraHours = 0;
     let bonuses = 0;
     let disabilities = 0;
     let absences = 0;
-    let additionalDeductions = 0;
     
-    // Procesar novedades
     for (const novedad of novedades) {
       const valor = Number(novedad.valor) || 0;
       
@@ -45,79 +43,58 @@ export class PayrollCalculationUnifiedService {
         case 'incapacidades':
           disabilities += valor;
           break;
-        case 'deducciones':
-        case 'prestamos':
-        case 'embargos':
-          additionalDeductions += valor;
-          break;
         case 'licencias':
         case 'ausencias':
           absences += Number(novedad.dias) || 0;
           break;
       }
     }
-    
-    // ✅ CÁLCULO DEVENGADO CORREGIDO
-    const grossPay = proportionalSalary + extraHours + bonuses - disabilities;
-    
-    // ✅ DEDUCCIONES LEGALES CORRECTAS (sobre salario base)
-    const healthDeduction = baseSalary * 0.04; // 4% salud empleado
-    const pensionDeduction = baseSalary * 0.04; // 4% pensión empleado
-    const basicDeductions = healthDeduction + pensionDeduction;
-    const totalDeductions = basicDeductions + additionalDeductions;
-    
-    // ✅ AUXILIO DE TRANSPORTE CORREGIDO (2025)
-    const transportAllowance = baseSalary <= 2320000 ? 140606 : 0;
-    
-    // ✅ NETO PAGADO FINAL
-    const netPay = grossPay - totalDeductions + transportAllowance;
-    
-    console.log(`✅ Cálculo completado para ${employee.nombre}:`, {
-      baseSalary,
-      workedDays,
-      proportionalSalary,
-      grossPay,
-      totalDeductions,
-      transportAllowance,
-      netPay
+
+    // Usar el servicio mejorado
+    const calculation = await PayrollCalculationEnhancedService.calculatePayroll({
+      baseSalary: Number(employee.salario_base) || 0,
+      workedDays: this.calculateCorrectWorkedDays(period),
+      extraHours,
+      disabilities,
+      bonuses,
+      absences,
+      periodType: period.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
+      empleadoId: employee.id,
+      periodoId: period.id
     });
-    
+
     return {
       extraHours,
       bonuses,
       disabilities,
       absences,
-      grossPay,
-      deductions: totalDeductions,
-      netPay,
-      transportAllowance,
-      workedDays
+      grossPay: calculation.grossPay,
+      deductions: calculation.totalDeductions,
+      netPay: calculation.netPay,
+      transportAllowance: calculation.transportAllowance,
+      workedDays: this.calculateCorrectWorkedDays(period)
     };
   }
 
-  // ✅ CÁLCULO CORRECTO DE DÍAS TRABAJADOS
   private static calculateCorrectWorkedDays(period: any): number {
     if (!period || !period.tipo_periodo) {
-      console.warn('⚠️ Período sin tipo definido, usando 30 días por defecto');
       return 30;
     }
 
     switch (period.tipo_periodo) {
       case 'quincenal':
-        return 15; // ✅ CORRECCIÓN: 15 días exactos para quincenales
+        return 15;
       case 'semanal':
-        return 7; // 7 días para semanales
+        return 7;
       case 'mensual':
-        // Para mensual, calcular días reales entre fechas
         if (period.fecha_inicio && period.fecha_fin) {
           const startDate = new Date(period.fecha_inicio);
           const endDate = new Date(period.fecha_fin);
           const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-          return Math.min(days, 31); // Máximo 31 días
+          return Math.min(days, 31);
         }
-        return 30; // Default mensual
+        return 30;
       case 'personalizado':
-        // Para personalizado, calcular días reales
         if (period.fecha_inicio && period.fecha_fin) {
           const startDate = new Date(period.fecha_inicio);
           const endDate = new Date(period.fecha_fin);
@@ -125,7 +102,6 @@ export class PayrollCalculationUnifiedService {
         }
         return 30;
       default:
-        console.warn(`⚠️ Tipo de período no reconocido: ${period.tipo_periodo}`);
         return 30;
     }
   }
