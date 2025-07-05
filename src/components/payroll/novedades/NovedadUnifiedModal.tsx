@@ -12,10 +12,11 @@ import { NovedadDeduccionesForm } from './forms/NovedadDeduccionesForm';
 import { NovedadPrestamosForm } from './forms/NovedadPrestamosForm';
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadBonificacionesForm } from './forms/NovedadBonificacionesForm';
-import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
+import { CreateNovedadData, PayrollNovedad, NovedadType } from '@/types/novedades-enhanced';
 import { formatCurrency } from '@/lib/utils';
 import { Plus, Check, X, Edit, Trash2, FileText } from 'lucide-react';
 import { useNovedades } from '@/hooks/useNovedades';
+import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 
 interface NovedadUnifiedModalProps {
   isOpen: boolean;
@@ -25,7 +26,7 @@ interface NovedadUnifiedModalProps {
   employeeSalary: number;
   periodId: string;
   onCreateNovedad: (data: CreateNovedadData) => Promise<void>;
-  onNovedadChange?: () => Promise<void>; // ✅ Nuevo callback para cambios
+  onNovedadChange?: () => Promise<void>;
   calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number, dias?: number) => number | null;
 }
 
@@ -49,7 +50,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   employeeSalary,
   periodId,
   onCreateNovedad,
-  onNovedadChange, // ✅ Nuevo prop
+  onNovedadChange,
   calculateSuggestedValue
 }) => {
   const [currentView, setCurrentView] = useState<ModalView>('consolidated');
@@ -60,6 +61,48 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   const { loadNovedades, deleteNovedad } = useNovedades(periodId);
+
+  // Función de cálculo mejorada que maneja todos los casos
+  const calculateNovedadValue = (
+    tipoNovedad: NovedadType,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ): number | null => {
+    console.log('🧮 NovedadUnifiedModal - Calculating value:', { tipoNovedad, subtipo, horas, dias, employeeSalary });
+    
+    if (!employeeSalary || employeeSalary <= 0) {
+      console.log('❌ Invalid salary for calculation');
+      return null;
+    }
+
+    try {
+      // Usar la función externa si está disponible
+      if (calculateSuggestedValue) {
+        const result = calculateSuggestedValue(tipoNovedad, subtipo, horas, dias);
+        console.log('📊 External calculation result:', result);
+        if (result && result > 0) {
+          return result;
+        }
+      }
+
+      // Usar la función interna como fallback
+      const calculationResult = calcularValorNovedadEnhanced(
+        tipoNovedad,
+        subtipo,
+        employeeSalary,
+        dias,
+        horas,
+        new Date()
+      );
+      
+      console.log('📊 Internal calculation result:', calculationResult.valor);
+      return calculationResult.valor > 0 ? calculationResult.valor : null;
+    } catch (error) {
+      console.error('❌ Error in calculation:', error);
+      return null;
+    }
+  };
 
   // Load existing novedades when modal opens
   useEffect(() => {
@@ -103,10 +146,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
   const handleSubmitSingle = async (formData: any) => {
     console.log('📝 NovedadUnifiedModal - Submitting single novedad:', formData);
+    console.log('👤 NovedadUnifiedModal - For employee:', selectedEmployeeId);
     
     const novedadData: CreateNovedadData = {
       empleado_id: employeeId,
       periodo_id: periodId,
+      company_id: '', // Will be set by the service
       ...formData
     };
 
@@ -125,8 +170,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const updatedNovedades = await loadNovedades(employeeId);
       setExistingNovedades(updatedNovedades);
       
-      // ✅ Notificar cambio para recálculo
+      // Notificar cambio para recálculo
       if (onNovedadChange) {
+        console.log('🔄 Triggering novedad change callback');
         await onNovedadChange();
       }
       
@@ -152,6 +198,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         const novedadData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
+          company_id: '', // Will be set by the service
           ...formData
         };
         
@@ -170,8 +217,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const updatedNovedades = await loadNovedades(employeeId);
       setExistingNovedades(updatedNovedades);
       
-      // ✅ Notificar cambio para recálculo
+      // Notificar cambio para recálculo
       if (onNovedadChange) {
+        console.log('🔄 Triggering novedad change callback for multiple');
         await onNovedadChange();
       }
       
@@ -194,7 +242,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         const updatedNovedades = await loadNovedades(employeeId);
         setExistingNovedades(updatedNovedades);
         
-        // ✅ Notificar cambio para recálculo automático
+        // Notificar cambio para recálculo automático
         console.log('🔄 Notificando cambio para recálculo...');
         if (onNovedadChange) {
           await onNovedadChange();
@@ -434,7 +482,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       onBack: handleBackToSelector,
       onSubmit: handleSubmitSingle,
       employeeSalary,
-      calculateSuggestedValue
+      calculateSuggestedValue: calculateNovedadValue
     };
 
     const commonPropsWithoutCalculation = {
@@ -450,7 +498,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onBack={handleBackToSelector}
             onSubmit={handleSubmitMultiple}
             employeeSalary={employeeSalary}
-            calculateSuggestedValue={calculateSuggestedValue}
+            calculateSuggestedValue={calculateNovedadValue}
           />
         );
       case 'recargo_nocturno':
