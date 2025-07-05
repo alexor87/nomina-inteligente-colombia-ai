@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { useSystemInitialization } from "@/hooks/useSystemInitialization";
+import { Layout } from "@/components/layout/Layout";
 
 // Components and pages
 import { Index } from "./pages/Index";
@@ -42,12 +43,16 @@ function AppContent() {
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/app/dashboard" element={<DashboardPage />} />
-        <Route path="/app/employees" element={<EmployeesPage />} />
-        <Route path="/app/payroll" element={<PayrollPage />} />
-        <Route path="/app/payroll-history" element={<PayrollHistoryPage />} />
-        <Route path="/app/reports" element={<ReportsPage />} />
-        <Route path="/app/settings" element={<SettingsPage />} />
+        
+        {/* Rutas protegidas con Layout */}
+        <Route path="/app" element={<Layout />}>
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="payroll" element={<PayrollPage />} />
+          <Route path="payroll-history" element={<PayrollHistoryPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
       </Routes>
     </div>
   );
