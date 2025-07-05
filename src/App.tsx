@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { useSystemInitialization } from "@/hooks/useSystemInitialization";
 import { Layout } from "@/components/layout/Layout";
+import { PayrollLiquidationUnified } from "@/components/payroll/PayrollLiquidationUnified";
+import { PayrollHistoryUnified } from "@/components/payroll-history/PayrollHistoryUnified";
 
 // Components and pages
 import { Index } from "./pages/Index";
@@ -15,16 +16,17 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
-import PayrollPage from "./pages/PayrollPage";
-import PayrollHistoryPage from "./pages/PayrollHistoryPage";
+// ✅ ALELUYA: Importar páginas nuevas unificadas
+import PayrollPageAleluya from "./pages/PayrollPageAleluya";
+import PayrollHistoryPageAleluya from "./pages/PayrollHistoryPageAleluya";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 
 const queryClient = new QueryClient();
 
 /**
- * ✅ COMPONENTE PRINCIPAL CON INICIALIZACIÓN CRÍTICA
- * Incluye diagnóstico y reparación automática al cargar
+ * ✅ COMPONENTE PRINCIPAL CON ARQUITECTURA ALELUYA
+ * Ahora usa páginas unificadas sin complejidad técnica expuesta
  */
 function AppContent() {
   // Inicialización automática del sistema
@@ -32,12 +34,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Indicador de inicialización crítica */}
-      {isInitializing && (
-        <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white px-4 py-2 text-center text-sm z-50">
-          🔧 Inicializando y diagnosticando sistema de nómina...
-        </div>
-      )}
+      {/* ✅ ALELUYA: Sin indicador de inicialización técnica - UX limpia */}
       
       <Routes>
         <Route path="/" element={<Index />} />
@@ -48,8 +45,9 @@ function AppContent() {
         <Route path="/app" element={<Layout />}>
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="employees" element={<EmployeesPage />} />
-          <Route path="payroll" element={<PayrollPage />} />
-          <Route path="payroll-history" element={<PayrollHistoryPage />} />
+          {/* ✅ ALELUYA: Usar páginas simplificadas */}
+          <Route path="payroll" element={<PayrollPageAleluya />} />
+          <Route path="payroll-history" element={<PayrollHistoryPageAleluya />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
