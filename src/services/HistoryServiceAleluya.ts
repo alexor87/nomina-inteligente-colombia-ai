@@ -67,9 +67,9 @@ export class HistoryServiceAleluya {
         period: period.periodo,
         startDate: period.fecha_inicio,
         endDate: period.fecha_fin,
-        type: period.tipo_periodo,
+        type: this.normalizeType(period.tipo_periodo),
         employeesCount: period.empleados_count || 0,
-        status: period.estado,
+        status: this.normalizeStatus(period.estado),
         totalGrossPay: period.total_devengado || 0,
         totalNetPay: period.total_neto || 0,
         totalDeductions: period.total_deducciones || 0,
@@ -133,9 +133,9 @@ export class HistoryServiceAleluya {
         period: period.periodo,
         startDate: period.fecha_inicio,
         endDate: period.fecha_fin,
-        type: period.tipo_periodo,
+        type: this.normalizeType(period.tipo_periodo),
         employeesCount: period.empleados_count || 0,
-        status: period.estado,
+        status: this.normalizeStatus(period.estado),
         totalGrossPay: period.total_devengado || 0,
         totalNetPay: period.total_neto || 0,
         totalDeductions: period.total_deducciones || 0,
@@ -313,6 +313,7 @@ export class HistoryServiceAleluya {
         company_id: companyId,
         employee_id: emp.employeeId,
         period_id: newPeriod.id,
+        periodo: periodData.periodName, // FIXED: Added missing periodo field
         salario_base: emp.baseSalary,
         dias_trabajados: periodData.type === 'quincenal' ? 15 : 30,
         total_devengado: emp.grossPay,
@@ -356,6 +357,21 @@ export class HistoryServiceAleluya {
     }
 
     return profile.company_id;
+  }
+
+  private static normalizeType(type: string): 'quincenal' | 'mensual' | 'semanal' {
+    switch (type) {
+      case 'quincenal':
+        return 'quincenal';
+      case 'semanal':
+        return 'semanal';
+      default:
+        return 'mensual';
+    }
+  }
+
+  private static normalizeStatus(status: string): 'borrador' | 'cerrado' {
+    return status === 'cerrado' ? 'cerrado' : 'borrador';
   }
 
   private static async recalculatePeriodTotals(periodId: string): Promise<void> {

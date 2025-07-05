@@ -47,11 +47,17 @@ export class PayrollServiceAleluya {
         .single();
 
       if (activePeriod) {
+        const normalizedPeriod: PayrollPeriod = {
+          ...activePeriod,
+          estado: this.normalizeStatus(activePeriod.estado),
+          tipo_periodo: this.normalizeType(activePeriod.tipo_periodo)
+        };
+        
         const employees = await this.loadEmployeesForPeriod(activePeriod.id);
         const summary = this.calculateSummary(employees);
         
         return {
-          period: activePeriod,
+          period: normalizedPeriod,
           employees,
           summary,
           needsCreation: false,
@@ -108,11 +114,17 @@ export class PayrollServiceAleluya {
 
       if (error) throw error;
 
+      const normalizedPeriod: PayrollPeriod = {
+        ...newPeriod,
+        estado: this.normalizeStatus(newPeriod.estado),
+        tipo_periodo: this.normalizeType(newPeriod.tipo_periodo)
+      };
+
       // Cargar empleados y crear registros de nómina
       const employees = await this.generatePayrollRecords(newPeriod.id);
       
       return {
-        period: newPeriod,
+        period: normalizedPeriod,
         employees,
         message: `Período ${suggestion.periodName} creado exitosamente`
       };
@@ -209,6 +221,21 @@ export class PayrollServiceAleluya {
     return profile.company_id;
   }
 
+  private static normalizeType(type: string): 'quincenal' | 'mensual' | 'semanal' {
+    switch (type) {
+      case 'quincenal':
+        return 'quincenal';
+      case 'semanal':
+        return 'semanal';
+      default:
+        return 'mensual';
+    }
+  }
+
+  private static normalizeStatus(status: string): 'borrador' | 'cerrado' {
+    return status === 'cerrado' ? 'cerrado' : 'borrador';
+  }
+
   private static async suggestNextPeriod(companyId: string) {
     // Obtener periodicidad configurada
     const { data: settings } = await supabase
@@ -303,11 +330,21 @@ export class PayrollServiceAleluya {
       return [];
     }
 
+    // Obtener nombre del período
+    const { data: period } = await supabase
+      .from('payroll_periods_real')
+      .select('periodo')
+      .eq('id', periodId)
+      .single();
+
+    const periodName = period?.periodo || 'Período actual';
+
     // Crear registros de nómina
     const payrollRecords = employees.map(emp => ({
       company_id: companyId,
       employee_id: emp.id,
       period_id: periodId,
+      periodo: periodName, // FIXED: Added missing periodo field
       salario_base: emp.salario_base || 0,
       dias_trabajados: 30,
       total_devengado: emp.salario_base || 0,
