@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -38,19 +37,27 @@ export const usePayrollLiquidation = () => {
   const loadEmployees = async (startDate: string, endDate: string) => {
     setIsLoading(true);
     try {
+      console.log('🔄 usePayrollLiquidation - Loading employees for period:', { startDate, endDate });
+      
       const employeesData = await PayrollLiquidationService.loadEmployeesForPeriod(startDate, endDate);
       
       // Create or get period for novedades
       const periodId = await PayrollLiquidationService.ensurePeriodExists(startDate, endDate);
       setCurrentPeriodId(periodId);
       
+      console.log('📋 usePayrollLiquidation - Period ID set:', periodId);
+      
       // Load novedades for each employee
       const employeesWithNovedades = await Promise.all(
         employeesData.map(async (employee) => {
+          console.log(`🔄 usePayrollLiquidation - Loading novedades for employee: ${employee.nombre}`);
+          
           const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
             employee.id,
             periodId
           );
+          
+          console.log(`📊 usePayrollLiquidation - Novedades totals for ${employee.nombre}:`, novedadesTotals);
           
           // Preservar las deducciones de ley calculadas y sumar las de novedades
           const totalDeducciones = employee.salud_empleado + employee.pension_empleado + 
@@ -62,7 +69,7 @@ export const usePayrollLiquidation = () => {
           const totalConNovedades = salarioProporcional + employee.auxilio_transporte + 
                                   novedadesTotals.totalDevengos - totalDeducciones;
           
-          return {
+          const updatedEmployee = {
             ...employee,
             devengos: novedadesTotals.totalDevengos,
             deducciones: totalDeducciones,
@@ -70,6 +77,15 @@ export const usePayrollLiquidation = () => {
             total_pagar: totalConNovedades,
             novedades_totals: novedadesTotals
           };
+          
+          console.log(`✅ usePayrollLiquidation - Final employee data for ${employee.nombre}:`, {
+            devengos: updatedEmployee.devengos,
+            deducciones: updatedEmployee.deducciones,
+            total_pagar: updatedEmployee.total_pagar,
+            hasNovedades: updatedEmployee.novedades_totals?.hasNovedades
+          });
+          
+          return updatedEmployee;
         })
       );
       
@@ -80,7 +96,7 @@ export const usePayrollLiquidation = () => {
         description: `Se cargaron ${employeesWithNovedades.length} empleados activos con deducciones detalladas`,
       });
     } catch (error) {
-      console.error('Error loading employees:', error);
+      console.error('❌ usePayrollLiquidation - Error loading employees:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los empleados",
@@ -92,7 +108,13 @@ export const usePayrollLiquidation = () => {
   };
 
   const refreshEmployeeNovedades = async (employeeId: string) => {
-    if (!currentPeriodId) return;
+    if (!currentPeriodId) {
+      console.warn('⚠️ usePayrollLiquidation - No current period ID when refreshing novedades');
+      return;
+    }
+    
+    console.log('🔄 usePayrollLiquidation - Refreshing novedades for employee:', employeeId);
+    console.log('📋 usePayrollLiquidation - Using period ID:', currentPeriodId);
     
     try {
       const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
@@ -100,30 +122,55 @@ export const usePayrollLiquidation = () => {
         currentPeriodId
       );
       
-      setEmployees(prev => prev.map(emp => {
-        if (emp.id === employeeId) {
-          // Preservar las deducciones de ley y agregar las de novedades
-          const totalDeducciones = emp.salud_empleado + emp.pension_empleado + 
-                                 emp.fondo_solidaridad + emp.retencion_fuente + 
-                                 novedadesTotals.totalDeducciones;
-          
-          const salarioProporcional = (emp.salario_base / 30) * emp.dias_trabajados;
-          const totalConNovedades = salarioProporcional + emp.auxilio_transporte + 
-                                  novedadesTotals.totalDevengos - totalDeducciones;
-          
-          return {
-            ...emp,
-            devengos: novedadesTotals.totalDevengos,
-            deducciones: totalDeducciones,
-            deducciones_novedades: novedadesTotals.totalDeducciones,
-            total_pagar: totalConNovedades,
-            novedades_totals: novedadesTotals
-          };
-        }
-        return emp;
-      }));
+      console.log('📊 usePayrollLiquidation - New novedades totals:', novedadesTotals);
+      
+      setEmployees(prev => {
+        const updatedEmployees = prev.map(emp => {
+          if (emp.id === employeeId) {
+            console.log(`🔄 usePayrollLiquidation - Updating employee ${emp.nombre} with new novedades`);
+            console.log('📊 usePayrollLiquidation - Previous employee state:', {
+              devengos: emp.devengos,
+              deducciones: emp.deducciones,
+              total_pagar: emp.total_pagar
+            });
+            
+            // Preservar las deducciones de ley y agregar las de novedades
+            const totalDeducciones = emp.salud_empleado + emp.pension_empleado + 
+                                   emp.fondo_solidaridad + emp.retencion_fuente + 
+                                   novedadesTotals.totalDeducciones;
+            
+            const salarioProporcional = (emp.salario_base / 30) * emp.dias_trabajados;
+            const totalConNovedades = salarioProporcional + emp.auxilio_transporte + 
+                                    novedadesTotals.totalDevengos - totalDeducciones;
+            
+            const updatedEmployee = {
+              ...emp,
+              devengos: novedadesTotals.totalDevengos,
+              deducciones: totalDeducciones,
+              deducciones_novedades: novedadesTotals.totalDeducciones,
+              total_pagar: totalConNovedades,
+              novedades_totals: novedadesTotals
+            };
+            
+            console.log('✅ usePayrollLiquidation - New employee state:', {
+              devengos: updatedEmployee.devengos,
+              deducciones: updatedEmployee.deducciones,
+              total_pagar: updatedEmployee.total_pagar,
+              hasNovedades: updatedEmployee.novedades_totals?.hasNovedades
+            });
+            
+            return updatedEmployee;
+          }
+          return emp;
+        });
+        
+        console.log('🔄 usePayrollLiquidation - State updated, employees array length:', updatedEmployees.length);
+        return updatedEmployees;
+      });
+      
+      console.log('✅ usePayrollLiquidation - Employee novedades refreshed successfully');
     } catch (error) {
-      console.error('Error refreshing employee novedades:', error);
+      console.error('❌ usePayrollLiquidation - Error refreshing employee novedades:', error);
     }
   };
 

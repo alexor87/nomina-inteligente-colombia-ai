@@ -57,23 +57,39 @@ export const PayrollLiquidationTable = ({
   const totalPagar = employees.reduce((sum, emp) => sum + emp.total_pagar, 0);
 
   const handleOpenNovedades = (employeeId: string) => {
+    console.log('🔄 PayrollLiquidationTable - Opening novedades modal for employee:', employeeId);
     setSelectedEmployeeId(employeeId);
     setIsNovedadesModalOpen(true);
   };
 
   const handleCloseNovedades = () => {
+    console.log('🔄 PayrollLiquidationTable - Closing novedades modal');
     setSelectedEmployeeId(null);
     setIsNovedadesModalOpen(false);
   };
 
   const handleNovedadChange = async () => {
     if (selectedEmployeeId) {
+      console.log('🔄 PayrollLiquidationTable - Triggering novedad change for employee:', selectedEmployeeId);
+      console.log('📊 PayrollLiquidationTable - Current employee state before change:', 
+        employees.find(emp => emp.id === selectedEmployeeId)
+      );
+      
       await onEmployeeNovedadesChange(selectedEmployeeId);
+      
+      console.log('📊 PayrollLiquidationTable - Employee state after change should be updated');
+    } else {
+      console.warn('⚠️ PayrollLiquidationTable - No selected employee ID when handling novedad change');
     }
   };
 
   const handleCreateNovedad = async (data: CreateNovedadData): Promise<void> => {
+    console.log('📝 PayrollLiquidationTable - Creating novedad:', data);
+    console.log('👤 PayrollLiquidationTable - For employee:', selectedEmployeeId);
+    
     await createNovedad(data);
+    console.log('✅ PayrollLiquidationTable - Novedad created, triggering recalculation');
+    
     await handleNovedadChange();
   };
 
@@ -82,7 +98,13 @@ export const PayrollLiquidationTable = ({
     : null;
 
   const calculateNovedadesNetas = (employee: Employee): number => {
-    return employee.devengos - employee.deducciones_novedades;
+    const netas = employee.devengos - employee.deducciones_novedades;
+    console.log(`💰 PayrollLiquidationTable - Novedades netas for ${employee.nombre}:`, {
+      devengos: employee.devengos,
+      deducciones: employee.deducciones_novedades,
+      netas: netas
+    });
+    return netas;
   };
 
   const toggleDeductionDetail = (employeeId: string) => {
@@ -109,6 +131,13 @@ export const PayrollLiquidationTable = ({
               const novedadesNetas = calculateNovedadesNetas(employee);
               const hasNovedades = employee.novedades_totals?.hasNovedades || false;
               const showDetail = showDeductionDetail === employee.id;
+              
+              console.log(`📋 PayrollLiquidationTable - Rendering employee ${employee.nombre}:`, {
+                hasNovedades,
+                novedadesNetas,
+                totalPagar: employee.total_pagar,
+                deducciones: employee.deducciones
+              });
               
               return (
                 <React.Fragment key={employee.id}>

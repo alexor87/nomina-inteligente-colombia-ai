@@ -1132,23 +1132,34 @@ export type Database = {
         Row: {
           auxilio_transporte: number | null
           bonificaciones: number | null
+          bonificaciones_adicionales: number | null
           cesantias: number | null
+          comisiones: number | null
           company_id: string
           created_at: string
+          descuentos_varios: number | null
           dias_trabajados: number | null
           editable: boolean | null
+          embargos: number | null
           employee_id: string
           estado: string | null
           fecha_reapertura: string | null
           fondo_solidaridad: number | null
           horas_extra: number | null
+          horas_extra_diurnas: number | null
+          horas_extra_nocturnas: number | null
           id: string
+          incapacidades: number | null
           intereses_cesantias: number | null
+          licencias_remuneradas: number | null
           neto_pagado: number | null
           otras_deducciones: number | null
+          otros_descuentos: number | null
+          otros_devengos: number | null
           pension_empleado: number | null
           period_id: string | null
           periodo: string
+          prestamos: number | null
           prima: number | null
           reabierto_por: string | null
           recargo_dominical: number | null
@@ -1165,23 +1176,34 @@ export type Database = {
         Insert: {
           auxilio_transporte?: number | null
           bonificaciones?: number | null
+          bonificaciones_adicionales?: number | null
           cesantias?: number | null
+          comisiones?: number | null
           company_id: string
           created_at?: string
+          descuentos_varios?: number | null
           dias_trabajados?: number | null
           editable?: boolean | null
+          embargos?: number | null
           employee_id: string
           estado?: string | null
           fecha_reapertura?: string | null
           fondo_solidaridad?: number | null
           horas_extra?: number | null
+          horas_extra_diurnas?: number | null
+          horas_extra_nocturnas?: number | null
           id?: string
+          incapacidades?: number | null
           intereses_cesantias?: number | null
+          licencias_remuneradas?: number | null
           neto_pagado?: number | null
           otras_deducciones?: number | null
+          otros_descuentos?: number | null
+          otros_devengos?: number | null
           pension_empleado?: number | null
           period_id?: string | null
           periodo: string
+          prestamos?: number | null
           prima?: number | null
           reabierto_por?: string | null
           recargo_dominical?: number | null
@@ -1198,23 +1220,34 @@ export type Database = {
         Update: {
           auxilio_transporte?: number | null
           bonificaciones?: number | null
+          bonificaciones_adicionales?: number | null
           cesantias?: number | null
+          comisiones?: number | null
           company_id?: string
           created_at?: string
+          descuentos_varios?: number | null
           dias_trabajados?: number | null
           editable?: boolean | null
+          embargos?: number | null
           employee_id?: string
           estado?: string | null
           fecha_reapertura?: string | null
           fondo_solidaridad?: number | null
           horas_extra?: number | null
+          horas_extra_diurnas?: number | null
+          horas_extra_nocturnas?: number | null
           id?: string
+          incapacidades?: number | null
           intereses_cesantias?: number | null
+          licencias_remuneradas?: number | null
           neto_pagado?: number | null
           otras_deducciones?: number | null
+          otros_descuentos?: number | null
+          otros_devengos?: number | null
           pension_empleado?: number | null
           period_id?: string | null
           periodo?: string
+          prestamos?: number | null
           prima?: number | null
           reabierto_por?: string | null
           recargo_dominical?: number | null
