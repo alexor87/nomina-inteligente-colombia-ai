@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 
 /**
  * ✅ SERVICIO DE NOVEDADES REPARADO - FASE 3 CRÍTICA
@@ -7,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
  */
 export class NovedadesEnhancedService {
   
-  static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<any[]> {
+  static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<PayrollNovedad[]> {
     try {
       console.log(`🔍 Obteniendo novedades para empleado ${employeeId} en período ${periodId}`);
       
@@ -31,19 +32,29 @@ export class NovedadesEnhancedService {
     }
   }
 
-  static async createNovedad(novedadData: {
-    empleado_id: string;
-    periodo_id: string;
-    tipo_novedad: string;
-    valor: number;
-    dias?: number;
-    horas?: number;
-    observacion?: string;
-    company_id: string;
-  }): Promise<{ success: boolean; data?: any; error?: string }> {
+  static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
       console.log('➕ Creando nueva novedad:', novedadData);
       
+      // ✅ CORRECCIÓN: Usar el tipo correcto y obtener company_id si no viene
+      let companyId = novedadData.company_id;
+      
+      if (!companyId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single();
+          companyId = profile?.company_id;
+        }
+      }
+
+      if (!companyId) {
+        throw new Error('No se pudo determinar la empresa');
+      }
+
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
         .insert({
@@ -54,27 +65,30 @@ export class NovedadesEnhancedService {
           dias: novedadData.dias,
           horas: novedadData.horas,
           observacion: novedadData.observacion,
-          company_id: novedadData.company_id,
-          creado_por: (await supabase.auth.getUser()).data.user?.id
+          company_id: companyId,
+          creado_por: (await supabase.auth.getUser()).data.user?.id,
+          fecha_inicio: novedadData.fecha_inicio,
+          fecha_fin: novedadData.fecha_fin,
+          base_calculo: novedadData.base_calculo
         })
         .select()
         .single();
 
       if (error) {
         console.error('❌ Error creando novedad:', error);
-        return { success: false, error: error.message };
+        throw error;
       }
 
       console.log('✅ Novedad creada exitosamente');
-      return { success: true, data: novedad };
+      return novedad as PayrollNovedad;
       
     } catch (error) {
       console.error('💥 Error crítico creando novedad:', error);
-      return { success: false, error: 'Error interno creando novedad' };
+      throw error;
     }
   }
 
-  static async updateNovedad(novedadId: string, updates: any): Promise<{ success: boolean; data?: any; error?: string }> {
+  static async updateNovedad(novedadId: string, updates: Partial<CreateNovedadData>): Promise<PayrollNovedad | null> {
     try {
       console.log(`🔄 Actualizando novedad ${novedadId}:`, updates);
       
@@ -87,19 +101,19 @@ export class NovedadesEnhancedService {
 
       if (error) {
         console.error('❌ Error actualizando novedad:', error);
-        return { success: false, error: error.message };
+        throw error;
       }
 
       console.log('✅ Novedad actualizada exitosamente');
-      return { success: true, data: novedad };
+      return novedad as PayrollNovedad;
       
     } catch (error) {
       console.error('💥 Error crítico actualizando novedad:', error);
-      return { success: false, error: 'Error interno actualizando novedad' };
+      throw error;
     }
   }
 
-  static async deleteNovedad(novedadId: string): Promise<{ success: boolean; error?: string }> {
+  static async deleteNovedad(novedadId: string): Promise<void> {
     try {
       console.log(`🗑️ Eliminando novedad ${novedadId}`);
       
@@ -110,15 +124,14 @@ export class NovedadesEnhancedService {
 
       if (error) {
         console.error('❌ Error eliminando novedad:', error);
-        return { success: false, error: error.message };
+        throw error;
       }
 
       console.log('✅ Novedad eliminada exitosamente');
-      return { success: true };
       
     } catch (error) {
       console.error('💥 Error crítico eliminando novedad:', error);
-      return { success: false, error: 'Error interno eliminando novedad' };
+      throw error;
     }
   }
 }

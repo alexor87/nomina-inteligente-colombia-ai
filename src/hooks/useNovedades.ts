@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useNovedades = (periodoId: string) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -13,16 +14,30 @@ export const useNovedades = (periodoId: string) => {
     setIsLoading(true);
     try {
       console.log('🚀 useNovedades - Creating novedad with data:', data);
-      console.log('📅 useNovedades - Using period ID:', periodoId);
       
-      // Ensure we're using the correct period ID
-      const createData: CreateNovedadData = {
-        ...data,
-        periodo_id: periodoId // Use the period ID from the hook
-      };
+      // ✅ CORRECCIÓN: Obtener company_id si no viene en los datos
+      let createData: CreateNovedadData = { ...data };
+      
+      if (!createData.company_id) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (profile?.company_id) {
+            createData.company_id = profile.company_id;
+          }
+        }
+      }
+
+      createData.periodo_id = periodoId; // Asegurar period ID correcto
       
       console.log('📤 useNovedades - Final create data:', createData);
       
+      // ✅ CORRECCIÓN: El servicio ahora devuelve PayrollNovedad directamente
       const result = await NovedadesEnhancedService.createNovedad(createData);
       
       if (result) {
@@ -48,7 +63,6 @@ export const useNovedades = (periodoId: string) => {
     } catch (error) {
       console.error('❌ useNovedades - Error creating novedad:', error);
       
-      // Provide user-friendly error messages
       let errorMessage = 'No se pudo crear la novedad';
       
       if (error instanceof Error) {

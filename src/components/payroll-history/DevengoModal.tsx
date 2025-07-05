@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -19,7 +20,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
-import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
+import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced, PayrollNovedad } from '@/types/novedades-enhanced';
 import { NovedadForm } from '@/components/payroll/novedades/NovedadForm';
 import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,27 +85,58 @@ export const DevengoModal = ({
     subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
     fecha_inicio: '',
     fecha_fin: '',
-    dias: null,
-    horas: null,
+    dias: undefined,
+    horas: undefined,
     valor: 0,
-    observacion: ''
+    observacion: '',
+    company_id: '' // ✅ AGREGADO - Será llenado automáticamente
   });
+
+  // ✅ CORRECCIÓN: Obtener company_id al cargar el modal
+  useEffect(() => {
+    const getCompanyId = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (profile?.company_id) {
+            setFormData(prev => ({
+              ...prev,
+              company_id: profile.company_id
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error getting company ID:', error);
+      }
+    };
+
+    if (isOpen) {
+      getCompanyId();
+    }
+  }, [isOpen]);
 
   // Actualizar formData cuando cambien las props
   useEffect(() => {
     if (isOpen) {
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         empleado_id: employeeId,
         periodo_id: periodId,
         tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
         subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
         fecha_inicio: '',
         fecha_fin: '',
-        dias: null,
-        horas: null,
+        dias: undefined,
+        horas: undefined,
         valor: 0,
         observacion: ''
-      });
+      }));
     }
   }, [isOpen, employeeId, periodId, modalType]);
 
@@ -251,10 +283,10 @@ export const DevengoModal = ({
       return;
     }
 
-    if (!formData.empleado_id || !formData.periodo_id) {
+    if (!formData.empleado_id || !formData.periodo_id || !formData.company_id) {
       toast({
         title: "Error",
-        description: "Faltan datos requeridos (empleado o período)",
+        description: "Faltan datos requeridos (empleado, período o empresa)",
         variant: "destructive"
       });
       return;
@@ -263,6 +295,7 @@ export const DevengoModal = ({
     try {
       setIsSubmitting(true);
       
+      // ✅ CORRECCIÓN: El servicio ahora devuelve PayrollNovedad directamente
       const newNovedad = await NovedadesEnhancedService.createNovedad(formData);
 
       if (newNovedad) {
@@ -272,18 +305,17 @@ export const DevengoModal = ({
         setEditingNovedad(null);
         
         // Reset form
-        setFormData({
-          empleado_id: employeeId,
-          periodo_id: periodId,
+        setFormData(prev => ({
+          ...prev,
           tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
           subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
           fecha_inicio: '',
           fecha_fin: '',
-          dias: null,
-          horas: null,
+          dias: undefined,
+          horas: undefined,
           valor: 0,
           observacion: ''
-        });
+        }));
         
         if (onNovedadCreated) {
           onNovedadCreated(employeeId, newNovedad.valor, modalType);
@@ -313,6 +345,7 @@ export const DevengoModal = ({
     try {
       setIsSubmitting(true);
       
+      // ✅ CORRECCIÓN: El servicio ahora devuelve PayrollNovedad directamente
       const updatedNovedad = await NovedadesEnhancedService.updateNovedad(
         editingNovedad.id,
         formData
@@ -375,36 +408,34 @@ export const DevengoModal = ({
 
   const handleEditNovedad = (novedad: NovedadDisplay) => {
     setEditingNovedad(novedad);
-    setFormData({
-      empleado_id: employeeId,
-      periodo_id: periodId,
+    setFormData(prev => ({
+      ...prev,
       tipo_novedad: novedad.tipo_novedad,
       valor: novedad.valor,
-      horas: novedad.horas || null,
-      dias: novedad.dias || null,
+      horas: novedad.horas || undefined,
+      dias: novedad.dias || undefined,
       observacion: novedad.observacion || '',
       fecha_inicio: novedad.fecha_inicio || '',
       fecha_fin: novedad.fecha_fin || '',
       subtipo: (novedad as any).subtipo || ''
-    });
+    }));
     setShowForm(true);
   };
 
   const handleCancelForm = () => {
     setShowForm(false);
     setEditingNovedad(null);
-    setFormData({
-      empleado_id: employeeId,
-      periodo_id: periodId,
+    setFormData(prev => ({
+      ...prev,
       tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
       subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
       fecha_inicio: '',
       fecha_fin: '',
-      dias: null,
-      horas: null,
+      dias: undefined,
+      horas: undefined,
       valor: 0,
       observacion: ''
-    });
+    }));
   };
 
   const totalNovedades = novedades.reduce((sum, novedad) => sum + novedad.valor, 0);
@@ -421,15 +452,9 @@ export const DevengoModal = ({
       licencia_remunerada: 'Licencia Remunerada',
       incapacidad: 'Incapacidad',
       bonificacion: 'Bonificación',
-      bonificacion_salarial: 'Bonificación Salarial',
-      bonificacion_no_salarial: 'Bonificación No Salarial',
       comision: 'Comisión',
       prima: 'Prima',
       otros_ingresos: 'Otros Ingresos',
-      auxilio_conectividad: 'Auxilio de Conectividad',
-      viaticos: 'Viáticos',
-      retroactivos: 'Retroactivos',
-      compensacion_ordinaria: 'Compensación Ordinaria',
       libranza: 'Libranza',
       multa: 'Multa',
       ausencia: 'Ausencia',
@@ -437,14 +462,7 @@ export const DevengoModal = ({
       retencion_fuente: 'Retención en la Fuente',
       fondo_solidaridad: 'Fondo de Solidaridad',
       salud: 'Salud',
-      pension: 'Pensión',
-      arl: 'ARL',
-      caja_compensacion: 'Caja de Compensación',
-      icbf: 'ICBF',
-      sena: 'SENA',
-      embargo: 'Embargo',
-      anticipo: 'Anticipo',
-      aporte_voluntario: 'Aporte Voluntario'
+      pension: 'Pensión'
     };
     return labels[tipo] || tipo;
   };
@@ -487,7 +505,7 @@ export const DevengoModal = ({
     return concepts;
   };
 
-  const isFormValid = formData.valor > 0 && formData.empleado_id && formData.periodo_id;
+  const isFormValid = formData.valor > 0 && formData.empleado_id && formData.periodo_id && formData.company_id;
   const conceptsList = renderConceptsList();
 
   return (
@@ -615,8 +633,8 @@ export const DevengoModal = ({
                     initialData={editingNovedad ? {
                       tipo_novedad: editingNovedad.tipo_novedad,
                       valor: editingNovedad.valor,
-                      horas: editingNovedad.horas || null,
-                      dias: editingNovedad.dias || null,
+                      horas: editingNovedad.horas || undefined,
+                      dias: editingNovedad.dias || undefined,
                       observacion: editingNovedad.observacion || '',
                       fecha_inicio: editingNovedad.fecha_inicio || '',
                       fecha_fin: editingNovedad.fecha_fin || ''
@@ -632,34 +650,31 @@ export const DevengoModal = ({
         </div>
 
         {/* Simplified Footer */}
-        <div className="border-t bg-white p-4">
+        <div className="p-4 border-t bg-gray-50">
           {showForm ? (
-            <div className="flex justify-end space-x-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancelForm}
-                disabled={isSubmitting}
-              >
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={handleCancelForm}>
                 Cancelar
               </Button>
-              <Button
+              <Button 
                 onClick={editingNovedad ? handleUpdateNovedad : handleCreateNovedad}
                 disabled={!isFormValid || isSubmitting}
-                className="min-w-[120px]"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
+                    {editingNovedad ? 'Actualizando...' : 'Creando...'}
                   </>
                 ) : (
-                  'Guardar'
+                  editingNovedad ? 'Actualizar' : 'Crear'
                 )}
               </Button>
             </div>
           ) : (
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-gray-600">
+                {conceptsList.length} concepto{conceptsList.length !== 1 ? 's' : ''}
+              </p>
               <Button variant="outline" onClick={onClose}>
                 Cerrar
               </Button>
@@ -670,3 +685,5 @@ export const DevengoModal = ({
     </Dialog>
   );
 };
+
+export default DevengoModal;

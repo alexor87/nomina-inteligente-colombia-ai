@@ -249,6 +249,68 @@ export class PayrollUnifiedService {
     }
   }
 
+  // ✅ CERRAR PERÍODO (MÉTODO AGREGADO)
+  static async closePeriod(periodId: string): Promise<{success: boolean, message: string}> {
+    try {
+      console.log('🔒 SERVICIO UNIFICADO - Cerrando período:', periodId);
+      
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        return { success: false, message: 'No se pudo obtener la empresa' };
+      }
+
+      // Verificar que el período existe y pertenece a la empresa
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (periodError || !period) {
+        return { success: false, message: 'Período no encontrado' };
+      }
+
+      // Actualizar estado del período
+      const { error: updateError } = await supabase
+        .from('payroll_periods_real')
+        .update({ 
+          estado: 'cerrado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId);
+
+      if (updateError) {
+        console.error('❌ Error cerrando período:', updateError);
+        return { success: false, message: updateError.message };
+      }
+
+      // Actualizar payrolls asociados
+      const { error: payrollsError } = await supabase
+        .from('payrolls')
+        .update({ 
+          estado: 'procesada',
+          editable: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('period_id', periodId);
+
+      if (payrollsError) {
+        console.warn('⚠️ Error actualizando payrolls:', payrollsError);
+      }
+
+      console.log(`✅ Período ${period.periodo} cerrado exitosamente`);
+      return {
+        success: true,
+        message: `Período ${period.periodo} cerrado exitosamente`
+      };
+
+    } catch (error) {
+      console.error('❌ Error cerrando período:', error);
+      return { success: false, message: `Error: ${error}` };
+    }
+  }
+
   // ✅ UTILIDADES REPARADAS
   private static extractNovedadValue(novedades: any[], tipo: string): number {
     const novedad = novedades.find(n => n.tipo_novedad === tipo);
