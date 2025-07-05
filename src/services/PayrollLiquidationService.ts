@@ -1,6 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
+import { DeductionCalculationService } from './DeductionCalculationService';
 import { format } from 'date-fns';
 
 interface Employee {
@@ -135,10 +137,26 @@ export class PayrollLiquidationService {
       // Calculate working days for the period
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
 
-      // Process each employee
-      const processedEmployees: Employee[] = employees.map(employee => {
+      // Process each employee using the comprehensive deduction service
+      const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
         const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
         const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
+        const totalDevengado = salarioProporcional + auxilioTransporte;
+        
+        // Use DeductionCalculationService for comprehensive deduction calculation
+        const deductionResult = await DeductionCalculationService.calculateDeductions({
+          salarioBase: employee.salario_base,
+          totalDevengado: totalDevengado,
+          auxilioTransporte: auxilioTransporte,
+          periodType: 'mensual' // Adjust based on period type
+        });
+        
+        console.log(`📊 Empleado ${employee.nombre}: Deducciones completas calculadas`, {
+          totalDevengado,
+          totalDeducciones: deductionResult.totalDeducciones,
+          fondoSolidaridad: deductionResult.fondoSolidaridad,
+          netoPagar: totalDevengado - deductionResult.totalDeducciones
+        });
         
         return {
           id: employee.id,
@@ -146,12 +164,12 @@ export class PayrollLiquidationService {
           apellido: employee.apellido,
           salario_base: employee.salario_base,
           devengos: 0, // Will be calculated from novedades
-          deducciones: 0, // Will be calculated from novedades
-          total_pagar: salarioProporcional + auxilioTransporte, // Base calculation with transport allowance
+          deducciones: deductionResult.totalDeducciones, // Includes all legal deductions including Fondo Solidaridad
+          total_pagar: totalDevengado - deductionResult.totalDeducciones, // Net pay after all deductions
           dias_trabajados: diasTrabajados,
           auxilio_transporte: auxilioTransporte
         };
-      });
+      }));
 
       return processedEmployees;
     } catch (error) {

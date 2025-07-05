@@ -85,8 +85,6 @@ export const PayrollLiquidationTable = ({
               <th className="text-left p-4">Empleado</th>
               <th className="text-right p-4">Salario Base</th>
               <th className="text-right p-4">Días</th>
-              <th className="text-right p-4">Salario Proporcional</th>
-              <th className="text-right p-4">Auxilio Transporte</th>
               <th className="text-center p-4">Novedades</th>
               <th className="text-right p-4">Total a Pagar</th>
               <th className="text-center p-4">Acciones</th>
@@ -94,7 +92,6 @@ export const PayrollLiquidationTable = ({
           </thead>
           <tbody>
             {employees.map((employee) => {
-              const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
               const hasNovedades = employee.novedades_totals?.hasNovedades || false;
               
               return (
@@ -106,16 +103,6 @@ export const PayrollLiquidationTable = ({
                   </td>
                   <td className="p-4 text-right">{formatCurrency(employee.salario_base)}</td>
                   <td className="p-4 text-right">{employee.dias_trabajados}</td>
-                  <td className="p-4 text-right">{formatCurrency(salarioProporcional)}</td>
-                  <td className="p-4 text-right">
-                    {employee.auxilio_transporte > 0 ? (
-                      <span className="text-green-600 font-medium">
-                        {formatCurrency(employee.auxilio_transporte)}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
                   <td className="p-4 text-center">
                     <div className="flex items-center justify-center space-x-2">
                       <Button
@@ -163,7 +150,7 @@ export const PayrollLiquidationTable = ({
           </tbody>
           <tfoot>
             <tr className="border-t-2 bg-gray-50">
-              <td colSpan={6} className="p-4 text-right font-bold">Total General:</td>
+              <td colSpan={4} className="p-4 text-right font-bold">Total General:</td>
               <td className="p-4 text-right font-bold text-lg">
                 {formatCurrency(totalPagar)}
               </td>
