@@ -175,55 +175,85 @@ export class CriticalRepairService {
       if (activeEmployees < 3) {
         const testEmployees = [
           {
-            cedula: `TEST${Date.now()}1`,
-            nombre: 'Juan Carlos',
-            apellido: 'Pérez López',
-            email: `juan.perez.${Date.now()}@test.com`,
-            telefono: '3001234567',
-            salario_base: 1500000,
+            cedula: `52789123`,
+            tipo_documento: 'CC',
+            nombre: 'María Fernanda',
+            apellido: 'González Pérez',
+            email: `maria.gonzalez.${Date.now()}@test.com`,
+            telefono: '3012345678',
+            salario_base: 2500000,
             tipo_contrato: 'indefinido',
-            fecha_ingreso: new Date().toISOString().split('T')[0],
+            fecha_ingreso: '2024-01-15',
             estado: 'activo',
-            cargo: 'Desarrollador Senior',
+            cargo: 'Gerente de Recursos Humanos',
             eps: 'SURA EPS',
             afp: 'Protección',
             arl: 'SURA ARL',
             caja_compensacion: 'Compensar',
-            company_id: companyId
+            company_id: companyId,
+            ciudad: 'Bogotá',
+            departamento: 'Cundinamarca',
+            sexo: 'F',
+            periodicidad_pago: 'mensual',
+            tipo_jornada: 'completa',
+            dias_trabajo: 30,
+            horas_trabajo: 8,
+            regimen_salud: 'contributivo',
+            estado_afiliacion: 'activo'
           },
           {
-            cedula: `TEST${Date.now()}2`,
-            nombre: 'María Elena',
-            apellido: 'González Ruiz',
-            email: `maria.gonzalez.${Date.now()}@test.com`,
-            telefono: '3007654321',
-            salario_base: 2000000,
+            cedula: `1234567890`,
+            tipo_documento: 'CC',
+            nombre: 'Carlos Andrés',
+            apellido: 'Rodríguez Silva',
+            email: `carlos.rodriguez.${Date.now()}@test.com`,
+            telefono: '3187654321',
+            salario_base: 1800000,
             tipo_contrato: 'indefinido',
-            fecha_ingreso: new Date().toISOString().split('T')[0],
+            fecha_ingreso: '2024-02-01',
             estado: 'activo',
-            cargo: 'Gerente de Proyectos',
+            cargo: 'Desarrollador Senior',
             eps: 'Nueva EPS',
             afp: 'Colfondos',
             arl: 'Positiva',
             caja_compensacion: 'Colsubsidio',
-            company_id: companyId
+            company_id: companyId,
+            ciudad: 'Medellín',
+            departamento: 'Antioquia',
+            sexo: 'M',
+            periodicidad_pago: 'mensual',
+            tipo_jornada: 'completa',
+            dias_trabajo: 30,
+            horas_trabajo: 8,
+            regimen_salud: 'contributivo',
+            estado_afiliacion: 'activo'
           },
           {
-            cedula: `TEST${Date.now()}3`,
-            nombre: 'Carlos Alberto',
-            apellido: 'Ramírez Silva',
-            email: `carlos.ramirez.${Date.now()}@test.com`,
-            telefono: '3009876543',
-            salario_base: 1800000,
+            cedula: `98765432`,
+            tipo_documento: 'CC',
+            nombre: 'Laura Patricia',
+            apellido: 'Martínez Ruiz',
+            email: `laura.martinez.${Date.now()}@test.com`,
+            telefono: '3209876543',
+            salario_base: 1400000,
             tipo_contrato: 'indefinido',
-            fecha_ingreso: new Date().toISOString().split('T')[0],
+            fecha_ingreso: '2024-03-01',
             estado: 'activo',
-            cargo: 'Analista de Sistemas',
+            cargo: 'Analista Contable',
             eps: 'Sanitas',
             afp: 'Porvenir',
             arl: 'SURA ARL',
             caja_compensacion: 'Cafam',
-            company_id: companyId
+            company_id: companyId,
+            ciudad: 'Cali',
+            departamento: 'Valle del Cauca',
+            sexo: 'F',
+            periodicidad_pago: 'mensual',
+            tipo_jornada: 'completa',
+            dias_trabajo: 30,
+            horas_trabajo: 8,
+            regimen_salud: 'contributivo',
+            estado_afiliacion: 'activo'
           }
         ];
         
@@ -234,7 +264,10 @@ export class CriticalRepairService {
           
           if (!empError) {
             employeesCreated++;
-            details.push(`👤 Empleado creado: ${employee.nombre} ${employee.apellido}`);
+            details.push(`👤 Empleado creado: ${employee.nombre} ${employee.apellido} - ${employee.cargo}`);
+          } else {
+            console.error('Error creando empleado:', empError);
+            details.push(`❌ Error creando empleado: ${employee.nombre}`);
           }
         }
       }
@@ -263,7 +296,7 @@ export class CriticalRepairService {
         const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
         
-        const { error: periodError } = await supabase
+        const { data: newPeriod, error: periodError } = await supabase
           .from('payroll_periods_real')
           .insert({
             company_id: companyId,
@@ -272,42 +305,50 @@ export class CriticalRepairService {
             fecha_fin: endDate.toISOString().split('T')[0],
             tipo_periodo: 'mensual',
             estado: 'borrador'
-          });
-        
-        if (!periodError) {
-          periodsCreated++;
-          details.push(`📅 Período creado: ${periodName}`);
-        }
-      }
-      
-      // Sincronizar datos de nómina si hay empleados y períodos
-      if ((activeEmployees > 0 || employeesCreated > 0) && (totalPeriods > 0 || periodsCreated > 0)) {
-        const { data: activePeriod } = await supabase
-          .from('payroll_periods_real')
-          .select('*')
-          .eq('company_id', companyId)
-          .eq('estado', 'borrador')
-          .order('created_at', { ascending: false })
-          .limit(1)
+          })
+          .select()
           .single();
         
-        if (activePeriod) {
+        if (!periodError && newPeriod) {
+          periodsCreated++;
+          details.push(`📅 Período creado: ${periodName}`);
+          
+          // Sincronizar datos de nómina para el nuevo período
           try {
-            await supabase.rpc('sync_historical_payroll_data', {
-              p_period_id: activePeriod.id,
+            const syncResult = await supabase.rpc('sync_historical_payroll_data', {
+              p_period_id: newPeriod.id,
               p_company_id: companyId
             });
-            details.push(`🔄 Datos de nómina sincronizados para ${activePeriod.periodo}`);
+            
+            if (syncResult) {
+              details.push(`🔄 Datos de nómina sincronizados para ${periodName}`);
+            }
           } catch (syncError) {
             console.warn('⚠️ Error en sincronización:', syncError);
             details.push(`⚠️ Advertencia: Error en sincronización de datos`);
           }
         }
+      } else {
+        details.push(`📅 Período ${periodName} ya existe`);
+        
+        // Sincronizar datos existentes si es necesario
+        try {
+          const syncResult = await supabase.rpc('sync_historical_payroll_data', {
+            p_period_id: currentPeriod.id,
+            p_company_id: companyId
+          });
+          
+          if (syncResult) {
+            details.push(`🔄 Datos actualizados para período existente ${periodName}`);
+          }
+        } catch (syncError) {
+          console.warn('⚠️ Error actualizando período existente:', syncError);
+        }
       }
       
       return {
         success: true,
-        message: `Datos de prueba creados exitosamente: ${employeesCreated} empleados, ${periodsCreated} períodos`,
+        message: `Reparación completada: ${employeesCreated} empleados creados, ${periodsCreated} períodos creados`,
         employeesCreated,
         periodsCreated,
         details
@@ -323,29 +364,6 @@ export class CriticalRepairService {
         details
       };
     }
-  }
-  
-  /**
-   * Limpiar servicios obsoletos y hooks duplicados
-   */
-  static async cleanObsoleteServices(): Promise<string[]> {
-    const cleaned: string[] = [];
-    
-    // Esta es una función conceptual - en la práctica requeriría eliminar archivos
-    // Por ahora solo reportamos qué se debería limpiar
-    const obsoleteFiles = [
-      'src/hooks/usePayrollLiquidation.ts',
-      'src/hooks/usePayrollHistorySimple.ts',
-      'src/services/PayrollUnifiedService.ts',
-      'src/services/PayrollLiquidationService.ts'
-    ];
-    
-    cleaned.push('📋 Archivos obsoletos identificados para limpieza manual:');
-    obsoleteFiles.forEach(file => {
-      cleaned.push(`  - ${file}`);
-    });
-    
-    return cleaned;
   }
   
   /**
