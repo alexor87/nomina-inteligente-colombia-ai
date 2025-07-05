@@ -7,6 +7,7 @@ import { PayrollEmployee } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
 import { formatCurrency } from '@/lib/utils';
+import { ConfigurationService } from '@/services/ConfigurationService';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -53,6 +54,12 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   const workedDays = calculateWorkedDays();
 
+  // Obtener configuración legal actual
+  const getCurrentYearConfig = () => {
+    const currentYear = new Date().getFullYear().toString();
+    return ConfigurationService.getConfiguration(currentYear);
+  };
+
   const handleOpenNovedadModal = (employee: PayrollEmployee) => {
     setSelectedEmployee(employee);
     setNovedadModalOpen(true);
@@ -72,17 +79,27 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   };
 
   const calculateTotalToPay = (employee: PayrollEmployee) => {
+    const config = getCurrentYearConfig();
     const novedades = getEmployeeNovedades(employee.id);
-    const salarioProporcional = (employee.baseSalary / 30) * workedDays;
-    const auxilioTransporte = workedDays >= 15 ? 162000 : 0; // Auxilio de transporte 2024
     
-    // Deducciones de ley (aproximadas)
-    const saludEmpleado = salarioProporcional * 0.04; // 4% salud empleado
-    const pensionEmpleado = salarioProporcional * 0.04; // 4% pensión empleado
+    // Salario proporcional según días trabajados
+    const salarioProporcional = (employee.baseSalary / 30) * workedDays;
+    
+    // Base gravable: salario proporcional + novedades netas
+    const baseGravable = salarioProporcional + novedades.totalNeto;
+    
+    // Deducciones de ley sobre base gravable (no incluir auxilio de transporte)
+    const saludEmpleado = baseGravable * config.porcentajes.saludEmpleado;
+    const pensionEmpleado = baseGravable * config.porcentajes.pensionEmpleado;
     const totalDeducciones = saludEmpleado + pensionEmpleado;
     
-    const totalBruto = salarioProporcional + auxilioTransporte + novedades.totalNeto;
-    const totalNeto = totalBruto - totalDeducciones;
+    // Auxilio de transporte proporcional (solo si salario ≤ 2 SMMLV)
+    const auxilioTransporte = employee.baseSalary <= (config.salarioMinimo * 2) 
+      ? (config.auxilioTransporte / 30) * workedDays 
+      : 0;
+    
+    // Total a pagar = base gravable - deducciones + auxilio de transporte
+    const totalNeto = baseGravable - totalDeducciones + auxilioTransporte;
     
     return Math.max(0, totalNeto);
   };
