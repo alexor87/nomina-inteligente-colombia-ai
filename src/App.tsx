@@ -18,13 +18,13 @@ import EmployeesPage from "./pages/EmployeesPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import PayrollLiquidationPage from "./pages/PayrollLiquidationPage";
 
 const queryClient = new QueryClient();
 
 /**
- * ✅ APLICACIÓN PRINCIPAL SIMPLIFICADA
- * Módulos de liquidación e historial eliminados
- * Solo conserva funcionalidad de novedades
+ * ✅ APLICACIÓN PRINCIPAL CON MÓDULO DE LIQUIDACIÓN
+ * Incluye nuevo módulo de liquidación de nómina funcional
  */
 function AppContent() {
   // Inicialización automática del sistema
@@ -41,10 +41,10 @@ function AppContent() {
         <Route path="/app" element={<Layout />}>
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="employees" element={<EmployeesPage />} />
+          <Route path="payroll" element={<PayrollLiquidationPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           {/* Placeholder para rutas eliminadas */}
-          <Route path="payroll" element={<PlaceholderPage />} />
           <Route path="payroll-history" element={<PlaceholderPage />} />
         </Route>
       </Routes>

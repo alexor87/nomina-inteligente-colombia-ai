@@ -6,7 +6,8 @@ import {
   Users,
   FileBarChart,
   Settings,
-  Building2
+  Building2,
+  Calculator
 } from "lucide-react";
 
 import {
@@ -32,6 +33,11 @@ const navigationItems = [
     title: "Empleados",
     url: "/app/employees",
     icon: Users,
+  },
+  {
+    title: "Liquidación",
+    url: "/app/payroll",
+    icon: Calculator,
   },
   {
     title: "Reportes",

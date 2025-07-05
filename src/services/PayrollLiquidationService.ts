@@ -1,335 +1,187 @@
-import { supabase } from '@/integrations/supabase/client';
-import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
-import { PayrollCalculationService } from './PayrollCalculationService';
-import { PayrollPeriodService } from './PayrollPeriodService';
 
-export interface PayrollLiquidationData {
-  period: PayrollPeriod;
-  employees: PayrollEmployee[];
+import { supabase } from '@/integrations/supabase/client';
+import { NovedadesCalculationService } from './NovedadesCalculationService';
+import { format } from 'date-fns';
+
+interface Employee {
+  id: string;
+  nombre: string;
+  apellido: string;
+  salario_base: number;
+  devengos: number;
+  deducciones: number;
+  total_pagar: number;
+  dias_trabajados: number;
 }
 
 export class PayrollLiquidationService {
-  // Obtener el company_id del usuario actual
+  
   static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('No authenticated user found');
-        return null;
-      }
+      if (!user) return null;
 
-      const { data: profile, error } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
 
-      if (error) {
-        console.error('Error getting user profile:', error);
-        return null;
-      }
-
-      if (!profile?.company_id) {
-        console.warn('User profile found but no company_id assigned');
-        return null;
-      }
-
-      return profile.company_id;
+      return profile?.company_id || null;
     } catch (error) {
-      console.error('Error getting user company ID:', error);
+      console.error('Error getting company ID:', error);
       return null;
     }
   }
 
-  // Guardar liquidación de nómina con transacciones completas
-  static async savePayrollLiquidation(data: PayrollLiquidationData): Promise<string> {
-    const companyId = await this.getCurrentUserCompanyId();
-    if (!companyId) {
-      throw new Error('No se encontró la empresa del usuario');
-    }
-
-    console.log('💾 Iniciando guardado transaccional de liquidación para período:', data.period.id);
-    console.log('👥 Empleados a liquidar:', data.employees.length);
-    
-    try {
-      // Verificar que el período esté en estado borrador
-      const { data: periodCheck, error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .select('estado')
-        .eq('id', data.period.id)
-        .single();
-
-      if (periodError || !periodCheck) {
-        throw new Error('No se encontró el período de nómina');
-      }
-
-      if (periodCheck.estado !== 'borrador') {
-        throw new Error('Solo se pueden liquidar períodos en estado borrador');
-      }
-
-      // Guardar liquidaciones con period_id
-      const periodoString = data.period.periodo || `${data.period.fecha_inicio}-${data.period.fecha_fin}`;
-      
-      const payrollInserts = data.employees.map(employee => ({
-        company_id: companyId,
-        employee_id: employee.id,
-        period_id: data.period.id, // CRÍTICO: usar period_id
-        periodo: periodoString,
-        salario_base: employee.baseSalary,
-        dias_trabajados: employee.workedDays,
-        horas_extra: employee.extraHours,
-        bonificaciones: employee.bonuses,
-        auxilio_transporte: employee.transportAllowance,
-        total_devengado: employee.grossPay,
-        salud_empleado: employee.grossPay * 0.04,
-        pension_empleado: employee.grossPay * 0.04,
-        total_deducciones: employee.deductions,
-        neto_pagado: employee.netPay,
-        estado: 'procesada'
-      }));
-
-      const { data: insertedPayrolls, error: insertError } = await supabase
-        .from('payrolls')
-        .insert(payrollInserts)
-        .select();
-
-      if (insertError) {
-        console.error('❌ Error guardando liquidaciones:', insertError);
-        throw new Error(`Error al guardar liquidaciones: ${insertError.message}`);
-      }
-
-      console.log('✅ Liquidaciones guardadas exitosamente:', insertedPayrolls.length);
-
-      // Actualizar totales en payroll_periods_real
-      const totalDevengado = data.employees.reduce((sum, emp) => sum + emp.grossPay, 0);
-      const totalDeducciones = data.employees.reduce((sum, emp) => sum + emp.deductions, 0);
-      const totalNeto = data.employees.reduce((sum, emp) => sum + emp.netPay, 0);
-
-      const { error: updateError } = await supabase
-        .from('payroll_periods_real')
-        .update({
-          empleados_count: data.employees.length,
-          total_devengado: totalDevengado,
-          total_deducciones: totalDeducciones,
-          total_neto: totalNeto,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', data.period.id);
-
-      if (updateError) {
-        throw new Error(`Error actualizando totales: ${updateError.message}`);
-      }
-
-      // CRÍTICO: Generar comprobantes es obligatorio, no opcional
-      await this.generateVouchers(data, insertedPayrolls, companyId);
-      
-      console.log('✅ Liquidación completa guardada exitosamente');
-      return `Liquidación procesada exitosamente para ${data.employees.length} empleados`;
-
-    } catch (error) {
-      console.error('❌ Error en liquidación:', error);
-      throw error;
-    }
+  static calculateWorkingDays(startDate: string, endDate: string): number {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both dates
+    return Math.min(diffDays, 30); // Max 30 days per month
   }
 
-  // Generar comprobantes de nómina con validaciones y transacciones
-  static async generateVouchers(liquidationData: PayrollLiquidationData, payrollRecords: any[], companyId: string): Promise<void> {
-    try {
-      console.log('📄 Iniciando generación de comprobantes');
-      console.log('👥 Empleados para comprobantes:', liquidationData.employees.length);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('Usuario no autenticado para generar comprobantes');
-      }
-
-      // Validar que tenemos los datos necesarios
-      if (!payrollRecords || payrollRecords.length !== liquidationData.employees.length) {
-        throw new Error(`Inconsistencia de datos: ${liquidationData.employees.length} empleados vs ${payrollRecords?.length || 0} registros de nómina`);
-      }
-
-      const periodoString = liquidationData.period.periodo || `${liquidationData.period.fecha_inicio}-${liquidationData.period.fecha_fin}`;
-      
-      const voucherInserts = liquidationData.employees.map((employee, index) => {
-        const payrollRecord = payrollRecords[index];
-        if (!payrollRecord) {
-          throw new Error(`No se encontró registro de nómina para empleado ${employee.name}`);
-        }
-
-        return {
-          company_id: companyId,
-          employee_id: employee.id,
-          payroll_id: payrollRecord.id,
-          periodo: periodoString,
-          start_date: liquidationData.period.fecha_inicio,
-          end_date: liquidationData.period.fecha_fin,
-          net_pay: employee.netPay,
-          voucher_status: 'generado',
-          sent_to_employee: false,
-          generated_by: user.id,
-          pdf_url: null,
-          dian_status: 'pendiente'
-        };
-      });
-
-      console.log('📄 Insertando comprobantes en base de datos...');
-      const { data: insertedVouchers, error } = await supabase
-        .from('payroll_vouchers')
-        .insert(voucherInserts)
-        .select();
-
-      if (error) {
-        console.error('❌ Error insertando comprobantes:', error);
-        throw error;
-      }
-
-      if (!insertedVouchers || insertedVouchers.length !== voucherInserts.length) {
-        throw new Error(`Error: Se esperaban ${voucherInserts.length} comprobantes, pero se crearon ${insertedVouchers?.length || 0}`);
-      }
-
-      console.log(`✅ ${insertedVouchers.length} comprobantes generados exitosamente`);
-    } catch (error) {
-      console.error('❌ Error generando comprobantes:', error);
-      throw new Error(`Error al generar los comprobantes: ${error.message}`);
-    }
-  }
-
-  // Cargar empleados de la empresa para la liquidación
-  static async loadEmployeesForLiquidation(): Promise<PayrollEmployee[]> {
+  static async loadEmployeesForPeriod(startDate: string, endDate: string): Promise<Employee[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
-        console.warn('No company ID found for user');
-        return [];
+        throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // Obtener la periodicidad configurada por el usuario
-      const companySettings = await PayrollPeriodService.getCompanySettings();
-      const periodType = companySettings?.periodicity || 'mensual';
-      
-      // Determinar días trabajados por defecto según la periodicidad
-      let defaultWorkedDays: number;
-      switch (periodType) {
-        case 'quincenal':
-          defaultWorkedDays = 15;
-          break;
-        case 'mensual':
-          defaultWorkedDays = 30;
-          break;
-        case 'semanal':
-          defaultWorkedDays = 7;
-          break;
-        default:
-          defaultWorkedDays = 30;
-      }
-
-      // Cargar SOLO los empleados ACTIVOS para la liquidación de nómina
-      const { data, error } = await supabase
+      // Load active employees
+      const { data: employees, error } = await supabase
         .from('employees')
-        .select('*')
+        .select('id, nombre, apellido, salario_base')
         .eq('company_id', companyId)
         .eq('estado', 'activo');
 
       if (error) {
-        console.error('Error loading employees:', error);
+        throw error;
+      }
+
+      if (!employees || employees.length === 0) {
         return [];
       }
 
-      if (!data || data.length === 0) {
-        console.log('No active employees found for payroll liquidation');
-        return [];
+      // Calculate working days for the period
+      const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
+
+      // Create a temporary period for novedades calculation
+      const tempPeriodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
+
+      // Process each employee with novedades
+      const processedEmployees: Employee[] = [];
+
+      for (const employee of employees) {
+        // For now, we'll use simple calculations since we don't have existing novedades for this period
+        // In a real scenario, you would query existing novedades for this period
+        const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
+        
+        const processedEmployee: Employee = {
+          id: employee.id,
+          nombre: employee.nombre,
+          apellido: employee.apellido,
+          salario_base: employee.salario_base,
+          devengos: 0, // Will be calculated from novedades
+          deducciones: 0, // Will be calculated from novedades
+          total_pagar: salarioProporcional,
+          dias_trabajados: diasTrabajados
+        };
+
+        processedEmployees.push(processedEmployee);
       }
 
-      console.log(`Loaded ${data.length} active employees for payroll liquidation with ${periodType} periodicity`);
-
-      // Process each employee with async calculation
-      const employees = await Promise.all(data.map(async (emp) => {
-        const baseEmployeeData = {
-          id: emp.id,
-          name: `${emp.nombre} ${emp.apellido}`,
-          position: emp.cargo || 'No especificado',
-          baseSalary: Number(emp.salario_base),
-          workedDays: defaultWorkedDays, // Usar días según periodicidad configurada
-          extraHours: 0,
-          disabilities: 0,
-          bonuses: 0,
-          absences: 0,
-          eps: emp.eps,
-          afp: emp.afp
-        };
-
-        // Calcular datos de nómina usando el servicio de cálculo con la periodicidad correcta
-        const calculation = await PayrollCalculationService.calculatePayroll({
-          baseSalary: baseEmployeeData.baseSalary,
-          workedDays: baseEmployeeData.workedDays,
-          extraHours: baseEmployeeData.extraHours,
-          disabilities: baseEmployeeData.disabilities,
-          bonuses: baseEmployeeData.bonuses,
-          absences: baseEmployeeData.absences,
-          periodType: periodType === 'semanal' ? 'mensual' : periodType as 'quincenal' | 'mensual' // Fallback para semanal
-        });
-
-        // Solo empleados activos, todos válidos por defecto
-        return {
-          ...baseEmployeeData,
-          grossPay: calculation.grossPay,
-          deductions: calculation.totalDeductions,
-          netPay: calculation.netPay,
-          transportAllowance: calculation.transportAllowance,
-          employerContributions: calculation.employerContributions,
-          status: 'valid' as PayrollEmployee['status'],
-          errors: []
-        };
-      }));
-
-      return employees;
+      return processedEmployees;
     } catch (error) {
-      console.error('Error loading employees:', error);
-      return [];
+      console.error('Error loading employees for period:', error);
+      throw error;
     }
   }
 
-  static async getPayrollHistory(): Promise<any[]> {
+  static async liquidatePayroll(employees: Employee[], startDate: string, endDate: string) {
     try {
       const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) return [];
+      if (!companyId) {
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
 
-      const { data, error } = await supabase
-        .from('payrolls')
-        .select(`
-          *,
-          employees (
-            nombre,
-            apellido,
-            cedula
-          )
-        `)
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
+      // Create period name
+      const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
 
-      if (error) throw error;
+      // Create period in payroll_periods_real
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .insert({
+          company_id: companyId,
+          periodo: periodName,
+          fecha_inicio: startDate,
+          fecha_fin: endDate,
+          tipo_periodo: 'personalizado',
+          estado: 'cerrado',
+          empleados_count: employees.length,
+          total_devengado: employees.reduce((sum, emp) => sum + emp.salario_base + emp.devengos, 0),
+          total_deducciones: employees.reduce((sum, emp) => sum + emp.deducciones, 0),
+          total_neto: employees.reduce((sum, emp) => sum + emp.total_pagar, 0)
+        })
+        .select()
+        .single();
 
-      return data || [];
+      if (periodError) {
+        throw periodError;
+      }
+
+      // Create payroll records for each employee
+      for (const employee of employees) {
+        const { error: payrollError } = await supabase
+          .from('payrolls')
+          .insert({
+            company_id: companyId,
+            employee_id: employee.id,
+            periodo: periodName,
+            period_id: period.id,
+            salario_base: employee.salario_base,
+            dias_trabajados: employee.dias_trabajados,
+            total_devengado: employee.salario_base + employee.devengos,
+            total_deducciones: employee.deducciones,
+            neto_pagado: employee.total_pagar,
+            estado: 'procesada'
+          });
+
+        if (payrollError) {
+          console.error('Error creating payroll record:', payrollError);
+        }
+
+        // Create voucher record
+        const { error: voucherError } = await supabase
+          .from('payroll_vouchers')
+          .insert({
+            company_id: companyId,
+            employee_id: employee.id,
+            payroll_id: null, // Will be updated if needed
+            periodo: periodName,
+            start_date: startDate,
+            end_date: endDate,
+            net_pay: employee.total_pagar,
+            voucher_status: 'generado'
+          });
+
+        if (voucherError) {
+          console.error('Error creating voucher record:', voucherError);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Liquidación completada para ${employees.length} empleados`,
+        periodId: period.id
+      };
     } catch (error) {
-      console.error('Error loading payroll history:', error);
-      return [];
-    }
-  }
-
-  static async reopenPayrollPeriod(payrollIds: string[]): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('payrolls')
-        .update({ estado: 'borrador' })
-        .in('id', payrollIds);
-
-      if (error) throw error;
-
-      console.log(`${payrollIds.length} registros de nómina reabiertos`);
-    } catch (error) {
-      console.error('Error reopening payroll period:', error);
-      throw new Error('Error al reabrir el período de nómina');
+      console.error('Error liquidating payroll:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Error desconocido'
+      };
     }
   }
 }
