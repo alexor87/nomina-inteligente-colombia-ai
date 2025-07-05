@@ -2,80 +2,42 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sidebar } from './Sidebar';
+import { AppSidebar } from '@/components/AppSidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import Header from './Header';
 
 export const Layout = () => {
-  const { roles } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
+  const { loading } = useAuth();
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-
-  // Handle click outside sidebar on mobile
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        sidebarRef.current &&
-        !sidebarRef.current.contains(event.target as Node) &&
-        !sidebarCollapsed &&
-        window.innerWidth < 768 // Only on mobile
-      ) {
-        setSidebarCollapsed(true);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [sidebarCollapsed]);
-
-  // Handle responsive behavior
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setSidebarCollapsed(true);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    handleResize(); // Check on mount
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
+  // Mostrar loading mientras se cargan los datos de autenticación
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50/30 flex">
-      <div ref={sidebarRef}>
-        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
-      </div>
-      
-      <div 
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
-        }`}
-      >
-        <Header />
+    <SidebarProvider>
+      <div className="min-h-screen bg-gray-50/30 flex w-full">
+        <AppSidebar />
         
-        <main className="flex-1 p-6 bg-white/50">
-          <div className="max-w-7xl mx-auto">
-            <Outlet />
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="bg-white border-b border-gray-100">
+            <div className="flex items-center justify-between px-6 py-3">
+              <SidebarTrigger className="md:hidden" />
+              <Header />
+            </div>
           </div>
-        </main>
+          
+          <main className="flex-1 p-6 bg-white/50">
+            <div className="max-w-7xl mx-auto">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-      
-      {/* Overlay para móvil cuando sidebar está abierto */}
-      {!sidebarCollapsed && window.innerWidth < 768 && (
-        <div 
-          className="fixed inset-0 bg-black/20 z-40 md:hidden"
-          onClick={() => setSidebarCollapsed(true)}
-        />
-      )}
-    </div>
+    </SidebarProvider>
   );
 };

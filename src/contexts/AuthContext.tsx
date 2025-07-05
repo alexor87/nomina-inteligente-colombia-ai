@@ -46,7 +46,7 @@ export const useAuth = () => {
   return context;
 };
 
-// Matriz de permisos por rol
+// Matriz de permisos por rol - simplificada para mayor estabilidad
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings'],
   rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports'],
@@ -66,84 +66,124 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Refs to prevent redundant calls
   const isRefreshingUserData = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialized = useRef(false);
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
-    if (roles.length === 0) {
+    try {
+      if (roles.length === 0) {
+        return false;
+      }
+      
+      return roles.some(r => {
+        const roleMatch = r.role === role;
+        const companyMatch = companyId ? r.company_id === companyId : true;
+        return roleMatch && companyMatch;
+      });
+    } catch (error) {
+      console.error('Error in hasRole:', error);
       return false;
     }
-    
-    return roles.some(r => {
-      const roleMatch = r.role === role;
-      const companyMatch = companyId ? r.company_id === companyId : true;
-      return roleMatch && companyMatch;
-    });
   }, [roles]);
 
   const hasModuleAccess = useCallback((module: string): boolean => {
-    if (roles.length === 0) {
-      return false;
+    try {
+      // Si no hay roles cargados, permitir acceso básico para evitar pantalla vacía
+      if (roles.length === 0 && user) {
+        // Permitir acceso a módulos básicos mientras se cargan los roles
+        const basicModules = ['dashboard', 'employees', 'payroll', 'payroll-history', 'reports', 'settings'];
+        return basicModules.includes(module);
+      }
+      
+      return roles.some(userRole => {
+        const permissions = ROLE_PERMISSIONS[userRole.role];
+        return permissions && permissions.includes(module);
+      });
+    } catch (error) {
+      console.error('Error in hasModuleAccess:', error);
+      // En caso de error, permitir acceso básico
+      return ['dashboard', 'employees', 'payroll', 'payroll-history', 'reports', 'settings'].includes(module);
     }
-    
-    return roles.some(userRole => {
-      return ROLE_PERMISSIONS[userRole.role]?.includes(module);
-    });
-  }, [roles]);
+  }, [roles, user]);
 
   const refreshUserData = useCallback(async () => {
     if (isRefreshingUserData.current) {
-      console.log('🔄 User data refresh already in progress, skipping...');
       return;
     }
 
     const currentUser = (await supabase.auth.getUser()).data.user;
     if (!currentUser) {
-      console.log('❌ No current user found');
       return;
     }
 
     isRefreshingUserData.current = true;
-    console.log('🔄 Refreshing user data for:', currentUser.email);
 
     try {
-      // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
+      // Fetch profile with timeout
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('user_id', currentUser.id)
         .single();
-      
-      if (!profileError && profileData) {
-        setProfile(profileData);
-        console.log('👤 User profile fetched successfully');
-        
-        // Only run role check if user has a company
-        if (profileData.company_id) {
-          console.log('🔧 Running role check for company:', profileData.company_id);
-          await performCompleteRoleCheck(currentUser.id);
+
+      const profileTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+
+      try {
+        const { data: profileData, error: profileError } = await Promise.race([
+          profilePromise,
+          profileTimeout
+        ]) as any;
+
+        if (!profileError && profileData) {
+          setProfile(profileData);
+          
+          // Only run role check if user has a company
+          if (profileData.company_id) {
+            setTimeout(() => {
+              performCompleteRoleCheck(currentUser.id).catch(console.error);
+            }, 100);
+          }
+        } else {
+          console.warn('Profile fetch failed:', profileError);
+          setProfile(null);
         }
-      } else {
-        console.error('❌ Error fetching user profile:', profileError);
+      } catch (error) {
+        console.warn('Profile fetch timed out or failed:', error);
         setProfile(null);
       }
 
-      // Fetch roles
-      const { data: userRoles, error: rolesError } = await supabase
+      // Fetch roles with timeout
+      const rolesPromise = supabase
         .rpc('get_user_companies_simple', { _user_id: currentUser.id });
-      
-      if (!rolesError && userRoles) {
-        const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
-          role: role.role_name as AppRole,
-          company_id: role.company_id
-        }));
-        setRoles(transformedRoles);
-        console.log('👥 User roles fetched:', transformedRoles.length, 'roles');
-      } else {
-        console.error('❌ Error fetching user roles:', rolesError);
+
+      const rolesTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Roles fetch timeout')), 5000)
+      );
+
+      try {
+        const { data: userRoles, error: rolesError } = await Promise.race([
+          rolesPromise,
+          rolesTimeout
+        ]) as any;
+
+        if (!rolesError && userRoles) {
+          const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
+            role: role.role_name as AppRole,
+            company_id: role.company_id
+          }));
+          setRoles(transformedRoles);
+        } else {
+          console.warn('Roles fetch failed:', rolesError);
+          setRoles([]);
+        }
+      } catch (error) {
+        console.warn('Roles fetch timed out or failed:', error);
         setRoles([]);
       }
 
     } catch (error) {
-      console.error('❌ Error refreshing user data:', error);
+      console.error('Error refreshing user data:', error);
     } finally {
       isRefreshingUserData.current = false;
     }
@@ -182,6 +222,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    // Prevent multiple initializations
+    if (isInitialized.current) {
+      return;
+    }
+    isInitialized.current = true;
+
     // Clear any existing timeout
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
@@ -195,13 +241,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Debounce user data refresh
+          // Debounced user data refresh
           setTimeout(async () => {
             if (!isRefreshingUserData.current) {
               await refreshUserData();
             }
             setLoading(false);
-          }, 300);
+          }, 500);
         } else {
           setRoles([]);
           setProfile(null);
@@ -213,7 +259,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('🔍 Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -223,17 +268,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await refreshUserData();
           }
           setLoading(false);
-        }, 300);
+        }, 500);
       } else {
         setLoading(false);
       }
     });
 
-    // Reduced timeout for faster loading
+    // Safety timeout - always stop loading after reasonable time
     loadingTimeoutRef.current = setTimeout(() => {
-      console.warn('⚠️ Auth loading timeout reached, setting loading to false');
+      console.warn('⚠️ Auth loading timeout reached');
       setLoading(false);
-    }, 3000);
+    }, 8000);
 
     return () => {
       subscription.unsubscribe();
