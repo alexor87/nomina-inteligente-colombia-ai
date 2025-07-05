@@ -43,7 +43,6 @@ export interface PeriodDetectionResult {
 }
 
 export class PayrollDomainService {
-  private static stateManager = new PayrollStateManager();
   private static calculator = new PayrollCalculationEngine();
 
   /**
@@ -56,19 +55,22 @@ export class PayrollDomainService {
         throw new Error('No se pudo determinar la empresa del usuario');
       }
 
-      // Usar la nueva función SQL optimizada
-      const { data, error } = await supabase.rpc('get_current_active_period', {
-        p_company_id: companyId
-      });
+      // Buscar período activo usando query directa optimizada
+      const { data: periods, error } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .in('estado', ['draft', 'active'])
+        .order('created_at', { ascending: false })
+        .limit(1);
 
       if (error) {
         console.error('❌ Error detecting period:', error);
         throw error;
       }
 
-      const result = data?.[0];
-      
-      if (!result || result.needs_creation) {
+      // Si no hay período activo, necesita crear uno
+      if (!periods || periods.length === 0) {
         return {
           currentPeriod: null,
           needsCreation: true,
@@ -78,24 +80,25 @@ export class PayrollDomainService {
         };
       }
 
+      const period = periods[0];
       const currentPeriod: PayrollPeriod = {
-        id: result.period_id,
-        periodo: result.period_name,
-        fecha_inicio: result.start_date,
-        fecha_fin: result.end_date,
-        estado: result.status as 'draft' | 'active' | 'closed',
-        tipo_periodo: 'mensual', // Default, can be enhanced
-        empleados_count: 0,
-        total_devengado: 0,
-        total_deducciones: 0,
-        total_neto: 0
+        id: period.id,
+        periodo: period.periodo,
+        fecha_inicio: period.fecha_inicio,
+        fecha_fin: period.fecha_fin,
+        estado: PayrollStateManager.normalizeState(period.estado),
+        tipo_periodo: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual',
+        empleados_count: period.empleados_count || 0,
+        total_devengado: Number(period.total_devengado) || 0,
+        total_deducciones: Number(period.total_deducciones) || 0,
+        total_neto: Number(period.total_neto) || 0
       };
 
       return {
         currentPeriod,
         needsCreation: false,
-        canContinue: result.can_continue,
-        message: `Período activo encontrado: ${result.period_name}`,
+        canContinue: true,
+        message: `Período activo encontrado: ${period.periodo}`,
         action: 'resume'
       };
 
@@ -258,7 +261,7 @@ export class PayrollDomainService {
         periodo: period.periodo,
         fecha_inicio: period.fecha_inicio,
         fecha_fin: period.fecha_fin,
-        estado: period.estado as 'draft' | 'active' | 'closed',
+        estado: PayrollStateManager.normalizeState(period.estado),
         tipo_periodo: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual',
         empleados_count: period.empleados_count || 0,
         total_devengado: Number(period.total_devengado) || 0,
@@ -313,7 +316,7 @@ export class PayrollDomainService {
   }
 
   // Métodos de utilidad privados
-  private static async getCurrentUserCompany_id(): Promise<string | null> {
+  private static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
@@ -339,7 +342,4 @@ export class PayrollDomainService {
     
     return `${months[date.getMonth()]} ${date.getFullYear()}`;
   }
-
-  // Fix for getCurrentUserCompanyId method name
-  private static getCurrentUserCompanyId = this.getCurrentUserCompany_id;
 }
