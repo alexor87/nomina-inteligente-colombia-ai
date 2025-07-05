@@ -203,7 +203,7 @@ export const PayrollLiquidationAleluya = () => {
             {/* Acciones */}
             <div className="flex flex-col space-y-2">
               <Button
-                onClick={() => liquidatePayroll()} // FIXED: Removed async/await syntax
+                onClick={liquidatePayroll}
                 disabled={!canLiquidate || isProcessing}
                 className="bg-green-600 hover:bg-green-700 text-white font-semibold"
                 size="sm"
@@ -223,7 +223,7 @@ export const PayrollLiquidationAleluya = () => {
 
               {canClosePeriod && (
                 <Button
-                  onClick={() => closePeriod()} // FIXED: Removed async/await syntax
+                  onClick={closePeriod}
                   disabled={isProcessing}
                   variant="outline"
                   className="border-green-600 text-green-700 hover:bg-green-50"
