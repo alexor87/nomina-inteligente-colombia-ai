@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,9 +16,11 @@ const PayrollLiquidationPage = () => {
     employees,
     isLoading,
     isLiquidating,
+    currentPeriodId,
     loadEmployees,
     removeEmployee,
-    liquidatePayroll
+    liquidatePayroll,
+    refreshEmployeeNovedades
   } = usePayrollLiquidation();
 
   const handleLoadEmployees = () => {
@@ -106,7 +107,9 @@ const PayrollLiquidationPage = () => {
               employees={employees}
               startDate={startDate}
               endDate={endDate}
+              currentPeriodId={currentPeriodId}
               onRemoveEmployee={removeEmployee}
+              onEmployeeNovedadesChange={refreshEmployeeNovedades}
             />
           </CardContent>
         </Card>

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { format } from 'date-fns';
@@ -42,6 +41,57 @@ export class PayrollLiquidationService {
     return Math.min(diffDays, 30); // Max 30 days per month
   }
 
+  static async ensurePeriodExists(startDate: string, endDate: string): Promise<string> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+
+      const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
+      
+      // Check if period already exists
+      const { data: existingPeriod } = await supabase
+        .from('payroll_periods_real')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('fecha_inicio', startDate)
+        .eq('fecha_fin', endDate)
+        .single();
+
+      if (existingPeriod) {
+        return existingPeriod.id;
+      }
+
+      // Create new period
+      const { data: newPeriod, error } = await supabase
+        .from('payroll_periods_real')
+        .insert({
+          company_id: companyId,
+          periodo: periodName,
+          fecha_inicio: startDate,
+          fecha_fin: endDate,
+          tipo_periodo: 'personalizado',
+          estado: 'borrador',
+          empleados_count: 0,
+          total_devengado: 0,
+          total_deducciones: 0,
+          total_neto: 0
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return newPeriod.id;
+    } catch (error) {
+      console.error('Error ensuring period exists:', error);
+      throw error;
+    }
+  }
+
   static async loadEmployeesForPeriod(startDate: string, endDate: string): Promise<Employee[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -67,30 +117,21 @@ export class PayrollLiquidationService {
       // Calculate working days for the period
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
 
-      // Create a temporary period for novedades calculation
-      const tempPeriodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
-
-      // Process each employee with novedades
-      const processedEmployees: Employee[] = [];
-
-      for (const employee of employees) {
-        // For now, we'll use simple calculations since we don't have existing novedades for this period
-        // In a real scenario, you would query existing novedades for this period
+      // Process each employee
+      const processedEmployees: Employee[] = employees.map(employee => {
         const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
         
-        const processedEmployee: Employee = {
+        return {
           id: employee.id,
           nombre: employee.nombre,
           apellido: employee.apellido,
           salario_base: employee.salario_base,
           devengos: 0, // Will be calculated from novedades
           deducciones: 0, // Will be calculated from novedades
-          total_pagar: salarioProporcional,
+          total_pagar: salarioProporcional, // Base calculation, will be updated with novedades
           dias_trabajados: diasTrabajados
         };
-
-        processedEmployees.push(processedEmployee);
-      }
+      });
 
       return processedEmployees;
     } catch (error) {
