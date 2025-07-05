@@ -10,7 +10,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Layout } from "@/components/layout/Layout";
 
 // Pages
-import Index from "./pages/Index";
+import { Index } from "./pages/Index";
 import AuthPage from "./pages/AuthPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -35,9 +35,9 @@ import CompanySettingsPage from "./pages/CompanySettingsPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import BillingHistoryPage from "./pages/BillingHistoryPage";
 import CompanyRegisterPage from "./pages/CompanyRegisterPage";
-import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
-import SuperAdminPage from "./pages/SuperAdminPage";
-import SupportBackofficePage from "./pages/SupportBackofficePage";
+import { CompanyRegistrationPage } from "./pages/CompanyRegistrationPage";
+import { SuperAdminPage } from "./pages/SuperAdminPage";
+import { SupportBackofficePage } from "./pages/SupportBackofficePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
