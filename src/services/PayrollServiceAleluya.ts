@@ -1,12 +1,13 @@
 
 /**
- * 🎯 SERVICIO ALELUYA - LIQUIDACIÓN DE NÓMINA REPARADO
- * Servicio completo con funciones implementadas correctamente
- * REPARADO: Generación automática de registros y estados normalizados
+ * 🎯 SERVICIO ALELUYA - LIQUIDACIÓN DE NÓMINA SIMPLIFICADO
+ * Servicio simple sin detección automática de períodos
+ * SIMPLIFICADO: Usuario elige fechas manualmente
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
+import { getPeriodNameFromDates } from '@/utils/periodDateUtils';
 
 export interface PayrollPeriod {
   id: string;
@@ -23,7 +24,7 @@ export interface PayrollPeriod {
 
 export class PayrollServiceAleluya {
   /**
-   * 📅 CARGAR PERÍODO ACTUAL - REPARADO
+   * 📅 CARGAR PERÍODO ACTUAL - SIMPLIFICADO
    */
   static async loadCurrentPeriod(): Promise<{
     period: PayrollPeriod | null;
@@ -74,15 +75,13 @@ export class PayrollServiceAleluya {
         };
       }
 
-      // No hay período activo - sugerir creación
-      const suggestion = await this.suggestNextPeriod(companyId);
-      
+      // No hay período activo - mostrar formulario de creación
       return {
         period: null,
         employees: [],
         summary: this.getEmptySummary(),
         needsCreation: true,
-        message: `Crear nuevo período: ${suggestion.periodName}`
+        message: 'Selecciona las fechas para crear un nuevo período'
       };
 
     } catch (error) {
@@ -92,27 +91,38 @@ export class PayrollServiceAleluya {
   }
 
   /**
-   * 🏗️ CREAR NUEVO PERÍODO - REPARADO
+   * 🏗️ CREAR PERÍODO CON FECHAS - SIMPLIFICADO
    */
-  static async createNewPeriod(): Promise<{
+  static async createPeriodWithDates(startDate: string, endDate: string): Promise<{
     period: PayrollPeriod;
     employees: PayrollEmployee[];
     message: string;
   }> {
     try {
       const companyId = await this.getCurrentCompanyId();
-      const suggestion = await this.suggestNextPeriod(companyId);
       
-      console.log('🔨 Creando período:', suggestion.periodName);
+      // Generar nombre del período basado en las fechas
+      const periodName = getPeriodNameFromDates(startDate, endDate);
+      
+      // Determinar tipo de período basado en los días
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+      
+      let tipoPerido: 'semanal' | 'quincenal' | 'mensual' = 'mensual';
+      if (daysDiff <= 7) tipoPerido = 'semanal';
+      else if (daysDiff <= 16) tipoPerido = 'quincenal';
+      
+      console.log('🔨 Creando período:', periodName, `(${daysDiff} días)`);
       
       const { data: newPeriod, error } = await supabase
         .from('payroll_periods_real')
         .insert({
           company_id: companyId,
-          periodo: suggestion.periodName,
-          fecha_inicio: suggestion.startDate,
-          fecha_fin: suggestion.endDate,
-          tipo_periodo: suggestion.type,
+          periodo: periodName,
+          fecha_inicio: startDate,
+          fecha_fin: endDate,
+          tipo_periodo: tipoPerido,
           estado: 'borrador',
           empleados_count: 0,
           total_devengado: 0,
@@ -138,7 +148,7 @@ export class PayrollServiceAleluya {
       return {
         period: normalizedPeriod,
         employees,
-        message: `Período ${suggestion.periodName} creado con ${employees.length} empleados`
+        message: `Período ${periodName} creado con ${employees.length} empleados`
       };
 
     } catch (error) {
@@ -148,7 +158,7 @@ export class PayrollServiceAleluya {
   }
 
   /**
-   * 💰 LIQUIDAR NÓMINA - REPARADO
+   * 💰 LIQUIDAR NÓMINA - SIMPLIFICADO
    */
   static async liquidatePayroll(
     periodId: string, 
@@ -199,7 +209,7 @@ export class PayrollServiceAleluya {
   }
 
   /**
-   * 🔒 CERRAR PERÍODO - REPARADO
+   * 🔒 CERRAR PERÍODO - SIMPLIFICADO
    */
   static async closePeriod(periodId: string): Promise<{
     success: boolean;
@@ -237,7 +247,7 @@ export class PayrollServiceAleluya {
     }
   }
 
-  // ===== MÉTODOS PRIVADOS REPARADOS =====
+  // ===== MÉTODOS PRIVADOS SIMPLIFICADOS =====
 
   private static async getCurrentCompanyId(): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -269,53 +279,6 @@ export class PayrollServiceAleluya {
 
   private static normalizeStatus(status: string): 'borrador' | 'cerrado' {
     return status === 'cerrado' ? 'cerrado' : 'borrador';
-  }
-
-  private static async suggestNextPeriod(companyId: string) {
-    // Obtener periodicidad configurada
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('periodicity')
-      .eq('company_id', companyId)
-      .single();
-
-    const periodicity = settings?.periodicity || 'quincenal';
-    const now = new Date();
-    
-    // Calcular período basado en fecha actual (3 julio 2025)
-    if (periodicity === 'quincenal') {
-      if (now.getDate() <= 15) {
-        return {
-          startDate: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
-          endDate: new Date(now.getFullYear(), now.getMonth(), 15).toISOString().split('T')[0],
-          periodName: `1 - 15 ${this.getMonthName(now.getMonth())} ${now.getFullYear()}`,
-          type: 'quincenal' as const
-        };
-      } else {
-        return {
-          startDate: new Date(now.getFullYear(), now.getMonth(), 16).toISOString().split('T')[0],
-          endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0],
-          periodName: `16 - ${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()} ${this.getMonthName(now.getMonth())} ${now.getFullYear()}`,
-          type: 'quincenal' as const
-        };
-      }
-    }
-
-    // Mensual por defecto
-    return {
-      startDate: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
-      endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0],
-      periodName: `${this.getMonthName(now.getMonth())} ${now.getFullYear()}`,
-      type: 'mensual' as const
-    };
-  }
-
-  private static getMonthName(month: number): string {
-    const months = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    return months[month];
   }
 
   private static async loadEmployeesForPeriod(periodId: string): Promise<PayrollEmployee[]> {
@@ -369,17 +332,20 @@ export class PayrollServiceAleluya {
     // Obtener información del período
     const { data: period } = await supabase
       .from('payroll_periods_real')
-      .select('periodo, tipo_periodo')
+      .select('periodo, tipo_periodo, fecha_inicio, fecha_fin')
       .eq('id', periodId)
       .single();
 
     const periodName = period?.periodo || 'Período actual';
     const periodType = period?.tipo_periodo || 'mensual';
 
-    // Calcular días según tipo de período
+    // Calcular días según fechas reales del período
     let workDays = 30;
-    if (periodType === 'quincenal') workDays = 15;
-    else if (periodType === 'semanal') workDays = 7;
+    if (period?.fecha_inicio && period?.fecha_fin) {
+      const start = new Date(period.fecha_inicio);
+      const end = new Date(period.fecha_fin);
+      workDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+    }
 
     // Crear registros de nómina
     const payrollRecords = employees.map(emp => ({

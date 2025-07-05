@@ -1,17 +1,21 @@
 
 /**
- * 🎯 COMPONENTE ALELUYA - LIQUIDACIÓN DE NÓMINA UNIFICADA
- * Arquitectura limpia y profesional para contadores colombianos
- * REPARADO: Funciones completas y tipos correctos
+ * 🎯 COMPONENTE ALELUYA - LIQUIDACIÓN DE NÓMINA SIMPLIFICADA
+ * Arquitectura simple con selección de fechas manual
+ * SIMPLIFICADO: Sin detección automática, usuario elige fechas
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
+import { format } from 'date-fns';
 import { 
-  Calendar, 
+  Calendar as CalendarIcon, 
   Users, 
   DollarSign, 
   Calculator,
@@ -23,8 +27,12 @@ import {
 import { PayrollTableNew } from './PayrollTableNew';
 import { usePayrollAleluya } from '@/hooks/usePayrollAleluya';
 import { formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 export const PayrollLiquidationAleluya = () => {
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
+
   const {
     // Estados principales
     isLoading,
@@ -39,7 +47,7 @@ export const PayrollLiquidationAleluya = () => {
     message,
     
     // Acciones principales
-    createPeriod,
+    createPeriodWithDates,
     liquidatePayroll,
     closePeriod,
     toggleEmployeeSelection,
@@ -79,6 +87,17 @@ export const PayrollLiquidationAleluya = () => {
     }
   };
 
+  const handleCreatePeriod = async () => {
+    if (!startDate || !endDate) {
+      return;
+    }
+    
+    await createPeriodWithDates(
+      startDate.toISOString().split('T')[0],
+      endDate.toISOString().split('T')[0]
+    );
+  };
+
   // Estado de carga inicial
   if (isLoading) {
     return (
@@ -99,21 +118,81 @@ export const PayrollLiquidationAleluya = () => {
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
             <CardTitle className="text-xl flex items-center space-x-2">
-              <Calendar className="h-6 w-6 text-blue-600" />
-              <span>Nuevo Período de Nómina</span>
+              <Calendar as CalendarIcon className="h-6 w-6 text-blue-600" />
+              <span>Crear Período de Nómina</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center space-y-4">
+          <CardContent className="space-y-6">
+            <div className="text-center space-y-6">
               <div className="bg-white rounded-lg p-6 border border-blue-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Listo para crear período
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Selecciona las fechas del período
                 </h3>
-                <p className="text-gray-600 mb-4">{message}</p>
                 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* Fecha de inicio */}
+                  <div className="space-y-2">
+                    <Label htmlFor="start-date">Fecha de inicio</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          id="start-date"
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !startDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {startDate ? format(startDate, "PPP") : <span>Seleccionar fecha</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={setStartDate}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Fecha de fin */}
+                  <div className="space-y-2">
+                    <Label htmlFor="end-date">Fecha de fin</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          id="end-date"
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !endDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {endDate ? format(endDate, "PPP") : <span>Seleccionar fecha</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={endDate}
+                          onSelect={setEndDate}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                          disabled={(date) => startDate ? date < startDate : false}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
                 <Button
-                  onClick={createPeriod}
-                  disabled={isProcessing}
+                  onClick={handleCreatePeriod}
+                  disabled={!startDate || !endDate || isProcessing}
                   size="lg"
                   className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3"
                 >
@@ -149,7 +228,7 @@ export const PayrollLiquidationAleluya = () => {
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Calendar className="h-6 w-6 text-green-600" />
+              <Calendar as CalendarIcon className="h-6 w-6 text-green-600" />
               <div>
                 <CardTitle className="text-xl text-gray-900">
                   {currentPeriod?.periodo || 'Período Activo'}

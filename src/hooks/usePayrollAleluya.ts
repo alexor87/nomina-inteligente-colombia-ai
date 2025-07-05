@@ -1,7 +1,7 @@
 
 /**
- * 🎯 HOOK ALELUYA - ESTADO SIMPLIFICADO REPARADO
- * REPARADO: Funciones async correctas y manejo de errores mejorado
+ * 🎯 HOOK ALELUYA - ESTADO SIMPLIFICADO
+ * SIMPLIFICADO: Sin detección automática, usuario elige fechas
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -45,7 +45,7 @@ export const usePayrollAleluya = () => {
   });
 
   /**
-   * 🔄 INICIALIZAR - REPARADO
+   * 🔄 INICIALIZAR - SIMPLIFICADO
    */
   const initialize = useCallback(async () => {
     try {
@@ -90,14 +90,14 @@ export const usePayrollAleluya = () => {
   }, [toast]);
 
   /**
-   * 🏗️ CREAR PERÍODO - REPARADO
+   * 🏗️ CREAR PERÍODO CON FECHAS - NUEVO
    */
-  const createPeriod = useCallback(async () => {
+  const createPeriodWithDates = useCallback(async (startDate: string, endDate: string) => {
     try {
       setState(prev => ({ ...prev, isProcessing: true }));
       
-      console.log('🏗️ Creando nuevo período...');
-      const result = await PayrollServiceAleluya.createNewPeriod();
+      console.log('🏗️ Creando período con fechas:', startDate, '-', endDate);
+      const result = await PayrollServiceAleluya.createPeriodWithDates(startDate, endDate);
       
       // Seleccionar empleados válidos automáticamente
       const validEmployeeIds = result.employees
@@ -146,7 +146,7 @@ export const usePayrollAleluya = () => {
   }, [toast]);
 
   /**
-   * 💰 LIQUIDAR NÓMINA - REPARADO
+   * 💰 LIQUIDAR NÓMINA - MANTENIDO
    */
   const liquidatePayroll = useCallback(async () => {
     if (!state.currentPeriod || state.selectedEmployees.length === 0) {
@@ -191,7 +191,7 @@ export const usePayrollAleluya = () => {
   }, [state.currentPeriod, state.selectedEmployees, toast, initialize]);
 
   /**
-   * 🔒 CERRAR PERÍODO - REPARADO
+   * 🔒 CERRAR PERÍODO - MANTENIDO
    */
   const closePeriod = useCallback(async () => {
     if (!state.currentPeriod) {
@@ -241,7 +241,7 @@ export const usePayrollAleluya = () => {
   }, [state.currentPeriod, toast, initialize]);
 
   /**
-   * ✅ SELECCIÓN DE EMPLEADOS - REPARADO
+   * ✅ SELECCIÓN DE EMPLEADOS - MANTENIDO
    */
   const toggleEmployeeSelection = useCallback((employeeId: string) => {
     setState(prev => {
@@ -284,7 +284,7 @@ export const usePayrollAleluya = () => {
     ...state,
     
     // Acciones principales
-    createPeriod,
+    createPeriodWithDates, // NUEVO: Crear período con fechas específicas
     liquidatePayroll,
     closePeriod,
     refresh: initialize,
