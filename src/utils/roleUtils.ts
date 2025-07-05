@@ -108,6 +108,117 @@ export async function performCompleteRoleCheck(userId: string): Promise<boolean>
   }
 }
 
+// Función para forzar asignación de rol de administrador
+export async function forceAssignAdminRole(userId: string, companyId: string): Promise<boolean> {
+  try {
+    console.log('🔧 Forzando asignación de rol administrador:', userId, companyId);
+    
+    const { error } = await supabase
+      .from('user_roles')
+      .insert({
+        user_id: userId,
+        role: 'administrador',
+        company_id: companyId,
+        assigned_by: userId
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error forzando rol:', error);
+      return false;
+    }
+
+    console.log('✅ Rol administrador forzado exitosamente');
+    return true;
+  } catch (error) {
+    console.error('❌ Error en forceAssignAdminRole:', error);
+    return false;
+  }
+}
+
+// Función para verificar si un usuario es de soporte
+export async function isUserSupport(userId: string): Promise<boolean> {
+  const cacheKey = `support-${userId}`;
+  const cached = getCachedResult(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'soporte')
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Error verificando rol de soporte:', error);
+      setCachedResult(cacheKey, false);
+      return false;
+    }
+
+    const isSupport = data && data.length > 0;
+    setCachedResult(cacheKey, isSupport);
+    return isSupport;
+  } catch (error) {
+    console.error('❌ Error en isUserSupport:', error);
+    setCachedResult(cacheKey, false);
+    return false;
+  }
+}
+
+// Función para obtener empresas de soporte
+export async function getSupportCompanies(userId: string): Promise<any[]> {
+  try {
+    console.log('🔍 Obteniendo empresas de soporte para:', userId);
+    
+    // Verificar si es usuario de soporte
+    const isSupport = await isUserSupport(userId);
+    if (!isSupport) {
+      console.log('❌ Usuario no tiene rol de soporte');
+      return [];
+    }
+
+    // Obtener todas las empresas donde tiene rol de soporte
+    const { data: supportRoles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('company_id')
+      .eq('user_id', userId)
+      .eq('role', 'soporte');
+
+    if (rolesError) {
+      console.error('❌ Error obteniendo roles de soporte:', rolesError);
+      return [];
+    }
+
+    if (!supportRoles || supportRoles.length === 0) {
+      console.log('ℹ️ No se encontraron empresas de soporte');
+      return [];
+    }
+
+    const companyIds = supportRoles.map(role => role.company_id);
+
+    // Obtener información de las empresas
+    const { data: companies, error: companiesError } = await supabase
+      .from('companies')
+      .select('*')
+      .in('id', companyIds);
+
+    if (companiesError) {
+      console.error('❌ Error obteniendo empresas:', companiesError);
+      return [];
+    }
+
+    console.log('✅ Empresas de soporte obtenidas:', companies?.length || 0);
+    return companies || [];
+  } catch (error) {
+    console.error('❌ Error en getSupportCompanies:', error);
+    return [];
+  }
+}
+
 // Limpiar cache cuando sea necesario
 export function clearRoleCache(): void {
   roleCheckCache.clear();
