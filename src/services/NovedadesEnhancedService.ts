@@ -1,5 +1,6 @@
 
 
+
 import { supabase } from '@/integrations/supabase/client';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 
@@ -56,23 +57,25 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
-      // ✅ CORRECCIÓN: Cast tipo_novedad to string para evitar errores de tipo
+      // ✅ CORRECCIÓN: Build data object with proper casting to avoid type errors
+      const insertData = {
+        empleado_id: novedadData.empleado_id,
+        periodo_id: novedadData.periodo_id,
+        tipo_novedad: novedadData.tipo_novedad,
+        valor: novedadData.valor,
+        dias: novedadData.dias,
+        horas: novedadData.horas,
+        observacion: novedadData.observacion,
+        company_id: companyId,
+        creado_por: (await supabase.auth.getUser()).data.user?.id,
+        fecha_inicio: novedadData.fecha_inicio,
+        fecha_fin: novedadData.fecha_fin,
+        base_calculo: novedadData.base_calculo
+      };
+
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
-        .insert({
-          empleado_id: novedadData.empleado_id,
-          periodo_id: novedadData.periodo_id,
-          tipo_novedad: novedadData.tipo_novedad as string, // Cast para evitar errores de tipo
-          valor: novedadData.valor,
-          dias: novedadData.dias,
-          horas: novedadData.horas,
-          observacion: novedadData.observacion,
-          company_id: companyId,
-          creado_por: (await supabase.auth.getUser()).data.user?.id,
-          fecha_inicio: novedadData.fecha_inicio,
-          fecha_fin: novedadData.fecha_fin,
-          base_calculo: novedadData.base_calculo
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -94,11 +97,15 @@ export class NovedadesEnhancedService {
     try {
       console.log(`🔄 Actualizando novedad ${novedadId}:`, updates);
       
-      // ✅ CORRECCIÓN: Cast tipo_novedad to string si existe
-      const updateData = {
-        ...updates,
-        tipo_novedad: updates.tipo_novedad ? updates.tipo_novedad as string : undefined
-      };
+      // ✅ CORRECCIÓN: Build update data object properly
+      const updateData: Record<string, any> = {};
+      
+      // Copy all defined properties
+      Object.keys(updates).forEach(key => {
+        if (updates[key as keyof CreateNovedadData] !== undefined) {
+          updateData[key] = updates[key as keyof CreateNovedadData];
+        }
+      });
       
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
@@ -143,3 +150,4 @@ export class NovedadesEnhancedService {
     }
   }
 }
+

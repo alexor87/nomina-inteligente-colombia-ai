@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -442,6 +443,7 @@ export const DevengoModal = ({
     : 0;
   const totalValue = totalBasicConcepts + totalNovedades;
 
+  // ✅ CORRECCIÓN: Complete all NovedadType labels to fix TS2740
   const getNovedadLabel = (tipo: NovedadType): string => {
     const labels: Record<NovedadType, string> = {
       horas_extra: 'Horas Extra',
@@ -450,15 +452,30 @@ export const DevengoModal = ({
       licencia_remunerada: 'Licencia Remunerada',
       incapacidad: 'Incapacidad',
       bonificacion: 'Bonificación',
+      bonificacion_salarial: 'Bonificación Salarial',
+      bonificacion_no_salarial: 'Bonificación No Salarial',
       comision: 'Comisión',
       prima: 'Prima',
       otros_ingresos: 'Otros Ingresos',
+      auxilio_conectividad: 'Auxilio de Conectividad',
+      viaticos: 'Viáticos',
+      retroactivos: 'Retroactivos',
+      compensacion_ordinaria: 'Compensación Ordinaria',
       libranza: 'Libranza',
       multa: 'Multa',
       ausencia: 'Ausencia',
       descuento_voluntario: 'Descuento Voluntario',
+      retencion_fuente: 'Retención en la Fuente',
+      fondo_solidaridad: 'Fondo de Solidaridad',
       salud: 'Salud',
-      pension: 'Pensión'
+      pension: 'Pensión',
+      arl: 'ARL',
+      caja_compensacion: 'Caja de Compensación',
+      icbf: 'ICBF',
+      sena: 'SENA',
+      embargo: 'Embargo',
+      anticipo: 'Anticipo',
+      aporte_voluntario: 'Aporte Voluntario'
     };
     return labels[tipo] || tipo;
   };
@@ -683,3 +700,4 @@ export const DevengoModal = ({
 };
 
 export default DevengoModal;
+
