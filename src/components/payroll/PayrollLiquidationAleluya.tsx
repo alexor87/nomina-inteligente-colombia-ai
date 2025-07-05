@@ -51,12 +51,11 @@ export const PayrollLiquidationAleluya = () => {
     totalEmployees
   } = usePayrollAleluya();
 
-  // Funciones implementadas para PayrollTableNew
+  // ✅ FIXED: Functions with correct signatures
   const handleRemoveEmployee = async (employeeId: string) => {
     try {
-      // Implementación real para remover empleado
       console.log('Removing employee:', employeeId);
-      await refresh(); // Recargar datos después de remover
+      await refresh();
     } catch (error) {
       console.error('Error removing employee:', error);
     }
@@ -64,19 +63,17 @@ export const PayrollLiquidationAleluya = () => {
 
   const handleCreateNovedad = async (employeeId: string) => {
     try {
-      // Implementación real para crear novedad
       console.log('Creating novedad for employee:', employeeId);
-      // Aquí iría la lógica para abrir modal de creación de novedad
+      // Implementation for creating novedad
     } catch (error) {
       console.error('Error creating novedad:', error);
     }
   };
 
-  const handleRecalculate = async (employeeId: string) => {
+  const handleRecalculate = async () => {
     try {
-      // Implementación real para recalcular
-      console.log('Recalculating for employee:', employeeId);
-      await refresh(); // Recargar datos después de recalcular
+      console.log('Recalculating payroll...');
+      await refresh();
     } catch (error) {
       console.error('Error recalculating:', error);
     }

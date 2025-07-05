@@ -6,6 +6,24 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// ✅ FIXED: Proper type definitions for database responses
+interface CleanDuplicatePeriodsResponse {
+  success: boolean;
+  periods_deleted: number;
+  message: string;
+}
+
+interface SyncHistoricalDataResponse {
+  success: boolean;
+  message: string;
+}
+
+interface DetectSmartPeriodResponse {
+  success: boolean;
+  calculated_period: any;
+  message: string;
+}
+
 export class DatabaseRepairUtils {
   /**
    * 🧹 LIMPIAR PERÍODOS DUPLICADOS
@@ -24,10 +42,13 @@ export class DatabaseRepairUtils {
       
       console.log('✅ Limpieza completada:', data);
       
+      // ✅ FIXED: Proper type casting
+      const result = data as CleanDuplicatePeriodsResponse;
+      
       return {
         success: true,
-        duplicatesRemoved: data.periods_deleted || 0,
-        message: `Se eliminaron ${data.periods_deleted || 0} períodos duplicados`
+        duplicatesRemoved: result.periods_deleted || 0,
+        message: `Se eliminaron ${result.periods_deleted || 0} períodos duplicados`
       };
       
     } catch (error) {
@@ -58,9 +79,12 @@ export class DatabaseRepairUtils {
       
       console.log('✅ Sincronización completada:', data);
       
+      // ✅ FIXED: Proper type casting
+      const result = data as SyncHistoricalDataResponse;
+      
       return {
-        success: data.success || false,
-        message: data.message || 'Sincronización completada'
+        success: result.success || false,
+        message: result.message || 'Sincronización completada'
       };
       
     } catch (error) {
@@ -89,10 +113,13 @@ export class DatabaseRepairUtils {
       
       console.log('✅ Detección completada:', data);
       
+      // ✅ FIXED: Proper type casting
+      const result = data as DetectSmartPeriodResponse;
+      
       return {
-        success: data.success || false,
-        suggestion: data.calculated_period || null,
-        message: data.message || 'Detección completada'
+        success: result.success || false,
+        suggestion: result.calculated_period || null,
+        message: result.message || 'Detección completada'
       };
       
     } catch (error) {
