@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
@@ -144,13 +145,13 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
 
       {/* Modal de Novedades */}
       <NovedadUnifiedModal
-        open={showNovedadesModal}
-        setOpen={setShowNovedadesModal}
+        isOpen={showNovedadesModal}
+        onClose={() => setShowNovedadesModal(false)}
+        employeeName={employee.name}
         employeeId={employee.id}
         employeeSalary={employee.baseSalary}
-        onSubmit={handleCreateNovedad}
-        selectedNovedadType={null}
-        onClose={() => setShowNovedadesModal(false)}
+        periodId={periodId}
+        onCreateNovedad={handleCreateNovedad}
       />
 
       {/* Modal de Edición de Liquidación */}

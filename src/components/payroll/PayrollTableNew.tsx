@@ -250,16 +250,18 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
 
       {selectedEmployeeForNovedad && (
         <NovedadUnifiedModal
-          open={showNovedadModal}
-          setOpen={setShowNovedadModal}
-          employeeId={selectedEmployeeForNovedad.id}
-          employeeSalary={selectedEmployeeForNovedad.baseSalary}
-          onSubmit={handleCreateNovedad}
-          selectedNovedadType={null}
+          isOpen={showNovedadModal}
           onClose={() => {
             setShowNovedadModal(false);
             setSelectedEmployeeForNovedad(null);
           }}
+          employeeName={selectedEmployeeForNovedad.name}
+          employeeId={selectedEmployeeForNovedad.id}
+          employeeSalary={selectedEmployeeForNovedad.baseSalary}
+          periodId={periodId}
+          onCreateNovedad={handleCreateNovedad}
+          onNovedadChange={handleNovedadChange}
+          calculateSuggestedValue={calculateSuggestedValue}
         />
       )}
     </>

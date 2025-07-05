@@ -372,13 +372,14 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
       {selectedEmployee && (
         <>
           <NovedadUnifiedModal
-            open={activeModal === 'novedades'}
-            setOpen={(open) => open ? setActiveModal('novedades') : handleCloseModal()}
+            isOpen={activeModal === 'novedades'}
+            onClose={handleCloseModal}
+            employeeName={selectedEmployee.name}
             employeeId={selectedEmployee.id}
             employeeSalary={selectedEmployee.baseSalary}
-            onSubmit={handleCreateNovedad}
-            selectedNovedadType={null}
-            onClose={handleCloseModal}
+            periodId={periodoId}
+            onCreateNovedad={handleCreateNovedad}
+            calculateSuggestedValue={calculateSuggestedValue}
           />
           
           <EmployeeLiquidationModal

@@ -259,16 +259,14 @@ export const PayrollLiquidationTable = ({
       {/* Modal de Novedades */}
       {selectedEmployee && currentPeriodId && (
         <NovedadUnifiedModal
-          open={isNovedadesModalOpen}
-          setOpen={setIsNovedadesModalOpen}
+          isOpen={isNovedadesModalOpen}
+          onClose={handleCloseNovedades}
+          employeeName={`${selectedEmployee.nombre} ${selectedEmployee.apellido}`}
           employeeId={selectedEmployee.id}
           employeeSalary={selectedEmployee.salario_base}
-          onSubmit={handleCreateNovedad}
-          selectedNovedadType={null}
-          onClose={() => {
-            setIsNovedadesModalOpen(false);
-            setSelectedEmployee(null);
-          }}
+          periodId={currentPeriodId}
+          onCreateNovedad={handleCreateNovedad}
+          onNovedadChange={handleNovedadChange}
         />
       )}
     </>
