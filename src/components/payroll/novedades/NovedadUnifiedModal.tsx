@@ -232,7 +232,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[625px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         {currentStep === 'form' && (
           <>
             <DialogHeader>
