@@ -212,6 +212,20 @@ export const usePayrollLiquidation = () => {
     }
   };
 
+  const updateEmployeeSalary = async (employeeId: string, newSalary: number) => {
+    try {
+      // Update employee salary in the state
+      setEmployees(prev => prev.map(emp => 
+        emp.id === employeeId ? { ...emp, salario_base: newSalary } : emp
+      ));
+      
+      console.log(`✅ usePayrollLiquidation - Employee salary updated: ${employeeId} -> ${newSalary}`);
+    } catch (error) {
+      console.error('❌ usePayrollLiquidation - Error updating employee salary:', error);
+      throw error;
+    }
+  };
+
   return {
     employees,
     isLoading,
@@ -220,6 +234,7 @@ export const usePayrollLiquidation = () => {
     loadEmployees,
     removeEmployee,
     liquidatePayroll,
-    refreshEmployeeNovedades
+    refreshEmployeeNovedades,
+    updateEmployeeSalary
   };
 };

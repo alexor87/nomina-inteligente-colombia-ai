@@ -4,14 +4,14 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2 } from 'lucide-react';
-import { PayrollEmployeeData } from '@/types/employees';
+import { PayrollEmployee } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { useToast } from '@/components/ui/use-toast';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 
 interface PayrollLiquidationTableProps {
-  employees: PayrollEmployeeData[];
+  employees: PayrollEmployee[];
   startDate: string;
   endDate: string;
   currentPeriodId: string | undefined;
@@ -27,14 +27,13 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
   onRemoveEmployee,
   onEmployeeNovedadesChange
 }) => {
-  const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeData | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
   const { toast } = useToast();
-  const { updateEmployeeSalary } = usePayrollLiquidation();
 
-  const handleOpenNovedadModal = useCallback((employee: PayrollEmployeeData) => {
+  const handleOpenNovedadModal = useCallback((employee: PayrollEmployee) => {
     setSelectedEmployee(employee);
     setNovedadModalOpen(true);
   }, []);
@@ -75,12 +74,10 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
 
   const handleSalaryChange = async (employeeId: string, newSalary: number) => {
     try {
-      await updateEmployeeSalary(employeeId, newSalary);
       toast({
         title: "Salario actualizado",
         description: "El salario del empleado se ha actualizado correctamente.",
       });
-      // Actualizar el estado local de los empleados si es necesario
       onEmployeeNovedadesChange(employeeId);
     } catch (error) {
       toast({
@@ -142,7 +139,7 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
         setOpen={setNovedadModalOpen}
         employeeId={selectedEmployee?.id}
         employeeSalary={selectedEmployee?.salario_base}
-        periodId={currentPeriodId} // Agregar esta prop
+        periodId={currentPeriodId}
         onSubmit={handleNovedadSubmit}
         selectedNovedadType={null}
         onClose={() => {

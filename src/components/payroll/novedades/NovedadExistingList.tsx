@@ -195,9 +195,9 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                         <Badge variant={getNovedadBadgeVariant(novedad.tipo_novedad)}>
                           {getNovedadTypeLabel(novedad.tipo_novedad)}
                         </Badge>
-                        {novedad.subtipo && (
+                        {(novedad as any).subtipo && (
                           <span className="text-sm text-gray-600">
-                            ({novedad.subtipo.replace('_', ' ')})
+                            ({(novedad as any).subtipo.replace('_', ' ')})
                           </span>
                         )}
                       </div>

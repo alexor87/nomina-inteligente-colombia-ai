@@ -254,6 +254,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
           setOpen={setShowNovedadModal}
           employeeId={selectedEmployeeForNovedad.id}
           employeeSalary={selectedEmployeeForNovedad.baseSalary}
+          periodId={periodId}
           onSubmit={handleCreateNovedad}
           selectedNovedadType={null}
           onClose={() => {
