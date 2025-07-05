@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
@@ -22,13 +23,16 @@ export class PayrollHistorySimpleService {
       
       console.log('📊 FASE 2 - Respuesta REAL de función DB:', data);
       
+      // ✅ Type casting correcto para JSON response
+      const response = data as { success: boolean; data: any[] } | null;
+      
       // Validar respuesta
-      if (!data || !data.success) {
+      if (!response || !response.success) {
         console.warn('⚠️ La función no retornó datos exitosos');
         return [];
       }
       
-      const periods = data.data || [];
+      const periods = response.data || [];
       console.log(`✅ FASE 2 - Períodos REALES cargados: ${periods.length}`);
       
       return periods.map((period: any) => ({
@@ -154,9 +158,12 @@ export class PayrollHistorySimpleService {
       
       console.log('✅ Períodos duplicados limpiados:', data);
       
+      // ✅ Type casting correcto para JSON response
+      const result = data as { periods_deleted: number; payrolls_updated: number } | null;
+      
       return {
         success: true,
-        message: `Limpieza completada: ${data.periods_deleted} períodos eliminados, ${data.payrolls_updated} payrolls actualizados`
+        message: `Limpieza completada: ${result?.periods_deleted || 0} períodos eliminados, ${result?.payrolls_updated || 0} payrolls actualizados`
       };
       
     } catch (error) {
@@ -168,3 +175,4 @@ export class PayrollHistorySimpleService {
     }
   }
 }
+
