@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -10,7 +11,7 @@ import { NovedadPrestamosConsolidatedForm } from './forms/NovedadPrestamosConsol
 import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesConsolidatedForm';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { useToast } from '@/components/ui/use-toast';
-import { calcularValorNovedad } from '@/types/novedades';
+import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
 
@@ -87,7 +88,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
 
     try {
-      const { valor } = calcularValorNovedad(tipoNovedad, subtipo, employeeSalary, dias, horas);
+      const { valor } = calcularValorNovedadEnhanced(tipoNovedad, subtipo, employeeSalary, dias, horas);
       return valor;
     } catch (error) {
       console.error('Error al calcular el valor sugerido:', error);
@@ -116,15 +117,24 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         return <NovedadVacacionesConsolidatedForm {...baseProps} />;
         
       case 'bonificacion':
+      case 'bonificacion_salarial':
+      case 'bonificacion_no_salarial':
         return <NovedadBonificacionesConsolidatedForm {...baseProps} />;
         
       case 'otros_ingresos':
+      case 'auxilio_conectividad':
+      case 'viaticos':
+      case 'retroactivos':
+      case 'compensacion_ordinaria':
         return <NovedadIngresosAdicionalesConsolidatedForm {...baseProps} />;
         
-      case 'prestamos':
+      case 'libranza':
+      case 'anticipo':
         return <NovedadPrestamosConsolidatedForm {...baseProps} />;
         
-      case 'deducciones':
+      case 'descuento_voluntario':
+      case 'multa':
+      case 'embargo':
         return <NovedadDeduccionesConsolidatedForm {...baseProps} />;
 
       // Fallback to individual forms for other types
