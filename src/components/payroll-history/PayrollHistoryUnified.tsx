@@ -28,7 +28,7 @@ export const PayrollHistoryUnified = () => {
     periods,
     isLoading: isLoadingHistory,
     error: historyError,
-    refreshHistory
+    refetch: refreshHistory
   } = usePayrollHistorySimple();
 
   const {

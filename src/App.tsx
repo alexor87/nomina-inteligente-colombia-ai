@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,7 +9,7 @@ import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { useSystemInitialization } from "@/hooks/useSystemInitialization";
 
 // Components and pages
-import Index from "./pages/Index";
+import { Index } from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";

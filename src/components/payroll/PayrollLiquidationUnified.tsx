@@ -26,11 +26,9 @@ export const PayrollLiquidationUnified = () => {
   const [systemReady, setSystemReady] = useState(false);
   
   const {
-    periodStatus,
     employees,
     isLoading: isLoadingPayroll,
-    error: payrollError,
-    refreshPeriod
+    periodSituation
   } = usePayrollDomain();
 
   const {
@@ -75,7 +73,6 @@ export const PayrollLiquidationUnified = () => {
     if (result?.success) {
       // Recargar datos después de la reparación
       setTimeout(() => {
-        refreshPeriod();
         runDiagnosis();
       }, 1000);
     }
