@@ -43,7 +43,7 @@ export class DatabaseRepairUtils {
       console.log('✅ Limpieza completada:', data);
       
       // ✅ FIXED: Proper type casting
-      const result = data as CleanDuplicatePeriodsResponse;
+      const result = data as unknown as CleanDuplicatePeriodsResponse;
       
       return {
         success: true,
@@ -80,7 +80,7 @@ export class DatabaseRepairUtils {
       console.log('✅ Sincronización completada:', data);
       
       // ✅ FIXED: Proper type casting
-      const result = data as SyncHistoricalDataResponse;
+      const result = data as unknown as SyncHistoricalDataResponse;
       
       return {
         success: result.success || false,
@@ -114,7 +114,7 @@ export class DatabaseRepairUtils {
       console.log('✅ Detección completada:', data);
       
       // ✅ FIXED: Proper type casting
-      const result = data as DetectSmartPeriodResponse;
+      const result = data as unknown as DetectSmartPeriodResponse;
       
       return {
         success: result.success || false,
