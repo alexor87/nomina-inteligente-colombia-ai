@@ -267,7 +267,7 @@ export const PayrollLiquidationTable = ({
           selectedNovedadType={null}
           onClose={() => {
             setIsNovedadesModalOpen(false);
-            setSelectedEmployee(null);
+            setSelectedEmployeeId(null);
           }}
         />
       )}
