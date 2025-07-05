@@ -3,24 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
 /**
- * INTERFAZ PARA LA RESPUESTA DE LA FUNCIÓN DB
- */
-interface PayrollHistoryResponse {
-  success: boolean;
-  data?: PayrollHistoryPeriod[];
-}
-
-/**
- * ✅ SERVICIO SIMPLE DE HISTORIAL - REPARACIÓN CRÍTICA FASE 3
- * Conecta directamente con la función de base de datos sincronizada
+ * ✅ SERVICIO REAL DE HISTORIAL - FASE 2 REPARADO
+ * Conecta directamente con datos reales sin fallbacks simulados
  */
 export class PayrollHistorySimpleService {
   
   static async getHistoryPeriods(): Promise<PayrollHistoryPeriod[]> {
     try {
-      console.log('📊 FASE 3 - Cargando historial desde función DB...');
+      console.log('📊 FASE 2 - Cargando historial REAL desde función DB...');
       
-      // Llamar a la función de base de datos que creamos
+      // Llamar a la función de base de datos reparada
       const { data, error } = await supabase.rpc('get_payroll_history_periods');
       
       if (error) {
@@ -28,18 +20,16 @@ export class PayrollHistorySimpleService {
         throw error;
       }
       
-      console.log('📊 FASE 3 - Respuesta de función DB:', data);
+      console.log('📊 FASE 2 - Respuesta REAL de función DB:', data);
       
-      // Type assertion correcta: primero a unknown, luego al tipo específico
-      const response = data as unknown as PayrollHistoryResponse;
-      
-      if (!response || !response.success) {
+      // Validar respuesta
+      if (!data || !data.success) {
         console.warn('⚠️ La función no retornó datos exitosos');
         return [];
       }
       
-      const periods = response.data || [];
-      console.log(`✅ FASE 3 - Períodos cargados: ${periods.length}`);
+      const periods = data.data || [];
+      console.log(`✅ FASE 2 - Períodos REALES cargados: ${periods.length}`);
       
       return periods.map((period: any) => ({
         id: period.id,
@@ -62,20 +52,20 @@ export class PayrollHistorySimpleService {
       }));
       
     } catch (error) {
-      console.error('💥 FASE 3 - Error crítico cargando historial:', error);
+      console.error('💥 FASE 2 - Error crítico cargando historial REAL:', error);
       
-      // ✅ FALLBACK: Si falla la función, intentar consulta directa
-      return PayrollHistorySimpleService.getFallbackHistoryPeriods();
+      // ✅ FALLBACK REAL (sin simulaciones)
+      return PayrollHistorySimpleService.getDirectHistoryPeriods();
     }
   }
   
-  private static async getFallbackHistoryPeriods(): Promise<PayrollHistoryPeriod[]> {
+  private static async getDirectHistoryPeriods(): Promise<PayrollHistoryPeriod[]> {
     try {
-      console.log('🔄 FASE 3 - Ejecutando fallback directo...');
+      console.log('🔄 FASE 2 - Ejecutando consulta directa REAL...');
       
       const companyId = await PayrollHistorySimpleService.getCurrentUserCompanyId();
       if (!companyId) {
-        console.warn('⚠️ No se pudo obtener company_id en fallback');
+        console.warn('⚠️ No se pudo obtener company_id');
         return [];
       }
       
@@ -86,11 +76,11 @@ export class PayrollHistorySimpleService {
         .order('fecha_inicio', { ascending: false });
       
       if (error) {
-        console.error('❌ Error en fallback:', error);
+        console.error('❌ Error en consulta directa:', error);
         return [];
       }
       
-      console.log(`🔄 FASE 3 - Fallback exitoso: ${periods?.length || 0} períodos`);
+      console.log(`🔄 FASE 2 - Consulta directa exitosa: ${periods?.length || 0} períodos REALES`);
       
       return (periods || []).map(period => ({
         id: period.id,
@@ -113,7 +103,7 @@ export class PayrollHistorySimpleService {
       }));
       
     } catch (error) {
-      console.error('💥 Error en fallback:', error);
+      console.error('💥 Error en consulta directa:', error);
       return [];
     }
   }
@@ -148,6 +138,33 @@ export class PayrollHistorySimpleService {
     } catch (error) {
       console.error('Error getting company ID:', error);
       return null;
+    }
+  }
+
+  // ✅ NUEVO: Limpiar períodos duplicados
+  static async cleanDuplicatePeriods(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🧹 FASE 2 - Limpiando períodos duplicados...');
+      
+      const { data, error } = await supabase.rpc('clean_specific_duplicate_periods');
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('✅ Períodos duplicados limpiados:', data);
+      
+      return {
+        success: true,
+        message: `Limpieza completada: ${data.periods_deleted} períodos eliminados, ${data.payrolls_updated} payrolls actualizados`
+      };
+      
+    } catch (error) {
+      console.error('❌ Error limpiando duplicados:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Error limpiando duplicados'
+      };
     }
   }
 }

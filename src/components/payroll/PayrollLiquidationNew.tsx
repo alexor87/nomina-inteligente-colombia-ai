@@ -6,12 +6,16 @@ import { PayrollPeriodHeader } from './liquidation/PayrollPeriodHeader';
 import { TransactionalClosureIndicator } from './closure/TransactionalClosureIndicator';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePayrollLiquidationUnified } from '@/hooks/usePayrollLiquidationUnified';
+import { useSystemInitialization } from '@/hooks/useSystemInitialization';
 
 /**
- * ✅ COMPONENTE PRINCIPAL DE LIQUIDACIÓN - CORRECCIÓN FASE 1
- * Usa el hook unificado para liquidación de nómina
+ * ✅ COMPONENTE PRINCIPAL REPARADO - FASE 2 CRÍTICA
+ * Usa servicios reales sin simulaciones + inicialización automática
  */
 export const PayrollLiquidationNew = () => {
+  // ✅ Inicialización del sistema con limpieza automática
+  const { isInitializing } = useSystemInitialization();
+  
   const {
     isLoading,
     isProcessing,
@@ -38,10 +42,21 @@ export const PayrollLiquidationNew = () => {
     hasEmployees
   } = usePayrollLiquidationUnified();
 
-  if (isLoading) {
+  // Mostrar loading durante inicialización o carga normal
+  if (isInitializing || isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <LoadingSpinner />
+        <div className="text-center space-y-4">
+          <LoadingSpinner />
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium text-gray-900">
+              {isInitializing ? '🔧 Optimizando sistema...' : '📊 Cargando nómina...'}
+            </h3>
+            <p className="text-gray-600">
+              {isInitializing ? 'Preparando datos reales' : 'Conectando con base de datos'}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -74,7 +89,7 @@ export const PayrollLiquidationNew = () => {
         totalCount={employees.length}
       />
 
-      {/* ✅ CORRECCIÓN FASE 1: Indicador de Cierre Transaccional */}
+      {/* ✅ Indicador de Cierre Transaccional */}
       <TransactionalClosureIndicator
         isProcessing={isProcessing}
         currentStep={closureStep}

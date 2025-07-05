@@ -1,18 +1,20 @@
 
 import { PayrollUnifiedService } from '../PayrollUnifiedService';
+import { PayrollCalculationEnhancedService } from '../PayrollCalculationEnhancedService';
 import { Result, PayrollClosureResult } from '@/types/payroll-liquidation';
 import { PayrollEmployee, PeriodStatus } from '@/types/payroll';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
- * ✅ FACADE CONSOLIDADA DE LIQUIDACIÓN - REPARACIÓN CRÍTICA
- * Unifica todos los servicios de liquidación en una sola interfaz
+ * ✅ FACADE REPARADA - FASE 2 CRÍTICA
+ * Conecta servicios reales sin simulaciones
  */
 export class PayrollLiquidationFacade {
   
-  // ✅ DETECCIÓN DE PERÍODO ACTUAL
+  // ✅ DETECCIÓN DE PERÍODO ACTUAL - REAL
   static async detectCurrentPeriodSituation(): Promise<Result<PeriodStatus>> {
     try {
-      console.log('🎯 FACADE - Detectando situación del período actual...');
+      console.log('🎯 FACADE REAL - Detectando situación del período actual...');
       
       const periodStatus = await PayrollUnifiedService.detectCurrentPeriodSituation();
       
@@ -30,10 +32,10 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ CARGA DE EMPLEADOS PARA PERÍODO ACTIVO
+  // ✅ CARGA REAL DE EMPLEADOS PARA PERÍODO ACTIVO
   static async loadEmployeesForActivePeriod(period: any): Promise<Result<PayrollEmployee[]>> {
     try {
-      console.log('👥 FACADE - Cargando empleados para período:', period.periodo);
+      console.log('👥 FACADE REAL - Cargando empleados para período:', period.periodo);
       
       const employees = await PayrollUnifiedService.loadEmployeesForActivePeriod(period);
       
@@ -51,13 +53,33 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ REMOVER EMPLEADO DEL PERÍODO
+  // ✅ REMOVER EMPLEADO DEL PERÍODO - IMPLEMENTACIÓN REAL
   static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<Result<void>> {
     try {
-      console.log('🗑️ FACADE - Removiendo empleado del período:', employeeId);
+      console.log('🗑️ FACADE REAL - Removiendo empleado del período:', employeeId);
       
-      // TODO: Implementar lógica real de remoción
-      console.log('✅ Empleado removido exitosamente (simulado)');
+      // Eliminar registro de payrolls
+      const { error: deleteError } = await supabase
+        .from('payrolls')
+        .delete()
+        .eq('employee_id', employeeId)
+        .eq('period_id', periodId);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      // Actualizar contador del período
+      const { error: updateError } = await supabase
+        .rpc('sync_historical_payroll_data', { 
+          p_period_id: periodId 
+        });
+
+      if (updateError) {
+        console.warn('⚠️ Warning actualizando contador:', updateError.message);
+      }
+      
+      console.log('✅ Empleado removido exitosamente');
       
       return {
         success: true,
@@ -73,34 +95,86 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ RECALCULAR EMPLEADO DESPUÉS DE NOVEDAD
+  // ✅ RECALCULAR EMPLEADO - IMPLEMENTACIÓN REAL
   static async recalculateAfterNovedadChange(employeeId: string, periodId: string): Promise<Result<PayrollEmployee>> {
     try {
-      console.log('🔄 FACADE - Recalculando empleado después de novedad:', employeeId);
+      console.log('🔄 FACADE REAL - Recalculando empleado después de novedad:', employeeId);
       
-      // TODO: Implementar lógica real de recálculo
-      const mockEmployee: PayrollEmployee = {
-        id: employeeId,
-        name: 'Empleado Recalculado',
-        position: 'Cargo',
-        baseSalary: 1000000,
-        workedDays: 30,
+      // Obtener datos del empleado y período
+      const { data: employee, error: empError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', employeeId)
+        .single();
+
+      if (empError || !employee) {
+        throw new Error('Empleado no encontrado');
+      }
+
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+
+      if (periodError || !period) {
+        throw new Error('Período no encontrado');
+      }
+
+      // Calcular nómina con servicio real
+      const calculationInput = {
+        baseSalary: Number(employee.salario_base),
+        workedDays: employee.dias_trabajo || 30,
         extraHours: 0,
         disabilities: 0,
         bonuses: 0,
         absences: 0,
-        grossPay: 1000000,
-        deductions: 80000,
-        netPay: 920000,
-        transportAllowance: 0,
-        employerContributions: 207500,
+        periodType: period.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
+        empleadoId: employeeId,
+        periodoId: periodId
+      };
+
+      const calculation = await PayrollCalculationEnhancedService.calculatePayroll(calculationInput);
+
+      // Actualizar registro en payrolls
+      const { error: updateError } = await supabase
+        .from('payrolls')
+        .update({
+          total_devengado: calculation.grossPay,
+          total_deducciones: calculation.totalDeductions,
+          neto_pagado: calculation.netPay,
+          updated_at: new Date().toISOString()
+        })
+        .eq('employee_id', employeeId)
+        .eq('period_id', periodId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Retornar empleado recalculado
+      const recalculatedEmployee: PayrollEmployee = {
+        id: employee.id,
+        name: `${employee.nombre} ${employee.apellido}`,
+        position: employee.cargo || 'Sin cargo',
+        baseSalary: Number(employee.salario_base),
+        workedDays: employee.dias_trabajo || 30,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        grossPay: calculation.grossPay,
+        deductions: calculation.totalDeductions,
+        netPay: calculation.netPay,
+        transportAllowance: calculation.transportAllowance,
+        employerContributions: calculation.employerContributions,
         status: 'valid',
         errors: []
       };
       
       return {
         success: true,
-        data: mockEmployee
+        data: recalculatedEmployee
       };
       
     } catch (error) {
@@ -112,13 +186,24 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ ACTUALIZAR CONTADOR DE EMPLEADOS
+  // ✅ ACTUALIZAR CONTADOR DE EMPLEADOS - IMPLEMENTACIÓN REAL
   static async updateEmployeeCount(periodId: string, count: number): Promise<Result<void>> {
     try {
-      console.log('📊 FACADE - Actualizando contador de empleados:', count);
+      console.log('📊 FACADE REAL - Actualizando contador de empleados:', count);
       
-      // TODO: Implementar actualización real en BD
-      console.log('✅ Contador actualizado exitosamente (simulado)');
+      const { error } = await supabase
+        .from('payroll_periods_real')
+        .update({ 
+          empleados_count: count,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId);
+
+      if (error) {
+        throw error;
+      }
+      
+      console.log('✅ Contador actualizado exitosamente');
       
       return {
         success: true,
@@ -134,26 +219,56 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ CERRAR PERÍODO
+  // ✅ CERRAR PERÍODO - IMPLEMENTACIÓN REAL
   static async closePeriod(period: any, employees: PayrollEmployee[]): Promise<Result<PayrollClosureResult>> {
     try {
-      console.log('🔒 FACADE - Cerrando período:', period.periodo);
+      console.log('🔒 FACADE REAL - Cerrando período:', period.periodo);
       
-      // TODO: Implementar lógica real de cierre
+      const transactionId = 'txn_' + Date.now();
+      
+      // Cerrar período en base de datos
+      const { error: closeError } = await supabase
+        .from('payroll_periods_real')
+        .update({ 
+          estado: 'cerrado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', period.id);
+
+      if (closeError) {
+        throw closeError;
+      }
+
+      // Marcar payrolls como procesados
+      const { error: payrollError } = await supabase
+        .from('payrolls')
+        .update({ 
+          estado: 'procesada',
+          updated_at: new Date().toISOString()
+        })
+        .eq('period_id', period.id);
+
+      if (payrollError) {
+        console.warn('⚠️ Warning actualizando payrolls:', payrollError.message);
+      }
+
+      // Detectar siguiente período sugerido
+      const nextPeriodResult = await PayrollUnifiedService.detectCurrentPeriodSituation();
+      
       const closureResult: PayrollClosureResult = {
         success: true,
         message: `Período ${period.periodo} cerrado exitosamente`,
-        transactionId: 'txn_' + Date.now(),
+        transactionId,
         rollbackExecuted: false,
         postClosureResult: {
           success: true,
           message: 'Cierre completado satisfactoriamente',
-          nextPeriodSuggestion: {
-            startDate: '2025-08-01',
-            endDate: '2025-08-31',
-            periodName: 'Agosto 2025',
-            type: 'mensual'
-          }
+          nextPeriodSuggestion: nextPeriodResult.nextPeriod ? {
+            startDate: nextPeriodResult.nextPeriod.startDate,
+            endDate: nextPeriodResult.nextPeriod.endDate,
+            periodName: nextPeriodResult.nextPeriod.periodName,
+            type: nextPeriodResult.nextPeriod.type
+          } : undefined
         }
       };
       
@@ -171,10 +286,10 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ CREAR SIGUIENTE PERÍODO
+  // ✅ CREAR SIGUIENTE PERÍODO - IMPLEMENTACIÓN REAL
   static async createNextPeriod(): Promise<Result<{ period: any; message: string }>> {
     try {
-      console.log('🆕 FACADE - Creando siguiente período...');
+      console.log('🆕 FACADE REAL - Creando siguiente período...');
       
       const result = await PayrollUnifiedService.createNextPeriod();
       

@@ -25,7 +25,6 @@ import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
 import EditEmployeePage from "./pages/EditEmployeePage";
 import EmployeeDetailsPage from "./pages/EmployeeDetailsPage";
 import PayrollPage from "./pages/PayrollPage";
-import PayrollPageRobust from "./pages/PayrollPageRobust";
 import PayrollHistoryPage from "./pages/PayrollHistoryPage";
 import PayrollHistoryDetailsPage from "./pages/PayrollHistoryDetailsPage";
 import PeriodEditPage from "./pages/PeriodEditPage";
@@ -87,8 +86,8 @@ function App() {
                   <Route path="employees/:id/edit" element={<EditEmployeePage />} />
                   <Route path="employees/:id" element={<EmployeeDetailsPage />} />
                   
-                  {/* Payroll management */}
-                  <Route path="payroll" element={<PayrollPageRobust />} />
+                  {/* ✅ REPARACIÓN CRÍTICA: Usar componente reparado */}
+                  <Route path="payroll" element={<PayrollPage />} />
                   <Route path="payroll-history" element={<PayrollHistoryPage />} />
                   <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
                   <Route path="period-edit/:periodId" element={<PeriodEditPage />} />
