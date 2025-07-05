@@ -271,9 +271,9 @@ export const PayrollLiquidationAleluya = () => {
           <CardContent>
             <PayrollTableNew
               employees={employees}
-              onRemoveEmployee={() => {}} // Función simplificada
-              onCreateNovedad={() => {}} // Función simplificada
-              onRecalculate={() => {}} // Función simplificada
+              onRemoveEmployee={async () => {}} // FIXED: Made async to match expected signature
+              onCreateNovedad={async () => {}} // FIXED: Made async to match expected signature
+              onRecalculate={async () => {}} // FIXED: Made async to match expected signature
               periodId={currentPeriod?.id || ''}
               canEdit={currentPeriod?.estado === 'borrador'}
               selectedEmployees={selectedEmployees}
