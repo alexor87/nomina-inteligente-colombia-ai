@@ -15,6 +15,12 @@ interface Employee {
   total_pagar: number;
   dias_trabajados: number;
   auxilio_transporte: number;
+  // Deducciones detalladas para auditoría
+  salud_empleado: number;
+  pension_empleado: number;
+  fondo_solidaridad: number;
+  retencion_fuente: number;
+  deducciones_novedades: number;
 }
 
 export class PayrollLiquidationService {
@@ -137,25 +143,26 @@ export class PayrollLiquidationService {
       // Calculate working days for the period
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
 
-      // Process each employee using the comprehensive deduction service
+      // Process each employee with detailed deduction calculation
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
         const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
         const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
         const totalDevengado = salarioProporcional + auxilioTransporte;
         
-        // Use DeductionCalculationService for comprehensive deduction calculation
+        // ✅ CÁLCULO DETALLADO DE DEDUCCIONES PARA AUDITORÍA
         const deductionResult = await DeductionCalculationService.calculateDeductions({
           salarioBase: employee.salario_base,
           totalDevengado: totalDevengado,
           auxilioTransporte: auxilioTransporte,
-          periodType: 'mensual' // Adjust based on period type
+          periodType: 'mensual'
         });
         
-        console.log(`📊 Empleado ${employee.nombre}: Deducciones completas calculadas`, {
-          totalDevengado,
-          totalDeducciones: deductionResult.totalDeducciones,
+        console.log(`📊 Empleado ${employee.nombre}: Deducciones detalladas`, {
+          salud: deductionResult.saludEmpleado,
+          pension: deductionResult.pensionEmpleado,
           fondoSolidaridad: deductionResult.fondoSolidaridad,
-          netoPagar: totalDevengado - deductionResult.totalDeducciones
+          retencion: deductionResult.retencionFuente,
+          total: deductionResult.totalDeducciones
         });
         
         return {
@@ -163,11 +170,17 @@ export class PayrollLiquidationService {
           nombre: employee.nombre,
           apellido: employee.apellido,
           salario_base: employee.salario_base,
-          devengos: 0, // Will be calculated from novedades
-          deducciones: deductionResult.totalDeducciones, // Includes all legal deductions including Fondo Solidaridad
-          total_pagar: totalDevengado - deductionResult.totalDeducciones, // Net pay after all deductions
+          devengos: 0, // Will be filled with novedades
+          deducciones: deductionResult.totalDeducciones,
+          total_pagar: totalDevengado - deductionResult.totalDeducciones,
           dias_trabajados: diasTrabajados,
-          auxilio_transporte: auxilioTransporte
+          auxilio_transporte: auxilioTransporte,
+          // ✅ DEDUCCIONES DETALLADAS PARA AUDITORÍA DIAN/UGPP
+          salud_empleado: deductionResult.saludEmpleado,
+          pension_empleado: deductionResult.pensionEmpleado,
+          fondo_solidaridad: deductionResult.fondoSolidaridad,
+          retencion_fuente: deductionResult.retencionFuente,
+          deducciones_novedades: 0 // Will be filled when processing novedades
         };
       }));
 
@@ -210,7 +223,7 @@ export class PayrollLiquidationService {
         throw periodError;
       }
 
-      // Create payroll records for each employee
+      // ✅ CREAR REGISTROS DE NÓMINA CON DEDUCCIONES DETALLADAS
       for (const employee of employees) {
         const { error: payrollError } = await supabase
           .from('payrolls')
@@ -223,6 +236,12 @@ export class PayrollLiquidationService {
             dias_trabajados: employee.dias_trabajados,
             auxilio_transporte: employee.auxilio_transporte,
             total_devengado: employee.salario_base + employee.devengos + employee.auxilio_transporte,
+            // ✅ DEDUCCIONES SEPARADAS PARA AUDITORÍA DIAN/UGPP
+            salud_empleado: employee.salud_empleado,
+            pension_empleado: employee.pension_empleado,
+            fondo_solidaridad: employee.fondo_solidaridad,
+            retencion_fuente: employee.retencion_fuente,
+            otras_deducciones: employee.deducciones_novedades, // Solo novedades de deducciones
             total_deducciones: employee.deducciones,
             neto_pagado: employee.total_pagar,
             estado: 'procesada'
@@ -253,7 +272,7 @@ export class PayrollLiquidationService {
 
       return {
         success: true,
-        message: `Liquidación completada para ${employees.length} empleados`,
+        message: `Liquidación completada para ${employees.length} empleados con deducciones detalladas`,
         periodId: period.id
       };
     } catch (error) {

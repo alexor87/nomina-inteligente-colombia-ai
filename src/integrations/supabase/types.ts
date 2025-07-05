@@ -1140,6 +1140,7 @@ export type Database = {
           employee_id: string
           estado: string | null
           fecha_reapertura: string | null
+          fondo_solidaridad: number | null
           horas_extra: number | null
           id: string
           intereses_cesantias: number | null
@@ -1172,6 +1173,7 @@ export type Database = {
           employee_id: string
           estado?: string | null
           fecha_reapertura?: string | null
+          fondo_solidaridad?: number | null
           horas_extra?: number | null
           id?: string
           intereses_cesantias?: number | null
@@ -1204,6 +1206,7 @@ export type Database = {
           employee_id?: string
           estado?: string | null
           fecha_reapertura?: string | null
+          fondo_solidaridad?: number | null
           horas_extra?: number | null
           id?: string
           intereses_cesantias?: number | null
