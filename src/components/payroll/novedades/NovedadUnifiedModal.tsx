@@ -12,6 +12,10 @@ import { NovedadDeduccionesForm } from './forms/NovedadDeduccionesForm';
 import { NovedadPrestamosForm } from './forms/NovedadPrestamosForm';
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadBonificacionesForm } from './forms/NovedadBonificacionesForm';
+import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesConsolidatedForm';
+import { NovedadBonificacionesConsolidatedForm } from './forms/NovedadBonificacionesConsolidatedForm';
+import { NovedadPrestamosConsolidatedForm } from './forms/NovedadPrestamosConsolidatedForm';
+import { NovedadIngresosAdicionalesConsolidatedForm } from './forms/NovedadIngresosAdicionalesConsolidatedForm';
 import { CreateNovedadData, PayrollNovedad, NovedadType } from '@/types/novedades-enhanced';
 import { formatCurrency } from '@/lib/utils';
 import { Plus, Check, X, Edit, Trash2, FileText } from 'lucide-react';
@@ -491,6 +495,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       employeeSalary
     };
 
+    const consolidatedProps = {
+      onBack: handleBackToSelector,
+      onSubmit: handleSubmitMultiple,
+      employeeSalary
+    };
+
     switch (selectedCategory) {
       case 'horas_extra':
         return (
@@ -504,7 +514,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'recargo_nocturno':
         return <NovedadRecargoForm {...commonProps} />;
       case 'bonificaciones':
-        return <NovedadBonificacionesForm {...commonPropsWithoutCalculation} />;
+        return <NovedadBonificacionesConsolidatedForm {...consolidatedProps} />;
       case 'vacaciones':
         return <NovedadVacacionesForm {...commonProps} />;
       case 'incapacidades':
@@ -512,13 +522,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'licencias':
         return <NovedadLicenciasForm {...commonProps} />;
       case 'ingresos_adicionales':
-        return <NovedadIngresosAdicionalesForm {...commonPropsWithoutCalculation} />;
+        return <NovedadIngresosAdicionalesConsolidatedForm {...consolidatedProps} />;
       case 'deducciones_especiales':
-        return <NovedadDeduccionesForm {...commonPropsWithoutCalculation} />;
+        return <NovedadDeduccionesConsolidatedForm {...consolidatedProps} />;
       case 'deducciones':
-        return <NovedadDeduccionesForm {...commonPropsWithoutCalculation} />;
+        return <NovedadDeduccionesConsolidatedForm {...consolidatedProps} />;
       case 'prestamos':
-        return <NovedadPrestamosForm {...commonPropsWithoutCalculation} />;
+        return <NovedadPrestamosConsolidatedForm {...consolidatedProps} />;
       case 'retefuente':
         return <NovedadRetefuenteForm {...commonPropsWithoutCalculation} />;
       default:
