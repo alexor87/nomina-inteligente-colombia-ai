@@ -1,4 +1,3 @@
-
 /**
  * 🎯 COMPONENTE ALELUYA - LIQUIDACIÓN DE NÓMINA SIMPLIFICADA
  * Arquitectura simple con selección de fechas manual
@@ -118,7 +117,7 @@ export const PayrollLiquidationAleluya = () => {
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
             <CardTitle className="text-xl flex items-center space-x-2">
-              <Calendar as CalendarIcon className="h-6 w-6 text-blue-600" />
+              <CalendarIcon className="h-6 w-6 text-blue-600" />
               <span>Crear Período de Nómina</span>
             </CardTitle>
           </CardHeader>
@@ -228,7 +227,7 @@ export const PayrollLiquidationAleluya = () => {
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Calendar as CalendarIcon className="h-6 w-6 text-green-600" />
+              <CalendarIcon className="h-6 w-6 text-green-600" />
               <div>
                 <CardTitle className="text-xl text-gray-900">
                   {currentPeriod?.periodo || 'Período Activo'}
