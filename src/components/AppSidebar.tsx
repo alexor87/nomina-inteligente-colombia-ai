@@ -4,11 +4,8 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   Home,
   Users,
-  Calculator,
-  History,
   FileBarChart,
   Settings,
-  ChevronDown,
   Building2
 } from "lucide-react";
 
@@ -35,16 +32,6 @@ const navigationItems = [
     title: "Empleados",
     url: "/app/employees",
     icon: Users,
-  },
-  {
-    title: "Nómina",
-    url: "/app/payroll",
-    icon: Calculator,
-  },
-  {
-    title: "Historial",
-    url: "/app/payroll-history",
-    icon: History,
   },
   {
     title: "Reportes",
@@ -78,7 +65,7 @@ export function AppSidebar() {
             </div>
             <div>
               <h2 className="text-lg font-semibold">Payroll System</h2>
-              <p className="text-xs text-muted-foreground">Gestión de Nómina</p>
+              <p className="text-xs text-muted-foreground">Gestión de Empleados</p>
             </div>
           </div>
         )}
