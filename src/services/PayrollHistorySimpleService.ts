@@ -1,31 +1,12 @@
 
 /**
- * ✅ SERVICIO DE HISTORIAL SIMPLE - REPARACIÓN CRÍTICA
- * Conectado con arquitectura unificada
+ * ✅ SERVICIO DE HISTORIAL SIMPLE - REPARACIÓN CRÍTICA COMPLETADA
+ * Conectado con arquitectura unificada y tipos corregidos
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollStateManager } from './PayrollStateManager';
-
-export interface PayrollHistoryPeriod {
-  id: string;
-  period: string;
-  startDate: string;
-  endDate: string;
-  type: 'semanal' | 'quincenal' | 'mensual';
-  employeesCount: number;
-  status: 'borrador' | 'active' | 'cerrado';
-  totalGrossPay: number;
-  totalNetPay: number;
-  totalDeductions: number;
-  totalCost: number;
-  employerContributions: number;
-  paymentStatus: 'pagado' | 'parcial' | 'pendiente';
-  version: number;
-  createdAt: string;
-  updatedAt: string;
-  editable: boolean;
-}
+import { PayrollHistoryPeriod } from '@/types/payroll-history';
 
 export class PayrollHistorySimpleService {
   /**
@@ -49,30 +30,76 @@ export class PayrollHistorySimpleService {
         return [];
       }
 
-      return (periods || []).map(period => ({
-        id: period.id,
-        period: period.periodo,
-        startDate: period.fecha_inicio,
-        endDate: period.fecha_fin,
-        type: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual',
-        employeesCount: period.empleados_count || 0,
-        status: PayrollStateManager.normalizeState(period.estado) === 'closed' ? 'cerrado' : 
-                PayrollStateManager.normalizeState(period.estado) === 'active' ? 'active' : 'borrador',
-        totalGrossPay: Number(period.total_devengado) || 0,
-        totalNetPay: Number(period.total_neto) || 0,
-        totalDeductions: Number(period.total_deducciones) || 0,
-        totalCost: Number(period.total_devengado) || 0,
-        employerContributions: (Number(period.total_devengado) || 0) * 0.205,
-        paymentStatus: PayrollStateManager.normalizeState(period.estado) === 'closed' ? 'pagado' : 'pendiente',
-        version: 1,
-        createdAt: period.created_at,
-        updatedAt: period.updated_at,
-        editable: PayrollStateManager.canEditPeriod(PayrollStateManager.normalizeState(period.estado))
-      }));
+      return (periods || []).map(period => {
+        const normalizedState = PayrollStateManager.normalizeState(period.estado);
+        
+        // Mapear estados normalizados a los tipos esperados por el historial
+        let historyStatus: PayrollHistoryPeriod['status'];
+        switch (normalizedState) {
+          case 'draft':
+            historyStatus = 'borrador';
+            break;
+          case 'active':
+            historyStatus = 'borrador'; // Los activos se consideran borradores para el historial
+            break;
+          case 'closed':
+            historyStatus = 'cerrado';
+            break;
+          default:
+            historyStatus = 'borrador';
+        }
+
+        return {
+          id: period.id,
+          period: period.periodo,
+          startDate: period.fecha_inicio,
+          endDate: period.fecha_fin,
+          type: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual',
+          employeesCount: period.empleados_count || 0,
+          status: historyStatus,
+          totalGrossPay: Number(period.total_devengado) || 0,
+          totalNetPay: Number(period.total_neto) || 0,
+          totalDeductions: Number(period.total_deducciones) || 0,
+          totalCost: Number(period.total_devengado) || 0,
+          employerContributions: (Number(period.total_devengado) || 0) * 0.205,
+          paymentStatus: historyStatus === 'cerrado' ? 'pagado' : 'pendiente',
+          version: 1,
+          createdAt: period.created_at,
+          updatedAt: period.updated_at,
+          editable: PayrollStateManager.canEditPeriod(normalizedState)
+        } as PayrollHistoryPeriod;
+      });
 
     } catch (error) {
       console.error('❌ Error in getHistoryPeriods:', error);
       return [];
+    }
+  }
+
+  /**
+   * Limpiar períodos duplicados (método agregado para compatibilidad)
+   */
+  static async cleanDuplicatePeriods(): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    try {
+      const { data, error } = await supabase.rpc('clean_duplicate_periods');
+      
+      if (error) {
+        throw error;
+      }
+
+      return {
+        success: true,
+        message: data?.message || 'Períodos duplicados limpiados exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error cleaning duplicate periods:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Error limpiando duplicados'
+      };
     }
   }
 

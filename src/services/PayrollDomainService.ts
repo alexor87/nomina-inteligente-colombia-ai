@@ -1,4 +1,3 @@
-
 /**
  * ✅ SERVICIO DOMINIO DE NÓMINA - ARQUITECTURA CRÍTICA REPARADA
  * Servicio único que maneja toda la lógica de negocio de nómina
@@ -40,6 +39,13 @@ export interface PeriodDetectionResult {
   canContinue: boolean;
   message: string;
   action: 'create' | 'resume' | 'wait';
+  suggestion: string;
+  nextPeriod?: {
+    startDate: string;
+    endDate: string;
+    periodName: string;
+    type: 'semanal' | 'quincenal' | 'mensual';
+  };
 }
 
 export class PayrollDomainService {
@@ -76,7 +82,8 @@ export class PayrollDomainService {
           needsCreation: true,
           canContinue: false,
           message: 'No hay período activo. Se debe crear un nuevo período.',
-          action: 'create'
+          action: 'create',
+          suggestion: 'Crear un nuevo período para continuar con la liquidación'
         };
       }
 
@@ -99,7 +106,8 @@ export class PayrollDomainService {
         needsCreation: false,
         canContinue: true,
         message: `Período activo encontrado: ${period.periodo}`,
-        action: 'resume'
+        action: 'resume',
+        suggestion: `Continuar con el período activo: ${period.periodo}`
       };
 
     } catch (error) {
@@ -109,7 +117,8 @@ export class PayrollDomainService {
         needsCreation: true,
         canContinue: false,
         message: 'Error detectando período actual',
-        action: 'create'
+        action: 'create',
+        suggestion: 'Verificar conexión y reintentar'
       };
     }
   }

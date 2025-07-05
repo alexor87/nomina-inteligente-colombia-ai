@@ -4,7 +4,7 @@ import { PayrollHistorySimpleService } from '@/services/PayrollHistorySimpleServ
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * ✅ HOOK DE INICIALIZACIÓN DEL SISTEMA - FASE 2
+ * ✅ HOOK DE INICIALIZACIÓN DEL SISTEMA - CORREGIDO
  * Limpia automáticamente datos duplicados al cargar la aplicación
  */
 export const useSystemInitialization = () => {
@@ -18,16 +18,16 @@ export const useSystemInitialization = () => {
       
       try {
         setIsInitializing(true);
-        console.log('🚀 FASE 2 - Inicializando sistema con datos reales...');
+        console.log('🚀 INICIALIZACIÓN - Sistema con datos reales...');
         
-        // Limpiar períodos duplicados automáticamente
+        // Limpiar períodos duplicados automáticamente usando método corregido
         const cleanupResult = await PayrollHistorySimpleService.cleanDuplicatePeriods();
         
         if (cleanupResult.success) {
           console.log('✅ Sistema inicializado correctamente:', cleanupResult.message);
           
           // Solo mostrar toast si se limpiaron duplicados
-          if (cleanupResult.message.includes('eliminados')) {
+          if (cleanupResult.message.includes('eliminados') || cleanupResult.message.includes('duplicados')) {
             toast({
               title: "Sistema optimizado",
               description: "Se han limpiado datos duplicados automáticamente",

@@ -1,22 +1,32 @@
-
-import { PayrollUnifiedService } from '../PayrollUnifiedService';
+import { PayrollDomainService } from '../PayrollDomainService';
 import { PayrollCalculationEnhancedService } from '../PayrollCalculationEnhancedService';
 import { Result, PayrollClosureResult } from '@/types/payroll-liquidation';
 import { PayrollEmployee, PeriodStatus } from '@/types/payroll';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * ✅ FACADE REPARADA - FASE 2 CRÍTICA
- * Conecta servicios reales sin simulaciones
+ * ✅ FACADE REPARADA - CONECTADA A ARQUITECTURA UNIFICADA
+ * Usa PayrollDomainService en lugar de servicios obsoletos
  */
 export class PayrollLiquidationFacade {
   
-  // ✅ DETECCIÓN DE PERÍODO ACTUAL - REAL
+  // ✅ DETECCIÓN DE PERÍODO ACTUAL - CONECTADA A DOMINIO
   static async detectCurrentPeriodSituation(): Promise<Result<PeriodStatus>> {
     try {
-      console.log('🎯 FACADE REAL - Detectando situación del período actual...');
+      console.log('🎯 FACADE UNIFICADA - Detectando situación del período actual...');
       
-      const periodStatus = await PayrollUnifiedService.detectCurrentPeriodSituation();
+      const periodDetection = await PayrollDomainService.detectCurrentPeriodSituation();
+      
+      // Convertir PeriodDetectionResult a PeriodStatus
+      const periodStatus: PeriodStatus = {
+        currentPeriod: periodDetection.currentPeriod,
+        needsCreation: periodDetection.needsCreation,
+        canContinue: periodDetection.canContinue,
+        message: periodDetection.message,
+        suggestion: periodDetection.suggestion,
+        action: periodDetection.action,
+        nextPeriod: periodDetection.nextPeriod
+      };
       
       return {
         success: true,
@@ -32,12 +42,12 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ CARGA REAL DE EMPLEADOS PARA PERÍODO ACTIVO
+  // ✅ CARGA DE EMPLEADOS - CONECTADA A DOMINIO
   static async loadEmployeesForActivePeriod(period: any): Promise<Result<PayrollEmployee[]>> {
     try {
-      console.log('👥 FACADE REAL - Cargando empleados para período:', period.periodo);
+      console.log('👥 FACADE UNIFICADA - Cargando empleados para período:', period.periodo);
       
-      const employees = await PayrollUnifiedService.loadEmployeesForActivePeriod(period);
+      const employees = await PayrollDomainService.loadEmployeesForLiquidation(period.id);
       
       return {
         success: true,
@@ -219,41 +229,22 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ CERRAR PERÍODO - IMPLEMENTACIÓN REAL
+  // ✅ CERRAR PERÍODO - CONECTADO A DOMINIO
   static async closePeriod(period: any, employees: PayrollEmployee[]): Promise<Result<PayrollClosureResult>> {
     try {
-      console.log('🔒 FACADE REAL - Cerrando período:', period.periodo);
+      console.log('🔒 FACADE UNIFICADA - Cerrando período:', period.periodo);
       
       const transactionId = 'txn_' + Date.now();
       
-      // Cerrar período en base de datos
-      const { error: closeError } = await supabase
-        .from('payroll_periods_real')
-        .update({ 
-          estado: 'cerrado',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', period.id);
-
-      if (closeError) {
-        throw closeError;
-      }
-
-      // Marcar payrolls como procesados
-      const { error: payrollError } = await supabase
-        .from('payrolls')
-        .update({ 
-          estado: 'procesada',
-          updated_at: new Date().toISOString()
-        })
-        .eq('period_id', period.id);
-
-      if (payrollError) {
-        console.warn('⚠️ Warning actualizando payrolls:', payrollError.message);
+      // Usar PayrollDomainService para cerrar período
+      const result = await PayrollDomainService.closePeriod(period.id);
+      
+      if (!result.success) {
+        throw new Error(result.message);
       }
 
       // Detectar siguiente período sugerido
-      const nextPeriodResult = await PayrollUnifiedService.detectCurrentPeriodSituation();
+      const nextPeriodResult = await PayrollDomainService.detectCurrentPeriodSituation();
       
       const closureResult: PayrollClosureResult = {
         success: true,
@@ -286,12 +277,12 @@ export class PayrollLiquidationFacade {
     }
   }
 
-  // ✅ CREAR SIGUIENTE PERÍODO - IMPLEMENTACIÓN REAL
+  // ✅ CREAR SIGUIENTE PERÍODO - CONECTADO A DOMINIO
   static async createNextPeriod(): Promise<Result<{ period: any; message: string }>> {
     try {
-      console.log('🆕 FACADE REAL - Creando siguiente período...');
+      console.log('🆕 FACADE UNIFICADA - Creando siguiente período...');
       
-      const result = await PayrollUnifiedService.createNextPeriod();
+      const result = await PayrollDomainService.createNextPeriod();
       
       if (!result.success) {
         return {
