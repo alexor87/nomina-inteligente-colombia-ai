@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Plus, Trash2, Calendar, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useMultipleNovedadEntries } from '@/hooks/useMultipleNovedadEntries';
@@ -158,100 +157,102 @@ export const NovedadVacacionesConsolidatedForm: React.FC<NovedadVacacionesConsol
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 pb-4 border-b">
+      {/* Header */}
+      <div className="flex items-center gap-3 pb-4 border-b bg-white">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">Vacaciones</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Vacaciones</h3>
       </div>
 
       {/* Form to add new entry */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar Período de Vacaciones
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Fecha Inicio</Label>
-              <Input
-                type="date"
-                value={newEntry.fecha_inicio}
-                onChange={(e) => setNewEntry(prev => ({ ...prev, fecha_inicio: e.target.value }))}
-              />
-            </div>
-
-            <div>
-              <Label>Fecha Fin</Label>
-              <Input
-                type="date"
-                value={newEntry.fecha_fin}
-                onChange={(e) => setNewEntry(prev => ({ ...prev, fecha_fin: e.target.value }))}
-              />
-            </div>
-          </div>
-
+      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
+        <h4 className="text-blue-800 font-medium">Agregar Período de Vacaciones</h4>
+        
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label>Días de Vacaciones</Label>
+            <Label htmlFor="fecha_inicio" className="text-gray-700">Fecha Inicio</Label>
             <Input
-              type="number"
-              placeholder="0"
-              value={newEntry.dias}
-              onChange={(e) => setNewEntry(prev => ({ ...prev, dias: e.target.value }))}
-              min="1"
-              max="15"
+              type="date"
+              value={newEntry.fecha_inicio}
+              onChange={(e) => setNewEntry(prev => ({ ...prev, fecha_inicio: e.target.value }))}
             />
-            <div className="text-xs text-gray-500 mt-1">
-              Máximo 15 días hábiles por período. Se calcula automáticamente según las fechas.
-            </div>
           </div>
 
           <div>
-            <Label>Valor</Label>
+            <Label htmlFor="fecha_fin" className="text-gray-700">Fecha Fin</Label>
             <Input
-              type="number"
-              placeholder="0"
-              value={newEntry.valor}
-              onChange={(e) => setNewEntry(prev => ({ ...prev, valor: e.target.value }))}
-              min="0"
-              step="1000"
+              type="date"
+              value={newEntry.fecha_fin}
+              onChange={(e) => setNewEntry(prev => ({ ...prev, fecha_fin: e.target.value }))}
             />
           </div>
+        </div>
 
-          <div>
-            <Label>Observaciones</Label>
-            <Textarea
-              placeholder="Período de vacaciones, resolución, etc..."
-              value={newEntry.observacion}
-              onChange={(e) => setNewEntry(prev => ({ ...prev, observacion: e.target.value }))}
-              rows={2}
-            />
+        <div>
+          <Label htmlFor="dias" className="text-gray-700">Días de Vacaciones</Label>
+          <Input
+            type="number"
+            placeholder="0"
+            value={newEntry.dias}
+            onChange={(e) => setNewEntry(prev => ({ ...prev, dias: e.target.value }))}
+            min="1"
+            max="15"
+          />
+          <div className="text-xs text-gray-500 mt-1">
+            Máximo 15 días hábiles por período. Se calcula automáticamente según las fechas.
           </div>
+        </div>
 
-          <Button 
-            onClick={handleAddEntry}
-            disabled={!newEntry.fecha_inicio || !newEntry.fecha_fin}
-            className="w-full"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Período
-          </Button>
-        </CardContent>
-      </Card>
+        <div>
+          <Label htmlFor="valor" className="text-gray-700">Valor</Label>
+          <Input
+            type="number"
+            placeholder="0"
+            value={newEntry.valor}
+            onChange={(e) => setNewEntry(prev => ({ ...prev, valor: e.target.value }))}
+            min="0"
+            step="1000"
+          />
+          {newEntry.valor && parseFloat(newEntry.valor) > 0 && (
+            <div className="mt-2">
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                {formatCurrency(parseFloat(newEntry.valor))}
+              </Badge>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="observacion" className="text-gray-700">Observaciones</Label>
+          <Textarea
+            placeholder="Período de vacaciones, resolución, etc..."
+            value={newEntry.observacion}
+            onChange={(e) => setNewEntry(prev => ({ ...prev, observacion: e.target.value }))}
+            rows={2}
+            className="resize-none"
+          />
+        </div>
+
+        <Button 
+          onClick={handleAddEntry}
+          disabled={!newEntry.fecha_inicio || !newEntry.fecha_fin}
+          className="w-full bg-blue-600 hover:bg-blue-700"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Agregar Período
+        </Button>
+      </div>
 
       {/* List of added entries */}
       {entries.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Períodos de Vacaciones Agregados ({entries.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <div className="space-y-4">
+          <h4 className="font-medium text-gray-900">Períodos de Vacaciones Agregados ({entries.length})</h4>
+          
+          <div className="space-y-2">
             {entries.map((entry) => {
               return (
-                <div key={entry.id} className="flex justify-between items-start p-3 border rounded-lg">
+                <div key={entry.id} className="flex justify-between items-start p-3 border rounded-lg bg-white">
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
@@ -278,30 +279,33 @@ export const NovedadVacacionesConsolidatedForm: React.FC<NovedadVacacionesConsol
                 </div>
               );
             })}
+          </div>
 
-            {/* Total */}
-            <div className="border-t pt-3 mt-3">
-              <div className="flex justify-between items-center font-semibold">
-                <span>Total Vacaciones:</span>
-                <div className="text-right">
-                  <div>{formatCurrency(totalValue)}</div>
-                  <div className="text-sm text-gray-600">
-                    {totalDays} días totales
-                  </div>
+          {/* Total */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="flex justify-between items-center font-semibold">
+              <span>Total Vacaciones:</span>
+              <div className="text-right">
+                <div className="text-xl font-bold text-blue-700">
+                  {formatCurrency(totalValue)}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {totalDays} días totales
                 </div>
               </div>
-              
-              {totalDays > 30 && (
-                <div className="mt-2 p-2 bg-amber-50 rounded text-amber-700 text-sm flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  El total excede 30 días anuales de vacaciones
-                </div>
-              )}
             </div>
-          </CardContent>
-        </Card>
+            
+            {totalDays > 30 && (
+              <div className="mt-2 p-2 bg-amber-50 rounded text-amber-700 text-sm flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                El total excede 30 días anuales de vacaciones
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
+      {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack}>
           Cancelar
@@ -309,6 +313,7 @@ export const NovedadVacacionesConsolidatedForm: React.FC<NovedadVacacionesConsol
         <Button 
           onClick={handleSubmit}
           disabled={entries.length === 0}
+          className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
         >
           Guardar {entries.length} Período{entries.length !== 1 ? 's' : ''} de Vacaciones
         </Button>

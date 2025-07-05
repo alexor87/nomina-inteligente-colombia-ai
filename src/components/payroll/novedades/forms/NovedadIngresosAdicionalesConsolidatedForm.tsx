@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, DollarSign, Info, Plus, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useMultipleNovedadEntries } from '@/hooks/useMultipleNovedadEntries';
@@ -136,24 +136,21 @@ export const NovedadIngresosAdicionalesConsolidatedForm: React.FC<NovedadIngreso
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 pb-4 border-b">
+      {/* Header */}
+      <div className="flex items-center gap-3 pb-4 border-b bg-white">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">Ingresos Adicionales</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Ingresos Adicionales</h3>
       </div>
 
       {/* Form to add new entry */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar Nuevo Ingreso
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
+        <h4 className="text-blue-800 font-medium">Agregar Nuevo Ingreso</h4>
+        
+        <div className="grid grid-cols-1 gap-4">
           <div>
-            <Label>Tipo de Ingreso</Label>
+            <Label htmlFor="tipo" className="text-gray-700">Tipo de Ingreso</Label>
             <Select 
               value={newEntry.tipo_novedad} 
               onValueChange={handleTipoIngresoChange}
@@ -175,7 +172,7 @@ export const NovedadIngresosAdicionalesConsolidatedForm: React.FC<NovedadIngreso
           </div>
 
           <div>
-            <Label>Valor del Ingreso</Label>
+            <Label htmlFor="valor" className="text-gray-700">Valor del Ingreso</Label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -189,137 +186,110 @@ export const NovedadIngresosAdicionalesConsolidatedForm: React.FC<NovedadIngreso
               />
             </div>
             {newEntry.valor && parseFloat(newEntry.valor) > 0 && (
-              <div className="text-xs text-gray-500 mt-1">
-                Valor: {formatCurrency(parseFloat(newEntry.valor))}
+              <div className="mt-2">
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  +{formatCurrency(parseFloat(newEntry.valor))}
+                </Badge>
               </div>
             )}
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 p-3 bg-white rounded border border-blue-200">
             <Checkbox 
               id="constitutivo" 
               checked={newEntry.constitutivo}
               onCheckedChange={(checked) => setNewEntry(prev => ({ ...prev, constitutivo: checked === true }))}
             />
-            <Label htmlFor="constitutivo" className="text-sm">
+            <Label htmlFor="constitutivo" className="text-sm text-gray-700">
               ¿Es constitutivo de salario?
             </Label>
           </div>
 
+          <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+            <div className="flex items-center gap-2 text-yellow-700 mb-1">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Nota</span>
+            </div>
+            <p className="text-sm text-yellow-700">
+              Los ingresos constitutivos de salario afectan el cálculo de prestaciones sociales y aportes.
+            </p>
+          </div>
+
           <div>
-            <Label>Observaciones</Label>
+            <Label htmlFor="observacion" className="text-gray-700">Observaciones (Opcional)</Label>
             <Textarea
               placeholder="Detalles adicionales sobre el ingreso..."
               value={newEntry.observacion}
               onChange={(e) => setNewEntry(prev => ({ ...prev, observacion: e.target.value }))}
               rows={2}
+              className="resize-none"
             />
           </div>
 
           <Button 
             onClick={handleAddEntry}
             disabled={!newEntry.tipo_novedad || !newEntry.valor || parseFloat(newEntry.valor) <= 0}
-            className="w-full"
+            className="w-full bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="h-4 w-4 mr-2" />
             Agregar Ingreso
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* List of added entries */}
       {entries.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Ingresos Agregados ({entries.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Group by constitutivo/no constitutivo */}
-            {entries.filter(e => e.constitutivo).length > 0 && (
-              <div>
-                <h4 className="font-medium text-green-700 mb-2">Constitutivos de Salario</h4>
-                {entries.filter(e => e.constitutivo).map((entry) => {
-                  const typeInfo = getTypeInfo(entry.tipo_novedad);
-                  return (
-                    <div key={entry.id} className="flex justify-between items-start p-3 border rounded-lg bg-green-50">
-                      <div className="flex-1">
-                        <div className="font-medium">{typeInfo?.label}</div>
-                        <div className="text-sm text-gray-600">{formatCurrency(entry.valor)}</div>
-                        {entry.observacion && (
-                          <div className="text-xs text-gray-500 mt-1">{entry.observacion}</div>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeEntry(entry.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        <div className="space-y-4">
+          <h4 className="font-medium text-gray-900">Ingresos Agregados ({entries.length})</h4>
+          
+          <div className="space-y-2">
+            {entries.map((entry) => {
+              const typeInfo = getTypeInfo(entry.tipo_novedad);
 
-            {entries.filter(e => !e.constitutivo).length > 0 && (
-              <div>
-                <h4 className="font-medium text-blue-700 mb-2">No Constitutivos de Salario</h4>
-                {entries.filter(e => !e.constitutivo).map((entry) => {
-                  const typeInfo = getTypeInfo(entry.tipo_novedad);
-                  return (
-                    <div key={entry.id} className="flex justify-between items-start p-3 border rounded-lg bg-blue-50">
-                      <div className="flex-1">
-                        <div className="font-medium">{typeInfo?.label}</div>
-                        <div className="text-sm text-gray-600">{formatCurrency(entry.valor)}</div>
-                        {entry.observacion && (
-                          <div className="text-xs text-gray-500 mt-1">{entry.observacion}</div>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeEntry(entry.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+              return (
+                <div key={entry.id} className="flex justify-between items-start p-3 border rounded-lg bg-white">
+                  <div className="flex-1">
+                    <div className="font-medium">{typeInfo?.label}</div>
+                    <div className="text-sm text-gray-600">{formatCurrency(entry.valor)}</div>
+                    <div className="text-xs text-gray-500">
+                      {entry.constitutivo ? 'Constitutivo de salario' : 'No constitutivo de salario'}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                    {entry.observacion && (
+                      <div className="text-xs text-gray-500 mt-1">{entry.observacion}</div>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeEntry(entry.id)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
 
-            {/* Totals */}
-            <div className="border-t pt-3 mt-3 space-y-2">
-              {totalConstitutivo > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>Total Constitutivo:</span>
-                  <span className="font-medium text-green-600">{formatCurrency(totalConstitutivo)}</span>
-                </div>
-              )}
-              {totalNoConstitutivo > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>Total No Constitutivo:</span>
-                  <span className="font-medium text-blue-600">{formatCurrency(totalNoConstitutivo)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-semibold border-t pt-2">
-                <span>Total General:</span>
-                <span>{formatCurrency(totalValue)}</span>
-              </div>
+          {/* Totals */}
+          <div className="bg-blue-50 p-4 rounded-lg space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Total Constitutivo:</span>
+              <span className="font-medium text-green-600">{formatCurrency(totalConstitutivo)}</span>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex justify-between text-sm">
+              <span>Total No Constitutivo:</span>
+              <span className="font-medium text-blue-600">{formatCurrency(totalNoConstitutivo)}</span>
+            </div>
+            <div className="flex justify-between font-semibold border-t pt-2">
+              <span>Total General:</span>
+              <span className="text-xl font-bold text-blue-700">{formatCurrency(totalValue)}</span>
+            </div>
+          </div>
+        </div>
       )}
 
-      <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-        <p className="text-sm text-yellow-700">
-          <strong>Nota:</strong> Los ingresos constitutivos de salario afectan el cálculo de prestaciones sociales y aportes.
-        </p>
-      </div>
-
+      {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack}>
           Cancelar
@@ -327,6 +297,7 @@ export const NovedadIngresosAdicionalesConsolidatedForm: React.FC<NovedadIngreso
         <Button 
           onClick={handleSubmit}
           disabled={entries.length === 0}
+          className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
         >
           Guardar {entries.length} Ingreso{entries.length !== 1 ? 's' : ''}
         </Button>
