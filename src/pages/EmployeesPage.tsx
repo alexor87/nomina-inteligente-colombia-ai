@@ -1,8 +1,8 @@
 
-import { EmployeeList } from '@/components/employees/EmployeeList';
+import { EmployeesDashboard } from '@/components/employees/EmployeesDashboard';
 
 const EmployeesPage = () => {
-  return <EmployeeList />;
+  return <EmployeesDashboard />;
 };
 
 export default EmployeesPage;

@@ -1,15 +1,16 @@
 
 import { useEffect, useState } from 'react';
-import { PayrollHistorySimpleService } from '@/services/PayrollHistorySimpleService';
+import { CriticalRepairService } from '@/services/CriticalRepairService';
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * ✅ HOOK DE INICIALIZACIÓN DEL SISTEMA - CORREGIDO
- * Limpia automáticamente datos duplicados al cargar la aplicación
+ * ✅ HOOK DE INICIALIZACIÓN CRÍTICA - REPARADO
+ * Inicialización automática con diagnóstico y reparación
  */
 export const useSystemInitialization = () => {
   const [isInitializing, setIsInitializing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -18,29 +19,44 @@ export const useSystemInitialization = () => {
       
       try {
         setIsInitializing(true);
-        console.log('🚀 INICIALIZACIÓN - Sistema con datos reales...');
+        console.log('🚀 INICIALIZACIÓN CRÍTICA - Diagnosticando sistema...');
         
-        // Limpiar períodos duplicados automáticamente usando método corregido
-        const cleanupResult = await PayrollHistorySimpleService.cleanDuplicatePeriods();
+        // Diagnóstico completo del sistema
+        const diagnosis = await CriticalRepairService.diagnoseSystem();
+        setSystemStatus(diagnosis);
         
-        if (cleanupResult.success) {
-          console.log('✅ Sistema inicializado correctamente:', cleanupResult.message);
+        // Si hay problemas críticos, intentar reparación automática
+        if (diagnosis.issues.length > 0) {
+          console.log('🔧 Problemas detectados, ejecutando reparación automática...');
           
-          // Solo mostrar toast si se limpiaron duplicados
-          if (cleanupResult.message.includes('eliminados') || cleanupResult.message.includes('duplicados')) {
+          const repairResult = await CriticalRepairService.createMinimumTestData();
+          
+          if (repairResult.success) {
             toast({
-              title: "Sistema optimizado",
-              description: "Se han limpiado datos duplicados automáticamente",
+              title: "🔧 Sistema reparado automáticamente",
+              description: `${repairResult.employeesCreated} empleados y ${repairResult.periodsCreated} períodos creados`,
               className: "border-green-200 bg-green-50"
             });
+            
+            // Re-diagnosticar después de la reparación
+            const newDiagnosis = await CriticalRepairService.diagnoseSystem();
+            setSystemStatus(newDiagnosis);
+          } else {
+            console.warn('⚠️ Reparación automática falló:', repairResult.message);
           }
+        } else {
+          console.log('✅ Sistema en buen estado');
         }
         
         setIsInitialized(true);
         
       } catch (error) {
-        console.error('❌ Error inicializando sistema:', error);
-        // No mostrar error al usuario en la inicialización automática
+        console.error('❌ Error en inicialización crítica:', error);
+        toast({
+          title: "Error en inicialización",
+          description: "Algunos componentes pueden no funcionar correctamente",
+          variant: "destructive"
+        });
       } finally {
         setIsInitializing(false);
       }
@@ -51,6 +67,7 @@ export const useSystemInitialization = () => {
 
   return {
     isInitializing,
-    isInitialized
+    isInitialized,
+    systemStatus
   };
 };
