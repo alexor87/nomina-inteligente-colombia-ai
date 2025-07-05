@@ -1,6 +1,6 @@
 import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
-// Enhanced NovedadType that matches database exactly
+// ✅ TIPOS SINCRONIZADOS CON LA BASE DE DATOS REAL
 export type NovedadType =
   | 'horas_extra'
   | 'recargo_nocturno'
@@ -95,7 +95,7 @@ export interface CreateNovedadData {
   fecha_fin?: string;
   base_calculo?: any;
   subtipo?: string;
-  company_id: string; // ✅ AGREGADO - Requerido por el servicio
+  company_id: string; // ✅ REQUERIDO
 }
 
 export interface BaseCalculoData {

@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Sheet,
@@ -24,6 +23,7 @@ import { PayrollNovedad, CreateNovedadData, NovedadType, calcularValorNovedadEnh
 import { NovedadForm } from './NovedadForm';
 import { formatCurrency } from '@/lib/utils';
 import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
+import { supabase } from '@/integrations/supabase/client';
 
 interface NovedadDrawerProps {
   isOpen: boolean;
@@ -59,8 +59,35 @@ export const NovedadDrawer = ({
   const [editingNovedad, setEditingNovedad] = useState<PayrollNovedad | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(new Date());
+  const [companyId, setCompanyId] = useState<string>('');
 
-  // Form state
+  // ✅ CORRECCIÓN: Obtener company_id
+  useEffect(() => {
+    const getCompanyId = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (profile?.company_id) {
+            setCompanyId(profile.company_id);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting company ID:', error);
+      }
+    };
+
+    if (isOpen) {
+      getCompanyId();
+    }
+  }, [isOpen]);
+
+  // Form state con company_id incluido
   const [formData, setFormData] = useState<CreateNovedadData>({
     empleado_id: employeeId,
     periodo_id: '',
@@ -68,11 +95,23 @@ export const NovedadDrawer = ({
     subtipo: 'diurnas',
     fecha_inicio: '',
     fecha_fin: '',
-    dias: null,
-    horas: null,
+    dias: undefined,
+    horas: undefined,
     valor: 0,
-    observacion: ''
+    observacion: '',
+    company_id: '' // ✅ INCLUIDO
   });
+
+  // Update form data when companyId changes
+  useEffect(() => {
+    if (companyId && isOpen) {
+      setFormData(prev => ({
+        ...prev,
+        company_id: companyId,
+        empleado_id: employeeId
+      }));
+    }
+  }, [companyId, employeeId, isOpen]);
 
   // Cargar fecha actual del período (en un drawer real tendríamos el periodId)
   useEffect(() => {
@@ -117,7 +156,7 @@ export const NovedadDrawer = ({
   }, [employeeSalary, currentPeriodDate]);
 
   const handleCreateNovedad = async () => {
-    if (formData.valor <= 0) return;
+    if (formData.valor <= 0 || !formData.company_id) return;
 
     setIsSubmitting(true);
     try {
@@ -130,10 +169,11 @@ export const NovedadDrawer = ({
         subtipo: 'diurnas',
         fecha_inicio: '',
         fecha_fin: '',
-        dias: null,
-        horas: null,
+        dias: undefined,
+        horas: undefined,
         valor: 0,
-        observacion: ''
+        observacion: '',
+        company_id: companyId // ✅ INCLUIR company_id
       });
       
       if (onRecalculatePayroll) {
@@ -158,7 +198,7 @@ export const NovedadDrawer = ({
   };
 
   const handleUpdateNovedad = async () => {
-    if (!editingNovedad || formData.valor <= 0) return;
+    if (!editingNovedad || formData.valor <= 0 || !formData.company_id) return;
 
     setIsSubmitting(true);
     try {
@@ -215,12 +255,13 @@ export const NovedadDrawer = ({
       periodo_id: novedad.periodo_id,
       tipo_novedad: novedad.tipo_novedad,
       valor: novedad.valor,
-      horas: novedad.horas || null,
-      dias: novedad.dias || null,
+      horas: novedad.horas || undefined,
+      dias: novedad.dias || undefined,
       observacion: novedad.observacion || '',
       fecha_inicio: novedad.fecha_inicio || '',
       fecha_fin: novedad.fecha_fin || '',
-      subtipo: (novedad as any).subtipo || ''
+      subtipo: (novedad as any).subtipo || '',
+      company_id: companyId // ✅ INCLUIR company_id
     });
     setShowForm(true);
   };
@@ -235,10 +276,11 @@ export const NovedadDrawer = ({
       subtipo: 'diurnas',
       fecha_inicio: '',
       fecha_fin: '',
-      dias: null,
-      horas: null,
+      dias: undefined,
+      horas: undefined,
       valor: 0,
-      observacion: ''
+      observacion: '',
+      company_id: companyId // ✅ INCLUIR company_id
     });
   };
 
@@ -380,7 +422,7 @@ export const NovedadDrawer = ({
     </div>
   );
 
-  const isFormValid = formData.valor > 0;
+  const isFormValid = formData.valor > 0 && formData.company_id;
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -426,7 +468,7 @@ export const NovedadDrawer = ({
                   <Button 
                     onClick={() => setShowForm(true)}
                     className="flex items-center space-x-2"
-                    disabled={isLoading}
+                    disabled={isLoading || !companyId}
                   >
                     <Plus className="h-4 w-4" />
                     <span>Agregar novedad</span>
@@ -467,8 +509,8 @@ export const NovedadDrawer = ({
                     initialData={editingNovedad ? {
                       tipo_novedad: editingNovedad.tipo_novedad,
                       valor: editingNovedad.valor,
-                      horas: editingNovedad.horas || null,
-                      dias: editingNovedad.dias || null,
+                      horas: editingNovedad.horas || undefined,
+                      dias: editingNovedad.dias || undefined,
                       observacion: editingNovedad.observacion || '',
                       fecha_inicio: editingNovedad.fecha_inicio || '',
                       fecha_fin: editingNovedad.fecha_fin || ''

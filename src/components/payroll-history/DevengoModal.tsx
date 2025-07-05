@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -8,12 +7,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Plus, 
   Trash2, 
-  Clock,
   AlertCircle,
   Loader2
 } from 'lucide-react';
@@ -452,9 +449,15 @@ export const DevengoModal = ({
       licencia_remunerada: 'Licencia Remunerada',
       incapacidad: 'Incapacidad',
       bonificacion: 'Bonificación',
+      bonificacion_salarial: 'Bonificación Salarial',
+      bonificacion_no_salarial: 'Bonificación No Salarial',
       comision: 'Comisión',
       prima: 'Prima',
       otros_ingresos: 'Otros Ingresos',
+      auxilio_conectividad: 'Auxilio de Conectividad',
+      viaticos: 'Viáticos',
+      retroactivos: 'Retroactivos',
+      compensacion_ordinaria: 'Compensación Ordinaria',
       libranza: 'Libranza',
       multa: 'Multa',
       ausencia: 'Ausencia',
@@ -462,7 +465,14 @@ export const DevengoModal = ({
       retencion_fuente: 'Retención en la Fuente',
       fondo_solidaridad: 'Fondo de Solidaridad',
       salud: 'Salud',
-      pension: 'Pensión'
+      pension: 'Pensión',
+      arl: 'ARL',
+      caja_compensacion: 'Caja de Compensación',
+      icbf: 'ICBF',
+      sena: 'SENA',
+      embargo: 'Embargo',
+      anticipo: 'Anticipo',
+      aporte_voluntario: 'Aporte Voluntario'
     };
     return labels[tipo] || tipo;
   };
@@ -506,7 +516,6 @@ export const DevengoModal = ({
   };
 
   const isFormValid = formData.valor > 0 && formData.empleado_id && formData.periodo_id && formData.company_id;
-  const conceptsList = renderConceptsList();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
