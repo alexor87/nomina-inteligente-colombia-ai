@@ -1,225 +1,231 @@
 
-/**
- * ✅ COMPONENTE UNIFICADO DE LIQUIDACIÓN - ARQUITECTURA CRÍTICA REPARADA
- * Componente principal que reemplaza PayrollLiquidationNew y otros
- * Usa la nueva arquitectura de servicios unificada
- */
-
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Users, DollarSign, Calculator } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  Users, 
+  Calendar, 
+  AlertTriangle,
+  CheckCircle,
+  Wrench,
+  Play
+} from 'lucide-react';
+import { CriticalRepairPanel } from '@/components/system/CriticalRepairPanel';
+import { PayrollLiquidationNew } from './PayrollLiquidationNew';
 import { usePayrollDomain } from '@/hooks/usePayrollDomain';
-import { formatCurrency } from '@/lib/utils';
+import { useCriticalRepair } from '@/hooks/useCriticalRepair';
 
+/**
+ * ✅ COMPONENTE UNIFICADO DE LIQUIDACIÓN - REPARACIÓN CRÍTICA INTEGRADA
+ * Incluye diagnóstico automático y panel de reparación
+ */
 export const PayrollLiquidationUnified = () => {
+  const [showRepairPanel, setShowRepairPanel] = useState(false);
+  const [systemReady, setSystemReady] = useState(false);
+  
   const {
-    isLoading,
-    currentPeriod,
+    periodStatus,
     employees,
-    periodSituation,
-    detectPeriodSituation,
-    createPeriod,
-    loadEmployees,
-    closePeriod
+    isLoading: isLoadingPayroll,
+    error: payrollError,
+    refreshPeriod
   } = usePayrollDomain();
 
-  // Detectar situación del período al cargar
-  useEffect(() => {
-    detectPeriodSituation();
-  }, [detectPeriodSituation]);
+  const {
+    diagnosis,
+    runDiagnosis,
+    runCriticalRepair,
+    isRepairing,
+    isDiagnosing
+  } = useCriticalRepair();
 
-  // Cargar empleados cuando hay período activo
+  // Ejecutar diagnóstico automático al cargar
   useEffect(() => {
-    if (currentPeriod?.id) {
-      loadEmployees(currentPeriod.id);
+    console.log('🚀 PayrollLiquidationUnified - Ejecutando diagnóstico automático...');
+    runDiagnosis();
+  }, [runDiagnosis]);
+
+  // Evaluar si el sistema está listo
+  useEffect(() => {
+    if (diagnosis) {
+      const hasEmployees = diagnosis.employeeCount > 0 && diagnosis.activeEmployeeCount > 0;
+      const hasPeriods = diagnosis.periodCount > 0;
+      const hasAuth = diagnosis.authentication;
+      const hasCompany = !!diagnosis.companyId;
+      
+      const ready = hasAuth && hasCompany && hasEmployees && hasPeriods;
+      setSystemReady(ready);
+      
+      console.log('📊 Estado del sistema:', {
+        hasAuth,
+        hasCompany,
+        hasEmployees,
+        hasPeriods,
+        ready
+      });
     }
-  }, [currentPeriod?.id, loadEmployees]);
+  }, [diagnosis]);
 
-  // Calcular totales
-  const totals = {
-    employees: employees.length,
-    grossPay: employees.reduce((sum, emp) => sum + emp.grossPay, 0),
-    deductions: employees.reduce((sum, emp) => sum + emp.deductions, 0),
-    netPay: employees.reduce((sum, emp) => sum + emp.netPay, 0)
+  const handleAutoRepair = async () => {
+    console.log('🔧 Iniciando reparación automática...');
+    const result = await runCriticalRepair();
+    
+    if (result?.success) {
+      // Recargar datos después de la reparación
+      setTimeout(() => {
+        refreshPeriod();
+        runDiagnosis();
+      }, 1000);
+    }
   };
 
-  if (isLoading && !periodSituation) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Detectando estado del período...</span>
-        </div>
-      </div>
-    );
-  }
+  const getSystemStatus = () => {
+    if (!diagnosis) return { color: 'yellow', label: 'Diagnosticando...', icon: AlertTriangle };
+    if (diagnosis.issues.length === 0) return { color: 'green', label: 'Sistema OK', icon: CheckCircle };
+    return { color: 'red', label: 'Requiere reparación', icon: AlertTriangle };
+  };
 
-  // Caso: Necesita crear período
-  if (periodSituation?.needsCreation) {
-    return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card>
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center space-x-2">
-              <Plus className="h-5 w-5" />
-              <span>Crear Nuevo Período</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-gray-600">
-              No hay período activo para liquidar nómina.
-            </p>
-            <Button 
-              onClick={createPeriod}
-              disabled={isLoading}
-              size="lg"
-              className="w-full"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creando período...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Período de Nómina
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const status = getSystemStatus();
 
   return (
     <div className="space-y-6">
-      {/* Header del período actual */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <Calculator className="h-5 w-5" />
-                <span>Liquidación de Nómina</span>
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
-                Período: {currentPeriod?.periodo}
-              </p>
-            </div>
+      {/* Header de diagnóstico crítico */}
+      <Card className="border-2 border-blue-200 bg-blue-50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center space-x-2">
+            <Wrench className="h-5 w-5 text-blue-600" />
+            <span>Estado del Sistema de Nómina</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Estado general */}
             <div className="flex items-center space-x-2">
-              <Badge 
-                variant={currentPeriod?.estado === 'draft' ? 'secondary' : 'default'}
-              >
-                {currentPeriod?.estado === 'draft' ? 'Borrador' : 'Activo'}
+              <status.icon className={`h-4 w-4 ${
+                status.color === 'green' ? 'text-green-600' : 
+                status.color === 'red' ? 'text-red-600' : 'text-yellow-600'
+              }`} />
+              <Badge variant={status.color === 'green' ? 'default' : 'destructive'}>
+                {status.label}
               </Badge>
-              {currentPeriod?.estado !== 'closed' && (
-                <Button 
-                  onClick={() => currentPeriod?.id && closePeriod(currentPeriod.id)}
-                  disabled={isLoading}
-                  variant="outline"
+            </div>
+
+            {/* Empleados */}
+            {diagnosis && (
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4" />
+                <span className="text-sm">
+                  {diagnosis.activeEmployeeCount} empleados activos
+                </span>
+              </div>
+            )}
+
+            {/* Períodos */}
+            {diagnosis && (
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm">
+                  {diagnosis.activePeriodCount} períodos activos
+                </span>
+              </div>
+            )}
+
+            {/* Acciones */}
+            <div className="flex space-x-2">
+              {!systemReady && (
+                <Button
+                  onClick={handleAutoRepair}
+                  disabled={isRepairing}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
-                  Cerrar Período
+                  {isRepairing ? (
+                    <>
+                      <Wrench className="h-3 w-3 mr-1 animate-spin" />
+                      Reparando...
+                    </>
+                  ) : (
+                    <>
+                      <Wrench className="h-3 w-3 mr-1" />
+                      Reparar Auto
+                    </>
+                  )}
                 </Button>
               )}
+              
+              <Button
+                onClick={() => setShowRepairPanel(!showRepairPanel)}
+                variant="outline"
+                size="sm"
+              >
+                {showRepairPanel ? 'Ocultar Panel' : 'Panel Avanzado'}
+              </Button>
             </div>
           </div>
-        </CardHeader>
-      </Card>
 
-      {/* Resumen de totales */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Empleados</p>
-                <p className="text-2xl font-bold">{totals.employees}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Problemas encontrados */}
+          {diagnosis && diagnosis.issues.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Problemas detectados:</strong>
+                <ul className="list-disc list-inside mt-1">
+                  {diagnosis.issues.slice(0, 3).map((issue, index) => (
+                    <li key={index} className="text-sm">{issue}</li>
+                  ))}
+                  {diagnosis.issues.length > 3 && (
+                    <li className="text-sm">... y {diagnosis.issues.length - 3} más</li>
+                  )}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <DollarSign className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Devengado</p>
-                <p className="text-lg font-bold">{formatCurrency(totals.grossPay)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <DollarSign className="h-8 w-8 text-red-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Deducciones</p>
-                <p className="text-lg font-bold">{formatCurrency(totals.deductions)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <DollarSign className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Neto</p>
-                <p className="text-lg font-bold">{formatCurrency(totals.netPay)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Lista de empleados */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Empleados en Liquidación</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              <span>Cargando empleados...</span>
-            </div>
-          ) : employees.length === 0 ? (
-            <div className="text-center p-8">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No hay empleados para liquidar</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {employees.map((employee) => (
-                <div 
-                  key={employee.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                >
-                  <div>
-                    <h4 className="font-medium">{employee.name}</h4>
-                    <p className="text-sm text-gray-600">{employee.position}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">{formatCurrency(employee.netPay)}</p>
-                    <p className="text-xs text-gray-500">
-                      Devengado: {formatCurrency(employee.grossPay)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Sistema OK */}
+          {systemReady && (
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                ✅ Sistema funcionando correctamente. Puedes proceder con la liquidación.
+              </AlertDescription>
+            </Alert>
           )}
         </CardContent>
       </Card>
+
+      {/* Panel de reparación avanzado */}
+      {showRepairPanel && (
+        <CriticalRepairPanel />
+      )}
+
+      {/* Componente de liquidación principal */}
+      {systemReady ? (
+        <div>
+          <div className="flex items-center space-x-2 mb-4">
+            <Play className="h-5 w-5 text-green-600" />
+            <h2 className="text-xl font-semibold">Liquidación de Nómina</h2>
+          </div>
+          <PayrollLiquidationNew />
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto" />
+              <h3 className="text-lg font-semibold">Sistema no está listo</h3>
+              <p className="text-gray-600">
+                El sistema requiere reparación antes de poder proceder con la liquidación.
+                Usa el botón "Reparar Auto" arriba o el panel avanzado para solucionar los problemas.
+              </p>
+              {isDiagnosing && (
+                <p className="text-sm text-blue-600">Diagnosticando sistema...</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
