@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +5,7 @@ import { Trash2, Plus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { useNovedades } from '@/hooks/useNovedades';
-import type { CreateNovedadData } from '@/types/novedades';
+import type { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface Employee {
   id: string;
@@ -64,8 +63,9 @@ export const PayrollLiquidationTable = ({
     }
   };
 
-  // Wrapper function to handle type mismatch
+  // Wrapper function to handle the enhanced CreateNovedadData type
   const handleCreateNovedad = async (data: CreateNovedadData): Promise<void> => {
+    // The data already comes with company_id from the modal, so we can pass it directly
     await createNovedad(data);
     await handleNovedadChange();
   };
