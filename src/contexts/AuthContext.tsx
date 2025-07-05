@@ -46,7 +46,7 @@ export const useAuth = () => {
   return context;
 };
 
-// Matriz de permisos por rol - simplificada para mayor estabilidad
+// Permisos por rol - SIMPLIFICADOS y ESTABLES
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings'],
   rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports'],
@@ -54,6 +54,9 @@ const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
   soporte: ['dashboard', 'reports', 'employees']
 };
+
+// NAVEGACIÓN BÁSICA SIEMPRE DISPONIBLE (fallback)
+const BASIC_MODULES = ['dashboard', 'employees', 'payroll', 'payroll-history', 'reports', 'settings'];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -63,15 +66,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
-  // Refs to prevent redundant calls
   const isRefreshingUserData = useRef(false);
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialized = useRef(false);
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     try {
       if (roles.length === 0) {
-        return false;
+        console.log('⚠️ No roles found, allowing basic access');
+        return true; // FALLBACK: permitir acceso básico si no hay roles cargados
       }
       
       return roles.some(r => {
@@ -81,27 +83,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.error('Error in hasRole:', error);
-      return false;
+      return true; // FALLBACK en caso de error
     }
   }, [roles]);
 
   const hasModuleAccess = useCallback((module: string): boolean => {
     try {
-      // Si no hay roles cargados, permitir acceso básico para evitar pantalla vacía
-      if (roles.length === 0 && user) {
-        // Permitir acceso a módulos básicos mientras se cargan los roles
-        const basicModules = ['dashboard', 'employees', 'payroll', 'payroll-history', 'reports', 'settings'];
-        return basicModules.includes(module);
+      // FALLBACK CRÍTICO: Si no hay usuario, denegar acceso
+      if (!user) {
+        return false;
+      }
+
+      // FALLBACK: Si no hay roles cargados, permitir módulos básicos
+      if (roles.length === 0) {
+        console.log('⚠️ No roles loaded, granting basic module access');
+        return BASIC_MODULES.includes(module);
       }
       
+      // Verificar permisos por rol
       return roles.some(userRole => {
         const permissions = ROLE_PERMISSIONS[userRole.role];
         return permissions && permissions.includes(module);
       });
     } catch (error) {
       console.error('Error in hasModuleAccess:', error);
-      // En caso de error, permitir acceso básico
-      return ['dashboard', 'employees', 'payroll', 'payroll-history', 'reports', 'settings'].includes(module);
+      // FALLBACK: En caso de error, permitir módulos básicos si hay usuario
+      return user ? BASIC_MODULES.includes(module) : false;
     }
   }, [roles, user]);
 
@@ -116,9 +123,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     isRefreshingUserData.current = true;
+    console.log('🔄 Refreshing user data for:', currentUser.email);
 
     try {
-      // Fetch profile with timeout
+      // Cargar perfil con timeout
       const profilePromise = supabase
         .from('profiles')
         .select('*')
@@ -126,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       const profileTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+        setTimeout(() => reject(new Error('Profile timeout')), 3000)
       );
 
       try {
@@ -137,28 +145,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (!profileError && profileData) {
           setProfile(profileData);
-          
-          // Only run role check if user has a company
-          if (profileData.company_id) {
-            setTimeout(() => {
-              performCompleteRoleCheck(currentUser.id).catch(console.error);
-            }, 100);
-          }
+          console.log('✅ Profile loaded:', profileData.company_id ? 'with company' : 'no company');
         } else {
-          console.warn('Profile fetch failed:', profileError);
+          console.warn('⚠️ Profile load failed:', profileError);
           setProfile(null);
         }
       } catch (error) {
-        console.warn('Profile fetch timed out or failed:', error);
+        console.warn('⚠️ Profile timeout or error:', error);
         setProfile(null);
       }
 
-      // Fetch roles with timeout
-      const rolesPromise = supabase
-        .rpc('get_user_companies_simple', { _user_id: currentUser.id });
-
+      // Cargar roles con timeout
+      const rolesPromise = supabase.rpc('get_user_companies_simple', { _user_id: currentUser.id });
       const rolesTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Roles fetch timeout')), 5000)
+        setTimeout(() => reject(new Error('Roles timeout')), 3000)
       );
 
       try {
@@ -167,23 +167,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           rolesTimeout
         ]) as any;
 
-        if (!rolesError && userRoles) {
+        if (!rolesError && userRoles && userRoles.length > 0) {
           const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
             role: role.role_name as AppRole,
             company_id: role.company_id
           }));
           setRoles(transformedRoles);
+          console.log('✅ Roles loaded:', transformedRoles.length);
         } else {
-          console.warn('Roles fetch failed:', rolesError);
-          setRoles([]);
+          console.warn('⚠️ No roles found, will use fallback permissions');
+          setRoles([]); // Esto activará los fallbacks
         }
       } catch (error) {
-        console.warn('Roles fetch timed out or failed:', error);
-        setRoles([]);
+        console.warn('⚠️ Roles timeout or error:', error);
+        setRoles([]); // Fallback
       }
 
     } catch (error) {
-      console.error('Error refreshing user data:', error);
+      console.error('❌ Error in refreshUserData:', error);
     } finally {
       isRefreshingUserData.current = false;
     }
@@ -222,26 +223,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Prevent multiple initializations
     if (isInitialized.current) {
       return;
     }
     isInitialized.current = true;
 
-    // Clear any existing timeout
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current);
-    }
+    console.log('🚀 AuthProvider initializing...');
 
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Auth state change:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Debounced user data refresh
+          // Cargar datos del usuario
           setTimeout(async () => {
             if (!isRefreshingUserData.current) {
               await refreshUserData();
@@ -257,8 +253,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Check for existing session
+    // Verificar sesión inicial
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('🔍 Initial session check:', session?.user?.email || 'no session');
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -274,19 +271,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Safety timeout - always stop loading after reasonable time
-    loadingTimeoutRef.current = setTimeout(() => {
-      console.warn('⚠️ Auth loading timeout reached');
-      setLoading(false);
-    }, 8000);
+    // Safety timeout
+    setTimeout(() => {
+      if (loading) {
+        console.warn('⚠️ Auth timeout reached, stopping loading');
+        setLoading(false);
+      }
+    }, 5000);
 
     return () => {
       subscription.unsubscribe();
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
     };
-  }, [refreshUserData]);
+  }, [refreshUserData, loading]);
 
   const value = {
     user,
