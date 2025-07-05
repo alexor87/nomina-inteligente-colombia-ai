@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -196,17 +195,16 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
 
       {selectedEmployee && (
         <NovedadUnifiedModal
-          isOpen={isNovedadModalOpen}
+          open={isNovedadModalOpen}
+          setOpen={setIsNovedadModalOpen}
+          employeeId={selectedEmployee.id}
+          employeeSalary={selectedEmployee.baseSalary}
+          onSubmit={handleCreateNovedad}
+          selectedNovedadType={null}
           onClose={() => {
             setIsNovedadModalOpen(false);
             setSelectedEmployee(null);
           }}
-          employeeName={selectedEmployee.name}
-          employeeId={selectedEmployee.id}
-          employeeSalary={selectedEmployee.baseSalary}
-          periodId={periodoId}
-          onCreateNovedad={handleCreateNovedad}
-          calculateSuggestedValue={calculateSuggestedValue}
         />
       )}
     </>
