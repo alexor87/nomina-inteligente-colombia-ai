@@ -138,16 +138,20 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 pb-4 border-b">
+      {/* Header */}
+      <div className="flex items-center gap-3 pb-4 border-b bg-white">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">Incapacidad</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Incapacidad</h3>
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label>Tipo de Incapacidad</Label>
+      {/* Form Section */}
+      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
+        <h4 className="text-blue-800 font-medium">Información de la Incapacidad</h4>
+        
+        <div>
+          <Label htmlFor="subtipo" className="text-gray-700">Tipo de Incapacidad</Label>
           <Select
             value={formData.subtipo}
             onValueChange={(value) => handleInputChange('subtipo', value)}
@@ -168,15 +172,15 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </Select>
           
           {currentSubtipoInfo && (
-            <div className="text-sm text-blue-600">
+            <div className="text-sm text-blue-600 mt-1">
               <strong>Cobertura:</strong> {currentSubtipoInfo.description}
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Fecha Inicio *</Label>
+          <div>
+            <Label htmlFor="fecha_inicio" className="text-gray-700">Fecha Inicio *</Label>
             <Input
               type="date"
               value={formData.fecha_inicio}
@@ -184,8 +188,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Fecha Fin *</Label>
+          <div>
+            <Label htmlFor="fecha_fin" className="text-gray-700">Fecha Fin *</Label>
             <Input
               type="date"
               value={formData.fecha_fin}
@@ -194,8 +198,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label>Días de Incapacidad *</Label>
+        <div>
+          <Label htmlFor="dias" className="text-gray-700">Días de Incapacidad *</Label>
           <Input
             type="number"
             min="1"
@@ -207,20 +211,22 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
         {/* Valor calculado */}
         {calculatedValue && calculatedValue > 0 && (
-          <div className="flex items-center justify-between bg-green-50 p-3 rounded">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">Valor calculado automáticamente:</span>
+          <div className="bg-green-50 p-3 rounded border border-green-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-green-600" />
+                <span className="text-sm text-green-700">Valor calculado automáticamente:</span>
+              </div>
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                {formatCurrency(calculatedValue)}
+              </Badge>
             </div>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              {formatCurrency(calculatedValue)}
-            </Badge>
           </div>
         )}
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Valor *</Label>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <Label htmlFor="valor" className="text-gray-700">Valor *</Label>
             {calculatedValue && calculatedValue !== formData.valor && (
               <Button
                 type="button"
@@ -230,7 +236,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
                 className="text-xs h-7 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
               >
                 <Calculator className="h-3 w-3 mr-1" />
-                Usar calculado: ${calculatedValue.toLocaleString()}
+                Usar calculado: {formatCurrency(calculatedValue)}
               </Button>
             )}
           </div>
@@ -246,29 +252,31 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Observaciones</Label>
+        <div>
+          <Label htmlFor="observacion" className="text-gray-700">Observaciones</Label>
           <Textarea
             value={formData.observacion}
             onChange={(e) => handleInputChange('observacion', e.target.value)}
             placeholder="Número de incapacidad, diagnóstico, etc..."
             rows={3}
+            className="resize-none"
           />
         </div>
 
         {/* Preview */}
         {formData.valor > 0 && (
-          <div className="p-3 bg-gray-50 rounded text-center">
-            <Badge variant="default" className="text-sm px-3 py-1">
+          <div className="bg-blue-100 p-3 rounded text-center">
+            <Badge variant="secondary" className="bg-green-100 text-green-800 text-sm px-3 py-1">
               +{formatCurrency(formData.valor)}
             </Badge>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-600 mt-1">
               {formData.dias} días de incapacidad {formData.subtipo}
             </div>
           </div>
         )}
       </div>
 
+      {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack}>
           Cancelar
@@ -276,6 +284,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         <Button 
           onClick={handleSubmit}
           disabled={!formData.dias || !formData.fecha_inicio || !formData.fecha_fin || formData.valor <= 0}
+          className="bg-blue-600 hover:bg-blue-700"
         >
           Guardar Incapacidad
         </Button>
