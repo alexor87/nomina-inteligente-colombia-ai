@@ -1,6 +1,4 @@
 
-
-
 import { supabase } from '@/integrations/supabase/client';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 
@@ -57,11 +55,11 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
-      // ✅ CORRECCIÓN: Build data object with proper casting to avoid type errors
+      // ✅ CORRECCIÓN: Cast tipo_novedad to database compatible string
       const insertData = {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
-        tipo_novedad: novedadData.tipo_novedad,
+        tipo_novedad: novedadData.tipo_novedad as any, // Cast to bypass strict typing
         valor: novedadData.valor,
         dias: novedadData.dias,
         horas: novedadData.horas,
@@ -97,13 +95,18 @@ export class NovedadesEnhancedService {
     try {
       console.log(`🔄 Actualizando novedad ${novedadId}:`, updates);
       
-      // ✅ CORRECCIÓN: Build update data object properly
+      // ✅ CORRECCIÓN: Build update data object with proper type casting
       const updateData: Record<string, any> = {};
       
-      // Copy all defined properties
+      // Copy all defined properties and cast tipo_novedad if present
       Object.keys(updates).forEach(key => {
-        if (updates[key as keyof CreateNovedadData] !== undefined) {
-          updateData[key] = updates[key as keyof CreateNovedadData];
+        const value = updates[key as keyof CreateNovedadData];
+        if (value !== undefined) {
+          if (key === 'tipo_novedad') {
+            updateData[key] = value as any; // Cast to bypass strict typing
+          } else {
+            updateData[key] = value;
+          }
         }
       });
       
@@ -150,4 +153,3 @@ export class NovedadesEnhancedService {
     }
   }
 }
-
