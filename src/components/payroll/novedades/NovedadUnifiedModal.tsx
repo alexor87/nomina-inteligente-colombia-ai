@@ -146,7 +146,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
   const handleSubmitSingle = async (formData: any) => {
     console.log('📝 NovedadUnifiedModal - Submitting single novedad:', formData);
-    console.log('👤 NovedadUnifiedModal - For employee:', selectedEmployeeId);
+    console.log('👤 NovedadUnifiedModal - For employee:', employeeId);
     
     const novedadData: CreateNovedadData = {
       empleado_id: employeeId,
