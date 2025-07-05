@@ -65,9 +65,7 @@ export const PayrollLiquidationTable = ({
     }
   };
 
-  // Wrapper function to handle the enhanced CreateNovedadData type
   const handleCreateNovedad = async (data: CreateNovedadData): Promise<void> => {
-    // The data already comes with company_id from the modal, so we can pass it directly
     await createNovedad(data);
     await handleNovedadChange();
   };
@@ -75,6 +73,10 @@ export const PayrollLiquidationTable = ({
   const selectedEmployee = selectedEmployeeId 
     ? employees.find(emp => emp.id === selectedEmployeeId)
     : null;
+
+  const calculateNovedadesNetas = (employee: Employee): number => {
+    return employee.devengos - employee.deducciones;
+  };
 
   return (
     <>
@@ -87,11 +89,12 @@ export const PayrollLiquidationTable = ({
               <th className="text-right p-4">Días</th>
               <th className="text-center p-4">Novedades</th>
               <th className="text-right p-4">Total a Pagar</th>
-              <th className="text-center p-4">Acciones</th>
+              <th className="text-center p-4">Eliminar</th>
             </tr>
           </thead>
           <tbody>
             {employees.map((employee) => {
+              const novedadesNetas = calculateNovedadesNetas(employee);
               const hasNovedades = employee.novedades_totals?.hasNovedades || false;
               
               return (
@@ -113,19 +116,17 @@ export const PayrollLiquidationTable = ({
                       >
                         <Plus className="h-4 w-4 text-blue-600" />
                       </Button>
-                      {hasNovedades && (
-                        <div className="flex flex-col text-xs">
-                          {employee.devengos > 0 && (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs mb-1">
-                              +{formatCurrency(employee.devengos)}
-                            </Badge>
-                          )}
-                          {employee.deducciones > 0 && (
-                            <Badge variant="secondary" className="bg-red-100 text-red-800 text-xs">
-                              -{formatCurrency(employee.deducciones)}
-                            </Badge>
-                          )}
-                        </div>
+                      {hasNovedades && novedadesNetas !== 0 && (
+                        <Badge 
+                          variant="secondary" 
+                          className={`text-xs ${
+                            novedadesNetas > 0 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {novedadesNetas > 0 ? '+' : ''}{formatCurrency(novedadesNetas)}
+                        </Badge>
                       )}
                     </div>
                   </td>
@@ -133,16 +134,14 @@ export const PayrollLiquidationTable = ({
                     {formatCurrency(employee.total_pagar)}
                   </td>
                   <td className="p-4 text-center">
-                    <div className="flex justify-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onRemoveEmployee(employee.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemoveEmployee(employee.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </td>
                 </tr>
               );
