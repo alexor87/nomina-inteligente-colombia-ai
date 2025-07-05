@@ -10,6 +10,7 @@ import { NovedadIngresosAdicionalesConsolidatedForm } from './forms/NovedadIngre
 import { NovedadPrestamosConsolidatedForm } from './forms/NovedadPrestamosConsolidatedForm';
 import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesConsolidatedForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
+import { NovedadExistingList } from './NovedadExistingList';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { useToast } from '@/components/ui/use-toast';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
@@ -21,6 +22,7 @@ interface NovedadUnifiedModalProps {
   setOpen: (open: boolean) => void;
   employeeId: string | undefined;
   employeeSalary: number | undefined;
+  periodId: string | undefined;
   onSubmit: (data: any) => Promise<void>;
   onClose?: () => void;
   selectedNovedadType: NovedadType | null;
@@ -46,11 +48,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   setOpen,
   employeeId,
   employeeSalary,
+  periodId,
   onSubmit,
   selectedNovedadType,
   onClose
 }) => {
-  const [currentStep, setCurrentStep] = useState<'selector' | 'form'>('selector');
+  const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
   const [employeeName, setEmployeeName] = useState<string>('');
   const { toast } = useToast();
@@ -61,7 +64,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       setSelectedType(selectedNovedadType);
       setCurrentStep('form');
     } else {
-      setCurrentStep('selector');
+      setCurrentStep('list');
       setSelectedType(null);
     }
   }, [selectedNovedadType, open]);
@@ -76,7 +79,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
   const handleClose = () => {
     setOpen(false);
-    setCurrentStep('selector');
+    setCurrentStep('list');
     setSelectedType(null);
     onClose?.();
   };
@@ -90,6 +93,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const handleBackToSelector = () => {
     setCurrentStep('selector');
     setSelectedType(null);
+  };
+
+  const handleBackToList = () => {
+    setCurrentStep('list');
+    setSelectedType(null);
+  };
+
+  const handleAddNew = () => {
+    setCurrentStep('selector');
   };
 
   const handleFormSubmit = async (formData: any) => {
@@ -106,13 +118,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       await onSubmit({
         ...formData,
         empleado_id: employeeId,
+        periodo_id: periodId,
         tipo_novedad: selectedType,
       });
       toast({
         title: "Novedad guardada",
         description: "La novedad se ha guardado correctamente",
       });
-      handleClose();
+      // Volver a la lista para mostrar la novedad recién creada
+      setCurrentStep('list');
+      setSelectedType(null);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -217,22 +232,43 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const renderContent = () => {
+    if (currentStep === 'list' && employeeId && periodId) {
+      return (
+        <NovedadExistingList
+          employeeId={employeeId}
+          periodId={periodId}
+          employeeName={employeeName}
+          onAddNew={handleAddNew}
+          onClose={handleClose}
+        />
+      );
+    }
+
     if (currentStep === 'selector') {
       return (
         <NovedadTypeSelector
-          onClose={handleClose}
+          onClose={handleBackToList}
           onSelectCategory={handleCategorySelect}
           employeeName={employeeName}
         />
       );
     }
 
-    return renderNovedadForm();
+    if (currentStep === 'form') {
+      return renderNovedadForm();
+    }
+
+    // Fallback
+    return (
+      <div className="p-6 text-center">
+        <p className="text-gray-500">Cargando...</p>
+      </div>
+    );
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         {currentStep === 'form' && (
           <>
             <DialogHeader>

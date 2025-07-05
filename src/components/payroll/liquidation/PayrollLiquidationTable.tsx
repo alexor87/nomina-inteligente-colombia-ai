@@ -1,276 +1,173 @@
-
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Eye } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { Edit, Trash2 } from 'lucide-react';
+import { PayrollEmployeeData } from '@/types/employees';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
-import { useNovedades } from '@/hooks/useNovedades';
-import type { CreateNovedadData } from '@/types/novedades-enhanced';
-
-interface Employee {
-  id: string;
-  nombre: string;
-  apellido: string;
-  salario_base: number;
-  devengos: number;
-  deducciones: number;
-  total_pagar: number;
-  dias_trabajados: number;
-  auxilio_transporte: number;
-  // Deducciones detalladas
-  salud_empleado: number;
-  pension_empleado: number;
-  fondo_solidaridad: number;
-  retencion_fuente: number;
-  deducciones_novedades: number;
-  novedades_totals?: {
-    totalDevengos: number;
-    totalDeducciones: number;
-    totalNeto: number;
-    hasNovedades: boolean;
-  };
-}
+import { useToast } from '@/components/ui/use-toast';
+import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
+import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 
 interface PayrollLiquidationTableProps {
-  employees: Employee[];
+  employees: PayrollEmployeeData[];
   startDate: string;
   endDate: string;
-  currentPeriodId: string | null;
+  currentPeriodId: string | undefined;
   onRemoveEmployee: (employeeId: string) => void;
-  onEmployeeNovedadesChange: (employeeId: string) => void;
+  onEmployeeNovedadesChange: (employeeId: string) => Promise<void>;
 }
 
-export const PayrollLiquidationTable = ({ 
-  employees, 
-  startDate, 
-  endDate, 
+export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = ({
+  employees,
+  startDate,
+  endDate,
   currentPeriodId,
   onRemoveEmployee,
   onEmployeeNovedadesChange
-}: PayrollLiquidationTableProps) => {
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
-  const [isNovedadesModalOpen, setIsNovedadesModalOpen] = useState(false);
-  const [showDeductionDetail, setShowDeductionDetail] = useState<string | null>(null);
-  const { createNovedad } = useNovedades(currentPeriodId || '');
+}) => {
+  const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeData | null>(null);
+  const [novedadModalOpen, setNovedadModalOpen] = useState(false);
+  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { updateEmployeeSalary } = usePayrollLiquidation();
 
-  const totalPagar = employees.reduce((sum, emp) => sum + emp.total_pagar, 0);
+  const handleOpenNovedadModal = useCallback((employee: PayrollEmployeeData) => {
+    setSelectedEmployee(employee);
+    setNovedadModalOpen(true);
+  }, []);
 
-  const handleOpenNovedades = (employeeId: string) => {
-    console.log('🔄 PayrollLiquidationTable - Opening novedades modal for employee:', employeeId);
-    setSelectedEmployeeId(employeeId);
-    setIsNovedadesModalOpen(true);
-  };
+  const handleCloseNovedadModal = useCallback(() => {
+    setNovedadModalOpen(false);
+    setSelectedEmployee(null);
+  }, []);
 
-  const handleCloseNovedades = () => {
-    console.log('🔄 PayrollLiquidationTable - Closing novedades modal');
-    setSelectedEmployeeId(null);
-    setIsNovedadesModalOpen(false);
-  };
+  const handleOpenConfirmationModal = useCallback((employeeId: string) => {
+    setEmployeeToDelete(employeeId);
+    setConfirmationModalOpen(true);
+  }, []);
 
-  const handleNovedadChange = async () => {
-    if (selectedEmployeeId) {
-      console.log('🔄 PayrollLiquidationTable - Triggering novedad change for employee:', selectedEmployeeId);
-      console.log('📊 PayrollLiquidationTable - Current employee state before change:', 
-        employees.find(emp => emp.id === selectedEmployeeId)
-      );
-      
-      await onEmployeeNovedadesChange(selectedEmployeeId);
-      
-      console.log('📊 PayrollLiquidationTable - Employee state after change should be updated');
-    } else {
-      console.warn('⚠️ PayrollLiquidationTable - No selected employee ID when handling novedad change');
+  const handleCloseConfirmationModal = useCallback(() => {
+    setConfirmationModalOpen(false);
+    setEmployeeToDelete(null);
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (employeeToDelete) {
+      onRemoveEmployee(employeeToDelete);
+      handleCloseConfirmationModal();
+      toast({
+        title: "Empleado removido",
+        description: "El empleado se ha removido de la liquidación actual.",
+      });
+    }
+  }, [employeeToDelete, onRemoveEmployee, handleCloseConfirmationModal, toast]);
+
+  const handleNovedadSubmit = async (data: any) => {
+    console.log('Novedad data submitted:', data);
+    handleCloseNovedadModal();
+    if (selectedEmployee) {
+      await onEmployeeNovedadesChange(selectedEmployee.id);
     }
   };
 
-  const handleCreateNovedad = async (data: CreateNovedadData): Promise<void> => {
-    console.log('📝 PayrollLiquidationTable - Creating novedad:', data);
-    console.log('👤 PayrollLiquidationTable - For employee:', selectedEmployeeId);
-    
-    await createNovedad(data);
-    console.log('✅ PayrollLiquidationTable - Novedad created, triggering recalculation');
-    
-    await handleNovedadChange();
-  };
-
-  const selectedEmployee = selectedEmployeeId 
-    ? employees.find(emp => emp.id === selectedEmployeeId)
-    : null;
-
-  const calculateNovedadesNetas = (employee: Employee): number => {
-    const netas = employee.devengos - employee.deducciones_novedades;
-    console.log(`💰 PayrollLiquidationTable - Novedades netas for ${employee.nombre}:`, {
-      devengos: employee.devengos,
-      deducciones: employee.deducciones_novedades,
-      netas: netas
-    });
-    return netas;
-  };
-
-  const toggleDeductionDetail = (employeeId: string) => {
-    setShowDeductionDetail(showDeductionDetail === employeeId ? null : employeeId);
+  const handleSalaryChange = async (employeeId: string, newSalary: number) => {
+    try {
+      await updateEmployeeSalary(employeeId, newSalary);
+      toast({
+        title: "Salario actualizado",
+        description: "El salario del empleado se ha actualizado correctamente.",
+      });
+      // Actualizar el estado local de los empleados si es necesario
+      onEmployeeNovedadesChange(employeeId);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el salario del empleado.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b">
-              <th className="text-left p-4">Empleado</th>
-              <th className="text-right p-4">Salario Base</th>
-              <th className="text-right p-4">Días</th>
-              <th className="text-center p-4">Novedades</th>
-              <th className="text-right p-4">Deducciones</th>
-              <th className="text-right p-4">Total a Pagar</th>
-              <th className="text-center p-4">Eliminar</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((employee) => {
-              const novedadesNetas = calculateNovedadesNetas(employee);
-              const hasNovedades = employee.novedades_totals?.hasNovedades || false;
-              const showDetail = showDeductionDetail === employee.id;
-              
-              console.log(`📋 PayrollLiquidationTable - Rendering employee ${employee.nombre}:`, {
-                hasNovedades,
-                novedadesNetas,
-                totalPagar: employee.total_pagar,
-                deducciones: employee.deducciones
-              });
-              
-              return (
-                <React.Fragment key={employee.id}>
-                  <tr className="border-b hover:bg-gray-50">
-                    <td className="p-4">
-                      <div>
-                        <div className="font-medium">{employee.nombre} {employee.apellido}</div>
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">{formatCurrency(employee.salario_base)}</td>
-                    <td className="p-4 text-right">{employee.dias_trabajados}</td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenNovedades(employee.id)}
-                          className="h-8 w-8 p-0 border-blue-300 hover:bg-blue-50"
-                        >
-                          <Plus className="h-4 w-4 text-blue-600" />
-                        </Button>
-                        {hasNovedades && novedadesNetas !== 0 && (
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs ${
-                              novedadesNetas > 0 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {novedadesNetas > 0 ? '+' : ''}{formatCurrency(novedadesNetas)}
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <span className="font-medium">{formatCurrency(employee.deducciones)}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleDeductionDetail(employee.id)}
-                          className="h-6 w-6 p-0"
-                          title="Ver detalle de deducciones"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </td>
-                    <td className="p-4 text-right font-bold">
-                      {formatCurrency(employee.total_pagar)}
-                    </td>
-                    <td className="p-4 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onRemoveEmployee(employee.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                  
-                  {/* Fila de detalle de deducciones para auditoría DIAN/UGPP */}
-                  {showDetail && (
-                    <tr className="bg-blue-50">
-                      <td colSpan={7} className="p-4">
-                        <div className="text-sm">
-                          <h4 className="font-semibold mb-2 text-blue-800">
-                            📋 Detalle de Deducciones - Auditoría DIAN/UGPP
-                          </h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                              <span className="text-gray-600">Salud (4%):</span>
-                              <div className="font-mono">{formatCurrency(employee.salud_empleado)}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Pensión (4%):</span>
-                              <div className="font-mono">{formatCurrency(employee.pension_empleado)}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Fondo Solidaridad:</span>
-                              <div className="font-mono">{formatCurrency(employee.fondo_solidaridad)}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Retención Fuente:</span>
-                              <div className="font-mono">{formatCurrency(employee.retencion_fuente)}</div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Novedades Deduc.:</span>
-                              <div className="font-mono">{formatCurrency(employee.deducciones_novedades)}</div>
-                            </div>
-                            <div className="border-l-2 border-blue-300 pl-4">
-                              <span className="text-blue-800 font-semibold">Total Deducciones:</span>
-                              <div className="font-mono font-bold">{formatCurrency(employee.deducciones)}</div>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 bg-gray-50">
-              <td colSpan={5} className="p-4 text-right font-bold">Total General:</td>
-              <td className="p-4 text-right font-bold text-lg">
-                {formatCurrency(totalPagar)}
-              </td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Salario Base</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {employees.map((employee) => (
+            <TableRow key={employee.id}>
+              <TableCell>{employee.first_name} {employee.last_name}</TableCell>
+              <TableCell>{employee.email}</TableCell>
+              <TableCell>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    type="number"
+                    defaultValue={employee.salario_base}
+                    onBlur={(e) => {
+                      const newSalary = parseFloat(e.target.value);
+                      if (!isNaN(newSalary) && newSalary !== employee.salario_base) {
+                        handleSalaryChange(employee.id, newSalary);
+                      }
+                    }}
+                    className="w-32"
+                  />
+                </div>
+              </TableCell>
+              <TableCell className="text-right">
+                <Button variant="ghost" size="sm" onClick={() => handleOpenNovedadModal(employee)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Novedades
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => handleOpenConfirmationModal(employee.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
 
-      {/* Modal de Novedades */}
-      {selectedEmployee && currentPeriodId && (
-        <NovedadUnifiedModal
-          open={isNovedadesModalOpen}
-          setOpen={setIsNovedadesModalOpen}
-          employeeId={selectedEmployee.id}
-          employeeSalary={selectedEmployee.salario_base}
-          onSubmit={handleCreateNovedad}
-          selectedNovedadType={null}
-          onClose={() => {
-            setIsNovedadesModalOpen(false);
-            setSelectedEmployeeId(null);
-          }}
-        />
-      )}
+      {/* Modal de novedades */}
+      <NovedadUnifiedModal
+        open={novedadModalOpen}
+        setOpen={setNovedadModalOpen}
+        employeeId={selectedEmployee?.id}
+        employeeSalary={selectedEmployee?.salario_base}
+        periodId={currentPeriodId} // Agregar esta prop
+        onSubmit={handleNovedadSubmit}
+        selectedNovedadType={null}
+        onClose={() => {
+          setSelectedEmployee(null);
+          setNovedadModalOpen(false);
+        }}
+      />
+
+      {/* Confirmation modal */}
+      <CustomModal isOpen={confirmationModalOpen} onClose={handleCloseConfirmationModal}>
+        <CustomModalHeader>
+          <CustomModalTitle>Confirmar Remoción</CustomModalTitle>
+        </CustomModalHeader>
+        <p className="text-sm text-gray-500">
+          ¿Estás seguro de que deseas remover a este empleado de la liquidación actual?
+        </p>
+        <div className="mt-4 flex justify-end space-x-2">
+          <Button variant="secondary" onClick={handleCloseConfirmationModal}>
+            Cancelar
+          </Button>
+          <Button variant="destructive" onClick={handleConfirmDelete}>
+            Confirmar
+          </Button>
+        </div>
+      </CustomModal>
     </>
   );
 };
