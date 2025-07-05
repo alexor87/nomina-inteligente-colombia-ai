@@ -15,16 +15,16 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
+import PayrollPage from "./pages/PayrollPage";
+import PayrollHistoryPage from "./pages/PayrollHistoryPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
-import PlaceholderPage from "./pages/PlaceholderPage";
-import PayrollLiquidationPage from "./pages/PayrollLiquidationPage";
 
 const queryClient = new QueryClient();
 
 /**
- * ✅ APLICACIÓN PRINCIPAL CON MÓDULO DE LIQUIDACIÓN
- * Incluye nuevo módulo de liquidación de nómina funcional
+ * ✅ COMPONENTE PRINCIPAL CON INICIALIZACIÓN CRÍTICA
+ * Incluye diagnóstico y reparación automática al cargar
  */
 function AppContent() {
   // Inicialización automática del sistema
@@ -32,6 +32,13 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Indicador de inicialización crítica */}
+      {isInitializing && (
+        <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white px-4 py-2 text-center text-sm z-50">
+          🔧 Inicializando y diagnosticando sistema de nómina...
+        </div>
+      )}
+      
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<LoginPage />} />
@@ -41,11 +48,10 @@ function AppContent() {
         <Route path="/app" element={<Layout />}>
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="employees" element={<EmployeesPage />} />
-          <Route path="payroll" element={<PayrollLiquidationPage />} />
+          <Route path="payroll" element={<PayrollPage />} />
+          <Route path="payroll-history" element={<PayrollHistoryPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
-          {/* Placeholder para rutas eliminadas */}
-          <Route path="payroll-history" element={<PlaceholderPage />} />
         </Route>
       </Routes>
     </div>
