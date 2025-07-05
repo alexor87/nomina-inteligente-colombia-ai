@@ -1,13 +1,11 @@
 
 /**
- * 🎯 SERVICIO ALELUYA - LIQUIDACIÓN DE NÓMINA SIMPLIFICADO
- * Servicio simple sin detección automática de períodos
- * SIMPLIFICADO: Usuario elige fechas manualmente
+ * 🎯 SERVICIO ALELUYA - LIQUIDACIÓN DE NÓMINA ULTRA-SIMPLIFICADO
+ * Sin lógica inteligente, solo fechas seleccionadas por el usuario
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
-import { getPeriodNameFromDates } from '@/utils/periodDateUtils';
 
 export interface PayrollPeriod {
   id: string;
@@ -15,7 +13,7 @@ export interface PayrollPeriod {
   fecha_inicio: string;
   fecha_fin: string;
   estado: 'borrador' | 'cerrado';
-  tipo_periodo: 'quincenal' | 'mensual' | 'semanal';
+  tipo_periodo: 'personalizado';
   empleados_count: number;
   total_devengado: number;
   total_deducciones: number;
@@ -24,7 +22,7 @@ export interface PayrollPeriod {
 
 export class PayrollServiceAleluya {
   /**
-   * 📅 CARGAR PERÍODO ACTUAL - SIMPLIFICADO
+   * 📅 CARGAR PERÍODO ACTUAL - ULTRA-SIMPLIFICADO
    */
   static async loadCurrentPeriod(): Promise<{
     period: PayrollPeriod | null;
@@ -51,11 +49,11 @@ export class PayrollServiceAleluya {
         
         const normalizedPeriod: PayrollPeriod = {
           ...activePeriod,
-          estado: this.normalizeStatus(activePeriod.estado),
-          tipo_periodo: this.normalizeType(activePeriod.tipo_periodo)
+          estado: activePeriod.estado as 'borrador' | 'cerrado',
+          tipo_periodo: 'personalizado'
         };
         
-        // Cargar empleados y generar registros si no existen
+        // Cargar empleados
         let employees = await this.loadEmployeesForPeriod(activePeriod.id);
         
         // Si no hay empleados, generar automáticamente
@@ -91,7 +89,7 @@ export class PayrollServiceAleluya {
   }
 
   /**
-   * 🏗️ CREAR PERÍODO CON FECHAS - SIMPLIFICADO
+   * 🏗️ CREAR PERÍODO CON FECHAS - ULTRA-SIMPLIFICADO
    */
   static async createPeriodWithDates(startDate: string, endDate: string): Promise<{
     period: PayrollPeriod;
@@ -101,19 +99,10 @@ export class PayrollServiceAleluya {
     try {
       const companyId = await this.getCurrentCompanyId();
       
-      // Generar nombre del período basado en las fechas
-      const periodName = getPeriodNameFromDates(startDate, endDate);
+      // ULTRA-SIMPLE: Crear nombre del período con fechas exactas
+      const periodName = `${startDate} - ${endDate}`;
       
-      // Determinar tipo de período basado en los días
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
-      
-      let tipoPerido: 'semanal' | 'quincenal' | 'mensual' = 'mensual';
-      if (daysDiff <= 7) tipoPerido = 'semanal';
-      else if (daysDiff <= 16) tipoPerido = 'quincenal';
-      
-      console.log('🔨 Creando período:', periodName, `(${daysDiff} días)`);
+      console.log('🔨 Creando período ultra-simple:', periodName);
       
       const { data: newPeriod, error } = await supabase
         .from('payroll_periods_real')
@@ -122,7 +111,7 @@ export class PayrollServiceAleluya {
           periodo: periodName,
           fecha_inicio: startDate,
           fecha_fin: endDate,
-          tipo_periodo: tipoPerido,
+          tipo_periodo: 'personalizado', // Siempre personalizado
           estado: 'borrador',
           empleados_count: 0,
           total_devengado: 0,
@@ -136,14 +125,14 @@ export class PayrollServiceAleluya {
 
       const normalizedPeriod: PayrollPeriod = {
         ...newPeriod,
-        estado: this.normalizeStatus(newPeriod.estado),
-        tipo_periodo: this.normalizeType(newPeriod.tipo_periodo)
+        estado: 'borrador',
+        tipo_periodo: 'personalizado'
       };
 
       // Generar registros de empleados automáticamente
       const employees = await this.generatePayrollRecords(newPeriod.id);
       
-      console.log('✅ Período creado con', employees.length, 'empleados');
+      console.log('✅ Período ultra-simple creado con', employees.length, 'empleados');
       
       return {
         period: normalizedPeriod,
@@ -158,7 +147,7 @@ export class PayrollServiceAleluya {
   }
 
   /**
-   * 💰 LIQUIDAR NÓMINA - SIMPLIFICADO
+   * 💰 LIQUIDAR NÓMINA - MANTENIDO SIMPLE
    */
   static async liquidatePayroll(
     periodId: string, 
@@ -209,7 +198,7 @@ export class PayrollServiceAleluya {
   }
 
   /**
-   * 🔒 CERRAR PERÍODO - SIMPLIFICADO
+   * 🔒 CERRAR PERÍODO - MANTENIDO
    */
   static async closePeriod(periodId: string): Promise<{
     success: boolean;
@@ -247,7 +236,7 @@ export class PayrollServiceAleluya {
     }
   }
 
-  // ===== MÉTODOS PRIVADOS SIMPLIFICADOS =====
+  // ===== MÉTODOS PRIVADOS ULTRA-SIMPLIFICADOS =====
 
   private static async getCurrentCompanyId(): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -264,21 +253,6 @@ export class PayrollServiceAleluya {
     }
 
     return profile.company_id;
-  }
-
-  private static normalizeType(type: string): 'quincenal' | 'mensual' | 'semanal' {
-    switch (type) {
-      case 'quincenal':
-        return 'quincenal';
-      case 'semanal':
-        return 'semanal';
-      default:
-        return 'mensual';
-    }
-  }
-
-  private static normalizeStatus(status: string): 'borrador' | 'cerrado' {
-    return status === 'cerrado' ? 'cerrado' : 'borrador';
   }
 
   private static async loadEmployeesForPeriod(periodId: string): Promise<PayrollEmployee[]> {
@@ -332,33 +306,27 @@ export class PayrollServiceAleluya {
     // Obtener información del período
     const { data: period } = await supabase
       .from('payroll_periods_real')
-      .select('periodo, tipo_periodo, fecha_inicio, fecha_fin')
+      .select('periodo')
       .eq('id', periodId)
       .single();
 
     const periodName = period?.periodo || 'Período actual';
-    const periodType = period?.tipo_periodo || 'mensual';
 
-    // Calcular días según fechas reales del período
-    let workDays = 30;
-    if (period?.fecha_inicio && period?.fecha_fin) {
-      const start = new Date(period.fecha_inicio);
-      const end = new Date(period.fecha_fin);
-      workDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
-    }
+    // ULTRA-SIMPLE: Usar siempre 30 días trabajados, sin cálculos automáticos
+    const workDays = 30;
 
-    // Crear registros de nómina
+    // Crear registros de nómina con valores simples
     const payrollRecords = employees.map(emp => ({
       company_id: companyId,
       employee_id: emp.id,
       period_id: periodId,
       periodo: periodName,
       salario_base: emp.salario_base || 0,
-      dias_trabajados: workDays,
-      total_devengado: Math.round((emp.salario_base || 0) * (workDays / 30)),
-      total_deducciones: Math.round((emp.salario_base || 0) * (workDays / 30) * 0.08),
-      neto_pagado: Math.round((emp.salario_base || 0) * (workDays / 30) * 0.92),
-      auxilio_transporte: emp.salario_base <= 2600000 ? Math.round(162000 * (workDays / 30)) : 0,
+      dias_trabajados: workDays, // Siempre 30 días
+      total_devengado: Math.round((emp.salario_base || 0)),
+      total_deducciones: Math.round((emp.salario_base || 0) * 0.08),
+      neto_pagado: Math.round((emp.salario_base || 0) * 0.92),
+      auxilio_transporte: emp.salario_base <= 2600000 ? 162000 : 0,
       estado: 'borrador'
     }));
 
@@ -368,7 +336,7 @@ export class PayrollServiceAleluya {
       throw error;
     }
 
-    console.log('✅ Generados', payrollRecords.length, 'registros de nómina');
+    console.log('✅ Generados', payrollRecords.length, 'registros de nómina ultra-simples');
 
     // Actualizar totales del período
     await this.updatePeriodTotals(periodId);

@@ -1,7 +1,7 @@
 
 /**
- * 🎯 HOOK ALELUYA - ESTADO SIMPLIFICADO
- * SIMPLIFICADO: Sin detección automática, usuario elige fechas
+ * 🎯 HOOK ALELUYA - ULTRA-SIMPLIFICADO
+ * Sin lógica inteligente, solo manejo de fechas seleccionadas por usuario
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -45,13 +45,13 @@ export const usePayrollAleluya = () => {
   });
 
   /**
-   * 🔄 INICIALIZAR - SIMPLIFICADO
+   * 🔄 INICIALIZAR - ULTRA-SIMPLE
    */
   const initialize = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
       
-      console.log('🔄 Inicializando hook de nómina...');
+      console.log('🔄 Inicializando hook ultra-simple...');
       const result = await PayrollServiceAleluya.loadCurrentPeriod();
       
       // Seleccionar empleados válidos automáticamente
@@ -71,7 +71,7 @@ export const usePayrollAleluya = () => {
         message: result.message
       }));
 
-      console.log('✅ Hook inicializado correctamente');
+      console.log('✅ Hook ultra-simple inicializado correctamente');
 
     } catch (error) {
       console.error('❌ Error inicializando hook:', error);
@@ -90,13 +90,13 @@ export const usePayrollAleluya = () => {
   }, [toast]);
 
   /**
-   * 🏗️ CREAR PERÍODO CON FECHAS - NUEVO
+   * 🏗️ CREAR PERÍODO CON FECHAS - ULTRA-SIMPLE
    */
   const createPeriodWithDates = useCallback(async (startDate: string, endDate: string) => {
     try {
       setState(prev => ({ ...prev, isProcessing: true }));
       
-      console.log('🏗️ Creando período con fechas:', startDate, '-', endDate);
+      console.log('🏗️ Creando período ultra-simple:', startDate, '-', endDate);
       const result = await PayrollServiceAleluya.createPeriodWithDates(startDate, endDate);
       
       // Seleccionar empleados válidos automáticamente
@@ -284,7 +284,7 @@ export const usePayrollAleluya = () => {
     ...state,
     
     // Acciones principales
-    createPeriodWithDates, // NUEVO: Crear período con fechas específicas
+    createPeriodWithDates, // ULTRA-SIMPLE: Crear período con fechas exactas
     liquidatePayroll,
     closePeriod,
     refresh: initialize,
