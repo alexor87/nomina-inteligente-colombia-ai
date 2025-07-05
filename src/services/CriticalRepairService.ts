@@ -199,7 +199,7 @@ export class CriticalRepairService {
             dias_trabajo: 30,
             horas_trabajo: 8,
             regimen_salud: 'contributivo',
-            estado_afiliacion: 'activo'
+            estado_afiliacion: 'completa'
           },
           {
             cedula: `1234567890`,
@@ -226,7 +226,7 @@ export class CriticalRepairService {
             dias_trabajo: 30,
             horas_trabajo: 8,
             regimen_salud: 'contributivo',
-            estado_afiliacion: 'activo'
+            estado_afiliacion: 'completa'
           },
           {
             cedula: `98765432`,
@@ -253,7 +253,7 @@ export class CriticalRepairService {
             dias_trabajo: 30,
             horas_trabajo: 8,
             regimen_salud: 'contributivo',
-            estado_afiliacion: 'activo'
+            estado_afiliacion: 'completa'
           }
         ];
         
