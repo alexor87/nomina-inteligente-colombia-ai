@@ -30,16 +30,24 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const {
     loadNovedadesTotals,
     getEmployeeNovedades,
-    refreshEmployeeNovedades
+    refreshEmployeeNovedades,
+    refreshAllEmployees,
+    lastRefreshTime
   } = usePayrollNovedades(currentPeriodId || '');
 
-  // Cargar novedades cuando se monten los empleados
+  // Cargar novedades cuando se monten los empleados o cambie el período
   useEffect(() => {
     if (employees.length > 0 && currentPeriodId) {
+      console.log('🔄 Cargando novedades para', employees.length, 'empleados, período:', currentPeriodId);
       const employeeIds = employees.map(emp => emp.id);
       loadNovedadesTotals(employeeIds);
     }
   }, [employees, currentPeriodId, loadNovedadesTotals]);
+
+  // Refrescar cuando cambie lastRefreshTime (después de actualizar novedades)
+  useEffect(() => {
+    console.log('🔄 LastRefreshTime cambió, forzando re-render de totales');
+  }, [lastRefreshTime]);
 
   // Calcular días trabajados basado en las fechas del período
   const calculateWorkedDays = () => {
@@ -62,6 +70,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   };
 
   const handleOpenNovedadModal = (employee: PayrollEmployee) => {
+    console.log('📝 Abriendo modal de novedades para:', employee.name, 'período:', currentPeriodId);
     setSelectedEmployee(employee);
     setNovedadModalOpen(true);
   };
@@ -73,30 +82,54 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   const handleNovedadSubmit = async (data: any) => {
     console.log('💾 Novedad data submitted:', data);
-    handleCloseNovedadModal();
     
-    if (selectedEmployee) {
+    if (selectedEmployee && currentPeriodId) {
       try {
-        console.log('🔄 Actualizando novedades para empleado:', selectedEmployee.id);
+        console.log('🔄 Iniciando sincronización completa para empleado:', selectedEmployee.id);
         
-        // 1. Actualizar el hook interno primero
+        // Cerrar modal primero para mejor UX
+        handleCloseNovedadModal();
+        
+        // 1. Esperar un poco para que la novedad se guarde completamente
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 2. Actualizar el hook interno específicamente para este empleado
+        console.log('🔄 Actualizando hook interno...');
         await refreshEmployeeNovedades(selectedEmployee.id);
-        console.log('✅ Hook interno actualizado');
         
-        // 2. Actualizar el estado del componente padre
+        // 3. Actualizar el estado del componente padre
+        console.log('🔄 Actualizando estado padre...');
         await onEmployeeNovedadesChange(selectedEmployee.id);
-        console.log('✅ Estado padre actualizado');
         
-        console.log('🎉 Sincronización completa - Total a Pagar se actualizará automáticamente');
+        // 4. Refrescar todos los empleados para asegurar consistencia
+        console.log('🔄 Refrescando todos los empleados...');
+        const employeeIds = employees.map(emp => emp.id);
+        await refreshAllEmployees(employeeIds);
+        
+        console.log('🎉 Sincronización completa exitosa - Total a Pagar se actualizará automáticamente');
       } catch (error) {
-        console.error('❌ Error sincronizando estados de novedades:', error);
+        console.error('❌ Error en sincronización completa de novedades:', error);
+        // Mostrar mensaje de error al usuario si es necesario
       }
+    } else {
+      console.warn('⚠️ Faltan datos necesarios para la sincronización:', {
+        selectedEmployee: !!selectedEmployee,
+        currentPeriodId: !!currentPeriodId
+      });
+      handleCloseNovedadModal();
     }
   };
 
   const calculateTotalToPay = (employee: PayrollEmployee) => {
     const config = getCurrentYearConfig();
     const novedades = getEmployeeNovedades(employee.id);
+    
+    // Log para debugging
+    console.log('💰 Calculando total para empleado:', employee.name, {
+      salarioBase: employee.baseSalary,
+      diasTrabajados: workedDays,
+      novedades: novedades
+    });
     
     // Salario proporcional según días trabajados
     const salarioProporcional = (employee.baseSalary / 30) * workedDays;
@@ -117,7 +150,10 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     // Total a pagar = base gravable - deducciones + auxilio de transporte
     const totalNeto = baseGravable - totalDeducciones + auxilioTransporte;
     
-    return Math.max(0, totalNeto);
+    const result = Math.max(0, totalNeto);
+    console.log('💰 Total calculado para', employee.name, ':', formatCurrency(result));
+    
+    return result;
   };
 
   return (
@@ -183,7 +219,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       </Table>
 
       {/* Modal de novedades */}
-      {selectedEmployee && (
+      {selectedEmployee && currentPeriodId && (
         <NovedadUnifiedModal
           open={novedadModalOpen}
           setOpen={setNovedadModalOpen}

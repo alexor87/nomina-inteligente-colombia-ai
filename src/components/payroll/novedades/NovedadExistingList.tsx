@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Edit, Plus } from 'lucide-react';
 import { useNovedades } from '@/hooks/useNovedades';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface NovedadExistingListProps {
   employeeId: string;
@@ -14,6 +14,7 @@ interface NovedadExistingListProps {
   employeeName: string;
   onAddNew: () => void;
   onClose: () => void;
+  refreshTrigger?: number; // Prop opcional para forzar actualización
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -21,35 +22,47 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   periodId,
   employeeName,
   onAddNew,
-  onClose
+  onClose,
+  refreshTrigger
 }) => {
   const [novedades, setNovedades] = useState<PayrollNovedad[]>([]);
   const [loading, setLoading] = useState(true);
   const { loadNovedades, deleteNovedad } = useNovedades(periodId);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchNovedades = async () => {
-      try {
-        setLoading(true);
-        const result = await loadNovedades(employeeId);
-        setNovedades(result);
-      } catch (error) {
-        console.error('❌ Error cargando novedades:', error);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar las novedades",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchNovedades = async () => {
+    try {
+      setLoading(true);
+      console.log('📋 Cargando novedades para empleado:', employeeId, 'período:', periodId);
+      const result = await loadNovedades(employeeId);
+      setNovedades(result);
+      console.log('📊 Novedades cargadas:', result.length, 'elementos');
+    } catch (error) {
+      console.error('❌ Error cargando novedades:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las novedades",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Cargar novedades al montar y cuando cambien los parámetros
+  useEffect(() => {
     if (employeeId && periodId) {
       fetchNovedades();
     }
-  }, [employeeId, periodId, loadNovedades, toast]);
+  }, [employeeId, periodId]);
+
+  // Refrescar cuando cambie refreshTrigger (después de crear novedad)
+  useEffect(() => {
+    if (refreshTrigger && employeeId && periodId) {
+      console.log('🔄 RefreshTrigger activado, recargando novedades...');
+      fetchNovedades();
+    }
+  }, [refreshTrigger]);
 
   const handleDelete = async (novedadId: string) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar esta novedad?')) {
