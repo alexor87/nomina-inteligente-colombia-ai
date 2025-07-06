@@ -29,7 +29,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   const {
     loadNovedadesTotals,
-    getEmployeeNovedades
+    getEmployeeNovedades,
+    refreshEmployeeNovedades
   } = usePayrollNovedades(currentPeriodId || '');
 
   // Cargar novedades cuando se monten los empleados
@@ -71,10 +72,25 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   };
 
   const handleNovedadSubmit = async (data: any) => {
-    console.log('Novedad data submitted:', data);
+    console.log('💾 Novedad data submitted:', data);
     handleCloseNovedadModal();
+    
     if (selectedEmployee) {
-      await onEmployeeNovedadesChange(selectedEmployee.id);
+      try {
+        console.log('🔄 Actualizando novedades para empleado:', selectedEmployee.id);
+        
+        // 1. Actualizar el hook interno primero
+        await refreshEmployeeNovedades(selectedEmployee.id);
+        console.log('✅ Hook interno actualizado');
+        
+        // 2. Actualizar el estado del componente padre
+        await onEmployeeNovedadesChange(selectedEmployee.id);
+        console.log('✅ Estado padre actualizado');
+        
+        console.log('🎉 Sincronización completa - Total a Pagar se actualizará automáticamente');
+      } catch (error) {
+        console.error('❌ Error sincronizando estados de novedades:', error);
+      }
     }
   };
 
