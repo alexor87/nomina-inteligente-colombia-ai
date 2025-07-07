@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -10,7 +11,7 @@ import { NovedadPrestamosConsolidatedForm } from './forms/NovedadPrestamosConsol
 import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesConsolidatedForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadExistingList } from './NovedadExistingList';
-import { NovedadType } from '@/types/novedades-enhanced';
+import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
@@ -22,7 +23,7 @@ interface NovedadUnifiedModalProps {
   employeeId: string | undefined;
   employeeSalary: number | undefined;
   periodId: string | undefined;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: CreateNovedadData) => Promise<void>;
   onClose?: () => void;
   selectedNovedadType: NovedadType | null;
 }
@@ -56,6 +57,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
   const [employeeName, setEmployeeName] = useState<string>('');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   // Initialize step based on whether a specific type was provided
@@ -69,17 +71,17 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   }, [selectedNovedadType, open]);
 
-  // Reset refresh trigger when modal opens
+  // Reset states when modal opens
   useEffect(() => {
     if (open) {
-      setRefreshTrigger(0);
+      setRefreshTrigger(Date.now());
+      setIsSubmitting(false);
     }
   }, [open]);
 
   // Mock employee name - in real app this would come from props or context
   useEffect(() => {
     if (employeeId) {
-      // For now, we'll use a placeholder. In a real app, you'd fetch this data
       setEmployeeName('Empleado');
     }
   }, [employeeId]);
@@ -89,6 +91,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     setCurrentStep('list');
     setSelectedType(null);
     setRefreshTrigger(0);
+    setIsSubmitting(false);
     onClose?.();
   };
 
@@ -107,7 +110,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     setCurrentStep('list');
     setSelectedType(null);
     // Trigger refresh when going back to list after form submission
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger(Date.now());
   };
 
   const handleAddNew = () => {
@@ -115,38 +118,45 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleFormSubmit = async (formData: any) => {
-    if (!employeeId) {
+    if (!employeeId || !periodId) {
       toast({
         title: "Error",
-        description: "No se ha seleccionado un empleado",
+        description: "Faltan datos del empleado o período",
         variant: "destructive",
       });
       return;
     }
 
+    setIsSubmitting(true);
     try {
       console.log('📤 Enviando novedad desde modal:', formData);
-      await onSubmit({
+      
+      const submitData: CreateNovedadData = {
         ...formData,
         empleado_id: employeeId,
         periodo_id: periodId,
-        tipo_novedad: selectedType,
-      });
-      toast({
-        title: "Novedad guardada",
-        description: "La novedad se ha guardado correctamente",
-      });
-      // Volver a la lista para mostrar la novedad recién creada y trigger refresh
+        tipo_novedad: selectedType!,
+        company_id: '' // Se completará en el hook/servicio
+      };
+
+      await onSubmit(submitData);
+      
+      console.log('✅ Novedad enviada exitosamente');
+      
+      // Volver a la lista para mostrar la novedad recién creada
       setCurrentStep('list');
       setSelectedType(null);
-      setRefreshTrigger(prev => prev + 1);
-      console.log('🔄 RefreshTrigger incrementado para actualizar lista');
+      setRefreshTrigger(Date.now());
+      
     } catch (error: any) {
+      console.error('❌ Error enviando novedad:', error);
       toast({
         title: "Error",
         description: error.message || "No se pudo guardar la novedad",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -177,7 +187,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       onBack: handleBackToSelector,
       onSubmit: handleFormSubmit,
       employeeSalary: employeeSalary || 0,
-      calculateSuggestedValue: calculateSuggestedValue
+      calculateSuggestedValue: calculateSuggestedValue,
+      isSubmitting
     };
 
     switch (selectedType) {
@@ -211,7 +222,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'embargo':
         return <NovedadDeduccionesConsolidatedForm {...baseProps} />;
 
-      // Fallback to individual forms for other types
       case 'incapacidad':
         return (
           <NovedadIncapacidadForm
@@ -219,6 +229,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onSubmit={handleFormSubmit}
             employeeSalary={employeeSalary || 0}
             calculateSuggestedValue={calculateSuggestedValue}
+            isSubmitting={isSubmitting}
           />
         );
         
@@ -229,6 +240,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onSubmit={handleFormSubmit}
             employeeSalary={employeeSalary || 0}
             calculateSuggestedValue={calculateSuggestedValue}
+            isSubmitting={isSubmitting}
           />
         );
 
@@ -298,7 +310,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
         {currentStep === 'form' && (
           <DialogFooter>
-            <Button type="button" variant="secondary" onClick={handleBackToSelector}>
+            <Button 
+              type="button" 
+              variant="secondary" 
+              onClick={handleBackToSelector}
+              disabled={isSubmitting}
+            >
               Volver
             </Button>
           </DialogFooter>

@@ -12,6 +12,7 @@ export const usePayrollNovedades = (periodId: string) => {
     if (periodId) {
       console.log('🔄 Período cambió, limpiando estado de novedades:', periodId);
       setNovedadesTotals({});
+      NovedadesCalculationService.invalidateCache();
       setLastRefreshTime(Date.now());
     }
   }, [periodId]);
@@ -43,6 +44,9 @@ export const usePayrollNovedades = (periodId: string) => {
     
     console.log('🔄 Actualizando novedades para empleado:', employeeId, 'período:', periodId);
     try {
+      // Invalidar cache específico
+      NovedadesCalculationService.invalidateCache(employeeId, periodId);
+      
       const totals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
       setNovedadesTotals(prev => ({
         ...prev,
@@ -63,13 +67,13 @@ export const usePayrollNovedades = (periodId: string) => {
       totalNeto: 0,
       hasNovedades: false
     };
-    console.log('📊 Obteniendo novedades para empleado:', employeeId, result);
     return result;
   }, [novedadesTotals]);
 
   // Refrescar todos los empleados después de cambios
   const refreshAllEmployees = useCallback(async (employeeIds: string[]) => {
     console.log('🔄 Refrescando todos los empleados después de cambios');
+    NovedadesCalculationService.invalidateCache();
     await loadNovedadesTotals(employeeIds);
   }, [loadNovedadesTotals]);
 
