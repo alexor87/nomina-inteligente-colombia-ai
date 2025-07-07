@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -206,52 +205,79 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
             </Card>
           </div>
 
-          {/* Lista de novedades */}
+          {/* Lista de novedades mejorada */}
           <div className="space-y-3">
             {novedades.map((novedad) => (
               <Card key={novedad.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="pt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Badge variant={getNovedadBadgeVariant(novedad.tipo_novedad)}>
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    {/* Columna 1: Tipo de novedad y subtipo */}
+                    <div className="col-span-12 sm:col-span-4 lg:col-span-3">
+                      <div className="space-y-2">
+                        <Badge 
+                          variant={getNovedadBadgeVariant(novedad.tipo_novedad)}
+                          className="text-xs"
+                        >
                           {getNovedadTypeLabel(novedad.tipo_novedad)}
                         </Badge>
                         {(novedad as any).subtipo && (
-                          <span className="text-sm text-gray-600">
-                            ({(novedad as any).subtipo.replace('_', ' ')})
-                          </span>
+                          <div className="text-xs text-gray-600">
+                            {(novedad as any).subtipo.replace('_', ' ')}
+                          </div>
                         )}
                       </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span className="font-medium text-gray-900">
+                    </div>
+
+                    {/* Columna 2: Valor monetario */}
+                    <div className="col-span-6 sm:col-span-3 lg:col-span-2">
+                      <div className="text-right sm:text-left">
+                        <div className="text-lg font-bold text-gray-900">
                           {formatCurrency(novedad.valor)}
-                        </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Columna 3: Detalles (horas/días) */}
+                    <div className="col-span-6 sm:col-span-2 lg:col-span-2">
+                      <div className="text-sm text-gray-600 space-y-1">
                         {novedad.horas && (
-                          <span>{novedad.horas} horas</span>
+                          <div className="flex items-center">
+                            <span className="font-medium">{novedad.horas}</span>
+                            <span className="ml-1">hrs</span>
+                          </div>
                         )}
                         {novedad.dias && (
-                          <span>{novedad.dias} días</span>
+                          <div className="flex items-center">
+                            <span className="font-medium">{novedad.dias}</span>
+                            <span className="ml-1">días</span>
+                          </div>
                         )}
                       </div>
-                      
+                    </div>
+
+                    {/* Columna 4: Observaciones */}
+                    <div className="col-span-12 sm:col-span-8 lg:col-span-4">
                       {novedad.observacion && (
-                        <p className="text-sm text-gray-600 mt-2">
-                          {novedad.observacion}
-                        </p>
+                        <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded text-left">
+                          <div className="line-clamp-2">
+                            {novedad.observacion}
+                          </div>
+                        </div>
                       )}
                     </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(novedad.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+
+                    {/* Columna 5: Acciones */}
+                    <div className="col-span-12 sm:col-span-4 lg:col-span-1">
+                      <div className="flex justify-end sm:justify-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(novedad.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
