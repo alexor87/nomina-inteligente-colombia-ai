@@ -8,15 +8,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Users, Calculator, Loader2, Settings, Bug } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { PeriodInfoPanel } from '@/components/payroll/liquidation/PeriodInfoPanel';
+import { PeriodSelector } from '@/components/payroll/PeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
 import { PayrollDiagnosticPanel } from '@/components/payroll/diagnostic/PayrollDiagnosticPanel';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { usePeriodDetection } from '@/hooks/usePeriodDetection';
+import { usePeriodSelection } from '@/hooks/usePeriodSelection';
 import { format } from 'date-fns';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollCleanupService } from '@/services/PayrollCleanupService';
 import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
+import { AvailablePeriod } from '@/services/payroll/PeriodGenerationService';
 
 const PayrollLiquidationPage = () => {
   const [startDate, setStartDate] = useState('');
@@ -24,6 +27,7 @@ const PayrollLiquidationPage = () => {
   const [showPeriodInfo, setShowPeriodInfo] = useState(false);
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<'dropdown' | 'manual'>('dropdown');
   
   const { companyId } = useCurrentCompany();
   
@@ -51,34 +55,64 @@ const PayrollLiquidationPage = () => {
     reset: resetDetection
   } = usePeriodDetection();
 
+  const {
+    selectedPeriod,
+    isManualMode,
+    handlePeriodSelect,
+    handleManualEntry,
+    resetSelection,
+    markCurrentPeriodAsLiquidated
+  } = usePeriodSelection(companyId || '');
+
   // Limpiar períodos abandonados al montar
   useEffect(() => {
     PayrollCleanupService.cleanupAbandonedPeriods();
   }, []);
 
-  // Auto-detectar período cuando ambas fechas están seleccionadas
+  // Auto-detectar período cuando ambas fechas están seleccionadas (solo en modo manual)
   useEffect(() => {
-    if (startDate && endDate && !showPeriodInfo) {
+    if (startDate && endDate && !showPeriodInfo && selectionMode === 'manual') {
       setShowPeriodInfo(true);
       detectPeriod(startDate, endDate);
     }
-  }, [startDate, endDate, showPeriodInfo, detectPeriod]);
+  }, [startDate, endDate, showPeriodInfo, detectPeriod, selectionMode]);
 
-  // Reset cuando cambian las fechas
+  // Reset cuando cambian las fechas (solo en modo manual)
   useEffect(() => {
-    if (!startDate || !endDate) {
+    if ((!startDate || !endDate) && selectionMode === 'manual') {
       setShowPeriodInfo(false);
       resetDetection();
     }
-  }, [startDate, endDate, resetDetection]);
+  }, [startDate, endDate, resetDetection, selectionMode]);
+
+  // Manejar selección de período desde dropdown
+  const handleDropdownPeriodSelect = async (period: AvailablePeriod) => {
+    handlePeriodSelect(period);
+    setSelectionMode('dropdown');
+    
+    // Cargar empleados directamente con las fechas del período
+    await loadEmployees(period.fecha_inicio, period.fecha_fin);
+  };
+
+  // Manejar entrada manual
+  const handleManualEntryMode = () => {
+    handleManualEntry();
+    setSelectionMode('manual');
+    resetDetection();
+    setStartDate('');
+    setEndDate('');
+    setShowPeriodInfo(false);
+  };
 
   const handleProceedWithPeriod = async () => {
-    if (!startDate || !endDate) {
-      alert('Por favor selecciona las fechas del período');
+    if (selectionMode === 'dropdown' && selectedPeriod) {
+      // Ya se cargó con la selección del dropdown
       return;
     }
     
-    await loadEmployees(startDate, endDate);
+    if (selectionMode === 'manual' && startDate && endDate) {
+      await loadEmployees(startDate, endDate);
+    }
   };
 
   const handleResolveConflict = async (action: 'selected' | 'existing') => {
@@ -101,10 +135,20 @@ const PayrollLiquidationPage = () => {
       return;
     }
 
-    const confirmMessage = `¿Deseas cerrar este periodo de nómina y generar los comprobantes de pago?\n\nPeríodo: ${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}\nEmpleados: ${employees.length}`;
+    const periodName = selectedPeriod ? selectedPeriod.etiqueta_visible : `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
+    const confirmMessage = `¿Deseas cerrar este periodo de nómina y generar los comprobantes de pago?\n\nPeríodo: ${periodName}\nEmpleados: ${employees.length}`;
     
     if (window.confirm(confirmMessage)) {
-      await liquidatePayroll(startDate, endDate);
+      const dates = selectedPeriod ? 
+        { start: selectedPeriod.fecha_inicio, end: selectedPeriod.fecha_fin } :
+        { start: startDate, end: endDate };
+        
+      await liquidatePayroll(dates.start, dates.end);
+      
+      // Si es un período del dropdown, marcarlo como liquidado
+      if (selectedPeriod) {
+        await markCurrentPeriodAsLiquidated();
+      }
     }
   };
 
@@ -127,6 +171,10 @@ const PayrollLiquidationPage = () => {
       console.error('Error adding employees:', error);
     }
   };
+
+  const currentPeriodDisplay = selectedPeriod ? 
+    selectedPeriod.etiqueta_visible : 
+    (startDate && endDate ? `${startDate} - ${endDate}` : 'No seleccionado');
 
   return (
     <div className="space-y-6">
@@ -175,49 +223,73 @@ const PayrollLiquidationPage = () => {
         </TabsList>
         
         <TabsContent value="liquidation" className="space-y-6">
-          {/* Date Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Calendar className="h-5 w-5" />
-                <span>Seleccionar Período</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="startDate">Fecha desde</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => handleDateChange('start', e.target.value)}
-                    disabled={isRemovingEmployee}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="endDate">Fecha hasta</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    min={startDate}
-                    onChange={(e) => handleDateChange('end', e.target.value)}
-                    disabled={isRemovingEmployee}
-                  />
-                </div>
-              </div>
-              
-              {detectionError && (
-                <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                  {detectionError}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Period Selection */}
+          {companyId && selectionMode === 'dropdown' && (
+            <PeriodSelector
+              companyId={companyId}
+              onPeriodSelect={handleDropdownPeriodSelect}
+              onManualEntry={handleManualEntryMode}
+              disabled={isRemovingEmployee}
+            />
+          )}
 
-          {/* Period Information Panel */}
-          {showPeriodInfo && periodInfo && (
+          {/* Manual Date Selection */}
+          {selectionMode === 'manual' && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Calendar className="h-5 w-5" />
+                    <span>Seleccionar Período Manual</span>
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectionMode('dropdown');
+                      resetSelection();
+                    }}
+                  >
+                    Volver a Períodos
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="startDate">Fecha desde</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => handleDateChange('start', e.target.value)}
+                      disabled={isRemovingEmployee}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="endDate">Fecha hasta</Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={endDate}
+                      min={startDate}
+                      onChange={(e) => handleDateChange('end', e.target.value)}
+                      disabled={isRemovingEmployee}
+                    />
+                  </div>
+                </div>
+                
+                {detectionError && (
+                  <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+                    {detectionError}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Period Information Panel (solo para modo manual) */}
+          {showPeriodInfo && periodInfo && selectionMode === 'manual' && (
             <PeriodInfoPanel
               periodInfo={periodInfo}
               employeesCount={0}
@@ -229,8 +301,8 @@ const PayrollLiquidationPage = () => {
             />
           )}
 
-          {/* Legacy fallback button */}
-          {startDate && endDate && !showPeriodInfo && !isDetecting && (
+          {/* Legacy fallback button para modo manual */}
+          {startDate && endDate && !showPeriodInfo && !isDetecting && selectionMode === 'manual' && (
             <Card>
               <CardContent className="pt-6">
                 <div className="flex justify-center">
@@ -276,12 +348,15 @@ const PayrollLiquidationPage = () => {
                     </Button>
                   </div>
                 </div>
+                <div className="text-sm text-gray-600">
+                  <strong>Período:</strong> {currentPeriodDisplay}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <PayrollLiquidationTable
                   employees={employees}
-                  startDate={startDate}
-                  endDate={endDate}
+                  startDate={selectedPeriod?.fecha_inicio || startDate}
+                  endDate={selectedPeriod?.fecha_fin || endDate}
                   currentPeriodId={currentPeriodId}
                   onRemoveEmployee={removeEmployee}
                   onEmployeeNovedadesChange={refreshEmployeeNovedades}
@@ -301,7 +376,7 @@ const PayrollLiquidationPage = () => {
         isOpen={showCleanupDialog}
         onClose={() => setShowCleanupDialog(false)}
         onCleanupComplete={() => {
-          if (startDate && endDate) {
+          if (startDate && endDate && selectionMode === 'manual') {
             detectPeriod(startDate, endDate);
           }
         }}

@@ -556,4 +556,74 @@ export class PeriodService {
       return this.generatePeriodInfo(startDate, endDate, companyId);
     }
   }
+
+  /**
+   * NUEVA: Crear período desde información predefinida
+   */
+  static async createPeriodFromGenerated(
+    companyId: string,
+    periodData: {
+      fecha_inicio: string;
+      fecha_fin: string;
+      tipo_periodo: 'semanal' | 'quincenal' | 'mensual';
+      numero_periodo_anual: number;
+      etiqueta_visible: string;
+    }
+  ): Promise<string | null> {
+    try {
+      const { data, error } = await supabase
+        .from('payroll_periods_real')
+        .insert({
+          company_id: companyId,
+          fecha_inicio: periodData.fecha_inicio,
+          fecha_fin: periodData.fecha_fin,
+          tipo_periodo: periodData.tipo_periodo,
+          numero_periodo_anual: periodData.numero_periodo_anual,
+          periodo: periodData.etiqueta_visible,
+          estado: 'en_proceso',
+          empleados_count: 0,
+          total_devengado: 0,
+          total_deducciones: 0,
+          total_neto: 0
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      
+      console.log('✅ Período creado desde datos predefinidos:', periodData.etiqueta_visible);
+      return data.id;
+    } catch (error) {
+      console.error('Error creando período desde datos predefinidos:', error);
+      return null;
+    }
+  }
+
+  /**
+   * NUEVA: Verificar si un período ya existe
+   */
+  static async checkPeriodExists(
+    companyId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<{ exists: boolean; periodId?: string; periodo?: string }> {
+    try {
+      const { data } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo')
+        .eq('company_id', companyId)
+        .eq('fecha_inicio', startDate)
+        .eq('fecha_fin', endDate)
+        .maybeSingle();
+
+      return {
+        exists: !!data,
+        periodId: data?.id,
+        periodo: data?.periodo
+      };
+    } catch (error) {
+      console.error('Error verificando existencia de período:', error);
+      return { exists: false };
+    }
+  }
 }
