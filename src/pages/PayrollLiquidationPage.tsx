@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar, Users, Calculator } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
+import { PeriodInfoPanel } from '@/components/payroll/liquidation/PeriodInfoPanel';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
+import { usePeriodDetection } from '@/hooks/usePeriodDetection';
 import { format } from 'date-fns';
 
 const PayrollLiquidationPage = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [showPeriodInfo, setShowPeriodInfo] = useState(false);
   
   const {
     employees,
@@ -23,12 +27,39 @@ const PayrollLiquidationPage = () => {
     refreshEmployeeNovedades
   } = usePayrollLiquidation();
 
-  const handleLoadEmployees = () => {
+  const {
+    periodInfo,
+    isDetecting,
+    error: detectionError,
+    detectPeriod,
+    reset: resetDetection
+  } = usePeriodDetection();
+
+  // Auto-detect period when both dates are selected
+  useEffect(() => {
+    if (startDate && endDate && !showPeriodInfo) {
+      console.log('📅 Fechas completas, iniciando detección automática...');
+      setShowPeriodInfo(true);
+      detectPeriod(startDate, endDate);
+    }
+  }, [startDate, endDate, showPeriodInfo, detectPeriod]);
+
+  // Reset when dates change
+  useEffect(() => {
+    if (!startDate || !endDate) {
+      setShowPeriodInfo(false);
+      resetDetection();
+    }
+  }, [startDate, endDate, resetDetection]);
+
+  const handleProceedWithPeriod = async () => {
     if (!startDate || !endDate) {
       alert('Por favor selecciona las fechas del período');
       return;
     }
-    loadEmployees(startDate, endDate);
+    
+    console.log('🚀 Procediendo con la carga de empleados...');
+    await loadEmployees(startDate, endDate);
   };
 
   const handleLiquidate = async () => {
@@ -44,6 +75,18 @@ const PayrollLiquidationPage = () => {
     }
   };
 
+  const handleDateChange = (field: 'start' | 'end', value: string) => {
+    if (field === 'start') {
+      setStartDate(value);
+      // Reset end date if start date is after current end date
+      if (endDate && new Date(value) > new Date(endDate)) {
+        setEndDate('');
+      }
+    } else {
+      setEndDate(value);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-2">
@@ -51,7 +94,7 @@ const PayrollLiquidationPage = () => {
         <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
       </div>
 
-      {/* Formulario de fechas */}
+      {/* Date Selection */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -60,14 +103,14 @@ const PayrollLiquidationPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="startDate">Fecha desde</Label>
               <Input
                 id="startDate"
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => handleDateChange('start', e.target.value)}
               />
             </div>
             <div>
@@ -76,18 +119,47 @@ const PayrollLiquidationPage = () => {
                 id="endDate"
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
+                onChange={(e) => handleDateChange('end', e.target.value)}
               />
             </div>
-            <Button onClick={handleLoadEmployees} disabled={isLoading}>
-              <Users className="h-4 w-4 mr-2" />
-              {isLoading ? 'Cargando...' : 'Cargar Empleados'}
-            </Button>
           </div>
+          
+          {detectionError && (
+            <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+              {detectionError}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Tabla de empleados */}
+      {/* Period Information Panel */}
+      {showPeriodInfo && periodInfo && (
+        <PeriodInfoPanel
+          periodInfo={periodInfo}
+          employeesCount={0} // This will be updated after period detection
+          isLoading={isDetecting}
+          startDate={startDate}
+          endDate={endDate}
+          onProceed={handleProceedWithPeriod}
+        />
+      )}
+
+      {/* Legacy fallback button - only show if period info is not available */}
+      {startDate && endDate && !showPeriodInfo && !isDetecting && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex justify-center">
+              <Button onClick={handleProceedWithPeriod} disabled={isLoading}>
+                <Users className="h-4 w-4 mr-2" />
+                {isLoading ? 'Cargando...' : 'Cargar Empleados'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Employee Table */}
       {employees.length > 0 && (
         <Card>
           <CardHeader>
