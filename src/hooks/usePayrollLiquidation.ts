@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
+import { PayrollAutoSaveService } from '@/services/PayrollAutoSaveService';
 import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
 import { PayrollEmployee } from '@/types/payroll';
+import { usePayrollAutoSave } from './usePayrollAutoSave';
 
 interface DBEmployee {
   id: string;
@@ -35,7 +37,97 @@ export const usePayrollLiquidation = () => {
   const [currentPeriodId, setCurrentPeriodId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [isRecovering, setIsRecovering] = useState(false);
   const { toast } = useToast();
+
+  // Auto-save integration
+  const { triggerAutoSave, isSaving, lastSaveTime } = usePayrollAutoSave({
+    periodId: currentPeriodId,
+    employees,
+    enabled: true
+  });
+
+  // Check for active period on mount
+  useEffect(() => {
+    checkForActivePeriod();
+  }, []);
+
+  const checkForActivePeriod = async () => {
+    try {
+      const activePeriod = await PayrollAutoSaveService.getActivePeriod();
+      
+      if (activePeriod && activePeriod.employees_count > 0) {
+        console.log('📋 Found active period:', activePeriod);
+        
+        // Show recovery option
+        const shouldRecover = window.confirm(
+          `Se encontró una liquidación en progreso:\n\n` +
+          `Período: ${activePeriod.periodo}\n` +
+          `Empleados: ${activePeriod.employees_count}\n` +
+          `Última actividad: ${new Date(activePeriod.last_activity_at).toLocaleString()}\n\n` +
+          `¿Desea continuar con esta liquidación?`
+        );
+
+        if (shouldRecover) {
+          await recoverActivePeriod(activePeriod);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for active period:', error);
+    }
+  };
+
+  const recoverActivePeriod = async (activePeriod: any) => {
+    setIsRecovering(true);
+    try {
+      console.log('🔄 Recovering active period:', activePeriod.id);
+      
+      // Set period info
+      setCurrentPeriodId(activePeriod.id);
+      setStartDate(activePeriod.fecha_inicio);
+      setEndDate(activePeriod.fecha_fin);
+      
+      // Load draft employees
+      const draftEmployees = await PayrollAutoSaveService.loadDraftEmployees(activePeriod.id);
+      
+      // Load and recalculate novedades for each employee
+      const employeesWithNovedades = await Promise.all(
+        draftEmployees.map(async (employee) => {
+          console.log(`🔄 Recalculating novedades for employee: ${employee.name}`);
+          
+          const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
+            employee.id,
+            activePeriod.id
+          );
+          
+          return {
+            ...employee,
+            bonuses: novedadesTotals.totalDevengos,
+            deductions: employee.deductions + novedadesTotals.totalDeducciones,
+            netPay: employee.grossPay + novedadesTotals.totalDevengos - (employee.deductions + novedadesTotals.totalDeducciones)
+          };
+        })
+      );
+      
+      setEmployees(employeesWithNovedades);
+      
+      toast({
+        title: "Liquidación recuperada",
+        description: `Se recuperó la liquidación con ${employeesWithNovedades.length} empleados`,
+        className: "border-blue-200 bg-blue-50"
+      });
+      
+    } catch (error) {
+      console.error('❌ Error recovering active period:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo recuperar la liquidación anterior",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRecovering(false);
+    }
+  };
 
   // Transform DB employee to PayrollEmployee
   const transformEmployee = (dbEmployee: DBEmployee): PayrollEmployee => ({
@@ -118,6 +210,9 @@ export const usePayrollLiquidation = () => {
       const transformedEmployees = employeesWithNovedades.map(transformEmployee);
       setEmployees(transformedEmployees);
       
+      // Trigger auto-save after loading
+      setTimeout(() => triggerAutoSave(), 1000);
+      
       toast({
         title: "Empleados cargados",
         description: `Se cargaron ${transformedEmployees.length} empleados activos con deducciones detalladas`,
@@ -183,11 +278,26 @@ export const usePayrollLiquidation = () => {
       const transformedNewEmployees = processedNewEmployees.map(transformEmployee);
       setEmployees(prev => [...prev, ...transformedNewEmployees]);
       
+      // Trigger auto-save after adding
+      setTimeout(() => triggerAutoSave(), 500);
+      
       console.log('✅ usePayrollLiquidation - Employees added successfully:', transformedNewEmployees.length);
     } catch (error) {
       console.error('❌ usePayrollLiquidation - Error adding employees:', error);
       throw error;
     }
+  };
+
+  const removeEmployee = (employeeId: string) => {
+    setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
+    
+    // Trigger auto-save after removing
+    setTimeout(() => triggerAutoSave(), 500);
+    
+    toast({
+      title: "Empleado removido",
+      description: "El empleado ha sido removido de esta liquidación",
+    });
   };
 
   const refreshEmployeeNovedades = async (employeeId: string) => {
@@ -233,14 +343,6 @@ export const usePayrollLiquidation = () => {
     } catch (error) {
       console.error('❌ usePayrollLiquidation - Error refreshing employee novedades:', error);
     }
-  };
-
-  const removeEmployee = (employeeId: string) => {
-    setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
-    toast({
-      title: "Empleado removido",
-      description: "El empleado ha sido removido de esta liquidación",
-    });
   };
 
   const liquidatePayroll = async (startDate: string, endDate: string) => {
@@ -307,7 +409,7 @@ export const usePayrollLiquidation = () => {
 
   return {
     employees,
-    isLoading,
+    isLoading: isLoading || isRecovering,
     isLiquidating,
     currentPeriodId,
     startDate,
@@ -317,6 +419,10 @@ export const usePayrollLiquidation = () => {
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
-    updateEmployeeSalary
+    updateEmployeeSalary,
+    // Auto-save status
+    isAutoSaving: isSaving,
+    lastAutoSaveTime: lastSaveTime,
+    triggerManualSave: triggerAutoSave
   };
 };

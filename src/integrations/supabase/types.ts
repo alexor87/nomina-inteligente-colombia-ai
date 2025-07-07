@@ -912,6 +912,7 @@ export type Database = {
           fecha_fin: string
           fecha_inicio: string
           id: string
+          last_activity_at: string | null
           periodo: string
           tipo_periodo: string
           total_deducciones: number | null
@@ -927,6 +928,7 @@ export type Database = {
           fecha_fin: string
           fecha_inicio: string
           id?: string
+          last_activity_at?: string | null
           periodo: string
           tipo_periodo?: string
           total_deducciones?: number | null
@@ -942,6 +944,7 @@ export type Database = {
           fecha_fin?: string
           fecha_inicio?: string
           id?: string
+          last_activity_at?: string | null
           periodo?: string
           tipo_periodo?: string
           total_deducciones?: number | null
@@ -1551,6 +1554,10 @@ export type Database = {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
       }
+      clean_abandoned_draft_periods: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       clean_duplicate_periods: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -1596,6 +1603,10 @@ export type Database = {
       }
       generate_payroll_records_for_period: {
         Args: { p_period_id: string }
+        Returns: Json
+      }
+      get_active_period_for_company: {
+        Args: { p_company_id?: string }
         Returns: Json
       }
       get_current_user_company_id: {

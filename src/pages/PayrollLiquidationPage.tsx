@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar, Users, Calculator } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { PeriodInfoPanel } from '@/components/payroll/liquidation/PeriodInfoPanel';
+import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { usePeriodDetection } from '@/hooks/usePeriodDetection';
 import { format } from 'date-fns';
@@ -29,7 +31,11 @@ const PayrollLiquidationPage = () => {
     addEmployees,
     removeEmployee,
     liquidatePayroll,
-    refreshEmployeeNovedades
+    refreshEmployeeNovedades,
+    // Auto-save properties
+    isAutoSaving,
+    lastAutoSaveTime,
+    triggerManualSave
   } = usePayrollLiquidation();
 
   const {
@@ -125,9 +131,19 @@ const PayrollLiquidationPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-2">
-        <Calculator className="h-6 w-6 text-blue-600" />
-        <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Calculator className="h-6 w-6 text-blue-600" />
+          <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
+        </div>
+        
+        {/* Auto-save indicator */}
+        {employees.length > 0 && (
+          <AutoSaveIndicator 
+            isSaving={isAutoSaving}
+            lastSaveTime={lastAutoSaveTime}
+          />
+        )}
       </div>
 
       {/* Date Selection */}
@@ -201,7 +217,14 @@ const PayrollLiquidationPage = () => {
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
-              <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
+              <div className="flex items-center space-x-4">
+                <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
+                {/* Additional save indicator in header */}
+                <AutoSaveIndicator 
+                  isSaving={isAutoSaving}
+                  lastSaveTime={lastAutoSaveTime}
+                />
+              </div>
               <div className="flex space-x-2">
                 <Button 
                   onClick={() => setShowAddEmployeeModal(true)}
