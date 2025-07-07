@@ -1,3 +1,4 @@
+
 /**
  * Utility functions for parsing and formatting period dates - CORREGIDO PROFESIONALMENTE
  */
@@ -134,13 +135,36 @@ export const parsePeriodToDateRange = (periodo: string): PeriodDateRange => {
 };
 
 /**
- * Format a date range for display - FUNCIÓN CORREGIDA
+ * FUNCIÓN CORREGIDA: Format a date range for display - SOLUCIÓN TIMEZONE
  */
 export const formatPeriodDateRange = (startDate: string, endDate: string): string => {
-  console.log('🔍 FORMATEANDO RANGO:', { startDate, endDate });
+  console.log('🔍 FORMATEANDO RANGO (CORREGIDO):', { startDate, endDate });
   
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+  const startParts = startDate.split('-'); // [year, month, day]
+  const endParts = endDate.split('-');     // [year, month, day]
+  
+  // Crear fechas usando constructor local para evitar interpretación UTC
+  const start = new Date(
+    parseInt(startParts[0]),     // year
+    parseInt(startParts[1]) - 1, // month (0-indexed)
+    parseInt(startParts[2])      // day
+  );
+  
+  const end = new Date(
+    parseInt(endParts[0]),       // year
+    parseInt(endParts[1]) - 1,   // month (0-indexed)
+    parseInt(endParts[2])        // day
+  );
+  
+  console.log('📅 FECHAS PARSEADAS CORRECTAMENTE:', { 
+    start: start.toDateString(), 
+    end: end.toDateString(),
+    startMonth: start.getMonth() + 1,
+    startYear: start.getFullYear(),
+    endMonth: end.getMonth() + 1,
+    endYear: end.getFullYear()
+  });
   
   const monthNames = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -154,18 +178,20 @@ export const formatPeriodDateRange = (startDate: string, endDate: string): strin
   const startYear = start.getFullYear();
   const endYear = end.getFullYear();
   
-  console.log('📅 COMPONENTES DE FORMATO:', { startDay, endDay, startMonth, endMonth, startYear, endYear });
+  console.log('📅 COMPONENTES DE FORMATO CORREGIDOS:', { 
+    startDay, endDay, startMonth, endMonth, startYear, endYear 
+  });
   
   // CORRECCIÓN: Si es el mismo mes y año, mostrar formato quincenal
   if (start.getMonth() === end.getMonth() && startYear === endYear) {
     const result = `${startDay} - ${endDay} ${startMonth} ${startYear}`;
-    console.log('✅ FORMATO MISMO MES:', result);
+    console.log('✅ FORMATO MISMO MES CORREGIDO:', result);
     return result;
   }
   
   // CORRECCIÓN: Si son diferentes meses o años, mostrar rango completo
   const result = `${startDay} ${startMonth} ${startYear} - ${endDay} ${endMonth} ${endYear}`;
-  console.log('✅ FORMATO RANGO COMPLETO:', result);
+  console.log('✅ FORMATO RANGO COMPLETO CORREGIDO:', result);
   return result;
 };
 
