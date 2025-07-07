@@ -133,11 +133,11 @@ export class PayrollPeriodDetectionRobust {
     try {
       const { data } = await supabase.rpc('get_active_period_for_company');
       
-      // Proper type casting with null check
-      const response = data as ActivePeriodResponse | null;
+      // Safe type casting with validation
+      const response = data as unknown as ActivePeriodResponse | null;
       
-      if (response?.has_active_period) {
-        return response.period;
+      if (response && typeof response === 'object' && 'has_active_period' in response) {
+        return response.has_active_period ? response.period : null;
       }
       
       return null;
@@ -151,10 +151,10 @@ export class PayrollPeriodDetectionRobust {
     try {
       const { data } = await supabase.rpc('detect_current_smart_period');
       
-      // Proper type casting with validation
-      const response = data as SmartPeriodResponse | null;
+      // Safe type casting with validation
+      const response = data as unknown as SmartPeriodResponse | null;
       
-      if (response?.success && response.calculated_period) {
+      if (response && typeof response === 'object' && 'success' in response && response.success && response.calculated_period) {
         return {
           startDate: response.calculated_period.start_date,
           endDate: response.calculated_period.end_date,

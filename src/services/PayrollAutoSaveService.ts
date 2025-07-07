@@ -45,9 +45,14 @@ export class PayrollAutoSaveService {
         return null;
       }
 
-      // Proper type casting with validation
-      const response = data as ActivePeriodResponse | null;
-      return response?.has_active_period ? response.period : null;
+      // Safe type casting with validation
+      const response = data as unknown as ActivePeriodResponse | null;
+      
+      if (response && typeof response === 'object' && 'has_active_period' in response) {
+        return response.has_active_period ? response.period : null;
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error calling get_active_period_for_company:', error);
       return null;
