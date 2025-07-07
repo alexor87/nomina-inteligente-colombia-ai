@@ -213,17 +213,19 @@ export class PeriodGenerationService {
         
         if (error) throw error;
         
-        // Mapear correctamente a AvailablePeriod
+        // Mapear correctamente a AvailablePeriod con type casting
         availablePeriods = (insertedPeriods || []).map(period => ({
           ...period,
+          tipo_periodo: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual', // Type casting
           etiqueta_visible: period.periodo, // Mapear periodo a etiqueta_visible
           can_select: period.estado === 'borrador' || period.estado === 'en_proceso',
           reason: period.estado === 'cerrado' ? 'Período ya liquidado' : undefined
         }));
       } else {
-        // Usar períodos existentes - Mapear correctamente a AvailablePeriod
+        // Usar períodos existentes - Mapear correctamente a AvailablePeriod con type casting
         availablePeriods = existingPeriods.map(period => ({
           ...period,
+          tipo_periodo: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual', // Type casting
           etiqueta_visible: period.periodo, // Mapear periodo a etiqueta_visible
           can_select: period.estado === 'borrador' || period.estado === 'en_proceso',
           reason: period.estado === 'cerrado' ? 'Período ya liquidado' : undefined
