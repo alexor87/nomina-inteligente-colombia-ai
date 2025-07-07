@@ -1,20 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { PayrollPeriodDetectionService } from '@/services/payroll-intelligent/PayrollPeriodDetectionService';
-
-interface PeriodDetectionResult {
-  hasActivePeriod: boolean;
-  activePeriod?: any;
-  suggestedAction: 'continue' | 'create' | 'conflict';
-  message: string;
-  periodData?: {
-    startDate: string;
-    endDate: string;
-    periodName: string;
-    type: 'semanal' | 'quincenal' | 'mensual';
-  };
-  conflictPeriod?: any;
-}
+import { PeriodService, PeriodDetectionResult } from '@/services/payroll/PeriodService';
 
 export const usePeriodDetection = () => {
   const [periodInfo, setPeriodInfo] = useState<PeriodDetectionResult | null>(null);
@@ -26,47 +12,22 @@ export const usePeriodDetection = () => {
       setIsDetecting(true);
       setError(null);
       
-      console.log('🔍 HOOK - Starting period detection for selected dates:', { startDate, endDate });
-      
-      // CRÍTICO: Usar el nuevo método que respeta las fechas seleccionadas
-      const result = await PayrollPeriodDetectionService.detectPeriodForSelectedDates(startDate, endDate);
-      
-      console.log('📊 HOOK - Detection result received:', result);
-      
-      // ASEGURAR que las fechas originales se preserven
-      if (result.periodData) {
-        result.periodData.startDate = startDate;
-        result.periodData.endDate = endDate;
-        console.log('🔒 HOOK - Dates preserved in result:', {
-          original: { startDate, endDate },
-          preserved: { 
-            startDate: result.periodData.startDate, 
-            endDate: result.periodData.endDate 
-          }
-        });
-      }
-      
+      const result = await PeriodService.detectPeriodForDates(startDate, endDate);
       setPeriodInfo(result);
       
       return result;
     } catch (error) {
-      console.error('❌ HOOK - Error detecting period:', error);
-      setError('Error detectando información del período');
+      const errorMessage = 'Error detectando información del período';
+      setError(errorMessage);
       
-      // Fallback: crear nuevo período con las fechas seleccionadas
-      const fallbackResult = {
+      // Fallback
+      const fallbackResult: PeriodDetectionResult = {
         hasActivePeriod: false,
-        suggestedAction: 'create' as const,
+        suggestedAction: 'create',
         message: 'Se creará un nuevo período para las fechas seleccionadas',
-        periodData: {
-          startDate,
-          endDate,
-          periodName: `Período ${startDate} - ${endDate}`,
-          type: 'mensual' as const
-        }
+        periodData: PeriodService.generatePeriodInfo(startDate, endDate)
       };
       
-      console.log('🆘 HOOK - Using fallback result:', fallbackResult);
       setPeriodInfo(fallbackResult);
     } finally {
       setIsDetecting(false);
@@ -74,7 +35,6 @@ export const usePeriodDetection = () => {
   }, []);
 
   const reset = useCallback(() => {
-    console.log('🔄 HOOK - Resetting period detection state');
     setPeriodInfo(null);
     setError(null);
     setIsDetecting(false);

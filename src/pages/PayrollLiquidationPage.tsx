@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,11 +37,9 @@ const PayrollLiquidationPage = () => {
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
-    // Auto-save properties
     isAutoSaving,
     lastAutoSaveTime,
     triggerManualSave,
-    // New removal status
     isRemovingEmployee
   } = usePayrollLiquidation();
 
@@ -52,25 +51,20 @@ const PayrollLiquidationPage = () => {
     reset: resetDetection
   } = usePeriodDetection();
 
-  // Ejecutar limpieza cuando se monta el componente
+  // Limpiar períodos abandonados al montar
   useEffect(() => {
-    const performInitialCleanup = async () => {
-      await PayrollCleanupService.cleanupAbandonedPeriods();
-    };
-    
-    performInitialCleanup();
+    PayrollCleanupService.cleanupAbandonedPeriods();
   }, []);
 
-  // Auto-detect period when both dates are selected
+  // Auto-detectar período cuando ambas fechas están seleccionadas
   useEffect(() => {
     if (startDate && endDate && !showPeriodInfo) {
-      console.log('📅 Fechas completas, iniciando detección automática para fechas seleccionadas...');
       setShowPeriodInfo(true);
       detectPeriod(startDate, endDate);
     }
   }, [startDate, endDate, showPeriodInfo, detectPeriod]);
 
-  // Reset when dates change
+  // Reset cuando cambian las fechas
   useEffect(() => {
     if (!startDate || !endDate) {
       setShowPeriodInfo(false);
@@ -84,27 +78,19 @@ const PayrollLiquidationPage = () => {
       return;
     }
     
-    console.log('🚀 Procediendo con la carga de empleados para fechas:', { startDate, endDate });
     await loadEmployees(startDate, endDate);
   };
 
   const handleResolveConflict = async (action: 'selected' | 'existing') => {
     if (action === 'selected') {
-      // Continuar con las fechas seleccionadas por el usuario
-      console.log('👤 Usuario eligió continuar con fechas seleccionadas:', { startDate, endDate });
       await loadEmployees(startDate, endDate);
     } else if (action === 'existing' && periodInfo?.conflictPeriod) {
-      // Cambiar a las fechas del período existente
       const existingStart = periodInfo.conflictPeriod.fecha_inicio;
       const existingEnd = periodInfo.conflictPeriod.fecha_fin;
       
-      console.log('📋 Usuario eligió abrir período existente:', { existingStart, existingEnd });
-      
-      // Actualizar las fechas en el estado
       setStartDate(existingStart);
       setEndDate(existingEnd);
       
-      // Cargar empleados con las fechas del período existente
       await loadEmployees(existingStart, existingEnd);
     }
   };
@@ -125,7 +111,6 @@ const PayrollLiquidationPage = () => {
   const handleDateChange = (field: 'start' | 'end', value: string) => {
     if (field === 'start') {
       setStartDate(value);
-      // Reset end date if start date is after current end date
       if (endDate && new Date(value) > new Date(endDate)) {
         setEndDate('');
       }
@@ -140,7 +125,6 @@ const PayrollLiquidationPage = () => {
       setShowAddEmployeeModal(false);
     } catch (error) {
       console.error('Error adding employees:', error);
-      // Error handling is done in the hook
     }
   };
 
@@ -159,7 +143,6 @@ const PayrollLiquidationPage = () => {
         </div>
         
         <div className="flex items-center space-x-4">
-          {/* Auto-save indicator */}
           {employees.length > 0 && (
             <AutoSaveIndicator 
               isSaving={isAutoSaving}
@@ -167,7 +150,6 @@ const PayrollLiquidationPage = () => {
             />
           )}
           
-          {/* Cleanup button */}
           <Button
             variant="outline"
             size="sm"
@@ -238,7 +220,7 @@ const PayrollLiquidationPage = () => {
           {showPeriodInfo && periodInfo && (
             <PeriodInfoPanel
               periodInfo={periodInfo}
-              employeesCount={0} // This will be updated after period detection
+              employeesCount={0}
               isLoading={isDetecting}
               startDate={startDate}
               endDate={endDate}
@@ -247,7 +229,7 @@ const PayrollLiquidationPage = () => {
             />
           )}
 
-          {/* Legacy fallback button - only show if period info is not available */}
+          {/* Legacy fallback button */}
           {startDate && endDate && !showPeriodInfo && !isDetecting && (
             <Card>
               <CardContent className="pt-6">
@@ -271,7 +253,6 @@ const PayrollLiquidationPage = () => {
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-4">
                     <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
-                    {/* Additional save indicator in header */}
                     <AutoSaveIndicator 
                       isSaving={isAutoSaving}
                       lastSaveTime={lastAutoSaveTime}
@@ -320,7 +301,6 @@ const PayrollLiquidationPage = () => {
         isOpen={showCleanupDialog}
         onClose={() => setShowCleanupDialog(false)}
         onCleanupComplete={() => {
-          // Refresh period detection after cleanup
           if (startDate && endDate) {
             detectPeriod(startDate, endDate);
           }

@@ -4,25 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar, Users, AlertTriangle, CheckCircle, Clock, Hash } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { PeriodDisplayService } from '@/services/payroll-intelligent/PeriodDisplayService';
-import { PeriodNumberCalculationService } from '@/services/payroll-intelligent/PeriodNumberCalculationService';
-
-interface PeriodInfo {
-  hasActivePeriod: boolean;
-  activePeriod?: any;
-  suggestedAction: 'continue' | 'create' | 'conflict';
-  message: string;
-  periodData?: {
-    startDate: string;
-    endDate: string;
-    periodName: string;
-    type: 'semanal' | 'quincenal' | 'mensual';
-  };
-  conflictPeriod?: any;
-}
+import { PeriodDetectionResult } from '@/services/payroll/PeriodService';
 
 interface PeriodInfoPanelProps {
-  periodInfo: PeriodInfo;
+  periodInfo: PeriodDetectionResult;
   employeesCount: number;
   isLoading: boolean;
   startDate: string;
@@ -40,13 +25,6 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
   onProceed,
   onResolveConflict
 }) => {
-  console.log('🎨 PERIOD INFO PANEL - Rendering with props:', {
-    startDate,
-    endDate,
-    periodInfo,
-    employeesCount
-  });
-
   if (isLoading) {
     return (
       <Card className="border-blue-200 bg-blue-50">
@@ -64,11 +42,6 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
   const isExistingPeriod = periodInfo.suggestedAction === 'continue';
   const isConflict = periodInfo.suggestedAction === 'conflict';
 
-  // CRÍTICO: Usar el servicio centralizado con las fechas EXACTAS del usuario
-  console.log('📋 PERIOD INFO PANEL - Generating display info for user-selected dates:', { startDate, endDate });
-  const displayInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate);
-  console.log('📋 PERIOD INFO PANEL - Display info generated:', displayInfo);
-  
   const getStatusColor = () => {
     if (isNewPeriod) return 'border-green-200 bg-green-50';
     if (isExistingPeriod) return 'border-blue-200 bg-blue-50';
@@ -83,68 +56,7 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
     return <Clock className="h-5 w-5 text-gray-600" />;
   };
 
-  // CRÍTICO: Determinar el nombre del período a mostrar SIEMPRE respetando las fechas seleccionadas
-  const getDisplayPeriodName = () => {
-    console.log('🏷️ PERIOD INFO PANEL - Determining display name...');
-    
-    // Para períodos existentes, usar el nombre del servicio o el nombre semántico
-    if (isExistingPeriod && periodInfo.activePeriod) {
-      console.log('📄 PERIOD INFO PANEL - Using existing period name');
-      if (periodInfo.activePeriod.numero_periodo_anual) {
-        const startParts = periodInfo.activePeriod.fecha_inicio.split('-');
-        const year = parseInt(startParts[0]);
-        
-        const semanticName = PeriodNumberCalculationService.getSemanticPeriodName(
-          periodInfo.activePeriod.numero_periodo_anual,
-          periodInfo.activePeriod.tipo_periodo,
-          year,
-          periodInfo.activePeriod.periodo
-        );
-        console.log('✨ PERIOD INFO PANEL - Using semantic name for existing period:', semanticName);
-        return semanticName;
-      }
-      console.log('📝 PERIOD INFO PANEL - Using period name from DB:', periodInfo.activePeriod.periodo);
-      return periodInfo.activePeriod.periodo;
-    }
-    
-    // CRÍTICO: Para períodos nuevos, usar SIEMPRE el nombre generado por el servicio centralizado
-    // con las fechas EXACTAS seleccionadas por el usuario
-    const finalName = displayInfo.semanticName || displayInfo.name;
-    console.log('🆕 PERIOD INFO PANEL - Using centralized service name:', finalName);
-    return finalName;
-  };
-
-  const getPeriodNumberInfo = () => {
-    if (periodInfo.activePeriod?.numero_periodo_anual) {
-      return {
-        hasNumber: true,
-        number: periodInfo.activePeriod.numero_periodo_anual
-      };
-    }
-    
-    // Para períodos nuevos, usar el número calculado por el servicio centralizado
-    if (displayInfo.number) {
-      console.log('🔢 PERIOD INFO PANEL - Using calculated period number:', displayInfo.number);
-      return {
-        hasNumber: true,
-        number: displayInfo.number
-      };
-    }
-    
-    return { hasNumber: false };
-  };
-
-  const periodNumberInfo = getPeriodNumberInfo();
-  const displayName = getDisplayPeriodName();
-  
-  // CRÍTICO: Usar SIEMPRE el tipo calculado por el servicio centralizado
-  const periodType = displayInfo.type;
-  console.log('📊 PERIOD INFO PANEL - Final display values:', {
-    displayName,
-    periodType,
-    periodNumberInfo,
-    userSelectedDates: { startDate, endDate }
-  });
+  const displayName = periodInfo.periodData.semanticName || periodInfo.periodData.name;
 
   return (
     <Card className={`${getStatusColor()} transition-colors`}>
@@ -152,10 +64,10 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
         <CardTitle className="flex items-center space-x-2">
           {getStatusIcon()}
           <span>Información del Período</span>
-          {periodNumberInfo.hasNumber && (
+          {periodInfo.periodData.number && (
             <Badge variant="outline" className="ml-2 font-mono">
               <Hash className="h-3 w-3 mr-1" />
-              #{periodNumberInfo.number}
+              #{periodInfo.periodData.number}
             </Badge>
           )}
         </CardTitle>
@@ -168,12 +80,11 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
             <div>
               <p className="text-sm text-gray-600 font-medium">Período Seleccionado</p>
               <p className="font-semibold text-gray-900">{displayName}</p>
-              {periodNumberInfo.hasNumber && (
+              {periodInfo.periodData.number && (
                 <p className="text-xs text-gray-500">
-                  Número ordinal: {periodNumberInfo.number}
+                  Número ordinal: {periodInfo.periodData.number}
                 </p>
               )}
-              {/* DEBUG INFO - Mostrar fechas exactas */}
               <p className="text-xs text-blue-500 mt-1">
                 Fechas: {startDate} - {endDate}
               </p>
@@ -183,7 +94,8 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
           <div className="flex items-center space-x-3">
             <div className="flex-shrink-0">
               <Badge variant="outline" className="font-medium">
-                {PeriodDisplayService.getPeriodTypeLabel(periodType)}
+                {periodInfo.periodData.type === 'quincenal' ? 'Quincenal' : 
+                 periodInfo.periodData.type === 'mensual' ? 'Mensual' : 'Semanal'}
               </Badge>
             </div>
           </div>
@@ -220,14 +132,6 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
                 <span className="text-gray-600">Empleados:</span>
                 <span className="font-semibold">{periodInfo.activePeriod.empleados_count || 0}</span>
               </div>
-              {periodInfo.activePeriod.numero_periodo_anual && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Número del año:</span>
-                  <Badge variant="outline" className="font-mono">
-                    #{periodInfo.activePeriod.numero_periodo_anual}
-                  </Badge>
-                </div>
-              )}
               {periodInfo.activePeriod.total_devengado > 0 && (
                 <div className="col-span-2 flex items-center justify-between">
                   <span className="text-gray-600">Total Devengado:</span>
