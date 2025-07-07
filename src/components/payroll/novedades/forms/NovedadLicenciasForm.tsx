@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +13,7 @@ interface NovedadLicenciasFormProps {
   onSubmit: (data: any) => void;
   employeeSalary: number;
   calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, dias?: number) => number | null;
+  isSubmitting: boolean;
 }
 
 const licenciaTypes = [
@@ -35,7 +35,8 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  calculateSuggestedValue
+  calculateSuggestedValue,
+  isSubmitting
 }) => {
   const [tipoLicencia, setTipoLicencia] = useState<string>('');
   const [subtipo, setSubtipo] = useState<string>('');
@@ -187,15 +188,15 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
 
       {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
-        <Button variant="outline" onClick={onBack}>
+        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
           Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid}
+          disabled={!isValid || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
         >
-          Guardar Licencia
+          {isSubmitting ? 'Guardando...' : 'Guardar Licencia'}
         </Button>
       </div>
     </div>

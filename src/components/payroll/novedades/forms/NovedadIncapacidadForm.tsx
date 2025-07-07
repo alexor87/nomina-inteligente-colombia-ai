@@ -21,6 +21,7 @@ interface NovedadIncapacidadFormProps {
     horas?: number,
     dias?: number
   ) => number | null;
+  isSubmitting: boolean;
 }
 
 const INCAPACIDAD_SUBTIPOS = [
@@ -48,7 +49,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  calculateSuggestedValue
+  calculateSuggestedValue,
+  isSubmitting
 }) => {
   const [formData, setFormData] = useState({
     subtipo: 'general',
@@ -278,15 +280,15 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
       {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
-        <Button variant="outline" onClick={onBack}>
+        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
           Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.dias || !formData.fecha_inicio || !formData.fecha_fin || formData.valor <= 0}
+          disabled={!formData.dias || !formData.fecha_inicio || !formData.fecha_fin || formData.valor <= 0 || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700"
         >
-          Guardar Incapacidad
+          {isSubmitting ? 'Guardando...' : 'Guardar Incapacidad'}
         </Button>
       </div>
     </div>
