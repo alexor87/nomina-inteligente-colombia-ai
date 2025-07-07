@@ -2,8 +2,9 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, Users, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Calendar, Users, AlertTriangle, CheckCircle, Clock, Hash } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { PeriodNumberCalculationService } from '@/services/payroll-intelligent/PeriodNumberCalculationService';
 
 interface PeriodInfo {
   hasActivePeriod: boolean;
@@ -87,12 +88,40 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
     return `${startDate} - ${endDate}`;
   };
 
+  const getPeriodNumberInfo = () => {
+    if (periodInfo.activePeriod?.numero_periodo_anual) {
+      const year = new Date(periodInfo.activePeriod.fecha_inicio).getFullYear();
+      const semanticName = PeriodNumberCalculationService.getSemanticPeriodName(
+        periodInfo.activePeriod.numero_periodo_anual,
+        periodInfo.activePeriod.tipo_periodo,
+        year,
+        periodInfo.activePeriod.periodo
+      );
+      
+      return {
+        hasNumber: true,
+        number: periodInfo.activePeriod.numero_periodo_anual,
+        semanticName
+      };
+    }
+    
+    return { hasNumber: false };
+  };
+
+  const periodNumberInfo = getPeriodNumberInfo();
+
   return (
     <Card className={`${getStatusColor()} transition-colors`}>
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           {getStatusIcon()}
           <span>Información del Período</span>
+          {periodNumberInfo.hasNumber && (
+            <Badge variant="outline" className="ml-2 font-mono">
+              <Hash className="h-3 w-3 mr-1" />
+              #{periodNumberInfo.number}
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -102,7 +131,14 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
             <Calendar className="h-5 w-5 text-gray-500 flex-shrink-0" />
             <div>
               <p className="text-sm text-gray-600 font-medium">Período Seleccionado</p>
-              <p className="font-semibold text-gray-900">{getSelectedPeriodName()}</p>
+              <p className="font-semibold text-gray-900">
+                {periodNumberInfo.hasNumber ? periodNumberInfo.semanticName : getSelectedPeriodName()}
+              </p>
+              {periodNumberInfo.hasNumber && (
+                <p className="text-xs text-gray-500">
+                  Número ordinal: {periodNumberInfo.number}
+                </p>
+              )}
             </div>
           </div>
           
@@ -148,6 +184,14 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
                 <span className="text-gray-600">Empleados:</span>
                 <span className="font-semibold">{periodInfo.activePeriod.empleados_count || 0}</span>
               </div>
+              {periodInfo.activePeriod.numero_periodo_anual && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Número del año:</span>
+                  <Badge variant="outline" className="font-mono">
+                    #{periodInfo.activePeriod.numero_periodo_anual}
+                  </Badge>
+                </div>
+              )}
               {periodInfo.activePeriod.total_devengado > 0 && (
                 <div className="col-span-2 flex items-center justify-between">
                   <span className="text-gray-600">Total Devengado:</span>

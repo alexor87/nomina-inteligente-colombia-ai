@@ -913,6 +913,7 @@ export type Database = {
           fecha_inicio: string
           id: string
           last_activity_at: string | null
+          numero_periodo_anual: number | null
           periodo: string
           tipo_periodo: string
           total_deducciones: number | null
@@ -929,6 +930,7 @@ export type Database = {
           fecha_inicio: string
           id?: string
           last_activity_at?: string | null
+          numero_periodo_anual?: number | null
           periodo: string
           tipo_periodo?: string
           total_deducciones?: number | null
@@ -945,6 +947,7 @@ export type Database = {
           fecha_inicio?: string
           id?: string
           last_activity_at?: string | null
+          numero_periodo_anual?: number | null
           periodo?: string
           tipo_periodo?: string
           total_deducciones?: number | null

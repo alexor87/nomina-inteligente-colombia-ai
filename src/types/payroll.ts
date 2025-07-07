@@ -1,4 +1,3 @@
-
 export interface PayrollPeriod {
   id: string;
   company_id: string;
@@ -15,6 +14,7 @@ export interface PayrollPeriod {
   updated_at: string;
   modificado_por?: string;
   modificado_en?: string;
+  numero_periodo_anual?: number;
 }
 
 export interface PayrollEmployee {
@@ -103,4 +103,5 @@ export interface DBPayrollPeriod {
   modificado_en?: string;
   created_at: string;
   updated_at: string;
+  numero_periodo_anual?: number;
 }

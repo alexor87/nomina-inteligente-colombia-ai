@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { getPeriodNameFromDates } from '@/utils/periodDateUtils';
+import { PeriodNumberCalculationService } from './PeriodNumberCalculationService';
 
 export interface PeriodDetectionResult {
   hasActivePeriod: boolean;
@@ -99,19 +100,43 @@ export class PayrollPeriodDetectionService {
       // PASO 3: No hay conflictos, crear nuevo período
       console.log('🆕 No hay períodos existentes, crear nuevo período');
       
+      // NUEVO: Calcular número de período para el nuevo período
+      const tipoPeriodo = this.detectPeriodType(startDate, endDate);
+      const numberResult = await PeriodNumberCalculationService.calculatePeriodNumber(
+        companyId, startDate, endDate, tipoPeriodo
+      );
+      
+      if (!numberResult.success) {
+        console.warn('⚠️ No se pudo calcular número de período:', numberResult.error);
+      }
+      
       // CORRECCIÓN: Usar fechas exactas del usuario para el nombre del período
-      const correctPeriodName = getPeriodNameFromDates(startDate, endDate);
+      let correctPeriodName = getPeriodNameFromDates(startDate, endDate);
+      
+      // Si se calculó número de período exitosamente, generar nombre semántico
+      if (numberResult.success && numberResult.numero_periodo_anual) {
+        const year = new Date(startDate).getFullYear();
+        const semanticName = PeriodNumberCalculationService.getSemanticPeriodName(
+          numberResult.numero_periodo_anual,
+          tipoPeriodo,
+          year,
+          correctPeriodName
+        );
+        correctPeriodName = semanticName;
+        console.log('✨ Nombre semántico generado:', semanticName);
+      }
+      
       console.log('📝 Nombre de período generado con fechas exactas:', correctPeriodName);
       
       return {
         hasActivePeriod: false,
         suggestedAction: 'create',
-        message: `Crear nuevo período: ${correctPeriodName}`,
+        message: `Crear nuevo período: ${correctPeriodName}${numberResult.warning ? ` (${numberResult.warning})` : ''}`,
         periodData: {
           startDate,
           endDate,
           periodName: correctPeriodName,
-          type: this.detectPeriodType(startDate, endDate)
+          type: tipoPeriodo
         }
       };
 
