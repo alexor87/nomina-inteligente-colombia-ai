@@ -88,6 +88,7 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
   };
 
   const getStatusBadge = (period: AvailablePeriod) => {
+    // Corregido: usar los estados correctos de la base de datos
     if (period.estado === 'cerrado') {
       return <Badge variant="secondary" className="text-xs">Liquidado</Badge>;
     }

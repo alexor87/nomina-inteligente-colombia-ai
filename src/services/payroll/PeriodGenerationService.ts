@@ -8,7 +8,8 @@ export interface GeneratedPeriod {
   tipo_periodo: 'semanal' | 'quincenal' | 'mensual';
   numero_periodo_anual: number;
   etiqueta_visible: string;
-  estado: 'disponible' | 'liquidado' | 'cerrado';
+  periodo: string; // Agregado: requerido por la base de datos
+  estado: 'borrador' | 'en_proceso' | 'cerrado';
   company_id: string;
 }
 
@@ -58,28 +59,32 @@ export class PeriodGenerationService {
       // Primera quincena (1-15)
       const firstStart = new Date(year, month, 1);
       const firstEnd = new Date(year, month, 15);
+      const firstLabel = `Quincena ${periodNumber} - 1 al 15 de ${this.getMonthName(month)} ${year}`;
       
       periods.push({
         fecha_inicio: firstStart.toISOString().split('T')[0],
         fecha_fin: firstEnd.toISOString().split('T')[0],
         tipo_periodo: 'quincenal',
         numero_periodo_anual: periodNumber++,
-        etiqueta_visible: `Quincena ${periodNumber - 1} - 1 al 15 de ${this.getMonthName(month)} ${year}`,
-        estado: 'disponible',
+        etiqueta_visible: firstLabel,
+        periodo: firstLabel, // Agregado: campo requerido
+        estado: 'borrador',
         company_id: companyId
       });
       
       // Segunda quincena (16-fin de mes)
       const secondStart = new Date(year, month, 16);
       const secondEnd = new Date(year, month + 1, 0); // Último día del mes
+      const secondLabel = `Quincena ${periodNumber} - 16 al ${secondEnd.getDate()} de ${this.getMonthName(month)} ${year}`;
       
       periods.push({
         fecha_inicio: secondStart.toISOString().split('T')[0],
         fecha_fin: secondEnd.toISOString().split('T')[0],
         tipo_periodo: 'quincenal',
         numero_periodo_anual: periodNumber++,
-        etiqueta_visible: `Quincena ${periodNumber - 1} - 16 al ${secondEnd.getDate()} de ${this.getMonthName(month)} ${year}`,
-        estado: 'disponible',
+        etiqueta_visible: secondLabel,
+        periodo: secondLabel, // Agregado: campo requerido
+        estado: 'borrador',
         company_id: companyId
       });
     }
@@ -110,13 +115,16 @@ export class PeriodGenerationService {
       // Si el domingo está en el siguiente año, parar
       if (sunday.getFullYear() > year) break;
       
+      const label = `Semana ${periodNumber} - ${currentMonday.getDate()} al ${sunday.getDate()} de ${this.getMonthName(currentMonday.getMonth())} ${year}`;
+      
       periods.push({
         fecha_inicio: currentMonday.toISOString().split('T')[0],
         fecha_fin: sunday.toISOString().split('T')[0],
         tipo_periodo: 'semanal',
         numero_periodo_anual: periodNumber++,
-        etiqueta_visible: `Semana ${periodNumber - 1} - ${currentMonday.getDate()} al ${sunday.getDate()} de ${this.getMonthName(currentMonday.getMonth())} ${year}`,
-        estado: 'disponible',
+        etiqueta_visible: label,
+        periodo: label, // Agregado: campo requerido
+        estado: 'borrador',
         company_id: companyId
       });
       
@@ -136,14 +144,16 @@ export class PeriodGenerationService {
     for (let month = 0; month < 12; month++) {
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + 1, 0); // Último día del mes
+      const label = `${this.getMonthName(month)} ${year}`;
       
       periods.push({
         fecha_inicio: startDate.toISOString().split('T')[0],
         fecha_fin: endDate.toISOString().split('T')[0],
         tipo_periodo: 'mensual',
         numero_periodo_anual: month + 1,
-        etiqueta_visible: `${this.getMonthName(month)} ${year}`,
-        estado: 'disponible',
+        etiqueta_visible: label,
+        periodo: label, // Agregado: campo requerido
+        estado: 'borrador',
         company_id: companyId
       });
     }
@@ -181,23 +191,40 @@ export class PeriodGenerationService {
         console.log('🔧 Generando períodos por primera vez para', year);
         const generatedPeriods = await this.generateYearPeriods(companyId, year, periodicity);
         
-        // Insertar en base de datos
+        // Insertar en base de datos - Mapear correctamente las propiedades
+        const periodsToInsert = generatedPeriods.map(period => ({
+          company_id: period.company_id,
+          fecha_inicio: period.fecha_inicio,
+          fecha_fin: period.fecha_fin,
+          tipo_periodo: period.tipo_periodo,
+          numero_periodo_anual: period.numero_periodo_anual,
+          periodo: period.periodo, // Corregido: usar periodo en lugar de etiqueta_visible
+          estado: period.estado,
+          empleados_count: 0,
+          total_devengado: 0,
+          total_deducciones: 0,
+          total_neto: 0
+        }));
+        
         const { data: insertedPeriods, error } = await supabase
           .from('payroll_periods_real')
-          .insert(generatedPeriods)
+          .insert(periodsToInsert)
           .select();
         
         if (error) throw error;
         
+        // Mapear correctamente a AvailablePeriod
         availablePeriods = (insertedPeriods || []).map(period => ({
           ...period,
+          etiqueta_visible: period.periodo, // Mapear periodo a etiqueta_visible
           can_select: period.estado === 'borrador' || period.estado === 'en_proceso',
           reason: period.estado === 'cerrado' ? 'Período ya liquidado' : undefined
         }));
       } else {
-        // Usar períodos existentes
+        // Usar períodos existentes - Mapear correctamente a AvailablePeriod
         availablePeriods = existingPeriods.map(period => ({
           ...period,
+          etiqueta_visible: period.periodo, // Mapear periodo a etiqueta_visible
           can_select: period.estado === 'borrador' || period.estado === 'en_proceso',
           reason: period.estado === 'cerrado' ? 'Período ya liquidado' : undefined
         }));
