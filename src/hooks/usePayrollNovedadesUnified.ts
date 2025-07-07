@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
@@ -10,6 +11,24 @@ export const usePayrollNovedadesUnified = (periodId: string) => {
   const [isCreating, setIsCreating] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
   const { toast } = useToast();
+
+  // Actualizar totales para un empleado específico
+  const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
+    if (!periodId) return;
+    
+    console.log('🔄 Actualizando novedades para empleado:', employeeId);
+    try {
+      const totals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
+      setNovedadesTotals(prev => ({
+        ...prev,
+        [employeeId]: totals
+      }));
+      setLastRefreshTime(Date.now());
+      console.log('✅ Novedades actualizadas para empleado:', employeeId, totals);
+    } catch (error) {
+      console.error('❌ Error actualizando novedades de empleado:', error);
+    }
+  }, [periodId]);
 
   // Cargar totales de novedades para empleados específicos
   const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
@@ -29,100 +48,84 @@ export const usePayrollNovedadesUnified = (periodId: string) => {
     }
   }, [periodId]);
 
-  // Crear nueva novedad
-  const createNovedad = useCallback(async (data: CreateNovedadData): Promise<PayrollNovedad | null> => {
+  // Crear múltiples novedades de una vez
+  const createMultipleNovedades = useCallback(async (novedadesArray: CreateNovedadData[]): Promise<PayrollNovedad[]> => {
     if (!periodId) {
       toast({
         title: "❌ Error",
         description: "No hay período activo",
         variant: "destructive"
       });
-      return null;
+      return [];
     }
 
     setIsCreating(true);
+    const createdNovedades: PayrollNovedad[] = [];
+    
     try {
-      console.log('🚀 Creating novelty with data:', data);
+      console.log(`🚀 Creating ${novedadesArray.length} novelties`);
       
-      // Validate required fields
-      if (!data.empleado_id || !data.tipo_novedad) {
-        throw new Error('Faltan datos requeridos: empleado_id o tipo_novedad');
-      }
+      // Crear cada novedad
+      for (const novedadData of novedadesArray) {
+        const createData: CreateNovedadData = {
+          ...novedadData,
+          periodo_id: periodId,
+          valor: Number(novedadData.valor) || 0,
+          horas: novedadData.horas ? Number(novedadData.horas) : undefined,
+          dias: novedadData.dias ? Number(novedadData.dias) : undefined
+        };
 
-      // Ensure valor is properly set
-      if (!data.valor || data.valor <= 0) {
-        console.warn('⚠️ Valor is 0 or null, this might be intentional but could indicate a calculation issue');
-      }
-      
-      const createData: CreateNovedadData = {
-        ...data,
-        periodo_id: periodId,
-        // Ensure all numeric values are properly handled
-        valor: Number(data.valor) || 0,
-        horas: data.horas ? Number(data.horas) : undefined,
-        dias: data.dias ? Number(data.dias) : undefined
-      };
-
-      console.log('💾 Final data to save:', createData);
-
-      const result = await NovedadesEnhancedService.createNovedad(createData);
-      
-      if (result) {
-        console.log('✅ Novelty created successfully:', result);
+        console.log('💾 Creating novelty:', createData);
+        const result = await NovedadesEnhancedService.createNovedad(createData);
         
-        // Force cache invalidation and immediate recalculation
+        if (result) {
+          createdNovedades.push(result);
+          console.log('✅ Novelty created:', result);
+        }
+      }
+
+      if (createdNovedades.length > 0) {
+        // Invalidar cache y recalcular
+        const employeeId = createdNovedades[0].empleado_id;
         console.log('🔄 Invalidating cache and recalculating totals...');
-        NovedadesCalculationService.invalidateCache(result.empleado_id, periodId);
+        NovedadesCalculationService.invalidateCache(employeeId, periodId);
         
         // Wait a bit for DB to propagate, then refresh
         await new Promise(resolve => setTimeout(resolve, 100));
-        await refreshEmployeeNovedades(result.empleado_id);
+        await refreshEmployeeNovedades(employeeId);
         
         toast({
-          title: "✅ Novedad creada",
-          description: `Se agregó la novedad de ${result.tipo_novedad} por $${Number(result.valor).toLocaleString()}`,
+          title: "✅ Novedades creadas",
+          description: `Se crearon ${createdNovedades.length} novedades exitosamente`,
           className: "border-green-200 bg-green-50"
         });
-        
-        return result;
       }
-      return null;
-    } catch (error) {
-      console.error('❌ Error creating novelty:', error);
       
-      let errorMessage = 'No se pudo crear la novedad';
+      return createdNovedades;
+    } catch (error) {
+      console.error('❌ Error creating novelties:', error);
+      
+      let errorMessage = 'No se pudieron crear las novedades';
       if (error instanceof Error) {
         errorMessage = error.message;
       }
       
       toast({
-        title: "❌ Error al crear novedad",
+        title: "❌ Error al crear novedades",
         description: errorMessage,
         variant: "destructive"
       });
-      return null;
+      return [];
     } finally {
       setIsCreating(false);
     }
   }, [periodId, toast, refreshEmployeeNovedades]);
 
-  // Actualizar totales para un empleado específico
-  const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
-    if (!periodId) return;
-    
-    console.log('🔄 Actualizando novedades para empleado:', employeeId);
-    try {
-      const totals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
-      setNovedadesTotals(prev => ({
-        ...prev,
-        [employeeId]: totals
-      }));
-      setLastRefreshTime(Date.now());
-      console.log('✅ Novedades actualizadas para empleado:', employeeId, totals);
-    } catch (error) {
-      console.error('❌ Error actualizando novedades de empleado:', error);
-    }
-  }, [periodId]);
+  // Crear nueva novedad (single)
+  const createNovedad = useCallback(async (data: CreateNovedadData): Promise<PayrollNovedad | null> => {
+    const results = await createMultipleNovedades([data]);
+    return results.length > 0 ? results[0] : null;
+  }, [createMultipleNovedades]);
 
   // Obtener totales de un empleado específico
   const getEmployeeNovedades = useCallback((employeeId: string): NovedadesTotals => {
@@ -200,6 +203,7 @@ export const usePayrollNovedadesUnified = (periodId: string) => {
     // Métodos principales
     loadNovedadesTotals,
     createNovedad,
+    createMultipleNovedades,
     refreshEmployeeNovedades,
     getEmployeeNovedades,
     refreshAllEmployees,
