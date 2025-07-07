@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 
@@ -16,7 +15,7 @@ export class NovedadesCalculationService {
     const cacheKey = `${employeeId}-${periodId}`;
     
     try {
-      console.log(`🧮 Calculando novedades para empleado ${employeeId} en período ${periodId}`);
+      console.log(`🧮 Calculating novelties for employee ${employeeId} in period ${periodId}`);
       
       const { data: novedades, error } = await supabase
         .from('payroll_novedades')
@@ -25,34 +24,37 @@ export class NovedadesCalculationService {
         .eq('periodo_id', periodId);
 
       if (error) {
-        console.error('❌ Error obteniendo novedades:', error);
+        console.error('❌ Error getting novelties:', error);
         return this.getEmptyTotals();
       }
 
       if (!novedades || novedades.length === 0) {
+        console.log(`ℹ️ No novelties found for employee ${employeeId}`);
         const emptyTotals = this.getEmptyTotals();
         this.cache.set(cacheKey, emptyTotals);
         return emptyTotals;
       }
 
+      console.log(`📊 Found ${novedades.length} novelties:`, novedades);
+      
       const totals = this.calculateTotalsFromNovedades(novedades as PayrollNovedad[]);
       this.cache.set(cacheKey, totals);
       
-      console.log(`✅ Totales calculados para ${employeeId}:`, totals);
+      console.log(`✅ Totals calculated for ${employeeId}:`, totals);
       return totals;
       
     } catch (error) {
-      console.error('💥 Error crítico calculando novedades:', error);
+      console.error('💥 Critical error calculating novelties:', error);
       return this.getEmptyTotals();
     }
   }
 
   static async calculateAllEmployeesNovedadesTotals(employeeIds: string[], periodId: string): Promise<Record<string, NovedadesTotals>> {
-    console.log(`🔄 Calculando novedades para ${employeeIds.length} empleados`);
+    console.log(`🔄 Calculating novelties for ${employeeIds.length} employees`);
     
     const results: Record<string, NovedadesTotals> = {};
     
-    // Procesar en paralelo para mejor performance
+    // Process in parallel for better performance
     const promises = employeeIds.map(async (employeeId) => {
       const totals = await this.calculateEmployeeNovedadesTotals(employeeId, periodId);
       return { employeeId, totals };
@@ -72,24 +74,32 @@ export class NovedadesCalculationService {
     let totalDeducciones = 0;
 
     novedades.forEach(novedad => {
+      // IMPROVED: Better number handling
       const valor = Number(novedad.valor) || 0;
       
-      // Clasificar por tipo de novedad
+      console.log(`💰 Processing novelty: ${novedad.tipo_novedad} = $${valor}`);
+      
+      // Classify by novelty type
       if (this.isDevengado(novedad.tipo_novedad)) {
         totalDevengos += valor;
+        console.log(`➕ Added to earnings: $${valor} (total: $${totalDevengos})`);
       } else if (this.isDeduccion(novedad.tipo_novedad)) {
         totalDeducciones += valor;
+        console.log(`➖ Added to deductions: $${valor} (total: $${totalDeducciones})`);
       }
     });
 
     const totalNeto = totalDevengos - totalDeducciones;
 
-    return {
+    const result = {
       totalDevengos,
       totalDeducciones,
       totalNeto,
       hasNovedades: novedades.length > 0
     };
+
+    console.log(`📈 Final calculation result:`, result);
+    return result;
   }
 
   private static isDevengado(tipoNovedad: string): boolean {
@@ -124,10 +134,10 @@ export class NovedadesCalculationService {
     if (employeeId && periodId) {
       const cacheKey = `${employeeId}-${periodId}`;
       this.cache.delete(cacheKey);
-      console.log(`🗑️ Cache invalidado para ${cacheKey}`);
+      console.log(`🗑️ Cache invalidated for ${cacheKey}`);
     } else {
       this.cache.clear();
-      console.log('🗑️ Cache completo invalidado');
+      console.log('🗑️ Complete cache invalidated');
     }
   }
 }

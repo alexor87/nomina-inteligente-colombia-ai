@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -129,30 +128,47 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      console.log('📤 Enviando novedad desde modal:', formData);
+      console.log('📤 Form data received:', formData);
       
-      const submitData: CreateNovedadData = {
-        ...formData,
-        empleado_id: employeeId,
-        periodo_id: periodId,
-        tipo_novedad: selectedType!,
-        company_id: '' // Se completará en el hook/servicio
-      };
+      // Check if form data is an array (multiple entries like Horas Extra)
+      const isArrayData = Array.isArray(formData);
+      const dataArray = isArrayData ? formData : [formData];
+      
+      console.log(`🔄 Processing ${dataArray.length} novelty entries`);
+      
+      // Process each entry
+      for (const entry of dataArray) {
+        const submitData: CreateNovedadData = {
+          empleado_id: employeeId,
+          periodo_id: periodId,
+          company_id: '', // Will be completed in the service
+          tipo_novedad: selectedType!,
+          valor: entry.valor || 0,
+          horas: entry.horas || undefined,
+          dias: entry.dias || undefined,
+          observacion: entry.observacion || undefined,
+          fecha_inicio: entry.fecha_inicio || undefined,
+          fecha_fin: entry.fecha_fin || undefined,
+          subtipo: entry.subtipo || undefined,
+          base_calculo: entry.base_calculo || undefined
+        };
 
-      await onSubmit(submitData);
+        console.log('💾 Saving novelty entry:', submitData);
+        await onSubmit(submitData);
+      }
       
-      console.log('✅ Novedad enviada exitosamente');
+      console.log('✅ All novelty entries processed successfully');
       
-      // Volver a la lista para mostrar la novedad recién creada
+      // Go back to list to show newly created novelties
       setCurrentStep('list');
       setSelectedType(null);
       setRefreshTrigger(Date.now());
       
     } catch (error: any) {
-      console.error('❌ Error enviando novedad:', error);
+      console.error('❌ Error processing novelties:', error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo guardar la novedad",
+        description: error.message || "No se pudieron guardar las novedades",
         variant: "destructive",
       });
     } finally {
