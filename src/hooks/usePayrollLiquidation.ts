@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -381,7 +382,7 @@ export const usePayrollLiquidation = () => {
     bonuses: dbEmployee.devengos,
     absences: 0,
     grossPay: dbEmployee.total_pagar + dbEmployee.deducciones,
-    deductions: dbEmployee.deducciones,
+    deductions: dbEmployee.deducciones, // FIXED: Changed from 'deducciones' to 'deductions'
     netPay: dbEmployee.total_pagar,
     status: 'valid',
     errors: [],
@@ -408,7 +409,7 @@ export const usePayrollLiquidation = () => {
           const updatedEmployee = {
             ...emp,
             bonuses: novedadesTotals.totalDevengos,
-            deductions: novedadesTotals.totalDeducciones,
+            deductions: novedadesTotals.totalDeducciones, // FIXED: Using 'deductions' property
             netPay: emp.grossPay - novedadesTotals.totalDeducciones + novedadesTotals.totalDevengos
           };
           
@@ -434,7 +435,7 @@ export const usePayrollLiquidation = () => {
         salario_base: emp.baseSalary,
         total_pagar: emp.netPay,
         devengos: emp.bonuses,
-        deducciones: emp.deducciones,
+        deducciones: emp.deductions, // FIXED: Using 'deductions' property
         dias_trabajados: emp.workedDays,
         auxilio_transporte: emp.transportAllowance,
         salud_empleado: 0,
