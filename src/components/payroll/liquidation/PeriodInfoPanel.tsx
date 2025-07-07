@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -79,21 +78,13 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
     return <Clock className="h-5 w-5 text-gray-600" />;
   };
 
-  // CORRECCIÓN CRÍTICA: Usar exactamente las fechas seleccionadas por el usuario
   const getSelectedPeriodName = () => {
-    console.log('🔍 DEBUGGING - Fechas recibidas:', { startDate, endDate });
-    console.log('🔍 DEBUGGING - periodInfo.periodData:', periodInfo.periodData);
-    
-    // USAR DIRECTAMENTE las fechas del usuario, NO las del periodData
     if (periodInfo.periodData) {
-      console.log('📝 DEBUGGING - Usando periodData.periodName:', periodInfo.periodData.periodName);
       return periodInfo.periodData.periodName;
     }
     
     // Fallback: crear nombre simple con las fechas exactas del usuario
-    const fallbackName = `${startDate} - ${endDate}`;
-    console.log('📝 DEBUGGING - Usando fallback name:', fallbackName);
-    return fallbackName;
+    return `${startDate} - ${endDate}`;
   };
 
   return (
@@ -104,75 +95,63 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
           <span>Información del Período</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {/* Selected Period Details */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4 text-gray-500" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex items-center space-x-3">
+            <Calendar className="h-5 w-5 text-gray-500 flex-shrink-0" />
             <div>
-              <p className="text-sm text-gray-600">Período Seleccionado</p>
-              <p className="font-medium">{getSelectedPeriodName()}</p>
+              <p className="text-sm text-gray-600 font-medium">Período Seleccionado</p>
+              <p className="font-semibold text-gray-900">{getSelectedPeriodName()}</p>
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline">
-              {getPeriodTypeLabel(
-                periodInfo.periodData?.type || 'mensual'
-              )}
-            </Badge>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Users className="h-4 w-4 text-gray-500" />
-            <div>
-              <p className="text-sm text-gray-600">Empleados Activos</p>
-              <p className="font-medium">{employeesCount} empleados</p>
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0">
+              <Badge variant="outline" className="font-medium">
+                {getPeriodTypeLabel(
+                  periodInfo.periodData?.type || 'mensual'
+                )}
+              </Badge>
             </div>
           </div>
-        </div>
-
-        {/* DEBUGGING: Mostrar fechas exactas para verificación */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs">
-          <p><strong>🔍 DEBUG - Fechas exactas seleccionadas:</strong></p>
-          <p>Inicio: {startDate}</p>
-          <p>Fin: {endDate}</p>
-          {periodInfo.periodData && (
-            <>
-              <p>periodData.startDate: {periodInfo.periodData.startDate}</p>
-              <p>periodData.endDate: {periodInfo.periodData.endDate}</p>
-              <p>periodData.periodName: {periodInfo.periodData.periodName}</p>
-            </>
-          )}
+          
+          <div className="flex items-center space-x-3">
+            <Users className="h-5 w-5 text-gray-500 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-gray-600 font-medium">Empleados Activos</p>
+              <p className="font-semibold text-gray-900">{employeesCount} empleados</p>
+            </div>
+          </div>
         </div>
 
         {/* Status Message */}
         <Alert className={isNewPeriod ? 'border-green-200 bg-green-50' : isExistingPeriod ? 'border-blue-200 bg-blue-50' : 'border-orange-200 bg-orange-50'}>
           <AlertDescription className="flex items-center space-x-2">
             {getStatusIcon()}
-            <span>{periodInfo.message}</span>
+            <span className="font-medium">{periodInfo.message}</span>
           </AlertDescription>
         </Alert>
 
         {/* Existing Period Info */}
         {periodInfo.activePeriod && (
-          <div className="bg-white/50 rounded-lg p-3 space-y-2">
-            <h4 className="font-medium text-sm">Información del Período Existente:</h4>
+          <div className="bg-white/70 rounded-lg p-4 border border-gray-200 space-y-3">
+            <h4 className="font-semibold text-gray-800 text-sm">Información del Período Existente:</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
+              <div className="flex items-center justify-between">
                 <span className="text-gray-600">Estado:</span>
-                <Badge variant={periodInfo.activePeriod.estado === 'borrador' ? 'default' : 'secondary'} className="ml-2">
+                <Badge variant={periodInfo.activePeriod.estado === 'borrador' ? 'default' : 'secondary'}>
                   {periodInfo.activePeriod.estado}
                 </Badge>
               </div>
-              <div>
+              <div className="flex items-center justify-between">
                 <span className="text-gray-600">Empleados:</span>
-                <span className="ml-2 font-medium">{periodInfo.activePeriod.empleados_count || 0}</span>
+                <span className="font-semibold">{periodInfo.activePeriod.empleados_count || 0}</span>
               </div>
               {periodInfo.activePeriod.total_devengado > 0 && (
-                <div>
+                <div className="col-span-2 flex items-center justify-between">
                   <span className="text-gray-600">Total Devengado:</span>
-                  <span className="ml-2 font-medium">{formatCurrency(periodInfo.activePeriod.total_devengado)}</span>
+                  <span className="font-semibold text-green-700">{formatCurrency(periodInfo.activePeriod.total_devengado)}</span>
                 </div>
               )}
             </div>
@@ -181,28 +160,35 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
 
         {/* Conflict Period Info */}
         {isConflict && periodInfo.conflictPeriod && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-3">
-            <h4 className="font-medium text-sm text-orange-800">Período en Conflicto:</h4>
-            <div className="text-sm">
-              <p><strong>Período existente:</strong> {periodInfo.conflictPeriod.periodo}</p>
-              <p><strong>Fechas:</strong> {periodInfo.conflictPeriod.fecha_inicio} - {periodInfo.conflictPeriod.fecha_fin}</p>
-              <p><strong>Estado:</strong> 
-                <Badge variant="secondary" className="ml-2">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-4">
+            <h4 className="font-semibold text-orange-800 text-sm">Período en Conflicto:</h4>
+            <div className="text-sm space-y-2">
+              <div className="flex justify-between">
+                <strong>Período existente:</strong>
+                <span>{periodInfo.conflictPeriod.periodo}</span>
+              </div>
+              <div className="flex justify-between">
+                <strong>Fechas:</strong>
+                <span>{periodInfo.conflictPeriod.fecha_inicio} - {periodInfo.conflictPeriod.fecha_fin}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <strong>Estado:</strong>
+                <Badge variant="secondary">
                   {periodInfo.conflictPeriod.estado}
                 </Badge>
-              </p>
+              </div>
             </div>
             
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-3 pt-3 border-t border-orange-200">
               <button
                 onClick={() => onResolveConflict?.('selected')}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
               >
                 Continuar con período seleccionado ({startDate} - {endDate})
               </button>
               <button
                 onClick={() => onResolveConflict?.('existing')}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
               >
                 Abrir período existente ({periodInfo.conflictPeriod.fecha_inicio} - {periodInfo.conflictPeriod.fecha_fin})
               </button>
@@ -212,14 +198,14 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
 
         {/* Action Button for non-conflict scenarios */}
         {!isConflict && (
-          <div className="flex justify-center pt-2">
+          <div className="flex justify-center pt-4">
             <button
               onClick={onProceed}
               className={`${
                 isNewPeriod 
                   ? 'bg-green-600 hover:bg-green-700' 
                   : 'bg-blue-600 hover:bg-blue-700'
-              } text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2`}
+              } text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 shadow-sm hover:shadow-md`}
             >
               {getStatusIcon()}
               <span>
