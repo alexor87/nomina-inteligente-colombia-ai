@@ -118,7 +118,7 @@ export const usePayrollIntelligentLoad = () => {
                                    novedadesTotals.totalDeducciones;
             
             const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
-            const totalConNovedades = salarieProporcional + employee.auxilio_transporte + 
+            const totalConNovedades = salarioProporcional + employee.auxilio_transporte + 
                                     novedadesTotals.totalDevengos - totalDeducciones;
             
             return {

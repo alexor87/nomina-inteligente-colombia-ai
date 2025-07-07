@@ -41,6 +41,7 @@ export const usePayrollLiquidation = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [isRecovering, setIsRecovering] = useState(false);
   const [isRemovingEmployee, setIsRemovingEmployee] = useState(false);
+  const [isAddingEmployees, setIsAddingEmployees] = useState(false);
   const { toast } = useToast();
 
   // Intelligent load hook
@@ -158,7 +159,12 @@ export const usePayrollLiquidation = () => {
       throw new Error('No hay información del período activo');
     }
 
-    console.log('🔄 usePayrollLiquidation - Adding employees:', employeeIds);
+    console.log('🔄 usePayrollLiquidation - Adding employees with immediate persistence:', employeeIds);
+    
+    setIsAddingEmployees(true);
+    
+    // Capturar estado previo para rollback
+    const previousEmployees = [...employees];
     
     try {
       const newEmployeesData = await PayrollLiquidationService.loadSpecificEmployeesForPeriod(
@@ -196,12 +202,40 @@ export const usePayrollLiquidation = () => {
       );
 
       const transformedNewEmployees = processedNewEmployees.map(transformEmployee);
-      setEmployees(prev => [...prev, ...transformedNewEmployees]);
       
-      console.log('✅ usePayrollLiquidation - Employees added successfully:', transformedNewEmployees.length);
+      // PASO 1: Actualizar estado inmediatamente
+      const updatedEmployees = [...previousEmployees, ...transformedNewEmployees];
+      setEmployees(updatedEmployees);
+      
+      console.log('💾 usePayrollLiquidation - Triggering immediate auto-save after adding employees');
+      
+      // PASO 2: PERSISTIR INMEDIATAMENTE en base de datos
+      await triggerAutoSave();
+      
+      console.log('✅ usePayrollLiquidation - Employees added and persisted successfully:', transformedNewEmployees.length);
+      
+      toast({
+        title: "Empleados agregados",
+        description: `Se agregaron ${transformedNewEmployees.length} empleado(s) y se guardaron automáticamente`,
+        className: "border-green-200 bg-green-50"
+      });
+      
     } catch (error) {
-      console.error('❌ usePayrollLiquidation - Error adding employees:', error);
+      console.error('❌ usePayrollLiquidation - Error adding employees with auto-save:', error);
+      
+      // ROLLBACK: Restaurar estado anterior en caso de error
+      console.log('🔄 Rolling back to previous employee state due to error');
+      setEmployees(previousEmployees);
+      
+      toast({
+        title: "Error",
+        description: "No se pudieron agregar los empleados. Se revirtieron los cambios.",
+        variant: "destructive"
+      });
+      
       throw error;
+    } finally {
+      setIsAddingEmployees(false);
     }
   };
 
@@ -401,7 +435,7 @@ export const usePayrollLiquidation = () => {
 
   return {
     employees,
-    isLoading: isLoading || isRecovering || isIntelligentLoading,
+    isLoading: isLoading || isRecovering || isIntelligentLoading || isAddingEmployees,
     isLiquidating,
     currentPeriodId,
     startDate,
@@ -416,8 +450,9 @@ export const usePayrollLiquidation = () => {
     isAutoSaving: isSaving,
     lastAutoSaveTime: lastSaveTime,
     triggerManualSave: triggerAutoSave,
-    // New removal status
+    // New status indicators
     isRemovingEmployee,
+    isAddingEmployees,
     // Debug info
     removedEmployeeIds
   };
