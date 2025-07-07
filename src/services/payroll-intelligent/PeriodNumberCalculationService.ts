@@ -1,4 +1,3 @@
-
 import { getWeek } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -82,7 +81,7 @@ export class PeriodNumberCalculationService {
   }
   
   /**
-   * Calcula número para período quincenal (conteo cronológico)
+   * Calcula número para período quincenal (conteo cronológico correcto)
    */
   private static async calculateBiweeklyPeriodNumber(
     companyId: string, 
@@ -92,23 +91,26 @@ export class PeriodNumberCalculationService {
     const startDay = new Date(startDate).getDate();
     const startMonth = new Date(startDate).getMonth() + 1;
     
+    console.log('📊 CALCULANDO QUINCENA CORREGIDA:', { startDay, startMonth, year });
+    
     // Contar quincenas hasta este punto en el año
     let biweeklyCount = 0;
     
-    for (let month = 1; month <= startMonth; month++) {
-      if (month < startMonth) {
-        // Meses completos: 2 quincenas por mes
-        biweeklyCount += 2;
-      } else {
-        // Mes actual: determinar si es primera o segunda quincena
-        if (startDay <= 15) {
-          biweeklyCount += 1; // Primera quincena
-        } else {
-          biweeklyCount += 2; // Segunda quincena
-        }
-      }
+    // Contar quincenas de los meses completos anteriores
+    for (let month = 1; month < startMonth; month++) {
+      biweeklyCount += 2; // Cada mes tiene exactamente 2 quincenas
     }
     
+    // Para el mes actual, determinar si es primera o segunda quincena
+    if (startDay <= 15) {
+      biweeklyCount += 1; // Primera quincena del mes actual
+      console.log('✅ Primera quincena del mes', startMonth, '= quincena', biweeklyCount);
+    } else {
+      biweeklyCount += 2; // Segunda quincena del mes actual (incluye la primera)
+      console.log('✅ Segunda quincena del mes', startMonth, '= quincena', biweeklyCount);
+    }
+    
+    console.log('📊 RESULTADO QUINCENA CORREGIDA:', biweeklyCount);
     return biweeklyCount;
   }
   
