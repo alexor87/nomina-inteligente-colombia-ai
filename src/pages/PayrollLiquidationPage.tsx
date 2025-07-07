@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Users, Calculator, Loader2 } from 'lucide-react';
+import { Calendar, Users, Calculator, Loader2, Settings } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { PeriodInfoPanel } from '@/components/payroll/liquidation/PeriodInfoPanel';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
@@ -14,12 +13,14 @@ import { format } from 'date-fns';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollCleanupService } from '@/services/PayrollCleanupService';
+import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
 
 const PayrollLiquidationPage = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showPeriodInfo, setShowPeriodInfo] = useState(false);
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   
   const { companyId } = useCurrentCompany();
   
@@ -155,13 +156,26 @@ const PayrollLiquidationPage = () => {
           )}
         </div>
         
-        {/* Auto-save indicator */}
-        {employees.length > 0 && (
-          <AutoSaveIndicator 
-            isSaving={isAutoSaving}
-            lastSaveTime={lastAutoSaveTime}
-          />
-        )}
+        <div className="flex items-center space-x-4">
+          {/* Auto-save indicator */}
+          {employees.length > 0 && (
+            <AutoSaveIndicator 
+              isSaving={isAutoSaving}
+              lastSaveTime={lastAutoSaveTime}
+            />
+          )}
+          
+          {/* Cleanup button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCleanupDialog(true)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Limpiar Períodos
+          </Button>
+        </div>
       </div>
 
       {/* Date Selection */}
@@ -279,6 +293,18 @@ const PayrollLiquidationPage = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Period Cleanup Dialog */}
+      <PeriodCleanupDialog
+        isOpen={showCleanupDialog}
+        onClose={() => setShowCleanupDialog(false)}
+        onCleanupComplete={() => {
+          // Refresh period detection after cleanup
+          if (startDate && endDate) {
+            detectPeriod(startDate, endDate);
+          }
+        }}
+      />
 
       {/* Add Employee Modal */}
       <EmployeeAddModal
