@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ import { usePeriodDetection } from '@/hooks/usePeriodDetection';
 import { format } from 'date-fns';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { PayrollCleanupService } from '@/services/PayrollCleanupService';
 
 const PayrollLiquidationPage = () => {
   const [startDate, setStartDate] = useState('');
@@ -49,6 +49,15 @@ const PayrollLiquidationPage = () => {
     detectPeriod,
     reset: resetDetection
   } = usePeriodDetection();
+
+  // Ejecutar limpieza cuando se monta el componente
+  useEffect(() => {
+    const performInitialCleanup = async () => {
+      await PayrollCleanupService.cleanupAbandonedPeriods();
+    };
+    
+    performInitialCleanup();
+  }, []);
 
   // Auto-detect period when both dates are selected
   useEffect(() => {

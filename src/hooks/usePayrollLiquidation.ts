@@ -4,9 +4,11 @@ import { PayrollLiquidationService } from '@/services/PayrollLiquidationService'
 import { PayrollAutoSaveService } from '@/services/PayrollAutoSaveService';
 import { PayrollDeletionService } from '@/services/PayrollDeletionService';
 import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
+import { PayrollActivePeriodsService } from '@/services/PayrollActivePeriodsService';
 import { PayrollEmployee } from '@/types/payroll';
 import { usePayrollAutoSave } from './usePayrollAutoSave';
 import { usePayrollIntelligentLoad } from './usePayrollIntelligentLoad';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DBEmployee {
   id: string;
@@ -63,30 +65,59 @@ export const usePayrollLiquidation = () => {
   });
 
   useEffect(() => {
-    checkForActivePeriod();
+    // Solo verificar períodos activos si el usuario está en la página de liquidación
+    // y no mostrar modal automático inmediatamente
+    const checkActivePeriodsDelayed = async () => {
+      // Esperar un poco antes de verificar para evitar modales inmediatos
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await checkForActivePeriod();
+    };
+
+    checkActivePeriodsDelayed();
   }, []);
 
   const checkForActivePeriod = async () => {
     try {
-      const activePeriod = await PayrollAutoSaveService.getActivePeriod();
+      // Primero limpiar períodos fantasma
+      await PayrollActivePeriodsService.cleanGhostPeriods();
       
-      if (activePeriod && activePeriod.employees_count > 0) {
-        console.log('📋 Found active period:', activePeriod);
+      // Luego verificar si hay períodos realmente activos
+      const result = await PayrollActivePeriodsService.checkForActivePeriod();
+      
+      if (result.has_active_period && result.period) {
+        console.log('📋 Período activo encontrado:', result.period);
         
+        // Mostrar confirmación más amigable
         const shouldRecover = window.confirm(
-          `Se encontró una liquidación en progreso:\n\n` +
-          `Período: ${activePeriod.periodo}\n` +
-          `Empleados: ${activePeriod.employees_count}\n` +
-          `Última actividad: ${new Date(activePeriod.last_activity_at).toLocaleString()}\n\n` +
-          `¿Desea continuar con esta liquidación?`
+          `¿Continuar con la liquidación en progreso?\n\n` +
+          `📋 Período: ${result.period.periodo}\n` +
+          `👥 Empleados: ${result.period.employees_count}\n` +
+          `⏰ Última actividad: ${new Date(result.period.last_activity_at).toLocaleString()}\n\n` +
+          `Selecciona "Aceptar" para continuar o "Cancelar" para iniciar una nueva liquidación.`
         );
 
         if (shouldRecover) {
-          await recoverActivePeriod(activePeriod);
+          await recoverActivePeriod(result.period);
+        } else {
+          // Si el usuario no quiere continuar, marcar el período como cancelado
+          await cancelActivePeriod(result.period.id);
         }
       }
     } catch (error) {
       console.error('Error checking for active period:', error);
+    }
+  };
+
+  const cancelActivePeriod = async (periodId: string) => {
+    try {
+      await supabase
+        .from('payroll_periods_real')
+        .update({ estado: 'cancelado' })
+        .eq('id', periodId);
+      
+      console.log('✅ Período activo cancelado por el usuario');
+    } catch (error) {
+      console.error('❌ Error cancelando período activo:', error);
     }
   };
 
@@ -403,7 +434,7 @@ export const usePayrollLiquidation = () => {
         salario_base: emp.baseSalary,
         total_pagar: emp.netPay,
         devengos: emp.bonuses,
-        deducciones: emp.deductions,
+        deducciones: emp.deducciones,
         dias_trabajados: emp.workedDays,
         auxilio_transporte: emp.transportAllowance,
         salud_empleado: 0,
