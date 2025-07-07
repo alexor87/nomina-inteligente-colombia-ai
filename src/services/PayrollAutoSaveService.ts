@@ -54,7 +54,11 @@ export class PayrollAutoSaveService {
     }
   }
 
-  static async saveDraftEmployees(periodId: string, employees: any[]): Promise<void> {
+  static async saveDraftEmployees(
+    periodId: string, 
+    employees: any[], 
+    removedEmployeeIds: string[] = []
+  ): Promise<void> {
     // Protección contra llamadas concurrentes
     if (this.isSaving && this.savingPromise) {
       console.log('🔄 Auto-save already in progress, waiting...');
@@ -65,7 +69,7 @@ export class PayrollAutoSaveService {
     this.isSaving = true;
     
     // Crear promesa para que otras llamadas puedan esperarla
-    this.savingPromise = this._performSave(periodId, employees);
+    this.savingPromise = this._performSave(periodId, employees, removedEmployeeIds);
     
     try {
       await this.savingPromise;
@@ -75,20 +79,23 @@ export class PayrollAutoSaveService {
     }
   }
 
-  private static async _performSave(periodId: string, employees: any[]): Promise<void> {
+  private static async _performSave(
+    periodId: string, 
+    employees: any[], 
+    removedEmployeeIds: string[] = []
+  ): Promise<void> {
     const companyId = await this.getCurrentUserCompanyId();
     if (!companyId) {
       throw new Error('No se pudo obtener la empresa del usuario');
     }
 
-    if (employees.length === 0) {
-      console.log('⚠️ No employees to save');
-      return;
-    }
+    console.log('💾 Starting atomic auto-save:', {
+      employees: employees.length,
+      removedEmployeeIds: removedEmployeeIds.length,
+      periodId
+    });
 
     try {
-      console.log('💾 Starting atomic auto-save for', employees.length, 'employees');
-
       // Obtener información del período para el campo 'periodo'
       const { data: periodData } = await supabase
         .from('payroll_periods_real')
@@ -98,38 +105,60 @@ export class PayrollAutoSaveService {
 
       const periodoName = periodData?.periodo || `Período ${new Date().toLocaleDateString()}`;
 
-      // Usar UPSERT atómico en lugar de DELETE + INSERT
-      const draftPayrolls = employees.map(employee => ({
-        company_id: companyId,
-        employee_id: employee.id,
-        period_id: periodId,
-        periodo: periodoName, // Campo que faltaba
-        salario_base: employee.baseSalary || 0,
-        dias_trabajados: employee.workedDays || 30,
-        auxilio_transporte: employee.transportAllowance || 0,
-        total_devengado: employee.grossPay || 0,
-        total_deducciones: employee.deductions || 0,
-        neto_pagado: employee.netPay || 0,
-        estado: 'borrador'
-      }));
+      // PASO 1: Eliminar empleados que fueron removidos de la liquidación
+      if (removedEmployeeIds.length > 0) {
+        console.log('🗑️ Deleting removed employees:', removedEmployeeIds);
+        
+        const { error: deleteError } = await supabase
+          .from('payrolls')
+          .delete()
+          .eq('company_id', companyId)
+          .eq('period_id', periodId)
+          .in('employee_id', removedEmployeeIds);
 
-      // UPSERT atómico usando ON CONFLICT
-      const { error: upsertError } = await supabase
-        .from('payrolls')
-        .upsert(draftPayrolls, {
-          onConflict: 'company_id,employee_id,period_id',
-          ignoreDuplicates: false
-        });
-
-      if (upsertError) {
-        console.error('❌ Upsert error:', upsertError);
-        throw upsertError;
+        if (deleteError) {
+          console.error('❌ Delete error:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log('✅ Removed employees deleted successfully:', removedEmployeeIds.length);
       }
 
-      // Actualizar totales del período atómicamente
+      // PASO 2: Upsert empleados actuales (solo si hay empleados)
+      if (employees.length > 0) {
+        const draftPayrolls = employees.map(employee => ({
+          company_id: companyId,
+          employee_id: employee.id,
+          period_id: periodId,
+          periodo: periodoName,
+          salario_base: employee.baseSalary || 0,
+          dias_trabajados: employee.workedDays || 30,
+          auxilio_transporte: employee.transportAllowance || 0,
+          total_devengado: employee.grossPay || 0,
+          total_deducciones: employee.deductions || 0,
+          neto_pagado: employee.netPay || 0,
+          estado: 'borrador'
+        }));
+
+        const { error: upsertError } = await supabase
+          .from('payrolls')
+          .upsert(draftPayrolls, {
+            onConflict: 'company_id,employee_id,period_id',
+            ignoreDuplicates: false
+          });
+
+        if (upsertError) {
+          console.error('❌ Upsert error:', upsertError);
+          throw upsertError;
+        }
+
+        console.log('✅ Employees upserted successfully:', draftPayrolls.length);
+      }
+
+      // PASO 3: Actualizar totales del período atómicamente
       await this.updatePeriodTotals(periodId, employees);
 
-      console.log('✅ Atomic auto-save completed successfully:', draftPayrolls.length, 'records');
+      console.log('✅ Atomic auto-save completed successfully');
     } catch (error) {
       console.error('❌ Error in atomic auto-save:', error);
       

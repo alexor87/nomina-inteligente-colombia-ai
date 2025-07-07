@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -32,6 +33,7 @@ interface DBEmployee {
 
 export const usePayrollLiquidation = () => {
   const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
+  const [removedEmployeeIds, setRemovedEmployeeIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLiquidating, setIsLiquidating] = useState(false);
   const [currentPeriodId, setCurrentPeriodId] = useState<string | null>(null);
@@ -40,11 +42,16 @@ export const usePayrollLiquidation = () => {
   const [isRecovering, setIsRecovering] = useState(false);
   const { toast } = useToast();
 
-  // Auto-save integration
+  // Auto-save integration with removed employee IDs
   const { triggerAutoSave, isSaving, lastSaveTime } = usePayrollAutoSave({
     periodId: currentPeriodId,
     employees,
-    enabled: true
+    removedEmployeeIds,
+    enabled: true,
+    onSaveSuccess: () => {
+      // Clear removed employee IDs after successful save
+      setRemovedEmployeeIds([]);
+    }
   });
 
   // Check for active period on mount
@@ -86,6 +93,9 @@ export const usePayrollLiquidation = () => {
       setCurrentPeriodId(activePeriod.id);
       setStartDate(activePeriod.fecha_inicio);
       setEndDate(activePeriod.fecha_fin);
+      
+      // Clear removed employee IDs when recovering
+      setRemovedEmployeeIds([]);
       
       // Load draft employees
       const draftEmployees = await PayrollAutoSaveService.loadDraftEmployees(activePeriod.id);
@@ -153,6 +163,9 @@ export const usePayrollLiquidation = () => {
     setIsLoading(true);
     setStartDate(startDate);
     setEndDate(endDate);
+    // Clear removed employee IDs when loading new employees
+    setRemovedEmployeeIds([]);
+    
     try {
       console.log('🔄 usePayrollLiquidation - Loading employees for period:', { startDate, endDate });
       
@@ -289,6 +302,17 @@ export const usePayrollLiquidation = () => {
   };
 
   const removeEmployee = (employeeId: string) => {
+    console.log('🗑️ usePayrollLiquidation - Removing employee:', employeeId);
+    
+    // Add to removed IDs list
+    setRemovedEmployeeIds(prev => {
+      if (!prev.includes(employeeId)) {
+        return [...prev, employeeId];
+      }
+      return prev;
+    });
+    
+    // Remove from current employees list
     setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
     
     // Trigger auto-save after removing
@@ -377,6 +401,7 @@ export const usePayrollLiquidation = () => {
         
         // Reset state
         setEmployees([]);
+        setRemovedEmployeeIds([]);
         setCurrentPeriodId(null);
       } else {
         throw new Error(result.message);
@@ -423,6 +448,8 @@ export const usePayrollLiquidation = () => {
     // Auto-save status
     isAutoSaving: isSaving,
     lastAutoSaveTime: lastSaveTime,
-    triggerManualSave: triggerAutoSave
+    triggerManualSave: triggerAutoSave,
+    // Debug info
+    removedEmployeeIds
   };
 };

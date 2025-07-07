@@ -8,29 +8,45 @@ import { useToast } from '@/hooks/use-toast';
 interface UsePayrollAutoSaveOptions {
   periodId: string | null;
   employees: PayrollEmployee[];
+  removedEmployeeIds?: string[];
   enabled?: boolean;
+  onSaveSuccess?: () => void;
 }
 
 export const usePayrollAutoSave = ({ 
   periodId, 
   employees, 
-  enabled = true 
+  removedEmployeeIds = [],
+  enabled = true,
+  onSaveSuccess
 }: UsePayrollAutoSaveOptions) => {
   const { toast } = useToast();
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
 
   const saveData = async () => {
-    if (!periodId || employees.length === 0) {
-      console.log('⚠️ Auto-save skipped: no period or employees');
+    if (!periodId) {
+      console.log('⚠️ Auto-save skipped: no period ID');
       return;
     }
     
-    console.log('🔄 Auto-saving payroll data for', employees.length, 'employees...');
+    if (employees.length === 0 && removedEmployeeIds.length === 0) {
+      console.log('⚠️ Auto-save skipped: no employees to save or remove');
+      return;
+    }
+    
+    console.log('🔄 Auto-saving payroll data:', {
+      employees: employees.length,
+      removedEmployeeIds: removedEmployeeIds.length,
+      periodId
+    });
     
     try {
-      await PayrollAutoSaveService.saveDraftEmployees(periodId, employees);
+      await PayrollAutoSaveService.saveDraftEmployees(periodId, employees, removedEmployeeIds);
       await PayrollAutoSaveService.updatePeriodActivity(periodId);
       setLastSaveTime(new Date());
+      
+      // Call success callback to clear removed employee IDs
+      onSaveSuccess?.();
       
       console.log('✅ Payroll auto-save completed');
     } catch (error) {
@@ -41,19 +57,19 @@ export const usePayrollAutoSave = ({
 
   const { triggerAutoSave, isSaving } = useAutoSave({
     onSave: saveData,
-    delay: 5000, // Aumentado a 5 segundos para reducir llamadas
-    enabled: enabled && !!periodId && employees.length > 0
+    delay: 5000, // 5 seconds delay to reduce calls
+    enabled: enabled && !!periodId && (employees.length > 0 || removedEmployeeIds.length > 0)
   });
 
-  // Trigger auto-save when employees change, but with better logic
+  // Trigger auto-save when employees or removed IDs change
   useEffect(() => {
-    if (enabled && periodId && employees.length > 0) {
-      // No disparar auto-guardado si ya se está guardando
+    if (enabled && periodId && (employees.length > 0 || removedEmployeeIds.length > 0)) {
+      // Don't trigger auto-save if already saving
       if (!PayrollAutoSaveService.isCurrentlySaving) {
         triggerAutoSave();
       }
     }
-  }, [employees, periodId, enabled, triggerAutoSave]);
+  }, [employees, removedEmployeeIds, periodId, enabled, triggerAutoSave]);
 
   return {
     triggerAutoSave,
