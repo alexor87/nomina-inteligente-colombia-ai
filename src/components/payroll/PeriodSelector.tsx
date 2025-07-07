@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, Clock, AlertCircle, Plus, CheckCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar, Clock, AlertCircle, Plus, CheckCircle, History } from 'lucide-react';
 import { PeriodGenerationService, AvailablePeriod } from '@/services/payroll/PeriodGenerationService';
+import { MissingPeriodsSelector } from './MissingPeriodsSelector';
 import { useToast } from '@/hooks/use-toast';
 
 interface PeriodSelectorProps {
@@ -108,6 +110,21 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
     onManualEntry();
   };
 
+  const handlePeriodCreated = async (createdPeriod: AvailablePeriod) => {
+    console.log('🎯 Período creado desde MissingPeriodsSelector:', createdPeriod.etiqueta_visible);
+    
+    // Recargar períodos disponibles
+    await loadAvailablePeriods();
+    
+    // Auto-seleccionar el período recién creado
+    setSelectedPeriodId(createdPeriod.id || '');
+    
+    toast({
+      title: "Período listo",
+      description: `${createdPeriod.etiqueta_visible} ha sido creado y seleccionado`,
+    });
+  };
+
   const getStatusBadge = (period: AvailablePeriod) => {
     if (period.estado === 'cerrado') {
       return <Badge variant="secondary" className="text-xs">Liquidado</Badge>;
@@ -163,140 +180,163 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
           <span>Seleccionar Período de Liquidación</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {availablePeriods.length > 0 ? (
-          <>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Períodos Disponibles ({availablePeriods.length})
-                </label>
-                <Select 
-                  value={selectedPeriodId} 
-                  onValueChange={setSelectedPeriodId}
+      <CardContent>
+        <Tabs defaultValue="current" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="current" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Períodos Actuales
+            </TabsTrigger>
+            <TabsTrigger value="previous" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Períodos Anteriores
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="current" className="space-y-6">
+            {availablePeriods.length > 0 ? (
+              <>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Períodos Disponibles ({availablePeriods.length})
+                    </label>
+                    <Select 
+                      value={selectedPeriodId} 
+                      onValueChange={setSelectedPeriodId}
+                      disabled={disabled}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecciona un período para liquidar" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {availablePeriods.map((period) => (
+                          <SelectItem key={period.id} value={period.id || ''}>
+                            <div className="flex items-center justify-between w-full">
+                              <span className="font-medium">{period.etiqueta_visible}</span>
+                              <div className="flex items-center space-x-2 ml-4">
+                                <Badge variant="outline" className="text-xs">
+                                  #{period.numero_periodo_anual}
+                                </Badge>
+                                {getStatusBadge(period)}
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedPeriodId && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      {(() => {
+                        const selected = periods.find(p => p.id === selectedPeriodId);
+                        return selected ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <CheckCircle className="h-4 w-4 text-blue-600" />
+                              <span className="font-medium text-blue-800">Período Seleccionado</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-600">Período:</span>
+                                <p className="font-medium">{selected.etiqueta_visible}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Fechas:</span>
+                                <p className="font-mono text-xs">{selected.fecha_inicio} - {selected.fecha_fin}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Tipo:</span>
+                                <p className="capitalize">{selected.tipo_periodo}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Número:</span>
+                                <p>#{selected.numero_periodo_anual}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={handleManualEntry}
+                    className="flex items-center space-x-2"
+                    disabled={disabled}
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Crear Período Manual</span>
+                  </Button>
+                  
+                  <Button
+                    onClick={handlePeriodSelection}
+                    disabled={!selectedPeriodId || disabled}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Continuar con Período Seleccionado
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="font-medium text-gray-900 mb-2">No hay períodos disponibles</h3>
+                <p className="text-gray-600 mb-4">
+                  Todos los períodos actuales han sido liquidados o no se han generado aún.
+                </p>
+                <Button
+                  onClick={handleManualEntry}
+                  className="flex items-center space-x-2"
                   disabled={disabled}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona un período para liquidar" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {availablePeriods.map((period) => (
-                      <SelectItem key={period.id} value={period.id || ''}>
-                        <div className="flex items-center justify-between w-full">
-                          <span className="font-medium">{period.etiqueta_visible}</span>
-                          <div className="flex items-center space-x-2 ml-4">
-                            <Badge variant="outline" className="text-xs">
-                              #{period.numero_periodo_anual}
-                            </Badge>
-                            {getStatusBadge(period)}
-                          </div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Plus className="h-4 w-4" />
+                  <span>Crear Período Manual</span>
+                </Button>
               </div>
+            )}
 
-              {selectedPeriodId && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  {(() => {
-                    const selected = periods.find(p => p.id === selectedPeriodId);
-                    return selected ? (
-                      <div className="space-y-2">
+            {unavailablePeriods.length > 0 && (
+              <div className="pt-4 border-t">
+                <details className="group">
+                  <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-800">
+                    Ver períodos no disponibles ({unavailablePeriods.length})
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    {unavailablePeriods.slice(0, 5).map((period) => (
+                      <div key={period.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded text-sm">
+                        <span className="text-gray-700">{period.etiqueta_visible}</span>
                         <div className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-blue-600" />
-                          <span className="font-medium text-blue-800">Período Seleccionado</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-600">Período:</span>
-                            <p className="font-medium">{selected.etiqueta_visible}</p>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Fechas:</span>
-                            <p className="font-mono text-xs">{selected.fecha_inicio} - {selected.fecha_fin}</p>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Tipo:</span>
-                            <p className="capitalize">{selected.tipo_periodo}</p>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Número:</span>
-                            <p>#{selected.numero_periodo_anual}</p>
-                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            #{period.numero_periodo_anual}
+                          </Badge>
+                          {getStatusBadge(period)}
                         </div>
                       </div>
-                    ) : null;
-                  })()}
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-between items-center pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={handleManualEntry}
-                className="flex items-center space-x-2"
-                disabled={disabled}
-              >
-                <Plus className="h-4 w-4" />
-                <span>Crear Período Manual</span>
-              </Button>
-              
-              <Button
-                onClick={handlePeriodSelection}
-                disabled={!selectedPeriodId || disabled}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Continuar con Período Seleccionado
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-8">
-            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="font-medium text-gray-900 mb-2">No hay períodos disponibles</h3>
-            <p className="text-gray-600 mb-4">
-              Todos los períodos del año actual han sido liquidados o no se han generado aún.
-            </p>
-            <Button
-              onClick={handleManualEntry}
-              className="flex items-center space-x-2"
-              disabled={disabled}
-            >
-              <Plus className="h-4 w-4" />
-              <span>Crear Período Manual</span>
-            </Button>
-          </div>
-        )}
-
-        {unavailablePeriods.length > 0 && (
-          <div className="pt-4 border-t">
-            <details className="group">
-              <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-800">
-                Ver períodos no disponibles ({unavailablePeriods.length})
-              </summary>
-              <div className="mt-2 space-y-2">
-                {unavailablePeriods.slice(0, 5).map((period) => (
-                  <div key={period.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded text-sm">
-                    <span className="text-gray-700">{period.etiqueta_visible}</span>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline" className="text-xs">
-                        #{period.numero_periodo_anual}
-                      </Badge>
-                      {getStatusBadge(period)}
-                    </div>
+                    ))}
+                    {unavailablePeriods.length > 5 && (
+                      <p className="text-xs text-gray-500 text-center">
+                        ... y {unavailablePeriods.length - 5} más
+                      </p>
+                    )}
                   </div>
-                ))}
-                {unavailablePeriods.length > 5 && (
-                  <p className="text-xs text-gray-500 text-center">
-                    ... y {unavailablePeriods.length - 5} más
-                  </p>
-                )}
+                </details>
               </div>
-            </details>
-          </div>
-        )}
+            )}
+          </TabsContent>
+          
+          <TabsContent value="previous" className="space-y-4">
+            <MissingPeriodsSelector
+              companyId={companyId}
+              onPeriodCreated={handlePeriodCreated}
+              disabled={disabled}
+            />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
