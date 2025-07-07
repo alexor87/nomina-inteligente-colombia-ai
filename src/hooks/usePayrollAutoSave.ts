@@ -1,6 +1,5 @@
 
-import { useEffect, useState } from 'react';
-import { useAutoSave } from './useAutoSave';
+import { useState } from 'react';
 import { PayrollAutoSaveService } from '@/services/PayrollAutoSaveService';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
@@ -22,10 +21,11 @@ export const usePayrollAutoSave = ({
 }: UsePayrollAutoSaveOptions) => {
   const { toast } = useToast();
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const saveData = async () => {
-    if (!periodId) {
-      console.log('⚠️ Auto-save skipped: no period ID');
+  const triggerAutoSave = async () => {
+    if (!enabled || !periodId) {
+      console.log('⚠️ Auto-save skipped: disabled or no period ID');
       return;
     }
     
@@ -33,12 +33,20 @@ export const usePayrollAutoSave = ({
       console.log('⚠️ Auto-save skipped: no employees to save or remove');
       return;
     }
+
+    // Prevent concurrent saves
+    if (isSaving || PayrollAutoSaveService.isCurrentlySaving) {
+      console.log('⚠️ Auto-save skipped: already saving');
+      return;
+    }
     
-    console.log('🔄 Auto-saving payroll data:', {
+    console.log('🔄 Manual auto-save triggered:', {
       employees: employees.length,
       removedEmployeeIds: removedEmployeeIds.length,
       periodId
     });
+    
+    setIsSaving(true);
     
     try {
       await PayrollAutoSaveService.saveDraftEmployees(periodId, employees, removedEmployeeIds);
@@ -48,28 +56,22 @@ export const usePayrollAutoSave = ({
       // Call success callback to clear removed employee IDs
       onSaveSuccess?.();
       
-      console.log('✅ Payroll auto-save completed');
+      console.log('✅ Manual auto-save completed');
     } catch (error) {
-      console.error('❌ Payroll auto-save failed:', error);
-      throw error; // Re-throw to let useAutoSave handle it
+      console.error('❌ Manual auto-save failed:', error);
+      
+      // Only show toast for errors that aren't duplicates
+      if (!error?.message?.includes('duplicate key value')) {
+        toast({
+          title: "Error al guardar",
+          description: "No se pudieron guardar los cambios automáticamente. Se reintentará pronto.",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
-
-  const { triggerAutoSave, isSaving } = useAutoSave({
-    onSave: saveData,
-    delay: 5000, // 5 seconds delay to reduce calls
-    enabled: enabled && !!periodId && (employees.length > 0 || removedEmployeeIds.length > 0)
-  });
-
-  // Trigger auto-save when employees or removed IDs change
-  useEffect(() => {
-    if (enabled && periodId && (employees.length > 0 || removedEmployeeIds.length > 0)) {
-      // Don't trigger auto-save if already saving
-      if (!PayrollAutoSaveService.isCurrentlySaving) {
-        triggerAutoSave();
-      }
-    }
-  }, [employees, removedEmployeeIds, periodId, enabled, triggerAutoSave]);
 
   return {
     triggerAutoSave,

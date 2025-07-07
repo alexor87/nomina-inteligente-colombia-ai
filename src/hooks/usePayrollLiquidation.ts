@@ -226,8 +226,7 @@ export const usePayrollLiquidation = () => {
       const transformedEmployees = employeesWithNovedades.map(transformEmployee);
       setEmployees(transformedEmployees);
       
-      // Trigger auto-save after loading
-      setTimeout(() => triggerAutoSave(), 1000);
+      // NO auto-save after loading - not critical
       
       toast({
         title: "Empleados cargados",
@@ -294,8 +293,7 @@ export const usePayrollLiquidation = () => {
       const transformedNewEmployees = processedNewEmployees.map(transformEmployee);
       setEmployees(prev => [...prev, ...transformedNewEmployees]);
       
-      // Trigger auto-save after adding
-      setTimeout(() => triggerAutoSave(), 500);
+      // NO auto-save after adding - not critical
       
       console.log('✅ usePayrollLiquidation - Employees added successfully:', transformedNewEmployees.length);
     } catch (error) {
@@ -392,6 +390,10 @@ export const usePayrollLiquidation = () => {
         }
         return emp;
       }));
+      
+      // CRITICAL: Trigger auto-save after novedades refresh
+      console.log('💾 Triggering auto-save after novedades refresh');
+      await triggerAutoSave();
       
       console.log('✅ usePayrollLiquidation - Employee novedades refreshed successfully');
     } catch (error) {
