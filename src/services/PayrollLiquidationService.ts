@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
@@ -187,6 +186,80 @@ export class PayrollLiquidationService {
       return processedEmployees;
     } catch (error) {
       console.error('Error loading employees for period:', error);
+      throw error;
+    }
+  }
+
+  static async loadSpecificEmployeesForPeriod(employeeIds: string[], startDate: string, endDate: string): Promise<Employee[]> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+
+      // Load specific employees
+      const { data: employees, error } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido, salario_base')
+        .eq('company_id', companyId)
+        .eq('estado', 'activo')
+        .in('id', employeeIds);
+
+      if (error) {
+        throw error;
+      }
+
+      if (!employees || employees.length === 0) {
+        return [];
+      }
+
+      // Calculate working days for the period
+      const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
+
+      // Process each employee with detailed deduction calculation
+      const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
+        const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
+        const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
+        const totalDevengado = salarioProporcional + auxilioTransporte;
+        
+        // ✅ CÁLCULO DETALLADO DE DEDUCCIONES PARA AUDITORÍA
+        const deductionResult = await DeductionCalculationService.calculateDeductions({
+          salarioBase: employee.salario_base,
+          totalDevengado: totalDevengado,
+          auxilioTransporte: auxilioTransporte,
+          periodType: 'mensual'
+        });
+        
+        console.log(`📊 Nuevo empleado ${employee.nombre}: Deducciones detalladas`, {
+          salud: deductionResult.saludEmpleado,
+          pension: deductionResult.pensionEmpleado,
+          fondoSolidaridad: deductionResult.fondoSolidaridad,
+          retencion: deductionResult.retencionFuente,
+          total: deductionResult.totalDeducciones
+        });
+        
+        return {
+          id: employee.id,
+          nombre: employee.nombre,
+          apellido: employee.apellido,
+          salario_base: employee.salario_base,
+          devengos: 0, // Will be filled with novedades
+          deducciones: deductionResult.totalDeducciones,
+          total_pagar: totalDevengado - deductionResult.totalDeducciones,
+          dias_trabajados: diasTrabajados,
+          auxilio_transporte: auxilioTransporte,
+          // ✅ DEDUCCIONES DETALLADAS PARA AUDITORÍA DIAN/UGPP
+          salud_empleado: deductionResult.saludEmpleado,
+          pension_empleado: deductionResult.pensionEmpleado,
+          fondo_solidaridad: deductionResult.fondoSolidaridad,
+          retencion_fuente: deductionResult.retencionFuente,
+          deducciones_novedades: 0 // Will be filled when processing novedades
+        };
+      }));
+
+      return processedEmployees;
+    } catch (error) {
+      console.error('Error loading specific employees for period:', error);
       throw error;
     }
   }

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,11 +9,16 @@ import { PeriodInfoPanel } from '@/components/payroll/liquidation/PeriodInfoPane
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { usePeriodDetection } from '@/hooks/usePeriodDetection';
 import { format } from 'date-fns';
+import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 
 const PayrollLiquidationPage = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showPeriodInfo, setShowPeriodInfo] = useState(false);
+  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  
+  const { company } = useCurrentCompany();
   
   const {
     employees,
@@ -22,6 +26,7 @@ const PayrollLiquidationPage = () => {
     isLiquidating,
     currentPeriodId,
     loadEmployees,
+    addEmployees,
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades
@@ -108,6 +113,16 @@ const PayrollLiquidationPage = () => {
     }
   };
 
+  const handleAddEmployees = async (employeeIds: string[]) => {
+    try {
+      await addEmployees(employeeIds);
+      setShowAddEmployeeModal(false);
+    } catch (error) {
+      console.error('Error adding employees:', error);
+      // Error handling is done in the hook
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-2">
@@ -187,13 +202,23 @@ const PayrollLiquidationPage = () => {
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
-              <Button 
-                onClick={handleLiquidate}
-                disabled={isLiquidating || employees.length === 0}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
-              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={() => setShowAddEmployeeModal(true)}
+                  variant="outline"
+                  disabled={isLoading || !currentPeriodId}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Agregar Empleado
+                </Button>
+                <Button 
+                  onClick={handleLiquidate}
+                  disabled={isLiquidating || employees.length === 0}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -208,6 +233,15 @@ const PayrollLiquidationPage = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Add Employee Modal */}
+      <EmployeeAddModal
+        isOpen={showAddEmployeeModal}
+        onClose={() => setShowAddEmployeeModal(false)}
+        onAddEmployees={handleAddEmployees}
+        currentEmployeeIds={employees.map(emp => emp.id)}
+        companyId={company?.id || ''}
+      />
     </div>
   );
 };

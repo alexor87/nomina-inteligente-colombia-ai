@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -34,6 +33,8 @@ export const usePayrollLiquidation = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLiquidating, setIsLiquidating] = useState(false);
   const [currentPeriodId, setCurrentPeriodId] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const { toast } = useToast();
 
   // Transform DB employee to PayrollEmployee
@@ -58,6 +59,8 @@ export const usePayrollLiquidation = () => {
 
   const loadEmployees = async (startDate: string, endDate: string) => {
     setIsLoading(true);
+    setStartDate(startDate);
+    setEndDate(endDate);
     try {
       console.log('🔄 usePayrollLiquidation - Loading employees for period:', { startDate, endDate });
       
@@ -128,6 +131,62 @@ export const usePayrollLiquidation = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const addEmployees = async (employeeIds: string[]) => {
+    if (!currentPeriodId || !startDate || !endDate) {
+      console.warn('⚠️ usePayrollLiquidation - Missing period info when adding employees');
+      throw new Error('No hay información del período activo');
+    }
+
+    console.log('🔄 usePayrollLiquidation - Adding employees:', employeeIds);
+    
+    try {
+      // Load the specific employees to add
+      const newEmployeesData = await PayrollLiquidationService.loadSpecificEmployeesForPeriod(
+        employeeIds, 
+        startDate, 
+        endDate
+      );
+
+      // Process each new employee with novedades
+      const processedNewEmployees = await Promise.all(
+        newEmployeesData.map(async (employee) => {
+          console.log(`🔄 usePayrollLiquidation - Processing new employee: ${employee.nombre}`);
+          
+          const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
+            employee.id,
+            currentPeriodId
+          );
+          
+          const totalDeducciones = employee.salud_empleado + employee.pension_empleado + 
+                                 employee.fondo_solidaridad + employee.retencion_fuente + 
+                                 novedadesTotals.totalDeducciones;
+          
+          const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
+          const totalConNovedades = salarioProporcional + employee.auxilio_transporte + 
+                                  novedadesTotals.totalDevengos - totalDeducciones;
+          
+          return {
+            ...employee,
+            devengos: novedadesTotals.totalDevengos,
+            deducciones: totalDeducciones,
+            deducciones_novedades: novedadesTotals.totalDeducciones,
+            total_pagar: totalConNovedades,
+            novedades_totals: novedadesTotals
+          };
+        })
+      );
+
+      // Transform and add to existing employees
+      const transformedNewEmployees = processedNewEmployees.map(transformEmployee);
+      setEmployees(prev => [...prev, ...transformedNewEmployees]);
+      
+      console.log('✅ usePayrollLiquidation - Employees added successfully:', transformedNewEmployees.length);
+    } catch (error) {
+      console.error('❌ usePayrollLiquidation - Error adding employees:', error);
+      throw error;
     }
   };
 
@@ -251,7 +310,10 @@ export const usePayrollLiquidation = () => {
     isLoading,
     isLiquidating,
     currentPeriodId,
+    startDate,
+    endDate,
     loadEmployees,
+    addEmployees,
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
