@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, Users, AlertTriangle, CheckCircle, Clock, Hash } from 'lucide-react';
+import { Calendar, Users, AlertTriangle, CheckCircle, Clock, Hash, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PeriodDetectionResult } from '@/services/payroll/PeriodService';
 
@@ -41,16 +41,19 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
   const isNewPeriod = periodInfo.suggestedAction === 'create';
   const isExistingPeriod = periodInfo.suggestedAction === 'continue';
   const isConflict = periodInfo.suggestedAction === 'conflict';
+  const isIncoherentPeriod = periodInfo.message.includes('no corresponden exactamente');
 
   const getStatusColor = () => {
-    if (isNewPeriod) return 'border-green-200 bg-green-50';
+    if (isNewPeriod && !isIncoherentPeriod) return 'border-green-200 bg-green-50';
+    if (isNewPeriod && isIncoherentPeriod) return 'border-yellow-200 bg-yellow-50';
     if (isExistingPeriod) return 'border-blue-200 bg-blue-50';
     if (isConflict) return 'border-orange-200 bg-orange-50';
     return 'border-gray-200 bg-gray-50';
   };
 
   const getStatusIcon = () => {
-    if (isNewPeriod) return <CheckCircle className="h-5 w-5 text-green-600" />;
+    if (isNewPeriod && !isIncoherentPeriod) return <CheckCircle className="h-5 w-5 text-green-600" />;
+    if (isNewPeriod && isIncoherentPeriod) return <Info className="h-5 w-5 text-yellow-600" />;
     if (isExistingPeriod) return <Calendar className="h-5 w-5 text-blue-600" />;
     if (isConflict) return <AlertTriangle className="h-5 w-5 text-orange-600" />;
     return <Clock className="h-5 w-5 text-gray-600" />;
@@ -110,12 +113,35 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
         </div>
 
         {/* Status Message */}
-        <Alert className={isNewPeriod ? 'border-green-200 bg-green-50' : isExistingPeriod ? 'border-blue-200 bg-blue-50' : 'border-orange-200 bg-orange-50'}>
+        <Alert className={
+          isNewPeriod && !isIncoherentPeriod ? 'border-green-200 bg-green-50' : 
+          isNewPeriod && isIncoherentPeriod ? 'border-yellow-200 bg-yellow-50' :
+          isExistingPeriod ? 'border-blue-200 bg-blue-50' : 'border-orange-200 bg-orange-50'
+        }>
           <AlertDescription className="flex items-center space-x-2">
             {getStatusIcon()}
             <span className="font-medium">{periodInfo.message}</span>
           </AlertDescription>
         </Alert>
+
+        {/* Coherence Warning for Incoherent Periods */}
+        {isIncoherentPeriod && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-2">
+            <h4 className="font-semibold text-yellow-800 text-sm flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Advertencia de Coherencia
+            </h4>
+            <p className="text-sm text-yellow-700">
+              Las fechas seleccionadas no corresponden exactamente a un período {periodInfo.periodData.type} estándar. 
+              Un período {periodInfo.periodData.type} típico sería:
+            </p>
+            <div className="text-xs text-yellow-600 font-mono bg-yellow-100 p-2 rounded">
+              {periodInfo.periodData.type === 'semanal' && '• Semana 1: 1-7 de enero, Semana 2: 8-14 de enero, etc.'}
+              {periodInfo.periodData.type === 'quincenal' && '• Quincena 1: 1-15 del mes, Quincena 2: 16-último día del mes'}
+              {periodInfo.periodData.type === 'mensual' && '• Mes: 1 de enero - 31 de enero, 1 de febrero - 28/29 de febrero, etc.'}
+            </div>
+          </div>
+        )}
 
         {/* Existing Period Info */}
         {periodInfo.activePeriod && (
@@ -186,8 +212,10 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
             <button
               onClick={onProceed}
               className={`${
-                isNewPeriod 
+                isNewPeriod && !isIncoherentPeriod
                   ? 'bg-green-600 hover:bg-green-700' 
+                  : isNewPeriod && isIncoherentPeriod
+                  ? 'bg-yellow-600 hover:bg-yellow-700'
                   : 'bg-blue-600 hover:bg-blue-700'
               } text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 shadow-sm hover:shadow-md`}
             >

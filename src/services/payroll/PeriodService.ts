@@ -1,4 +1,3 @@
-
 /**
  * SERVICIO UNIFICADO DE PERÍODOS - ARQUITECTURA REFACTORIZADA
  * Responsable de TODA la lógica relacionada con períodos de nómina
@@ -82,7 +81,11 @@ class QuincenalStrategy implements PeriodStrategy {
     const month = date.getMonth() + 1;
     const day = date.getDate();
     
-    return (month - 1) * 2 + (day <= 15 ? 1 : 2);
+    // Contar quincenas hasta este punto en el año
+    const previousMonthsQuincenas = (month - 1) * 2;
+    const currentQuincena = day <= 15 ? 1 : 2;
+    
+    return previousMonthsQuincenas + currentQuincena;
   }
 
   validatePeriod(startDate: string, endDate: string): boolean {
@@ -176,9 +179,17 @@ class SemanalStrategy implements PeriodStrategy {
   }
 
   calculateNumber(startDate: string): number {
+    // CORREGIDO: Calcular semana consecutiva desde el 1 de enero
     const date = new Date(startDate);
-    const startOfYear = new Date(date.getFullYear(), 0, 1);
-    return Math.ceil((date.getTime() - startOfYear.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const startOfYear = new Date(date.getFullYear(), 0, 1); // 1 de enero
+    
+    // Calcular días transcurridos desde el 1 de enero
+    const daysDiff = Math.floor((date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Calcular número de semana (1-based)
+    const weekNumber = Math.floor(daysDiff / 7) + 1;
+    
+    return weekNumber;
   }
 
   validatePeriod(startDate: string, endDate: string): boolean {
@@ -226,6 +237,9 @@ export class PeriodService {
     const year = parseInt(startDate.split('-')[0]);
     const semanticName = strategy.generateSemanticName(number, year);
     
+    // Validar coherencia del período
+    const isCoherent = this.validatePeriodCoherence(startDate, endDate, type, number);
+    
     return {
       name,
       semanticName,
@@ -233,8 +247,53 @@ export class PeriodService {
       startDate,
       endDate,
       number,
-      isValid: true
+      isValid: isCoherent
     };
+  }
+
+  /**
+   * Validar coherencia entre fechas seleccionadas y número calculado
+   */
+  private static validatePeriodCoherence(
+    startDate: string, 
+    endDate: string, 
+    type: 'semanal' | 'quincenal' | 'mensual',
+    calculatedNumber: number
+  ): boolean {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const year = start.getFullYear();
+    
+    switch (type) {
+      case 'semanal':
+        // Validar que las fechas correspondan exactamente a la semana calculada
+        const expectedWeekStart = new Date(year, 0, 1 + (calculatedNumber - 1) * 7);
+        const expectedWeekEnd = new Date(year, 0, 1 + calculatedNumber * 7 - 1);
+        
+        return start.getTime() === expectedWeekStart.getTime() && 
+               end.getTime() === expectedWeekEnd.getTime();
+               
+      case 'quincenal':
+        const month = start.getMonth() + 1;
+        const day = start.getDate();
+        
+        // Primera quincena: 1-15, Segunda quincena: 16-fin de mes
+        if (calculatedNumber % 2 === 1) { // Quincena impar (primera del mes)
+          return day === 1 && end.getDate() === 15;
+        } else { // Quincena par (segunda del mes)
+          const lastDayOfMonth = new Date(year, month, 0).getDate();
+          return day === 16 && end.getDate() === lastDayOfMonth;
+        }
+        
+      case 'mensual':
+        // Validar que sea exactamente del 1 al último día del mes
+        const lastDay = new Date(year, calculatedNumber, 0).getDate();
+        return start.getDate() === 1 && end.getDate() === lastDay &&
+               start.getMonth() + 1 === calculatedNumber;
+               
+      default:
+        return true;
+    }
   }
 
   /**
@@ -252,6 +311,22 @@ export class PeriodService {
 
       // Generar información del período UNA SOLA VEZ
       const periodInfo = this.generatePeriodInfo(startDate, endDate, companyId);
+      
+      // Verificar si las fechas seleccionadas son coherentes con el período calculado
+      if (!periodInfo.isValid) {
+        const warningMessage = `Las fechas seleccionadas no corresponden exactamente a un período ${periodInfo.type} completo. Se creará el período con las fechas seleccionadas.`;
+        
+        return {
+          hasActivePeriod: false,
+          suggestedAction: 'create',
+          message: warningMessage,
+          periodData: {
+            ...periodInfo,
+            name: periodInfo.semanticName || periodInfo.name,
+            isValid: true // Permitir creación pero con advertencia
+          }
+        };
+      }
       
       // Buscar período exacto
       const { data: exactPeriod } = await supabase
