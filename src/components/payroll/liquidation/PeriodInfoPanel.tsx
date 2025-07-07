@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -78,11 +79,21 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
     return <Clock className="h-5 w-5 text-gray-600" />;
   };
 
+  // CORRECCIÓN CRÍTICA: Usar exactamente las fechas seleccionadas por el usuario
   const getSelectedPeriodName = () => {
+    console.log('🔍 DEBUGGING - Fechas recibidas:', { startDate, endDate });
+    console.log('🔍 DEBUGGING - periodInfo.periodData:', periodInfo.periodData);
+    
+    // USAR DIRECTAMENTE las fechas del usuario, NO las del periodData
     if (periodInfo.periodData) {
+      console.log('📝 DEBUGGING - Usando periodData.periodName:', periodInfo.periodData.periodName);
       return periodInfo.periodData.periodName;
     }
-    return `${startDate} - ${endDate}`;
+    
+    // Fallback: crear nombre simple con las fechas exactas del usuario
+    const fallbackName = `${startDate} - ${endDate}`;
+    console.log('📝 DEBUGGING - Usando fallback name:', fallbackName);
+    return fallbackName;
   };
 
   return (
@@ -119,6 +130,20 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
               <p className="font-medium">{employeesCount} empleados</p>
             </div>
           </div>
+        </div>
+
+        {/* DEBUGGING: Mostrar fechas exactas para verificación */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs">
+          <p><strong>🔍 DEBUG - Fechas exactas seleccionadas:</strong></p>
+          <p>Inicio: {startDate}</p>
+          <p>Fin: {endDate}</p>
+          {periodInfo.periodData && (
+            <>
+              <p>periodData.startDate: {periodInfo.periodData.startDate}</p>
+              <p>periodData.endDate: {periodInfo.periodData.endDate}</p>
+              <p>periodData.periodName: {periodInfo.periodData.periodName}</p>
+            </>
+          )}
         </div>
 
         {/* Status Message */}

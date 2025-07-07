@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for parsing and formatting period dates - CORREGIDO PROFESIONALMENTE
  */
@@ -171,10 +170,10 @@ export const formatPeriodDateRange = (startDate: string, endDate: string): strin
 };
 
 /**
- * FUNCIÓN COMPLETAMENTE REESCRITA: Get the period name from a date range - SIN BUGS DE FECHAS
+ * FUNCIÓN COMPLETAMENTE REESCRITA Y CORREGIDA: Get the period name from a date range
  */
 export const getPeriodNameFromDates = (startDate: string, endDate: string): string => {
-  console.log('🏷️ GENERANDO NOMBRE CORREGIDO DEFINITIVO:', { startDate, endDate });
+  console.log('🏷️ GENERANDO NOMBRE EXACTO para fechas usuario:', { startDate, endDate });
   
   // CORRECCIÓN CRÍTICA: Parsear fechas de manera consistente y robusta
   const startParts = startDate.split('-'); // [year, month, day]
@@ -206,6 +205,7 @@ export const getPeriodNameFromDates = (startDate: string, endDate: string): stri
     const lastDayOfMonth = new Date(startYear, startMonth + 1, 0).getDate();
     
     console.log(`📅 MISMO MES: ${monthName} ${startYear}, último día: ${lastDayOfMonth}`);
+    console.log(`📅 RANGO RECIBIDO: ${startDay} - ${endDay}`);
     
     // CORRECCIÓN: Primera quincena (1-15)
     if (startDay === 1 && endDay === 15) {
@@ -215,8 +215,8 @@ export const getPeriodNameFromDates = (startDate: string, endDate: string): stri
     }
     
     // CORRECCIÓN: Segunda quincena (16-fin de mes)
-    if (startDay === 16 && endDay === lastDayOfMonth) {
-      const result = `16 - ${lastDayOfMonth} ${monthName} ${startYear}`;
+    if (startDay === 16) {
+      const result = `16 - ${endDay} ${monthName} ${startYear}`;
       console.log('✅ SEGUNDA QUINCENA GENERADA:', result);
       return result;
     }

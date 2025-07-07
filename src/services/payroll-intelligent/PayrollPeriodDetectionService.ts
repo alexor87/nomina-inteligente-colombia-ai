@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
+import { getPeriodNameFromDates } from '@/utils/periodDateUtils';
 
 export interface PeriodDetectionResult {
   hasActivePeriod: boolean;
@@ -77,6 +78,10 @@ export class PayrollPeriodDetectionService {
         const conflictPeriod = overlappingPeriods[0];
         console.log('⚠️ Período solapado encontrado:', conflictPeriod.periodo);
         
+        // CORRECCIÓN: Usar fechas exactas del usuario para el nombre del período
+        const correctPeriodName = getPeriodNameFromDates(startDate, endDate);
+        console.log('📝 Nombre de período generado con fechas exactas:', correctPeriodName);
+        
         return {
           hasActivePeriod: false,
           suggestedAction: 'conflict',
@@ -84,7 +89,7 @@ export class PayrollPeriodDetectionService {
           periodData: {
             startDate,
             endDate,
-            periodName: this.generatePeriodName(startDate, endDate),
+            periodName: correctPeriodName,
             type: this.detectPeriodType(startDate, endDate)
           },
           conflictPeriod
@@ -94,20 +99,28 @@ export class PayrollPeriodDetectionService {
       // PASO 3: No hay conflictos, crear nuevo período
       console.log('🆕 No hay períodos existentes, crear nuevo período');
       
+      // CORRECCIÓN: Usar fechas exactas del usuario para el nombre del período
+      const correctPeriodName = getPeriodNameFromDates(startDate, endDate);
+      console.log('📝 Nombre de período generado con fechas exactas:', correctPeriodName);
+      
       return {
         hasActivePeriod: false,
         suggestedAction: 'create',
-        message: `Crear nuevo período: ${this.generatePeriodName(startDate, endDate)}`,
+        message: `Crear nuevo período: ${correctPeriodName}`,
         periodData: {
           startDate,
           endDate,
-          periodName: this.generatePeriodName(startDate, endDate),
+          periodName: correctPeriodName,
           type: this.detectPeriodType(startDate, endDate)
         }
       };
 
     } catch (error) {
       console.error('💥 Error en detección de período:', error);
+      
+      // CORRECCIÓN: Usar fechas exactas incluso en caso de error
+      const fallbackPeriodName = getPeriodNameFromDates(startDate, endDate);
+      console.log('📝 Nombre de período fallback con fechas exactas:', fallbackPeriodName);
       
       return {
         hasActivePeriod: false,
@@ -116,7 +129,7 @@ export class PayrollPeriodDetectionService {
         periodData: {
           startDate,
           endDate,
-          periodName: this.generatePeriodName(startDate, endDate),
+          periodName: fallbackPeriodName,
           type: this.detectPeriodType(startDate, endDate)
         }
       };
@@ -189,39 +202,6 @@ export class PayrollPeriodDetectionService {
         periodData
       };
     }
-  }
-
-  private static generatePeriodName(startDate: string, endDate: string): string {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    const startDay = start.getDate();
-    const endDay = end.getDate();
-    const month = start.getMonth();
-    const year = start.getFullYear();
-    
-    const monthNames = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    
-    // Si es del 1 al 15, primera quincena
-    if (startDay === 1 && endDay === 15) {
-      return `1 - 15 ${monthNames[month]} ${year}`;
-    }
-    
-    // Si es del 16 al final del mes, segunda quincena
-    if (startDay === 16) {
-      return `16 - ${endDay} ${monthNames[month]} ${year}`;
-    }
-    
-    // Si es todo el mes
-    if (startDay === 1 && endDay >= 28) {
-      return `${monthNames[month]} ${year}`;
-    }
-    
-    // Formato genérico
-    return `${startDay}/${month + 1}/${year} - ${endDay}/${month + 1}/${year}`;
   }
 
   private static detectPeriodType(startDate: string, endDate: string): 'semanal' | 'quincenal' | 'mensual' {
