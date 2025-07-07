@@ -1,11 +1,10 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 
 export interface PeriodDetectionResult {
   hasActivePeriod: boolean;
   activePeriod?: any;
-  suggestedAction: 'continue' | 'create' | 'wait';
+  suggestedAction: 'continue' | 'create' | 'conflict';
   message: string;
   periodData?: {
     startDate: string;
@@ -13,13 +12,121 @@ export interface PeriodDetectionResult {
     periodName: string;
     type: 'semanal' | 'quincenal' | 'mensual';
   };
+  conflictPeriod?: any;
 }
 
 export class PayrollPeriodDetectionService {
   
+  static async detectPeriodForSelectedDates(startDate: string, endDate: string): Promise<PeriodDetectionResult> {
+    try {
+      console.log('🔍 Detectando período para fechas seleccionadas:', { startDate, endDate });
+      
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+
+      // PASO 1: Buscar período exacto con las fechas seleccionadas
+      const { data: exactPeriod, error: exactError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('fecha_inicio', startDate)
+        .eq('fecha_fin', endDate)
+        .maybeSingle();
+
+      if (exactError) {
+        console.error('❌ Error buscando período exacto:', exactError);
+        throw exactError;
+      }
+
+      // Si existe período exacto, continuar con él
+      if (exactPeriod) {
+        console.log('✅ Período exacto encontrado:', exactPeriod.periodo);
+        
+        return {
+          hasActivePeriod: true,
+          activePeriod: exactPeriod,
+          suggestedAction: 'continue',
+          message: `Continuando con período existente: ${exactPeriod.periodo}`,
+          periodData: {
+            startDate: exactPeriod.fecha_inicio,
+            endDate: exactPeriod.fecha_fin,
+            periodName: exactPeriod.periodo,
+            type: exactPeriod.tipo_periodo as 'semanal' | 'quincenal' | 'mensual'
+          }
+        };
+      }
+
+      // PASO 2: Verificar si hay períodos activos que se solapen
+      const { data: overlappingPeriods, error: overlapError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .in('estado', ['borrador', 'en_proceso'])
+        .or(`fecha_inicio.lte.${endDate},fecha_fin.gte.${startDate}`)
+        .order('created_at', { ascending: false });
+
+      if (overlapError) {
+        console.error('❌ Error buscando períodos solapados:', overlapError);
+        throw overlapError;
+      }
+
+      // Si hay períodos solapados, mostrar conflicto
+      if (overlappingPeriods && overlappingPeriods.length > 0) {
+        const conflictPeriod = overlappingPeriods[0];
+        console.log('⚠️ Período solapado encontrado:', conflictPeriod.periodo);
+        
+        return {
+          hasActivePeriod: false,
+          suggestedAction: 'conflict',
+          message: `Existe un período abierto que se solapa: ${conflictPeriod.periodo}`,
+          periodData: {
+            startDate,
+            endDate,
+            periodName: this.generatePeriodName(startDate, endDate),
+            type: this.detectPeriodType(startDate, endDate)
+          },
+          conflictPeriod
+        };
+      }
+
+      // PASO 3: No hay conflictos, crear nuevo período
+      console.log('🆕 No hay períodos existentes, crear nuevo período');
+      
+      return {
+        hasActivePeriod: false,
+        suggestedAction: 'create',
+        message: `Crear nuevo período: ${this.generatePeriodName(startDate, endDate)}`,
+        periodData: {
+          startDate,
+          endDate,
+          periodName: this.generatePeriodName(startDate, endDate),
+          type: this.detectPeriodType(startDate, endDate)
+        }
+      };
+
+    } catch (error) {
+      console.error('💥 Error en detección de período:', error);
+      
+      return {
+        hasActivePeriod: false,
+        suggestedAction: 'create',
+        message: 'Error detectando período. Se creará un nuevo período.',
+        periodData: {
+          startDate,
+          endDate,
+          periodName: this.generatePeriodName(startDate, endDate),
+          type: this.detectPeriodType(startDate, endDate)
+        }
+      };
+    }
+  }
+
+  // Método legacy mantenido para compatibilidad
   static async detectCurrentPeriodSituation(): Promise<PeriodDetectionResult> {
     try {
-      console.log('🔍 Iniciando detección de período actual...');
+      console.log('🔍 Detectando situación actual del período (modo legacy)...');
       
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
@@ -48,62 +155,87 @@ export class PayrollPeriodDetectionService {
           hasActivePeriod: true,
           activePeriod,
           suggestedAction: 'continue',
-          message: `Continuando con período activo: ${activePeriod.periodo}`
+          message: `Continuando con período activo: ${activePeriod.periodo}`,
+          periodData: {
+            startDate: activePeriod.fecha_inicio,
+            endDate: activePeriod.fecha_fin,
+            periodName: activePeriod.periodo,
+            type: activePeriod.tipo_periodo as 'semanal' | 'quincenal' | 'mensual'
+          }
         };
       }
 
-      // Si no hay período activo, verificar el histórico para sugerir el siguiente
-      console.log('📊 No hay período activo, consultando historial...');
-      
-      const historicalPeriods = await PayrollHistoryService.getHistoryPeriods();
-      
-      if (historicalPeriods.length === 0) {
-        // Primera vez - crear período inicial
-        const suggestedPeriod = await this.generateSuggestedPeriod(companyId);
-        
-        return {
-          hasActivePeriod: false,
-          suggestedAction: 'create',
-          message: 'No hay períodos creados. Crear el primer período.',
-          periodData: suggestedPeriod
-        };
-      }
-
-      // Determinar el siguiente período basado en el último cerrado
-      const lastPeriod = historicalPeriods
-        .filter(p => p.status === 'cerrado')
-        .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
-
-      if (!lastPeriod) {
-        // Hay períodos pero ninguno cerrado - situación anómala
-        const suggestedPeriod = await this.generateSuggestedPeriod(companyId);
-        
-        return {
-          hasActivePeriod: false,
-          suggestedAction: 'create',
-          message: 'Períodos encontrados pero ninguno cerrado. Crear nuevo período.',
-          periodData: suggestedPeriod
-        };
-      }
-
-      // Generar el siguiente período después del último cerrado
-      const nextPeriod = await this.generateNextPeriod(lastPeriod, companyId);
+      // Si no hay período activo, sugerir crear uno nuevo
+      const today = new Date();
+      const periodData = this.calculatePeriodDates(today, 'mensual');
       
       return {
         hasActivePeriod: false,
         suggestedAction: 'create',
-        message: `Crear siguiente período después de: ${lastPeriod.period}`,
-        periodData: nextPeriod
+        message: 'No hay períodos activos. Crear nuevo período.',
+        periodData
       };
 
     } catch (error) {
-      console.error('💥 Error en detección de período:', error);
+      console.error('💥 Error en detección de período legacy:', error);
+      
+      const today = new Date();
+      const periodData = this.calculatePeriodDates(today, 'mensual');
       
       return {
         hasActivePeriod: false,
-        suggestedAction: 'wait',
-        message: 'Error detectando período. Revisa la configuración.'
+        suggestedAction: 'create',
+        message: 'Error detectando período. Se creará un nuevo período.',
+        periodData
       };
+    }
+  }
+
+  private static generatePeriodName(startDate: string, endDate: string): string {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const startDay = start.getDate();
+    const endDay = end.getDate();
+    const month = start.getMonth();
+    const year = start.getFullYear();
+    
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    
+    // Si es del 1 al 15, primera quincena
+    if (startDay === 1 && endDay === 15) {
+      return `1 - 15 ${monthNames[month]} ${year}`;
+    }
+    
+    // Si es del 16 al final del mes, segunda quincena
+    if (startDay === 16) {
+      return `16 - ${endDay} ${monthNames[month]} ${year}`;
+    }
+    
+    // Si es todo el mes
+    if (startDay === 1 && endDay >= 28) {
+      return `${monthNames[month]} ${year}`;
+    }
+    
+    // Formato genérico
+    return `${startDay}/${month + 1}/${year} - ${endDay}/${month + 1}/${year}`;
+  }
+
+  private static detectPeriodType(startDate: string, endDate: string): 'semanal' | 'quincenal' | 'mensual' {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    
+    if (diffDays <= 7) {
+      return 'semanal';
+    } else if (diffDays <= 16) {
+      return 'quincenal';
+    } else {
+      return 'mensual';
     }
   }
 
@@ -147,18 +279,7 @@ export class PayrollPeriodDetectionService {
     return this.calculatePeriodDates(today, periodicity);
   }
 
-  private static async generateNextPeriod(lastPeriod: any, companyId: string) {
-    const periodicity = await this.getCompanyPeriodicity(companyId);
-    const lastEndDate = new Date(lastPeriod.endDate);
-    
-    // El siguiente período comienza el día después del último
-    const nextStartDate = new Date(lastEndDate);
-    nextStartDate.setDate(nextStartDate.getDate() + 1);
-    
-    return this.calculatePeriodDates(nextStartDate, periodicity);
-  }
-
-  private static calculatePeriodDates(referenceDate: Date, periodicity: 'semanal' | 'quincenal' | 'mensual') {
+  static calculatePeriodDates(referenceDate: Date, periodicity: 'semanal' | 'quincenal' | 'mensual') {
     const year = referenceDate.getFullYear();
     const month = referenceDate.getMonth();
     const day = referenceDate.getDate();

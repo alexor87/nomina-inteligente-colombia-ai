@@ -5,7 +5,7 @@ import { PayrollPeriodDetectionService } from '@/services/payroll-intelligent/Pa
 interface PeriodDetectionResult {
   hasActivePeriod: boolean;
   activePeriod?: any;
-  suggestedAction: 'continue' | 'create' | 'wait';
+  suggestedAction: 'continue' | 'create' | 'conflict';
   message: string;
   periodData?: {
     startDate: string;
@@ -13,6 +13,7 @@ interface PeriodDetectionResult {
     periodName: string;
     type: 'semanal' | 'quincenal' | 'mensual';
   };
+  conflictPeriod?: any;
 }
 
 export const usePeriodDetection = () => {
@@ -25,27 +26,21 @@ export const usePeriodDetection = () => {
       setIsDetecting(true);
       setError(null);
       
-      console.log('🔍 Detectando período para fechas:', { startDate, endDate });
+      console.log('🔍 Iniciando detección para fechas seleccionadas:', { startDate, endDate });
       
-      // Use the existing period detection service
-      const result = await PayrollPeriodDetectionService.detectCurrentPeriodSituation();
+      // Usar el nuevo método que respeta las fechas seleccionadas
+      const result = await PayrollPeriodDetectionService.detectPeriodForSelectedDates(startDate, endDate);
       
       console.log('📊 Resultado de detección:', result);
       
-      setPeriodInfo({
-        hasActivePeriod: result.hasActivePeriod,
-        activePeriod: result.activePeriod,
-        suggestedAction: result.suggestedAction,
-        message: result.message,
-        periodData: result.periodData
-      });
+      setPeriodInfo(result);
       
       return result;
     } catch (error) {
       console.error('❌ Error detectando período:', error);
       setError('Error detectando información del período');
       
-      // Fallback: create new period
+      // Fallback: crear nuevo período con las fechas seleccionadas
       setPeriodInfo({
         hasActivePeriod: false,
         suggestedAction: 'create',

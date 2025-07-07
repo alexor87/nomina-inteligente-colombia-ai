@@ -38,7 +38,7 @@ const PayrollLiquidationPage = () => {
   // Auto-detect period when both dates are selected
   useEffect(() => {
     if (startDate && endDate && !showPeriodInfo) {
-      console.log('📅 Fechas completas, iniciando detección automática...');
+      console.log('📅 Fechas completas, iniciando detección automática para fechas seleccionadas...');
       setShowPeriodInfo(true);
       detectPeriod(startDate, endDate);
     }
@@ -58,8 +58,29 @@ const PayrollLiquidationPage = () => {
       return;
     }
     
-    console.log('🚀 Procediendo con la carga de empleados...');
+    console.log('🚀 Procediendo con la carga de empleados para fechas:', { startDate, endDate });
     await loadEmployees(startDate, endDate);
+  };
+
+  const handleResolveConflict = async (action: 'selected' | 'existing') => {
+    if (action === 'selected') {
+      // Continuar con las fechas seleccionadas por el usuario
+      console.log('👤 Usuario eligió continuar con fechas seleccionadas:', { startDate, endDate });
+      await loadEmployees(startDate, endDate);
+    } else if (action === 'existing' && periodInfo?.conflictPeriod) {
+      // Cambiar a las fechas del período existente
+      const existingStart = periodInfo.conflictPeriod.fecha_inicio;
+      const existingEnd = periodInfo.conflictPeriod.fecha_fin;
+      
+      console.log('📋 Usuario eligió abrir período existente:', { existingStart, existingEnd });
+      
+      // Actualizar las fechas en el estado
+      setStartDate(existingStart);
+      setEndDate(existingEnd);
+      
+      // Cargar empleados con las fechas del período existente
+      await loadEmployees(existingStart, existingEnd);
+    }
   };
 
   const handleLiquidate = async () => {
@@ -142,6 +163,7 @@ const PayrollLiquidationPage = () => {
           startDate={startDate}
           endDate={endDate}
           onProceed={handleProceedWithPeriod}
+          onResolveConflict={handleResolveConflict}
         />
       )}
 
