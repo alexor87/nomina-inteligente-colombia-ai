@@ -1,7 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
-import { getPeriodNameFromDates } from '@/utils/periodDateUtils';
+import { PeriodDisplayService } from './PeriodDisplayService';
 import { PeriodNumberCalculationService } from './PeriodNumberCalculationService';
 
 export interface PeriodDetectionResult {
@@ -22,8 +21,6 @@ export class PayrollPeriodDetectionService {
   
   static async detectPeriodForSelectedDates(startDate: string, endDate: string): Promise<PeriodDetectionResult> {
     try {
-      console.log('🔍 Detectando período para fechas seleccionadas:', { startDate, endDate });
-      
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('No se pudo obtener la empresa del usuario');
@@ -45,8 +42,6 @@ export class PayrollPeriodDetectionService {
 
       // Si existe período exacto, continuar con él
       if (exactPeriod) {
-        console.log('✅ Período exacto encontrado:', exactPeriod.periodo);
-        
         return {
           hasActivePeriod: true,
           activePeriod: exactPeriod,
@@ -78,11 +73,9 @@ export class PayrollPeriodDetectionService {
       // Si hay períodos solapados, mostrar conflicto
       if (overlappingPeriods && overlappingPeriods.length > 0) {
         const conflictPeriod = overlappingPeriods[0];
-        console.log('⚠️ Período solapado encontrado:', conflictPeriod.periodo);
         
-        // CORRECCIÓN: Usar fechas exactas del usuario para el nombre del período
-        const correctPeriodName = getPeriodNameFromDates(startDate, endDate);
-        console.log('📝 Nombre de período generado con fechas exactas:', correctPeriodName);
+        // Usar el servicio centralizado para generar la información del período
+        const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate, companyId);
         
         return {
           hasActivePeriod: false,
@@ -91,65 +84,48 @@ export class PayrollPeriodDetectionService {
           periodData: {
             startDate,
             endDate,
-            periodName: correctPeriodName,
-            type: this.detectPeriodType(startDate, endDate)
+            periodName: periodInfo.name,
+            type: periodInfo.type
           },
           conflictPeriod
         };
       }
 
       // PASO 3: No hay conflictos, crear nuevo período
-      console.log('🆕 No hay períodos existentes, crear nuevo período');
+      // Usar el servicio centralizado para generar toda la información
+      const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate, companyId);
       
-      // NUEVO: Calcular número de período para el nuevo período
-      const tipoPeriodo = this.detectPeriodType(startDate, endDate);
-      const numberResult = await PeriodNumberCalculationService.calculatePeriodNumber(
-        companyId, startDate, endDate, tipoPeriodo
-      );
-      
-      if (!numberResult.success) {
-        console.warn('⚠️ No se pudo calcular número de período:', numberResult.error);
-      }
-      
-      // CORRECCIÓN: Usar fechas exactas del usuario para el nombre del período
-      let correctPeriodName = getPeriodNameFromDates(startDate, endDate);
-      
-      // Si se calculó número de período exitosamente, generar nombre semántico
-      if (numberResult.success && numberResult.numero_periodo_anual) {
-        // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
-        const startParts = startDate.split('-');
-        const year = parseInt(startParts[0]); // Usar año de la fecha de inicio
-        
-        const semanticName = PeriodNumberCalculationService.getSemanticPeriodName(
-          numberResult.numero_periodo_anual,
-          tipoPeriodo,
-          year,
-          correctPeriodName
+      // Calcular número de período si es posible
+      let warningMessage = '';
+      if (periodInfo.number) {
+        const numberResult = await PeriodNumberCalculationService.calculatePeriodNumber(
+          companyId, startDate, endDate, periodInfo.type
         );
-        correctPeriodName = semanticName;
-        console.log('✨ Nombre semántico generado:', semanticName);
+        
+        if (!numberResult.success && numberResult.error) {
+          warningMessage = ` (${numberResult.error})`;
+        } else if (numberResult.warning) {
+          warningMessage = ` (${numberResult.warning})`;
+        }
       }
-      
-      console.log('📝 Nombre de período generado con fechas exactas:', correctPeriodName);
       
       return {
         hasActivePeriod: false,
         suggestedAction: 'create',
-        message: `Crear nuevo período: ${correctPeriodName}${numberResult.warning ? ` (${numberResult.warning})` : ''}`,
+        message: `Crear nuevo período: ${periodInfo.name}${warningMessage}`,
         periodData: {
           startDate,
           endDate,
-          periodName: correctPeriodName,
-          type: tipoPeriodo
+          periodName: periodInfo.name,
+          type: periodInfo.type
         }
       };
 
     } catch (error) {
       console.error('💥 Error en detección de período:', error);
       
-      // CORRECCIÓN: Usar fechas exactas incluso en caso de error
-      const fallbackPeriodName = getPeriodNameFromDates(startDate, endDate);
-      console.log('📝 Nombre de período fallback con fechas exactas:', fallbackPeriodName);
+      // Usar el servicio centralizado para el fallback
+      const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate);
       
       return {
         hasActivePeriod: false,
@@ -158,14 +134,13 @@ export class PayrollPeriodDetectionService {
         periodData: {
           startDate,
           endDate,
-          periodName: fallbackPeriodName,
-          type: this.detectPeriodType(startDate, endDate)
+          periodName: periodInfo.name,
+          type: periodInfo.type
         }
       };
     }
   }
 
-  // Método legacy mantenido para compatibilidad
   static async detectCurrentPeriodSituation(): Promise<PeriodDetectionResult> {
     try {
       console.log('🔍 Detectando situación actual del período (modo legacy)...');
@@ -234,7 +209,7 @@ export class PayrollPeriodDetectionService {
   }
 
   /**
-   * ✅ FUNCIÓN CORREGIDA: Detectar tipo de período basado en días reales
+   * Detectar tipo de período basado en días reales
    */
   private static detectPeriodType(startDate: string, endDate: string): 'semanal' | 'quincenal' | 'mensual' {
     console.log('🔍 DETECTANDO TIPO DE PERÍODO (CORREGIDO):', { startDate, endDate });
@@ -313,13 +288,6 @@ export class PayrollPeriodDetectionService {
     }
   }
 
-  private static async generateSuggestedPeriod(companyId: string) {
-    const periodicity = await this.getCompanyPeriodicity(companyId);
-    const today = new Date();
-    
-    return this.calculatePeriodDates(today, periodicity);
-  }
-
   static calculatePeriodDates(referenceDate: Date, periodicity: 'semanal' | 'quincenal' | 'mensual') {
     const year = referenceDate.getFullYear();
     const month = referenceDate.getMonth();
@@ -327,25 +295,19 @@ export class PayrollPeriodDetectionService {
     
     let startDate: Date;
     let endDate: Date;
-    let periodName: string;
     
     switch (periodicity) {
       case 'quincenal':
         if (day <= 15) {
-          // Primera quincena
           startDate = new Date(year, month, 1);
           endDate = new Date(year, month, 15);
-          periodName = `1 - 15 ${this.getMonthName(month)} ${year}`;
         } else {
-          // Segunda quincena
           startDate = new Date(year, month, 16);
-          endDate = new Date(year, month + 1, 0); // Último día del mes
-          periodName = `16 - ${endDate.getDate()} ${this.getMonthName(month)} ${year}`;
+          endDate = new Date(year, month + 1, 0);
         }
         break;
         
       case 'semanal':
-        // Lunes a domingo
         const dayOfWeek = referenceDate.getDay();
         const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
         
@@ -354,34 +316,26 @@ export class PayrollPeriodDetectionService {
         
         endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + 6);
-        
-        periodName = `Semana ${startDate.getDate()}-${endDate.getDate()} ${this.getMonthName(startDate.getMonth())} ${year}`;
         break;
         
       default: // mensual
         startDate = new Date(year, month, 1);
         endDate = new Date(year, month + 1, 0);
-        periodName = `${this.getMonthName(month)} ${year}`;
         break;
     }
     
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    const periodName = PeriodDisplayService.generatePeriodName(startDateStr, endDateStr);
+    
     return {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      startDate: startDateStr,
+      endDate: endDateStr,
       periodName,
       type: periodicity
     };
   }
 
-  private static getMonthName(monthIndex: number): string {
-    const months = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    return months[monthIndex];
-  }
-
-  // Método público para usar en otros servicios
   static async getLastClosedPeriod(): Promise<any | null> {
     try {
       const companyId = await this.getCurrentUserCompanyId();

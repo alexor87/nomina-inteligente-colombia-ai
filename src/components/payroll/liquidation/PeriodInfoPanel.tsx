@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar, Users, AlertTriangle, CheckCircle, Clock, Hash } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { PeriodDisplayService } from '@/services/payroll-intelligent/PeriodDisplayService';
 import { PeriodNumberCalculationService } from '@/services/payroll-intelligent/PeriodNumberCalculationService';
 
 interface PeriodInfo {
@@ -55,16 +56,10 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
   const isNewPeriod = periodInfo.suggestedAction === 'create';
   const isExistingPeriod = periodInfo.suggestedAction === 'continue';
   const isConflict = periodInfo.suggestedAction === 'conflict';
-  
-  const getPeriodTypeLabel = (type: string) => {
-    const labels = {
-      'quincenal': 'Quincenal',
-      'mensual': 'Mensual',
-      'semanal': 'Semanal'
-    };
-    return labels[type as keyof typeof labels] || type;
-  };
 
+  // Usar el servicio centralizado para obtener información del período
+  const displayInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate);
+  
   const getStatusColor = () => {
     if (isNewPeriod) return 'border-green-200 bg-green-50';
     if (isExistingPeriod) return 'border-blue-200 bg-blue-50';
@@ -79,67 +74,42 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
     return <Clock className="h-5 w-5 text-gray-600" />;
   };
 
-  const getSelectedPeriodName = () => {
-    // CORRECCIÓN: Priorizar el nombre generado correctamente por el servicio
-    if (periodInfo.periodData?.periodName) {
-      console.log('🏷️ USANDO NOMBRE DEL SERVICIO:', periodInfo.periodData.periodName);
-      return periodInfo.periodData.periodName;
+  // Determinar el nombre del período a mostrar
+  const getDisplayPeriodName = () => {
+    // Para períodos existentes, usar el nombre del servicio o el nombre semántico
+    if (isExistingPeriod && periodInfo.activePeriod) {
+      if (periodInfo.activePeriod.numero_periodo_anual) {
+        const startParts = periodInfo.activePeriod.fecha_inicio.split('-');
+        const year = parseInt(startParts[0]);
+        
+        return PeriodNumberCalculationService.getSemanticPeriodName(
+          periodInfo.activePeriod.numero_periodo_anual,
+          periodInfo.activePeriod.tipo_periodo,
+          year,
+          periodInfo.activePeriod.periodo
+        );
+      }
+      return periodInfo.activePeriod.periodo;
     }
     
-    // Fallback: crear nombre simple con las fechas exactas del usuario
-    const fallbackName = `${startDate} - ${endDate}`;
-    console.log('🏷️ USANDO NOMBRE FALLBACK:', fallbackName);
-    return fallbackName;
+    // Para períodos nuevos, usar el nombre generado por el servicio centralizado
+    return periodInfo.periodData?.periodName || displayInfo.name;
   };
 
   const getPeriodNumberInfo = () => {
     if (periodInfo.activePeriod?.numero_periodo_anual) {
-      // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
-      const startParts = periodInfo.activePeriod.fecha_inicio.split('-');
-      const year = parseInt(startParts[0]); // Usar año de la fecha de inicio, no new Date()
-      
-      console.log('🔢 GENERANDO NOMBRE SEMÁNTICO PARA PERÍODO EXISTENTE:', {
-        numero: periodInfo.activePeriod.numero_periodo_anual,
-        tipo: periodInfo.activePeriod.tipo_periodo,
-        year,
-        fechaInicio: periodInfo.activePeriod.fecha_inicio
-      });
-      
-      const semanticName = PeriodNumberCalculationService.getSemanticPeriodName(
-        periodInfo.activePeriod.numero_periodo_anual,
-        periodInfo.activePeriod.tipo_periodo,
-        year,
-        periodInfo.activePeriod.periodo
-      );
-      
-      console.log('✨ NOMBRE SEMÁNTICO GENERADO:', semanticName);
-      
       return {
         hasNumber: true,
-        number: periodInfo.activePeriod.numero_periodo_anual,
-        semanticName
+        number: periodInfo.activePeriod.numero_periodo_anual
       };
     }
     
     return { hasNumber: false };
   };
 
-  // CORRECCIÓN: Solo usar getPeriodNumberInfo para períodos EXISTENTES con número
-  // Para períodos nuevos, usar siempre el nombre del servicio
-  const shouldUseSemanticName = isExistingPeriod && periodInfo.activePeriod?.numero_periodo_anual;
-  const periodNumberInfo = shouldUseSemanticName ? getPeriodNumberInfo() : { hasNumber: false };
-
-  console.log('🔍 DEBUG PERIOD DISPLAY:', {
-    isNewPeriod,
-    isExistingPeriod,
-    shouldUseSemanticName,
-    hasNumber: periodNumberInfo.hasNumber,
-    periodDataName: periodInfo.periodData?.periodName,
-    semanticName: periodNumberInfo.semanticName,
-    finalDisplayName: shouldUseSemanticName && periodNumberInfo.hasNumber 
-      ? periodNumberInfo.semanticName 
-      : getSelectedPeriodName()
-  });
+  const periodNumberInfo = getPeriodNumberInfo();
+  const displayName = getDisplayPeriodName();
+  const periodType = periodInfo.periodData?.type || displayInfo.type;
 
   return (
     <Card className={`${getStatusColor()} transition-colors`}>
@@ -162,12 +132,7 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
             <Calendar className="h-5 w-5 text-gray-500 flex-shrink-0" />
             <div>
               <p className="text-sm text-gray-600 font-medium">Período Seleccionado</p>
-              <p className="font-semibold text-gray-900">
-                {shouldUseSemanticName && periodNumberInfo.hasNumber 
-                  ? periodNumberInfo.semanticName 
-                  : getSelectedPeriodName()
-                }
-              </p>
+              <p className="font-semibold text-gray-900">{displayName}</p>
               {periodNumberInfo.hasNumber && (
                 <p className="text-xs text-gray-500">
                   Número ordinal: {periodNumberInfo.number}
@@ -179,9 +144,7 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
           <div className="flex items-center space-x-3">
             <div className="flex-shrink-0">
               <Badge variant="outline" className="font-medium">
-                {getPeriodTypeLabel(
-                  periodInfo.periodData?.type || 'mensual'
-                )}
+                {PeriodDisplayService.getPeriodTypeLabel(periodType)}
               </Badge>
             </div>
           </div>
