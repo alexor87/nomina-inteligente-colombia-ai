@@ -30,6 +30,11 @@ export class PayrollPeriodDetectionService {
 
       console.log('🏢 DETECTION SERVICE - Company ID:', companyId);
 
+      // CRÍTICO: Generar TODA la información del período UNA SOLA VEZ con el servicio centralizado
+      console.log('📋 DETECTION SERVICE - Generating CENTRALIZED period info for selected dates:', { startDate, endDate });
+      const centralizedPeriodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate, companyId);
+      console.log('✅ DETECTION SERVICE - CENTRALIZED period info generated:', centralizedPeriodInfo);
+
       // PASO 1: Buscar período exacto con las fechas seleccionadas
       const { data: exactPeriod, error: exactError } = await supabase
         .from('payroll_periods_real')
@@ -80,9 +85,8 @@ export class PayrollPeriodDetectionService {
         const conflictPeriod = overlappingPeriods[0];
         console.log('⚠️ DETECTION SERVICE - Conflict detected with:', conflictPeriod.periodo);
         
-        // CRÍTICO: Usar el servicio centralizado EXACTAMENTE con las fechas seleccionadas
-        const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate, companyId);
-        console.log('📋 DETECTION SERVICE - Generated period info for conflict:', periodInfo);
+        // USAR la información centralizada ya generada
+        console.log('📋 DETECTION SERVICE - Using CENTRALIZED period info for conflict:', centralizedPeriodInfo.name);
         
         return {
           hasActivePeriod: false,
@@ -91,24 +95,21 @@ export class PayrollPeriodDetectionService {
           periodData: {
             startDate, // PRESERVAR fechas originales
             endDate,   // PRESERVAR fechas originales
-            periodName: periodInfo.name,
-            type: periodInfo.type
+            periodName: centralizedPeriodInfo.name, // USAR nombre centralizado
+            type: centralizedPeriodInfo.type
           },
           conflictPeriod
         };
       }
 
       // PASO 3: No hay conflictos, crear nuevo período
-      // CRÍTICO: Usar el servicio centralizado EXACTAMENTE con las fechas seleccionadas
-      console.log('🆕 DETECTION SERVICE - No conflicts, generating new period info');
-      const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate, companyId);
-      console.log('📋 DETECTION SERVICE - Generated period info:', periodInfo);
+      console.log('🆕 DETECTION SERVICE - No conflicts, using CENTRALIZED period info');
       
       // Calcular número de período si es posible
       let warningMessage = '';
-      if (periodInfo.number) {
+      if (centralizedPeriodInfo.number) {
         const numberResult = await PeriodNumberCalculationService.calculatePeriodNumber(
-          companyId, startDate, endDate, periodInfo.type
+          companyId, startDate, endDate, centralizedPeriodInfo.type
         );
         
         if (!numberResult.success && numberResult.error) {
@@ -117,20 +118,24 @@ export class PayrollPeriodDetectionService {
           warningMessage = ` (${numberResult.warning})`;
         }
       }
+
+      // CRÍTICO: Usar el nombre semántico preferido si está disponible
+      const finalPeriodName = centralizedPeriodInfo.semanticName || centralizedPeriodInfo.name;
+      console.log('🏷️ DETECTION SERVICE - Final period name selected:', finalPeriodName);
       
       const result = {
         hasActivePeriod: false,
         suggestedAction: 'create' as const,
-        message: `Crear nuevo período: ${periodInfo.name}${warningMessage}`,
+        message: `Crear nuevo período: ${finalPeriodName}${warningMessage}`, // USAR nombre centralizado
         periodData: {
           startDate, // PRESERVAR fechas originales
           endDate,   // PRESERVAR fechas originales
-          periodName: periodInfo.name,
-          type: periodInfo.type
+          periodName: finalPeriodName, // USAR nombre centralizado
+          type: centralizedPeriodInfo.type
         }
       };
 
-      console.log('✅ DETECTION SERVICE - Final result:', result);
+      console.log('✅ DETECTION SERVICE - Final result with CENTRALIZED naming:', result);
       return result;
 
     } catch (error) {
@@ -138,15 +143,16 @@ export class PayrollPeriodDetectionService {
       
       // CRÍTICO: Usar el servicio centralizado para el fallback
       const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate);
+      const fallbackName = periodInfo.semanticName || periodInfo.name;
       
       return {
         hasActivePeriod: false,
         suggestedAction: 'create',
-        message: 'Error detectando período. Se creará un nuevo período.',
+        message: `Error detectando período. Se creará: ${fallbackName}`,
         periodData: {
           startDate, // PRESERVAR fechas originales
           endDate,   // PRESERVAR fechas originales
-          periodName: periodInfo.name,
+          periodName: fallbackName,
           type: periodInfo.type
         }
       };
