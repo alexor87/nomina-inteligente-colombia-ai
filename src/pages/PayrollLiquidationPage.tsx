@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Users, Calculator, Shield } from 'lucide-react';
+import { Calendar, Users, Calculator, Shield, Loader2 } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { PeriodInfoPanel } from '@/components/payroll/liquidation/PeriodInfoPanel';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
@@ -37,7 +37,9 @@ const PayrollLiquidationPage = () => {
     // Auto-save properties
     isAutoSaving,
     lastAutoSaveTime,
-    triggerManualSave
+    triggerManualSave,
+    // New removal status
+    isRemovingEmployee
   } = usePayrollLiquidation();
 
   const {
@@ -147,6 +149,12 @@ const PayrollLiquidationPage = () => {
               <span className="text-sm font-medium">{dataIntegrityIssues} problemas detectados</span>
             </div>
           )}
+          {isRemovingEmployee && (
+            <div className="flex items-center space-x-1 text-blue-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-medium">Eliminando empleado...</span>
+            </div>
+          )}
         </div>
         
         {/* Auto-save indicator */}
@@ -181,6 +189,7 @@ const PayrollLiquidationPage = () => {
                 type="date"
                 value={startDate}
                 onChange={(e) => handleDateChange('start', e.target.value)}
+                disabled={isRemovingEmployee}
               />
             </div>
             <div>
@@ -191,6 +200,7 @@ const PayrollLiquidationPage = () => {
                 value={endDate}
                 min={startDate}
                 onChange={(e) => handleDateChange('end', e.target.value)}
+                disabled={isRemovingEmployee}
               />
             </div>
           </div>
@@ -221,7 +231,10 @@ const PayrollLiquidationPage = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex justify-center">
-              <Button onClick={handleProceedWithPeriod} disabled={isLoading}>
+              <Button 
+                onClick={handleProceedWithPeriod} 
+                disabled={isLoading || isRemovingEmployee}
+              >
                 <Users className="h-4 w-4 mr-2" />
                 {isLoading ? 'Cargando...' : 'Cargar Empleados'}
               </Button>
@@ -247,14 +260,14 @@ const PayrollLiquidationPage = () => {
                 <Button 
                   onClick={() => setShowAddEmployeeModal(true)}
                   variant="outline"
-                  disabled={isLoading || !currentPeriodId}
+                  disabled={isLoading || !currentPeriodId || isRemovingEmployee}
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Agregar Empleado
                 </Button>
                 <Button 
                   onClick={handleLiquidate}
-                  disabled={isLiquidating || employees.length === 0}
+                  disabled={isLiquidating || employees.length === 0 || isRemovingEmployee}
                   className="bg-green-600 hover:bg-green-700"
                 >
                   {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}

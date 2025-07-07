@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -40,6 +39,7 @@ export const usePayrollLiquidation = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isRecovering, setIsRecovering] = useState(false);
+  const [isRemovingEmployee, setIsRemovingEmployee] = useState(false);
   const { toast } = useToast();
 
   // Auto-save integration with removed employee IDs
@@ -97,12 +97,15 @@ export const usePayrollLiquidation = () => {
       // Clear removed employee IDs when recovering
       setRemovedEmployeeIds([]);
       
-      // Load draft employees
+      // Load draft employees with validation
       const draftEmployees = await PayrollAutoSaveService.loadDraftEmployees(activePeriod.id);
+      
+      // Filter out any employees that might have been deleted but not persisted
+      const validEmployees = draftEmployees.filter(emp => emp.id);
       
       // Load and recalculate novedades for each employee
       const employeesWithNovedades = await Promise.all(
-        draftEmployees.map(async (employee) => {
+        validEmployees.map(async (employee) => {
           console.log(`🔄 Recalculating novedades for employee: ${employee.name}`);
           
           const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
@@ -301,8 +304,10 @@ export const usePayrollLiquidation = () => {
     }
   };
 
-  const removeEmployee = (employeeId: string) => {
+  const removeEmployee = async (employeeId: string) => {
     console.log('🗑️ usePayrollLiquidation - Removing employee:', employeeId);
+    
+    setIsRemovingEmployee(true);
     
     // Add to removed IDs list
     setRemovedEmployeeIds(prev => {
@@ -315,13 +320,38 @@ export const usePayrollLiquidation = () => {
     // Remove from current employees list
     setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
     
-    // Trigger auto-save after removing
-    setTimeout(() => triggerAutoSave(), 500);
-    
-    toast({
-      title: "Empleado removido",
-      description: "El empleado ha sido removido de esta liquidación",
-    });
+    try {
+      // IMMEDIATE AUTO-SAVE for critical deletions
+      console.log('💾 Executing immediate auto-save for employee deletion');
+      await PayrollAutoSaveService.saveDraftEmployees(
+        currentPeriodId!,
+        employees.filter(emp => emp.id !== employeeId),
+        [employeeId]
+      );
+      
+      toast({
+        title: "Empleado eliminado",
+        description: "El empleado ha sido removido permanentemente de esta liquidación",
+        className: "border-green-200 bg-green-50"
+      });
+      
+      console.log('✅ usePayrollLiquidation - Employee removal persisted successfully');
+    } catch (error) {
+      console.error('❌ Error persisting employee removal:', error);
+      
+      // Rollback on error
+      setEmployees(prev => [...prev.filter(emp => emp.id !== employeeId), 
+        prev.find(emp => emp.id === employeeId)!].filter(Boolean));
+      setRemovedEmployeeIds(prev => prev.filter(id => id !== employeeId));
+      
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el empleado. Intente nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRemovingEmployee(false);
+    }
   };
 
   const refreshEmployeeNovedades = async (employeeId: string) => {
@@ -449,6 +479,8 @@ export const usePayrollLiquidation = () => {
     isAutoSaving: isSaving,
     lastAutoSaveTime: lastSaveTime,
     triggerManualSave: triggerAutoSave,
+    // New removal status
+    isRemovingEmployee,
     // Debug info
     removedEmployeeIds
   };

@@ -13,6 +13,29 @@ export interface RobustPeriodStatus {
   diagnostic?: any;
 }
 
+interface ActivePeriodResponse {
+  has_active_period: boolean;
+  period?: {
+    id: string;
+    periodo: string;
+    fecha_inicio: string;
+    fecha_fin: string;
+    estado: string;
+    last_activity_at: string;
+    employees_count: number;
+  };
+}
+
+interface SmartPeriodResponse {
+  success: boolean;
+  calculated_period?: {
+    start_date: string;
+    end_date: string;
+    period_name: string;
+    type: string;
+  };
+}
+
 export class PayrollPeriodDetectionRobust {
   
   static async detectWithDiagnosis(): Promise<RobustPeriodStatus> {
@@ -110,8 +133,11 @@ export class PayrollPeriodDetectionRobust {
     try {
       const { data } = await supabase.rpc('get_active_period_for_company');
       
-      if (data?.has_active_period) {
-        return data.period;
+      // Proper type casting with null check
+      const response = data as ActivePeriodResponse | null;
+      
+      if (response?.has_active_period) {
+        return response.period;
       }
       
       return null;
@@ -125,12 +151,15 @@ export class PayrollPeriodDetectionRobust {
     try {
       const { data } = await supabase.rpc('detect_current_smart_period');
       
-      if (data?.success && data.calculated_period) {
+      // Proper type casting with validation
+      const response = data as SmartPeriodResponse | null;
+      
+      if (response?.success && response.calculated_period) {
         return {
-          startDate: data.calculated_period.start_date,
-          endDate: data.calculated_period.end_date,
-          periodName: data.calculated_period.period_name,
-          type: data.calculated_period.type
+          startDate: response.calculated_period.start_date,
+          endDate: response.calculated_period.end_date,
+          periodName: response.calculated_period.period_name,
+          type: response.calculated_period.type
         };
       }
       

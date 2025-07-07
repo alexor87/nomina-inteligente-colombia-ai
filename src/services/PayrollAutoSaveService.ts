@@ -45,8 +45,8 @@ export class PayrollAutoSaveService {
         return null;
       }
 
-      // Cast the Json response to our expected type
-      const response = data as unknown as ActivePeriodResponse;
+      // Proper type casting with validation
+      const response = data as ActivePeriodResponse | null;
       return response?.has_active_period ? response.period : null;
     } catch (error) {
       console.error('Error calling get_active_period_for_company:', error);
@@ -255,27 +255,28 @@ export class PayrollAutoSaveService {
         throw error;
       }
 
-      // Transform to PayrollEmployee format
-      const employees = draftPayrolls?.map(payroll => ({
-        id: payroll.employee_id,
-        name: `${payroll.employees?.nombre} ${payroll.employees?.apellido}`,
-        position: payroll.employees?.cargo || 'Empleado',
-        baseSalary: payroll.salario_base,
-        workedDays: payroll.dias_trabajados,
-        extraHours: 0,
-        disabilities: 0,
-        bonuses: payroll.bonificaciones || 0,
-        absences: 0,
-        grossPay: payroll.total_devengado,
-        deductions: payroll.total_deducciones,
-        netPay: payroll.neto_pagado,
-        status: 'valid' as const,
-        errors: [],
-        transportAllowance: payroll.auxilio_transporte,
-        employerContributions: 0
-      })) || [];
+      // Transform to PayrollEmployee format and filter valid employees
+      const employees = draftPayrolls?.filter(payroll => payroll.employees && payroll.employee_id)
+        .map(payroll => ({
+          id: payroll.employee_id,
+          name: `${payroll.employees?.nombre} ${payroll.employees?.apellido}`,
+          position: payroll.employees?.cargo || 'Empleado',
+          baseSalary: payroll.salario_base,
+          workedDays: payroll.dias_trabajados,
+          extraHours: 0,
+          disabilities: 0,
+          bonuses: payroll.bonificaciones || 0,
+          absences: 0,
+          grossPay: payroll.total_devengado,
+          deductions: payroll.total_deducciones,
+          netPay: payroll.neto_pagado,
+          status: 'valid' as const,
+          errors: [],
+          transportAllowance: payroll.auxilio_transporte,
+          employerContributions: 0
+        })) || [];
 
-      console.log('✅ Draft employees loaded:', employees.length);
+      console.log('✅ Draft employees loaded and validated:', employees.length);
       return employees;
     } catch (error) {
       console.error('❌ Error loading draft employees:', error);
