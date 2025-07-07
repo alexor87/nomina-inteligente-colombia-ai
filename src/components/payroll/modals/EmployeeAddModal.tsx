@@ -52,12 +52,18 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      const { data: employees, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('id, nombre, apellido, cedula, cargo, salario_base')
         .eq('company_id', companyId)
-        .eq('estado', 'activo')
-        .not('id', 'in', `(${currentEmployeeIds.join(',')})`);
+        .eq('estado', 'activo');
+
+      // FASE 2: Corregir la consulta SQL para manejar el caso cuando currentEmployeeIds está vacío
+      if (currentEmployeeIds && currentEmployeeIds.length > 0) {
+        query = query.not('id', 'in', `(${currentEmployeeIds.join(',')})`);
+      }
+
+      const { data: employees, error } = await query;
 
       if (error) {
         throw error;
@@ -82,6 +88,7 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
     employee.cargo?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // FASE 1: Corregir la doble interacción - función separada para manejar la selección
   const handleEmployeeToggle = (employeeId: string) => {
     setSelectedEmployeeIds(prev =>
       prev.includes(employeeId)
@@ -90,11 +97,27 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
     );
   };
 
+  // FASE 3: Mejorar la funcionalidad "Seleccionar todos"
   const handleSelectAll = () => {
-    if (selectedEmployeeIds.length === filteredEmployees.length) {
-      setSelectedEmployeeIds([]);
+    if (filteredEmployees.length === 0) return;
+    
+    const allFilteredIds = filteredEmployees.map(emp => emp.id);
+    const allSelected = allFilteredIds.every(id => selectedEmployeeIds.includes(id));
+    
+    if (allSelected) {
+      // Deseleccionar todos los filtrados
+      setSelectedEmployeeIds(prev => prev.filter(id => !allFilteredIds.includes(id)));
     } else {
-      setSelectedEmployeeIds(filteredEmployees.map(emp => emp.id));
+      // Seleccionar todos los filtrados
+      setSelectedEmployeeIds(prev => {
+        const newIds = [...prev];
+        allFilteredIds.forEach(id => {
+          if (!newIds.includes(id)) {
+            newIds.push(id);
+          }
+        });
+        return newIds;
+      });
     }
   };
 
@@ -118,7 +141,7 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
         className: "border-green-200 bg-green-50"
       });
       
-      // Reset and close
+      // FASE 4: Reset and close
       setSelectedEmployeeIds([]);
       setSearchTerm('');
       onClose();
@@ -135,10 +158,15 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
   };
 
   const handleClose = () => {
+    // FASE 4: Resetear estado al cerrar el modal
     setSelectedEmployeeIds([]);
     setSearchTerm('');
     onClose();
   };
+
+  // FASE 3: Calcular si todos los empleados filtrados están seleccionados
+  const allFilteredSelected = filteredEmployees.length > 0 && 
+    filteredEmployees.every(emp => selectedEmployeeIds.includes(emp.id));
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -167,15 +195,15 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
             </div>
           </div>
 
-          {/* Select All */}
+          {/* Select All - FASE 3: Mejorado */}
           {filteredEmployees.length > 0 && (
             <div className="flex items-center space-x-2 pb-2 border-b">
               <Checkbox
                 id="select-all"
-                checked={selectedEmployeeIds.length === filteredEmployees.length}
+                checked={allFilteredSelected}
                 onCheckedChange={handleSelectAll}
               />
-              <Label htmlFor="select-all" className="text-sm font-medium">
+              <Label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
                 Seleccionar todos ({filteredEmployees.length})
               </Label>
             </div>
@@ -200,16 +228,19 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
                 {filteredEmployees.map((employee) => (
                   <div
                     key={employee.id}
-                    className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 ${
-                      selectedEmployeeIds.includes(employee.id) ? 'bg-blue-50 border-blue-200' : 'border-gray-200'
+                    className={`flex items-center space-x-3 p-3 rounded-lg border ${
+                      selectedEmployeeIds.includes(employee.id) ? 'bg-blue-50 border-blue-200' : 'border-gray-200 hover:bg-gray-50'
                     }`}
-                    onClick={() => handleEmployeeToggle(employee.id)}
                   >
+                    {/* FASE 1: Eliminar onClick del div, solo usar onCheckedChange del checkbox */}
                     <Checkbox
                       checked={selectedEmployeeIds.includes(employee.id)}
                       onCheckedChange={() => handleEmployeeToggle(employee.id)}
                     />
-                    <div className="flex-1 grid grid-cols-4 gap-4">
+                    <div 
+                      className="flex-1 grid grid-cols-4 gap-4 cursor-pointer"
+                      onClick={() => handleEmployeeToggle(employee.id)}
+                    >
                       <div>
                         <div className="font-medium text-gray-900">
                           {employee.nombre} {employee.apellido}
