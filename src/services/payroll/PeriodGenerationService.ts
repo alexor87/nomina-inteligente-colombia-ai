@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface GeneratedPeriod {
@@ -217,6 +216,7 @@ export class PeriodGenerationService {
         availablePeriods = (insertedPeriods || []).map(period => ({
           ...period,
           tipo_periodo: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual', // Type casting
+          estado: period.estado as 'borrador' | 'en_proceso' | 'cerrado', // Type casting
           etiqueta_visible: period.periodo, // Mapear periodo a etiqueta_visible
           can_select: period.estado === 'borrador' || period.estado === 'en_proceso',
           reason: period.estado === 'cerrado' ? 'Período ya liquidado' : undefined
@@ -226,6 +226,7 @@ export class PeriodGenerationService {
         availablePeriods = existingPeriods.map(period => ({
           ...period,
           tipo_periodo: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual', // Type casting
+          estado: period.estado as 'borrador' | 'en_proceso' | 'cerrado', // Type casting
           etiqueta_visible: period.periodo, // Mapear periodo a etiqueta_visible
           can_select: period.estado === 'borrador' || period.estado === 'en_proceso',
           reason: period.estado === 'cerrado' ? 'Período ya liquidado' : undefined
