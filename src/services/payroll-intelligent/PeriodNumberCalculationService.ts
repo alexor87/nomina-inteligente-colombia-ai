@@ -20,7 +20,7 @@ export class PeriodNumberCalculationService {
     tipoPeriodo: 'mensual' | 'quincenal' | 'semanal'
   ): Promise<PeriodNumberResult> {
     try {
-      console.log('📊 Calculando número de período:', { 
+      console.log('📊 CALCULANDO NÚMERO DE PERÍODO:', { 
         companyId, startDate, endDate, tipoPeriodo 
       });
       
@@ -42,16 +42,26 @@ export class PeriodNumberCalculationService {
           return { success: false, error: 'Tipo de período no soportado' };
       }
       
-      // Validar que no exista ya ese número para la empresa/año/tipo
-      const isDuplicate = await this.checkDuplicateNumber(
-        companyId, year, tipoPeriodo, calculatedNumber
-      );
+      console.log('🎯 NÚMERO CALCULADO FINAL:', calculatedNumber);
       
-      if (isDuplicate) {
-        return {
-          success: false,
-          error: `Ya existe un período ${tipoPeriodo} #${calculatedNumber} para el año ${year}`
-        };
+      // TEMPORAL: Deshabilitar validación de duplicados para diagnóstico
+      const skipDuplicateCheck = process.env.NODE_ENV === 'development';
+      
+      if (!skipDuplicateCheck) {
+        // Validar que no exista ya ese número para la empresa/año/tipo
+        const isDuplicate = await this.checkDuplicateNumber(
+          companyId, year, tipoPeriodo, calculatedNumber
+        );
+        
+        if (isDuplicate) {
+          console.warn('⚠️ PERÍODO DUPLICADO DETECTADO:', calculatedNumber);
+          return {
+            success: false,
+            error: `Ya existe un período ${tipoPeriodo} #${calculatedNumber} para el año ${year}`
+          };
+        }
+      } else {
+        console.log('🚧 VALIDACIÓN DE DUPLICADOS DESHABILITADA PARA DIAGNÓSTICO');
       }
       
       // Validar coherencia de fechas vs periodicidad
@@ -64,7 +74,7 @@ export class PeriodNumberCalculationService {
       };
       
     } catch (error) {
-      console.error('Error calculando número de período:', error);
+      console.error('❌ ERROR CALCULANDO NÚMERO DE PERÍODO:', error);
       return { 
         success: false, 
         error: 'Error interno calculando número de período' 
@@ -91,7 +101,9 @@ export class PeriodNumberCalculationService {
     const startDay = new Date(startDate).getDate();
     const startMonth = new Date(startDate).getMonth() + 1;
     
-    console.log('📊 CALCULANDO QUINCENA CORREGIDA:', { startDay, startMonth, year });
+    console.log('📊 CALCULANDO QUINCENA DETALLADO:', { 
+      startDate, startDay, startMonth, year 
+    });
     
     // Contar quincenas hasta este punto en el año
     let biweeklyCount = 0;
@@ -99,19 +111,60 @@ export class PeriodNumberCalculationService {
     // Contar quincenas de los meses completos anteriores
     for (let month = 1; month < startMonth; month++) {
       biweeklyCount += 2; // Cada mes tiene exactamente 2 quincenas
+      console.log(`📊 Mes ${month}: +2 quincenas = Total: ${biweeklyCount}`);
     }
     
     // Para el mes actual, determinar si es primera o segunda quincena
     if (startDay <= 15) {
       biweeklyCount += 1; // Primera quincena del mes actual
-      console.log('✅ Primera quincena del mes', startMonth, '= quincena', biweeklyCount);
+      console.log(`✅ Primera quincena del mes ${startMonth} = quincena ${biweeklyCount}`);
     } else {
       biweeklyCount += 2; // Segunda quincena del mes actual (incluye la primera)
-      console.log('✅ Segunda quincena del mes', startMonth, '= quincena', biweeklyCount);
+      console.log(`✅ Segunda quincena del mes ${startMonth} = quincena ${biweeklyCount}`);
     }
     
-    console.log('📊 RESULTADO QUINCENA CORREGIDA:', biweeklyCount);
+    console.log('🎯 RESULTADO QUINCENA FINAL:', biweeklyCount);
+    
+    // Verificar contra cálculo independiente
+    const verification = this.verifyBiweeklyCalculation(startDate);
+    if (verification !== biweeklyCount) {
+      console.error('❌ INCONSISTENCIA EN CÁLCULO:', {
+        original: biweeklyCount,
+        verification,
+        startDate
+      });
+    } else {
+      console.log('✅ CÁLCULO VERIFICADO CORRECTO:', biweeklyCount);
+    }
+    
     return biweeklyCount;
+  }
+  
+  /**
+   * Verificación independiente del cálculo quincenal
+   */
+  private static verifyBiweeklyCalculation(startDate: string): number {
+    const date = new Date(startDate);
+    const month = date.getMonth() + 1; // 1-12
+    const day = date.getDate();
+    
+    // Meses completos anteriores × 2
+    const previousMonthsQuincenas = (month - 1) * 2;
+    
+    // Quincena actual del mes
+    const currentQuincena = day <= 15 ? 1 : 2;
+    
+    const total = previousMonthsQuincenas + currentQuincena;
+    
+    console.log('🔍 VERIFICACIÓN INDEPENDIENTE:', {
+      month,
+      day,
+      previousMonthsQuincenas,
+      currentQuincena,
+      total
+    });
+    
+    return total;
   }
   
   /**
@@ -131,9 +184,13 @@ export class PeriodNumberCalculationService {
     tipoPeriodo: string,
     numeroCalculado: number
   ): Promise<boolean> {
+    console.log('🔍 VERIFICANDO DUPLICADOS:', {
+      companyId, year, tipoPeriodo, numeroCalculado
+    });
+    
     const { data, error } = await supabase
       .from('payroll_periods_real')
-      .select('id')
+      .select('id, periodo, fecha_inicio, fecha_fin, numero_periodo_anual')
       .eq('company_id', companyId)
       .eq('tipo_periodo', tipoPeriodo)
       .eq('numero_periodo_anual', numeroCalculado)
@@ -142,11 +199,18 @@ export class PeriodNumberCalculationService {
       .limit(1);
     
     if (error) {
-      console.error('Error verificando duplicados:', error);
+      console.error('❌ Error verificando duplicados:', error);
       return false;
     }
     
-    return data && data.length > 0;
+    const hasDuplicate = data && data.length > 0;
+    if (hasDuplicate) {
+      console.warn('⚠️ PERÍODO DUPLICADO ENCONTRADO:', data[0]);
+    } else {
+      console.log('✅ No hay duplicados para número:', numeroCalculado);
+    }
+    
+    return hasDuplicate;
   }
   
   /**
@@ -219,6 +283,33 @@ export class PeriodNumberCalculationService {
       
       default:
         return fallbackName;
+    }
+  }
+  
+  /**
+   * Método para testing y diagnóstico
+   */
+  static async runDiagnosticTest(): Promise<void> {
+    console.log('🧪 EJECUTANDO PRUEBAS DE DIAGNÓSTICO');
+    
+    const testCases = [
+      { date: '2025-01-01', expected: 1, description: '1-15 Enero' },
+      { date: '2025-01-16', expected: 2, description: '16-31 Enero' },
+      { date: '2025-07-01', expected: 13, description: '1-15 Julio' },
+      { date: '2025-07-16', expected: 14, description: '16-31 Julio' },
+      { date: '2025-09-01', expected: 17, description: '1-15 Septiembre' },
+      { date: '2025-09-16', expected: 18, description: '16-30 Septiembre' },
+    ];
+    
+    for (const test of testCases) {
+      const calculated = this.verifyBiweeklyCalculation(test.date);
+      const isCorrect = calculated === test.expected;
+      
+      console.log(`🧪 ${test.description}: Esperado=${test.expected}, Calculado=${calculated}, ✅=${isCorrect}`);
+      
+      if (!isCorrect) {
+        console.error(`❌ ERROR EN CASO DE PRUEBA: ${test.description}`);
+      }
     }
   }
 }

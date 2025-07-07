@@ -1,13 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Users, Calculator, Loader2, Settings } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar, Users, Calculator, Loader2, Settings, Bug } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { PeriodInfoPanel } from '@/components/payroll/liquidation/PeriodInfoPanel';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
+import { PayrollDiagnosticPanel } from '@/components/payroll/diagnostic/PayrollDiagnosticPanel';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { usePeriodDetection } from '@/hooks/usePeriodDetection';
 import { format } from 'date-fns';
@@ -179,121 +180,140 @@ const PayrollLiquidationPage = () => {
         </div>
       </div>
 
-      {/* Date Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Calendar className="h-5 w-5" />
-            <span>Seleccionar Período</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="startDate">Fecha desde</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={startDate}
-                onChange={(e) => handleDateChange('start', e.target.value)}
-                disabled={isRemovingEmployee}
-              />
-            </div>
-            <div>
-              <Label htmlFor="endDate">Fecha hasta</Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={endDate}
-                min={startDate}
-                onChange={(e) => handleDateChange('end', e.target.value)}
-                disabled={isRemovingEmployee}
-              />
-            </div>
-          </div>
-          
-          {detectionError && (
-            <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-              {detectionError}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Period Information Panel */}
-      {showPeriodInfo && periodInfo && (
-        <PeriodInfoPanel
-          periodInfo={periodInfo}
-          employeesCount={0} // This will be updated after period detection
-          isLoading={isDetecting}
-          startDate={startDate}
-          endDate={endDate}
-          onProceed={handleProceedWithPeriod}
-          onResolveConflict={handleResolveConflict}
-        />
-      )}
-
-      {/* Legacy fallback button - only show if period info is not available */}
-      {startDate && endDate && !showPeriodInfo && !isDetecting && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-center">
-              <Button 
-                onClick={handleProceedWithPeriod} 
-                disabled={isLoading || isRemovingEmployee}
-              >
-                <Users className="h-4 w-4 mr-2" />
-                {isLoading ? 'Cargando...' : 'Cargar Empleados'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Employee Table */}
-      {employees.length > 0 && (
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-4">
-                <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
-                {/* Additional save indicator in header */}
-                <AutoSaveIndicator 
-                  isSaving={isAutoSaving}
-                  lastSaveTime={lastAutoSaveTime}
-                />
+      <Tabs defaultValue="liquidation" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="liquidation" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Liquidación
+          </TabsTrigger>
+          <TabsTrigger value="diagnostic" className="flex items-center gap-2">
+            <Bug className="h-4 w-4" />
+            Diagnóstico
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="liquidation" className="space-y-6">
+          {/* Date Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5" />
+                <span>Seleccionar Período</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="startDate">Fecha desde</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => handleDateChange('start', e.target.value)}
+                    disabled={isRemovingEmployee}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="endDate">Fecha hasta</Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={endDate}
+                    min={startDate}
+                    onChange={(e) => handleDateChange('end', e.target.value)}
+                    disabled={isRemovingEmployee}
+                  />
+                </div>
               </div>
-              <div className="flex space-x-2">
-                <Button 
-                  onClick={() => setShowAddEmployeeModal(true)}
-                  variant="outline"
-                  disabled={isLoading || !currentPeriodId || isRemovingEmployee}
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  Agregar Empleado
-                </Button>
-                <Button 
-                  onClick={handleLiquidate}
-                  disabled={isLiquidating || employees.length === 0 || isRemovingEmployee}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <PayrollLiquidationTable
-              employees={employees}
+              
+              {detectionError && (
+                <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+                  {detectionError}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Period Information Panel */}
+          {showPeriodInfo && periodInfo && (
+            <PeriodInfoPanel
+              periodInfo={periodInfo}
+              employeesCount={0} // This will be updated after period detection
+              isLoading={isDetecting}
               startDate={startDate}
               endDate={endDate}
-              currentPeriodId={currentPeriodId}
-              onRemoveEmployee={removeEmployee}
-              onEmployeeNovedadesChange={refreshEmployeeNovedades}
+              onProceed={handleProceedWithPeriod}
+              onResolveConflict={handleResolveConflict}
             />
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {/* Legacy fallback button - only show if period info is not available */}
+          {startDate && endDate && !showPeriodInfo && !isDetecting && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex justify-center">
+                  <Button 
+                    onClick={handleProceedWithPeriod} 
+                    disabled={isLoading || isRemovingEmployee}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    {isLoading ? 'Cargando...' : 'Cargar Empleados'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Employee Table */}
+          {employees.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-4">
+                    <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
+                    {/* Additional save indicator in header */}
+                    <AutoSaveIndicator 
+                      isSaving={isAutoSaving}
+                      lastSaveTime={lastAutoSaveTime}
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button 
+                      onClick={() => setShowAddEmployeeModal(true)}
+                      variant="outline"
+                      disabled={isLoading || !currentPeriodId || isRemovingEmployee}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Agregar Empleado
+                    </Button>
+                    <Button 
+                      onClick={handleLiquidate}
+                      disabled={isLiquidating || employees.length === 0 || isRemovingEmployee}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <PayrollLiquidationTable
+                  employees={employees}
+                  startDate={startDate}
+                  endDate={endDate}
+                  currentPeriodId={currentPeriodId}
+                  onRemoveEmployee={removeEmployee}
+                  onEmployeeNovedadesChange={refreshEmployeeNovedades}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="diagnostic">
+          <PayrollDiagnosticPanel />
+        </TabsContent>
+      </Tabs>
 
       {/* Period Cleanup Dialog */}
       <PeriodCleanupDialog
