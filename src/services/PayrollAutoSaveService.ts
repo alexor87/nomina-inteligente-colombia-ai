@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { PayrollDeletionService } from './PayrollDeletionService';
 
 interface ActivePeriodResponse {
   has_active_period: boolean;
@@ -59,6 +59,56 @@ export class PayrollAutoSaveService {
     }
   }
 
+  /**
+   * NUEVO: Eliminación directa sin pasar por upsert
+   */
+  static async deleteEmployeesFromPeriod(
+    periodId: string, 
+    employeeIds: string[]
+  ): Promise<void> {
+    if (employeeIds.length === 0) return;
+
+    const companyId = await this.getCurrentUserCompanyId();
+    if (!companyId) {
+      throw new Error('No se pudo obtener la empresa del usuario');
+    }
+
+    console.log('🗑️ PayrollAutoSaveService - Deleting employees directly:', employeeIds);
+
+    try {
+      // Validar integridad del período
+      const periodExists = await this.validatePeriodIntegrity(periodId, companyId);
+      if (!periodExists) {
+        console.warn('⚠️ Período no válido para eliminación:', periodId);
+        return;
+      }
+
+      // Eliminar cada empleado individualmente con validación
+      for (const employeeId of employeeIds) {
+        const exists = await PayrollDeletionService.validateEmployeeInPeriod(
+          periodId, employeeId, companyId
+        );
+        
+        if (exists) {
+          await PayrollDeletionService.deleteEmployeeFromPeriod(
+            periodId, employeeId, companyId
+          );
+          
+          await PayrollDeletionService.logDeletion(
+            periodId, employeeId, companyId, `Employee ${employeeId}`
+          );
+        } else {
+          console.log(`⚠️ Employee ${employeeId} not found in period, skipping deletion`);
+        }
+      }
+
+      console.log('✅ All employees deleted successfully');
+    } catch (error) {
+      console.error('❌ Error in deleteEmployeesFromPeriod:', error);
+      throw error;
+    }
+  }
+
   static async saveDraftEmployees(
     periodId: string, 
     employees: any[], 
@@ -74,7 +124,7 @@ export class PayrollAutoSaveService {
     this.isSaving = true;
     
     // Crear promesa para que otras llamadas puedan esperarla
-    this.savingPromise = this._performSave(periodId, employees, removedEmployeeIds);
+    this.savingPromise = this._performAtomicSave(periodId, employees, removedEmployeeIds);
     
     try {
       await this.savingPromise;
@@ -84,7 +134,10 @@ export class PayrollAutoSaveService {
     }
   }
 
-  private static async _performSave(
+  /**
+   * MEJORADO: Operación atómica de guardado con eliminaciones separadas
+   */
+  private static async _performAtomicSave(
     periodId: string, 
     employees: any[], 
     removedEmployeeIds: string[] = []
@@ -94,7 +147,7 @@ export class PayrollAutoSaveService {
       throw new Error('No se pudo obtener la empresa del usuario');
     }
 
-    console.log('💾 Starting atomic auto-save:', {
+    console.log('💾 Starting ATOMIC auto-save:', {
       employees: employees.length,
       removedEmployeeIds: removedEmployeeIds.length,
       periodId
@@ -108,76 +161,29 @@ export class PayrollAutoSaveService {
         return;
       }
 
-      // Obtener información del período para el campo 'periodo'
-      const { data: periodData } = await supabase
-        .from('payroll_periods_real')
-        .select('periodo')
-        .eq('id', periodId)
-        .single();
-
-      const periodoName = periodData?.periodo || `Período ${new Date().toLocaleDateString()}`;
-
-      // PASO 1: Eliminar empleados que fueron removidos de la liquidación
+      // PASO 1: ELIMINACIONES DIRECTAS PRIMERO (crítico)
       if (removedEmployeeIds.length > 0) {
-        console.log('🗑️ Deleting removed employees:', removedEmployeeIds);
-        
-        const { error: deleteError } = await supabase
-          .from('payrolls')
-          .delete()
-          .eq('company_id', companyId)
-          .eq('period_id', periodId)
-          .in('employee_id', removedEmployeeIds);
-
-        if (deleteError) {
-          console.error('❌ Delete error:', deleteError);
-          throw deleteError;
-        }
-        
-        console.log('✅ Removed employees deleted successfully:', removedEmployeeIds.length);
+        console.log('🗑️ PHASE 1: Direct deletions');
+        await this.deleteEmployeesFromPeriod(periodId, removedEmployeeIds);
       }
 
       // PASO 2: Upsert empleados actuales (solo si hay empleados)
       if (employees.length > 0) {
-        const draftPayrolls = employees.map(employee => ({
-          company_id: companyId,
-          employee_id: employee.id,
-          period_id: periodId,
-          periodo: periodoName,
-          salario_base: employee.baseSalary || 0,
-          dias_trabajados: employee.workedDays || 30,
-          auxilio_transporte: employee.transportAllowance || 0,
-          total_devengado: employee.grossPay || 0,
-          total_deducciones: employee.deductions || 0,
-          neto_pagado: employee.netPay || 0,
-          estado: 'borrador'
-        }));
-
-        const { error: upsertError } = await supabase
-          .from('payrolls')
-          .upsert(draftPayrolls, {
-            onConflict: 'company_id,employee_id,period_id',
-            ignoreDuplicates: false
-          });
-
-        if (upsertError) {
-          console.error('❌ Upsert error:', upsertError);
-          throw upsertError;
-        }
-
-        console.log('✅ Employees upserted successfully:', draftPayrolls.length);
+        console.log('💾 PHASE 2: Upserting remaining employees');
+        await this._upsertEmployees(periodId, companyId, employees);
       }
 
       // PASO 3: Actualizar totales del período atómicamente
+      console.log('📊 PHASE 3: Updating period totals');
       await this.updatePeriodTotals(periodId, employees);
 
-      console.log('✅ Atomic auto-save completed successfully');
+      console.log('✅ ATOMIC auto-save completed successfully');
     } catch (error) {
       console.error('❌ Error in atomic auto-save:', error);
       
       // Manejo específico de errores de constraint
       if (error?.message?.includes('duplicate key value')) {
         console.log('🔄 Handling duplicate key error - will retry on next trigger');
-        // No lanzar error para duplicados, se resolverá en próximo guardado
         return;
       }
       
@@ -185,7 +191,104 @@ export class PayrollAutoSaveService {
     }
   }
 
-  // Nueva función para validar integridad del período
+  /**
+   * NUEVO: Método separado para upsert de empleados
+   */
+  private static async _upsertEmployees(
+    periodId: string, 
+    companyId: string, 
+    employees: any[]
+  ): Promise<void> {
+    // Obtener información del período para el campo 'periodo'
+    const { data: periodData } = await supabase
+      .from('payroll_periods_real')
+      .select('periodo')
+      .eq('id', periodId)
+      .single();
+
+    const periodoName = periodData?.periodo || `Período ${new Date().toLocaleDateString()}`;
+
+    const draftPayrolls = employees.map(employee => ({
+      company_id: companyId,
+      employee_id: employee.id,
+      period_id: periodId,
+      periodo: periodoName,
+      salario_base: employee.baseSalary || 0,
+      dias_trabajados: employee.workedDays || 30,
+      auxilio_transporte: employee.transportAllowance || 0,
+      total_devengado: employee.grossPay || 0,
+      total_deducciones: employee.deductions || 0,
+      neto_pagado: employee.netPay || 0,
+      estado: 'borrador'
+    }));
+
+    const { error: upsertError } = await supabase
+      .from('payrolls')
+      .upsert(draftPayrolls, {
+        onConflict: 'company_id,employee_id,period_id',
+        ignoreDuplicates: false
+      });
+
+    if (upsertError) {
+      console.error('❌ Upsert error:', upsertError);
+      throw upsertError;
+    }
+
+    console.log('✅ Employees upserted successfully:', draftPayrolls.length);
+  }
+
+  /**
+   * MEJORADO: Cargar empleados borrador excluyendo eliminados
+   */
+  static async loadDraftEmployeesFiltered(periodId: string): Promise<any[]> {
+    try {
+      const { data: draftPayrolls, error } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees:employee_id (
+            id, nombre, apellido, cargo, salario_base
+          )
+        `)
+        .eq('period_id', periodId)
+        .eq('estado', 'borrador');
+
+      if (error) {
+        throw error;
+      }
+
+      // Transform to PayrollEmployee format and filter valid employees
+      const employees = draftPayrolls?.filter(payroll => 
+        payroll.employees && 
+        payroll.employee_id && 
+        payroll.employees.id // Asegurar que el empleado existe
+      ).map(payroll => ({
+        id: payroll.employee_id,
+        name: `${payroll.employees?.nombre} ${payroll.employees?.apellido}`,
+        position: payroll.employees?.cargo || 'Empleado',
+        baseSalary: payroll.salario_base,
+        workedDays: payroll.dias_trabajados,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: payroll.bonificaciones || 0,
+        absences: 0,
+        grossPay: payroll.total_devengado,
+        deductions: payroll.total_deducciones,
+        netPay: payroll.neto_pagado,
+        status: 'valid' as const,
+        errors: [],
+        transportAllowance: payroll.auxilio_transporte,
+        employerContributions: 0
+      })) || [];
+
+      console.log('✅ Draft employees loaded and filtered:', employees.length);
+      return employees;
+    } catch (error) {
+      console.error('❌ Error loading filtered draft employees:', error);
+      throw error;
+    }
+  }
+
   private static async validatePeriodIntegrity(periodId: string, companyId: string): Promise<boolean> {
     try {
       const { data: period, error } = await supabase
@@ -244,49 +347,8 @@ export class PayrollAutoSaveService {
   }
 
   static async loadDraftEmployees(periodId: string): Promise<any[]> {
-    try {
-      const { data: draftPayrolls, error } = await supabase
-        .from('payrolls')
-        .select(`
-          *,
-          employees:employee_id (
-            id, nombre, apellido, cargo, salario_base
-          )
-        `)
-        .eq('period_id', periodId)
-        .eq('estado', 'borrador');
-
-      if (error) {
-        throw error;
-      }
-
-      // Transform to PayrollEmployee format and filter valid employees
-      const employees = draftPayrolls?.filter(payroll => payroll.employees && payroll.employee_id)
-        .map(payroll => ({
-          id: payroll.employee_id,
-          name: `${payroll.employees?.nombre} ${payroll.employees?.apellido}`,
-          position: payroll.employees?.cargo || 'Empleado',
-          baseSalary: payroll.salario_base,
-          workedDays: payroll.dias_trabajados,
-          extraHours: 0,
-          disabilities: 0,
-          bonuses: payroll.bonificaciones || 0,
-          absences: 0,
-          grossPay: payroll.total_devengado,
-          deductions: payroll.total_deducciones,
-          netPay: payroll.neto_pagado,
-          status: 'valid' as const,
-          errors: [],
-          transportAllowance: payroll.auxilio_transporte,
-          employerContributions: 0
-        })) || [];
-
-      console.log('✅ Draft employees loaded and validated:', employees.length);
-      return employees;
-    } catch (error) {
-      console.error('❌ Error loading draft employees:', error);
-      throw error;
-    }
+    // Usar el método mejorado que filtra empleados eliminados
+    return this.loadDraftEmployeesFiltered(periodId);
   }
 
   static async updatePeriodActivity(periodId: string): Promise<void> {
@@ -294,7 +356,7 @@ export class PayrollAutoSaveService {
       await supabase
         .from('payroll_periods_real')
         .update({ 
-          updated_at: new Date().toISOString() // This will trigger the activity update
+          updated_at: new Date().toISOString()
         })
         .eq('id', periodId);
     } catch (error) {
