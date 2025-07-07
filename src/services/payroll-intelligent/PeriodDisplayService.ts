@@ -20,8 +20,11 @@ export class PeriodDisplayService {
    * MÉTODO PRINCIPAL - Genera toda la información del período de manera consistente
    */
   static generatePeriodInfo(startDate: string, endDate: string, companyId?: string): PeriodInfo {
+    console.log('🔍 PERIOD DISPLAY SERVICE - Input:', { startDate, endDate, companyId });
+    
     // Validar fechas
     if (!this.isValidDateRange(startDate, endDate)) {
+      console.log('❌ Invalid date range detected');
       return {
         name: `${startDate} - ${endDate}`,
         type: 'mensual',
@@ -33,12 +36,15 @@ export class PeriodDisplayService {
 
     // Calcular días reales
     const days = this.calculateDaysBetween(startDate, endDate);
+    console.log('📊 Days calculated:', days);
     
     // Determinar tipo de período basado en días
     const type = this.determinePeriodType(days);
+    console.log('📋 Period type determined:', type);
     
     // Generar nombre base
     const baseName = this.generateBaseName(startDate, endDate, type);
+    console.log('🏷️ Base name generated:', baseName);
     
     // Si es posible, calcular número ordinal y generar nombre semántico
     let number: number | undefined;
@@ -46,13 +52,16 @@ export class PeriodDisplayService {
     
     if (companyId) {
       number = this.calculatePeriodNumber(startDate, type);
+      console.log('🔢 Period number calculated:', number);
+      
       if (number) {
         const year = parseInt(startDate.split('-')[0]);
         semanticName = this.generateSemanticName(number, type, year);
+        console.log('✨ Semantic name generated:', semanticName);
       }
     }
 
-    return {
+    const result = {
       name: semanticName || baseName,
       type,
       number,
@@ -61,6 +70,9 @@ export class PeriodDisplayService {
       endDate,
       isValid: true
     };
+
+    console.log('✅ PERIOD DISPLAY SERVICE - Final result:', result);
+    return result;
   }
 
   /**
@@ -83,22 +95,46 @@ export class PeriodDisplayService {
     );
     
     const diffTime = end.getTime() - start.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    
+    console.log('🧮 Date calculation details:', {
+      startDate,
+      endDate,
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+      diffTime,
+      days
+    });
+    
+    return days;
   }
 
   /**
    * Determinar tipo de período basado en número de días
    */
   private static determinePeriodType(days: number): 'semanal' | 'quincenal' | 'mensual' {
-    if (days <= 7) return 'semanal';
-    if (days <= 16) return 'quincenal';
-    return 'mensual';
+    console.log('🎯 Determining period type for days:', days);
+    
+    let type: 'semanal' | 'quincenal' | 'mensual';
+    
+    if (days <= 7) {
+      type = 'semanal';
+    } else if (days <= 16) {
+      type = 'quincenal';
+    } else {
+      type = 'mensual';
+    }
+    
+    console.log('📊 Period type decision:', { days, type });
+    return type;
   }
 
   /**
    * Generar nombre base del período
    */
   private static generateBaseName(startDate: string, endDate: string, type: 'semanal' | 'quincenal' | 'mensual'): string {
+    console.log('🏷️ Generating base name for:', { startDate, endDate, type });
+    
     const startParts = startDate.split('-');
     const endParts = endDate.split('-');
     
@@ -121,52 +157,70 @@ export class PeriodDisplayService {
       
       // Verificar si es primera quincena (1-15)
       if (startDay === 1 && endDay === 15) {
-        return `1 - 15 ${monthName} ${startYear}`;
+        const name = `1 - 15 ${monthName} ${startYear}`;
+        console.log('📅 First fortnight detected:', name);
+        return name;
       }
       
       // Verificar si es segunda quincena (16-fin de mes)
       if (startDay === 16) {
-        return `16 - ${endDay} ${monthName} ${startYear}`;
+        const name = `16 - ${endDay} ${monthName} ${startYear}`;
+        console.log('📅 Second fortnight detected:', name);
+        return name;
       }
       
       // Verificar si es mes completo
       const lastDayOfMonth = new Date(startYear, startMonth + 1, 0).getDate();
       if (startDay === 1 && endDay === lastDayOfMonth) {
-        return `${monthName} ${startYear}`;
+        const name = `${monthName} ${startYear}`;
+        console.log('📅 Full month detected:', name);
+        return name;
       }
       
       // Período personalizado dentro del mismo mes
-      return `${startDay} - ${endDay} ${monthName} ${startYear}`;
+      const name = `${startDay} - ${endDay} ${monthName} ${startYear}`;
+      console.log('📅 Custom period within same month:', name);
+      return name;
     }
 
     // Rango entre diferentes meses
     const startMonthName = monthNames[startMonth];
     const endMonthName = monthNames[endMonth];
     
+    let name: string;
     if (startYear === endYear) {
-      return `${startDay} ${startMonthName} - ${endDay} ${endMonthName} ${startYear}`;
+      name = `${startDay} ${startMonthName} - ${endDay} ${endMonthName} ${startYear}`;
     } else {
-      return `${startDay} ${startMonthName} ${startYear} - ${endDay} ${endMonthName} ${endYear}`;
+      name = `${startDay} ${startMonthName} ${startYear} - ${endDay} ${endMonthName} ${endYear}`;
     }
+    
+    console.log('📅 Cross-month period:', name);
+    return name;
   }
 
   /**
    * Calcular número ordinal del período en el año
    */
   private static calculatePeriodNumber(startDate: string, type: 'semanal' | 'quincenal' | 'mensual'): number | undefined {
+    console.log('🔢 Calculating period number for:', { startDate, type });
+    
     const startParts = startDate.split('-');
     const month = parseInt(startParts[1]); // 1-12
     const day = parseInt(startParts[2]);
 
+    let number: number | undefined;
+
     switch (type) {
       case 'mensual':
-        return month;
+        number = month;
+        break;
         
       case 'quincenal':
         // Contar quincenas hasta este punto
         const previousMonthsQuincenas = (month - 1) * 2;
         const currentQuincena = day <= 15 ? 1 : 2;
-        return previousMonthsQuincenas + currentQuincena;
+        number = previousMonthsQuincenas + currentQuincena;
+        break;
         
       case 'semanal':
         // Para semanal, usar aproximación basada en semanas del año
@@ -175,34 +229,48 @@ export class PeriodDisplayService {
           parseInt(startParts[1]) - 1,
           parseInt(startParts[2])
         );
-        return Math.ceil((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+        number = Math.ceil((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+        break;
         
       default:
-        return undefined;
+        number = undefined;
     }
+
+    console.log('🔢 Period number result:', { type, month, day, number });
+    return number;
   }
 
   /**
    * Generar nombre semántico basado en número ordinal
    */
   private static generateSemanticName(number: number, type: 'semanal' | 'quincenal' | 'mensual', year: number): string {
+    console.log('✨ Generating semantic name:', { number, type, year });
+    
+    let name: string;
+    
     switch (type) {
       case 'mensual':
         const monthNames = [
           'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
         ];
-        return `${monthNames[number - 1]} ${year}`;
+        name = `${monthNames[number - 1]} ${year}`;
+        break;
         
       case 'quincenal':
-        return `Quincena ${number} del ${year}`;
+        name = `Quincena ${number} del ${year}`;
+        break;
         
       case 'semanal':
-        return `Semana ${number} del ${year}`;
+        name = `Semana ${number} del ${year}`;
+        break;
         
       default:
-        return `Período ${number} del ${year}`;
+        name = `Período ${number} del ${year}`;
     }
+    
+    console.log('✨ Semantic name result:', name);
+    return name;
   }
 
   /**
@@ -228,7 +296,9 @@ export class PeriodDisplayService {
       parseInt(endParts[2])
     );
     
-    return start <= end && !isNaN(start.getTime()) && !isNaN(end.getTime());
+    const isValid = start <= end && !isNaN(start.getTime()) && !isNaN(end.getTime());
+    console.log('✅ Date range validation:', { startDate, endDate, isValid });
+    return isValid;
   }
 
   /**

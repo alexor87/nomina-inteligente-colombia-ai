@@ -21,10 +21,14 @@ export class PayrollPeriodDetectionService {
   
   static async detectPeriodForSelectedDates(startDate: string, endDate: string): Promise<PeriodDetectionResult> {
     try {
+      console.log('🔍 DETECTION SERVICE - Starting detection for:', { startDate, endDate });
+      
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
+
+      console.log('🏢 DETECTION SERVICE - Company ID:', companyId);
 
       // PASO 1: Buscar período exacto con las fechas seleccionadas
       const { data: exactPeriod, error: exactError } = await supabase
@@ -36,12 +40,13 @@ export class PayrollPeriodDetectionService {
         .maybeSingle();
 
       if (exactError) {
-        console.error('❌ Error buscando período exacto:', exactError);
+        console.error('❌ DETECTION SERVICE - Error searching exact period:', exactError);
         throw exactError;
       }
 
       // Si existe período exacto, continuar con él
       if (exactPeriod) {
+        console.log('✅ DETECTION SERVICE - Exact period found:', exactPeriod.periodo);
         return {
           hasActivePeriod: true,
           activePeriod: exactPeriod,
@@ -66,24 +71,26 @@ export class PayrollPeriodDetectionService {
         .order('created_at', { ascending: false });
 
       if (overlapError) {
-        console.error('❌ Error buscando períodos solapados:', overlapError);
+        console.error('❌ DETECTION SERVICE - Error searching overlapping periods:', overlapError);
         throw overlapError;
       }
 
       // Si hay períodos solapados, mostrar conflicto
       if (overlappingPeriods && overlappingPeriods.length > 0) {
         const conflictPeriod = overlappingPeriods[0];
+        console.log('⚠️ DETECTION SERVICE - Conflict detected with:', conflictPeriod.periodo);
         
-        // Usar el servicio centralizado para generar la información del período
+        // CRÍTICO: Usar el servicio centralizado EXACTAMENTE con las fechas seleccionadas
         const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate, companyId);
+        console.log('📋 DETECTION SERVICE - Generated period info for conflict:', periodInfo);
         
         return {
           hasActivePeriod: false,
           suggestedAction: 'conflict',
           message: `Existe un período abierto que se solapa: ${conflictPeriod.periodo}`,
           periodData: {
-            startDate,
-            endDate,
+            startDate, // PRESERVAR fechas originales
+            endDate,   // PRESERVAR fechas originales
             periodName: periodInfo.name,
             type: periodInfo.type
           },
@@ -92,8 +99,10 @@ export class PayrollPeriodDetectionService {
       }
 
       // PASO 3: No hay conflictos, crear nuevo período
-      // Usar el servicio centralizado para generar toda la información
+      // CRÍTICO: Usar el servicio centralizado EXACTAMENTE con las fechas seleccionadas
+      console.log('🆕 DETECTION SERVICE - No conflicts, generating new period info');
       const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate, companyId);
+      console.log('📋 DETECTION SERVICE - Generated period info:', periodInfo);
       
       // Calcular número de período si es posible
       let warningMessage = '';
@@ -109,22 +118,25 @@ export class PayrollPeriodDetectionService {
         }
       }
       
-      return {
+      const result = {
         hasActivePeriod: false,
-        suggestedAction: 'create',
+        suggestedAction: 'create' as const,
         message: `Crear nuevo período: ${periodInfo.name}${warningMessage}`,
         periodData: {
-          startDate,
-          endDate,
+          startDate, // PRESERVAR fechas originales
+          endDate,   // PRESERVAR fechas originales
           periodName: periodInfo.name,
           type: periodInfo.type
         }
       };
 
+      console.log('✅ DETECTION SERVICE - Final result:', result);
+      return result;
+
     } catch (error) {
-      console.error('💥 Error en detección de período:', error);
+      console.error('💥 DETECTION SERVICE - Critical error:', error);
       
-      // Usar el servicio centralizado para el fallback
+      // CRÍTICO: Usar el servicio centralizado para el fallback
       const periodInfo = PeriodDisplayService.generatePeriodInfo(startDate, endDate);
       
       return {
@@ -132,8 +144,8 @@ export class PayrollPeriodDetectionService {
         suggestedAction: 'create',
         message: 'Error detectando período. Se creará un nuevo período.',
         periodData: {
-          startDate,
-          endDate,
+          startDate, // PRESERVAR fechas originales
+          endDate,   // PRESERVAR fechas originales
           periodName: periodInfo.name,
           type: periodInfo.type
         }
@@ -206,53 +218,6 @@ export class PayrollPeriodDetectionService {
         periodData
       };
     }
-  }
-
-  /**
-   * Detectar tipo de período basado en días reales
-   */
-  private static detectPeriodType(startDate: string, endDate: string): 'semanal' | 'quincenal' | 'mensual' {
-    console.log('🔍 DETECTANDO TIPO DE PERÍODO (CORREGIDO):', { startDate, endDate });
-    
-    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
-    const startParts = startDate.split('-');
-    const endParts = endDate.split('-');
-    
-    const start = new Date(
-      parseInt(startParts[0]),     // year
-      parseInt(startParts[1]) - 1, // month (0-indexed)
-      parseInt(startParts[2])      // day
-    );
-    
-    const end = new Date(
-      parseInt(endParts[0]),       // year
-      parseInt(endParts[1]) - 1,   // month (0-indexed)
-      parseInt(endParts[2])        // day
-    );
-    
-    // Calcular diferencia en días (inclusivo)
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    
-    console.log('📊 CÁLCULO DE DÍAS CORREGIDO:', { 
-      start: start.toDateString(), 
-      end: end.toDateString(), 
-      diffDays 
-    });
-    
-    let periodType: 'semanal' | 'quincenal' | 'mensual';
-    
-    if (diffDays <= 7) {
-      periodType = 'semanal';
-    } else if (diffDays <= 16) {
-      periodType = 'quincenal';
-    } else {
-      periodType = 'mensual';
-    }
-    
-    console.log('✅ TIPO DE PERÍODO DETECTADO:', { diffDays, periodType });
-    
-    return periodType;
   }
 
   private static async getCurrentUserCompanyId(): Promise<string | null> {

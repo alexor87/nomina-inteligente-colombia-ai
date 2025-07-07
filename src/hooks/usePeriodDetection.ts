@@ -26,38 +26,55 @@ export const usePeriodDetection = () => {
       setIsDetecting(true);
       setError(null);
       
-      console.log('🔍 Iniciando detección para fechas seleccionadas:', { startDate, endDate });
+      console.log('🔍 HOOK - Starting period detection for selected dates:', { startDate, endDate });
       
-      // Usar el nuevo método que respeta las fechas seleccionadas
+      // CRÍTICO: Usar el nuevo método que respeta las fechas seleccionadas
       const result = await PayrollPeriodDetectionService.detectPeriodForSelectedDates(startDate, endDate);
       
-      console.log('📊 Resultado de detección:', result);
+      console.log('📊 HOOK - Detection result received:', result);
+      
+      // ASEGURAR que las fechas originales se preserven
+      if (result.periodData) {
+        result.periodData.startDate = startDate;
+        result.periodData.endDate = endDate;
+        console.log('🔒 HOOK - Dates preserved in result:', {
+          original: { startDate, endDate },
+          preserved: { 
+            startDate: result.periodData.startDate, 
+            endDate: result.periodData.endDate 
+          }
+        });
+      }
       
       setPeriodInfo(result);
       
       return result;
     } catch (error) {
-      console.error('❌ Error detectando período:', error);
+      console.error('❌ HOOK - Error detecting period:', error);
       setError('Error detectando información del período');
       
       // Fallback: crear nuevo período con las fechas seleccionadas
-      setPeriodInfo({
+      const fallbackResult = {
         hasActivePeriod: false,
-        suggestedAction: 'create',
+        suggestedAction: 'create' as const,
         message: 'Se creará un nuevo período para las fechas seleccionadas',
         periodData: {
           startDate,
           endDate,
           periodName: `Período ${startDate} - ${endDate}`,
-          type: 'mensual'
+          type: 'mensual' as const
         }
-      });
+      };
+      
+      console.log('🆘 HOOK - Using fallback result:', fallbackResult);
+      setPeriodInfo(fallbackResult);
     } finally {
       setIsDetecting(false);
     }
   }, []);
 
   const reset = useCallback(() => {
+    console.log('🔄 HOOK - Resetting period detection state');
     setPeriodInfo(null);
     setError(null);
     setIsDetecting(false);
