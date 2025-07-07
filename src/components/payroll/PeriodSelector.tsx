@@ -29,26 +29,46 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    loadAvailablePeriods();
+    if (companyId) {
+      console.log('🎯 PeriodSelector: Cargando períodos para company:', companyId);
+      loadAvailablePeriods();
+    }
   }, [companyId]);
 
   const loadAvailablePeriods = async () => {
-    if (!companyId) return;
+    if (!companyId) {
+      console.error('❌ No company ID provided to PeriodSelector');
+      return;
+    }
     
     setIsLoading(true);
     try {
+      console.log('📋 Cargando períodos disponibles...');
       const availablePeriods = await PeriodGenerationService.getAvailablePeriods(companyId);
+      
+      console.log(`✅ Períodos cargados:`, availablePeriods);
       setPeriods(availablePeriods);
       
-      // Auto-seleccionar el siguiente período disponible
+      // Auto-seleccionar el primer período disponible
       const nextPeriod = availablePeriods.find(p => p.can_select);
       if (nextPeriod?.id) {
         setSelectedPeriodId(nextPeriod.id);
+        console.log('🎯 Auto-seleccionado período:', nextPeriod.etiqueta_visible);
       }
       
-      console.log(`📋 Cargados ${availablePeriods.length} períodos`);
+      if (availablePeriods.length === 0) {
+        console.warn('⚠️ No se encontraron períodos disponibles');
+        toast({
+          title: "Sin períodos",
+          description: "No se encontraron períodos disponibles para esta empresa",
+          variant: "destructive"
+        });
+      } else {
+        console.log(`📊 Total períodos: ${availablePeriods.length}, Disponibles: ${availablePeriods.filter(p => p.can_select).length}`);
+      }
+      
     } catch (error) {
-      console.error('Error cargando períodos:', error);
+      console.error('❌ Error cargando períodos:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los períodos disponibles",
@@ -79,6 +99,7 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
       return;
     }
     
+    console.log('✅ Período seleccionado para liquidación:', selectedPeriod.etiqueta_visible);
     onPeriodSelect(selectedPeriod);
   };
 
@@ -88,7 +109,6 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
   };
 
   const getStatusBadge = (period: AvailablePeriod) => {
-    // Corregido: usar los estados correctos de la base de datos
     if (period.estado === 'cerrado') {
       return <Badge variant="secondary" className="text-xs">Liquidado</Badge>;
     }
