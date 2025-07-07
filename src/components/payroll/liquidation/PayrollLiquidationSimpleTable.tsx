@@ -1,36 +1,32 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  MoreHorizontal, 
-  Trash2, 
-  FileText, 
-  Search,
-  Loader2,
-  AlertCircle 
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, Trash2 } from 'lucide-react';
 import { PayrollEmployee } from '@/types/payroll';
-import { formatCurrency } from '@/lib/utils';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
-import { useNovedades } from '@/hooks/useNovedades';
+import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
+import { formatCurrency } from '@/lib/utils';
+import { ConfigurationService } from '@/services/ConfigurationService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
   startDate: string;
   endDate: string;
   currentPeriodId: string | undefined;
-  onRemoveEmployee: (employeeId: string) => void;
   onEmployeeNovedadesChange: (employeeId: string) => Promise<void>;
+  onRemoveEmployee?: (employeeId: string) => void;
 }
 
 export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTableProps> = ({
@@ -38,284 +34,252 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   startDate,
   endDate,
   currentPeriodId,
-  onRemoveEmployee,
-  onEmployeeNovedadesChange
+  onEmployeeNovedadesChange,
+  onRemoveEmployee
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
-  const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
-  const [removingEmployeeId, setRemovingEmployeeId] = useState<string | null>(null);
+  const [novedadModalOpen, setNovedadModalOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
+  const { toast } = useToast();
 
-  const { createNovedad } = useNovedades(currentPeriodId || '');
+  const {
+    loadNovedadesTotals,
+    createNovedad,
+    getEmployeeNovedades,
+    refreshEmployeeNovedades,
+    isCreating,
+    lastRefreshTime
+  } = usePayrollNovedadesUnified(currentPeriodId || '');
 
-  const filteredEmployees = employees.filter(employee =>
-    employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleRemoveEmployee = async (employeeId: string) => {
-    const employee = employees.find(emp => emp.id === employeeId);
-    if (!employee) return;
-
-    const confirmMessage = `¿Estás seguro que deseas eliminar a ${employee.name} de esta liquidación?\n\nEsta acción eliminará al empleado permanentemente de este período de nómina.`;
-    
-    if (window.confirm(confirmMessage)) {
-      setRemovingEmployeeId(employeeId);
-      try {
-        await onRemoveEmployee(employeeId);
-      } finally {
-        setRemovingEmployeeId(null);
-      }
+  // Cargar novedades cuando se monten los empleados o cambie el período
+  useEffect(() => {
+    if (employees.length > 0 && currentPeriodId) {
+      console.log('📊 Cargando novedades para empleados, período:', currentPeriodId);
+      const employeeIds = employees.map(emp => emp.id);
+      loadNovedadesTotals(employeeIds);
     }
+  }, [employees, currentPeriodId, loadNovedadesTotals]);
+
+  // Calcular días trabajados basado en las fechas del período
+  const calculateWorkedDays = () => {
+    if (!startDate || !endDate) return 30;
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    
+    return Math.max(1, diffDays);
+  };
+
+  const workedDays = calculateWorkedDays();
+
+  // Obtener configuración legal actual
+  const getCurrentYearConfig = () => {
+    const currentYear = new Date().getFullYear().toString();
+    return ConfigurationService.getConfiguration(currentYear);
   };
 
   const handleOpenNovedadModal = (employee: PayrollEmployee) => {
-    console.log('🔄 Abriendo modal de novedades para empleado:', employee.name);
+    console.log('📝 Abriendo modal de novedades para:', employee.name);
     setSelectedEmployee(employee);
-    setIsNovedadModalOpen(true);
+    setNovedadModalOpen(true);
   };
 
-  const handleCreateNovedad = async (data: CreateNovedadData) => {
-    if (!selectedEmployee || !currentPeriodId) return;
-    
-    console.log('📝 Creando novedad con callback de sincronización:', data);
-    
-    try {
-      const novedadData: CreateNovedadData = {
-        empleado_id: selectedEmployee.id,
-        periodo_id: currentPeriodId,
-        ...data
-      };
-      
-      await createNovedad(novedadData);
-      
-      // ✅ CALLBACK DE SINCRONIZACIÓN - Refrescar novedades del empleado
-      console.log('🔄 Ejecutando callback de sincronización para empleado:', selectedEmployee.id);
-      await onEmployeeNovedadesChange(selectedEmployee.id);
-      
-      console.log('✅ Sincronización completada exitosamente');
-    } catch (error) {
-      console.error('❌ Error en callback de sincronización:', error);
-      throw error;
-    }
-  };
-
-  const handleCloseNovedadModal = async () => {
-    console.log('🔄 Cerrando modal de novedades y ejecutando callback final');
-    
-    // ✅ CALLBACK AL CERRAR - Asegurar sincronización final
-    if (selectedEmployee) {
-      try {
-        await onEmployeeNovedadesChange(selectedEmployee.id);
-        console.log('✅ Callback final de sincronización ejecutado');
-      } catch (error) {
-        console.error('❌ Error en callback final:', error);
-      }
-    }
-    
-    setIsNovedadModalOpen(false);
+  const handleCloseNovedadModal = () => {
+    setNovedadModalOpen(false);
     setSelectedEmployee(null);
   };
 
-  if (employees.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          No hay empleados cargados
-        </h3>
-        <p className="text-gray-500">
-          Selecciona un período para cargar los empleados
-        </p>
-      </div>
-    );
-  }
+  const handleNovedadSubmit = async (data: CreateNovedadData) => {
+    if (!selectedEmployee || !currentPeriodId) {
+      console.warn('⚠️ Faltan datos necesarios para crear novedad');
+      return;
+    }
+
+    console.log('💾 Creando novedad:', data);
+    
+    try {
+      const result = await createNovedad({
+        ...data,
+        empleado_id: selectedEmployee.id,
+        periodo_id: currentPeriodId
+      });
+      
+      if (result) {
+        // Cerrar modal
+        handleCloseNovedadModal();
+        
+        // Notificar al componente padre para actualización general
+        await onEmployeeNovedadesChange(selectedEmployee.id);
+        
+        console.log('✅ Novedad creada y sincronizada exitosamente');
+      }
+    } catch (error) {
+      console.error('❌ Error en creación de novedad:', error);
+    }
+  };
+
+  const handleDeleteEmployee = (employee: PayrollEmployee) => {
+    setEmployeeToDelete(employee);
+  };
+
+  const confirmDeleteEmployee = () => {
+    if (employeeToDelete && onRemoveEmployee) {
+      onRemoveEmployee(employeeToDelete.id);
+      toast({
+        title: "✅ Empleado removido",
+        description: `${employeeToDelete.name} ha sido removido de esta liquidación`,
+        className: "border-orange-200 bg-orange-50"
+      });
+      setEmployeeToDelete(null);
+    }
+  };
+
+  const cancelDeleteEmployee = () => {
+    setEmployeeToDelete(null);
+  };
+
+  const calculateTotalToPay = (employee: PayrollEmployee) => {
+    const config = getCurrentYearConfig();
+    const novedades = getEmployeeNovedades(employee.id);
+    
+    // Salario proporcional según días trabajados
+    const salarioProporcional = (employee.baseSalary / 30) * workedDays;
+    
+    // Base gravable: salario proporcional + novedades netas
+    const baseGravable = salarioProporcional + novedades.totalNeto;
+    
+    // Deducciones de ley sobre base gravable
+    const saludEmpleado = baseGravable * config.porcentajes.saludEmpleado;
+    const pensionEmpleado = baseGravable * config.porcentajes.pensionEmpleado;
+    const totalDeducciones = saludEmpleado + pensionEmpleado;
+    
+    // Auxilio de transporte proporcional (solo si salario ≤ 2 SMMLV)
+    const auxilioTransporte = employee.baseSalary <= (config.salarioMinimo * 2) 
+      ? (config.auxilioTransporte / 30) * workedDays 
+      : 0;
+    
+    // Total a pagar = base gravable - deducciones + auxilio de transporte
+    const totalNeto = baseGravable - totalDeducciones + auxilioTransporte;
+    
+    return Math.max(0, totalNeto);
+  };
 
   return (
     <>
-      <div className="space-y-4">
-        {/* Search Header */}
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              type="text"
-              placeholder="Buscar empleado por nombre o ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="text-sm text-gray-500">
-            {filteredEmployees.length} de {employees.length} empleados
-          </div>
-        </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre Empleado</TableHead>
+            <TableHead className="text-right">Salario Base</TableHead>
+            <TableHead className="text-center">Días Trabajados</TableHead>
+            <TableHead className="text-center">Novedades</TableHead>
+            <TableHead className="text-right">Total a Pagar Período</TableHead>
+            <TableHead className="text-center">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {employees.map((employee) => {
+            const novedades = getEmployeeNovedades(employee.id);
+            const totalToPay = calculateTotalToPay(employee);
+            const hasNovedades = novedades.hasNovedades;
 
-        {/* Employee Table */}
-        <div className="bg-white rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">
-                    Empleado
-                  </th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
-                    Salario Base
-                  </th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
-                    Bonificaciones
-                  </th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
-                    Deducciones
-                  </th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
-                    Neto a Pagar
-                  </th>
-                  <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredEmployees.map((employee) => (
-                  <tr 
-                    key={employee.id} 
-                    className={`hover:bg-gray-50 transition-colors ${
-                      removingEmployeeId === employee.id ? 'opacity-50' : ''
-                    }`}
-                  >
-                    <td className="px-4 py-4">
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={`https://avatar.vercel.sh/${employee.name}`} />
-                          <AvatarFallback className="text-xs">
-                            {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {employee.name}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            ID: {employee.id.slice(0, 8)}...
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {employee.position}
-                          </p>
-                        </div>
+            return (
+              <TableRow key={employee.id}>
+                <TableCell>
+                  <div className="font-medium">{employee.name}</div>
+                  <div className="text-sm text-gray-500">{employee.position}</div>
+                </TableCell>
+                
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(employee.baseSalary)}
+                </TableCell>
+                
+                <TableCell className="text-center font-medium">
+                  {workedDays} días
+                </TableCell>
+                
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center space-x-2">
+                    {hasNovedades && (
+                      <div className={`text-sm font-medium ${
+                        novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {novedades.totalNeto >= 0 ? '+' : ''}{formatCurrency(novedades.totalNeto)}
                       </div>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <span className="text-sm font-medium text-gray-900">
-                        {formatCurrency(employee.baseSalary)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <span className="text-sm font-medium text-green-600">
-                        {formatCurrency(employee.bonuses)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <span className="text-sm font-medium text-red-600">
-                        {formatCurrency(employee.deductions)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <span className="text-sm font-bold text-blue-600">
-                        {formatCurrency(employee.netPay)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenNovedadModal(employee)}
-                          className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          Novedades
-                        </Button>
-                        
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              disabled={removingEmployeeId === employee.id}
-                            >
-                              {removingEmployeeId === employee.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <MoreHorizontal className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleRemoveEmployee(employee.id)}
-                              className="text-red-600 focus:text-red-600"
-                              disabled={removingEmployeeId === employee.id}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenNovedadModal(employee)}
+                      disabled={isCreating}
+                      className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+                
+                <TableCell className="text-right font-semibold text-lg">
+                  {formatCurrency(totalToPay)}
+                </TableCell>
 
-        {/* Summary Row */}
-        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-sm text-gray-600">Total Empleados</div>
-              <div className="text-lg font-semibold text-gray-900">
-                {filteredEmployees.length}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600">Total Salarios</div>
-              <div className="text-lg font-semibold text-gray-900">
-                {formatCurrency(filteredEmployees.reduce((sum, emp) => sum + emp.baseSalary, 0))}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600">Total Bonificaciones</div>
-              <div className="text-lg font-semibold text-green-600">
-                {formatCurrency(filteredEmployees.reduce((sum, emp) => sum + emp.bonuses, 0))}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600">Total Neto</div>
-              <div className="text-lg font-semibold text-blue-600">
-                {formatCurrency(filteredEmployees.reduce((sum, emp) => sum + emp.netPay, 0))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+                <TableCell className="text-center">
+                  {onRemoveEmployee && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteEmployee(employee)}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
 
-      {/* Novedad Modal with Synchronization Callback */}
-      {selectedEmployee && (
+      {/* Modal de novedades */}
+      {selectedEmployee && currentPeriodId && (
         <NovedadUnifiedModal
-          open={isNovedadModalOpen}
-          setOpen={setIsNovedadModalOpen}
+          open={novedadModalOpen}
+          setOpen={setNovedadModalOpen}
           employeeId={selectedEmployee.id}
           employeeSalary={selectedEmployee.baseSalary}
-          periodId={currentPeriodId || ''}
-          onSubmit={handleCreateNovedad}
+          periodId={currentPeriodId}
+          onSubmit={handleNovedadSubmit}
           selectedNovedadType={null}
           onClose={handleCloseNovedadModal}
         />
       )}
+
+      {/* Confirmation Dialog for Delete */}
+      <AlertDialog open={!!employeeToDelete} onOpenChange={cancelDeleteEmployee}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Remover empleado de la liquidación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas remover a <strong>{employeeToDelete?.name}</strong> de esta liquidación? 
+              Esta acción no afectará el registro del empleado en el módulo de empleados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDeleteEmployee}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteEmployee}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
