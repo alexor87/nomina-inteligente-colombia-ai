@@ -6,6 +6,7 @@ import { PayrollDeletionService } from '@/services/PayrollDeletionService';
 import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
 import { PayrollEmployee } from '@/types/payroll';
 import { usePayrollAutoSave } from './usePayrollAutoSave';
+import { usePayrollIntelligentLoad } from './usePayrollIntelligentLoad';
 
 interface DBEmployee {
   id: string;
@@ -42,20 +43,21 @@ export const usePayrollLiquidation = () => {
   const [isRemovingEmployee, setIsRemovingEmployee] = useState(false);
   const { toast } = useToast();
 
-  // Auto-save integration - MEJORADO para limpiar IDs solo después de eliminación exitosa
+  // Intelligent load hook
+  const { intelligentLoad, isLoading: isIntelligentLoading } = usePayrollIntelligentLoad();
+
+  // Auto-save integration
   const { triggerAutoSave, isSaving, lastSaveTime } = usePayrollAutoSave({
     periodId: currentPeriodId,
     employees,
     removedEmployeeIds,
     enabled: true,
     onSaveSuccess: () => {
-      // NUEVO: Solo limpiar removed IDs después de confirmación de guardado exitoso
       console.log('✅ Auto-save success callback - clearing removed employee IDs');
       setRemovedEmployeeIds([]);
     }
   });
 
-  // 
   useEffect(() => {
     checkForActivePeriod();
   }, []);
@@ -84,52 +86,23 @@ export const usePayrollLiquidation = () => {
     }
   };
 
-  /**
-   * MEJORADO: Recovery que NO limpia removedEmployeeIds automáticamente
-   */
   const recoverActivePeriod = async (activePeriod: any) => {
     setIsRecovering(true);
     try {
-      console.log('🔄 Recovering active period with improved logic:', activePeriod.id);
+      console.log('🔄 Recovering active period with intelligent load:', activePeriod.id);
       
       // Set period info
       setCurrentPeriodId(activePeriod.id);
       setStartDate(activePeriod.fecha_inicio);
       setEndDate(activePeriod.fecha_fin);
       
-      // CRÍTICO: NO limpiar removedEmployeeIds aquí
-      // Dejar que el recovery respete eliminaciones previas
-      
-      // Load draft employees with FILTERED validation (excluye eliminados)
-      const draftEmployees = await PayrollAutoSaveService.loadDraftEmployeesFiltered(activePeriod.id);
-      
-      // Additional validation: filter out any employees that might be corrupted
-      const validEmployees = draftEmployees.filter(emp => emp.id && emp.name);
-      
-      // Load and recalculate novedades for each employee
-      const employeesWithNovedades = await Promise.all(
-        validEmployees.map(async (employee) => {
-          console.log(`🔄 Recalculating novedades for employee: ${employee.name}`);
-          
-          const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
-            employee.id,
-            activePeriod.id
-          );
-          
-          return {
-            ...employee,
-            bonuses: novedadesTotals.totalDevengos,
-            deductions: employee.deductions + novedadesTotals.totalDeducciones,
-            netPay: employee.grossPay + novedadesTotals.totalDevengos - (employee.deductions + novedadesTotals.totalDeducciones)
-          };
-        })
-      );
-      
-      setEmployees(employeesWithNovedades);
+      // USAR INTELLIGENT LOAD para recovery
+      const result = await intelligentLoad(activePeriod.fecha_inicio, activePeriod.fecha_fin);
+      setEmployees(result.employees);
       
       toast({
         title: "Liquidación recuperada",
-        description: `Se recuperó la liquidación con ${employeesWithNovedades.length} empleados`,
+        description: `Se recuperó la liquidación con ${result.employees.length} empleados`,
         className: "border-blue-200 bg-blue-50"
       });
       
@@ -145,95 +118,30 @@ export const usePayrollLiquidation = () => {
     }
   };
 
-  // 
-  const transformEmployee = (dbEmployee: DBEmployee): PayrollEmployee => ({
-    id: dbEmployee.id,
-    name: `${dbEmployee.nombre} ${dbEmployee.apellido}`,
-    position: 'Empleado',
-    baseSalary: dbEmployee.salario_base,
-    workedDays: dbEmployee.dias_trabajados,
-    extraHours: 0,
-    disabilities: 0,
-    bonuses: dbEmployee.devengos,
-    absences: 0,
-    grossPay: dbEmployee.total_pagar + dbEmployee.deducciones,
-    deductions: dbEmployee.deducciones,
-    netPay: dbEmployee.total_pagar,
-    status: 'valid',
-    errors: [],
-    transportAllowance: dbEmployee.auxilio_transporte,
-    employerContributions: 0
-  });
-
   const loadEmployees = async (startDate: string, endDate: string) => {
     setIsLoading(true);
     setStartDate(startDate);
     setEndDate(endDate);
     
-    // CRÍTICO: Limpiar removed employee IDs solo cuando cargamos nuevos empleados
+    // Limpiar removed employee IDs solo cuando cargamos nuevos empleados
     setRemovedEmployeeIds([]);
     
     try {
-      console.log('🔄 usePayrollLiquidation - Loading employees for period:', { startDate, endDate });
+      console.log('🧠 usePayrollLiquidation - Using INTELLIGENT LOAD for dates:', { startDate, endDate });
       
-      const employeesData = await PayrollLiquidationService.loadEmployeesForPeriod(startDate, endDate);
+      const result = await intelligentLoad(startDate, endDate);
       
-      const periodId = await PayrollLiquidationService.ensurePeriodExists(startDate, endDate);
-      setCurrentPeriodId(periodId);
+      setCurrentPeriodId(result.periodId);
+      setEmployees(result.employees);
       
-      console.log('📋 usePayrollLiquidation - Period ID set:', periodId);
+      if (result.isRecovery) {
+        console.log('✅ Successfully recovered existing payroll data');
+      } else {
+        console.log('✅ Successfully loaded fresh employee data');
+      }
       
-      // 
-      const employeesWithNovedades = await Promise.all(
-        employeesData.map(async (employee) => {
-          console.log(`🔄 usePayrollLiquidation - Loading novedades for employee: ${employee.nombre}`);
-          
-          const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
-            employee.id,
-            periodId
-          );
-          
-          console.log(`📊 usePayrollLiquidation - Novedades totals for ${employee.nombre}:`, novedadesTotals);
-          
-          const totalDeducciones = employee.salud_empleado + employee.pension_empleado + 
-                                 employee.fondo_solidaridad + employee.retencion_fuente + 
-                                 novedadesTotals.totalDeducciones;
-          
-          const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
-          const totalConNovedades = salarioProporcional + employee.auxilio_transporte + 
-                                  novedadesTotals.totalDevengos - totalDeducciones;
-          
-          const updatedEmployee = {
-            ...employee,
-            devengos: novedadesTotals.totalDevengos,
-            deducciones: totalDeducciones,
-            deducciones_novedades: novedadesTotals.totalDeducciones,
-            total_pagar: totalConNovedades,
-            novedades_totals: novedadesTotals
-          };
-          
-          console.log(`✅ usePayrollLiquidation - Final employee data for ${employee.nombre}:`, {
-            devengos: updatedEmployee.devengos,
-            deducciones: updatedEmployee.deducciones,
-            total_pagar: updatedEmployee.total_pagar,
-            hasNovedades: updatedEmployee.novedades_totals?.hasNovedades
-          });
-          
-          return updatedEmployee;
-        })
-      );
-      
-      const transformedEmployees = employeesWithNovedades.map(transformEmployee);
-      setEmployees(transformedEmployees);
-      
-      // NO auto-save after loading - not critical
-      
-      toast({
-        title: "Empleados cargados",
-        description: `Se cargaron ${transformedEmployees.length} empleados activos con deducciones detalladas`,
-      });
     } catch (error) {
-      console.error('❌ usePayrollLiquidation - Error loading employees:', error);
+      console.error('❌ usePayrollLiquidation - Error in intelligent load:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los empleados",
@@ -244,7 +152,6 @@ export const usePayrollLiquidation = () => {
     }
   };
 
-  // 
   const addEmployees = async (employeeIds: string[]) => {
     if (!currentPeriodId || !startDate || !endDate) {
       console.warn('⚠️ usePayrollLiquidation - Missing period info when adding employees');
@@ -291,8 +198,6 @@ export const usePayrollLiquidation = () => {
       const transformedNewEmployees = processedNewEmployees.map(transformEmployee);
       setEmployees(prev => [...prev, ...transformedNewEmployees]);
       
-      // NO auto-save after adding - not critical
-      
       console.log('✅ usePayrollLiquidation - Employees added successfully:', transformedNewEmployees.length);
     } catch (error) {
       console.error('❌ usePayrollLiquidation - Error adding employees:', error);
@@ -300,9 +205,6 @@ export const usePayrollLiquidation = () => {
     }
   };
 
-  /**
-   * CORREGIDO: removeEmployee con lógica atómica y estado correcto
-   */
   const removeEmployee = async (employeeId: string) => {
     console.log('🗑️ usePayrollLiquidation - Removing employee (IMPROVED):', employeeId);
     
@@ -318,7 +220,6 @@ export const usePayrollLiquidation = () => {
     
     setIsRemovingEmployee(true);
     
-    // FASE 1: Actualizar estado UI inmediatamente para feedback
     const employeeToRemove = employees.find(emp => emp.id === employeeId);
     const currentEmployeesSnapshot = [...employees];
     const currentRemovedSnapshot = [...removedEmployeeIds];
@@ -333,7 +234,6 @@ export const usePayrollLiquidation = () => {
     });
     
     try {
-      // FASE 2: ELIMINACIÓN DIRECTA EN BASE DE DATOS
       console.log('💾 Executing DIRECT database deletion for employee');
       
       const companyId = await PayrollAutoSaveService.getCurrentUserCompanyId();
@@ -341,14 +241,12 @@ export const usePayrollLiquidation = () => {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
       
-      // Usar el servicio de eliminación directa
       await PayrollDeletionService.deleteEmployeeFromPeriod(
         currentPeriodId,
         employeeId,
         companyId
       );
       
-      // FASE 3: Registrar eliminación para auditoría
       await PayrollDeletionService.logDeletion(
         currentPeriodId,
         employeeId,
@@ -356,11 +254,9 @@ export const usePayrollLiquidation = () => {
         employeeToRemove?.name || `Employee ${employeeId}`
       );
       
-      // FASE 4: Actualizar totales del período
       const remainingEmployees = employees.filter(emp => emp.id !== employeeId);
       await PayrollAutoSaveService.updatePeriodActivity(currentPeriodId);
       
-      // ÉXITO: Limpiar IDs de eliminados ya que se persistió
       setRemovedEmployeeIds(prev => prev.filter(id => id !== employeeId));
       
       toast({
@@ -388,7 +284,25 @@ export const usePayrollLiquidation = () => {
     }
   };
 
-  // 
+  const transformEmployee = (dbEmployee: DBEmployee): PayrollEmployee => ({
+    id: dbEmployee.id,
+    name: `${dbEmployee.nombre} ${dbEmployee.apellido}`,
+    position: 'Empleado',
+    baseSalary: dbEmployee.salario_base,
+    workedDays: dbEmployee.dias_trabajados,
+    extraHours: 0,
+    disabilities: 0,
+    bonuses: dbEmployee.devengos,
+    absences: 0,
+    grossPay: dbEmployee.total_pagar + dbEmployee.deducciones,
+    deductions: dbEmployee.deducciones,
+    netPay: dbEmployee.total_pagar,
+    status: 'valid',
+    errors: [],
+    transportAllowance: dbEmployee.auxilio_transporte,
+    employerContributions: 0
+  });
+
   const refreshEmployeeNovedades = async (employeeId: string) => {
     if (!currentPeriodId) {
       console.warn('⚠️ usePayrollLiquidation - No current period ID when refreshing novedades');
@@ -396,7 +310,6 @@ export const usePayrollLiquidation = () => {
     }
     
     console.log('🔄 usePayrollLiquidation - Refreshing novedades for employee:', employeeId);
-    console.log('📋 usePayrollLiquidation - Using period ID:', currentPeriodId);
     
     try {
       const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
@@ -404,12 +317,8 @@ export const usePayrollLiquidation = () => {
         currentPeriodId
       );
       
-      console.log('📊 usePayrollLiquidation - New novedades totals:', novedadesTotals);
-      
       setEmployees(prev => prev.map(emp => {
         if (emp.id === employeeId) {
-          console.log(`🔄 usePayrollLiquidation - Updating employee ${emp.name} with new novedades`);
-          
           const updatedEmployee = {
             ...emp,
             bonuses: novedadesTotals.totalDevengos,
@@ -417,21 +326,12 @@ export const usePayrollLiquidation = () => {
             netPay: emp.grossPay - novedadesTotals.totalDeducciones + novedadesTotals.totalDevengos
           };
           
-          console.log('✅ usePayrollLiquidation - New employee state:', {
-            bonuses: updatedEmployee.bonuses,
-            deductions: updatedEmployee.deductions,
-            netPay: updatedEmployee.netPay
-          });
-          
           return updatedEmployee;
         }
         return emp;
       }));
       
-      // CRITICAL: Trigger auto-save after novedades refresh
-      console.log('💾 Triggering auto-save after novedades refresh');
       await triggerAutoSave();
-      
       console.log('✅ usePayrollLiquidation - Employee novedades refreshed successfully');
     } catch (error) {
       console.error('❌ usePayrollLiquidation - Error refreshing employee novedades:', error);
@@ -501,7 +401,7 @@ export const usePayrollLiquidation = () => {
 
   return {
     employees,
-    isLoading: isLoading || isRecovering,
+    isLoading: isLoading || isRecovering || isIntelligentLoading,
     isLiquidating,
     currentPeriodId,
     startDate,
