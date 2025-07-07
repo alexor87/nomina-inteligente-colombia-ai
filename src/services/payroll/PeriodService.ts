@@ -15,12 +15,13 @@ export interface PeriodInfo {
   endDate: string;
   number?: number;
   isValid: boolean;
+  validationError?: string;
 }
 
 export interface PeriodDetectionResult {
   hasActivePeriod: boolean;
   activePeriod?: any;
-  suggestedAction: 'continue' | 'create' | 'conflict';
+  suggestedAction: 'continue' | 'create' | 'conflict' | 'invalid';
   message: string;
   periodData: PeriodInfo;
   conflictPeriod?: any;
@@ -211,24 +212,91 @@ export class PeriodService {
     semanal: new SemanalStrategy()
   };
 
+  // CONSTANTES DE VALIDACIÓN EMPRESARIAL
+  private static readonly MAX_DAYS_SEMANAL = 10;
+  private static readonly MAX_DAYS_QUINCENAL = 20;
+  private static readonly MAX_DAYS_MENSUAL = 35;
+  private static readonly MAX_DAYS_ABSOLUTE = 35; // Límite absoluto para cualquier período de nómina
+
   /**
-   * Generar información completa del período
+   * Validar rango empresarial de fechas
+   */
+  private static validateBusinessDateRange(startDate: string, endDate: string): {
+    isValid: boolean;
+    error?: string;
+    maxDaysForType?: number;
+  } {
+    const days = this.calculateDaysBetween(startDate, endDate);
+    
+    // Validación absoluta: ningún período de nómina puede ser mayor a 35 días
+    if (days > this.MAX_DAYS_ABSOLUTE) {
+      return {
+        isValid: false,
+        error: `Rango de fechas demasiado amplio para un período de nómina (${days} días). Máximo permitido: 35 días.`
+      };
+    }
+
+    // Detectar tipo tentativo para validaciones específicas
+    const tentativeType = this.detectPeriodType(startDate, endDate);
+    let maxDaysForType: number;
+    
+    switch (tentativeType) {
+      case 'semanal':
+        maxDaysForType = this.MAX_DAYS_SEMANAL;
+        break;
+      case 'quincenal':
+        maxDaysForType = this.MAX_DAYS_QUINCENAL;
+        break;
+      default:
+        maxDaysForType = this.MAX_DAYS_MENSUAL;
+        break;
+    }
+
+    if (days > maxDaysForType) {
+      return {
+        isValid: false,
+        error: `Rango demasiado amplio para período ${tentativeType} (${days} días). Máximo para ${tentativeType}: ${maxDaysForType} días.`,
+        maxDaysForType
+      };
+    }
+
+    return { isValid: true };
+  }
+
+  /**
+   * Generar información completa del período con validación empresarial
    */
   static generatePeriodInfo(
     startDate: string, 
     endDate: string, 
     companyId?: string
   ): PeriodInfo {
+    // PRIMERO: Validar rango básico
     if (!this.isValidDateRange(startDate, endDate)) {
       return {
         name: `${startDate} - ${endDate}`,
         type: 'mensual',
         startDate,
         endDate,
-        isValid: false
+        isValid: false,
+        validationError: 'Rango de fechas inválido'
       };
     }
 
+    // SEGUNDO: Validar rango empresarial
+    const businessValidation = this.validateBusinessDateRange(startDate, endDate);
+    if (!businessValidation.isValid) {
+      return {
+        name: `Rango inválido (${this.calculateDaysBetween(startDate, endDate)} días)`,
+        type: 'mensual',
+        startDate,
+        endDate,
+        isValid: false,
+        validationError: businessValidation.error
+      };
+    }
+
+    // TERCERO: Procesar período normalmente
     const type = this.detectPeriodType(startDate, endDate);
     const strategy = this.strategies[type];
     
@@ -297,7 +365,7 @@ export class PeriodService {
   }
 
   /**
-   * Detectar período para fechas seleccionadas
+   * Detectar período para fechas seleccionadas con validación empresarial
    */
   static async detectPeriodForDates(
     startDate: string, 
@@ -309,8 +377,18 @@ export class PeriodService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // Generar información del período UNA SOLA VEZ
+      // CRÍTICO: Generar información del período UNA SOLA VEZ con validación empresarial
       const periodInfo = this.generatePeriodInfo(startDate, endDate, companyId);
+      
+      // Si el rango es empresarialmente inválido, retornar inmediatamente
+      if (!periodInfo.isValid && periodInfo.validationError) {
+        return {
+          hasActivePeriod: false,
+          suggestedAction: 'invalid',
+          message: periodInfo.validationError,
+          periodData: periodInfo
+        };
+      }
       
       // Verificar si las fechas seleccionadas son coherentes con el período calculado
       if (!periodInfo.isValid) {

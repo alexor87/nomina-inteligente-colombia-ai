@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, Users, AlertTriangle, CheckCircle, Clock, Hash, Info } from 'lucide-react';
+import { Calendar, Users, AlertTriangle, CheckCircle, Clock, Hash, Info, XCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PeriodDetectionResult } from '@/services/payroll/PeriodService';
 
@@ -41,9 +41,11 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
   const isNewPeriod = periodInfo.suggestedAction === 'create';
   const isExistingPeriod = periodInfo.suggestedAction === 'continue';
   const isConflict = periodInfo.suggestedAction === 'conflict';
+  const isInvalid = periodInfo.suggestedAction === 'invalid';
   const isIncoherentPeriod = periodInfo.message.includes('no corresponden exactamente');
 
   const getStatusColor = () => {
+    if (isInvalid) return 'border-red-200 bg-red-50';
     if (isNewPeriod && !isIncoherentPeriod) return 'border-green-200 bg-green-50';
     if (isNewPeriod && isIncoherentPeriod) return 'border-yellow-200 bg-yellow-50';
     if (isExistingPeriod) return 'border-blue-200 bg-blue-50';
@@ -52,6 +54,7 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
   };
 
   const getStatusIcon = () => {
+    if (isInvalid) return <XCircle className="h-5 w-5 text-red-600" />;
     if (isNewPeriod && !isIncoherentPeriod) return <CheckCircle className="h-5 w-5 text-green-600" />;
     if (isNewPeriod && isIncoherentPeriod) return <Info className="h-5 w-5 text-yellow-600" />;
     if (isExistingPeriod) return <Calendar className="h-5 w-5 text-blue-600" />;
@@ -67,7 +70,7 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
         <CardTitle className="flex items-center space-x-2">
           {getStatusIcon()}
           <span>Información del Período</span>
-          {periodInfo.periodData.number && (
+          {periodInfo.periodData.number && !isInvalid && (
             <Badge variant="outline" className="ml-2 font-mono">
               <Hash className="h-3 w-3 mr-1" />
               #{periodInfo.periodData.number}
@@ -76,53 +79,78 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Selected Period Details */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="flex items-center space-x-3">
-            <Calendar className="h-5 w-5 text-gray-500 flex-shrink-0" />
-            <div>
-              <p className="text-sm text-gray-600 font-medium">Período Seleccionado</p>
-              <p className="font-semibold text-gray-900">{displayName}</p>
-              {periodInfo.periodData.number && (
-                <p className="text-xs text-gray-500">
-                  Número ordinal: {periodInfo.periodData.number}
-                </p>
-              )}
-              <p className="text-xs text-blue-500 mt-1">
-                Fechas: {startDate} - {endDate}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0">
-              <Badge variant="outline" className="font-medium">
-                {periodInfo.periodData.type === 'quincenal' ? 'Quincenal' : 
-                 periodInfo.periodData.type === 'mensual' ? 'Mensual' : 'Semanal'}
-              </Badge>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <Users className="h-5 w-5 text-gray-500 flex-shrink-0" />
-            <div>
-              <p className="text-sm text-gray-600 font-medium">Empleados Activos</p>
-              <p className="font-semibold text-gray-900">{employeesCount} empleados</p>
-            </div>
-          </div>
-        </div>
+        {/* Invalid Range Alert */}
+        {isInvalid && (
+          <Alert className="border-red-200 bg-red-50">
+            <XCircle className="h-4 w-4" />
+            <AlertDescription className="font-medium text-red-800">
+              <div className="space-y-2">
+                <p>{periodInfo.periodData.validationError}</p>
+                <div className="text-sm text-red-700">
+                  <p><strong>Rangos válidos para nómina:</strong></p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Semanal: máximo 10 días (ej: 1-7 enero)</li>
+                    <li>Quincenal: máximo 20 días (ej: 1-15 enero)</li>
+                    <li>Mensual: máximo 35 días (ej: 1-31 enero)</li>
+                  </ul>
+                  <p className="mt-2 font-medium">Por favor, selecciona un rango de fechas más corto.</p>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
-        {/* Status Message */}
-        <Alert className={
-          isNewPeriod && !isIncoherentPeriod ? 'border-green-200 bg-green-50' : 
-          isNewPeriod && isIncoherentPeriod ? 'border-yellow-200 bg-yellow-50' :
-          isExistingPeriod ? 'border-blue-200 bg-blue-50' : 'border-orange-200 bg-orange-50'
-        }>
-          <AlertDescription className="flex items-center space-x-2">
-            {getStatusIcon()}
-            <span className="font-medium">{periodInfo.message}</span>
-          </AlertDescription>
-        </Alert>
+        {/* Selected Period Details - Only show if not invalid */}
+        {!isInvalid && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-center space-x-3">
+              <Calendar className="h-5 w-5 text-gray-500 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-gray-600 font-medium">Período Seleccionado</p>
+                <p className="font-semibold text-gray-900">{displayName}</p>
+                {periodInfo.periodData.number && (
+                  <p className="text-xs text-gray-500">
+                    Número ordinal: {periodInfo.periodData.number}
+                  </p>
+                )}
+                <p className="text-xs text-blue-500 mt-1">
+                  Fechas: {startDate} - {endDate}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <Badge variant="outline" className="font-medium">
+                  {periodInfo.periodData.type === 'quincenal' ? 'Quincenal' : 
+                   periodInfo.periodData.type === 'mensual' ? 'Mensual' : 'Semanal'}
+                </Badge>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <Users className="h-5 w-5 text-gray-500 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-gray-600 font-medium">Empleados Activos</p>
+                <p className="font-semibold text-gray-900">{employeesCount} empleados</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Status Message - Only show if not invalid */}
+        {!isInvalid && (
+          <Alert className={
+            isNewPeriod && !isIncoherentPeriod ? 'border-green-200 bg-green-50' : 
+            isNewPeriod && isIncoherentPeriod ? 'border-yellow-200 bg-yellow-50' :
+            isExistingPeriod ? 'border-blue-200 bg-blue-50' : 'border-orange-200 bg-orange-50'
+          }>
+            <AlertDescription className="flex items-center space-x-2">
+              {getStatusIcon()}
+              <span className="font-medium">{periodInfo.message}</span>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Coherence Warning for Incoherent Periods */}
         {isIncoherentPeriod && (
@@ -206,8 +234,8 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
           </div>
         )}
 
-        {/* Action Button for non-conflict scenarios */}
-        {!isConflict && (
+        {/* Action Button for non-conflict and non-invalid scenarios */}
+        {!isConflict && !isInvalid && (
           <div className="flex justify-center pt-4">
             <button
               onClick={onProceed}
