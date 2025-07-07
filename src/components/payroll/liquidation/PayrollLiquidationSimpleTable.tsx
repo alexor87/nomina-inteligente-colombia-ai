@@ -1,14 +1,24 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { PayrollEmployee } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { formatCurrency } from '@/lib/utils';
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -16,6 +26,7 @@ interface PayrollLiquidationSimpleTableProps {
   endDate: string;
   currentPeriodId: string | undefined;
   onEmployeeNovedadesChange: (employeeId: string) => Promise<void>;
+  onRemoveEmployee?: (employeeId: string) => void;
 }
 
 export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTableProps> = ({
@@ -23,10 +34,13 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   startDate,
   endDate,
   currentPeriodId,
-  onEmployeeNovedadesChange
+  onEmployeeNovedadesChange,
+  onRemoveEmployee
 }) => {
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
+  const { toast } = useToast();
 
   const {
     loadNovedadesTotals,
@@ -106,6 +120,26 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     }
   };
 
+  const handleDeleteEmployee = (employee: PayrollEmployee) => {
+    setEmployeeToDelete(employee);
+  };
+
+  const confirmDeleteEmployee = () => {
+    if (employeeToDelete && onRemoveEmployee) {
+      onRemoveEmployee(employeeToDelete.id);
+      toast({
+        title: "✅ Empleado removido",
+        description: `${employeeToDelete.name} ha sido removido de esta liquidación`,
+        className: "border-orange-200 bg-orange-50"
+      });
+      setEmployeeToDelete(null);
+    }
+  };
+
+  const cancelDeleteEmployee = () => {
+    setEmployeeToDelete(null);
+  };
+
   const calculateTotalToPay = (employee: PayrollEmployee) => {
     const config = getCurrentYearConfig();
     const novedades = getEmployeeNovedades(employee.id);
@@ -142,6 +176,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             <TableHead className="text-center">Días Trabajados</TableHead>
             <TableHead className="text-center">Novedades</TableHead>
             <TableHead className="text-right">Total a Pagar Período</TableHead>
+            <TableHead className="text-center">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -189,6 +224,19 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                 <TableCell className="text-right font-semibold text-lg">
                   {formatCurrency(totalToPay)}
                 </TableCell>
+
+                <TableCell className="text-center">
+                  {onRemoveEmployee && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteEmployee(employee)}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             );
           })}
@@ -208,6 +256,30 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           onClose={handleCloseNovedadModal}
         />
       )}
+
+      {/* Confirmation Dialog for Delete */}
+      <AlertDialog open={!!employeeToDelete} onOpenChange={cancelDeleteEmployee}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Remover empleado de la liquidación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas remover a <strong>{employeeToDelete?.name}</strong> de esta liquidación? 
+              Esta acción no afectará el registro del empleado en el módulo de empleados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDeleteEmployee}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteEmployee}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

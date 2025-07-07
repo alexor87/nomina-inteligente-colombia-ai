@@ -26,6 +26,7 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
       startDate={startDate}
       endDate={endDate}
       currentPeriodId={currentPeriodId}
+      onRemoveEmployee={onRemoveEmployee}
       onEmployeeNovedadesChange={onEmployeeNovedadesChange}
     />
   );
