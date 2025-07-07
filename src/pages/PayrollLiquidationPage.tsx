@@ -1,13 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Users, Calculator, Shield, Loader2 } from 'lucide-react';
+import { Calendar, Users, Calculator, Loader2 } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { PeriodInfoPanel } from '@/components/payroll/liquidation/PeriodInfoPanel';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
-import { DataIntegrityMonitor } from '@/components/payroll/DataIntegrityMonitor';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { usePeriodDetection } from '@/hooks/usePeriodDetection';
 import { format } from 'date-fns';
@@ -20,7 +20,6 @@ const PayrollLiquidationPage = () => {
   const [endDate, setEndDate] = useState('');
   const [showPeriodInfo, setShowPeriodInfo] = useState(false);
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
-  const [dataIntegrityIssues, setDataIntegrityIssues] = useState(0);
   
   const { companyId } = useCurrentCompany();
   
@@ -142,22 +141,12 @@ const PayrollLiquidationPage = () => {
     }
   };
 
-  const handleIntegrityIssuesDetected = (issues: number) => {
-    setDataIntegrityIssues(issues);
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Calculator className="h-6 w-6 text-blue-600" />
           <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
-          {dataIntegrityIssues > 0 && (
-            <div className="flex items-center space-x-1 text-amber-600">
-              <Shield className="h-4 w-4" />
-              <span className="text-sm font-medium">{dataIntegrityIssues} problemas detectados</span>
-            </div>
-          )}
           {isRemovingEmployee && (
             <div className="flex items-center space-x-1 text-blue-600">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -174,12 +163,6 @@ const PayrollLiquidationPage = () => {
           />
         )}
       </div>
-
-      {/* Monitor de Integridad de Datos */}
-      <DataIntegrityMonitor 
-        onIssuesDetected={handleIntegrityIssuesDetected}
-        compact={employees.length > 0}
-      />
 
       {/* Date Selection */}
       <Card>
