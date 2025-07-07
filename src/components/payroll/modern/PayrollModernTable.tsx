@@ -45,6 +45,7 @@ interface PayrollModernTableProps {
   onRefreshEmployees?: () => void;
   onDeleteEmployee?: (id: string) => void;
   onDeleteMultipleEmployees?: (employeeIds: string[]) => Promise<void>;
+  onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
 }
 
 type ActiveModal = 'novedades' | 'liquidation' | 'calculation' | 'voucherPreview' | 'voucherSend' | 'notes' | null;
@@ -58,7 +59,8 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
   periodoId,
   onRefreshEmployees,
   onDeleteEmployee,
-  onDeleteMultipleEmployees
+  onDeleteMultipleEmployees,
+  onEmployeeNovedadesChange
 }) => {
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
@@ -98,8 +100,20 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     setSelectedEmployee(employee);
   };
 
-  const handleCloseModal = () => {
+  const handleCloseModal = async () => {
     console.log('🔒 Cerrando modal:', activeModal);
+    
+    // Execute sync callback if closing novedades modal and callback is available
+    if (activeModal === 'novedades' && selectedEmployee && onEmployeeNovedadesChange) {
+      console.log('🔄 Ejecutando callback de sincronización al cerrar modal de novedades');
+      try {
+        await onEmployeeNovedadesChange(selectedEmployee.id);
+        console.log('✅ Callback de sincronización ejecutado exitosamente');
+      } catch (error) {
+        console.error('❌ Error en callback de sincronización:', error);
+      }
+    }
+    
     setActiveModal(null);
     setSelectedEmployee(null);
   };
@@ -116,6 +130,17 @@ export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
     };
     
     await createNovedad(createData, true);
+    
+    // Execute sync callback immediately after creating novedad
+    if (onEmployeeNovedadesChange) {
+      console.log('🔄 Ejecutando callback de sincronización después de crear novedad');
+      try {
+        await onEmployeeNovedadesChange(selectedEmployee.id);
+        console.log('✅ Callback de sincronización ejecutado exitosamente');
+      } catch (error) {
+        console.error('❌ Error en callback de sincronización:', error);
+      }
+    }
     
     // Actualizar novedades para este empleado específico
     await refreshEmployeeNovedades(selectedEmployee.id);
