@@ -3,46 +3,55 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Shield, 
-  AlertTriangle, 
-  CheckCircle, 
-  RefreshCw,
-  Settings,
-  TrendingUp
-} from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle, RefreshCw, Zap } from 'lucide-react';
 import { PayrollDataIntegrityService, DataIntegrityReport } from '@/services/payroll-intelligent/PayrollDataIntegrityService';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { useToast } from '@/hooks/use-toast';
 
 interface DataIntegrityMonitorProps {
-  companyId: string;
-  onCleanupComplete?: () => void;
+  onIssuesDetected?: (issues: number) => void;
+  compact?: boolean;
 }
 
 export const DataIntegrityMonitor: React.FC<DataIntegrityMonitorProps> = ({
-  companyId,
-  onCleanupComplete
+  onIssuesDetected,
+  compact = false
 }) => {
   const [report, setReport] = useState<DataIntegrityReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRunningCleanup, setIsRunningCleanup] = useState(false);
+  const { companyId } = useCurrentCompany();
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadIntegrityReport();
-  }, [companyId]);
-
-  const loadIntegrityReport = async () => {
+  const generateReport = async () => {
+    if (!companyId) return;
+    
     try {
       setIsLoading(true);
+      console.log('🔍 Generando reporte de integridad...');
+      
       const integrityReport = await PayrollDataIntegrityService.generateIntegrityReport(companyId);
       setReport(integrityReport);
+      
+      // Notificar sobre problemas detectados
+      const totalIssues = integrityReport.duplicatePeriods + 
+                         integrityReport.orphanedPayrolls + 
+                         integrityReport.missingPeriodIds + 
+                         integrityReport.stateConsistencyIssues;
+      
+      onIssuesDetected?.(totalIssues);
+      
+      if (totalIssues > 0) {
+        console.log(`⚠️ Se detectaron ${totalIssues} problemas de integridad`);
+      } else {
+        console.log('✅ Integridad de datos verificada - Sin problemas');
+      }
+      
     } catch (error) {
-      console.error('Error loading integrity report:', error);
+      console.error('❌ Error generando reporte:', error);
       toast({
         title: "Error",
-        description: "No se pudo cargar el reporte de integridad",
+        description: "No se pudo generar el reporte de integridad",
         variant: "destructive"
       });
     } finally {
@@ -50,9 +59,13 @@ export const DataIntegrityMonitor: React.FC<DataIntegrityMonitorProps> = ({
     }
   };
 
-  const runCleanup = async () => {
+  const runAutomaticCleanup = async () => {
+    if (!companyId) return;
+    
     try {
       setIsRunningCleanup(true);
+      console.log('🧹 Ejecutando limpieza automática...');
+      
       const result = await PayrollDataIntegrityService.runAutomaticCleanup(companyId);
       
       if (result.success) {
@@ -62,9 +75,8 @@ export const DataIntegrityMonitor: React.FC<DataIntegrityMonitorProps> = ({
           className: "border-green-200 bg-green-50"
         });
         
-        // Reload report after cleanup
-        await loadIntegrityReport();
-        onCleanupComplete?.();
+        // Regenerar reporte después de la limpieza
+        await generateReport();
       } else {
         toast({
           title: "Error en Limpieza",
@@ -72,8 +84,9 @@ export const DataIntegrityMonitor: React.FC<DataIntegrityMonitorProps> = ({
           variant: "destructive"
         });
       }
+      
     } catch (error) {
-      console.error('Error running cleanup:', error);
+      console.error('❌ Error en limpieza automática:', error);
       toast({
         title: "Error",
         description: "Error ejecutando limpieza automática",
@@ -84,46 +97,72 @@ export const DataIntegrityMonitor: React.FC<DataIntegrityMonitorProps> = ({
     }
   };
 
-  const getHealthStatus = () => {
-    if (!report) return { status: 'unknown', color: 'gray', label: 'Desconocido' };
-    
-    const totalIssues = report.duplicatePeriods + report.orphanedPayrolls + 
-                       report.missingPeriodIds + report.stateConsistencyIssues;
-    
-    if (totalIssues === 0) {
-      return { status: 'healthy', color: 'green', label: 'Saludable' };
-    } else if (totalIssues <= 5) {
-      return { status: 'warning', color: 'yellow', label: 'Atención' };
-    } else {
-      return { status: 'critical', color: 'red', label: 'Crítico' };
-    }
-  };
+  // Generar reporte al montar el componente
+  useEffect(() => {
+    generateReport();
+  }, [companyId]);
 
-  const health = getHealthStatus();
-
-  if (isLoading) {
+  if (!report) {
     return (
-      <Card className="border-blue-200">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mr-2" />
-            <span>Analizando integridad de datos...</span>
+      <Card className={compact ? "p-4" : ""}>
+        <CardContent className="flex items-center justify-center py-8">
+          <div className="flex items-center space-x-2 text-gray-500">
+            <Shield className="h-5 w-5" />
+            <span>Cargando monitor de integridad...</span>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  if (!report) {
+  const totalIssues = report.duplicatePeriods + 
+                     report.orphanedPayrolls + 
+                     report.missingPeriodIds + 
+                     report.stateConsistencyIssues;
+
+  const getStatusIcon = () => {
+    if (totalIssues === 0) return <CheckCircle className="h-5 w-5 text-green-600" />;
+    if (totalIssues < 3) return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
+    return <AlertTriangle className="h-5 w-5 text-red-600" />;
+  };
+
+  const getStatusColor = () => {
+    if (totalIssues === 0) return "border-green-200 bg-green-50";
+    if (totalIssues < 3) return "border-yellow-200 bg-yellow-50";
+    return "border-red-200 bg-red-50";
+  };
+
+  if (compact) {
     return (
-      <Card className="border-gray-200">
-        <CardContent className="p-6">
-          <div className="text-center">
-            <AlertTriangle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-600">No se pudo cargar el reporte de integridad</p>
-            <Button onClick={loadIntegrityReport} className="mt-2">
-              Reintentar
-            </Button>
+      <Card className={`${getStatusColor()} transition-colors`}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              {getStatusIcon()}
+              <span className="font-medium">
+                {totalIssues === 0 ? 'Datos Íntegros' : `${totalIssues} Problemas`}
+              </span>
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                onClick={generateReport}
+                disabled={isLoading}
+                size="sm"
+                variant="outline"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
+              {totalIssues > 0 && (
+                <Button
+                  onClick={runAutomaticCleanup}
+                  disabled={isRunningCleanup}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Zap className={`h-4 w-4 ${isRunningCleanup ? 'animate-pulse' : ''}`} />
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -131,82 +170,78 @@ export const DataIntegrityMonitor: React.FC<DataIntegrityMonitorProps> = ({
   }
 
   return (
-    <Card className={`border-${health.color}-200`}>
+    <Card className={`${getStatusColor()} transition-colors`}>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Monitor de Integridad de Datos
-          <Badge className={`bg-${health.color}-100 text-${health.color}-800`}>
-            {health.label}
-          </Badge>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Shield className="h-5 w-5" />
+            <span>Monitor de Integridad</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            {getStatusIcon()}
+            <Badge variant={totalIssues === 0 ? "default" : "destructive"}>
+              {totalIssues === 0 ? 'Saludable' : `${totalIssues} Problemas`}
+            </Badge>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Health Summary */}
+        {/* Métricas de integridad */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{report.totalPeriods}</div>
+            <div className="text-2xl font-bold">{report.totalPeriods}</div>
             <div className="text-sm text-gray-600">Total Períodos</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">{report.duplicatePeriods}</div>
+            <div className="text-2xl font-bold text-red-600">{report.duplicatePeriods}</div>
             <div className="text-sm text-gray-600">Duplicados</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{report.orphanedPayrolls}</div>
+            <div className="text-2xl font-bold text-yellow-600">{report.orphanedPayrolls}</div>
             <div className="text-sm text-gray-600">Huérfanos</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">{report.stateConsistencyIssues}</div>
-            <div className="text-sm text-gray-600">Estados Inválidos</div>
+            <div className="text-2xl font-bold text-blue-600">{report.missingPeriodIds}</div>
+            <div className="text-sm text-gray-600">Sin Vínculo</div>
           </div>
         </div>
 
-        {/* Recommendations */}
-        <div>
-          <h4 className="font-medium mb-2 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Recomendaciones
-          </h4>
+        {/* Recomendaciones */}
+        {report.recommendations.length > 0 && (
           <div className="space-y-2">
-            {report.recommendations.map((rec, index) => (
-              <Alert key={index} className={rec.includes('✅') ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}>
-                <AlertDescription className="flex items-center gap-2">
-                  {rec.includes('✅') ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  )}
-                  {rec}
-                </AlertDescription>
-              </Alert>
-            ))}
+            <h4 className="font-medium text-gray-700">Recomendaciones:</h4>
+            <ul className="space-y-1">
+              {report.recommendations.map((rec, index) => (
+                <li key={index} className="text-sm text-gray-600 flex items-start space-x-2">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <span>{rec}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
+        )}
 
-        {/* Actions */}
-        <div className="flex gap-2 pt-4 border-t">
-          <Button 
-            onClick={loadIntegrityReport} 
-            variant="outline"
+        {/* Acciones */}
+        <div className="flex space-x-2 pt-4 border-t">
+          <Button
+            onClick={generateReport}
             disabled={isLoading}
+            variant="outline"
+            size="sm"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Actualizar
           </Button>
           
-          {health.status !== 'healthy' && (
-            <Button 
-              onClick={runCleanup}
+          {totalIssues > 0 && (
+            <Button
+              onClick={runAutomaticCleanup}
               disabled={isRunningCleanup}
+              size="sm"
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {isRunningCleanup ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Settings className="h-4 w-4 mr-2" />
-              )}
-              Ejecutar Limpieza
+              <Zap className={`h-4 w-4 mr-2 ${isRunningCleanup ? 'animate-pulse' : ''}`} />
+              {isRunningCleanup ? 'Limpiando...' : 'Limpieza Automática'}
             </Button>
           )}
         </div>

@@ -96,6 +96,13 @@ export class PayrollAutoSaveService {
     });
 
     try {
+      // Validación de integridad antes de guardar
+      const periodExists = await this.validatePeriodIntegrity(periodId, companyId);
+      if (!periodExists) {
+        console.warn('⚠️ Período no válido para auto-guardado:', periodId);
+        return;
+      }
+
       // Obtener información del período para el campo 'periodo'
       const { data: periodData } = await supabase
         .from('payroll_periods_real')
@@ -170,6 +177,35 @@ export class PayrollAutoSaveService {
       }
       
       throw error;
+    }
+  }
+
+  // Nueva función para validar integridad del período
+  private static async validatePeriodIntegrity(periodId: string, companyId: string): Promise<boolean> {
+    try {
+      const { data: period, error } = await supabase
+        .from('payroll_periods_real')
+        .select('id, estado, company_id')
+        .eq('id', periodId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (error || !period) {
+        console.error('❌ Período no encontrado o no válido:', periodId);
+        return false;
+      }
+
+      // Verificar que el período esté en estado válido para edición
+      const editableStates = ['borrador', 'en_proceso'];
+      if (!editableStates.includes(period.estado)) {
+        console.warn('⚠️ Período no editable:', period.estado);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Error validando integridad del período:', error);
+      return false;
     }
   }
 
