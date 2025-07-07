@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 interface UseAutoSaveOptions {
@@ -8,14 +8,17 @@ interface UseAutoSaveOptions {
   enabled?: boolean;
 }
 
-export const useAutoSave = ({ onSave, delay = 2000, enabled = true }: UseAutoSaveOptions) => {
+export const useAutoSave = ({ onSave, delay = 5000, enabled = true }: UseAutoSaveOptions) => {
   const { toast } = useToast();
   const timeoutRef = useRef<NodeJS.Timeout>();
-  const isSavingRef = useRef(false);
-  const lastSaveTimeRef = useRef<Date>();
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaveTime, setLastSaveTime] = useState<Date>();
+  const isExecutingRef = useRef(false);
 
   const triggerAutoSave = useCallback(() => {
-    if (!enabled || isSavingRef.current) return;
+    if (!enabled || isExecutingRef.current) {
+      return;
+    }
 
     // Clear existing timeout
     if (timeoutRef.current) {
@@ -24,24 +27,30 @@ export const useAutoSave = ({ onSave, delay = 2000, enabled = true }: UseAutoSav
 
     // Set new timeout for auto-save
     timeoutRef.current = setTimeout(async () => {
-      if (!enabled) return;
+      if (!enabled || isExecutingRef.current) return;
+      
+      isExecutingRef.current = true;
+      setIsSaving(true);
       
       try {
-        isSavingRef.current = true;
         await onSave();
-        lastSaveTimeRef.current = new Date();
+        setLastSaveTime(new Date());
         
-        // Optional: Show subtle save indicator
         console.log('✅ Auto-guardado completado:', new Date().toLocaleTimeString());
       } catch (error) {
         console.error('❌ Error en auto-guardado:', error);
-        toast({
-          title: "Error al guardar",
-          description: "No se pudieron guardar los cambios automáticamente. Verifique su conexión.",
-          variant: "destructive"
-        });
+        
+        // Solo mostrar toast para errores que no sean duplicados
+        if (!error?.message?.includes('duplicate key value')) {
+          toast({
+            title: "Error al guardar",
+            description: "No se pudieron guardar los cambios automáticamente. Se reintentará pronto.",
+            variant: "destructive"
+          });
+        }
       } finally {
-        isSavingRef.current = false;
+        isExecutingRef.current = false;
+        setIsSaving(false);
       }
     }, delay);
   }, [onSave, delay, enabled, toast]);
@@ -57,7 +66,7 @@ export const useAutoSave = ({ onSave, delay = 2000, enabled = true }: UseAutoSav
 
   return {
     triggerAutoSave,
-    isSaving: isSavingRef.current,
-    lastSaveTime: lastSaveTimeRef.current
+    isSaving,
+    lastSaveTime
   };
 };
