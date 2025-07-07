@@ -26,16 +26,23 @@ export const usePayrollAutoSave = ({
   const [isSaving, setIsSaving] = useState(false);
 
   /**
-   * MEJORADO: Trigger auto-save con diagnóstico completo y manejo robusto de errores
+   * CORREGIDO: Trigger auto-save con parámetro opcional para empleados explícitos
    */
-  const triggerAutoSave = async (): Promise<boolean> => {
-    console.log('🔄 triggerAutoSave - INICIANDO con diagnóstico completo');
-    console.log('📊 triggerAutoSave - Estado inicial:', {
+  const triggerAutoSave = async (explicitEmployees?: PayrollEmployee[]): Promise<boolean> => {
+    console.log('🔄 triggerAutoSave - INICIANDO con corrección de closure');
+    
+    // CORRECCIÓN CRÍTICA: Usar empleados explícitos si se proporcionan
+    const employeesToSave = explicitEmployees || employees;
+    
+    console.log('📊 triggerAutoSave - Estado de empleados:', {
       enabled,
       periodId,
-      employeesCount: employees.length,
+      employeesFromState: employees.length,
+      explicitEmployees: explicitEmployees?.length || 0,
+      employeesToSave: employeesToSave.length,
       removedEmployeeIds: removedEmployeeIds.length,
-      currentlySaving: isSaving
+      currentlySaving: isSaving,
+      usingExplicitEmployees: !!explicitEmployees
     });
 
     if (!enabled || !periodId) {
@@ -43,25 +50,27 @@ export const usePayrollAutoSave = ({
       return false;
     }
     
-    if (employees.length === 0 && removedEmployeeIds.length === 0) {
+    if (employeesToSave.length === 0 && removedEmployeeIds.length === 0) {
       console.warn('⚠️ triggerAutoSave - CANCELADO: no hay empleados para guardar o eliminar');
       return false;
     }
 
-    // MEJORADO: Prevenir llamadas concurrentes más robustamente
+    // Prevenir llamadas concurrentes
     if (isSaving || PayrollAutoSaveService.isCurrentlySaving) {
       console.warn('⚠️ triggerAutoSave - CANCELADO: ya se está guardando');
       return false;
     }
     
-    console.log('💾 triggerAutoSave - EJECUTANDO guardado automático');
+    console.log('💾 triggerAutoSave - EJECUTANDO guardado automático con empleados correctos');
+    console.log('👥 triggerAutoSave - Empleados a guardar:', employeesToSave.map(emp => `${emp.name} (${emp.id})`));
+    
     setIsSaving(true);
     
     try {
       console.log('🔄 triggerAutoSave - Llamando PayrollAutoSaveService.saveDraftEmployees');
       
-      // CRÍTICO: Usar el servicio mejorado con eliminaciones atómicas
-      await PayrollAutoSaveService.saveDraftEmployees(periodId, employees, removedEmployeeIds);
+      // CRÍTICO: Pasar los empleados correctos al servicio
+      await PayrollAutoSaveService.saveDraftEmployees(periodId, employeesToSave, removedEmployeeIds);
       
       console.log('✅ triggerAutoSave - saveDraftEmployees completado, actualizando actividad del período');
       await PayrollAutoSaveService.updatePeriodActivity(periodId);
@@ -80,10 +89,11 @@ export const usePayrollAutoSave = ({
         message: error?.message,
         stack: error?.stack,
         periodId,
-        employeesCount: employees.length
+        employeesToSaveCount: employeesToSave.length,
+        explicitEmployeesProvided: !!explicitEmployees
       });
       
-      // MEJORADO: Manejo de errores más específico y callback de error
+      // Manejo de errores mejorado
       onSaveError?.(error);
       
       if (error?.message?.includes('duplicate key value')) {

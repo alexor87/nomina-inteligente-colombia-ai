@@ -47,7 +47,7 @@ export const usePayrollLiquidation = () => {
   // Intelligent load hook
   const { intelligentLoad, isLoading: isIntelligentLoading } = usePayrollIntelligentLoad();
 
-  // Auto-save integration with IMPROVED error handling
+  // Auto-save integration with CORRECTED closure handling
   const { triggerAutoSave, isSaving, lastSaveTime } = usePayrollAutoSave({
     periodId: currentPeriodId,
     employees,
@@ -162,7 +162,7 @@ export const usePayrollLiquidation = () => {
       throw new Error('No hay información del período activo');
     }
 
-    console.log('🔄 usePayrollLiquidation - INICIANDO adición de empleados con persistencia inmediata');
+    console.log('🔄 usePayrollLiquidation - INICIANDO adición de empleados con persistencia inmediata CORREGIDA');
     console.log('📊 usePayrollLiquidation - Empleados a agregar:', employeeIds);
     console.log('📊 usePayrollLiquidation - Estado previo:', {
       currentEmployeesCount: employees.length,
@@ -216,22 +216,24 @@ export const usePayrollLiquidation = () => {
       const transformedNewEmployees = processedNewEmployees.map(transformEmployee);
       console.log('✅ usePayrollLiquidation - Empleados transformados:', transformedNewEmployees.length);
       
-      // PASO 1: Actualizar estado inmediatamente
+      // PASO 1: Crear estado actualizado pero NO actualizar UI todavía
       const updatedEmployees = [...previousEmployees, ...transformedNewEmployees];
-      setEmployees(updatedEmployees);
-      console.log('✅ usePayrollLiquidation - Estado actualizado en UI');
+      console.log('📊 usePayrollLiquidation - Estado preparado (NO actualizado en UI aún):', updatedEmployees.length);
       
-      console.log('💾 usePayrollLiquidation - INICIANDO auto-save inmediato tras agregar empleados');
+      console.log('💾 usePayrollLiquidation - INICIANDO auto-save CORREGIDO con empleados explícitos');
       
-      // PASO 2: PERSISTIR INMEDIATAMENTE con validación
-      const saveResult = await triggerAutoSave();
+      // PASO 2: CORRECCIÓN CRÍTICA - Pasar empleados explícitos al auto-save
+      const saveResult = await triggerAutoSave(updatedEmployees);
       
       if (!saveResult) {
-        console.error('❌ usePayrollLiquidation - Auto-save FALLÓ, ejecutando rollback');
+        console.error('❌ usePayrollLiquidation - Auto-save FALLÓ, NO actualizando UI');
         throw new Error('Failed to save employees to database');
       }
       
-      console.log('✅ usePayrollLiquidation - Auto-save EXITOSO, empleados persistidos');
+      console.log('✅ usePayrollLiquidation - Auto-save EXITOSO, actualizando UI');
+      
+      // PASO 3: Solo ahora actualizar la UI tras confirmación de guardado exitoso
+      setEmployees(updatedEmployees);
       
       toast({
         title: "Empleados agregados",
@@ -242,13 +244,12 @@ export const usePayrollLiquidation = () => {
     } catch (error) {
       console.error('❌ usePayrollLiquidation - ERROR CRÍTICO agregando empleados:', error);
       
-      // ROLLBACK: Restaurar estado anterior en caso de error
-      console.log('🔄 usePayrollLiquidation - EJECUTANDO ROLLBACK - restaurando estado anterior');
-      setEmployees(previousEmployees);
+      // ROLLBACK: No es necesario revertir el estado porque nunca se actualizó la UI
+      console.log('🔄 usePayrollLiquidation - Sin necesidad de rollback - UI nunca se actualizó');
       
       toast({
         title: "Error",
-        description: "No se pudieron agregar los empleados. Se revirtieron los cambios.",
+        description: "No se pudieron agregar los empleados. No se realizaron cambios.",
         variant: "destructive"
       });
       
