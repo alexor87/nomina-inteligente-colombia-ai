@@ -1,6 +1,19 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+interface ActivePeriodResponse {
+  has_active_period: boolean;
+  period?: {
+    id: string;
+    periodo: string;
+    fecha_inicio: string;
+    fecha_fin: string;
+    estado: string;
+    last_activity_at: string;
+    employees_count: number;
+  };
+}
+
 export class PayrollAutoSaveService {
   
   static async getCurrentUserCompanyId(): Promise<string | null> {
@@ -30,7 +43,9 @@ export class PayrollAutoSaveService {
         return null;
       }
 
-      return data?.has_active_period ? data.period : null;
+      // Cast the Json response to our expected type
+      const response = data as ActivePeriodResponse;
+      return response?.has_active_period ? response.period : null;
     } catch (error) {
       console.error('Error calling get_active_period_for_company:', error);
       return null;
