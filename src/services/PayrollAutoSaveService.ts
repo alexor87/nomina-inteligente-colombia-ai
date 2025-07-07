@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 interface ActivePeriodResponse {
@@ -44,7 +43,7 @@ export class PayrollAutoSaveService {
       }
 
       // Cast the Json response to our expected type
-      const response = data as ActivePeriodResponse;
+      const response = data as unknown as ActivePeriodResponse;
       return response?.has_active_period ? response.period : null;
     } catch (error) {
       console.error('Error calling get_active_period_for_company:', error);
