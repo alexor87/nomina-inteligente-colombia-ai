@@ -14,7 +14,8 @@ interface NovedadExistingListProps {
   employeeName: string;
   onAddNew: () => void;
   onClose: () => void;
-  refreshTrigger?: number; // Prop opcional para forzar actualización
+  refreshTrigger?: number;
+  onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -23,7 +24,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   employeeName,
   onAddNew,
   onClose,
-  refreshTrigger
+  refreshTrigger,
+  onEmployeeNovedadesChange
 }) => {
   const [novedades, setNovedades] = useState<PayrollNovedad[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,13 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       try {
         await deleteNovedad(novedadId);
         setNovedades(prev => prev.filter(n => n.id !== novedadId));
+        
+        // Notificar cambio a la tabla principal
+        if (onEmployeeNovedadesChange) {
+          console.log('🔄 Notificando cambio después de eliminar novedad para:', employeeId);
+          await onEmployeeNovedadesChange(employeeId);
+        }
+        
         toast({
           title: "Novedad eliminada",
           description: "La novedad se ha eliminado correctamente",

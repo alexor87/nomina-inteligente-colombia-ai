@@ -25,6 +25,7 @@ interface NovedadUnifiedModalProps {
   onSubmit: (data: CreateNovedadData) => Promise<void>;
   onClose?: () => void;
   selectedNovedadType: NovedadType | null;
+  onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
 }
 
 // Mapping from categories to specific novedad types
@@ -50,7 +51,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   periodId,
   onSubmit,
   selectedNovedadType,
-  onClose
+  onClose,
+  onEmployeeNovedadesChange
 }) => {
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
@@ -282,6 +284,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           onAddNew={handleAddNew}
           onClose={handleClose}
           refreshTrigger={refreshTrigger}
+          onEmployeeNovedadesChange={onEmployeeNovedadesChange}
         />
       );
     }

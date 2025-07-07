@@ -86,7 +86,12 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     setNovedadModalOpen(true);
   };
 
-  const handleCloseNovedadModal = () => {
+  const handleCloseNovedadModal = async () => {
+    if (selectedEmployee) {
+      // Asegurar sincronización final al cerrar el modal
+      console.log('🔄 Sincronización final al cerrar modal para:', selectedEmployee.name);
+      await onEmployeeNovedadesChange(selectedEmployee.id);
+    }
     setNovedadModalOpen(false);
     setSelectedEmployee(null);
   };
@@ -110,14 +115,17 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         // Cerrar modal
         handleCloseNovedadModal();
         
-        // Notificar al componente padre para actualización general
-        await onEmployeeNovedadesChange(selectedEmployee.id);
-        
         console.log('✅ Novedad creada y sincronizada exitosamente');
       }
     } catch (error) {
       console.error('❌ Error en creación de novedad:', error);
     }
+  };
+
+  // Callback para manejar cambios desde el modal (eliminaciones, etc.)
+  const handleNovedadChange = async (employeeId: string) => {
+    console.log('🔄 Novedad modificada para empleado:', employeeId);
+    await onEmployeeNovedadesChange(employeeId);
   };
 
   const handleDeleteEmployee = (employee: PayrollEmployee) => {
@@ -254,6 +262,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           onSubmit={handleNovedadSubmit}
           selectedNovedadType={null}
           onClose={handleCloseNovedadModal}
+          onEmployeeNovedadesChange={handleNovedadChange}
         />
       )}
 
