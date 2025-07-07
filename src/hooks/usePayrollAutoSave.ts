@@ -10,6 +10,7 @@ interface UsePayrollAutoSaveOptions {
   removedEmployeeIds?: string[];
   enabled?: boolean;
   onSaveSuccess?: () => void;
+  onSaveError?: (error: any) => void;
 }
 
 export const usePayrollAutoSave = ({ 
@@ -17,73 +18,96 @@ export const usePayrollAutoSave = ({
   employees, 
   removedEmployeeIds = [],
   enabled = true,
-  onSaveSuccess
+  onSaveSuccess,
+  onSaveError
 }: UsePayrollAutoSaveOptions) => {
   const { toast } = useToast();
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   /**
-   * MEJORADO: Trigger auto-save con mejor manejo de concurrencia
+   * MEJORADO: Trigger auto-save con diagnóstico completo y manejo robusto de errores
    */
-  const triggerAutoSave = async () => {
+  const triggerAutoSave = async (): Promise<boolean> => {
+    console.log('🔄 triggerAutoSave - INICIANDO con diagnóstico completo');
+    console.log('📊 triggerAutoSave - Estado inicial:', {
+      enabled,
+      periodId,
+      employeesCount: employees.length,
+      removedEmployeeIds: removedEmployeeIds.length,
+      currentlySaving: isSaving
+    });
+
     if (!enabled || !periodId) {
-      console.log('⚠️ Auto-save skipped: disabled or no period ID');
-      return;
+      console.warn('⚠️ triggerAutoSave - CANCELADO: disabled o no period ID', { enabled, periodId });
+      return false;
     }
     
     if (employees.length === 0 && removedEmployeeIds.length === 0) {
-      console.log('⚠️ Auto-save skipped: no employees to save or remove');
-      return;
+      console.warn('⚠️ triggerAutoSave - CANCELADO: no hay empleados para guardar o eliminar');
+      return false;
     }
 
     // MEJORADO: Prevenir llamadas concurrentes más robustamente
     if (isSaving || PayrollAutoSaveService.isCurrentlySaving) {
-      console.log('⚠️ Auto-save skipped: already saving');
-      return;
+      console.warn('⚠️ triggerAutoSave - CANCELADO: ya se está guardando');
+      return false;
     }
     
-    console.log('🔄 Manual auto-save triggered (IMPROVED):', {
-      employees: employees.length,
-      removedEmployeeIds: removedEmployeeIds.length,
-      periodId,
-      enabled
-    });
-    
+    console.log('💾 triggerAutoSave - EJECUTANDO guardado automático');
     setIsSaving(true);
     
     try {
+      console.log('🔄 triggerAutoSave - Llamando PayrollAutoSaveService.saveDraftEmployees');
+      
       // CRÍTICO: Usar el servicio mejorado con eliminaciones atómicas
       await PayrollAutoSaveService.saveDraftEmployees(periodId, employees, removedEmployeeIds);
+      
+      console.log('✅ triggerAutoSave - saveDraftEmployees completado, actualizando actividad del período');
       await PayrollAutoSaveService.updatePeriodActivity(periodId);
+      
       setLastSaveTime(new Date());
       
-      // IMPORTANTE: Solo llamar callback después de éxito confirmado
-      console.log('✅ Auto-save successful, calling success callback');
+      console.log('✅ triggerAutoSave - ÉXITO COMPLETO, ejecutando callback de éxito');
       onSaveSuccess?.();
       
-      console.log('✅ Manual auto-save completed successfully');
-    } catch (error) {
-      console.error('❌ Manual auto-save failed:', error);
+      console.log('✅ triggerAutoSave - Guardado automático completado exitosamente');
+      return true;
       
-      // MEJORADO: Manejo de errores más específico
+    } catch (error) {
+      console.error('❌ triggerAutoSave - ERROR CRÍTICO en guardado automático:', error);
+      console.error('❌ triggerAutoSave - Detalles del error:', {
+        message: error?.message,
+        stack: error?.stack,
+        periodId,
+        employeesCount: employees.length
+      });
+      
+      // MEJORADO: Manejo de errores más específico y callback de error
+      onSaveError?.(error);
+      
       if (error?.message?.includes('duplicate key value')) {
-        console.log('🔄 Duplicate key error - will be resolved on next save');
+        console.log('🔄 triggerAutoSave - Error de duplicados - será resuelto en próximo guardado');
         // No mostrar toast para errores de duplicados
       } else if (error?.message?.includes('period_id')) {
+        console.error('❌ triggerAutoSave - Error de período, mostrando toast específico');
         toast({
           title: "Error de período",
           description: "Problema con el período de nómina. Intente recargar la página.",
           variant: "destructive"
         });
       } else {
+        console.error('❌ triggerAutoSave - Error general, mostrando toast genérico');
         toast({
           title: "Error al guardar",
           description: "No se pudieron guardar los cambios automáticamente. Se reintentará pronto.",
           variant: "destructive"
         });
       }
+      
+      return false;
     } finally {
+      console.log('🏁 triggerAutoSave - FINALIZANDO, limpiando estado de guardado');
       setIsSaving(false);
     }
   };

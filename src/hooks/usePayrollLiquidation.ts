@@ -47,7 +47,7 @@ export const usePayrollLiquidation = () => {
   // Intelligent load hook
   const { intelligentLoad, isLoading: isIntelligentLoading } = usePayrollIntelligentLoad();
 
-  // Auto-save integration
+  // Auto-save integration with IMPROVED error handling
   const { triggerAutoSave, isSaving, lastSaveTime } = usePayrollAutoSave({
     periodId: currentPeriodId,
     employees,
@@ -56,6 +56,9 @@ export const usePayrollLiquidation = () => {
     onSaveSuccess: () => {
       console.log('✅ Auto-save success callback - clearing removed employee IDs');
       setRemovedEmployeeIds([]);
+    },
+    onSaveError: (error) => {
+      console.error('❌ Auto-save error callback - handling save failure:', error);
     }
   });
 
@@ -159,23 +162,32 @@ export const usePayrollLiquidation = () => {
       throw new Error('No hay información del período activo');
     }
 
-    console.log('🔄 usePayrollLiquidation - Adding employees with immediate persistence:', employeeIds);
+    console.log('🔄 usePayrollLiquidation - INICIANDO adición de empleados con persistencia inmediata');
+    console.log('📊 usePayrollLiquidation - Empleados a agregar:', employeeIds);
+    console.log('📊 usePayrollLiquidation - Estado previo:', {
+      currentEmployeesCount: employees.length,
+      periodId: currentPeriodId
+    });
     
     setIsAddingEmployees(true);
     
     // Capturar estado previo para rollback
     const previousEmployees = [...employees];
+    console.log('💾 usePayrollLiquidation - Estado anterior capturado para rollback');
     
     try {
+      console.log('🔄 usePayrollLiquidation - Cargando datos de empleados específicos');
       const newEmployeesData = await PayrollLiquidationService.loadSpecificEmployeesForPeriod(
         employeeIds, 
         startDate, 
         endDate
       );
+      console.log('✅ usePayrollLiquidation - Datos de empleados cargados:', newEmployeesData.length);
 
+      console.log('🔄 usePayrollLiquidation - Procesando empleados con novedades');
       const processedNewEmployees = await Promise.all(
         newEmployeesData.map(async (employee) => {
-          console.log(`🔄 usePayrollLiquidation - Processing new employee: ${employee.nombre}`);
+          console.log(`🔄 usePayrollLiquidation - Procesando empleado: ${employee.nombre}`);
           
           const novedadesTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(
             employee.id,
@@ -202,17 +214,24 @@ export const usePayrollLiquidation = () => {
       );
 
       const transformedNewEmployees = processedNewEmployees.map(transformEmployee);
+      console.log('✅ usePayrollLiquidation - Empleados transformados:', transformedNewEmployees.length);
       
       // PASO 1: Actualizar estado inmediatamente
       const updatedEmployees = [...previousEmployees, ...transformedNewEmployees];
       setEmployees(updatedEmployees);
+      console.log('✅ usePayrollLiquidation - Estado actualizado en UI');
       
-      console.log('💾 usePayrollLiquidation - Triggering immediate auto-save after adding employees');
+      console.log('💾 usePayrollLiquidation - INICIANDO auto-save inmediato tras agregar empleados');
       
-      // PASO 2: PERSISTIR INMEDIATAMENTE en base de datos
-      await triggerAutoSave();
+      // PASO 2: PERSISTIR INMEDIATAMENTE con validación
+      const saveResult = await triggerAutoSave();
       
-      console.log('✅ usePayrollLiquidation - Employees added and persisted successfully:', transformedNewEmployees.length);
+      if (!saveResult) {
+        console.error('❌ usePayrollLiquidation - Auto-save FALLÓ, ejecutando rollback');
+        throw new Error('Failed to save employees to database');
+      }
+      
+      console.log('✅ usePayrollLiquidation - Auto-save EXITOSO, empleados persistidos');
       
       toast({
         title: "Empleados agregados",
@@ -221,10 +240,10 @@ export const usePayrollLiquidation = () => {
       });
       
     } catch (error) {
-      console.error('❌ usePayrollLiquidation - Error adding employees with auto-save:', error);
+      console.error('❌ usePayrollLiquidation - ERROR CRÍTICO agregando empleados:', error);
       
       // ROLLBACK: Restaurar estado anterior en caso de error
-      console.log('🔄 Rolling back to previous employee state due to error');
+      console.log('🔄 usePayrollLiquidation - EJECUTANDO ROLLBACK - restaurando estado anterior');
       setEmployees(previousEmployees);
       
       toast({
@@ -235,6 +254,7 @@ export const usePayrollLiquidation = () => {
       
       throw error;
     } finally {
+      console.log('🏁 usePayrollLiquidation - FINALIZANDO adición de empleados');
       setIsAddingEmployees(false);
     }
   };

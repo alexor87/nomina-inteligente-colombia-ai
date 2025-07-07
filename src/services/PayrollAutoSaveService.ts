@@ -114,9 +114,17 @@ export class PayrollAutoSaveService {
     employees: any[], 
     removedEmployeeIds: string[] = []
   ): Promise<void> {
+    console.log('💾 PayrollAutoSaveService.saveDraftEmployees - INICIANDO con diagnóstico completo');
+    console.log('📊 PayrollAutoSaveService - Parámetros recibidos:', {
+      periodId,
+      employeesCount: employees.length,
+      removedEmployeeIdsCount: removedEmployeeIds.length,
+      currentlySaving: this.isSaving
+    });
+
     // Protección contra llamadas concurrentes
     if (this.isSaving && this.savingPromise) {
-      console.log('🔄 Auto-save already in progress, waiting...');
+      console.log('🔄 PayrollAutoSaveService - Auto-save ya en progreso, esperando...');
       await this.savingPromise;
       return;
     }
@@ -128,6 +136,10 @@ export class PayrollAutoSaveService {
     
     try {
       await this.savingPromise;
+      console.log('✅ PayrollAutoSaveService.saveDraftEmployees - COMPLETADO exitosamente');
+    } catch (error) {
+      console.error('❌ PayrollAutoSaveService.saveDraftEmployees - ERROR:', error);
+      throw error;
     } finally {
       this.isSaving = false;
       this.savingPromise = null;
@@ -135,55 +147,71 @@ export class PayrollAutoSaveService {
   }
 
   /**
-   * MEJORADO: Operación atómica de guardado con eliminaciones separadas
+   * MEJORADO: Operación atómica de guardado con diagnóstico detallado
    */
   private static async _performAtomicSave(
     periodId: string, 
     employees: any[], 
     removedEmployeeIds: string[] = []
   ): Promise<void> {
+    console.log('🔄 PayrollAutoSaveService._performAtomicSave - INICIANDO operación atómica');
+    
     const companyId = await this.getCurrentUserCompanyId();
     if (!companyId) {
+      console.error('❌ PayrollAutoSaveService - No se pudo obtener company ID');
       throw new Error('No se pudo obtener la empresa del usuario');
     }
 
-    console.log('💾 Starting ATOMIC auto-save:', {
+    console.log('✅ PayrollAutoSaveService - Company ID obtenido:', companyId);
+    console.log('📊 PayrollAutoSaveService - Iniciando guardado atómico:', {
       employees: employees.length,
       removedEmployeeIds: removedEmployeeIds.length,
-      periodId
+      periodId,
+      companyId
     });
 
     try {
       // Validación de integridad antes de guardar
+      console.log('🔍 PayrollAutoSaveService - Validando integridad del período');
       const periodExists = await this.validatePeriodIntegrity(periodId, companyId);
       if (!periodExists) {
-        console.warn('⚠️ Período no válido para auto-guardado:', periodId);
-        return;
+        console.error('❌ PayrollAutoSaveService - Período no válido:', periodId);
+        throw new Error('Período no válido para auto-guardado');
       }
+      console.log('✅ PayrollAutoSaveService - Período válido confirmado');
 
       // PASO 1: ELIMINACIONES DIRECTAS PRIMERO (crítico)
       if (removedEmployeeIds.length > 0) {
-        console.log('🗑️ PHASE 1: Direct deletions');
+        console.log('🗑️ PayrollAutoSaveService - FASE 1: Eliminaciones directas');
         await this.deleteEmployeesFromPeriod(periodId, removedEmployeeIds);
+        console.log('✅ PayrollAutoSaveService - Eliminaciones completadas');
       }
 
       // PASO 2: Upsert empleados actuales (solo si hay empleados)
       if (employees.length > 0) {
-        console.log('💾 PHASE 2: Upserting remaining employees');
+        console.log('💾 PayrollAutoSaveService - FASE 2: Upserting empleados restantes');
         await this._upsertEmployees(periodId, companyId, employees);
+        console.log('✅ PayrollAutoSaveService - Upsert de empleados completado');
       }
 
       // PASO 3: Actualizar totales del período atómicamente
-      console.log('📊 PHASE 3: Updating period totals');
+      console.log('📊 PayrollAutoSaveService - FASE 3: Actualizando totales del período');
       await this.updatePeriodTotals(periodId, employees);
+      console.log('✅ PayrollAutoSaveService - Totales del período actualizados');
 
-      console.log('✅ ATOMIC auto-save completed successfully');
+      console.log('✅ PayrollAutoSaveService - GUARDADO ATÓMICO COMPLETADO exitosamente');
     } catch (error) {
-      console.error('❌ Error in atomic auto-save:', error);
+      console.error('❌ PayrollAutoSaveService - ERROR en guardado atómico:', error);
+      console.error('❌ PayrollAutoSaveService - Detalles del error:', {
+        message: error?.message,
+        periodId,
+        companyId,
+        employeesCount: employees.length
+      });
       
       // Manejo específico de errores de constraint
       if (error?.message?.includes('duplicate key value')) {
-        console.log('🔄 Handling duplicate key error - will retry on next trigger');
+        console.log('🔄 PayrollAutoSaveService - Manejando error de duplicados - se reintentará');
         return;
       }
       
@@ -192,21 +220,30 @@ export class PayrollAutoSaveService {
   }
 
   /**
-   * NUEVO: Método separado para upsert de empleados
+   * MEJORADO: Método separado para upsert de empleados con logging detallado
    */
   private static async _upsertEmployees(
     periodId: string, 
     companyId: string, 
     employees: any[]
   ): Promise<void> {
+    console.log('💾 PayrollAutoSaveService._upsertEmployees - INICIANDO upsert de empleados');
+    console.log('📊 PayrollAutoSaveService._upsertEmployees - Empleados a procesar:', employees.length);
+    
     // Obtener información del período para el campo 'periodo'
-    const { data: periodData } = await supabase
+    const { data: periodData, error: periodError } = await supabase
       .from('payroll_periods_real')
       .select('periodo')
       .eq('id', periodId)
       .single();
 
+    if (periodError) {
+      console.error('❌ PayrollAutoSaveService - Error obteniendo datos del período:', periodError);
+      throw periodError;
+    }
+
     const periodoName = periodData?.periodo || `Período ${new Date().toLocaleDateString()}`;
+    console.log('✅ PayrollAutoSaveService - Nombre del período obtenido:', periodoName);
 
     const draftPayrolls = employees.map(employee => ({
       company_id: companyId,
@@ -222,6 +259,9 @@ export class PayrollAutoSaveService {
       estado: 'borrador'
     }));
 
+    console.log('📊 PayrollAutoSaveService - Registros preparados para upsert:', draftPayrolls.length);
+    console.log('🔍 PayrollAutoSaveService - Primer registro como ejemplo:', draftPayrolls[0]);
+
     const { error: upsertError } = await supabase
       .from('payrolls')
       .upsert(draftPayrolls, {
@@ -230,11 +270,11 @@ export class PayrollAutoSaveService {
       });
 
     if (upsertError) {
-      console.error('❌ Upsert error:', upsertError);
+      console.error('❌ PayrollAutoSaveService - Error en upsert:', upsertError);
       throw upsertError;
     }
 
-    console.log('✅ Employees upserted successfully:', draftPayrolls.length);
+    console.log('✅ PayrollAutoSaveService - Empleados upserteados exitosamente:', draftPayrolls.length);
   }
 
   /**
