@@ -80,23 +80,39 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
   };
 
   const getSelectedPeriodName = () => {
-    if (periodInfo.periodData) {
+    // CORRECCIÓN: Priorizar el nombre generado correctamente por el servicio
+    if (periodInfo.periodData?.periodName) {
+      console.log('🏷️ USANDO NOMBRE DEL SERVICIO:', periodInfo.periodData.periodName);
       return periodInfo.periodData.periodName;
     }
     
     // Fallback: crear nombre simple con las fechas exactas del usuario
-    return `${startDate} - ${endDate}`;
+    const fallbackName = `${startDate} - ${endDate}`;
+    console.log('🏷️ USANDO NOMBRE FALLBACK:', fallbackName);
+    return fallbackName;
   };
 
   const getPeriodNumberInfo = () => {
     if (periodInfo.activePeriod?.numero_periodo_anual) {
-      const year = new Date(periodInfo.activePeriod.fecha_inicio).getFullYear();
+      // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+      const startParts = periodInfo.activePeriod.fecha_inicio.split('-');
+      const year = parseInt(startParts[0]); // Usar año de la fecha de inicio, no new Date()
+      
+      console.log('🔢 GENERANDO NOMBRE SEMÁNTICO PARA PERÍODO EXISTENTE:', {
+        numero: periodInfo.activePeriod.numero_periodo_anual,
+        tipo: periodInfo.activePeriod.tipo_periodo,
+        year,
+        fechaInicio: periodInfo.activePeriod.fecha_inicio
+      });
+      
       const semanticName = PeriodNumberCalculationService.getSemanticPeriodName(
         periodInfo.activePeriod.numero_periodo_anual,
         periodInfo.activePeriod.tipo_periodo,
         year,
         periodInfo.activePeriod.periodo
       );
+      
+      console.log('✨ NOMBRE SEMÁNTICO GENERADO:', semanticName);
       
       return {
         hasNumber: true,
@@ -108,7 +124,22 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
     return { hasNumber: false };
   };
 
-  const periodNumberInfo = getPeriodNumberInfo();
+  // CORRECCIÓN: Solo usar getPeriodNumberInfo para períodos EXISTENTES con número
+  // Para períodos nuevos, usar siempre el nombre del servicio
+  const shouldUseSemanticName = isExistingPeriod && periodInfo.activePeriod?.numero_periodo_anual;
+  const periodNumberInfo = shouldUseSemanticName ? getPeriodNumberInfo() : { hasNumber: false };
+
+  console.log('🔍 DEBUG PERIOD DISPLAY:', {
+    isNewPeriod,
+    isExistingPeriod,
+    shouldUseSemanticName,
+    hasNumber: periodNumberInfo.hasNumber,
+    periodDataName: periodInfo.periodData?.periodName,
+    semanticName: periodNumberInfo.semanticName,
+    finalDisplayName: shouldUseSemanticName && periodNumberInfo.hasNumber 
+      ? periodNumberInfo.semanticName 
+      : getSelectedPeriodName()
+  });
 
   return (
     <Card className={`${getStatusColor()} transition-colors`}>
@@ -132,7 +163,10 @@ export const PeriodInfoPanel: React.FC<PeriodInfoPanelProps> = ({
             <div>
               <p className="text-sm text-gray-600 font-medium">Período Seleccionado</p>
               <p className="font-semibold text-gray-900">
-                {periodNumberInfo.hasNumber ? periodNumberInfo.semanticName : getSelectedPeriodName()}
+                {shouldUseSemanticName && periodNumberInfo.hasNumber 
+                  ? periodNumberInfo.semanticName 
+                  : getSelectedPeriodName()
+                }
               </p>
               {periodNumberInfo.hasNumber && (
                 <p className="text-xs text-gray-500">
