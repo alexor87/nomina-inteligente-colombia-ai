@@ -18,7 +18,7 @@ const PayrollLiquidationPage = () => {
   const [showPeriodInfo, setShowPeriodInfo] = useState(false);
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   
-  const { company } = useCurrentCompany();
+  const { companyId } = useCurrentCompany();
   
   const {
     employees,
@@ -240,7 +240,7 @@ const PayrollLiquidationPage = () => {
         onClose={() => setShowAddEmployeeModal(false)}
         onAddEmployees={handleAddEmployees}
         currentEmployeeIds={employees.map(emp => emp.id)}
-        companyId={company?.id || ''}
+        companyId={companyId || ''}
       />
     </div>
   );
