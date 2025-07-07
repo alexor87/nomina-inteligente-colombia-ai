@@ -1,3 +1,4 @@
+
 import { getWeek } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -24,7 +25,9 @@ export class PeriodNumberCalculationService {
         companyId, startDate, endDate, tipoPeriodo 
       });
       
-      const year = new Date(startDate).getFullYear();
+      // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+      const startParts = startDate.split('-');
+      const year = parseInt(startParts[0]);
       let calculatedNumber: number;
       
       // Calcular número según tipo de período
@@ -83,25 +86,32 @@ export class PeriodNumberCalculationService {
   }
   
   /**
-   * Calcula número para período mensual (1-12)
+   * ✅ FUNCIÓN CORREGIDA: Calcula número para período mensual (1-12)
    */
   private static calculateMonthlyPeriodNumber(startDate: string): number {
-    const date = new Date(startDate);
-    return date.getMonth() + 1; // getMonth() es 0-indexed
+    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+    const startParts = startDate.split('-');
+    const month = parseInt(startParts[1]); // Mes (1-12)
+    
+    console.log('📊 CÁLCULO MENSUAL CORREGIDO:', { startDate, month });
+    
+    return month;
   }
   
   /**
-   * Calcula número para período quincenal (conteo cronológico correcto)
+   * ✅ FUNCIÓN CORREGIDA: Calcula número para período quincenal (conteo cronológico correcto)
    */
   private static async calculateBiweeklyPeriodNumber(
     companyId: string, 
     startDate: string, 
     year: number
   ): Promise<number> {
-    const startDay = new Date(startDate).getDate();
-    const startMonth = new Date(startDate).getMonth() + 1;
+    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+    const startParts = startDate.split('-');
+    const startDay = parseInt(startParts[2]);
+    const startMonth = parseInt(startParts[1]);
     
-    console.log('📊 CALCULANDO QUINCENA DETALLADO:', { 
+    console.log('📊 CALCULANDO QUINCENA DETALLADO (CORREGIDO):', { 
       startDate, startDay, startMonth, year 
     });
     
@@ -141,12 +151,13 @@ export class PeriodNumberCalculationService {
   }
   
   /**
-   * Verificación independiente del cálculo quincenal
+   * ✅ FUNCIÓN CORREGIDA: Verificación independiente del cálculo quincenal
    */
   private static verifyBiweeklyCalculation(startDate: string): number {
-    const date = new Date(startDate);
-    const month = date.getMonth() + 1; // 1-12
-    const day = date.getDate();
+    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+    const startParts = startDate.split('-');
+    const month = parseInt(startParts[1]); // 1-12
+    const day = parseInt(startParts[2]);
     
     // Meses completos anteriores × 2
     const previousMonthsQuincenas = (month - 1) * 2;
@@ -156,7 +167,7 @@ export class PeriodNumberCalculationService {
     
     const total = previousMonthsQuincenas + currentQuincena;
     
-    console.log('🔍 VERIFICACIÓN INDEPENDIENTE:', {
+    console.log('🔍 VERIFICACIÓN INDEPENDIENTE CORREGIDA:', {
       month,
       day,
       previousMonthsQuincenas,
@@ -168,10 +179,22 @@ export class PeriodNumberCalculationService {
   }
   
   /**
-   * Calcula número para período semanal (semana ISO del año)
+   * ✅ FUNCIÓN CORREGIDA: Calcula número para período semanal (semana ISO del año)
    */
   private static calculateWeeklyPeriodNumber(startDate: string): number {
-    const date = new Date(startDate);
+    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+    const startParts = startDate.split('-');
+    const date = new Date(
+      parseInt(startParts[0]),     // year
+      parseInt(startParts[1]) - 1, // month (0-indexed)
+      parseInt(startParts[2])      // day
+    );
+    
+    console.log('📊 CÁLCULO SEMANAL CORREGIDO:', { 
+      startDate, 
+      parsedDate: date.toDateString() 
+    });
+    
     return getWeek(date, { weekStartsOn: 1 }); // Lunes como primer día
   }
   
@@ -214,16 +237,34 @@ export class PeriodNumberCalculationService {
   }
   
   /**
-   * Valida coherencia entre fechas y tipo de período
+   * ✅ FUNCIÓN CORREGIDA: Valida coherencia entre fechas y tipo de período
    */
   private static validatePeriodCoherence(
     startDate: string, 
     endDate: string, 
     tipoPeriodo: string
   ): { warning?: string } {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+    const startParts = startDate.split('-');
+    const endParts = endDate.split('-');
+    
+    const start = new Date(
+      parseInt(startParts[0]),     // year
+      parseInt(startParts[1]) - 1, // month (0-indexed)
+      parseInt(startParts[2])      // day
+    );
+    
+    const end = new Date(
+      parseInt(endParts[0]),       // year
+      parseInt(endParts[1]) - 1,   // month (0-indexed)
+      parseInt(endParts[2])        // day
+    );
+    
     const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    console.log('📊 VALIDACIÓN DE COHERENCIA CORREGIDA:', { 
+      startDate, endDate, diffDays, tipoPeriodo 
+    });
     
     let expectedMinDays: number;
     let expectedMaxDays: number;
@@ -255,7 +296,7 @@ export class PeriodNumberCalculationService {
   }
   
   /**
-   * Genera nombre semántico del período basado en el número
+   * ✅ FUNCIÓN CORREGIDA: Genera nombre semántico del período basado en el número
    */
   static getSemanticPeriodName(
     numeroAnual: number | null,
@@ -263,9 +304,15 @@ export class PeriodNumberCalculationService {
     year: number,
     fallbackName: string
   ): string {
+    console.log('🏷️ GENERANDO NOMBRE SEMÁNTICO CORREGIDO:', { 
+      numeroAnual, tipoPeriodo, year, fallbackName 
+    });
+    
     if (!numeroAnual) {
       return fallbackName; // Períodos antiguos sin numeración
     }
+    
+    let semanticName: string;
     
     switch (tipoPeriodo) {
       case 'mensual':
@@ -273,17 +320,24 @@ export class PeriodNumberCalculationService {
           'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
         ];
-        return `${monthNames[numeroAnual - 1]} ${year}`;
+        semanticName = `${monthNames[numeroAnual - 1]} ${year}`;
+        break;
       
       case 'quincenal':
-        return `Quincena ${numeroAnual} del ${year}`;
+        semanticName = `Quincena ${numeroAnual} del ${year}`;
+        break;
       
       case 'semanal':
-        return `Semana ${numeroAnual} del ${year}`;
+        semanticName = `Semana ${numeroAnual} del ${year}`;
+        break;
       
       default:
-        return fallbackName;
+        semanticName = fallbackName;
+        break;
     }
+    
+    console.log('✅ NOMBRE SEMÁNTICO GENERADO:', semanticName);
+    return semanticName;
   }
   
   /**

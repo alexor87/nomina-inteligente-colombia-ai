@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { getPeriodNameFromDates } from '@/utils/periodDateUtils';
@@ -115,7 +116,10 @@ export class PayrollPeriodDetectionService {
       
       // Si se calculó número de período exitosamente, generar nombre semántico
       if (numberResult.success && numberResult.numero_periodo_anual) {
-        const year = new Date(startDate).getFullYear();
+        // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+        const startParts = startDate.split('-');
+        const year = parseInt(startParts[0]); // Usar año de la fecha de inicio
+        
         const semanticName = PeriodNumberCalculationService.getSemanticPeriodName(
           numberResult.numero_periodo_anual,
           tipoPeriodo,
@@ -229,19 +233,51 @@ export class PayrollPeriodDetectionService {
     }
   }
 
+  /**
+   * ✅ FUNCIÓN CORREGIDA: Detectar tipo de período basado en días reales
+   */
   private static detectPeriodType(startDate: string, endDate: string): 'semanal' | 'quincenal' | 'mensual' {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    console.log('🔍 DETECTANDO TIPO DE PERÍODO (CORREGIDO):', { startDate, endDate });
+    
+    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
+    const startParts = startDate.split('-');
+    const endParts = endDate.split('-');
+    
+    const start = new Date(
+      parseInt(startParts[0]),     // year
+      parseInt(startParts[1]) - 1, // month (0-indexed)
+      parseInt(startParts[2])      // day
+    );
+    
+    const end = new Date(
+      parseInt(endParts[0]),       // year
+      parseInt(endParts[1]) - 1,   // month (0-indexed)
+      parseInt(endParts[2])        // day
+    );
+    
+    // Calcular diferencia en días (inclusivo)
     const diffTime = end.getTime() - start.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     
+    console.log('📊 CÁLCULO DE DÍAS CORREGIDO:', { 
+      start: start.toDateString(), 
+      end: end.toDateString(), 
+      diffDays 
+    });
+    
+    let periodType: 'semanal' | 'quincenal' | 'mensual';
+    
     if (diffDays <= 7) {
-      return 'semanal';
+      periodType = 'semanal';
     } else if (diffDays <= 16) {
-      return 'quincenal';
+      periodType = 'quincenal';
     } else {
-      return 'mensual';
+      periodType = 'mensual';
     }
+    
+    console.log('✅ TIPO DE PERÍODO DETECTADO:', { diffDays, periodType });
+    
+    return periodType;
   }
 
   private static async getCurrentUserCompanyId(): Promise<string | null> {
