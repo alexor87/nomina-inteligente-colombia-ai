@@ -101,7 +101,7 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [companyId, cleanDuplicates]);
 
-  // Función simple para cargar empleados
+  // SOLUCIÓN KISS: Cargar SOLO empleados que están en payrolls para este período
   const loadEmployees = useCallback(async (startDate: string, endDate: string) => {
     setIsLoading(true);
     try {
@@ -114,52 +114,108 @@ export const usePayrollUnified = (companyId: string) => {
 
       setCurrentPeriod(period);
 
-      // Cargar empleados activos
-      const { data: activeEmployees, error: empError } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('estado', 'activo');
-
-      if (empError) throw empError;
-
-      // Cargar payrolls existentes para este período
-      const { data: payrolls, error: payrollError } = await supabase
+      // CAMBIO PRINCIPAL: Cargar SOLO empleados que están en payrolls para este período
+      const { data: periodEmployees, error: periodError } = await supabase
         .from('payrolls')
-        .select('*')
+        .select(`
+          *,
+          employees!inner(*)
+        `)
         .eq('company_id', companyId)
         .eq('period_id', period.id);
 
-      if (payrollError) throw payrollError;
-
-      // Combinar datos
-      const employeesList: PayrollEmployee[] = (activeEmployees || []).map(emp => {
-        const payroll = payrolls?.find(p => p.employee_id === emp.id);
+      if (periodError) {
+        console.error('Error cargando empleados del período:', periodError);
         
-        return {
-          id: emp.id,
-          name: `${emp.nombre} ${emp.apellido}`,
-          position: emp.cargo || 'Sin cargo',
-          baseSalary: Number(emp.salario_base) || 0,
-          workedDays: payroll?.dias_trabajados || 15,
-          extraHours: payroll?.horas_extra || 0,
-          disabilities: payroll?.incapacidades || 0,
-          bonuses: payroll?.bonificaciones || 0,
-          absences: 0,
-          grossPay: payroll?.total_devengado || Number(emp.salario_base) || 0,
-          deductions: payroll?.total_deducciones || 0,
-          netPay: payroll?.neto_pagado || Number(emp.salario_base) || 0,
-          status: 'valid' as const,
-          errors: [],
-          eps: emp.eps,
-          afp: emp.afp,
-          transportAllowance: payroll?.auxilio_transporte || 0,
-          employerContributions: 0
-        };
-      });
+        // Si no hay empleados en payrolls, cargar empleados activos por primera vez
+        const { data: activeEmployees, error: empError } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('company_id', companyId)
+          .eq('estado', 'activo');
 
-      setEmployees(employeesList);
-      console.log('✅ Empleados cargados:', employeesList.length);
+        if (empError) throw empError;
+
+        // Crear registros en payrolls para empleados activos
+        if (activeEmployees && activeEmployees.length > 0) {
+          const payrollRecords = activeEmployees.map(emp => ({
+            company_id: companyId,
+            employee_id: emp.id,
+            period_id: period.id,
+            periodo: period.periodo,
+            salario_base: Number(emp.salario_base) || 0,
+            dias_trabajados: 15,
+            total_devengado: Number(emp.salario_base) || 0,
+            total_deducciones: 0,
+            neto_pagado: Number(emp.salario_base) || 0,
+            estado: 'borrador'
+          }));
+
+          const { error: insertError } = await supabase
+            .from('payrolls')
+            .insert(payrollRecords);
+
+          if (insertError) {
+            console.error('Error creando registros de payroll:', insertError);
+          } else {
+            console.log('✅ Registros de payroll creados para empleados activos');
+          }
+
+          // Convertir a formato PayrollEmployee
+          const employeesList: PayrollEmployee[] = activeEmployees.map(emp => ({
+            id: emp.id,
+            name: `${emp.nombre} ${emp.apellido}`,
+            position: emp.cargo || 'Sin cargo',
+            baseSalary: Number(emp.salario_base) || 0,
+            workedDays: 15,
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            grossPay: Number(emp.salario_base) || 0,
+            deductions: 0,
+            netPay: Number(emp.salario_base) || 0,
+            status: 'valid' as const,
+            errors: [],
+            eps: emp.eps,
+            afp: emp.afp,
+            transportAllowance: 0,
+            employerContributions: 0
+          }));
+
+          setEmployees(employeesList);
+        } else {
+          setEmployees([]);
+        }
+      } else {
+        // Convertir datos de payrolls + employees a formato PayrollEmployee
+        const employeesList: PayrollEmployee[] = (periodEmployees || []).map(payroll => {
+          const emp = payroll.employees as any;
+          return {
+            id: emp.id,
+            name: `${emp.nombre} ${emp.apellido}`,
+            position: emp.cargo || 'Sin cargo',
+            baseSalary: Number(emp.salario_base) || 0,
+            workedDays: payroll.dias_trabajados || 15,
+            extraHours: payroll.horas_extra || 0,
+            disabilities: payroll.incapacidades || 0,
+            bonuses: payroll.bonificaciones || 0,
+            absences: 0,
+            grossPay: payroll.total_devengado || Number(emp.salario_base) || 0,
+            deductions: payroll.total_deducciones || 0,
+            netPay: payroll.neto_pagado || Number(emp.salario_base) || 0,
+            status: 'valid' as const,
+            errors: [],
+            eps: emp.eps,
+            afp: emp.afp,
+            transportAllowance: payroll.auxilio_transporte || 0,
+            employerContributions: 0
+          };
+        });
+
+        setEmployees(employeesList);
+        console.log('✅ Empleados del período cargados:', employeesList.length);
+      }
 
     } catch (error) {
       console.error('Error cargando empleados:', error);
@@ -173,7 +229,7 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [companyId, findOrCreatePeriod, toast]);
 
-  // Función simple para agregar empleados
+  // MEJORAR addEmployees para asegurar persistencia en payrolls
   const addEmployees = useCallback(async (employeeIds: string[]) => {
     if (!currentPeriod) return;
 
@@ -184,6 +240,26 @@ export const usePayrollUnified = (companyId: string) => {
         .in('id', employeeIds);
 
       if (error) throw error;
+
+      // Crear registros en payrolls para persistencia
+      const payrollRecords = (newEmployees || []).map(emp => ({
+        company_id: companyId,
+        employee_id: emp.id,
+        period_id: currentPeriod.id,
+        periodo: currentPeriod.periodo,
+        salario_base: Number(emp.salario_base) || 0,
+        dias_trabajados: 15,
+        total_devengado: Number(emp.salario_base) || 0,
+        total_deducciones: 0,
+        neto_pagado: Number(emp.salario_base) || 0,
+        estado: 'borrador'
+      }));
+
+      const { error: insertError } = await supabase
+        .from('payrolls')
+        .insert(payrollRecords);
+
+      if (insertError) throw insertError;
 
       const newEmployeesList: PayrollEmployee[] = (newEmployees || []).map(emp => ({
         id: emp.id,
@@ -216,14 +292,14 @@ export const usePayrollUnified = (companyId: string) => {
         variant: "destructive",
       });
     }
-  }, [currentPeriod, toast]);
+  }, [currentPeriod, companyId, toast]);
 
-  // Función simple para remover empleado
+  // Función simple para remover empleado (ya funcionaba correctamente)
   const removeEmployee = useCallback(async (employeeId: string) => {
     if (!currentPeriod) return;
 
     try {
-      // Remover de payrolls si existe
+      // Remover de payrolls (esto ya mantenía la persistencia)
       await supabase
         .from('payrolls')
         .delete()
@@ -272,7 +348,6 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, employees, toast]);
 
-  // Función para refrescar novedades de un empleado
   const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
     console.log('🔄 Refrescando novedades para empleado:', employeeId);
     // Recargar empleados para obtener los datos más actuales
