@@ -13,23 +13,33 @@ export interface SelectablePeriod {
 
 export class SimplePeriodService {
   /**
-   * Obtener períodos seleccionables para el año 2025 (año MRP activo)
+   * Obtener períodos seleccionables para el año 2025 según configuración de empresa
    */
   static async getSelectablePeriods(companyId: string): Promise<SelectablePeriod[]> {
     try {
-      console.log('📋 Cargando períodos seleccionables para 2025...');
+      console.log('📋 Cargando períodos seleccionables según configuración de empresa...');
       
-      // Generar todos los períodos quincenales esperados para 2025
-      const expectedPeriods = this.generateBiWeeklyPeriods2025();
+      // Obtener configuración de periodicidad de la empresa
+      const { data: companySettings } = await supabase
+        .from('company_settings')
+        .select('periodicity')
+        .eq('company_id', companyId)
+        .single();
+
+      const periodicity = companySettings?.periodicity || 'mensual';
+      console.log('⚙️ Periodicidad configurada:', periodicity);
       
-      // Obtener períodos existentes en BD (SOLO activos/borrador)
+      // Generar períodos según la configuración
+      const expectedPeriods = this.generatePeriods2025(periodicity);
+      
+      // Obtener períodos existentes en BD
       const { data: existingPeriods } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
         .gte('fecha_inicio', '2025-01-01')
         .lte('fecha_fin', '2025-12-31')
-        .in('estado', ['borrador', 'en_proceso', 'cerrado']) // Excluir cancelados
+        .in('estado', ['borrador', 'en_proceso', 'cerrado'])
         .order('numero_periodo_anual');
       
       // Crear mapa de períodos existentes
@@ -42,7 +52,6 @@ export class SimplePeriodService {
         const existing = existingMap.get(expected.periodNumber);
         
         if (existing) {
-          // Período existe - verificar si se puede seleccionar
           const canSelect = existing.estado === 'borrador' || existing.estado === 'en_proceso';
           return {
             id: existing.id,
@@ -54,7 +63,6 @@ export class SimplePeriodService {
             needsCreation: false
           };
         } else {
-          // Período no existe - se puede crear y seleccionar
           return {
             label: expected.label,
             startDate: expected.startDate,
@@ -66,10 +74,9 @@ export class SimplePeriodService {
         }
       });
 
-      // Ordenar por número de período
       selectablePeriods.sort((a, b) => a.periodNumber - b.periodNumber);
       
-      console.log(`✅ ${selectablePeriods.length} períodos disponibles (${selectablePeriods.filter(p => p.canSelect).length} seleccionables)`);
+      console.log(`✅ ${selectablePeriods.length} períodos ${periodicity} disponibles (${selectablePeriods.filter(p => p.canSelect).length} seleccionables)`);
       
       return selectablePeriods;
       
@@ -87,13 +94,22 @@ export class SimplePeriodService {
       if (period.needsCreation) {
         console.log(`🎯 Creando período automáticamente: ${period.label}`);
         
+        // Obtener configuración para determinar tipo de período
+        const { data: companySettings } = await supabase
+          .from('company_settings')
+          .select('periodicity')
+          .eq('company_id', companyId)
+          .single();
+
+        const periodicity = companySettings?.periodicity || 'mensual';
+        
         const { data, error } = await supabase
           .from('payroll_periods_real')
           .insert({
             company_id: companyId,
             fecha_inicio: period.startDate,
             fecha_fin: period.endDate,
-            tipo_periodo: 'quincenal',
+            tipo_periodo: periodicity,
             numero_periodo_anual: period.periodNumber,
             periodo: period.label,
             estado: 'borrador',
@@ -122,7 +138,6 @@ export class SimplePeriodService {
         };
       }
       
-      // Período ya existe, simplemente retornarlo
       return period;
     } catch (error) {
       console.error('❌ Error seleccionando período:', error);
@@ -131,7 +146,68 @@ export class SimplePeriodService {
   }
 
   /**
-   * FUNCIÓN CORREGIDA: Generar períodos quincenales para 2025 con numeración correcta
+   * Generar períodos para 2025 según tipo de periodicidad
+   */
+  private static generatePeriods2025(periodicity: string): Array<{
+    label: string;
+    startDate: string;
+    endDate: string;
+    periodNumber: number;
+  }> {
+    const year = 2025;
+    
+    switch (periodicity) {
+      case 'mensual':
+        return this.generateMonthlyPeriods2025();
+      case 'quincenal':
+        return this.generateBiWeeklyPeriods2025();
+      case 'semanal':
+        return this.generateWeeklyPeriods2025();
+      default:
+        console.warn('⚠️ Periodicidad no reconocida, usando mensual');
+        return this.generateMonthlyPeriods2025();
+    }
+  }
+
+  /**
+   * Generar períodos mensuales para 2025
+   */
+  private static generateMonthlyPeriods2025(): Array<{
+    label: string;
+    startDate: string;
+    endDate: string;
+    periodNumber: number;
+  }> {
+    const periods = [];
+    const year = 2025;
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    for (let month = 0; month < 12; month++) {
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, month + 1, 0); // Último día del mes
+      
+      periods.push({
+        label: `${monthNames[month]} ${year}`,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        periodNumber: month + 1
+      });
+    }
+
+    console.log('✅ PERÍODOS MENSUALES 2025 GENERADOS:', {
+      totalPeriods: periods.length,
+      firstPeriod: periods[0],
+      lastPeriod: periods[periods.length - 1]
+    });
+
+    return periods;
+  }
+
+  /**
+   * Generar períodos quincenales para 2025
    */
   private static generateBiWeeklyPeriods2025(): Array<{
     label: string;
@@ -140,13 +216,13 @@ export class SimplePeriodService {
     periodNumber: number;
   }> {
     const periods = [];
-    const year = 2025; // Año fijo para MRP
+    const year = 2025;
     const monthNames = [
       'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
 
-    let periodNumber = 1; // CORRECCIÓN: Iniciar en 1
+    let periodNumber = 1;
 
     for (let month = 0; month < 12; month++) {
       // Primera quincena (1-15)
@@ -157,22 +233,69 @@ export class SimplePeriodService {
         label: `1 - 15 ${monthNames[month]} ${year}`,
         startDate: firstStart.toISOString().split('T')[0],
         endDate: firstEnd.toISOString().split('T')[0],
-        periodNumber: periodNumber++ // CORRECCIÓN: Numeración secuencial correcta
+        periodNumber: periodNumber++
       });
 
       // Segunda quincena (16-fin de mes)
       const secondStart = new Date(year, month, 16);
-      const secondEnd = new Date(year, month + 1, 0); // Último día del mes
+      const secondEnd = new Date(year, month + 1, 0);
       
       periods.push({
         label: `16 - ${secondEnd.getDate()} ${monthNames[month]} ${year}`,
         startDate: secondStart.toISOString().split('T')[0],
         endDate: secondEnd.toISOString().split('T')[0],
-        periodNumber: periodNumber++ // CORRECCIÓN: Numeración secuencial correcta
+        periodNumber: periodNumber++
       });
     }
 
-    console.log('✅ PERÍODOS 2025 GENERADOS CORRECTAMENTE:', {
+    console.log('✅ PERÍODOS QUINCENALES 2025 GENERADOS:', {
+      totalPeriods: periods.length,
+      firstPeriod: periods[0],
+      lastPeriod: periods[periods.length - 1]
+    });
+
+    return periods;
+  }
+
+  /**
+   * Generar períodos semanales para 2025
+   */
+  private static generateWeeklyPeriods2025(): Array<{
+    label: string;
+    startDate: string;
+    endDate: string;
+    periodNumber: number;
+  }> {
+    const periods = [];
+    const year = 2025;
+    let periodNumber = 1;
+    
+    // Empezar desde el primer lunes de 2025
+    let currentDate = new Date(year, 0, 1); // 1 enero 2025
+    const dayOfWeek = currentDate.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+    currentDate.setDate(currentDate.getDate() + daysToMonday);
+
+    while (currentDate.getFullYear() === year) {
+      const weekStart = new Date(currentDate);
+      const weekEnd = new Date(currentDate);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      if (weekEnd.getFullYear() > year) {
+        break;
+      }
+
+      periods.push({
+        label: `Semana ${periodNumber} (${weekStart.getDate()}/${weekStart.getMonth() + 1} - ${weekEnd.getDate()}/${weekEnd.getMonth() + 1})`,
+        startDate: weekStart.toISOString().split('T')[0],
+        endDate: weekEnd.toISOString().split('T')[0],
+        periodNumber: periodNumber++
+      });
+
+      currentDate.setDate(currentDate.getDate() + 7);
+    }
+
+    console.log('✅ PERÍODOS SEMANALES 2025 GENERADOS:', {
       totalPeriods: periods.length,
       firstPeriod: periods[0],
       lastPeriod: periods[periods.length - 1]

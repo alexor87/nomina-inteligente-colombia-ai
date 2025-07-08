@@ -23,6 +23,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
   const [selectedPeriodNumber, setSelectedPeriodNumber] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [periodicity, setPeriodicity] = useState<string>('mensual');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -34,6 +35,16 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
   const loadPeriods = async () => {
     setIsLoading(true);
     try {
+      // Obtener configuración de periodicidad
+      const { data: companySettings } = await supabase
+        .from('company_settings')
+        .select('periodicity')
+        .eq('company_id', companyId)
+        .single();
+
+      const currentPeriodicity = companySettings?.periodicity || 'mensual';
+      setPeriodicity(currentPeriodicity);
+
       const loadedPeriods = await SimplePeriodService.getSelectablePeriods(companyId);
       setPeriods(loadedPeriods);
       
@@ -117,6 +128,15 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
   const availablePeriods = periods.filter(p => p.canSelect);
   const selectedPeriod = periods.find(p => p.periodNumber.toString() === selectedPeriodNumber);
 
+  const getPeriodTypeLabel = (type: string) => {
+    const labels = {
+      'mensual': 'Mensual',
+      'quincenal': 'Quincenal', 
+      'semanal': 'Semanal'
+    };
+    return labels[type] || type;
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -125,6 +145,9 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
           <span>Seleccionar Período de Nómina</span>
           <Badge variant="outline" className="text-xs bg-blue-50">
             2025
+          </Badge>
+          <Badge variant="secondary" className="text-xs">
+            {getPeriodTypeLabel(periodicity)}
           </Badge>
         </CardTitle>
       </CardHeader>
