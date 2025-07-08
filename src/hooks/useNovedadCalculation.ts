@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadType } from '@/types/novedades-enhanced';
+import { RecargosCalculationService } from '@/services/RecargosCalculationService';
 
 interface UseNovedadCalculationProps {
   employeeSalary: number;
@@ -38,8 +39,27 @@ export const useNovedadCalculation = ({
       return null;
     }
 
+    // ✅ SOLUCIÓN KISS: Usar servicio unificado para recargos
+    if (tipoNovedad === 'recargo_nocturno' && subtipo && horas && horas > 0) {
+      try {
+        const result = RecargosCalculationService.calcularRecargo({
+          salarioBase: employeeSalary,
+          tipoRecargo: subtipo as any,
+          horas: horas
+        });
+        
+        console.log('📊 Recargo calculation result:', result.valorRecargo);
+        setCalculatedValue(result.valorRecargo);
+        return result.valorRecargo;
+      } catch (error) {
+        console.error('❌ Error in recargo calculation:', error);
+        setCalculatedValue(null);
+        return null;
+      }
+    }
+
     // Skip calculation if required inputs are missing
-    const requiresHours = ['horas_extra', 'recargo_nocturno'].includes(tipoNovedad);
+    const requiresHours = ['horas_extra'].includes(tipoNovedad);
     const requiresDays = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'ausencia'].includes(tipoNovedad);
 
     if (requiresHours && (!horas || horas <= 0)) {

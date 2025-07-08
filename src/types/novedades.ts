@@ -1,3 +1,4 @@
+
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -204,7 +205,9 @@ export const HORAS_EXTRA_FACTORS = {
   festivas_nocturnas: 2.5           // 150% de recargo para días festivos nocturnos
 } as const;
 
-// Función para calcular automáticamente el valor de una novedad
+// ✅ FUNCIÓN ACTUALIZADA PARA USAR SERVICIO UNIFICADO
+import { RecargosCalculationService } from '@/services/RecargosCalculationService';
+
 export const calcularValorNovedad = (
   tipoNovedad: NovedadType,
   subtipo: string | undefined,
@@ -277,16 +280,26 @@ export const calcularValorNovedad = (
       break;
 
     case 'recargo_nocturno':
-      if (horas && horas > 0) {
-        const tarifaHora = salarioBase / 240;
-        // Corregido: recargo nocturno es 35% ADICIONAL al valor hora normal
-        // Valor total = Valor hora normal + 35% de recargo = 1.35 × Valor hora normal
-        valor = Math.round(tarifaHora * 1.35 * horas);
-        factorCalculo = 1.35;
-        detalleCalculo = `Recargo nocturno (35% adicional): (${salarioBase.toLocaleString()} ÷ 240) × 1.35 × ${horas} horas = ${valor.toLocaleString()}`;
-        console.log('Resultado recargo nocturno:', { tarifaHora, valor });
+      // ✅ USAR SERVICIO UNIFICADO PARA RECARGOS
+      if (horas && horas > 0 && subtipo) {
+        try {
+          const resultado = RecargosCalculationService.calcularRecargo({
+            salarioBase,
+            tipoRecargo: subtipo as any,
+            horas
+          });
+          
+          valor = resultado.valorRecargo;
+          factorCalculo = resultado.factorRecargo;
+          detalleCalculo = resultado.detalleCalculo;
+          
+          console.log('✅ Recargo calculado con servicio unificado:', resultado);
+        } catch (error) {
+          console.error('❌ Error calculando recargo:', error);
+          detalleCalculo = 'Error en cálculo de recargo';
+        }
       } else {
-        detalleCalculo = 'Ingrese las horas de recargo nocturno';
+        detalleCalculo = 'Ingrese las horas de recargo y seleccione tipo';
       }
       break;
 
@@ -371,19 +384,14 @@ export const calcularValorNovedad = (
 
     default:
       console.log('Tipo de novedad sin cálculo automático:', tipoNovedad);
-      detalleCalculo = 'Cálculo manual requerido';
-      break;
+      detalleCalculo = 'Ingrese el valor manualmente';
   }
-
-  console.log('Resultado final cálculo:', { valor, detalleCalculo });
 
   return {
     valor,
     baseCalculo: {
       salario_base: salarioBase,
       factor_calculo: factorCalculo,
-      tarifa_hora: tipoNovedad.includes('hora') ? salarioBase / 240 : undefined,
-      dias_periodo: dias,
       detalle_calculo: detalleCalculo
     }
   };

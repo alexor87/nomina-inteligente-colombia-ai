@@ -8,8 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useNovedadCalculation } from '@/hooks/useNovedadCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
+import { RecargosCalculationService } from '@/services/RecargosCalculationService';
 
 interface NovedadRecargoFormProps {
   onBack: () => void;
@@ -34,8 +34,7 @@ const RECARGO_SUBTIPOS = [
 export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   onBack,
   onSubmit,
-  employeeSalary,
-  calculateSuggestedValue
+  employeeSalary
 }) => {
   const [formData, setFormData] = useState({
     subtipo: 'nocturno',
@@ -44,10 +43,28 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
     observacion: ''
   });
 
-  const { calculatedValue, calculateValue } = useNovedadCalculation({
-    employeeSalary,
-    calculateSuggestedValue
-  });
+  const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
+
+  // ✅ SOLUCIÓN KISS: Usar servicio unificado para calcular recargos
+  const calculateRecargoValue = (subtipo: string, horas: number) => {
+    if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
+      return null;
+    }
+
+    try {
+      const result = RecargosCalculationService.calcularRecargo({
+        salarioBase: employeeSalary,
+        tipoRecargo: subtipo as any,
+        horas: horas
+      });
+      
+      console.log('💰 Recargo calculado:', result);
+      return result.valorRecargo;
+    } catch (error) {
+      console.error('❌ Error calculando recargo:', error);
+      return null;
+    }
+  };
 
   // Calcular valor automáticamente cuando cambien horas o subtipo
   useEffect(() => {
@@ -57,16 +74,12 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         horas: parseFloat(formData.horas)
       });
       
-      calculateValue(
-        'recargo_nocturno' as NovedadType,
-        formData.subtipo,
-        parseFloat(formData.horas),
-        undefined
-      );
+      const calculated = calculateRecargoValue(formData.subtipo, parseFloat(formData.horas));
+      setCalculatedValue(calculated);
     } else {
-      calculateValue('recargo_nocturno' as NovedadType, formData.subtipo, 0, undefined);
+      setCalculatedValue(null);
     }
-  }, [formData.subtipo, formData.horas, calculateValue]);
+  }, [formData.subtipo, formData.horas, employeeSalary]);
 
   // Aplicar valor calculado automáticamente
   useEffect(() => {

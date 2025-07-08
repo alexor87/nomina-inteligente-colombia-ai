@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Trash2, Calculator, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useMultipleNovedadEntries } from '@/hooks/useMultipleNovedadEntries';
+import { RecargosCalculationService } from '@/services/RecargosCalculationService';
 
 interface RecargoEntry {
   id: string;
@@ -23,12 +24,6 @@ interface NovedadRecargoConsolidatedFormProps {
   onBack: () => void;
   onSubmit: (formDataArray: any[]) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (
-    tipoNovedad: string,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => number | null;
 }
 
 const RECARGO_SUBTIPOS = [
@@ -42,10 +37,9 @@ const RECARGO_SUBTIPOS = [
 export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidatedFormProps> = ({
   onBack,
   onSubmit,
-  employeeSalary,
-  calculateSuggestedValue
+  employeeSalary
 }) => {
-  const { entries, addEntry, updateEntry, removeEntry, getTotalValue } = useMultipleNovedadEntries<RecargoEntry>();
+  const { entries, addEntry, removeEntry, getTotalValue } = useMultipleNovedadEntries<RecargoEntry>();
   
   const [newEntry, setNewEntry] = useState({
     subtipo: 'nocturno',
@@ -54,11 +48,24 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     observacion: ''
   });
 
+  // ✅ SOLUCIÓN KISS: Usar servicio unificado
   const calculateValueForEntry = (subtipo: string, horas: number) => {
-    if (calculateSuggestedValue) {
-      return calculateSuggestedValue('recargo_nocturno', subtipo, horas, undefined);
+    if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
+      return null;
     }
-    return null;
+
+    try {
+      const result = RecargosCalculationService.calcularRecargo({
+        salarioBase: employeeSalary,
+        tipoRecargo: subtipo as any,
+        horas: horas
+      });
+      
+      return result.valorRecargo;
+    } catch (error) {
+      console.error('❌ Error calculando recargo:', error);
+      return null;
+    }
   };
 
   const handleAddEntry = () => {
@@ -124,7 +131,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         setNewEntry(prev => ({ ...prev, valor: calculatedValue.toString() }));
       }
     }
-  }, [newEntry.subtipo, newEntry.horas]);
+  }, [newEntry.subtipo, newEntry.horas, employeeSalary]);
 
   return (
     <div className="space-y-6">
