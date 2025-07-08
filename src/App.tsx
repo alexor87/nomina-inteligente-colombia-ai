@@ -20,13 +20,13 @@ import EditEmployeePage from "./pages/EditEmployeePage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
-import PayrollLiquidationPage from "./pages/PayrollLiquidationPage";
+import PayrollLiquidationPageSimple from "./pages/PayrollLiquidationPageSimple";
 
 const queryClient = new QueryClient();
 
 /**
- * ✅ APLICACIÓN PRINCIPAL CON MÓDULO DE LIQUIDACIÓN Y RUTAS DE EMPLEADOS
- * Incluye nuevo módulo de liquidación de nómina funcional y rutas para crear/editar empleados
+ * ✅ APLICACIÓN PRINCIPAL CON SOLUCIÓN KISS SIMPLIFICADA
+ * Implementación simplificada del módulo de liquidación siguiendo principio KISS
  */
 function AppContent() {
   // Inicialización automática del sistema
@@ -45,7 +45,7 @@ function AppContent() {
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="employees/create" element={<CreateEmployeeModernPage />} />
           <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
-          <Route path="payroll" element={<PayrollLiquidationPage />} />
+          <Route path="payroll" element={<PayrollLiquidationPageSimple />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           {/* Placeholder para rutas eliminadas */}
