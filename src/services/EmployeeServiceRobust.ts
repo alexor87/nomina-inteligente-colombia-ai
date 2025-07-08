@@ -201,18 +201,20 @@ export class EmployeeServiceRobust {
       }
 
       // Filtrar empleados que no tienen el campo o tienen valor null/undefined
-      const employeesToUpdate = employees?.filter(emp => 
-        !emp.custom_fields || 
-        emp.custom_fields[fieldKey] === null || 
-        emp.custom_fields[fieldKey] === undefined
-      ) || [];
+      const employeesToUpdate = employees?.filter(emp => {
+        const customFields = emp.custom_fields || {};
+        return customFields[fieldKey] === null || 
+               customFields[fieldKey] === undefined || 
+               !(fieldKey in customFields);
+      }) || [];
 
       console.log(`📊 Found ${employeesToUpdate.length} employees to update`);
 
       // Actualizar cada empleado con el valor por defecto
       for (const employee of employeesToUpdate) {
+        const currentCustomFields = employee.custom_fields || {};
         const updatedCustomFields = {
-          ...(employee.custom_fields || {}),
+          ...currentCustomFields,
           [fieldKey]: defaultValue
         };
 
