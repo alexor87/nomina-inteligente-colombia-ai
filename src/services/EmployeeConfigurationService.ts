@@ -198,20 +198,56 @@ export class EmployeeConfigurationService {
         return [];
       }
       
-      // Mapear los datos de la base de datos al formato SchemaVersion
+      // Mapear los datos de la base de datos al formato SchemaVersion con conversión segura de tipos
       return (data || []).map(version => ({
         id: version.id,
         company_id: version.company_id,
         version_number: version.version_number,
         changes_summary: version.changes_summary,
-        field_definitions: Array.isArray(version.field_definitions) 
-          ? version.field_definitions as CustomField[]
-          : [],
+        field_definitions: this.parseFieldDefinitions(version.field_definitions),
         created_by: version.created_by,
         created_at: version.created_at
       }));
     } catch (error) {
       console.error('Error en getSchemaVersions:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Función helper para parsear field_definitions de forma segura
+   */
+  private static parseFieldDefinitions(fieldDefinitions: any): CustomField[] {
+    try {
+      if (!fieldDefinitions) return [];
+      
+      // Si ya es un array, intentar parsearlo
+      if (Array.isArray(fieldDefinitions)) {
+        return fieldDefinitions.map(field => ({
+          id: field.id || '',
+          field_key: field.field_key || '',
+          field_label: field.field_label || '',
+          field_type: field.field_type as CustomFieldType || 'text',
+          field_options: field.field_options || null,
+          is_required: field.is_required || false,
+          default_value: field.default_value || null,
+          sort_order: field.sort_order || 0,
+          visibleOnlyToHR: false,
+          editableByEmployee: true
+        }));
+      }
+      
+      // Si es string, intentar parsearlo como JSON
+      if (typeof fieldDefinitions === 'string') {
+        const parsed = JSON.parse(fieldDefinitions);
+        if (Array.isArray(parsed)) {
+          return this.parseFieldDefinitions(parsed);
+        }
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error parsing field_definitions:', error);
       return [];
     }
   }
