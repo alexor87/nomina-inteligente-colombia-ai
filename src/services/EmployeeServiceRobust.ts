@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified } from '@/types/employee-unified';
+import { mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 
 interface EmployeeServiceResponse {
   success: boolean;
@@ -21,15 +22,21 @@ export class EmployeeServiceRobust {
       // Separar custom_fields del resto de datos
       const { custom_fields, ...standardFields } = employeeData;
 
-      // Preparar datos para inserción
-      const dataToInsert = {
+      // Preparar datos para inserción usando el mapper
+      const dbData = mapUnifiedToDatabase({
         ...standardFields,
+        custom_fields: custom_fields || {}
+      } as EmployeeUnified);
+
+      // Asegurar que campos requeridos estén presentes
+      const dataToInsert = {
+        ...dbData,
         company_id: employeeData.empresaId || employeeData.company_id,
+        cedula: employeeData.cedula || '',
+        nombre: employeeData.nombre || '',
+        apellido: employeeData.apellido || '',
         custom_fields: custom_fields || {}
       };
-
-      // Remover campos que no existen en la tabla
-      delete dataToInsert.empresaId;
 
       console.log('📤 Inserting employee data:', dataToInsert);
 
@@ -51,12 +58,7 @@ export class EmployeeServiceRobust {
       console.log('✅ Employee created successfully:', data.id);
 
       // Mapear datos de vuelta al formato esperado
-      const createdEmployee: EmployeeUnified = {
-        ...data,
-        empresaId: data.company_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at
-      };
+      const createdEmployee = mapDatabaseToUnified(data);
 
       return {
         success: true,
@@ -85,19 +87,23 @@ export class EmployeeServiceRobust {
       // Separar custom_fields del resto de datos
       const { custom_fields, ...standardFields } = employeeData;
 
+      // Preparar datos para actualización usando el mapper
+      const dbData = mapUnifiedToDatabase({
+        ...standardFields,
+        custom_fields: custom_fields || {}
+      } as EmployeeUnified);
+
       // Preparar datos para actualización
       const dataToUpdate = {
-        ...standardFields,
+        ...dbData,
         company_id: employeeData.empresaId || employeeData.company_id,
         custom_fields: custom_fields || {},
         updated_at: new Date().toISOString()
       };
 
-      // Remover campos que no existen en la tabla
-      delete dataToUpdate.empresaId;
+      // Remover campos que no deben actualizarse
       delete dataToUpdate.id;
-      delete dataToUpdate.createdAt;
-      delete dataToUpdate.updatedAt;
+      delete dataToUpdate.created_at;
 
       console.log('📤 Updating employee data:', dataToUpdate);
 
@@ -120,12 +126,7 @@ export class EmployeeServiceRobust {
       console.log('✅ Employee updated successfully:', data.id);
 
       // Mapear datos de vuelta al formato esperado
-      const updatedEmployee: EmployeeUnified = {
-        ...data,
-        empresaId: data.company_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at
-      };
+      const updatedEmployee = mapDatabaseToUnified(data);
 
       return {
         success: true,
@@ -166,13 +167,7 @@ export class EmployeeServiceRobust {
       }
 
       // Mapear datos al formato esperado
-      const employee: EmployeeUnified = {
-        ...data,
-        empresaId: data.company_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        custom_fields: data.custom_fields || {}
-      };
+      const employee = mapDatabaseToUnified(data);
 
       console.log('✅ Employee found:', employee.id);
       return employee;
@@ -217,7 +212,7 @@ export class EmployeeServiceRobust {
       // Actualizar cada empleado con el valor por defecto
       for (const employee of employeesToUpdate) {
         const updatedCustomFields = {
-          ...employee.custom_fields,
+          ...(employee.custom_fields || {}),
           [fieldKey]: defaultValue
         };
 

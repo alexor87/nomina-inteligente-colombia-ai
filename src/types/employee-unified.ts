@@ -118,6 +118,7 @@ export function mapDatabaseToUnified(dbEmployee: any): MainEmployee {
     subtipoCotizanteId: dbEmployee.subtipo_cotizante_id || dbEmployee.subtipoCotizanteId,
     regimenSalud: dbEmployee.regimen_salud || dbEmployee.regimenSalud || 'contributivo',
     estadoAfiliacion: dbEmployee.estado_afiliacion || dbEmployee.estadoAfiliacion || 'pendiente',
+    custom_fields: dbEmployee.custom_fields || {},
     avatar: undefined, // Not stored in database
     centrosocial: dbEmployee.centro_costos || dbEmployee.centroCostos,
     ultimaLiquidacion: undefined,
@@ -171,6 +172,7 @@ export function mapUnifiedToDatabase(employee: Partial<MainEmployee>): any {
     tipo_cotizante_id: employee.tipoCotizanteId,
     subtipo_cotizante_id: employee.subtipoCotizanteId,
     regimen_salud: employee.regimenSalud,
-    estado_afiliacion: employee.estadoAfiliacion
+    estado_afiliacion: employee.estadoAfiliacion,
+    custom_fields: employee.custom_fields || {}
   };
 }

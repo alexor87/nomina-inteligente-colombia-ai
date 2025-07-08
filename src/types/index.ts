@@ -59,6 +59,9 @@ export interface Employee {
   regimenSalud?: 'contributivo' | 'subsidiado';
   estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   
+  // Custom fields - AGREGADO
+  custom_fields?: Record<string, any>;
+  
   // UI/Display properties
   avatar?: string;
   centrosocial?: string;

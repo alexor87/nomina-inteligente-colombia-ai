@@ -88,7 +88,9 @@ export const FormField = ({
       />
       
       {errors[name] && (
-        <p className="text-red-400 text-xs mt-1">{errors[name]?.message}</p>
+        <p className="text-red-400 text-xs mt-1">
+          {typeof errors[name]?.message === 'string' ? errors[name]?.message : `${label} es requerido`}
+        </p>
       )}
     </div>
   );

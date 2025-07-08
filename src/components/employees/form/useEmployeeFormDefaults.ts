@@ -59,3 +59,8 @@ export const getEmployeeFormDefaults = (employee?: EmployeeUnified): Partial<Emp
 
   return baseDefaults;
 };
+
+// Función para poblar el formulario con datos del empleado
+export const populateFormWithEmployee = (employee: EmployeeUnified): Partial<EmployeeFormData> => {
+  return getEmployeeFormDefaults(employee);
+};

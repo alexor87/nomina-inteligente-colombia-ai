@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { EmployeeServiceRobust } from '@/services/EmployeeServiceRobust';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { useToast } from '@/hooks/use-toast';
 
 export interface EmployeeCRUDState {
@@ -44,7 +44,7 @@ export const useEmployeeCRUDRobust = () => {
     }));
   }, []);
 
-  const createEmployee = useCallback(async (formData: any): Promise<{ success: boolean; data?: Employee; error?: string }> => {
+  const createEmployee = useCallback(async (formData: any): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> => {
     console.log('🚀 useEmployeeCRUDRobust: Starting employee creation');
     
     setLoading('create', true);
@@ -52,20 +52,20 @@ export const useEmployeeCRUDRobust = () => {
     try {
       const result = await EmployeeServiceRobust.createEmployee(formData);
 
-      if (result.success && result.data) {
+      if (result.success && result.employee) {
         console.log('✅ Employee created successfully');
         
         toast({
           title: "Empleado creado",
-          description: `${result.data.nombre} ${result.data.apellido} ha sido creado correctamente.`,
+          description: `${result.employee.nombre} ${result.employee.apellido} ha sido creado correctamente.`,
         });
 
         setLoading('create', false);
-        return { success: true, data: result.data };
+        return { success: true, data: result.employee };
       } else {
         console.error('❌ Employee creation failed:', result.error);
         
-        const errorMessage = result.error || 'Error desconocido al crear empleado';
+        const errorMessage = result.message || 'Error desconocido al crear empleado';
         setError(errorMessage);
         
         toast({
@@ -92,7 +92,7 @@ export const useEmployeeCRUDRobust = () => {
     }
   }, [setLoading, setError, toast]);
 
-  const updateEmployee = useCallback(async (employeeId: string, formData: any): Promise<{ success: boolean; data?: Employee; error?: string }> => {
+  const updateEmployee = useCallback(async (employeeId: string, formData: any): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> => {
     console.log('🔄 useEmployeeCRUDRobust: Starting employee update');
     
     setLoading('update', true);
@@ -100,20 +100,20 @@ export const useEmployeeCRUDRobust = () => {
     try {
       const result = await EmployeeServiceRobust.updateEmployee(employeeId, formData);
 
-      if (result.success && result.data) {
+      if (result.success && result.employee) {
         console.log('✅ Employee updated successfully');
         
         toast({
           title: "Empleado actualizado",
-          description: `${result.data.nombre} ${result.data.apellido} ha sido actualizado correctamente.`,
+          description: `${result.employee.nombre} ${result.employee.apellido} ha sido actualizado correctamente.`,
         });
 
         setLoading('update', false);
-        return { success: true, data: result.data };
+        return { success: true, data: result.employee };
       } else {
         console.error('❌ Employee update failed:', result.error);
         
-        const errorMessage = result.error || 'Error desconocido al actualizar empleado';
+        const errorMessage = result.message || 'Error desconocido al actualizar empleado';
         setError(errorMessage);
         
         toast({
@@ -140,22 +140,22 @@ export const useEmployeeCRUDRobust = () => {
     }
   }, [setLoading, setError, toast]);
 
-  const getEmployee = useCallback(async (employeeId: string): Promise<{ success: boolean; data?: Employee; error?: string }> => {
+  const getEmployee = useCallback(async (employeeId: string): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> => {
     console.log('🔍 useEmployeeCRUDRobust: Fetching employee');
     
     setLoading('fetch', true);
 
     try {
-      const result = await EmployeeServiceRobust.getEmployeeById(employeeId);
+      const employee = await EmployeeServiceRobust.getEmployeeById(employeeId);
 
-      if (result.success && result.data) {
+      if (employee) {
         console.log('✅ Employee fetched successfully');
         setLoading('fetch', false);
-        return { success: true, data: result.data };
+        return { success: true, data: employee };
       } else {
-        console.error('❌ Employee fetch failed:', result.error);
+        console.error('❌ Employee not found');
         
-        const errorMessage = result.error || 'Error desconocido al obtener empleado';
+        const errorMessage = 'Empleado no encontrado';
         setError(errorMessage);
         
         return { success: false, error: errorMessage };
