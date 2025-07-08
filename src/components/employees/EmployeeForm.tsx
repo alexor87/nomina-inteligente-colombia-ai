@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -401,41 +400,41 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
         </div>
 
         {/* Campos Personalizados */}
-        {configuration.customFields.length > 0 && (
+        {configuration?.custom_fields && configuration.custom_fields.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-900">Campos Personalizados</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {configuration.customFields.map((field) => (
+              {configuration.custom_fields.map((field) => (
                 <div key={field.id}>
                   <Label htmlFor={field.id}>
-                    {field.name} {field.required && '*'}
+                    {field.field_label} {field.is_required && '*'}
                   </Label>
-                  {field.type === 'text' && (
+                  {field.field_type === 'text' && (
                     <Input
                       id={field.id}
-                      placeholder={`Ingresa ${field.name.toLowerCase()}`}
+                      placeholder={`Ingresa ${field.field_label.toLowerCase()}`}
                     />
                   )}
-                  {field.type === 'number' && (
+                  {field.field_type === 'number' && (
                     <Input
                       id={field.id}
                       type="number"
-                      placeholder={`Ingresa ${field.name.toLowerCase()}`}
+                      placeholder={`Ingresa ${field.field_label.toLowerCase()}`}
                     />
                   )}
-                  {field.type === 'date' && (
+                  {field.field_type === 'date' && (
                     <Input
                       id={field.id}
                       type="date"
                     />
                   )}
-                  {field.type === 'list' && field.options && (
+                  {field.field_type === 'select' && field.field_options && (
                     <Select>
                       <SelectTrigger>
-                        <SelectValue placeholder={`Seleccionar ${field.name.toLowerCase()}`} />
+                        <SelectValue placeholder={`Seleccionar ${field.field_label.toLowerCase()}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        {field.options.map((option, index) => (
+                        {Array.isArray(field.field_options) && field.field_options.map((option, index) => (
                           <SelectItem key={index} value={option}>
                             {option}
                           </SelectItem>

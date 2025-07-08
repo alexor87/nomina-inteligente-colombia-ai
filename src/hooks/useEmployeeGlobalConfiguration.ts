@@ -2,12 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { EmployeeConfigurationService } from '@/services/EmployeeConfigurationService';
-import { CustomField, DefaultParameters, EmployeeGlobalConfiguration } from '@/types/employee-config';
+import { CustomField, DefaultParameters, EmployeeGlobalConfiguration, ValidationRule } from '@/types/employee-config';
 import { useToast } from '@/hooks/use-toast';
 
 export const useEmployeeGlobalConfiguration = () => {
   const [configuration, setConfiguration] = useState<EmployeeGlobalConfiguration | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasChanges, setHasChanges] = useState(false);
   const { companyId } = useCurrentCompany();
   const { toast } = useToast();
 
@@ -61,6 +62,7 @@ export const useEmployeeGlobalConfiguration = () => {
           className: "border-green-200 bg-green-50"
         });
         
+        setHasChanges(true);
         return true;
       }
       
@@ -94,6 +96,8 @@ export const useEmployeeGlobalConfiguration = () => {
           description: "El campo ha sido actualizado exitosamente",
           className: "border-green-200 bg-green-50"
         });
+        
+        setHasChanges(true);
       }
       
       return success;
@@ -124,6 +128,8 @@ export const useEmployeeGlobalConfiguration = () => {
           description: "El campo ha sido eliminado exitosamente",
           className: "border-green-200 bg-green-50"
         });
+        
+        setHasChanges(true);
       }
       
       return success;
@@ -144,15 +150,65 @@ export const useEmployeeGlobalConfiguration = () => {
       ...prev,
       default_parameters: { ...prev.default_parameters, ...parameters }
     } : null);
+    setHasChanges(true);
+  };
+
+  // Actualizar reglas de validación
+  const updateValidationRules = async (rules: ValidationRule[]) => {
+    setConfiguration(prev => prev ? {
+      ...prev,
+      validation_rules: rules
+    } : null);
+    setHasChanges(true);
+  };
+
+  // Guardar configuración
+  const saveConfiguration = async () => {
+    try {
+      // Por ahora, solo marcamos como guardado
+      setHasChanges(false);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Error al guardar configuración' };
+    }
+  };
+
+  // Restablecer configuración
+  const resetConfiguration = () => {
+    loadConfiguration();
+    setHasChanges(false);
+  };
+
+  // Validar configuración
+  const validateConfiguration = () => {
+    if (!configuration) {
+      return { isValid: false, errors: ['No hay configuración cargada'] };
+    }
+    
+    const errors: string[] = [];
+    
+    // Validar campos personalizados
+    configuration.custom_fields.forEach(field => {
+      if (!field.field_key || !field.field_label) {
+        errors.push(`Campo incompleto: ${field.field_label || 'Sin nombre'}`);
+      }
+    });
+    
+    return { isValid: errors.length === 0, errors };
   };
 
   return {
     configuration,
     isLoading,
+    hasChanges,
     addCustomField,
     updateCustomField,
     removeCustomField,
     updateDefaultParameters,
+    updateValidationRules,
+    saveConfiguration,
+    resetConfiguration,
+    validateConfiguration,
     reloadConfiguration: loadConfiguration
   };
 };

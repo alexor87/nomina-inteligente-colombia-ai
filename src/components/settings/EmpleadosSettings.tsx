@@ -67,6 +67,14 @@ export const EmpleadosSettings = () => {
     );
   }
 
+  if (!configuration) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">No se pudo cargar la configuración</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -76,7 +84,7 @@ export const EmpleadosSettings = () => {
 
       {/* Campos Personalizados */}
       <CustomFieldsGlobalSection
-        customFields={configuration.customFields}
+        customFields={configuration.custom_fields}
         onAdd={addCustomField}
         onUpdate={updateCustomField}
         onRemove={removeCustomField}
@@ -84,13 +92,12 @@ export const EmpleadosSettings = () => {
 
       {/* Reglas de Validación */}
       <ValidationRulesSection
-        rules={configuration.validationRules}
-        onUpdate={updateValidationRules}
+        validationRules={configuration.validation_rules}
       />
 
       {/* Parámetros por Defecto */}
       <DefaultParametersSection
-        parameters={configuration.defaultParameters}
+        parameters={configuration.default_parameters}
         onUpdate={updateDefaultParameters}
       />
 

@@ -55,6 +55,20 @@ export const CONTRACT_TYPES = [
   { value: 'practicas', label: 'Prácticas' }
 ] as const;
 
+// Tipos de documento disponibles
+export type TipoDocumento = 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
+
+export const TIPOS_DOCUMENTO = [
+  { value: 'CC', label: 'Cédula de Ciudadanía' },
+  { value: 'TI', label: 'Tarjeta de Identidad' },
+  { value: 'CE', label: 'Cédula de Extranjería' },
+  { value: 'PA', label: 'Pasaporte' },
+  { value: 'RC', label: 'Registro Civil' },
+  { value: 'NIT', label: 'NIT' },
+  { value: 'PEP', label: 'Permiso Especial de Permanencia' },
+  { value: 'PPT', label: 'Permiso por Protección Temporal' }
+] as const;
+
 // Niveles de riesgo ARL
 export type ARLRiskLevel = '1' | '2' | '3' | '4' | '5';
 
