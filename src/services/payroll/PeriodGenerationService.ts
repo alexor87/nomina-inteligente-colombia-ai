@@ -12,9 +12,11 @@ export interface GeneratedPeriod {
   company_id: string;
 }
 
-export interface AvailablePeriod extends GeneratedPeriod {
+export interface UnifiedPeriod extends GeneratedPeriod {
   can_select: boolean;
+  status_type: 'available' | 'closed' | 'to_create';
   reason?: string;
+  needs_creation?: boolean;
 }
 
 export interface MissingPeriod {
@@ -30,13 +32,22 @@ export interface MissingPeriod {
 export class PeriodGenerationService {
   
   /**
-   * Obtener períodos disponibles para liquidación - VERSIÓN CONSERVADORA
+   * NUEVO: Obtener TODOS los períodos del año (existentes + faltantes) - SOLUCIÓN HÍBRIDA
    */
-  static async getAvailablePeriods(companyId: string, year: number = new Date().getFullYear()): Promise<AvailablePeriod[]> {
+  static async getAllPeriodsForYear(companyId: string, year: number = new Date().getFullYear()): Promise<UnifiedPeriod[]> {
     try {
-      console.log(`🔍 Buscando períodos para empresa: ${companyId}, año: ${year}`);
+      console.log(`🔄 HÍBRIDO: Obteniendo todos los períodos para empresa: ${companyId}, año: ${year}`);
       
-      // Obtener todos los períodos del año desde la base de datos
+      // Obtener configuración de periodicidad
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('periodicity')
+        .eq('company_id', companyId)
+        .single();
+
+      const periodicity = (settings?.periodicity as 'semanal' | 'quincenal' | 'mensual') || 'quincenal';
+      
+      // Obtener períodos existentes
       const { data: existingPeriods, error } = await supabase
         .from('payroll_periods_real')
         .select('*')
@@ -50,117 +61,91 @@ export class PeriodGenerationService {
         throw error;
       }
 
-      if (!existingPeriods || existingPeriods.length === 0) {
-        console.warn('⚠️ No se encontraron períodos para la empresa');
-        return [];
-      }
-
-      console.log(`✅ Encontrados ${existingPeriods.length} períodos en BD`);
-      
-      // Mapear períodos a AvailablePeriod con validación de selección
-      const availablePeriods: AvailablePeriod[] = existingPeriods.map(period => {
-        const canSelect = period.estado === 'borrador' || period.estado === 'en_proceso';
-        const reason = period.estado === 'cerrado' ? 'Período ya liquidado' : undefined;
-        
-        return {
-          id: period.id,
-          fecha_inicio: period.fecha_inicio,
-          fecha_fin: period.fecha_fin,
-          tipo_periodo: period.tipo_periodo as 'semanal' | 'quincenal' | 'mensual',
-          numero_periodo_anual: period.numero_periodo_anual || 0,
-          etiqueta_visible: period.periodo,
-          periodo: period.periodo,
-          estado: period.estado as 'borrador' | 'en_proceso' | 'cerrado',
-          company_id: period.company_id,
-          can_select: canSelect,
-          reason: reason
-        };
-      });
-      
-      const selectableCount = availablePeriods.filter(p => p.can_select).length;
-      const closedCount = availablePeriods.filter(p => !p.can_select).length;
-      
-      console.log(`📊 Períodos procesados: ${availablePeriods.length} total, ${selectableCount} disponibles, ${closedCount} cerrados`);
-      
-      return availablePeriods;
-      
-    } catch (error) {
-      console.error('❌ Error en getAvailablePeriods:', error);
-      return [];
-    }
-  }
-
-  /**
-   * NUEVA: Obtener períodos faltantes del año
-   */
-  static async getMissingPeriods(companyId: string, year: number = new Date().getFullYear()): Promise<MissingPeriod[]> {
-    try {
-      console.log(`🔍 Buscando períodos faltantes para empresa: ${companyId}, año: ${year}`);
-      
-      // Obtener configuración de periodicidad
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('periodicity')
-        .eq('company_id', companyId)
-        .single();
-
-      const periodicity = (settings?.periodicity as 'semanal' | 'quincenal' | 'mensual') || 'quincenal';
-      
-      // Obtener períodos existentes
-      const { data: existingPeriods } = await supabase
-        .from('payroll_periods_real')
-        .select('numero_periodo_anual, fecha_inicio, fecha_fin')
-        .eq('company_id', companyId)
-        .gte('fecha_inicio', `${year}-01-01`)
-        .lte('fecha_fin', `${year}-12-31`);
-
-      const existingNumbers = new Set(existingPeriods?.map(p => p.numero_periodo_anual) || []);
-      
       // Generar todos los períodos esperados según periodicidad
       const expectedPeriods = this.generateExpectedPeriods(periodicity, year);
       
-      // Encontrar períodos faltantes
-      const missingPeriods: MissingPeriod[] = expectedPeriods
-        .filter(period => !existingNumbers.has(period.numero_periodo_anual))
-        .map(period => {
-          // Verificar si podría haber solapamiento
-          const warning = this.checkOverlapWarning(period, existingPeriods || []);
+      // Crear mapa de períodos existentes por número
+      const existingPeriodsMap = new Map(
+        (existingPeriods || []).map(p => [p.numero_periodo_anual, p])
+      );
+      
+      // Combinar períodos existentes + faltantes
+      const unifiedPeriods: UnifiedPeriod[] = expectedPeriods.map(expectedPeriod => {
+        const existingPeriod = existingPeriodsMap.get(expectedPeriod.numero_periodo_anual);
+        
+        if (existingPeriod) {
+          // Período existe en BD
+          const canSelect = existingPeriod.estado === 'borrador' || existingPeriod.estado === 'en_proceso';
+          const statusType: 'available' | 'closed' | 'to_create' = 
+            existingPeriod.estado === 'cerrado' ? 'closed' : 'available';
           
           return {
-            ...period,
-            can_create: true,
-            warning
+            id: existingPeriod.id,
+            fecha_inicio: existingPeriod.fecha_inicio,
+            fecha_fin: existingPeriod.fecha_fin,
+            tipo_periodo: existingPeriod.tipo_periodo as 'semanal' | 'quincenal' | 'mensual',
+            numero_periodo_anual: existingPeriod.numero_periodo_anual || 0,
+            etiqueta_visible: existingPeriod.periodo,
+            periodo: existingPeriod.periodo,
+            estado: existingPeriod.estado as 'borrador' | 'en_proceso' | 'cerrado',
+            company_id: existingPeriod.company_id,
+            can_select: canSelect,
+            status_type: statusType,
+            reason: statusType === 'closed' ? 'Período ya liquidado - Editar desde Historial' : undefined,
+            needs_creation: false
           };
-        });
+        } else {
+          // Período faltante - se puede crear
+          return {
+            fecha_inicio: expectedPeriod.fecha_inicio,
+            fecha_fin: expectedPeriod.fecha_fin,
+            tipo_periodo: expectedPeriod.tipo_periodo,
+            numero_periodo_anual: expectedPeriod.numero_periodo_anual,
+            etiqueta_visible: expectedPeriod.etiqueta_visible,
+            periodo: expectedPeriod.etiqueta_visible,
+            estado: 'borrador' as const,
+            company_id: companyId,
+            can_select: true,
+            status_type: 'to_create',
+            reason: 'Se creará automáticamente al seleccionar',
+            needs_creation: true
+          };
+        }
+      });
       
-      console.log(`📋 Períodos faltantes encontrados: ${missingPeriods.length}`);
-      return missingPeriods;
+      const existingCount = unifiedPeriods.filter(p => !p.needs_creation).length;
+      const toCreateCount = unifiedPeriods.filter(p => p.needs_creation).length;
+      const availableCount = unifiedPeriods.filter(p => p.can_select).length;
+      
+      console.log(`📊 HÍBRIDO: ${unifiedPeriods.length} períodos totales - ${existingCount} existentes, ${toCreateCount} por crear, ${availableCount} disponibles`);
+      
+      return unifiedPeriods;
       
     } catch (error) {
-      console.error('❌ Error obteniendo períodos faltantes:', error);
+      console.error('❌ Error en getAllPeriodsForYear:', error);
       return [];
     }
   }
 
   /**
-   * NUEVA: Crear período bajo demanda
+   * NUEVO: Crear período bajo demanda desde UnifiedPeriod
    */
-  static async createPeriodOnDemand(
+  static async createPeriodFromUnified(
     companyId: string, 
-    missingPeriod: MissingPeriod
-  ): Promise<AvailablePeriod | null> {
+    unifiedPeriod: UnifiedPeriod
+  ): Promise<UnifiedPeriod | null> {
     try {
-      console.log(`🎯 Creando período bajo demanda: ${missingPeriod.etiqueta_visible}`);
+      console.log(`🎯 Creando período híbrido: ${unifiedPeriod.etiqueta_visible}`);
       
       const { data, error } = await supabase
         .from('payroll_periods_real')
         .insert({
           company_id: companyId,
-          fecha_inicio: missingPeriod.fecha_inicio,
-          fecha_fin: missingPeriod.fecha_fin,
-          tipo_periodo: missingPeriod.tipo_periodo,
-          numero_periodo_anual: missingPeriod.numero_periodo_anual,
-          periodo: missingPeriod.etiqueta_visible,
+          fecha_inicio: unifiedPeriod.fecha_inicio,
+          fecha_fin: unifiedPeriod.fecha_fin,
+          tipo_periodo: unifiedPeriod.tipo_periodo,
+          numero_periodo_anual: unifiedPeriod.numero_periodo_anual,
+          periodo: unifiedPeriod.etiqueta_visible,
           estado: 'borrador',
           empleados_count: 0,
           total_devengado: 0,
@@ -171,11 +156,11 @@ export class PeriodGenerationService {
         .single();
 
       if (error) {
-        console.error('❌ Error creando período:', error);
+        console.error('❌ Error creando período híbrido:', error);
         return null;
       }
 
-      console.log('✅ Período creado exitosamente:', data.periodo);
+      console.log('✅ Período híbrido creado exitosamente:', data.periodo);
       
       return {
         id: data.id,
@@ -187,12 +172,53 @@ export class PeriodGenerationService {
         periodo: data.periodo,
         estado: data.estado as 'borrador' | 'en_proceso' | 'cerrado',
         company_id: data.company_id,
-        can_select: true
+        can_select: true,
+        status_type: 'available',
+        needs_creation: false
       };
       
     } catch (error) {
-      console.error('❌ Error en createPeriodOnDemand:', error);
+      console.error('❌ Error en createPeriodFromUnified:', error);
       return null;
+    }
+  }
+
+  /**
+   * NUEVO: Generar automáticamente períodos faltantes al inicio
+   */
+  static async ensureCompleteYearPeriods(companyId: string, year: number = new Date().getFullYear()): Promise<{
+    generated: number;
+    existing: number;
+    total: number;
+  }> {
+    try {
+      console.log(`🔧 Asegurando períodos completos para empresa: ${companyId}, año: ${year}`);
+      
+      const allPeriods = await this.getAllPeriodsForYear(companyId, year);
+      const periodsToCreate = allPeriods.filter(p => p.needs_creation);
+      
+      let generatedCount = 0;
+      
+      for (const period of periodsToCreate) {
+        const created = await this.createPeriodFromUnified(companyId, period);
+        if (created) {
+          generatedCount++;
+        }
+      }
+      
+      const existingCount = allPeriods.length - periodsToCreate.length;
+      
+      console.log(`✅ Períodos completados: ${generatedCount} generados, ${existingCount} existían, ${allPeriods.length} total`);
+      
+      return {
+        generated: generatedCount,
+        existing: existingCount,
+        total: allPeriods.length
+      };
+      
+    } catch (error) {
+      console.error('❌ Error asegurando períodos completos:', error);
+      return { generated: 0, existing: 0, total: 0 };
     }
   }
 
@@ -313,10 +339,51 @@ export class PeriodGenerationService {
     return undefined;
   }
 
-  static async getNextAvailablePeriod(companyId: string): Promise<AvailablePeriod | null> {
+  // MÉTODOS LEGACY MANTENIDOS PARA COMPATIBILIDAD
+  static async getAvailablePeriods(companyId: string, year: number = new Date().getFullYear()): Promise<any[]> {
+    console.warn('⚠️ getAvailablePeriods es legacy, usar getAllPeriodsForYear');
+    const allPeriods = await this.getAllPeriodsForYear(companyId, year);
+    return allPeriods.filter(p => p.can_select);
+  }
+
+  static async getMissingPeriods(companyId: string, year: number = new Date().getFullYear()): Promise<MissingPeriod[]> {
+    console.warn('⚠️ getMissingPeriods es legacy, usar getAllPeriodsForYear');
+    const allPeriods = await this.getAllPeriodsForYear(companyId, year);
+    return allPeriods
+      .filter(p => p.needs_creation)
+      .map(p => ({
+        numero_periodo_anual: p.numero_periodo_anual,
+        fecha_inicio: p.fecha_inicio,
+        fecha_fin: p.fecha_fin,
+        etiqueta_visible: p.etiqueta_visible,
+        tipo_periodo: p.tipo_periodo,
+        can_create: true
+      }));
+  }
+
+  static async createPeriodOnDemand(companyId: string, missingPeriod: MissingPeriod): Promise<any | null> {
+    console.warn('⚠️ createPeriodOnDemand es legacy, usar createPeriodFromUnified');
+    const unifiedPeriod: UnifiedPeriod = {
+      fecha_inicio: missingPeriod.fecha_inicio,
+      fecha_fin: missingPeriod.fecha_fin,
+      tipo_periodo: missingPeriod.tipo_periodo,
+      numero_periodo_anual: missingPeriod.numero_periodo_anual,
+      etiqueta_visible: missingPeriod.etiqueta_visible,
+      periodo: missingPeriod.etiqueta_visible,
+      estado: 'borrador',
+      company_id: companyId,
+      can_select: true,
+      status_type: 'to_create',
+      needs_creation: true
+    };
+    
+    return this.createPeriodFromUnified(companyId, unifiedPeriod);
+  }
+
+  static async getNextAvailablePeriod(companyId: string): Promise<any | null> {
     try {
-      const periods = await this.getAvailablePeriods(companyId);
-      const availablePeriods = periods.filter(p => p.can_select);
+      const allPeriods = await this.getAllPeriodsForYear(companyId);
+      const availablePeriods = allPeriods.filter(p => p.can_select);
       
       if (availablePeriods.length === 0) {
         console.warn('⚠️ No hay períodos disponibles');
@@ -364,8 +431,9 @@ export class PeriodGenerationService {
     year: number = new Date().getFullYear(),
     periodicity: 'semanal' | 'quincenal' | 'mensual' = 'quincenal'
   ): Promise<GeneratedPeriod[]> {
-    console.warn('⚠️ generateYearPeriods es legacy, usar getMissingPeriods + createPeriodOnDemand');
-    const periods = await this.getAvailablePeriods(companyId, year);
-    return periods.map(p => ({ ...p, can_select: undefined, reason: undefined }));
+    console.warn('⚠️ generateYearPeriods es legacy, usar ensureCompleteYearPeriods');
+    await this.ensureCompleteYearPeriods(companyId, year);
+    const allPeriods = await this.getAllPeriodsForYear(companyId, year);
+    return allPeriods.map(p => ({ ...p, can_select: undefined, reason: undefined, status_type: undefined, needs_creation: undefined }));
   }
 }

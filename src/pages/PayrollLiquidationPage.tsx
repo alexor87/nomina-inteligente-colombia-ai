@@ -19,7 +19,7 @@ import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollCleanupService } from '@/services/PayrollCleanupService';
 import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
-import { AvailablePeriod } from '@/services/payroll/PeriodGenerationService';
+import { UnifiedPeriod } from '@/services/payroll/PeriodGenerationService';
 
 const PayrollLiquidationPage = () => {
   const [startDate, setStartDate] = useState('');
@@ -85,8 +85,9 @@ const PayrollLiquidationPage = () => {
     }
   }, [startDate, endDate, resetDetection, selectionMode]);
 
-  // Manejar selección de período desde dropdown
-  const handleDropdownPeriodSelect = async (period: AvailablePeriod) => {
+  // Manejar selección de período desde dropdown híbrido
+  const handleHybridPeriodSelect = async (period: UnifiedPeriod) => {
+    console.log('🎯 HÍBRIDO: Período seleccionado desde dropdown:', period.etiqueta_visible);
     handlePeriodSelect(period);
     setSelectionMode('dropdown');
     
@@ -223,11 +224,11 @@ const PayrollLiquidationPage = () => {
         </TabsList>
         
         <TabsContent value="liquidation" className="space-y-6">
-          {/* Period Selection */}
+          {/* Period Selection HÍBRIDO */}
           {companyId && selectionMode === 'dropdown' && (
             <PeriodSelector
               companyId={companyId}
-              onPeriodSelect={handleDropdownPeriodSelect}
+              onPeriodSelect={handleHybridPeriodSelect}
               onManualEntry={handleManualEntryMode}
               disabled={isRemovingEmployee}
             />
