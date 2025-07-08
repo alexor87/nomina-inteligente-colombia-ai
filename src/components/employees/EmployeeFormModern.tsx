@@ -1,3 +1,4 @@
+
 import { useMemo } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
@@ -85,7 +86,9 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     // Add company ID to form data
     const formDataWithCompany = {
       ...data,
-      empresaId: companyId
+      empresaId: companyId,
+      // Asegurar que custom_fields está presente y es un objeto
+      custom_fields: data.custom_fields || {}
     };
 
     // Use robust submission for both create and update operations
@@ -116,7 +119,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     name: employee ? `${employee.nombre} ${employee.apellido}` : 'New Employee',
     mode: isEditMode ? 'edit' : 'create',
     isLoading,
-    hasError: !!submissionError
+    hasError: !!submissionError,
+    customFieldsCount: configuration?.custom_fields?.length || 0
   });
 
   return (
@@ -151,7 +155,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
             watch={watch}
             arlRiskLevels={arlRiskLevels}
             register={register}
-            configuration={configuration}
+            customFields={configuration?.custom_fields || []}
           />
         </form>
 

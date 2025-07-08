@@ -4,7 +4,9 @@ import { PersonalInfoSection } from './PersonalInfoSection';
 import { LaborInfoSection } from './LaborInfoSection';
 import { BankingInfoSection } from './BankingInfoSection';
 import { AffiliationsSection } from './AffiliationsSection';
+import { CustomFieldsSection } from './CustomFieldsSection';
 import { EmployeeFormData } from './types';
+import { CustomField } from '@/types/employee-config';
 
 interface EmployeeFormContentProps {
   control: Control<EmployeeFormData>;
@@ -14,7 +16,7 @@ interface EmployeeFormContentProps {
   watch: UseFormWatch<EmployeeFormData>;
   arlRiskLevels: { value: string; label: string; percentage: string }[];
   register: any;
-  configuration: any;
+  customFields: CustomField[];
 }
 
 export const EmployeeFormContent = ({
@@ -25,7 +27,7 @@ export const EmployeeFormContent = ({
   watch,
   arlRiskLevels,
   register,
-  configuration
+  customFields
 }: EmployeeFormContentProps) => {
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
@@ -75,13 +77,13 @@ export const EmployeeFormContent = ({
           />
         </div>
 
-        {/* Custom Fields Section - Only if configured */}
-        {configuration.customFields.length > 0 && (
-          <div id="section-personalizados" className="border-t border-gray-100 pt-8">
-            <h2 className="text-lg font-medium text-gray-900 mb-6">Campos Personalizados</h2>
-            {/* Custom fields implementation would go here */}
-          </div>
-        )}
+        {/* Custom Fields Section */}
+        <CustomFieldsSection
+          customFields={customFields}
+          control={control}
+          errors={errors}
+          setValue={setValue}
+        />
       </div>
     </div>
   );

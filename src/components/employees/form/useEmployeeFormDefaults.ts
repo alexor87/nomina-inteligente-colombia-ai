@@ -1,109 +1,61 @@
 
+import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeFormData } from './types';
 
-export const getEmployeeFormDefaults = (): EmployeeFormData => {
-  const today = new Date().toISOString().split('T')[0];
-  
-  return {
-    // Personal Information
-    cedula: '',
-    tipoDocumento: 'CC',
-    nombre: '',
-    segundoNombre: '',
-    apellido: '',
-    email: '',
-    telefono: '',
-    sexo: 'M',
-    fechaNacimiento: '',
-    direccion: '',
-    ciudad: '',
-    departamento: '',
+export const getEmployeeFormDefaults = (employee?: EmployeeUnified): Partial<EmployeeFormData> => {
+  const baseDefaults: Partial<EmployeeFormData> = {
+    // Información Personal
+    cedula: employee?.cedula || '',
+    tipoDocumento: employee?.tipoDocumento || 'CC',
+    nombre: employee?.nombre || '',
+    segundoNombre: employee?.segundoNombre || '',
+    apellido: employee?.apellido || '',
+    email: employee?.email || '',
+    telefono: employee?.telefono || '',
+    sexo: employee?.sexo || 'M',
+    fechaNacimiento: employee?.fechaNacimiento || '',
+    direccion: employee?.direccion || '',
+    ciudad: employee?.ciudad || '',
+    departamento: employee?.departamento || '',
     
-    // Labor Information
-    salarioBase: 1300000, // Colombian minimum wage
-    tipoContrato: 'indefinido',
-    fechaIngreso: today,
-    periodicidadPago: 'mensual',
-    cargo: '',
-    codigoCIIU: '',
-    nivelRiesgoARL: 'I',
-    estado: 'activo',
-    centroCostos: '',
+    // Información Laboral
+    salarioBase: employee?.salarioBase || 0,
+    tipoContrato: employee?.tipoContrato || 'indefinido',
+    fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
+    periodicidadPago: (employee?.periodicidadPago === 'quincenal' ? 'quincenal' : 'mensual') as 'quincenal' | 'mensual',
+    cargo: employee?.cargo || '',
+    codigoCIIU: employee?.codigoCIIU || '',
+    nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
+    estado: employee?.estado || 'activo',
+    centroCostos: employee?.centroCostos || '',
+    fechaFirmaContrato: employee?.fechaFirmaContrato || '',
+    fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
+    tipoJornada: employee?.tipoJornada || 'completa',
+    diasTrabajo: employee?.diasTrabajo || 30,
+    horasTrabajo: employee?.horasTrabajo || 8,
+    beneficiosExtralegales: employee?.beneficiosExtralegales || false,
+    clausulasEspeciales: employee?.clausulasEspeciales || '',
     
-    // Contract Details
-    fechaFirmaContrato: today,
-    fechaFinalizacionContrato: '',
-    tipoJornada: 'completa',
-    diasTrabajo: 30,
-    horasTrabajo: 8,
-    beneficiosExtralegales: false,
-    clausulasEspeciales: '',
+    // Información Bancaria
+    banco: employee?.banco || '',
+    tipoCuenta: employee?.tipoCuenta || 'ahorros',
+    numeroCuenta: employee?.numeroCuenta || '',
+    titularCuenta: employee?.titularCuenta || '',
+    formaPago: employee?.formaPago || 'dispersion',
     
-    // Banking Information
-    banco: '',
-    tipoCuenta: 'ahorros',
-    numeroCuenta: '',
-    titularCuenta: '',
-    formaPago: 'dispersion',
+    // Afiliaciones
+    eps: employee?.eps || '',
+    afp: employee?.afp || '',
+    arl: employee?.arl || '',
+    cajaCompensacion: employee?.cajaCompensacion || '',
+    tipoCotizanteId: employee?.tipoCotizanteId || '',
+    subtipoCotizanteId: employee?.subtipoCotizanteId || '',
+    regimenSalud: employee?.regimenSalud || 'contributivo',
+    estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
     
-    // Affiliations
-    eps: '',
-    afp: '',
-    arl: '',
-    cajaCompensacion: '',
-    tipoCotizanteId: '',
-    subtipoCotizanteId: '',
-    regimenSalud: 'contributivo',
-    estadoAfiliacion: 'pendiente'
+    // Campos Personalizados
+    custom_fields: employee?.custom_fields || {}
   };
-};
 
-// Helper to populate form with employee data
-export const populateFormWithEmployee = (employee: any): EmployeeFormData => {
-  const defaults = getEmployeeFormDefaults();
-  
-  return {
-    ...defaults,
-    cedula: employee.cedula || defaults.cedula,
-    tipoDocumento: employee.tipoDocumento || employee.tipo_documento || defaults.tipoDocumento,
-    nombre: employee.nombre || defaults.nombre,
-    segundoNombre: employee.segundoNombre || employee.segundo_nombre || defaults.segundoNombre,
-    apellido: employee.apellido || defaults.apellido,
-    email: employee.email || defaults.email,
-    telefono: employee.telefono || defaults.telefono,
-    sexo: employee.sexo || defaults.sexo,
-    fechaNacimiento: employee.fechaNacimiento || employee.fecha_nacimiento || defaults.fechaNacimiento,
-    direccion: employee.direccion || defaults.direccion,
-    ciudad: employee.ciudad || defaults.ciudad,
-    departamento: employee.departamento || defaults.departamento,
-    salarioBase: Number(employee.salarioBase || employee.salario_base || defaults.salarioBase),
-    tipoContrato: employee.tipoContrato || employee.tipo_contrato || defaults.tipoContrato,
-    fechaIngreso: employee.fechaIngreso || employee.fecha_ingreso || defaults.fechaIngreso,
-    periodicidadPago: (employee.periodicidadPago || employee.periodicidad_pago || defaults.periodicidadPago) as 'quincenal' | 'mensual',
-    cargo: employee.cargo || defaults.cargo,
-    codigoCIIU: employee.codigoCIIU || employee.codigo_ciiu || defaults.codigoCIIU,
-    nivelRiesgoARL: employee.nivelRiesgoARL || employee.nivel_riesgo_arl || defaults.nivelRiesgoARL,
-    estado: employee.estado || defaults.estado,
-    centroCostos: employee.centroCostos || employee.centro_costos || defaults.centroCostos,
-    fechaFirmaContrato: employee.fechaFirmaContrato || employee.fecha_firma_contrato || defaults.fechaFirmaContrato,
-    fechaFinalizacionContrato: employee.fechaFinalizacionContrato || employee.fecha_finalizacion_contrato || defaults.fechaFinalizacionContrato,
-    tipoJornada: employee.tipoJornada || employee.tipo_jornada || defaults.tipoJornada,
-    diasTrabajo: employee.diasTrabajo || employee.dias_trabajo || defaults.diasTrabajo,
-    horasTrabajo: employee.horasTrabajo || employee.horas_trabajo || defaults.horasTrabajo,
-    beneficiosExtralegales: employee.beneficiosExtralegales || employee.beneficios_extralegales || defaults.beneficiosExtralegales,
-    clausulasEspeciales: employee.clausulasEspeciales || employee.clausulas_especiales || defaults.clausulasEspeciales,
-    banco: employee.banco || defaults.banco,
-    tipoCuenta: employee.tipoCuenta || employee.tipo_cuenta || defaults.tipoCuenta,
-    numeroCuenta: employee.numeroCuenta || employee.numero_cuenta || defaults.numeroCuenta,
-    titularCuenta: employee.titularCuenta || employee.titular_cuenta || defaults.titularCuenta,
-    formaPago: employee.formaPago || employee.forma_pago || defaults.formaPago,
-    eps: employee.eps || defaults.eps,
-    afp: employee.afp || defaults.afp,
-    arl: employee.arl || defaults.arl,
-    cajaCompensacion: employee.cajaCompensacion || employee.caja_compensacion || defaults.cajaCompensacion,
-    tipoCotizanteId: employee.tipoCotizanteId || employee.tipo_cotizante_id || defaults.tipoCotizanteId,
-    subtipoCotizanteId: employee.subtipoCotizanteId || employee.subtipo_cotizante_id || defaults.subtipoCotizanteId,
-    regimenSalud: employee.regimenSalud || employee.regimen_salud || defaults.regimenSalud,
-    estadoAfiliacion: employee.estadoAfiliacion || employee.estado_afiliacion || defaults.estadoAfiliacion
-  };
+  return baseDefaults;
 };

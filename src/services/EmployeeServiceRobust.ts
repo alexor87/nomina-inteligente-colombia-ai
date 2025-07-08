@@ -1,203 +1,155 @@
-import { supabase } from '@/integrations/supabase/client';
-import { Employee } from '@/types';
-import { EmployeeDataMapper } from './EmployeeDataMapper';
-import { validateEmployeeData, ValidatedEmployeeData } from '@/schemas/employeeValidation';
 
-export interface ServiceResponse<T> {
+import { supabase } from '@/integrations/supabase/client';
+import { EmployeeUnified } from '@/types/employee-unified';
+
+interface EmployeeServiceResponse {
   success: boolean;
-  data?: T;
-  error?: string;
-  details?: any;
+  employee?: EmployeeUnified;
+  message?: string;
+  error?: any;
 }
 
 export class EmployeeServiceRobust {
+  
   /**
-   * Creates a new employee with comprehensive validation and error handling
+   * Crear un nuevo empleado con campos personalizados
    */
-  static async createEmployee(formData: any): Promise<ServiceResponse<Employee>> {
-    console.log('🚀 EmployeeServiceRobust: Starting employee creation process');
-    console.log('📝 Form data received:', formData);
-
+  static async createEmployee(employeeData: Partial<EmployeeUnified>): Promise<EmployeeServiceResponse> {
     try {
-      // Step 1: Get company ID
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        return {
-          success: false,
-          error: 'No se pudo obtener la empresa del usuario. Asegúrate de estar autenticado.'
-        };
-      }
-      console.log('🏢 Company ID obtained:', companyId);
+      console.log('🏢 EmployeeServiceRobust: Creating employee with data:', employeeData);
 
-      // Step 2: Validate form data using Zod schema
-      const validationResult = validateEmployeeData(formData);
-      if (!validationResult.success) {
-        console.error('❌ Form validation failed:', validationResult.errors);
-        return {
-          success: false,
-          error: 'Datos del formulario inválidos',
-          details: validationResult.errors
-        };
-      }
+      // Separar custom_fields del resto de datos
+      const { custom_fields, ...standardFields } = employeeData;
 
-      const validatedData = validationResult.data!;
-      console.log('✅ Form data validated successfully');
+      // Preparar datos para inserción
+      const dataToInsert = {
+        ...standardFields,
+        company_id: employeeData.empresaId || employeeData.company_id,
+        custom_fields: custom_fields || {}
+      };
 
-      // Step 3: Check for duplicate cedula
-      const duplicateCheck = await this.checkDuplicateCedula(validatedData.cedula, companyId);
-      if (!duplicateCheck.success) {
-        return {
-          success: false,
-          error: duplicateCheck.error,
-          details: duplicateCheck.details
-        };
-      }
+      // Remover campos que no existen en la tabla
+      delete dataToInsert.empresaId;
 
-      // Step 4: Map form data to database format
-      const dbData = EmployeeDataMapper.mapFormToDatabase(validatedData, companyId);
-      
-      // DEBUG: Log the mapped data before validation
-      EmployeeDataMapper.debugLogData('After mapping to database format', dbData);
-      
-      // Step 5: Final validation of mapped data (NOW USES CORRECT SNAKE_CASE FIELDS)
-      const finalValidation = EmployeeDataMapper.validateRequiredFields(dbData);
-      if (!finalValidation.isValid) {
-        console.error('❌ Final validation failed:', finalValidation.errors);
-        return {
-          success: false,
-          error: 'Los datos mapeados no pasaron la validación final',
-          details: {
-            errors: finalValidation.errors,
-            mappedData: dbData,
-            originalFormData: formData
-          }
-        };
-      }
+      console.log('📤 Inserting employee data:', dataToInsert);
 
-      // Step 6: Insert into database
-      console.log('💾 Attempting to insert employee into database');
-      const { data: insertedData, error: insertError } = await supabase
+      const { data, error } = await supabase
         .from('employees')
-        .insert([dbData])
-        .select()
+        .insert(dataToInsert)
+        .select('*')
         .single();
 
-      if (insertError) {
-        console.error('❌ Database insertion failed:', insertError);
-        return this.handleDatabaseError(insertError);
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
       }
 
-      if (!insertedData) {
-        return {
-          success: false,
-          error: 'No se pudo crear el empleado - no se recibieron datos de respuesta'
-        };
+      if (!data) {
+        throw new Error('No data returned from database');
       }
 
-      // Step 7: Map database response back to Employee format
-      const createdEmployee = EmployeeDataMapper.mapDatabaseToEmployee(insertedData);
-      
-      console.log('✅ Employee created successfully:', createdEmployee.id);
+      console.log('✅ Employee created successfully:', data.id);
+
+      // Mapear datos de vuelta al formato esperado
+      const createdEmployee: EmployeeUnified = {
+        ...data,
+        empresaId: data.company_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+
       return {
         success: true,
-        data: createdEmployee
+        employee: createdEmployee,
+        message: 'Empleado creado exitosamente'
       };
 
     } catch (error: any) {
-      console.error('❌ Unexpected error during employee creation:', error);
+      console.error('❌ Error creating employee:', error);
       return {
         success: false,
-        error: 'Error inesperado al crear el empleado',
-        details: error.message
+        message: error.message || 'Error creating employee',
+        error
       };
     }
   }
 
   /**
-   * Updates an existing employee
+   * Actualizar un empleado existente con campos personalizados
    */
-  static async updateEmployee(employeeId: string, formData: any): Promise<ServiceResponse<Employee>> {
-    console.log('🔄 EmployeeServiceRobust: Starting employee update process');
-    console.log('📝 Employee ID:', employeeId);
-    console.log('📝 Update data:', formData);
-
+  static async updateEmployee(employeeId: string, employeeData: Partial<EmployeeUnified>): Promise<EmployeeServiceResponse> {
     try {
-      // Step 1: Validate employee exists
-      const existingEmployee = await this.getEmployeeById(employeeId);
-      if (!existingEmployee.success || !existingEmployee.data) {
-        return {
-          success: false,
-          error: 'Empleado no encontrado'
-        };
-      }
+      console.log('🔄 EmployeeServiceRobust: Updating employee:', employeeId);
+      console.log('📝 Update data:', employeeData);
 
-      // Step 2: Validate partial form data
-      const validationResult = validateEmployeeData(formData);
-      if (!validationResult.success) {
-        return {
-          success: false,
-          error: 'Datos del formulario inválidos',
-          details: validationResult.errors
-        };
-      }
+      // Separar custom_fields del resto de datos
+      const { custom_fields, ...standardFields } = employeeData;
 
-      // Step 3: Get company ID
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        return {
-          success: false,
-          error: 'No se pudo obtener la empresa del usuario'
-        };
-      }
+      // Preparar datos para actualización
+      const dataToUpdate = {
+        ...standardFields,
+        company_id: employeeData.empresaId || employeeData.company_id,
+        custom_fields: custom_fields || {},
+        updated_at: new Date().toISOString()
+      };
 
-      // Step 4: Map update data
-      const dbData = EmployeeDataMapper.mapFormToDatabase(validationResult.data!, companyId);
-      
-      // Step 5: Update in database
-      const { data: updatedData, error: updateError } = await supabase
+      // Remover campos que no existen en la tabla
+      delete dataToUpdate.empresaId;
+      delete dataToUpdate.id;
+      delete dataToUpdate.createdAt;
+      delete dataToUpdate.updatedAt;
+
+      console.log('📤 Updating employee data:', dataToUpdate);
+
+      const { data, error } = await supabase
         .from('employees')
-        .update(dbData)
+        .update(dataToUpdate)
         .eq('id', employeeId)
-        .select()
+        .select('*')
         .single();
 
-      if (updateError) {
-        console.error('❌ Database update failed:', updateError);
-        return this.handleDatabaseError(updateError);
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
       }
 
-      if (!updatedData) {
-        return {
-          success: false,
-          error: 'No se pudo actualizar el empleado'
-        };
+      if (!data) {
+        throw new Error('No data returned from database');
       }
 
-      const updatedEmployee = EmployeeDataMapper.mapDatabaseToEmployee(updatedData);
-      
-      console.log('✅ Employee updated successfully:', updatedEmployee.id);
+      console.log('✅ Employee updated successfully:', data.id);
+
+      // Mapear datos de vuelta al formato esperado
+      const updatedEmployee: EmployeeUnified = {
+        ...data,
+        empresaId: data.company_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+
       return {
         success: true,
-        data: updatedEmployee
+        employee: updatedEmployee,
+        message: 'Empleado actualizado exitosamente'
       };
 
     } catch (error: any) {
-      console.error('❌ Unexpected error during employee update:', error);
+      console.error('❌ Error updating employee:', error);
       return {
         success: false,
-        error: 'Error inesperado al actualizar el empleado',
-        details: error.message
+        message: error.message || 'Error updating employee',
+        error
       };
     }
   }
 
   /**
-   * Gets an employee by ID
+   * Obtener un empleado por ID
    */
-  static async getEmployeeById(employeeId: string): Promise<ServiceResponse<Employee>> {
+  static async getEmployeeById(employeeId: string): Promise<EmployeeUnified | null> {
     try {
-      console.log('🔍 EmployeeServiceRobust: Fetching employee by ID:', employeeId);
-      
+      console.log('🔍 EmployeeServiceRobust: Getting employee by ID:', employeeId);
+
       const { data, error } = await supabase
         .from('employees')
         .select('*')
@@ -205,146 +157,86 @@ export class EmployeeServiceRobust {
         .single();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          return {
-            success: false,
-            error: 'Empleado no encontrado'
-          };
-        }
-        console.error('❌ Error fetching employee:', error);
-        return this.handleDatabaseError(error);
+        console.error('❌ Database error:', error);
+        throw error;
       }
 
       if (!data) {
-        return {
-          success: false,
-          error: 'Empleado no encontrado'
-        };
-      }
-
-      const employee = EmployeeDataMapper.mapDatabaseToEmployee(data);
-      console.log('✅ Employee fetched successfully:', employee.id);
-      
-      return {
-        success: true,
-        data: employee
-      };
-
-    } catch (error: any) {
-      console.error('❌ Unexpected error fetching employee:', error);
-      return {
-        success: false,
-        error: 'Error inesperado al obtener el empleado',
-        details: error.message
-      };
-    }
-  }
-
-  /**
-   * Check for duplicate cedula in the same company
-   */
-  private static async checkDuplicateCedula(cedula: string, companyId: string): Promise<ServiceResponse<boolean>> {
-    console.log('🔍 Checking for duplicate cedula:', cedula);
-    
-    const { data: existingEmployee, error } = await supabase
-      .from('employees')
-      .select('id, nombre, apellido')
-      .eq('company_id', companyId)
-      .eq('cedula', cedula)
-      .maybeSingle();
-
-    if (error) {
-      console.error('❌ Error checking duplicate cedula:', error);
-      return {
-        success: false,
-        error: 'Error verificando documento duplicado'
-      };
-    }
-
-    if (existingEmployee) {
-      return {
-        success: false,
-        error: `Ya existe un empleado con la cédula ${cedula}: ${existingEmployee.nombre} ${existingEmployee.apellido}`
-      };
-    }
-
-    console.log('✅ No duplicate cedula found');
-    return { success: true, data: true };
-  }
-
-  /**
-   * Get current user's company ID
-   */
-  private static async getCurrentUserCompanyId(): Promise<string | null> {
-    try {
-      const { data, error } = await supabase.rpc('get_current_user_company_id');
-      
-      if (error) {
-        console.error('❌ Error getting company ID:', error);
         return null;
       }
 
-      return data;
-    } catch (error) {
-      console.error('❌ Unexpected error getting company ID:', error);
+      // Mapear datos al formato esperado
+      const employee: EmployeeUnified = {
+        ...data,
+        empresaId: data.company_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        custom_fields: data.custom_fields || {}
+      };
+
+      console.log('✅ Employee found:', employee.id);
+      return employee;
+
+    } catch (error: any) {
+      console.error('❌ Error getting employee:', error);
       return null;
     }
   }
 
   /**
-   * Handle database errors with user-friendly messages
+   * Aplicar valores por defecto a empleados existentes cuando se agrega un nuevo campo
    */
-  private static handleDatabaseError(error: any): ServiceResponse<never> {
-    console.error('🔍 Analyzing database error:', error);
+  static async applyDefaultValuesToExistingEmployees(
+    companyId: string, 
+    fieldKey: string, 
+    defaultValue: any
+  ): Promise<boolean> {
+    try {
+      console.log(`🔄 Applying default value for field ${fieldKey} to existing employees`);
 
-    // Handle specific PostgreSQL error codes
-    if (error.code === '23505') { // Unique constraint violation
-      if (error.message.includes('employees_company_id_cedula_key')) {
-        return {
-          success: false,
-          error: 'Ya existe un empleado con este número de documento en la empresa'
-        };
+      // Obtener empleados que no tienen este campo personalizado
+      const { data: employees, error: fetchError } = await supabase
+        .from('employees')
+        .select('id, custom_fields')
+        .eq('company_id', companyId);
+
+      if (fetchError) {
+        console.error('❌ Error fetching employees:', fetchError);
+        return false;
       }
-      return {
-        success: false,
-        error: 'Ya existe un registro con estos datos'
-      };
-    }
 
-    if (error.code === '23503') { // Foreign key constraint violation
-      return {
-        success: false,
-        error: 'Error de referencia en los datos. Verifica que todos los datos relacionados sean válidos.'
-      };
-    }
+      // Filtrar empleados que no tienen el campo o tienen valor null/undefined
+      const employeesToUpdate = employees?.filter(emp => 
+        !emp.custom_fields || 
+        emp.custom_fields[fieldKey] === null || 
+        emp.custom_fields[fieldKey] === undefined
+      ) || [];
 
-    if (error.code === '23514') { // Check constraint violation
-      return {
-        success: false,
-        error: 'Los datos no cumplen con las restricciones de validación'
-      };
-    }
+      console.log(`📊 Found ${employeesToUpdate.length} employees to update`);
 
-    // Handle Supabase-specific errors
-    if (error.message?.includes('JWT')) {
-      return {
-        success: false,
-        error: 'Sesión expirada. Por favor inicia sesión nuevamente.'
-      };
-    }
+      // Actualizar cada empleado con el valor por defecto
+      for (const employee of employeesToUpdate) {
+        const updatedCustomFields = {
+          ...employee.custom_fields,
+          [fieldKey]: defaultValue
+        };
 
-    if (error.message?.includes('permission')) {
-      return {
-        success: false,
-        error: 'No tienes permisos para realizar esta operación'
-      };
-    }
+        const { error: updateError } = await supabase
+          .from('employees')
+          .update({ custom_fields: updatedCustomFields })
+          .eq('id', employee.id);
 
-    // Generic error
-    return {
-      success: false,
-      error: `Error de base de datos: ${error.message || 'Error desconocido'}`,
-      details: error
-    };
+        if (updateError) {
+          console.error(`❌ Error updating employee ${employee.id}:`, updateError);
+        }
+      }
+
+      console.log('✅ Default values applied successfully');
+      return true;
+
+    } catch (error: any) {
+      console.error('❌ Error applying default values:', error);
+      return false;
+    }
   }
 }
