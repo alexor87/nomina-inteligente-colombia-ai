@@ -179,6 +179,17 @@ export class EmployeeServiceRobust {
   }
 
   /**
+   * Helper function to safely get custom fields as object
+   */
+  private static getCustomFieldsAsObject(customFields: any): Record<string, any> {
+    if (!customFields) return {};
+    if (typeof customFields === 'object' && !Array.isArray(customFields) && customFields !== null) {
+      return customFields as Record<string, any>;
+    }
+    return {};
+  }
+
+  /**
    * Aplicar valores por defecto a empleados existentes cuando se agrega un nuevo campo
    */
   static async applyDefaultValuesToExistingEmployees(
@@ -202,7 +213,7 @@ export class EmployeeServiceRobust {
 
       // Filtrar empleados que no tienen el campo o tienen valor null/undefined
       const employeesToUpdate = employees?.filter(emp => {
-        const customFields = emp.custom_fields || {};
+        const customFields = this.getCustomFieldsAsObject(emp.custom_fields);
         return customFields[fieldKey] === null || 
                customFields[fieldKey] === undefined || 
                !(fieldKey in customFields);
@@ -212,7 +223,7 @@ export class EmployeeServiceRobust {
 
       // Actualizar cada empleado con el valor por defecto
       for (const employee of employeesToUpdate) {
-        const currentCustomFields = employee.custom_fields || {};
+        const currentCustomFields = this.getCustomFieldsAsObject(employee.custom_fields);
         const updatedCustomFields = {
           ...currentCustomFields,
           [fieldKey]: defaultValue
