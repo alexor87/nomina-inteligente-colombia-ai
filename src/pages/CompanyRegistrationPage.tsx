@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CompanyRegistrationWizard } from '@/components/auth/CompanyRegistrationWizard';
@@ -27,13 +28,11 @@ export const CompanyRegistrationPage = () => {
         telefono: '',
         ciudad: 'Bogotá',
         plan: 'profesional' as const,
-        // Additional data that we'll store in company settings
-        actividad_economica: data.industry,
-        codigo_ciiu: data.ciiuCode,
-        numero_empleados: data.employeeCount,
-        frecuencia_nomina: data.payrollFrequency,
-        area_funcional: data.functionalArea,
+        // NUEVO: Incluir periodicidad del onboarding
+        periodicity: data.payrollFrequency || 'mensual', // Usar payrollFrequency del wizard
       };
+
+      console.log('📋 Registration data with periodicity:', registrationData);
 
       // For now, we'll create a basic company
       // In the future, we can extend CompanyService to handle the additional data
@@ -44,6 +43,7 @@ export const CompanyRegistrationPage = () => {
         telefono: registrationData.telefono,
         ciudad: registrationData.ciudad,
         plan: registrationData.plan,
+        periodicity: registrationData.periodicity, // Pasar periodicidad
       });
       
       console.log('Company created successfully:', companyId);
@@ -53,7 +53,7 @@ export const CompanyRegistrationPage = () => {
       
       toast({
         title: "¡Bienvenido a NóminaFácil!",
-        description: "Tu empresa ha sido registrada exitosamente. ¡Comienza tu prueba gratuita!",
+        description: `Tu empresa ha sido registrada exitosamente con configuración ${registrationData.periodicity}. ¡Comienza tu prueba gratuita!`,
       });
 
       // Navigate to dashboard

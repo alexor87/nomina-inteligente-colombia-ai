@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface SelectablePeriod {
@@ -29,7 +28,7 @@ export class SimplePeriodService {
       const periodicity = companySettings?.periodicity || 'mensual';
       console.log('⚙️ Periodicidad configurada:', periodicity);
       
-      // Generar períodos según la configuración
+      // Generar períodos según la configuración (KISS: solo mensual y quincenal)
       const expectedPeriods = this.generatePeriods2025(periodicity);
       
       // Obtener períodos existentes en BD
@@ -146,7 +145,7 @@ export class SimplePeriodService {
   }
 
   /**
-   * Generar períodos para 2025 según tipo de periodicidad
+   * Generar períodos para 2025 según tipo de periodicidad (KISS: solo mensual y quincenal)
    */
   private static generatePeriods2025(periodicity: string): Array<{
     label: string;
@@ -154,17 +153,13 @@ export class SimplePeriodService {
     endDate: string;
     periodNumber: number;
   }> {
-    const year = 2025;
-    
     switch (periodicity) {
       case 'mensual':
         return this.generateMonthlyPeriods2025();
       case 'quincenal':
         return this.generateBiWeeklyPeriods2025();
-      case 'semanal':
-        return this.generateWeeklyPeriods2025();
       default:
-        console.warn('⚠️ Periodicidad no reconocida, usando mensual');
+        console.warn('⚠️ Periodicidad no reconocida, usando mensual por defecto');
         return this.generateMonthlyPeriods2025();
     }
   }
@@ -249,53 +244,6 @@ export class SimplePeriodService {
     }
 
     console.log('✅ PERÍODOS QUINCENALES 2025 GENERADOS:', {
-      totalPeriods: periods.length,
-      firstPeriod: periods[0],
-      lastPeriod: periods[periods.length - 1]
-    });
-
-    return periods;
-  }
-
-  /**
-   * Generar períodos semanales para 2025
-   */
-  private static generateWeeklyPeriods2025(): Array<{
-    label: string;
-    startDate: string;
-    endDate: string;
-    periodNumber: number;
-  }> {
-    const periods = [];
-    const year = 2025;
-    let periodNumber = 1;
-    
-    // Empezar desde el primer lunes de 2025
-    let currentDate = new Date(year, 0, 1); // 1 enero 2025
-    const dayOfWeek = currentDate.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-    currentDate.setDate(currentDate.getDate() + daysToMonday);
-
-    while (currentDate.getFullYear() === year) {
-      const weekStart = new Date(currentDate);
-      const weekEnd = new Date(currentDate);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-
-      if (weekEnd.getFullYear() > year) {
-        break;
-      }
-
-      periods.push({
-        label: `Semana ${periodNumber} (${weekStart.getDate()}/${weekStart.getMonth() + 1} - ${weekEnd.getDate()}/${weekEnd.getMonth() + 1})`,
-        startDate: weekStart.toISOString().split('T')[0],
-        endDate: weekEnd.toISOString().split('T')[0],
-        periodNumber: periodNumber++
-      });
-
-      currentDate.setDate(currentDate.getDate() + 7);
-    }
-
-    console.log('✅ PERÍODOS SEMANALES 2025 GENERADOS:', {
       totalPeriods: periods.length,
       firstPeriod: periods[0],
       lastPeriod: periods[periods.length - 1]

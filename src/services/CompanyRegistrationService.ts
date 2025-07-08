@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { forceAssignAdminRole, performCompleteRoleCheck } from '@/utils/roleUtils';
+import { CompanyConfigurationService } from './CompanyConfigurationService';
 
 export interface CompanyRegistrationData {
   nit: string;
@@ -9,6 +10,7 @@ export interface CompanyRegistrationData {
   telefono?: string;
   ciudad?: string;
   plan: 'basico' | 'profesional' | 'empresarial';
+  periodicity?: string; // Nueva propiedad para periodicidad
 }
 
 export interface CompanyRegistrationWithUser extends CompanyRegistrationData {
@@ -200,6 +202,20 @@ export class CompanyRegistrationService {
       }
 
       console.log('✅ Company created successfully:', result);
+
+      // NUEVO: Guardar configuración de periodicidad después de crear la empresa
+      if (data.periodicity) {
+        try {
+          console.log('💾 Saving periodicity configuration:', data.periodicity);
+          await CompanyConfigurationService.saveCompanyConfiguration(result, data.periodicity);
+          console.log('✅ Periodicity configuration saved successfully');
+        } catch (configError) {
+          console.error('⚠️ Error saving periodicity configuration:', configError);
+          // No lanzar error aquí para no fallar todo el proceso
+          // La empresa ya fue creada exitosamente
+        }
+      }
+
       return result;
       
     } catch (error) {
