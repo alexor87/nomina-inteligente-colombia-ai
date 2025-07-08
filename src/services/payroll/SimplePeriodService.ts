@@ -22,13 +22,14 @@ export class SimplePeriodService {
       // Generar todos los períodos quincenales esperados para 2025
       const expectedPeriods = this.generateBiWeeklyPeriods2025();
       
-      // Obtener períodos existentes en BD
+      // Obtener períodos existentes en BD (SOLO activos/borrador)
       const { data: existingPeriods } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
         .gte('fecha_inicio', '2025-01-01')
         .lte('fecha_fin', '2025-12-31')
+        .in('estado', ['borrador', 'en_proceso', 'cerrado']) // Excluir cancelados
         .order('numero_periodo_anual');
       
       // Crear mapa de períodos existentes
@@ -37,7 +38,7 @@ export class SimplePeriodService {
       );
       
       // Combinar períodos esperados con existentes
-      return expectedPeriods.map(expected => {
+      const selectablePeriods = expectedPeriods.map(expected => {
         const existing = existingMap.get(expected.periodNumber);
         
         if (existing) {
@@ -64,6 +65,13 @@ export class SimplePeriodService {
           };
         }
       });
+
+      // Ordenar por número de período
+      selectablePeriods.sort((a, b) => a.periodNumber - b.periodNumber);
+      
+      console.log(`✅ ${selectablePeriods.length} períodos disponibles (${selectablePeriods.filter(p => p.canSelect).length} seleccionables)`);
+      
+      return selectablePeriods;
       
     } catch (error) {
       console.error('❌ Error cargando períodos seleccionables:', error);

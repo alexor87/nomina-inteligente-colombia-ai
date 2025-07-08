@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,20 +12,16 @@ import {
   AlertTriangle, 
   CheckCircle, 
   Calendar,
-  Clock,
-  Settings,
-  Zap
+  Settings
 } from 'lucide-react';
 import { BiWeeklyDiagnosticService } from '@/services/payroll-intelligent/BiWeeklyDiagnosticService';
-import { PayrollDiagnosticService } from '@/services/payroll-intelligent/PayrollDiagnosticService';
+import { PeriodSimpleFixService } from '@/services/payroll-intelligent/PeriodSimpleFixService';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { useToast } from '@/hooks/use-toast';
 
 export const PayrollDiagnosticPanel = () => {
   const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
-  const [isApplyingCorrections, setIsApplyingCorrections] = useState(false);
-  const [isResolvingConflicts, setIsResolvingConflicts] = useState(false);
-  const [isApplyingRootCorrection, setIsApplyingRootCorrection] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
   const [diagnosticResult, setDiagnosticResult] = useState<any>(null);
   const [lastDiagnosticTime, setLastDiagnosticTime] = useState<Date | null>(null);
   
@@ -36,7 +33,7 @@ export const PayrollDiagnosticPanel = () => {
     
     setIsRunningDiagnostic(true);
     try {
-      console.log('🔍 Ejecutando diagnóstico completo...');
+      console.log('🔍 Ejecutando diagnóstico...');
       const result = await BiWeeklyDiagnosticService.runCompleteDiagnostic(companyId);
       
       setDiagnosticResult(result);
@@ -60,16 +57,16 @@ export const PayrollDiagnosticPanel = () => {
     }
   };
 
-  const applyCorrections = async () => {
+  const fixAllIssues = async () => {
     if (!companyId) return;
     
-    setIsApplyingCorrections(true);
+    setIsFixing(true);
     try {
-      console.log('🔧 Aplicando correcciones automáticas...');
-      const result = await BiWeeklyDiagnosticService.applyAutoCorrections(companyId);
+      console.log('🔧 Arreglando períodos automáticamente...');
+      const result = await PeriodSimpleFixService.fixAllIssues(companyId);
       
       toast({
-        title: result.success ? "✅ Correcciones aplicadas" : "⚠️ Correcciones parciales",
+        title: result.success ? "✅ Períodos arreglados" : "⚠️ Corrección parcial",
         description: result.message,
         className: result.success ? "border-green-200 bg-green-50" : "border-orange-200 bg-orange-50"
       });
@@ -78,72 +75,14 @@ export const PayrollDiagnosticPanel = () => {
       await runDiagnostic();
       
     } catch (error) {
-      console.error('Error aplicando correcciones:', error);
+      console.error('Error arreglando períodos:', error);
       toast({
-        title: "Error en correcciones",
-        description: "No se pudieron aplicar las correcciones",
+        title: "Error en corrección",
+        description: "No se pudieron arreglar los períodos",
         variant: "destructive"
       });
     } finally {
-      setIsApplyingCorrections(false);
-    }
-  };
-
-  const resolveConflicts = async () => {
-    if (!companyId) return;
-    
-    setIsResolvingConflicts(true);
-    try {
-      console.log('🎯 Resolviendo conflictos específicos...');
-      const result = await BiWeeklyDiagnosticService.resolveNumerationConflicts(companyId);
-      
-      toast({
-        title: result.success ? "✅ Conflictos resueltos" : "⚠️ Resolución parcial",
-        description: result.message,
-        className: result.success ? "border-green-200 bg-green-50" : "border-orange-200 bg-orange-50"
-      });
-      
-      // Ejecutar diagnóstico nuevamente para ver los resultados
-      await runDiagnostic();
-      
-    } catch (error) {
-      console.error('Error resolviendo conflictos:', error);
-      toast({
-        title: "Error resolviendo conflictos",
-        description: "No se pudieron resolver los conflictos",
-        variant: "destructive"
-      });
-    } finally {
-      setIsResolvingConflicts(false);
-    }
-  };
-
-  const applyRootCorrection = async () => {
-    if (!companyId) return;
-    
-    setIsApplyingRootCorrection(true);
-    try {
-      console.log('🔧 Aplicando corrección de raíz completa...');
-      const result = await BiWeeklyDiagnosticService.applyRootCorrection(companyId);
-      
-      toast({
-        title: result.success ? "✅ Corrección de raíz completada" : "⚠️ Corrección parcial",
-        description: result.message,
-        className: result.success ? "border-green-200 bg-green-50" : "border-orange-200 bg-orange-50"
-      });
-      
-      // Ejecutar diagnóstico nuevamente para ver los resultados
-      await runDiagnostic();
-      
-    } catch (error) {
-      console.error('Error en corrección de raíz:', error);
-      toast({
-        title: "Error en corrección de raíz",
-        description: "No se pudo completar la corrección de raíz",
-        variant: "destructive"
-      });
-    } finally {
-      setIsApplyingRootCorrection(false);
+      setIsFixing(false);
     }
   };
 
@@ -157,6 +96,7 @@ export const PayrollDiagnosticPanel = () => {
   const totalIssues = diagnosticResult?.data?.existingPeriods?.filter((p: any) => !p.is_correct)?.length || 0;
   const duplicates = diagnosticResult?.data?.duplicateCheck?.duplicates?.length || 0;
   const conflicts = diagnosticResult?.data?.duplicateCheck?.conflicts?.length || 0;
+  const hasIssues = totalIssues > 0 || duplicates > 0 || conflicts > 0;
 
   return (
     <div className="space-y-6">
@@ -165,7 +105,7 @@ export const PayrollDiagnosticPanel = () => {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Bug className="h-5 w-5 text-blue-600" />
-              Diagnóstico de Numeración Quincenal
+              Diagnóstico de Períodos Quincenales
             </CardTitle>
             <div className="flex items-center gap-2">
               {lastDiagnosticTime && (
@@ -177,7 +117,7 @@ export const PayrollDiagnosticPanel = () => {
                 variant="outline"
                 size="sm"
                 onClick={runDiagnostic}
-                disabled={isRunningDiagnostic}
+                disabled={isRunningDiagnostic || isFixing}
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${isRunningDiagnostic ? 'animate-spin' : ''}`} />
                 Diagnóstico
@@ -241,88 +181,47 @@ export const PayrollDiagnosticPanel = () => {
             </div>
           )}
 
-          {/* Alertas y acciones */}
-          {diagnosticResult && (totalIssues > 0 || duplicates > 0 || conflicts > 0) && (
+          {/* Alerta y botón de corrección simple */}
+          {hasIssues && (
             <>
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Se encontraron problemas en la numeración quincenal:</strong>
-                  <ul className="list-disc list-inside mt-2 text-sm">
-                    {totalIssues > 0 && <li>{totalIssues} períodos con numeración incorrecta</li>}
-                    {duplicates > 0 && <li>{duplicates} períodos duplicados</li>}
-                    {conflicts > 0 && <li>{conflicts} conflictos de numeración</li>}
-                  </ul>
+                  <strong>Se encontraron problemas en el sistema de períodos quincenales.</strong>
                 </AlertDescription>
               </Alert>
 
-              <Alert className="border-blue-200 bg-blue-50">
-                <Zap className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-800">
-                  <strong>💡 Recomendación:</strong> Para problemas persistentes o complejos, 
-                  usa la <strong>Corrección de Raíz</strong> que detecta y resuelve conflictos 
-                  desde la base del sistema.
-                </AlertDescription>
-              </Alert>
+              <div className="flex justify-center">
+                <Button
+                  onClick={fixAllIssues}
+                  disabled={isFixing || isRunningDiagnostic}
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg"
+                  size="lg"
+                >
+                  {isFixing ? (
+                    <>
+                      <RefreshCw className="h-5 w-5 animate-spin mr-2" />
+                      Arreglando períodos...
+                    </>
+                  ) : (
+                    <>
+                      <Wrench className="h-5 w-5 mr-2" />
+                      🔧 Arreglar Períodos
+                    </>
+                  )}
+                </Button>
+              </div>
             </>
           )}
 
-          {/* Botones de acción MEJORADOS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Button
-              onClick={applyRootCorrection}
-              disabled={isApplyingRootCorrection || isApplyingCorrections || isResolvingConflicts}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {isApplyingRootCorrection ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  Corrigiendo raíz...
-                </>
-              ) : (
-                <>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Corrección de Raíz
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={resolveConflicts}
-              disabled={isResolvingConflicts || isApplyingCorrections || isApplyingRootCorrection}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {isResolvingConflicts ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  Resolviendo conflictos...
-                </>
-              ) : (
-                <>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Resolver Conflictos
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={applyCorrections}
-              disabled={isApplyingCorrections || isResolvingConflicts || isApplyingRootCorrection}
-              variant="outline"
-            >
-              {isApplyingCorrections ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  Aplicando correcciones...
-                </>
-              ) : (
-                <>
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Correcciones Básicas
-                </>
-              )}
-            </Button>
-          </div>
+          {!hasIssues && diagnosticResult && (
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                <strong>✅ Sistema funcionando correctamente</strong> - Todos los períodos quincenales están en orden.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Resultados detallados */}
           {diagnosticResult?.data && (

@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { SimplePeriodService, SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -8,53 +8,99 @@ export const useSimplePeriodSelection = (companyId: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handlePeriodSelect = useCallback((period: SelectablePeriod) => {
-    console.log('🎯 Período seleccionado:', period.label);
-    setSelectedPeriod(period);
-  }, []);
+  // Clave para persistir la selección en localStorage
+  const STORAGE_KEY = `selected_period_${companyId}`;
 
-  const resetSelection = useCallback(() => {
-    console.log('🔄 Reseteando selección de período');
-    setSelectedPeriod(null);
-  }, []);
-
-  const markCurrentPeriodAsLiquidated = useCallback(async () => {
-    if (!selectedPeriod?.id) {
-      console.warn('⚠️ No hay período seleccionado para liquidar');
-      return false;
+  // Cargar período guardado al inicializar
+  useEffect(() => {
+    if (companyId) {
+      const savedPeriod = localStorage.getItem(STORAGE_KEY);
+      if (savedPeriod) {
+        try {
+          const parsed = JSON.parse(savedPeriod);
+          setSelectedPeriod(parsed);
+          console.log('📋 Período recuperado del almacenamiento:', parsed.label);
+        } catch (error) {
+          console.warn('Error recuperando período guardado:', error);
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
     }
+  }, [companyId]);
+
+  const handlePeriodSelect = async (period: SelectablePeriod) => {
+    setIsLoading(true);
     
     try {
-      console.log(`🔒 Liquidando período: ${selectedPeriod.label}`);
-      const success = await SimplePeriodService.markAsLiquidated(selectedPeriod.id);
+      const result = await SimplePeriodService.selectPeriod(companyId, period);
       
-      if (success) {
+      if (result) {
+        setSelectedPeriod(result);
+        
+        // Guardar en localStorage para persistencia
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(result));
+        
         toast({
-          title: "Período liquidado",
-          description: `${selectedPeriod.label} ha sido marcado como liquidado`,
+          title: "Período seleccionado",
+          description: `${result.label} está listo para trabajar`,
+          className: "border-green-200 bg-green-50"
         });
-        resetSelection();
-        console.log('✅ Período liquidado exitosamente');
+        
+        console.log('✅ Período seleccionado y guardado:', result.label);
       } else {
         toast({
           title: "Error",
-          description: "No se pudo marcar el período como liquidado",
+          description: "No se pudo seleccionar el período",
           variant: "destructive"
         });
-        console.error('❌ Falló la liquidación del período');
+      }
+    } catch (error) {
+      console.error('Error seleccionando período:', error);
+      toast({
+        title: "Error",
+        description: "Error al seleccionar período",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetSelection = () => {
+    setSelectedPeriod(null);
+    localStorage.removeItem(STORAGE_KEY);
+    console.log('🔄 Selección de período reiniciada');
+  };
+
+  const markCurrentPeriodAsLiquidated = async () => {
+    if (!selectedPeriod?.id) return false;
+    
+    try {
+      const success = await SimplePeriodService.markAsLiquidated(selectedPeriod.id);
+      
+      if (success) {
+        // Actualizar estado local
+        setSelectedPeriod(prev => prev ? { ...prev, canSelect: false } : null);
+        
+        // Actualizar localStorage
+        const updatedPeriod = { ...selectedPeriod, canSelect: false };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPeriod));
+        
+        toast({
+          title: "Período cerrado",
+          description: `${selectedPeriod.label} ha sido marcado como liquidado`,
+          className: "border-green-200 bg-green-50"
+        });
+        
+        console.log('✅ Período marcado como liquidado:', selectedPeriod.label);
       }
       
       return success;
     } catch (error) {
-      console.error('❌ Error marcando período como liquidado:', error);
-      toast({
-        title: "Error",
-        description: "Error interno al liquidar el período",
-        variant: "destructive"
-      });
+      console.error('Error marcando período como liquidado:', error);
       return false;
     }
-  }, [selectedPeriod, toast, resetSelection]);
+  };
 
   return {
     selectedPeriod,
