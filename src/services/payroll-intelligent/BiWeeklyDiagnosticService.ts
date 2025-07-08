@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { ConflictResolutionService } from './ConflictResolutionService';
 
 export interface DiagnosticResult {
   success: boolean;
@@ -261,50 +262,26 @@ export class BiWeeklyDiagnosticService {
   }
   
   /**
-   * Aplicar correcciones automáticas
+   * Aplicar correcciones automáticas MEJORADO con resolución de conflictos
    */
   static async applyAutoCorrections(companyId: string): Promise<DiagnosticResult> {
-    console.log('🔧 APLICANDO CORRECCIONES AUTOMÁTICAS');
+    console.log('🔧 APLICANDO CORRECCIONES AUTOMÁTICAS MEJORADAS');
     
     try {
-      const diagnostic = await this.runCompleteDiagnostic(companyId);
-      if (!diagnostic.success) return diagnostic;
-      
-      const { existingPeriods } = diagnostic.data;
-      const periodsToCorrect = existingPeriods.filter((p: PeriodDiagnostic) => !p.is_correct);
-      
-      let correctedCount = 0;
-      const errors = [];
-      
-      for (const period of periodsToCorrect) {
-        try {
-          console.log(`🔧 Corrigiendo período: ${period.periodo} de ${period.numero_periodo_anual} a ${period.calculated_number}`);
-          
-          const { error } = await supabase
-            .from('payroll_periods_real')
-            .update({ 
-              numero_periodo_anual: period.calculated_number,
-              updated_at: new Date().toISOString()
-            })
-            .eq('fecha_inicio', period.fecha_inicio)
-            .eq('fecha_fin', period.fecha_fin);
-            
-          if (error) {
-            errors.push(`Error corrigiendo ${period.periodo}: ${error.message}`);
-          } else {
-            correctedCount++;
-            console.log(`✅ Corregido: ${period.periodo} → Quincena ${period.calculated_number}`);
-          }
-        } catch (err) {
-          errors.push(`Error procesando ${period.periodo}: ${err.message}`);
-        }
-      }
+      // Ejecutar corrección completa de conflictos
+      const conflictResult = await ConflictResolutionService.resolveAllConflicts(companyId);
       
       return {
-        success: true,
-        message: `Correcciones aplicadas: ${correctedCount} períodos actualizados`,
-        data: { correctedCount, errors },
-        errors: errors.length > 0 ? errors : undefined
+        success: conflictResult.success,
+        message: conflictResult.message,
+        data: {
+          correctedCount: conflictResult.periodsUpdated,
+          duplicatesRemoved: conflictResult.duplicatesRemoved,
+          periodsCreated: conflictResult.periodsCreated,
+          conflictsResolved: conflictResult.conflictsResolved,
+          errors: conflictResult.errors
+        },
+        errors: conflictResult.errors.length > 0 ? conflictResult.errors : undefined
       };
       
     } catch (error) {
@@ -312,6 +289,32 @@ export class BiWeeklyDiagnosticService {
       return {
         success: false,
         message: 'Error aplicando correcciones automáticas',
+        errors: [error.message]
+      };
+    }
+  }
+  
+  /**
+   * Ejecutar corrección específica de conflictos de numeración
+   */
+  static async resolveNumerationConflicts(companyId: string): Promise<DiagnosticResult> {
+    console.log('🎯 RESOLVIENDO CONFLICTOS DE NUMERACIÓN ESPECÍFICOS');
+    
+    try {
+      const result = await ConflictResolutionService.resolveAllConflicts(companyId);
+      
+      return {
+        success: result.success,
+        message: `Conflictos resueltos: ${result.conflictsResolved} conflictos, ${result.duplicatesRemoved} duplicados eliminados, ${result.periodsUpdated} períodos actualizados`,
+        data: result,
+        errors: result.errors.length > 0 ? result.errors : undefined
+      };
+      
+    } catch (error) {
+      console.error('❌ ERROR RESOLVIENDO CONFLICTOS:', error);
+      return {
+        success: false,
+        message: 'Error resolviendo conflictos de numeración',
         errors: [error.message]
       };
     }
