@@ -53,7 +53,7 @@ export const getEmployeeFormDefaults = (employee?: EmployeeUnified): Partial<Emp
     regimenSalud: employee?.regimenSalud || 'contributivo',
     estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
     
-    // Campos Personalizados
+    // Campos Personalizados - Asegurar que siempre sea un objeto
     custom_fields: employee?.custom_fields || {}
   };
 

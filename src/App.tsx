@@ -15,6 +15,8 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
+import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
+import EditEmployeePage from "./pages/EditEmployeePage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
@@ -23,8 +25,8 @@ import PayrollLiquidationPage from "./pages/PayrollLiquidationPage";
 const queryClient = new QueryClient();
 
 /**
- * ✅ APLICACIÓN PRINCIPAL CON MÓDULO DE LIQUIDACIÓN
- * Incluye nuevo módulo de liquidación de nómina funcional
+ * ✅ APLICACIÓN PRINCIPAL CON MÓDULO DE LIQUIDACIÓN Y RUTAS DE EMPLEADOS
+ * Incluye nuevo módulo de liquidación de nómina funcional y rutas para crear/editar empleados
  */
 function AppContent() {
   // Inicialización automática del sistema
@@ -41,6 +43,8 @@ function AppContent() {
         <Route path="/app" element={<Layout />}>
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="employees" element={<EmployeesPage />} />
+          <Route path="employees/create" element={<CreateEmployeeModernPage />} />
+          <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
           <Route path="payroll" element={<PayrollLiquidationPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />

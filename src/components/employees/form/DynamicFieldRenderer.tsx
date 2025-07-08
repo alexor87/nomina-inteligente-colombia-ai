@@ -32,7 +32,7 @@ export const DynamicFieldRenderer = ({ field, control, setValue, errors }: Dynam
               <Input
                 {...formField}
                 placeholder={`Ingresa ${field.field_label.toLowerCase()}`}
-                className={hasError ? 'border-red-500' : ''}
+                className={`h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md ${hasError ? 'border-red-500' : ''}`}
               />
             )}
           />
@@ -50,7 +50,7 @@ export const DynamicFieldRenderer = ({ field, control, setValue, errors }: Dynam
                 {...formField}
                 type="number"
                 placeholder={`Ingresa ${field.field_label.toLowerCase()}`}
-                className={hasError ? 'border-red-500' : ''}
+                className={`h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md ${hasError ? 'border-red-500' : ''}`}
                 onChange={(e) => formField.onChange(Number(e.target.value))}
               />
             )}
@@ -68,7 +68,7 @@ export const DynamicFieldRenderer = ({ field, control, setValue, errors }: Dynam
               <Input
                 {...formField}
                 type="date"
-                className={hasError ? 'border-red-500' : ''}
+                className={`h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md ${hasError ? 'border-red-500' : ''}`}
               />
             )}
           />
@@ -104,12 +104,16 @@ export const DynamicFieldRenderer = ({ field, control, setValue, errors }: Dynam
             rules={{ required: field.is_required ? `${field.field_label} es requerido` : false }}
             render={({ field: formField }) => (
               <Select onValueChange={formField.onChange} value={formField.value}>
-                <SelectTrigger className={hasError ? 'border-red-500' : ''}>
+                <SelectTrigger className={`h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md ${hasError ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder={`Seleccionar ${field.field_label.toLowerCase()}`} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border-gray-200 shadow-lg z-50">
                   {options.map((option, index) => (
-                    <SelectItem key={index} value={String(option)}>
+                    <SelectItem 
+                      key={index} 
+                      value={String(option)}
+                      className="hover:bg-gray-50 focus:bg-gray-50"
+                    >
                       {String(option)}
                     </SelectItem>
                   ))}
@@ -137,7 +141,7 @@ export const DynamicFieldRenderer = ({ field, control, setValue, errors }: Dynam
                 {...formField}
                 type="email"
                 placeholder={`Ingresa ${field.field_label.toLowerCase()}`}
-                className={hasError ? 'border-red-500' : ''}
+                className={`h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md ${hasError ? 'border-red-500' : ''}`}
               />
             )}
           />
@@ -155,7 +159,7 @@ export const DynamicFieldRenderer = ({ field, control, setValue, errors }: Dynam
                 {...formField}
                 type="tel"
                 placeholder={`Ingresa ${field.field_label.toLowerCase()}`}
-                className={hasError ? 'border-red-500' : ''}
+                className={`h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md ${hasError ? 'border-red-500' : ''}`}
               />
             )}
           />
@@ -166,21 +170,21 @@ export const DynamicFieldRenderer = ({ field, control, setValue, errors }: Dynam
           <Input
             placeholder="Tipo de campo no soportado"
             disabled
-            className="bg-gray-100"
+            className="bg-gray-100 h-9 border-gray-200"
           />
         );
     }
   };
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor={fieldName} className="text-sm font-medium">
+    <div className="space-y-1.5">
+      <Label htmlFor={fieldName} className="text-sm font-normal text-gray-600">
         {field.field_label}
-        {field.is_required && <span className="text-red-500 ml-1">*</span>}
+        {field.is_required && <span className="text-red-400 ml-1">*</span>}
       </Label>
       {renderFieldByType()}
       {hasError && (
-        <p className="text-red-500 text-sm">
+        <p className="text-red-400 text-xs mt-1">
           {hasError.message || `${field.field_label} es requerido`}
         </p>
       )}
