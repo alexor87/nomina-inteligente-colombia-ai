@@ -1,16 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Plus, AlertTriangle, Clock } from 'lucide-react';
-import { PeriodGenerationService, MissingPeriod, AvailablePeriod } from '@/services/payroll/PeriodGenerationService';
+import { PeriodGenerationService, MissingPeriod, UnifiedPeriod } from '@/services/payroll/PeriodGenerationService';
 import { useToast } from '@/hooks/use-toast';
 
 interface MissingPeriodsSelectorProps {
   companyId: string;
-  onPeriodCreated: (period: AvailablePeriod) => void;
+  onPeriodCreated: (period: UnifiedPeriod) => void;
   disabled?: boolean;
 }
 
