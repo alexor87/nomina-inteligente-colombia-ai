@@ -1,4 +1,3 @@
-
 import { getWeek } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -36,7 +35,7 @@ export class PeriodNumberCalculationService {
           calculatedNumber = this.calculateMonthlyPeriodNumber(startDate);
           break;
         case 'quincenal':
-          calculatedNumber = await this.calculateBiweeklyPeriodNumber(companyId, startDate, year);
+          calculatedNumber = this.calculateBiweeklyPeriodNumber(startDate, year);
           break;
         case 'semanal':
           calculatedNumber = this.calculateWeeklyPeriodNumber(startDate);
@@ -99,83 +98,46 @@ export class PeriodNumberCalculationService {
   }
   
   /**
-   * ✅ FUNCIÓN CORREGIDA: Calcula número para período quincenal (conteo cronológico correcto)
+   * ✅ FUNCIÓN CORREGIDA: Calcula número para período quincenal (lógica unificada)
    */
-  private static async calculateBiweeklyPeriodNumber(
-    companyId: string, 
-    startDate: string, 
-    year: number
-  ): Promise<number> {
-    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
-    const startParts = startDate.split('-');
-    const startDay = parseInt(startParts[2]);
-    const startMonth = parseInt(startParts[1]);
+  private static calculateBiweeklyPeriodNumber(startDate: string, year: number): number {
+    console.log('🔢 CALCULANDO NÚMERO QUINCENAL CORREGIDO para:', startDate);
     
-    console.log('📊 CALCULANDO QUINCENA DETALLADO (CORREGIDO):', { 
-      startDate, startDay, startMonth, year 
+    // Parsing manual para evitar problemas de timezone
+    const parts = startDate.split('-');
+    const yearParsed = parseInt(parts[0]);
+    const month = parseInt(parts[1]); // 1-12
+    const day = parseInt(parts[2]);
+    
+    console.log('📊 Datos parseados:', { year: yearParsed, month, day });
+    
+    // Verificar que sea año 2025
+    if (yearParsed !== 2025) {
+      console.warn('⚠️ Año diferente a 2025:', yearParsed);
+    }
+    
+    // LÓGICA CORREGIDA: (mes-1) * 2 + quincena_del_mes
+    const monthsCompleted = month - 1; // Meses completados antes del actual
+    const biweekliesFromCompletedMonths = monthsCompleted * 2;
+    
+    // Determinar si es primera (1-15) o segunda quincena (16-fin)
+    const biweeklyInCurrentMonth = day <= 15 ? 1 : 2;
+    
+    const totalBiweekly = biweekliesFromCompletedMonths + biweeklyInCurrentMonth;
+    
+    console.log('🧮 Cálculo detallado:', {
+      monthsCompleted,
+      biweekliesFromCompletedMonths,
+      biweeklyInCurrentMonth: day <= 15 ? 'Primera quincena' : 'Segunda quincena',
+      totalBiweekly
     });
     
-    // Contar quincenas hasta este punto en el año
-    let biweeklyCount = 0;
-    
-    // Contar quincenas de los meses completos anteriores
-    for (let month = 1; month < startMonth; month++) {
-      biweeklyCount += 2; // Cada mes tiene exactamente 2 quincenas
-      console.log(`📊 Mes ${month}: +2 quincenas = Total: ${biweeklyCount}`);
+    // Validar rango (debe estar entre 1 y 24 para el año)
+    if (totalBiweekly < 1 || totalBiweekly > 24) {
+      console.error('❌ NÚMERO QUINCENAL FUERA DE RANGO:', totalBiweekly);
     }
     
-    // Para el mes actual, determinar si es primera o segunda quincena
-    if (startDay <= 15) {
-      biweeklyCount += 1; // Primera quincena del mes actual
-      console.log(`✅ Primera quincena del mes ${startMonth} = quincena ${biweeklyCount}`);
-    } else {
-      biweeklyCount += 2; // Segunda quincena del mes actual (incluye la primera)
-      console.log(`✅ Segunda quincena del mes ${startMonth} = quincena ${biweeklyCount}`);
-    }
-    
-    console.log('🎯 RESULTADO QUINCENA FINAL:', biweeklyCount);
-    
-    // Verificar contra cálculo independiente
-    const verification = this.verifyBiweeklyCalculation(startDate);
-    if (verification !== biweeklyCount) {
-      console.error('❌ INCONSISTENCIA EN CÁLCULO:', {
-        original: biweeklyCount,
-        verification,
-        startDate
-      });
-    } else {
-      console.log('✅ CÁLCULO VERIFICADO CORRECTO:', biweeklyCount);
-    }
-    
-    return biweeklyCount;
-  }
-  
-  /**
-   * ✅ FUNCIÓN CORREGIDA: Verificación independiente del cálculo quincenal
-   */
-  private static verifyBiweeklyCalculation(startDate: string): number {
-    // ✅ CORRECCIÓN: Parsing manual para evitar problemas de timezone
-    const startParts = startDate.split('-');
-    const month = parseInt(startParts[1]); // 1-12
-    const day = parseInt(startParts[2]);
-    
-    // Meses completos anteriores × 2
-    const previousMonthsQuincenas = (month - 1) * 2;
-    
-    // Quincena actual del mes
-    const currentQuincena = day <= 15 ? 1 : 2;
-    
-    const total = previousMonthsQuincenas + currentQuincena;
-    
-    console.log('🔍 VERIFICACIÓN INDEPENDIENTE CORREGIDA:', {
-      month,
-      day,
-      previousMonthsQuincenas,
-      currentQuincena,
-      total
-    });
-    
-    return total;
+    return totalBiweekly;
   }
   
   /**
@@ -341,22 +303,26 @@ export class PeriodNumberCalculationService {
   }
   
   /**
-   * Método para testing y diagnóstico
+   * Método para testing y diagnóstico - CASOS CORREGIDOS
    */
   static async runDiagnosticTest(): Promise<void> {
-    console.log('🧪 EJECUTANDO PRUEBAS DE DIAGNÓSTICO');
+    console.log('🧪 EJECUTANDO PRUEBAS DE DIAGNÓSTICO CORREGIDAS');
     
     const testCases = [
       { date: '2025-01-01', expected: 1, description: '1-15 Enero' },
       { date: '2025-01-16', expected: 2, description: '16-31 Enero' },
+      { date: '2025-02-01', expected: 3, description: '1-15 Febrero' },
+      { date: '2025-02-16', expected: 4, description: '16-28 Febrero' },
       { date: '2025-07-01', expected: 13, description: '1-15 Julio' },
       { date: '2025-07-16', expected: 14, description: '16-31 Julio' },
       { date: '2025-09-01', expected: 17, description: '1-15 Septiembre' },
       { date: '2025-09-16', expected: 18, description: '16-30 Septiembre' },
+      { date: '2025-12-01', expected: 23, description: '1-15 Diciembre' },
+      { date: '2025-12-16', expected: 24, description: '16-31 Diciembre' },
     ];
     
     for (const test of testCases) {
-      const calculated = this.verifyBiweeklyCalculation(test.date);
+      const calculated = this.calculateBiweeklyPeriodNumber(test.date, 2025);
       const isCorrect = calculated === test.expected;
       
       console.log(`🧪 ${test.description}: Esperado=${test.expected}, Calculado=${calculated}, ✅=${isCorrect}`);

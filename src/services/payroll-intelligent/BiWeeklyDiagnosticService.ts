@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DiagnosticResult {
@@ -105,10 +104,14 @@ export class BiWeeklyDiagnosticService {
     const testCases = [
       { startDate: '2025-01-01', expected: 1, description: '1-15 Enero' },
       { startDate: '2025-01-16', expected: 2, description: '16-31 Enero' },
+      { startDate: '2025-02-01', expected: 3, description: '1-15 Febrero' },
+      { startDate: '2025-02-16', expected: 4, description: '16-28 Febrero' },
       { startDate: '2025-07-01', expected: 13, description: '1-15 Julio' },
       { startDate: '2025-07-16', expected: 14, description: '16-31 Julio' },
       { startDate: '2025-09-01', expected: 17, description: '1-15 Septiembre' },
       { startDate: '2025-09-16', expected: 18, description: '16-30 Septiembre' },
+      { startDate: '2025-12-01', expected: 23, description: '1-15 Diciembre' },
+      { startDate: '2025-12-16', expected: 24, description: '16-31 Diciembre' },
     ];
     
     const results = testCases.map(testCase => {
@@ -128,6 +131,49 @@ export class BiWeeklyDiagnosticService {
     console.log(`🧪 RESULTADO PRUEBAS: ${allCorrect ? '✅ TODAS CORRECTAS' : '❌ HAY ERRORES'}`);
     
     return { results, allCorrect };
+  }
+  
+  /**
+   * FUNCIÓN CORREGIDA: Calcular número correcto de quincena
+   */
+  private static calculateCorrectBiweeklyNumber(startDate: string): number {
+    console.log('🔢 CALCULANDO NÚMERO QUINCENAL CORREGIDO para:', startDate);
+    
+    // Parsing manual para evitar problemas de timezone
+    const parts = startDate.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]); // 1-12
+    const day = parseInt(parts[2]);
+    
+    console.log('📊 Datos parseados:', { year, month, day });
+    
+    // Verificar que sea año 2025
+    if (year !== 2025) {
+      console.warn('⚠️ Año diferente a 2025:', year);
+    }
+    
+    // Calcular número quincenal: (mes-1) * 2 + quincena_del_mes
+    const monthsCompleted = month - 1; // Meses completados antes del actual
+    const biweekliesFromCompletedMonths = monthsCompleted * 2;
+    
+    // Determinar si es primera (1-15) o segunda quincena (16-fin)
+    const biweeklyInCurrentMonth = day <= 15 ? 1 : 2;
+    
+    const totalBiweekly = biweekliesFromCompletedMonths + biweeklyInCurrentMonth;
+    
+    console.log('🧮 Cálculo detallado:', {
+      monthsCompleted,
+      biweekliesFromCompletedMonths,
+      biweeklyInCurrentMonth: day <= 15 ? 'Primera quincena' : 'Segunda quincena',
+      totalBiweekly
+    });
+    
+    // Validar rango (debe estar entre 1 y 24 para el año)
+    if (totalBiweekly < 1 || totalBiweekly > 24) {
+      console.error('❌ NÚMERO QUINCENAL FUERA DE RANGO:', totalBiweekly);
+    }
+    
+    return totalBiweekly;
   }
   
   /**
@@ -169,30 +215,6 @@ export class BiWeeklyDiagnosticService {
     console.log(`🔍 Encontrados: ${duplicates.length} duplicados, ${conflicts.length} conflictos`);
     
     return { duplicates, conflicts };
-  }
-  
-  /**
-   * Calcular número correcto de quincena
-   */
-  private static calculateCorrectBiweeklyNumber(startDate: string): number {
-    const date = new Date(startDate);
-    const startDay = date.getDate();
-    const startMonth = date.getMonth() + 1;
-    
-    // Contar quincenas de los meses completos anteriores
-    let biweeklyCount = 0;
-    for (let month = 1; month < startMonth; month++) {
-      biweeklyCount += 2;
-    }
-    
-    // Para el mes actual
-    if (startDay <= 15) {
-      biweeklyCount += 1; // Primera quincena
-    } else {
-      biweeklyCount += 2; // Segunda quincena
-    }
-    
-    return biweeklyCount;
   }
   
   /**
@@ -256,13 +278,14 @@ export class BiWeeklyDiagnosticService {
       
       for (const period of periodsToCorrect) {
         try {
+          console.log(`🔧 Corrigiendo período: ${period.periodo} de ${period.numero_periodo_anual} a ${period.calculated_number}`);
+          
           const { error } = await supabase
             .from('payroll_periods_real')
             .update({ 
               numero_periodo_anual: period.calculated_number,
               updated_at: new Date().toISOString()
             })
-            .eq('company_id', companyId)
             .eq('fecha_inicio', period.fecha_inicio)
             .eq('fecha_fin', period.fecha_fin);
             

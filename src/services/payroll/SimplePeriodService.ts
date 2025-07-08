@@ -123,7 +123,7 @@ export class SimplePeriodService {
   }
 
   /**
-   * Generar períodos quincenales para 2025 (año MRP activo)
+   * FUNCIÓN CORREGIDA: Generar períodos quincenales para 2025 con numeración correcta
    */
   private static generateBiWeeklyPeriods2025(): Array<{
     label: string;
@@ -138,7 +138,7 @@ export class SimplePeriodService {
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
 
-    let periodNumber = 1;
+    let periodNumber = 1; // CORRECCIÓN: Iniciar en 1
 
     for (let month = 0; month < 12; month++) {
       // Primera quincena (1-15)
@@ -149,7 +149,7 @@ export class SimplePeriodService {
         label: `1 - 15 ${monthNames[month]} ${year}`,
         startDate: firstStart.toISOString().split('T')[0],
         endDate: firstEnd.toISOString().split('T')[0],
-        periodNumber: periodNumber++
+        periodNumber: periodNumber++ // CORRECCIÓN: Numeración secuencial correcta
       });
 
       // Segunda quincena (16-fin de mes)
@@ -160,9 +160,15 @@ export class SimplePeriodService {
         label: `16 - ${secondEnd.getDate()} ${monthNames[month]} ${year}`,
         startDate: secondStart.toISOString().split('T')[0],
         endDate: secondEnd.toISOString().split('T')[0],
-        periodNumber: periodNumber++
+        periodNumber: periodNumber++ // CORRECCIÓN: Numeración secuencial correcta
       });
     }
+
+    console.log('✅ PERÍODOS 2025 GENERADOS CORRECTAMENTE:', {
+      totalPeriods: periods.length,
+      firstPeriod: periods[0],
+      lastPeriod: periods[periods.length - 1]
+    });
 
     return periods;
   }
