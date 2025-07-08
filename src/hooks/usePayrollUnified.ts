@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
@@ -57,9 +56,23 @@ export const usePayrollUnified = (companyId: string) => {
       if (existingPeriods && existingPeriods.length > 0) {
         const period = existingPeriods[0];
         
-        // SOLUCIÓN KISS: Si el período está cancelado, reactivarlo
+        // SOLUCIÓN KISS: Si el período está cancelado, reactivarlo Y limpiar payrolls antiguos
         if (period.estado === 'cancelado') {
-          console.log('🔄 Reactivando período cancelado:', period.id);
+          console.log('🔄 Reactivando período cancelado y limpiando payrolls:', period.id);
+          
+          // Primero limpiar registros antiguos de payrolls
+          const { error: deleteError } = await supabase
+            .from('payrolls')
+            .delete()
+            .eq('period_id', period.id);
+          
+          if (deleteError) {
+            console.error('Error limpiando payrolls antiguos:', deleteError);
+          } else {
+            console.log('✅ Payrolls antiguos eliminados');
+          }
+          
+          // Luego reactivar el período
           const { error: updateError } = await supabase
             .from('payroll_periods_real')
             .update({ estado: 'en_proceso' })
@@ -118,7 +131,7 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [companyId, cleanDuplicates]);
 
-  // SOLUCIÓN KISS: Cargar SOLO empleados que están en payrolls para este período
+  // SOLUCIÓN KISS: Un solo flujo simplificado para cargar empleados
   const loadEmployees = useCallback(async (startDate: string, endDate: string) => {
     setIsLoading(true);
     try {
@@ -131,7 +144,7 @@ export const usePayrollUnified = (companyId: string) => {
 
       setCurrentPeriod(period);
 
-      // CAMBIO PRINCIPAL: Cargar SOLO empleados que están en payrolls para este período
+      // Verificar si ya hay empleados en payrolls para este período
       const { data: periodEmployees, error: periodError } = await supabase
         .from('payrolls')
         .select(`
@@ -143,18 +156,29 @@ export const usePayrollUnified = (companyId: string) => {
 
       if (periodError) {
         console.error('Error cargando empleados del período:', periodError);
+        setEmployees([]);
+        return;
+      }
+
+      // Si NO hay empleados en payrolls, crear registros desde empleados activos
+      if (!periodEmployees || periodEmployees.length === 0) {
+        console.log('🔧 No hay empleados en payrolls, creando desde empleados activos...');
         
-        // Si no hay empleados en payrolls, cargar empleados activos por primera vez
         const { data: activeEmployees, error: empError } = await supabase
           .from('employees')
           .select('*')
           .eq('company_id', companyId)
           .eq('estado', 'activo');
 
-        if (empError) throw empError;
+        if (empError) {
+          console.error('Error cargando empleados activos:', empError);
+          setEmployees([]);
+          return;
+        }
 
-        // Crear registros en payrolls para empleados activos
         if (activeEmployees && activeEmployees.length > 0) {
+          console.log(`✅ Encontrados ${activeEmployees.length} empleados activos`);
+          
           const payrollRecords = activeEmployees.map(emp => ({
             company_id: companyId,
             employee_id: emp.id,
@@ -174,9 +198,11 @@ export const usePayrollUnified = (companyId: string) => {
 
           if (insertError) {
             console.error('Error creando registros de payroll:', insertError);
-          } else {
-            console.log('✅ Registros de payroll creados para empleados activos');
+            setEmployees([]);
+            return;
           }
+
+          console.log('✅ Registros de payroll creados exitosamente');
 
           // Convertir a formato PayrollEmployee
           const employeesList: PayrollEmployee[] = activeEmployees.map(emp => ({
@@ -202,11 +228,14 @@ export const usePayrollUnified = (companyId: string) => {
 
           setEmployees(employeesList);
         } else {
+          console.log('⚠️ No se encontraron empleados activos');
           setEmployees([]);
         }
       } else {
-        // Convertir datos de payrolls + employees a formato PayrollEmployee
-        const employeesList: PayrollEmployee[] = (periodEmployees || []).map(payroll => {
+        // Si YA hay empleados en payrolls, convertir y mostrar
+        console.log(`✅ Empleados existentes en payrolls: ${periodEmployees.length}`);
+        
+        const employeesList: PayrollEmployee[] = periodEmployees.map(payroll => {
           const emp = payroll.employees as any;
           return {
             id: emp.id,
@@ -231,7 +260,6 @@ export const usePayrollUnified = (companyId: string) => {
         });
 
         setEmployees(employeesList);
-        console.log('✅ Empleados del período cargados:', employeesList.length);
       }
 
     } catch (error) {
@@ -241,12 +269,12 @@ export const usePayrollUnified = (companyId: string) => {
         description: "No se pudieron cargar los empleados",
         variant: "destructive",
       });
+      setEmployees([]);
     } finally {
       setIsLoading(false);
     }
   }, [companyId, findOrCreatePeriod, toast]);
 
-  // MEJORAR addEmployees para asegurar persistencia en payrolls
   const addEmployees = useCallback(async (employeeIds: string[]) => {
     if (!currentPeriod) return;
 
@@ -311,7 +339,6 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, companyId, toast]);
 
-  // Función simple para remover empleado (ya funcionaba correctamente)
   const removeEmployee = useCallback(async (employeeId: string) => {
     if (!currentPeriod) return;
 
@@ -335,7 +362,6 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, toast]);
 
-  // Función simple para liquidar
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
     if (!currentPeriod || employees.length === 0) return;
 
