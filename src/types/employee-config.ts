@@ -1,81 +1,97 @@
 
+// Tipos para el sistema de campos dinámicos por empresa
+
+export type CustomFieldType = 'text' | 'number' | 'date' | 'boolean' | 'select' | 'email' | 'phone';
+
+export interface CustomField {
+  id: string;
+  field_key: string;
+  field_label: string;
+  field_type: CustomFieldType;
+  field_options?: any; // Para opciones de select, validaciones, etc.
+  is_required: boolean;
+  default_value?: any;
+  sort_order: number;
+  visibleOnlyToHR?: boolean;
+  editableByEmployee?: boolean;
+}
+
+export interface CompanyFieldConfiguration {
+  id: string;
+  company_id: string;
+  custom_fields: CustomField[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SchemaVersion {
+  id: string;
+  company_id: string;
+  version_number: number;
+  changes_summary: string;
+  field_definitions: CustomField[];
+  created_by?: string;
+  created_at: string;
+}
+
+// Parámetros por defecto para nuevos empleados
+export interface DefaultParameters {
+  defaultContractType: ContractType;
+  standardWorkingHours: number;
+  suggestedPaymentPeriodicity: 'quincenal' | 'mensual';
+  suggestedCostCenter: string;
+  defaultARLRiskLevel: ARLRiskLevel;
+}
+
+// Tipos de contrato disponibles
+export type ContractType = 'indefinido' | 'fijo' | 'obra_labor' | 'temporal' | 'aprendizaje' | 'practicas';
+
 export const CONTRACT_TYPES = [
   { value: 'indefinido', label: 'Indefinido' },
   { value: 'fijo', label: 'Término Fijo' },
-  { value: 'obra', label: 'Obra o Labor' },
-  { value: 'aprendizaje', label: 'Aprendizaje' }
+  { value: 'obra_labor', label: 'Obra o Labor' },
+  { value: 'temporal', label: 'Temporal' },
+  { value: 'aprendizaje', label: 'Aprendizaje' },
+  { value: 'practicas', label: 'Prácticas' }
 ] as const;
 
-export const TIPOS_DOCUMENTO = [
-  { value: 'CC', label: 'Cédula de Ciudadanía' },
-  { value: 'TI', label: 'Tarjeta de Identidad' },
-  { value: 'CE', label: 'Cédula de Extranjería' },
-  { value: 'PA', label: 'Pasaporte' },
-  { value: 'RC', label: 'Registro Civil' },
-  { value: 'NIT', label: 'NIT' },
-  { value: 'PEP', label: 'Permiso Especial de Permanencia' },
-  { value: 'PPT', label: 'Permiso por Protección Temporal' }
-] as const;
-
-export const DEPARTAMENTOS_COLOMBIA = [
-  'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 
-  'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 
-  'Cundinamarca', 'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 
-  'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda', 
-  'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 
-  'Vaupés', 'Vichada'
-] as const;
+// Niveles de riesgo ARL
+export type ARLRiskLevel = '1' | '2' | '3' | '4' | '5';
 
 export const ARL_RISK_LEVELS = [
-  { value: 'I', label: 'Nivel I - Riesgo Mínimo' },
-  { value: 'II', label: 'Nivel II - Riesgo Bajo' },
-  { value: 'III', label: 'Nivel III - Riesgo Medio' },
-  { value: 'IV', label: 'Nivel IV - Riesgo Alto' },
-  { value: 'V', label: 'Nivel V - Riesgo Máximo' }
+  { value: '1', label: 'Clase I - Riesgo Mínimo' },
+  { value: '2', label: 'Clase II - Riesgo Bajo' },
+  { value: '3', label: 'Clase III - Riesgo Medio' },
+  { value: '4', label: 'Clase IV - Riesgo Alto' },
+  { value: '5', label: 'Clase V - Riesgo Máximo' }
 ] as const;
 
+// Tipos de campos personalizados disponibles
 export const CUSTOM_FIELD_TYPES = [
   { value: 'text', label: 'Texto' },
   { value: 'number', label: 'Número' },
   { value: 'date', label: 'Fecha' },
-  { value: 'list', label: 'Lista de opciones' },
-  { value: 'boolean', label: 'Sí/No' }
+  { value: 'boolean', label: 'Sí/No' },
+  { value: 'select', label: 'Lista desplegable' },
+  { value: 'email', label: 'Email' },
+  { value: 'phone', label: 'Teléfono' }
 ] as const;
 
-// Tipos para campos personalizados
-export interface CustomField {
+// Reglas de validación para empleados
+export interface ValidationRule {
   id: string;
-  name: string;
-  label: string;
-  type: 'text' | 'number' | 'date' | 'list' | 'boolean';
-  required: boolean;
-  visibleOnlyToHR: boolean;
-  editableByEmployee: boolean;
-  options?: string[];
-  defaultValue?: string | number | boolean;
+  field: string;
+  rule_type: 'required' | 'min_length' | 'max_length' | 'pattern' | 'custom';
+  value?: any;
+  message: string;
+  is_active: boolean;
 }
 
-// Tipos para reglas de validación
-export interface ValidationRules {
-  allowWithoutEPS: boolean;
-  allowWithoutCajaCompensacion: boolean;
-  allowPendingAffiliations: boolean;
-  validateARLRiskLevel: boolean;
-  allowEditBaseSalary: boolean;
-}
-
-// Tipos para parámetros por defecto
-export interface DefaultParameters {
-  defaultContractType: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
-  standardWorkingHours: number;
-  suggestedPaymentPeriodicity: 'quincenal' | 'mensual';
-  suggestedCostCenter: string;
-  defaultARLRiskLevel: 'I' | 'II' | 'III' | 'IV' | 'V';
-}
-
-// Configuración global de empleados
+// Configuración global de empleados por empresa
 export interface EmployeeGlobalConfiguration {
-  customFields: CustomField[];
-  validationRules: ValidationRules;
-  defaultParameters: DefaultParameters;
+  company_id: string;
+  default_parameters: DefaultParameters;
+  custom_fields: CustomField[];
+  validation_rules: ValidationRule[];
+  updated_at: string;
 }

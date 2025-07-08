@@ -1,148 +1,158 @@
 
 import { useState, useEffect } from 'react';
-import { EmployeeGlobalConfiguration, CustomField, ValidationRules, DefaultParameters } from '@/types/employee-config';
-
-const STORAGE_KEY = 'employee_global_configuration';
-
-const getDefaultConfiguration = (): EmployeeGlobalConfiguration => ({
-  customFields: [],
-  validationRules: {
-    allowWithoutEPS: false,
-    allowWithoutCajaCompensacion: false,
-    allowPendingAffiliations: false,
-    validateARLRiskLevel: true,
-    allowEditBaseSalary: true
-  },
-  defaultParameters: {
-    defaultContractType: 'indefinido',
-    standardWorkingHours: 8,
-    suggestedPaymentPeriodicity: 'mensual',
-    suggestedCostCenter: '',
-    defaultARLRiskLevel: 'I'
-  }
-});
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { EmployeeConfigurationService } from '@/services/EmployeeConfigurationService';
+import { CustomField, DefaultParameters, EmployeeGlobalConfiguration } from '@/types/employee-config';
+import { useToast } from '@/hooks/use-toast';
 
 export const useEmployeeGlobalConfiguration = () => {
-  const [configuration, setConfiguration] = useState<EmployeeGlobalConfiguration>(getDefaultConfiguration());
+  const [configuration, setConfiguration] = useState<EmployeeGlobalConfiguration | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasChanges, setHasChanges] = useState(false);
+  const { companyId } = useCurrentCompany();
+  const { toast } = useToast();
 
-  useEffect(() => {
-    loadConfiguration();
-  }, []);
-
-  const loadConfiguration = () => {
+  // Cargar configuración inicial
+  const loadConfiguration = async () => {
+    if (!companyId) return;
+    
+    setIsLoading(true);
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const config = JSON.parse(stored);
-        setConfiguration({ ...getDefaultConfiguration(), ...config });
-      }
+      const config = await EmployeeConfigurationService.getCompanyConfiguration(companyId);
+      setConfiguration(config);
     } catch (error) {
-      console.error('Error loading employee configuration:', error);
+      console.error('Error cargando configuración:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la configuración de empleados",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveConfiguration = async () => {
+  useEffect(() => {
+    loadConfiguration();
+  }, [companyId]);
+
+  // Agregar nuevo campo personalizado
+  const addCustomField = async (field: Omit<CustomField, 'id'>) => {
+    if (!companyId) return false;
+
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(configuration));
-      setHasChanges(false);
-      return { success: true };
+      const newField = await EmployeeConfigurationService.saveCustomField(companyId, field);
+      
+      if (newField) {
+        setConfiguration(prev => prev ? {
+          ...prev,
+          custom_fields: [...prev.custom_fields, newField]
+        } : null);
+        
+        // Crear snapshot del esquema
+        await EmployeeConfigurationService.createSchemaVersion(
+          companyId,
+          `Campo agregado: ${field.field_label}`,
+          configuration?.custom_fields || []
+        );
+        
+        toast({
+          title: "Campo agregado",
+          description: `El campo "${field.field_label}" ha sido agregado exitosamente`,
+          className: "border-green-200 bg-green-50"
+        });
+        
+        return true;
+      }
+      
+      return false;
     } catch (error) {
-      console.error('Error saving employee configuration:', error);
-      return { success: false, error: 'Error al guardar la configuración' };
+      console.error('Error agregando campo:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo agregar el campo personalizado",
+        variant: "destructive"
+      });
+      return false;
     }
   };
 
-  const addCustomField = (field: Omit<CustomField, 'id'>) => {
-    const newField: CustomField = {
-      ...field,
-      id: Date.now().toString()
-    };
-    
-    setConfiguration(prev => ({
-      ...prev,
-      customFields: [...prev.customFields, newField]
-    }));
-    setHasChanges(true);
-  };
-
-  const updateCustomField = (id: string, updates: Partial<CustomField>) => {
-    setConfiguration(prev => ({
-      ...prev,
-      customFields: prev.customFields.map(field =>
-        field.id === id ? { ...field, ...updates } : field
-      )
-    }));
-    setHasChanges(true);
-  };
-
-  const removeCustomField = (id: string) => {
-    setConfiguration(prev => ({
-      ...prev,
-      customFields: prev.customFields.filter(field => field.id !== id)
-    }));
-    setHasChanges(true);
-  };
-
-  const updateValidationRules = (rules: Partial<ValidationRules>) => {
-    setConfiguration(prev => ({
-      ...prev,
-      validationRules: { ...prev.validationRules, ...rules }
-    }));
-    setHasChanges(true);
-  };
-
-  const updateDefaultParameters = (params: Partial<DefaultParameters>) => {
-    setConfiguration(prev => ({
-      ...prev,
-      defaultParameters: { ...prev.defaultParameters, ...params }
-    }));
-    setHasChanges(true);
-  };
-
-  const resetConfiguration = () => {
-    setConfiguration(getDefaultConfiguration());
-    setHasChanges(false);
-  };
-
-  const validateConfiguration = () => {
-    const errors: string[] = [];
-    
-    // Validar que los campos personalizados tengan nombres únicos
-    const fieldNames = configuration.customFields.map(f => f.name.toLowerCase());
-    const duplicates = fieldNames.filter((name, index) => fieldNames.indexOf(name) !== index);
-    if (duplicates.length > 0) {
-      errors.push('Existen campos personalizados con nombres duplicados');
+  // Actualizar campo personalizado
+  const updateCustomField = async (fieldId: string, updates: Partial<CustomField>) => {
+    try {
+      const success = await EmployeeConfigurationService.updateCustomField(fieldId, updates);
+      
+      if (success) {
+        setConfiguration(prev => prev ? {
+          ...prev,
+          custom_fields: prev.custom_fields.map(field => 
+            field.id === fieldId ? { ...field, ...updates } : field
+          )
+        } : null);
+        
+        toast({
+          title: "Campo actualizado",
+          description: "El campo ha sido actualizado exitosamente",
+          className: "border-green-200 bg-green-50"
+        });
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('Error actualizando campo:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el campo",
+        variant: "destructive"
+      });
+      return false;
     }
+  };
 
-    // Validar que los campos de lista tengan opciones
-    const listFieldsWithoutOptions = configuration.customFields.filter(
-      f => f.type === 'list' && (!f.options || f.options.length === 0)
-    );
-    if (listFieldsWithoutOptions.length > 0) {
-      errors.push('Los campos de lista deben tener al menos una opción');
+  // Eliminar campo personalizado
+  const removeCustomField = async (fieldId: string) => {
+    try {
+      const success = await EmployeeConfigurationService.deleteCustomField(fieldId);
+      
+      if (success) {
+        setConfiguration(prev => prev ? {
+          ...prev,
+          custom_fields: prev.custom_fields.filter(field => field.id !== fieldId)
+        } : null);
+        
+        toast({
+          title: "Campo eliminado",
+          description: "El campo ha sido eliminado exitosamente",
+          className: "border-green-200 bg-green-50"
+        });
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('Error eliminando campo:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el campo",
+        variant: "destructive"
+      });
+      return false;
     }
+  };
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+  // Actualizar parámetros por defecto
+  const updateDefaultParameters = async (parameters: Partial<DefaultParameters>) => {
+    setConfiguration(prev => prev ? {
+      ...prev,
+      default_parameters: { ...prev.default_parameters, ...parameters }
+    } : null);
   };
 
   return {
     configuration,
     isLoading,
-    hasChanges,
     addCustomField,
     updateCustomField,
     removeCustomField,
-    updateValidationRules,
     updateDefaultParameters,
-    saveConfiguration,
-    resetConfiguration,
-    validateConfiguration
+    reloadConfiguration: loadConfiguration
   };
 };

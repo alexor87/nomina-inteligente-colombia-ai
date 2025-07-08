@@ -22,10 +22,11 @@ export const CustomFieldsGlobalSection = ({
 }: CustomFieldsGlobalSectionProps) => {
   const handleAddField = () => {
     onAdd({
-      name: 'Nuevo Campo',
-      label: 'Nuevo Campo',
-      type: 'text',
-      required: false,
+      field_key: 'nuevo_campo',
+      field_label: 'Nuevo Campo',
+      field_type: 'text',
+      is_required: false,
+      sort_order: customFields.length + 1,
       visibleOnlyToHR: false,
       editableByEmployee: true
     });
@@ -46,14 +47,14 @@ export const CustomFieldsGlobalSection = ({
           <div key={field.id} className="grid grid-cols-12 gap-4 items-center p-4 border rounded-lg">
             <div className="col-span-3">
               <Input
-                value={field.name}
-                onChange={(e) => onUpdate(field.id, { name: e.target.value })}
-                placeholder="Nombre del campo"
+                value={field.field_label}
+                onChange={(e) => onUpdate(field.id, { field_label: e.target.value })}
+                placeholder="Etiqueta del campo"
               />
             </div>
             
             <div className="col-span-2">
-              <Select value={field.type} onValueChange={(value) => onUpdate(field.id, { type: value as any })}>
+              <Select value={field.field_type} onValueChange={(value) => onUpdate(field.id, { field_type: value as any })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -69,8 +70,8 @@ export const CustomFieldsGlobalSection = ({
             
             <div className="col-span-2 flex items-center space-x-2">
               <Checkbox
-                checked={field.required}
-                onCheckedChange={(checked) => onUpdate(field.id, { required: checked as boolean })}
+                checked={field.is_required}
+                onCheckedChange={(checked) => onUpdate(field.id, { is_required: checked as boolean })}
               />
               <label className="text-sm">Requerido</label>
             </div>

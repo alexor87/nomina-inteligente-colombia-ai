@@ -169,6 +169,97 @@ export type Database = {
         }
         Relationships: []
       }
+      company_field_definitions: {
+        Row: {
+          company_id: string
+          created_at: string
+          default_value: Json | null
+          field_key: string
+          field_label: string
+          field_options: Json | null
+          field_type: string
+          id: string
+          is_active: boolean | null
+          is_required: boolean | null
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          default_value?: Json | null
+          field_key: string
+          field_label: string
+          field_options?: Json | null
+          field_type: string
+          id?: string
+          is_active?: boolean | null
+          is_required?: boolean | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          default_value?: Json | null
+          field_key?: string
+          field_label?: string
+          field_options?: Json | null
+          field_type?: string
+          id?: string
+          is_active?: boolean | null
+          is_required?: boolean | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_field_definitions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_schema_versions: {
+        Row: {
+          changes_summary: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          field_definitions: Json
+          id: string
+          version_number: number
+        }
+        Insert: {
+          changes_summary: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          field_definitions: Json
+          id?: string
+          version_number: number
+        }
+        Update: {
+          changes_summary?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          field_definitions?: Json
+          id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_schema_versions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_settings: {
         Row: {
           company_id: string
@@ -569,6 +660,7 @@ export type Database = {
           codigo_ciiu: string | null
           company_id: string
           created_at: string
+          custom_fields: Json | null
           departamento: string | null
           dias_trabajo: number | null
           direccion: string | null
@@ -616,6 +708,7 @@ export type Database = {
           codigo_ciiu?: string | null
           company_id: string
           created_at?: string
+          custom_fields?: Json | null
           departamento?: string | null
           dias_trabajo?: number | null
           direccion?: string | null
@@ -663,6 +756,7 @@ export type Database = {
           codigo_ciiu?: string | null
           company_id?: string
           created_at?: string
+          custom_fields?: Json | null
           departamento?: string | null
           dias_trabajo?: number | null
           direccion?: string | null
@@ -1616,6 +1710,19 @@ export type Database = {
       get_active_period_for_company: {
         Args: { p_company_id?: string }
         Returns: Json
+      }
+      get_company_active_field_definitions: {
+        Args: { p_company_id: string }
+        Returns: {
+          id: string
+          field_key: string
+          field_label: string
+          field_type: string
+          field_options: Json
+          is_required: boolean
+          default_value: Json
+          sort_order: number
+        }[]
       }
       get_current_user_company_id: {
         Args: Record<PropertyKey, never>
