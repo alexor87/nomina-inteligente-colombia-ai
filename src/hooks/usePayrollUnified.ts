@@ -56,6 +56,23 @@ export const usePayrollUnified = (companyId: string) => {
 
       if (existingPeriods && existingPeriods.length > 0) {
         const period = existingPeriods[0];
+        
+        // SOLUCIÓN KISS: Si el período está cancelado, reactivarlo
+        if (period.estado === 'cancelado') {
+          console.log('🔄 Reactivando período cancelado:', period.id);
+          const { error: updateError } = await supabase
+            .from('payroll_periods_real')
+            .update({ estado: 'en_proceso' })
+            .eq('id', period.id);
+          
+          if (updateError) {
+            console.error('Error reactivando período:', updateError);
+          } else {
+            period.estado = 'en_proceso';
+            console.log('✅ Período reactivado exitosamente');
+          }
+        }
+        
         console.log('✅ Período encontrado:', period.id);
         return {
           id: period.id,
