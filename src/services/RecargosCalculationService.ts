@@ -2,13 +2,17 @@
 /**
  * Servicio unificado para cálculo de recargos
  * KISS: Una sola función, una sola fórmula, factores estandarizados
+ * CORREGIDO: Usa jornada legal dinámica con fórmula correcta
  * Resultado debe coincidir exactamente con Aleluya
  */
+
+import { getHourlyDivisor } from '@/utils/jornadaLegal';
 
 export interface RecargoCalculationInput {
   salarioBase: number;
   tipoRecargo: 'nocturno' | 'dominical' | 'festivo' | 'nocturno_dominical' | 'nocturno_festivo';
   horas: number;
+  fechaPeriodo?: Date; // ✅ NUEVO: Para cálculo dinámico de jornada legal
 }
 
 export interface RecargoCalculationResult {
@@ -16,6 +20,12 @@ export interface RecargoCalculationResult {
   factorRecargo: number;
   valorRecargo: number;
   detalleCalculo: string;
+  jornadaInfo?: {
+    horasSemanales: number;
+    horasMensuales: number;
+    divisorHorario: number;
+    fechaVigencia: Date;
+  };
 }
 
 export class RecargosCalculationService {
@@ -31,16 +41,23 @@ export class RecargosCalculationService {
   };
 
   /**
-   * Calcula el valor del recargo usando la fórmula exacta de Aleluya
-   * Fórmula: (salario ÷ 30 ÷ 7.3333) × factor × horas
+   * Calcula el valor del recargo usando jornada legal dinámica
+   * CORREGIDO: Usa getHourlyDivisor(fecha) para cálculo exacto según período
+   * Fórmula: (salario ÷ divisor_horario_legal) × factor × horas
    */
   static calcularRecargo(input: RecargoCalculationInput): RecargoCalculationResult {
-    const { salarioBase, tipoRecargo, horas } = input;
+    const { salarioBase, tipoRecargo, horas, fechaPeriodo = new Date() } = input;
     
-    console.log('🧮 Calculando recargo unificado:', { salarioBase, tipoRecargo, horas });
+    console.log('🧮 Calculando recargo con jornada legal dinámica:', { 
+      salarioBase, 
+      tipoRecargo, 
+      horas, 
+      fechaPeriodo: fechaPeriodo.toISOString().split('T')[0] 
+    });
     
-    // Valor hora exacto como Aleluya: salario ÷ 30 ÷ 7.3333
-    const valorHora = salarioBase / 30 / 7.3333;
+    // ✅ CORRECCIÓN PRINCIPAL: Usar divisor horario dinámico según jornada legal
+    const divisorHorario = getHourlyDivisor(fechaPeriodo);
+    const valorHora = salarioBase / divisorHorario;
     
     // Factor de recargo según tipo
     const factorRecargo = this.FACTORES_RECARGO[tipoRecargo];
@@ -52,10 +69,12 @@ export class RecargosCalculationService {
     // Valor del recargo = valor hora × factor × horas
     const valorRecargo = Math.round(valorHora * factorRecargo * horas);
     
-    // Detalle del cálculo para auditoría
-    const detalleCalculo = `(${salarioBase.toLocaleString()} ÷ 30 ÷ 7.3333) × ${(factorRecargo * 100).toFixed(0)}% × ${horas}h = ${valorRecargo.toLocaleString()}`;
+    // Detalle del cálculo para auditoría con información de jornada
+    const detalleCalculo = `(${salarioBase.toLocaleString()} ÷ ${divisorHorario}h) × ${(factorRecargo * 100).toFixed(0)}% × ${horas}h = ${valorRecargo.toLocaleString()}`;
     
-    console.log('✅ Recargo calculado:', {
+    console.log('✅ Recargo calculado con jornada dinámica:', {
+      fechaPeriodo: fechaPeriodo.toISOString().split('T')[0],
+      divisorHorario,
       valorHora: Math.round(valorHora),
       factorRecargo,
       valorRecargo,
@@ -66,7 +85,13 @@ export class RecargosCalculationService {
       valorHora: Math.round(valorHora),
       factorRecargo,
       valorRecargo,
-      detalleCalculo
+      detalleCalculo,
+      jornadaInfo: {
+        horasSemanales: divisorHorario === 230 ? 46 : (divisorHorario === 220 ? 44 : 42),
+        horasMensuales: divisorHorario,
+        divisorHorario,
+        fechaVigencia: fechaPeriodo
+      }
     };
   }
 

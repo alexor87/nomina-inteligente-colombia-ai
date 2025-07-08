@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calculator } from 'lucide-react';
+import { ArrowLeft, Calculator, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { RecargosCalculationService } from '@/services/RecargosCalculationService';
@@ -15,6 +15,7 @@ interface NovedadRecargoFormProps {
   onBack: () => void;
   onSubmit: (formData: any) => void;
   employeeSalary: number;
+  periodoFecha?: Date; // ✅ NUEVO: Fecha del período para jornada legal correcta
   calculateSuggestedValue?: (
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
@@ -34,7 +35,8 @@ const RECARGO_SUBTIPOS = [
 export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   onBack,
   onSubmit,
-  employeeSalary
+  employeeSalary,
+  periodoFecha
 }) => {
   const [formData, setFormData] = useState({
     subtipo: 'nocturno',
@@ -44,21 +46,26 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   });
 
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
+  const [jornadaInfo, setJornadaInfo] = useState<any>(null);
 
-  // ✅ SOLUCIÓN KISS: Usar servicio unificado para calcular recargos
+  // ✅ CORRECCIÓN: Usar fecha del período para jornada legal correcta
   const calculateRecargoValue = (subtipo: string, horas: number) => {
     if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
       return null;
     }
 
     try {
+      console.log('💰 Calculando recargo con fecha del período:', periodoFecha?.toISOString().split('T')[0]);
+      
       const result = RecargosCalculationService.calcularRecargo({
         salarioBase: employeeSalary,
         tipoRecargo: subtipo as any,
-        horas: horas
+        horas: horas,
+        fechaPeriodo: periodoFecha || new Date() // ✅ Usar fecha del período
       });
       
       console.log('💰 Recargo calculado:', result);
+      setJornadaInfo(result.jornadaInfo);
       return result.valorRecargo;
     } catch (error) {
       console.error('❌ Error calculando recargo:', error);
@@ -130,6 +137,17 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         </Button>
         <h3 className="text-lg font-semibold">Recargo</h3>
       </div>
+
+      {/* ✅ NUEVO: Información de jornada legal usada */}
+      {jornadaInfo && (
+        <div className="flex items-center gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
+          <Info className="h-4 w-4" />
+          <span>
+            Jornada legal: {jornadaInfo.horasSemanales}h semanales = {jornadaInfo.divisorHorario}h mensuales
+            {periodoFecha && ` (vigente desde ${periodoFecha.toLocaleDateString()})`}
+          </span>
+        </div>
+      )}
 
       <div className="space-y-4">
         <div className="space-y-2">

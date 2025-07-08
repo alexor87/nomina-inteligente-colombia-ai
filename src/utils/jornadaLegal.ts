@@ -1,6 +1,8 @@
+
 /**
  * Utilidad para manejar la jornada laboral legal según la Ley 2101 de 2021
  * que reduce progresivamente la jornada máxima semanal en Colombia
+ * CORREGIDO: Fórmula correcta (horas_semanales / 6) * 30
  */
 
 export interface JornadaLegalInfo {
@@ -54,7 +56,7 @@ export const getJornadaLegal = (fecha: Date = new Date()): JornadaLegalInfo => {
     const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
     return {
       horasSemanales: jornadaTradicional.horasSemanales,
-      horasMensuales: (jornadaTradicional.horasSemanales * 52) / 12,
+      horasMensuales: (jornadaTradicional.horasSemanales / 6) * 30, // ✅ FÓRMULA CORREGIDA
       fechaVigencia: jornadaTradicional.fechaInicio,
       descripcion: jornadaTradicional.descripcion,
       ley: 'Código Sustantivo del Trabajo'
@@ -63,7 +65,7 @@ export const getJornadaLegal = (fecha: Date = new Date()): JornadaLegalInfo => {
 
   return {
     horasSemanales: jornadaVigente.horasSemanales,
-    horasMensuales: (jornadaVigente.horasSemanales * 52) / 12, // Conversión a horas mensuales
+    horasMensuales: (jornadaVigente.horasSemanales / 6) * 30, // ✅ FÓRMULA CORREGIDA: (horas/día × 30 días)
     fechaVigencia: jornadaVigente.fechaInicio,
     descripcion: jornadaVigente.descripcion,
     ley: 'Ley 2101 de 2021'
@@ -73,10 +75,18 @@ export const getJornadaLegal = (fecha: Date = new Date()): JornadaLegalInfo => {
 /**
  * Calcula el divisor horario para el cálculo del valor de la hora ordinaria
  * Basado en la jornada legal vigente para la fecha especificada
+ * CORREGIDO: Ahora usa la fórmula correcta de legislación colombiana
  */
 export const getHourlyDivisor = (fecha: Date = new Date()): number => {
   const jornadaInfo = getJornadaLegal(fecha);
-  return Math.round(jornadaInfo.horasMensuales);
+  const divisor = Math.round(jornadaInfo.horasMensuales);
+  
+  console.log(`📅 Fecha: ${fecha.toISOString().split('T')[0]}`);
+  console.log(`⏰ Jornada legal: ${jornadaInfo.horasSemanales} horas semanales`);
+  console.log(`📊 Horas mensuales: ${jornadaInfo.horasMensuales.toFixed(2)} (${jornadaInfo.horasSemanales}/6 × 30)`);
+  console.log(`🔢 Divisor horario: ${divisor}`);
+  
+  return divisor;
 };
 
 /**

@@ -5,6 +5,7 @@ import { RecargosCalculationService } from '@/services/RecargosCalculationServic
 
 interface UseNovedadCalculationProps {
   employeeSalary: number;
+  periodoFecha?: Date; // ✅ NUEVO: Fecha del período para jornada legal correcta
   calculateSuggestedValue?: (
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
@@ -15,6 +16,7 @@ interface UseNovedadCalculationProps {
 
 export const useNovedadCalculation = ({
   employeeSalary,
+  periodoFecha,
   calculateSuggestedValue
 }: UseNovedadCalculationProps) => {
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
@@ -30,7 +32,8 @@ export const useNovedadCalculation = ({
       subtipo, 
       horas, 
       dias, 
-      employeeSalary 
+      employeeSalary,
+      periodoFecha: periodoFecha?.toISOString().split('T')[0]
     });
 
     if (!employeeSalary || employeeSalary <= 0) {
@@ -39,13 +42,14 @@ export const useNovedadCalculation = ({
       return null;
     }
 
-    // ✅ SOLUCIÓN KISS: Usar servicio unificado para recargos
+    // ✅ CORRECCIÓN: Usar fecha del período para jornada legal correcta
     if (tipoNovedad === 'recargo_nocturno' && subtipo && horas && horas > 0) {
       try {
         const result = RecargosCalculationService.calcularRecargo({
           salarioBase: employeeSalary,
           tipoRecargo: subtipo as any,
-          horas: horas
+          horas: horas,
+          fechaPeriodo: periodoFecha || new Date() // ✅ Pasar fecha del período
         });
         
         console.log('📊 Recargo calculation result:', result.valorRecargo);
@@ -95,7 +99,7 @@ export const useNovedadCalculation = ({
 
     setCalculatedValue(null);
     return null;
-  }, [employeeSalary, calculateSuggestedValue]);
+  }, [employeeSalary, periodoFecha, calculateSuggestedValue]);
 
   return {
     calculatedValue,

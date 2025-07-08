@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -16,26 +15,6 @@ interface PayrollCalculationInput {
   absences: number;
   periodType: 'quincenal' | 'mensual' | 'semanal';
   periodDate?: string;
-}
-
-interface PayrollConfiguration {
-  salarioMinimo: number;
-  auxilioTransporte: number;
-  uvt: number;
-  porcentajes: {
-    saludEmpleado: number;
-    pensionEmpleado: number;
-    saludEmpleador: number;
-    pensionEmpleador: number;
-    arl: number;
-    cajaCompensacion: number;
-    icbf: number;
-    sena: number;
-    cesantias: number;
-    interesesCesantias: number;
-    prima: number;
-    vacaciones: number;
-  };
 }
 
 interface JornadaLegalInfo {
@@ -66,7 +45,7 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
-// Jornadas legales según Ley 2101 de 2021
+// ✅ CORRECCIÓN: Jornadas legales con fórmula correcta
 const JORNADAS_LEGALES = [
   {
     fechaInicio: new Date('2026-07-15'),
@@ -104,7 +83,7 @@ function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
     const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
     return {
       horasSemanales: jornadaTradicional.horasSemanales,
-      horasMensuales: (jornadaTradicional.horasSemanales * 52) / 12,
+      horasMensuales: (jornadaTradicional.horasSemanales / 6) * 30, // ✅ FÓRMULA CORREGIDA
       fechaVigencia: jornadaTradicional.fechaInicio,
       descripcion: jornadaTradicional.descripcion,
       ley: 'Código Sustantivo del Trabajo'
@@ -113,7 +92,7 @@ function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
 
   return {
     horasSemanales: jornadaVigente.horasSemanales,
-    horasMensuales: (jornadaVigente.horasSemanales * 52) / 12,
+    horasMensuales: (jornadaVigente.horasSemanales / 6) * 30, // ✅ FÓRMULA CORREGIDA
     fechaVigencia: jornadaVigente.fechaInicio,
     descripcion: jornadaVigente.descripcion,
     ley: 'Ley 2101 de 2021'
