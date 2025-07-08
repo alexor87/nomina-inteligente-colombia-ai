@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ConflictResolutionService } from './ConflictResolutionService';
+import { RootConflictResolutionService } from './RootConflictResolutionService';
 
 export interface DiagnosticResult {
   success: boolean;
@@ -289,6 +290,39 @@ export class BiWeeklyDiagnosticService {
       return {
         success: false,
         message: 'Error aplicando correcciones automáticas',
+        errors: [error.message]
+      };
+    }
+  }
+  
+  /**
+   * NUEVO: Ejecutar corrección de raíz completa
+   */
+  static async applyRootCorrection(companyId: string): Promise<DiagnosticResult> {
+    console.log('🔧 APLICANDO CORRECCIÓN DE RAÍZ COMPLETA');
+    
+    try {
+      const rootResult = await RootConflictResolutionService.executeRootCorrection(companyId);
+      
+      return {
+        success: rootResult.success,
+        message: rootResult.message,
+        data: {
+          conflictsResolved: rootResult.conflictsResolved,
+          periodsDeleted: rootResult.periodsDeleted,
+          periodsUpdated: rootResult.periodsUpdated,
+          periodsCreated: rootResult.periodsCreated,
+          detailedLog: rootResult.detailedLog,
+          errors: rootResult.errors
+        },
+        errors: rootResult.errors.length > 0 ? rootResult.errors : undefined
+      };
+      
+    } catch (error) {
+      console.error('❌ ERROR EN CORRECCIÓN DE RAÍZ:', error);
+      return {
+        success: false,
+        message: 'Error crítico durante la corrección de raíz',
         errors: [error.message]
       };
     }

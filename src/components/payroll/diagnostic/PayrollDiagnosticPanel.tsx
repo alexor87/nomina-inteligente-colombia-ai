@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +24,7 @@ export const PayrollDiagnosticPanel = () => {
   const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
   const [isApplyingCorrections, setIsApplyingCorrections] = useState(false);
   const [isResolvingConflicts, setIsResolvingConflicts] = useState(false);
+  const [isApplyingRootCorrection, setIsApplyingRootCorrection] = useState(false);
   const [diagnosticResult, setDiagnosticResult] = useState<any>(null);
   const [lastDiagnosticTime, setLastDiagnosticTime] = useState<Date | null>(null);
   
@@ -115,6 +115,35 @@ export const PayrollDiagnosticPanel = () => {
       });
     } finally {
       setIsResolvingConflicts(false);
+    }
+  };
+
+  const applyRootCorrection = async () => {
+    if (!companyId) return;
+    
+    setIsApplyingRootCorrection(true);
+    try {
+      console.log('🔧 Aplicando corrección de raíz completa...');
+      const result = await BiWeeklyDiagnosticService.applyRootCorrection(companyId);
+      
+      toast({
+        title: result.success ? "✅ Corrección de raíz completada" : "⚠️ Corrección parcial",
+        description: result.message,
+        className: result.success ? "border-green-200 bg-green-50" : "border-orange-200 bg-orange-50"
+      });
+      
+      // Ejecutar diagnóstico nuevamente para ver los resultados
+      await runDiagnostic();
+      
+    } catch (error) {
+      console.error('Error en corrección de raíz:', error);
+      toast({
+        title: "Error en corrección de raíz",
+        description: "No se pudo completar la corrección de raíz",
+        variant: "destructive"
+      });
+    } finally {
+      setIsApplyingRootCorrection(false);
     }
   };
 
@@ -214,25 +243,54 @@ export const PayrollDiagnosticPanel = () => {
 
           {/* Alertas y acciones */}
           {diagnosticResult && (totalIssues > 0 || duplicates > 0 || conflicts > 0) && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Se encontraron problemas en la numeración quincenal:</strong>
-                <ul className="list-disc list-inside mt-2 text-sm">
-                  {totalIssues > 0 && <li>{totalIssues} períodos con numeración incorrecta</li>}
-                  {duplicates > 0 && <li>{duplicates} períodos duplicados</li>}
-                  {conflicts > 0 && <li>{conflicts} conflictos de numeración</li>}
-                </ul>
-              </AlertDescription>
-            </Alert>
+            <>
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Se encontraron problemas en la numeración quincenal:</strong>
+                  <ul className="list-disc list-inside mt-2 text-sm">
+                    {totalIssues > 0 && <li>{totalIssues} períodos con numeración incorrecta</li>}
+                    {duplicates > 0 && <li>{duplicates} períodos duplicados</li>}
+                    {conflicts > 0 && <li>{conflicts} conflictos de numeración</li>}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+
+              <Alert className="border-blue-200 bg-blue-50">
+                <Zap className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>💡 Recomendación:</strong> Para problemas persistentes o complejos, 
+                  usa la <strong>Corrección de Raíz</strong> que detecta y resuelve conflictos 
+                  desde la base del sistema.
+                </AlertDescription>
+              </Alert>
+            </>
           )}
 
-          {/* Botones de acción */}
-          <div className="flex gap-3">
+          {/* Botones de acción MEJORADOS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Button
+              onClick={applyRootCorrection}
+              disabled={isApplyingRootCorrection || isApplyingCorrections || isResolvingConflicts}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isApplyingRootCorrection ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  Corrigiendo raíz...
+                </>
+              ) : (
+                <>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Corrección de Raíz
+                </>
+              )}
+            </Button>
+
             <Button
               onClick={resolveConflicts}
-              disabled={isResolvingConflicts || isApplyingCorrections}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
+              disabled={isResolvingConflicts || isApplyingCorrections || isApplyingRootCorrection}
+              className="bg-blue-600 hover:bg-blue-700"
             >
               {isResolvingConflicts ? (
                 <>
@@ -249,9 +307,8 @@ export const PayrollDiagnosticPanel = () => {
 
             <Button
               onClick={applyCorrections}
-              disabled={isApplyingCorrections || isResolvingConflicts}
+              disabled={isApplyingCorrections || isResolvingConflicts || isApplyingRootCorrection}
               variant="outline"
-              className="flex-1"
             >
               {isApplyingCorrections ? (
                 <>
@@ -261,7 +318,7 @@ export const PayrollDiagnosticPanel = () => {
               ) : (
                 <>
                   <Wrench className="h-4 w-4 mr-2" />
-                  Aplicar Correcciones
+                  Correcciones Básicas
                 </>
               )}
             </Button>
