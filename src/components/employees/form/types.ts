@@ -8,7 +8,11 @@ export interface EmployeeFormData extends Omit<EmployeeUnified, 'id' | 'createdA
   // Campos personalizados dinámicos
   custom_fields: Record<string, any>;
   
-  // ✅ CORREGIR: Mapear campos con nombres correctos
+  // ✅ CORREGIR: Tipos actualizados para coincidir con los valores del UI
   centro_costos?: string;
   codigo_ciiu?: string;
+  tipoContrato: "indefinido" | "fijo" | "obra_labor" | "aprendizaje" | "practicas";
+  estado: "activo" | "inactivo" | "vacaciones" | "incapacidad" | "licencia";
+  periodicidadPago: "mensual" | "quincenal" | "semanal";
+  tipoJornada: "completa" | "medio_tiempo" | "por_horas" | "flexible";
 }

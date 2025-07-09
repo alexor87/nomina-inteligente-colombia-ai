@@ -1,11 +1,12 @@
 import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
-// ✅ TIPOS SINCRONIZADOS CON LA BASE DE DATOS REAL
+// ✅ TIPOS SINCRONIZADOS CON LA BASE DE DATOS REAL - ACTUALIZADO
 export type NovedadType =
   | 'horas_extra'
   | 'recargo_nocturno'
   | 'vacaciones'
   | 'licencia_remunerada'
+  | 'licencia_no_remunerada' // ✅ AGREGADO
   | 'incapacidad'
   | 'bonificacion'
   | 'bonificacion_salarial'
@@ -38,6 +39,7 @@ export const NOVEDAD_CATEGORIES: Record<NovedadType, 'devengado' | 'deduccion'> 
   recargo_nocturno: 'devengado',
   vacaciones: 'devengado',
   licencia_remunerada: 'devengado',
+  licencia_no_remunerada: 'devengado', // ✅ AGREGADO
   incapacidad: 'devengado',
   bonificacion: 'devengado',
   bonificacion_salarial: 'devengado',
@@ -361,6 +363,18 @@ export const calcularValorNovedadEnhanced = (
         result.baseCalculo.factor_calculo = 1.0;
         result.baseCalculo.detalle_calculo = 
           `${dias} días licencia remunerada × $${Math.round(valorDiario)} = $${Math.round(result.valor)}`;
+        break;
+
+      // ✅ NUEVA LÓGICA: Licencia no remunerada (valor siempre $0)
+      case 'licencia_no_remunerada':
+        valor = 0; // Siempre $0 por definición legal
+        factorCalculo = 0;
+        if (dias && dias > 0) {
+          result.baseCalculo.detalle_calculo = `Licencia no remunerada: ${dias} días sin remuneración (Art. 51 CST). Suspende acumulación de prestaciones sociales.`;
+        } else {
+          result.baseCalculo.detalle_calculo = 'Licencia no remunerada: Sin remuneración por definición legal';
+        }
+        console.log('Resultado licencia no remunerada:', { dias, valor: 0 });
         break;
 
       case 'bonificacion':

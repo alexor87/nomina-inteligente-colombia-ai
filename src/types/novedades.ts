@@ -60,6 +60,7 @@ export type NovedadType =
   | 'recargo_nocturno'
   | 'vacaciones'
   | 'licencia_remunerada'
+  | 'licencia_no_remunerada' // ✅ AGREGADO
   | 'incapacidad'
   | 'bonificacion'
   | 'comision'
@@ -73,9 +74,7 @@ export type NovedadType =
   | 'libranza'
   | 'ausencia'
   | 'multa'
-  | 'descuento_voluntario'
-  // ✅ NUEVO: Licencia no remunerada (categoría neutral)
-  | 'licencia_no_remunerada';
+  | 'descuento_voluntario';
 
 export const NOVEDAD_CATEGORIES = {
   devengados: {
@@ -138,6 +137,25 @@ export const NOVEDAD_CATEGORIES = {
         auto_calculo: true,
         subtipos: ['paternidad', 'matrimonio', 'luto', 'estudio']
       },
+      // ✅ AGREGADO: Licencia no remunerada
+      licencia_no_remunerada: {
+        label: 'Licencia No Remunerada',
+        description: 'Permiso autorizado sin pago que mantiene el vínculo laboral',
+        requiere_horas: false,
+        requiere_dias: true,
+        auto_calculo: false, // Siempre valor $0
+        legal_note: 'Suspende temporalmente prestaciones sociales según Art. 51 CST',
+        affects_benefits: true,
+        subtipos: [
+          'personal', 
+          'estudios', 
+          'familiar', 
+          'salud_no_eps', 
+          'maternidad_extendida',
+          'cuidado_hijo_menor',
+          'emergencia_familiar'
+        ]
+      },
       otros_ingresos: {
         label: 'Otros Ingresos',
         requiere_horas: false,
@@ -194,32 +212,6 @@ export const NOVEDAD_CATEGORIES = {
         requiere_dias: false,
         auto_calculo: true,
         subtipos: []
-      }
-    }
-  },
-  // ✅ NUEVA CATEGORÍA: Licencias no remuneradas (categoría neutral)
-  licencias_no_remuneradas: {
-    label: 'Licencias No Remuneradas',
-    color: 'yellow',
-    description: 'Ausencias autorizadas sin remuneración que mantienen el vínculo laboral',
-    types: {
-      licencia_no_remunerada: {
-        label: 'Licencia No Remunerada',
-        description: 'Permiso autorizado sin pago que mantiene el contrato de trabajo',
-        requiere_horas: false,
-        requiere_dias: true,
-        auto_calculo: false, // Siempre valor $0
-        legal_note: 'Suspende temporalmente prestaciones sociales según Art. 51 CST',
-        affects_benefits: true,
-        subtipos: [
-          'personal', 
-          'estudios', 
-          'familiar', 
-          'salud_no_eps', 
-          'maternidad_extendida',
-          'cuidado_hijo_menor',
-          'emergencia_familiar'
-        ]
       }
     }
   }

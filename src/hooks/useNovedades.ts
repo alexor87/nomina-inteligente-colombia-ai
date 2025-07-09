@@ -43,8 +43,26 @@ export const useNovedades = (periodoId: string) => {
       if (result) {
         console.log('✅ useNovedades - Novedad created successfully:', result);
         
+        // ✅ CONVERSIÓN: Convertir el resultado del servicio al tipo local
+        const localResult: PayrollNovedad = {
+          id: result.id,
+          company_id: result.company_id,
+          empleado_id: result.empleado_id,
+          periodo_id: result.periodo_id,
+          tipo_novedad: result.tipo_novedad as PayrollNovedad['tipo_novedad'],
+          valor: result.valor,
+          horas: result.horas,
+          dias: result.dias,
+          observacion: result.observacion,
+          fecha_inicio: result.fecha_inicio,
+          fecha_fin: result.fecha_fin,
+          base_calculo: result.base_calculo,
+          created_at: result.created_at,
+          updated_at: result.updated_at
+        };
+        
         // Update local state
-        setNovedades(prev => [result, ...prev]);
+        setNovedades(prev => [localResult, ...prev]);
         
         if (showSuccessToast) {
           toast({
@@ -58,7 +76,7 @@ export const useNovedades = (periodoId: string) => {
           });
         }
         
-        return result;
+        return localResult;
       }
     } catch (error) {
       console.error('❌ useNovedades - Error creating novedad:', error);
@@ -98,8 +116,27 @@ export const useNovedades = (periodoId: string) => {
       console.log('📋 Loading novedades for employee:', employeeId, 'period:', periodoId);
       const result = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodoId);
       console.log('📊 Loaded novedades:', result);
-      setNovedades(result);
-      return result;
+      
+      // ✅ CONVERSIÓN: Convertir los resultados del servicio al tipo local
+      const localResults: PayrollNovedad[] = result.map(nov => ({
+        id: nov.id,
+        company_id: nov.company_id,
+        empleado_id: nov.empleado_id,
+        periodo_id: nov.periodo_id,
+        tipo_novedad: nov.tipo_novedad as PayrollNovedad['tipo_novedad'],
+        valor: nov.valor,
+        horas: nov.horas,
+        dias: nov.dias,
+        observacion: nov.observacion,
+        fecha_inicio: nov.fecha_inicio,
+        fecha_fin: nov.fecha_fin,
+        base_calculo: nov.base_calculo,
+        created_at: nov.created_at,
+        updated_at: nov.updated_at
+      }));
+      
+      setNovedades(localResults);
+      return localResults;
     } catch (error) {
       console.error('❌ Error loading novedades:', error);
       return [];
@@ -113,8 +150,26 @@ export const useNovedades = (periodoId: string) => {
       const result = await NovedadesEnhancedService.updateNovedad(id, updates);
       
       if (result) {
+        // ✅ CONVERSIÓN: Convertir el resultado del servicio al tipo local
+        const localResult: PayrollNovedad = {
+          id: result.id,
+          company_id: result.company_id,
+          empleado_id: result.empleado_id,
+          periodo_id: result.periodo_id,
+          tipo_novedad: result.tipo_novedad as PayrollNovedad['tipo_novedad'],
+          valor: result.valor,
+          horas: result.horas,
+          dias: result.dias,
+          observacion: result.observacion,
+          fecha_inicio: result.fecha_inicio,
+          fecha_fin: result.fecha_fin,
+          base_calculo: result.base_calculo,
+          created_at: result.created_at,
+          updated_at: result.updated_at
+        };
+        
         // Update local state
-        setNovedades(prev => prev.map(nov => nov.id === id ? result : nov));
+        setNovedades(prev => prev.map(nov => nov.id === id ? localResult : nov));
         
         toast({
           title: "✅ Novedad actualizada",
@@ -122,7 +177,7 @@ export const useNovedades = (periodoId: string) => {
           className: "border-green-200 bg-green-50"
         });
         
-        return result;
+        return localResult;
       }
     } catch (error) {
       console.error('❌ Error updating novedad:', error);

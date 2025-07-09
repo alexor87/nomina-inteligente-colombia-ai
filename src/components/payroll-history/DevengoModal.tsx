@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -19,10 +18,23 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { PayrollHistoryService } from '@/services/PayrollHistoryService';
-import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced, PayrollNovedad } from '@/types/novedades-enhanced';
+import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { NovedadForm } from '@/components/payroll/novedades/NovedadForm';
 import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+
+// ✅ USAR TIPO LOCAL UNIFICADO
+interface NovedadDisplay {
+  id: string;
+  tipo_novedad: NovedadType;
+  valor: number;
+  horas?: number;
+  dias?: number;
+  observacion?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  base_calculo?: any;
+}
 
 interface DevengoModalProps {
   isOpen: boolean;
@@ -34,18 +46,6 @@ interface DevengoModalProps {
   periodId: string;
   modalType: 'devengado' | 'deduccion';
   onNovedadCreated?: (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => void;
-}
-
-interface NovedadDisplay {
-  id: string;
-  tipo_novedad: NovedadType;
-  valor: number;
-  horas?: number;
-  dias?: number;
-  observacion?: string;
-  fecha_inicio?: string;
-  fecha_fin?: string;
-  base_calculo?: any;
 }
 
 interface BasicConcepts {
@@ -210,13 +210,23 @@ export const DevengoModal = ({
       // Try direct service call first
       const data = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
       
-      // Filtrar por tipo de modal
+      // Filtrar por tipo de modal y convertir a NovedadDisplay
       const filteredNovedades = (data || []).filter(novedad => {
         const isDevengado = ['horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
                             'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(novedad.tipo_novedad);
         
         return modalType === 'devengado' ? isDevengado : !isDevengado;
-      });
+      }).map(novedad => ({
+        id: novedad.id,
+        tipo_novedad: novedad.tipo_novedad as NovedadType,
+        valor: novedad.valor,
+        horas: novedad.horas,
+        dias: novedad.dias,
+        observacion: novedad.observacion,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        base_calculo: novedad.base_calculo
+      }));
       
       setNovedades(filteredNovedades);
       
@@ -450,6 +460,7 @@ export const DevengoModal = ({
       recargo_nocturno: 'Recargo Nocturno',
       vacaciones: 'Vacaciones',
       licencia_remunerada: 'Licencia Remunerada',
+      licencia_no_remunerada: 'Licencia No Remunerada', // ✅ AGREGADO
       incapacidad: 'Incapacidad',
       bonificacion: 'Bonificación',
       bonificacion_salarial: 'Bonificación Salarial',
@@ -700,4 +711,3 @@ export const DevengoModal = ({
 };
 
 export default DevengoModal;
-
