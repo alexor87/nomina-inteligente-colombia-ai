@@ -89,10 +89,10 @@ export const TimeOffModal = ({
           className: "border-green-200 bg-green-50"
         });
         
-        // ✅ SOLUCIÓN DEFINITIVA: Delay para ver el toast antes de cerrar
+        // ✅ SOLUCIÓN DEFINITIVA: Delay sincronizado para ver el toast antes de cerrar
         setTimeout(() => {
-          handleClose();
-          onSave();
+          onSave(); // Primero avisar que guardó
+          handleClose(); // Luego cerrar modal
         }, 2000);
       } else {
         toast({

@@ -53,7 +53,10 @@ export const TimeOffSection = ({
   };
 
   const handleRecordSaved = () => {
-    loadRecords();
+    // ✅ SOLUCIÓN DEFINITIVA: Delay para sincronizar con el cierre del modal
+    setTimeout(() => {
+      loadRecords();
+    }, 2100); // 100ms después del modal para evitar re-render conflicts
   };
 
   const handleDeleteRecord = async (recordId: string) => {
