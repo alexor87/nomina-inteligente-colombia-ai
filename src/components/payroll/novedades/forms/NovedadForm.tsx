@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { NovedadType } from '@/types/novedades-enhanced';
 
-// ✅ FIXED: Valid NovedadType values only
+// ✅ FIXED: Only valid NovedadType values from the database
 const validNovedadTypes: NovedadType[] = [
   'vacaciones',
   'incapacidad', 
@@ -30,8 +30,6 @@ const validNovedadTypes: NovedadType[] = [
   'pension',
   'fondo_solidaridad',
   'retencion_fuente',
-  'embargos',
-  'otros_descuentos',
   'licencia_no_remunerada'
 ];
 

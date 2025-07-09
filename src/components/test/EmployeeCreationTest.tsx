@@ -37,7 +37,7 @@ export const EmployeeCreationTest = () => {
 
     addLog('info', '🧪 Iniciando simulación de creación de empleado');
 
-    // Datos de prueba para el empleado
+    // ✅ FIXED: Added missing tipoJornada field
     const testEmployeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
       cedula: '12345678',
       tipoDocumento: 'CC',
@@ -48,8 +48,9 @@ export const EmployeeCreationTest = () => {
       salarioBase: 2500000,
       tipoContrato: 'indefinido',
       fechaIngreso: new Date().toISOString().split('T')[0],
-      periodicidadPago: 'mensual', // Agregar campo faltante
+      periodicidadPago: 'mensual',
       estado: 'activo',
+      tipoJornada: 'completa', // ✅ ADDED REQUIRED FIELD
       eps: 'Compensar EPS',
       afp: 'Porvenir',
       arl: 'SURA ARL',

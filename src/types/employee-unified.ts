@@ -1,3 +1,4 @@
+
 export interface EmployeeUnified {
   id: string;
   company_id?: string;
@@ -11,7 +12,7 @@ export interface EmployeeUnified {
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F'; // ✅ SIMPLIFIED: Removed 'O' to match Employee type
+  sexo?: 'M' | 'F';
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
@@ -29,28 +30,28 @@ export interface EmployeeUnified {
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada: 'completa' | 'parcial' | 'horas'; // ✅ MADE REQUIRED to match Employee
+  tipoJornada: 'completa' | 'parcial' | 'horas'; // ✅ REQUIRED to match Employee
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
   clausulasEspeciales?: string;
   
-  // Banking Information
+  // Banking Information - ✅ MADE OPTIONAL to match Employee
   banco?: string;
-  tipoCuenta: 'ahorros' | 'corriente';
+  tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
-  formaPago: 'dispersion' | 'manual';
+  formaPago?: 'dispersion' | 'manual';
   
-  // Affiliations
+  // Affiliations - ✅ MADE OPTIONAL to match Employee
   eps?: string;
   afp?: string;
   arl?: string;
   cajaCompensacion?: string;
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
-  regimenSalud: 'contributivo' | 'subsidiado';
-  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
+  regimenSalud?: 'contributivo' | 'subsidiado';
+  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   
   // Custom fields
   custom_fields?: Record<string, any>;
@@ -95,18 +96,18 @@ export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
     beneficiosExtralegales: Boolean(dbData.beneficios_extralegales),
     clausulasEspeciales: dbData.clausulas_especiales || undefined,
     banco: dbData.banco || undefined,
-    tipoCuenta: dbData.tipo_cuenta || 'ahorros',
+    tipoCuenta: dbData.tipo_cuenta || undefined, // ✅ NO DEFAULT - OPTIONAL
     numeroCuenta: dbData.numero_cuenta || undefined,
     titularCuenta: dbData.titular_cuenta || undefined,
-    formaPago: dbData.forma_pago || 'dispersion',
+    formaPago: dbData.forma_pago || undefined, // ✅ NO DEFAULT - OPTIONAL
     eps: dbData.eps || undefined,
     afp: dbData.afp || undefined,
     arl: dbData.arl || undefined,
     cajaCompensacion: dbData.caja_compensacion || undefined,
     tipoCotizanteId: dbData.tipo_cotizante_id || undefined,
     subtipoCotizanteId: dbData.subtipo_cotizante_id || undefined,
-    regimenSalud: dbData.regimen_salud || 'contributivo',
-    estadoAfiliacion: dbData.estado_afiliacion || 'pendiente',
+    regimenSalud: dbData.regimen_salud || undefined, // ✅ NO DEFAULT - OPTIONAL
+    estadoAfiliacion: dbData.estado_afiliacion || undefined, // ✅ NO DEFAULT - OPTIONAL
     custom_fields: dbData.custom_fields || {},
     createdAt: dbData.created_at,
     updatedAt: dbData.updated_at
@@ -145,18 +146,18 @@ export const mapUnifiedToDatabase = (unified: EmployeeUnified) => {
     beneficios_extralegales: unified.beneficiosExtralegales || false,
     clausulas_especiales: unified.clausulasEspeciales || null,
     banco: unified.banco || null,
-    tipo_cuenta: unified.tipoCuenta,
+    tipo_cuenta: unified.tipoCuenta || null,
     numero_cuenta: unified.numeroCuenta || null,
     titular_cuenta: unified.titularCuenta || null,
-    forma_pago: unified.formaPago,
+    forma_pago: unified.formaPago || null,
     eps: unified.eps || null,
     afp: unified.afp || null,
     arl: unified.arl || null,
     caja_compensacion: unified.cajaCompensacion || null,
     tipo_cotizante_id: unified.tipoCotizanteId || null,
     subtipo_cotizante_id: unified.subtipoCotizanteId || null,
-    regimen_salud: unified.regimenSalud,
-    estado_afiliacion: unified.estadoAfiliacion,
+    regimen_salud: unified.regimenSalud || null,
+    estado_afiliacion: unified.estadoAfiliacion || null,
     custom_fields: unified.custom_fields || {}
   };
 };

@@ -7,14 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Controller } from 'react-hook-form';
 import { EmployeeFormData } from './types';
 
-// ✅ FIXED: Simplified interface to match actual usage
+// ✅ SIMPLIFIED: Support both wizard and form modes
 interface PersonalInfoSectionProps {
-  control: Control<EmployeeFormData>;
-  errors: FieldErrors<EmployeeFormData>;
+  control?: Control<EmployeeFormData>;
+  errors?: FieldErrors<EmployeeFormData>;
   watchedValues?: EmployeeFormData;
   watch?: UseFormWatch<EmployeeFormData>;
-  formData?: any; // For EmployeeFormWizard compatibility
-  updateFormData?: (data: any) => void; // For EmployeeFormWizard compatibility
+  formData?: any;
+  updateFormData?: (data: any) => void;
 }
 
 const TIPOS_DOCUMENTO = [
@@ -30,7 +30,7 @@ const TIPOS_DOCUMENTO = [
 
 export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
   control,
-  errors,
+  errors = {},
   watchedValues,
   watch,
   formData,
@@ -124,6 +124,10 @@ export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
   }
 
   // Normal mode - use react-hook-form control
+  if (!control) {
+    return <div>Error: Missing control prop</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div>
