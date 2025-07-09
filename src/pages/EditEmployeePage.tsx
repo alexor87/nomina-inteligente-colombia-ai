@@ -85,7 +85,6 @@ const EditEmployeePage = () => {
       onSuccess={handleSuccess}
       onCancel={handleCancel}
       onDataRefresh={handleDataRefresh}
-      onTimeOffModalStateChange={setIsTimeOffModalOpen}
     />
   );
 };
