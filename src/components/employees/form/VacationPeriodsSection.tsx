@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,7 +68,6 @@ export const VacationPeriodsSection = ({
           className: "border-green-200 bg-green-50"
         });
         loadPeriods();
-        setShowModal(false);
       } else {
         toast({
           title: "Error",
