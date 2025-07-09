@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +16,7 @@ import { EmployeeWithStatus } from '@/types/employee-extended';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TimeOffSection } from './form/TimeOffSection';
 
 interface EmployeeProfileProps {
   employee: EmployeeWithStatus;
@@ -92,6 +92,10 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
   const [novelties, setNovelties] = useState<NoveltyRecord[]>([]);
   const [contractChanges, setContractChanges] = useState<ContractChange[]>([]);
   const [communications, setCommunications] = useState<Communication[]>([]);
+  
+  // SOLUCIÓN KISS: Estado para controlar auto-guardado
+  const [isTimeOffModalOpen, setIsTimeOffModalOpen] = useState(false);
+  
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -177,7 +181,6 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
   };
 
   const loadContributions = async () => {
-    // Simular datos de aportes - en producción vendría de una tabla específica
     const mockContributions: ContributionRecord[] = [
       {
         mes: 'Junio 2025',
@@ -200,7 +203,6 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
   };
 
   const loadNovelties = async () => {
-    // Simular novedades - en producción vendría de una tabla de novedades
     const mockNovelties: NoveltyRecord[] = [
       {
         id: '1',
@@ -217,7 +219,6 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
   };
 
   const loadContractChanges = async () => {
-    // Simular cambios contractuales
     const mockChanges: ContractChange[] = [
       {
         id: '1',
@@ -236,7 +237,7 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
       const { data, error } = await supabase
         .from('voucher_audit_log')
         .select('*')
-        .eq('user_id', 'system') // Filtrar por comunicaciones del sistema
+        .eq('user_id', 'system')
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -292,7 +293,6 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
       return;
     }
     
-    // Simular descarga
     toast({
       title: "Descarga iniciada",
       description: `Descargando comprobante de ${voucher.periodo}`,
@@ -317,28 +317,26 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
       {/* Header fijo */}
       <div className="flex-shrink-0 bg-white border-b p-4 lg:p-6">
         <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3 lg:space-x-6 min-w-0 flex-1">
-            <Avatar className="h-12 w-12 lg:h-20 lg:w-20 flex-shrink-0">
-              <AvatarImage src={employee.avatar} alt={`${employee.nombre} ${employee.apellido}`} />
-              <AvatarFallback className="bg-blue-600 text-white text-sm lg:text-2xl">
-                {employee.nombre[0]}{employee.apellido[0]}
-              </AvatarFallback>
-            </Avatar>
+          <Avatar className="h-12 w-12 lg:h-20 lg:w-20 flex-shrink-0">
+            <AvatarImage src={employee.avatar} alt={`${employee.nombre} ${employee.apellido}`} />
+            <AvatarFallback className="bg-blue-600 text-white text-sm lg:text-2xl">
+              {employee.nombre[0]}{employee.apellido[0]}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="space-y-2 lg:space-y-3 min-w-0 flex-1">
+            <div>
+              <h1 className="text-xl lg:text-3xl font-bold text-gray-900 truncate">
+                {employee.nombre} {employee.apellido}
+              </h1>
+              <p className="text-sm lg:text-lg text-gray-600 truncate">{employee.cargo}</p>
+            </div>
             
-            <div className="space-y-2 lg:space-y-3 min-w-0 flex-1">
-              <div>
-                <h1 className="text-xl lg:text-3xl font-bold text-gray-900 truncate">
-                  {employee.nombre} {employee.apellido}
-                </h1>
-                <p className="text-sm lg:text-lg text-gray-600 truncate">{employee.cargo}</p>
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-2">
-                {getStatusBadge(employee.estado)}
-                <Badge variant="outline" className="text-xs lg:text-sm">
-                  {employee.cedula}
-                </Badge>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {getStatusBadge(employee.estado)}
+              <Badge variant="outline" className="text-xs lg:text-sm">
+                {employee.cedula}
+              </Badge>
             </div>
           </div>
           
@@ -392,6 +390,12 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
+            {/* Sección de Tiempo Libre con control de auto-guardado */}
+            <TimeOffSection 
+              employeeId={employee.id} 
+              onModalStateChange={setIsTimeOffModalOpen}
+            />
+            
             {/* Tabs principales */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="sticky top-0 bg-gray-50 pb-4 z-10">
