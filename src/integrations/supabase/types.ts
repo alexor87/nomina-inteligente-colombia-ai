@@ -845,6 +845,7 @@ export type Database = {
           adjunto_url: string | null
           base_calculo: string | null
           company_id: string
+          constitutivo_salario: boolean | null
           creado_por: string | null
           created_at: string
           dias: number | null
@@ -864,6 +865,7 @@ export type Database = {
           adjunto_url?: string | null
           base_calculo?: string | null
           company_id: string
+          constitutivo_salario?: boolean | null
           creado_por?: string | null
           created_at?: string
           dias?: number | null
@@ -883,6 +885,7 @@ export type Database = {
           adjunto_url?: string | null
           base_calculo?: string | null
           company_id?: string
+          constitutivo_salario?: boolean | null
           creado_por?: string | null
           created_at?: string
           dias?: number | null

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
@@ -184,7 +183,7 @@ export class PayrollLiquidationNewService {
     };
   }
 
-  // ✅ NUEVA FUNCIÓN ALELUYA: Cálculo exacto como Aleluya CON NOVEDADES
+  // ✅ NUEVA FUNCIÓN ALELUYA: Cálculo exacto como Aleluya CON NOVEDADES Y BONIFICACIONES CONSTITUTIVAS
   private static async calculateEmployeePayrollAleluya(
     employee: any, 
     period: any, 
@@ -214,9 +213,10 @@ export class PayrollLiquidationNewService {
         transportAllowance = Math.round(dailyTransport * workedDays);
       }
 
-      // ✅ 3. PROCESAR NOVEDADES
+      // ✅ 3. PROCESAR NOVEDADES CON LÓGICA CONSTITUTIVA VS NO CONSTITUTIVA
       let extraHours = 0;
-      let bonuses = 0;
+      let bonusesConstitutivos = 0;     // ✅ NUEVO: Bonificaciones constitutivas
+      let bonusesNoConstitutivos = 0;   // ✅ NUEVO: Bonificaciones no constitutivas
       let additionalDeductions = 0;
       let additionalEarnings = 0;
 
@@ -224,10 +224,11 @@ export class PayrollLiquidationNewService {
       
       for (const novedad of novedades) {
         const valor = Number(novedad.valor) || 0;
+        const esConstitutivo = Boolean(novedad.constitutivo_salario);
         
-        console.log(`   - ${novedad.tipo_novedad}: $${valor.toLocaleString()}`);
+        console.log(`   - ${novedad.tipo_novedad}: $${valor.toLocaleString()}, constitutivo: ${esConstitutivo}`);
         
-        // Clasificar novedades en devengos y deducciones
+        // Clasificar novedades
         switch (novedad.tipo_novedad) {
           case 'horas_extra':
           case 'recargo_nocturno':
@@ -238,7 +239,14 @@ export class PayrollLiquidationNewService {
           case 'comision':
           case 'prima':
           case 'otros_ingresos':
-            bonuses += valor;
+            // ✅ NUEVA LÓGICA: Separar bonificaciones constitutivas vs no constitutivas
+            if (esConstitutivo) {
+              bonusesConstitutivos += valor;
+              console.log(`   ✅ Bonificación CONSTITUTIVA: $${valor.toLocaleString()}`);
+            } else {
+              bonusesNoConstitutivos += valor;
+              console.log(`   ➡️ Bonificación NO CONSTITUTIVA: $${valor.toLocaleString()}`);
+            }
             additionalEarnings += valor;
             break;
           case 'retencion_fuente':
@@ -248,30 +256,39 @@ export class PayrollLiquidationNewService {
           case 'fondo_solidaridad':
             additionalDeductions += valor;
             break;
-          // Salud y pensión no se incluyen aquí porque ya se calculan automáticamente
           default:
             console.log(`   ⚠️ Tipo de novedad no clasificado: ${novedad.tipo_novedad}`);
         }
       }
 
-      // 4. Total devengado CON NOVEDADES
+      // 4. ✅ CALCULAR BASE SALARIAL PARA APORTES (incluye bonificaciones constitutivas)
+      const salarioBaseParaAportes = proportionalSalary + bonusesConstitutivos;
+      console.log(`💰 Base para aportes: $${salarioBaseParaAportes.toLocaleString()} (salario: ${proportionalSalary.toLocaleString()} + constitutivas: ${bonusesConstitutivos.toLocaleString()})`);
+
+      // 5. Total devengado (incluye todas las bonificaciones)
+      const totalBonuses = bonusesConstitutivos + bonusesNoConstitutivos;
       const grossPay = proportionalSalary + transportAllowance + additionalEarnings;
       
-      // 5. Deducciones (solo sobre salario proporcional, sin auxilio) + novedades
-      const healthDeduction = Math.round(proportionalSalary * 0.04); // 4%
-      const pensionDeduction = Math.round(proportionalSalary * 0.04); // 4%
+      // 6. ✅ DEDUCCIONES solo sobre la base para aportes (salario + bonificaciones constitutivas)
+      const healthDeduction = Math.round(salarioBaseParaAportes * 0.04); // 4%
+      const pensionDeduction = Math.round(salarioBaseParaAportes * 0.04); // 4%
       const totalDeductions = healthDeduction + pensionDeduction + additionalDeductions;
       
-      // 6. Neto a pagar
+      // 7. Neto a pagar
       const netPay = grossPay - totalDeductions;
       
-      console.log(`💰 RESULTADO ALELUYA CON NOVEDADES para ${employee.nombre}:`, {
+      console.log(`💰 RESULTADO ALELUYA CON BONIFICACIONES CONSTITUTIVAS para ${employee.nombre}:`, {
         proportionalSalary,
+        bonusesConstitutivos,
+        bonusesNoConstitutivos,
+        salarioBaseParaAportes,
         transportAllowance,
         additionalEarnings,
         extraHours,
-        bonuses,
+        totalBonuses,
         grossPay,
+        healthDeduction,
+        pensionDeduction,
         totalDeductions,
         additionalDeductions,
         netPay
@@ -285,7 +302,7 @@ export class PayrollLiquidationNewService {
         workedDays,
         extraHours,
         disabilities: 0,
-        bonuses,
+        bonuses: totalBonuses, // Total de bonificaciones (constitutivas + no constitutivas)
         absences: 0,
         grossPay,
         deductions: totalDeductions,
@@ -295,7 +312,7 @@ export class PayrollLiquidationNewService {
         eps: employee.eps || '',
         afp: employee.afp || '',
         transportAllowance,
-        employerContributions: this.calculateEmployerContributions(baseSalary)
+        employerContributions: this.calculateEmployerContributions(salarioBaseParaAportes) // ✅ Usar base para aportes
       };
     } catch (error) {
       console.error('❌ Error en cálculo ALELUYA:', error);
@@ -327,9 +344,9 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  private static calculateEmployerContributions(baseSalary: number): number {
-    // Cálculo aproximado de aportes patronales
-    return baseSalary * 0.325;
+  private static calculateEmployerContributions(salarioBaseParaAportes: number): number {
+    // ✅ Cálculo de aportes patronales basado en la base correcta (incluye bonificaciones constitutivas)
+    return salarioBaseParaAportes * 0.325;
   }
 
   static async updateEmployeeCount(periodId: string, count: number): Promise<void> {
@@ -347,7 +364,6 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  // ✅ CORRECCIÓN CRÍTICA: Implementar removeEmployeeFromPeriod
   static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
     try {
       console.log(`🗑️ Removiendo empleado ${employeeId} del período ${periodId}`);
@@ -383,7 +399,6 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  // ✅ CORRECCIÓN CRÍTICA: Implementar closePeriod mejorado con rollback
   static async closePeriod(period: any, employees: PayrollEmployee[]): Promise<string> {
     try {
       console.log(`🔐 ALELUYA - Iniciando cierre de período: ${period.periodo}`);
@@ -519,7 +534,6 @@ export class PayrollLiquidationNewService {
     }
   }
 
-  // ✅ NUEVO: Función para recalcular después de cambios en novedades
   static async recalculateAfterNovedadChange(employeeId: string, periodId: string): Promise<PayrollEmployee | null> {
     try {
       console.log(`🔄 Recalculando empleado ${employeeId} en período ${periodId}`);
