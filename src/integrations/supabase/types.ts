@@ -692,6 +692,73 @@ export type Database = {
           },
         ]
       }
+      employee_vacation_periods: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          days_count: number
+          employee_id: string
+          end_date: string
+          id: string
+          observations: string | null
+          processed_in_period_id: string | null
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          days_count: number
+          employee_id: string
+          end_date: string
+          id?: string
+          observations?: string | null
+          processed_in_period_id?: string | null
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          days_count?: number
+          employee_id?: string
+          end_date?: string
+          id?: string
+          observations?: string | null
+          processed_in_period_id?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_vacation_periods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_vacation_periods_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_vacation_periods_processed_in_period_id_fkey"
+            columns: ["processed_in_period_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_periods_real"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           afp: string | null
