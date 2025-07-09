@@ -1,4 +1,3 @@
-
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { FormField } from './FormField';
 import { EmployeeFormData } from './types';
@@ -187,12 +186,12 @@ export const LaborInfoSection = ({
             />
           </div>
 
-          {/* ✅ NUEVO: Sección de Vacaciones Iniciales (Fase 1 - KISS) */}
+          {/* ✅ ACTUALIZADO: Sección de Vacaciones Iniciales con texto más claro */}
           <div className="border-t border-gray-100 pt-6">
             <h3 className="text-md font-medium text-gray-800 mb-4">Vacaciones Iniciales</h3>
             
             <div className="space-y-4">
-              {/* Checkbox para vacaciones acumuladas */}
+              {/* Checkbox para vacaciones pendientes */}
               <div className="flex items-center space-x-3">
                 <input
                   id="hasAccumulatedVacations"
@@ -201,7 +200,7 @@ export const LaborInfoSection = ({
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                 <label htmlFor="hasAccumulatedVacations" className="text-sm font-medium text-gray-700">
-                  ¿El empleado tiene vacaciones acumuladas de trabajos anteriores?
+                  ¿El empleado tiene vacaciones pendientes?
                 </label>
               </div>
 
@@ -210,7 +209,7 @@ export const LaborInfoSection = ({
                 <div className="ml-7">
                   <FormField
                     name="initialVacationDays"
-                    label="Días de vacaciones acumulados"
+                    label="Días de vacaciones pendientes"
                     type="number"
                     control={control}
                     errors={errors}
@@ -218,7 +217,7 @@ export const LaborInfoSection = ({
                     className="max-w-xs"
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    Días de vacaciones que el empleado ya tenía acumulados
+                    Días de vacaciones pendientes
                   </p>
                 </div>
               )}
