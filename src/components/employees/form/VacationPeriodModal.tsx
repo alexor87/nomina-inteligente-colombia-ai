@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -95,10 +94,6 @@ export const VacationPeriodModal = ({
         end_date: formData.end_date,
         observations: formData.observations || undefined
       });
-
-      // Limpiar formulario
-      setFormData({ start_date: '', end_date: '', observations: '' });
-      setCalculatedDays(null);
 
     } catch (error) {
       toast({
