@@ -1,35 +1,32 @@
 
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { Users } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
-import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
-import { EmployeeWithStatus } from '@/types/employee-extended';
-import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
-import { EmployeeExcelExportService } from '@/services/EmployeeExcelExportService';
-import { useToast } from '@/hooks/use-toast';
-import { PaginationControls } from '@/components/ui/PaginationControls';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { useNavigate } from 'react-router-dom';
-import { EmployeeListHeader } from './EmployeeListHeader';
-import { EmployeeSearchBar } from './EmployeeSearchBar';
-import { EmployeeFiltersCollapsible } from './EmployeeFiltersCollapsible';
-import { EmployeeBulkActions } from './EmployeeBulkActions';
-import { EmployeeTableReadOnly } from './EmployeeTableReadOnly';
-import { EmployeeEmptyState } from './EmployeeEmptyState';
-import { SupportModeAlert } from './SupportModeAlert';
-import { EmployeeCRUDService } from '@/services/EmployeeCRUDService';
 
-export const EmployeeList = () => {
+interface EmployeeListProps {
+  onEmployeeSelect?: (employee: EmployeeUnified) => void;
+  selectionMode?: boolean;
+}
+
+export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: EmployeeListProps) => {
   const navigate = useNavigate();
   const {
     employees,
-    allEmployees,
-    filters,
-    selectedEmployees,
     isLoading,
+    error,
+    filters,
+    setFilters,
+    selectedEmployees,
     pagination,
-    updateFilters,
     clearFilters,
     toggleEmployeeSelection,
     toggleAllEmployees,
@@ -38,260 +35,270 @@ export const EmployeeList = () => {
     refreshEmployees,
     forceCompleteRefresh,
     getComplianceIndicators,
-    clearSelection
+    clearSelection,
+    statistics
   } = useEmployeeList();
 
-  const { changeEmployeeStatus, deleteEmployee } = useEmployeeCRUD();
-  const { toast } = useToast();
-
   const [showFilters, setShowFilters] = useState(false);
-  const [isImportDrawerOpen, setIsImportDrawerOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
-  // Verificar si estamos en modo soporte
-  const urlParams = new URLSearchParams(window.location.search);
-  const supportCompanyId = urlParams.get('support_company');
-  const isSupportMode = !!supportCompanyId;
-
-  // Calcular filtros activos
-  const activeFiltersCount = Object.values(filters).filter(value => 
-    value !== '' && value !== undefined && value !== filters.searchTerm
-  ).length;
-
-  const handleCreateEmployee = () => {
-    navigate('/app/employees/create');
-  };
-
-  const handleEditEmployee = (employee: any) => {
-    navigate(`/app/employees/${employee.id}/edit`);
-  };
-
-  const handleDeleteEmployee = async (employeeId: string) => {
-    try {
-      // Check if employee has associated payrolls
-      const hasPayrolls = await EmployeeCRUDService.checkEmployeeHasPayrolls(employeeId);
-      
-      if (hasPayrolls) {
-        toast({
-          title: "No se puede eliminar el empleado",
-          description: "El empleado tiene nóminas asociadas. Primero debe eliminar o transferir las nóminas.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Confirm deletion
-      if (window.confirm('¿Estás seguro de que deseas eliminar este empleado?')) {
-        const result = await deleteEmployee(employeeId);
-        if (result.success) {
-          refreshEmployees();
-        }
-      }
-    } catch (error) {
-      console.error('Error checking employee payrolls:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo verificar si el empleado tiene nóminas asociadas.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleStatusChange = async (employeeId: string, newStatus: string) => {
-    const result = await changeEmployeeStatus(employeeId, newStatus);
-    if (result.success) {
-      refreshEmployees();
-    }
-  };
-
-  const handleBulkUpdateStatus = async (newStatus: string) => {
-    if (selectedEmployees.length === 0) return;
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      'activo': 'bg-green-100 text-green-800',
+      'inactivo': 'bg-red-100 text-red-800',
+      'vacaciones': 'bg-blue-100 text-blue-800',
+      'incapacidad': 'bg-yellow-100 text-yellow-800'
+    };
     
-    setIsBulkUpdating(true);
-    
-    try {
-      // Update each selected employee's status
-      const updatePromises = selectedEmployees.map(employeeId => 
-        changeEmployeeStatus(employeeId, newStatus)
-      );
-      
-      const results = await Promise.all(updatePromises);
-      const successCount = results.filter(result => result.success).length;
-      const failureCount = results.length - successCount;
-      
-      if (successCount > 0) {
-        toast({
-          title: "Estados actualizados",
-          description: `Se actualizaron ${successCount} empleado${successCount !== 1 ? 's' : ''} a ${newStatus}${failureCount > 0 ? `. ${failureCount} falló${failureCount !== 1 ? 'n' : ''}` : ''}.`,
-        });
-        
-        // Refresh the employee list and clear selection
-        refreshEmployees();
-        clearSelection();
-      } else {
-        toast({
-          title: "Error en actualización masiva",
-          description: "No se pudo actualizar el estado de ningún empleado.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Error in bulk status update:', error);
-      toast({
-        title: "Error en actualización masiva",
-        description: "Ocurrió un error al actualizar los estados.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsBulkUpdating(false);
+    const labels = {
+      'activo': 'Activo',
+      'inactivo': 'Inactivo',
+      'vacaciones': 'Vacaciones',
+      'incapacidad': 'Incapacidad'
+    };
+
+    return (
+      <Badge variant="outline" className={variants[status as keyof typeof variants] || 'bg-gray-100 text-gray-800'}>
+        {labels[status as keyof typeof labels] || status}
+      </Badge>
+    );
+  };
+
+  const handleEmployeeClick = (employee: EmployeeUnified) => {
+    if (selectionMode && onEmployeeSelect) {
+      onEmployeeSelect(employee);
+    } else {
+      navigate(`/app/employees/${employee.id}/edit`);
     }
   };
-
-  const handleExportToExcel = async () => {
-    try {
-      setIsExporting(true);
-      
-      toast({
-        title: "Preparando archivo...",
-        description: EmployeeExcelExportService.getExportSummary(totalEmployees, filteredCount),
-      });
-
-      const result = await EmployeeExcelExportService.exportToExcel(allEmployees, 'empleados');
-      
-      toast({
-        title: "Archivo exportado exitosamente",
-        description: `Se exportaron ${result.recordCount} empleados a ${result.fileName}`,
-      });
-    } catch (error) {
-      console.error('Error exporting employees:', error);
-      toast({
-        title: "Error al exportar",
-        description: "No se pudo generar el archivo Excel. Por favor intenta nuevamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const goBackToSupport = () => {
-    window.location.href = '/support-backoffice';
-  };
-
-  const currentPageEmployeeIds = employees.map(emp => emp.id);
-  const allCurrentPageSelected = currentPageEmployeeIds.every(id => selectedEmployees.includes(id));
-
-  const hasFilters = filters.searchTerm || filters.estado || filters.tipoContrato;
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando empleados...</p>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-red-600">
+            Error: {error}
+            <Button onClick={refreshEmployees} className="ml-4">
+              Reintentar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <TooltipProvider>
-      <div className="space-y-6">
-        {/* Alerta de modo soporte */}
-        {isSupportMode && (
-          <SupportModeAlert onGoBackToSupport={goBackToSupport} />
-        )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Empleados</h2>
+          <p className="text-gray-600">
+            {totalEmployees} empleados • {filteredCount} mostrados
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+            <Filter className="w-4 h-4 mr-2" />
+            Filtros
+          </Button>
+          <Button onClick={() => navigate('/app/employees/new')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Empleado
+          </Button>
+        </div>
+      </div>
 
-        {/* Header */}
-        <EmployeeListHeader
-          filteredCount={filteredCount}
-          totalEmployees={totalEmployees}
-          searchTerm={filters.searchTerm}
-          isSupportMode={isSupportMode}
-          showFilters={showFilters}
-          isExporting={isExporting}
-          employeeCount={employees.length}
-          onToggleFilters={() => setShowFilters(!showFilters)}
-          onOpenImport={() => setIsImportDrawerOpen(true)}
-          onExportToExcel={handleExportToExcel}
-          onCreateEmployee={handleCreateEmployee}
-          onRefreshData={refreshEmployees}
-          onForceCompleteRefresh={forceCompleteRefresh}
-        />
-
-        {/* Barra de búsqueda con botón de filtros */}
-        <EmployeeSearchBar
-          searchTerm={filters.searchTerm}
-          onSearchChange={(value) => updateFilters({ searchTerm: value })}
-          showFilters={showFilters}
-          onToggleFilters={() => setShowFilters(!showFilters)}
-          activeFiltersCount={activeFiltersCount}
-        />
-
-        {/* Panel de filtros colapsible */}
-        {showFilters && (
-          <EmployeeFiltersCollapsible
-            filters={filters}
-            onUpdateFilters={updateFilters}
-            onClearFilters={clearFilters}
-            totalCount={totalEmployees}
-            filteredCount={filteredCount}
-          />
-        )}
-
-        {/* Acciones en lote */}
-        <EmployeeBulkActions
-          selectedCount={selectedEmployees.length}
-          onBulkUpdateStatus={handleBulkUpdateStatus}
-          isUpdating={isBulkUpdating}
-        />
-
+      {/* Filters */}
+      {showFilters && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Users className="h-5 w-5" />
-              <span>Listado de Empleados</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {employees.length > 0 ? (
-              <>
-                <EmployeeTableReadOnly
-                  employees={employees}
-                  selectedEmployees={selectedEmployees}
-                  allCurrentPageSelected={allCurrentPageSelected}
-                  onToggleEmployeeSelection={toggleEmployeeSelection}
-                  onToggleAllEmployees={toggleAllEmployees}
-                  onEditEmployee={handleEditEmployee}
-                  onDeleteEmployee={handleDeleteEmployee}
-                  onStatusChange={handleStatusChange}
-                  getComplianceIndicators={getComplianceIndicators}
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Buscar empleados..."
+                  value={filters.searchTerm}
+                  onChange={(e) => setFilters({ searchTerm: e.target.value })}
+                  className="pl-10"
                 />
-                
-                <PaginationControls 
-                  pagination={pagination} 
-                  itemName="empleados"
-                />
-              </>
-            ) : (
-              <EmployeeEmptyState
-                hasFilters={!!hasFilters}
-                onCreateEmployee={handleCreateEmployee}
-              />
-            )}
+              </div>
+              
+              <Select
+                value={filters.estado}
+                onValueChange={(value) => setFilters({ estado: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="activo">Activo</SelectItem>
+                  <SelectItem value="inactivo">Inactivo</SelectItem>
+                  <SelectItem value="vacaciones">Vacaciones</SelectItem>
+                  <SelectItem value="incapacidad">Incapacidad</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={filters.tipoContrato}
+                onValueChange={(value) => setFilters({ tipoContrato: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de Contrato" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="indefinido">Indefinido</SelectItem>
+                  <SelectItem value="fijo">Fijo</SelectItem>
+                  <SelectItem value="obra">Obra</SelectItem>
+                  <SelectItem value="aprendizaje">Aprendizaje</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" onClick={clearFilters}>
+                Limpiar
+              </Button>
+            </div>
           </CardContent>
         </Card>
+      )}
 
-        <ImportEmployeesDrawer
-          isOpen={isImportDrawerOpen}
-          onClose={() => setIsImportDrawerOpen(false)}
-          onImportComplete={() => {
-            refreshEmployees();
-            setIsImportDrawerOpen(false);
-          }}
-        />
+      {/* Statistics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-600">{statistics.active}</div>
+            <div className="text-sm text-gray-600">Activos</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-red-600">{statistics.inactive}</div>
+            <div className="text-sm text-gray-600">Inactivos</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-blue-600">{statistics.onVacation}</div>
+            <div className="text-sm text-gray-600">En Vacaciones</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-yellow-600">{statistics.onLeave}</div>
+            <div className="text-sm text-gray-600">Incapacidad</div>
+          </CardContent>
+        </Card>
       </div>
-    </TooltipProvider>
+
+      {/* Employee Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Lista de Empleados
+            {selectedEmployees.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  {selectedEmployees.length} seleccionados
+                </span>
+                <Button variant="outline" size="sm" onClick={clearSelection}>
+                  Limpiar
+                </Button>
+              </div>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-4">
+                    <Checkbox
+                      checked={employees.length > 0 && employees.every(emp => selectedEmployees.includes(emp.id))}
+                      onCheckedChange={toggleAllEmployees}
+                    />
+                  </th>
+                  <th className="text-left p-4">Empleado</th>
+                  <th className="text-left p-4">Cédula</th>
+                  <th className="text-left p-4">Cargo</th>
+                  <th className="text-left p-4">Estado</th>
+                  <th className="text-left p-4">Salario</th>
+                  <th className="text-left p-4">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map((employee) => (
+                  <tr
+                    key={employee.id}
+                    className="border-b hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleEmployeeClick(employee)}
+                  >
+                    <td className="p-4">
+                      <Checkbox
+                        checked={selectedEmployees.includes(employee.id)}
+                        onCheckedChange={() => toggleEmployeeSelection(employee.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
+                    <td className="p-4">
+                      <div>
+                        <div className="font-medium">
+                          {employee.nombre} {employee.apellido}
+                        </div>
+                        <div className="text-sm text-gray-600">{employee.email}</div>
+                      </div>
+                    </td>
+                    <td className="p-4">{employee.cedula}</td>
+                    <td className="p-4">{employee.cargo || 'No especificado'}</td>
+                    <td className="p-4">{getStatusBadge(employee.estado)}</td>
+                    <td className="p-4">
+                      ${employee.salarioBase?.toLocaleString() || '0'}
+                    </td>
+                    <td className="p-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => navigate(`/app/employees/${employee.id}/edit`)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Mail className="w-4 h-4 mr-2" />
+                            Enviar Comprobante
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {employees.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No se encontraron empleados</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };

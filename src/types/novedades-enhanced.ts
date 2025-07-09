@@ -33,7 +33,7 @@ export interface CreateNovedadData {
   empleado_id: string;
   periodo_id: string;
   tipo_novedad: NovedadType;
-  valor: number;
+  valor: number; // Required field
   dias?: number;
   horas?: number;
   observacion?: string;
@@ -163,6 +163,79 @@ export const isDeduccion = (tipo: NovedadType): boolean => {
 
 export const isTiempo = (tipo: NovedadType): boolean => {
   return ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'].includes(tipo);
+};
+
+// Enhanced calculation function
+export const calcularValorNovedadEnhanced = (
+  tipoNovedad: NovedadType,
+  subtipo: string | undefined,
+  salarioBase: number,
+  dias?: number,
+  horas?: number,
+  fechaPeriodo: Date = new Date()
+): { valor: number; formula: string; breakdown: any } => {
+  let valor = 0;
+  let formula = '';
+  let breakdown = {};
+
+  const salarioDiario = salarioBase / 30;
+  const salarioHora = salarioBase / (30 * 8);
+
+  switch (tipoNovedad) {
+    case 'vacaciones':
+      if (dias) {
+        valor = salarioDiario * dias;
+        formula = `(${salarioBase} / 30) * ${dias} días`;
+        breakdown = { salarioBase, salarioDiario, dias };
+      }
+      break;
+
+    case 'horas_extra':
+      if (horas) {
+        const factor = subtipo === 'nocturna' ? 1.75 : 1.25; // Recargo nocturno vs diurno
+        valor = salarioHora * horas * factor;
+        formula = `(${salarioBase} / 240) * ${horas} * ${factor}`;
+        breakdown = { salarioBase, salarioHora, horas, factor };
+      }
+      break;
+
+    case 'incapacidad':
+      if (dias) {
+        // Primeros 2 días: 0%, día 3 en adelante: 66.67%
+        const diasPagados = Math.max(0, dias - 2);
+        valor = salarioDiario * diasPagados * 0.6667;
+        formula = `(${salarioBase} / 30) * ${diasPagados} días * 66.67%`;
+        breakdown = { salarioBase, salarioDiario, dias, diasPagados };
+      }
+      break;
+
+    case 'licencia_remunerada':
+      if (dias) {
+        valor = salarioDiario * dias;
+        formula = `(${salarioBase} / 30) * ${dias} días`;
+        breakdown = { salarioBase, salarioDiario, dias };
+      }
+      break;
+
+    case 'ausencia':
+      if (dias) {
+        valor = -(salarioDiario * dias); // Negativo para descuentos
+        formula = `-(${salarioBase} / 30) * ${dias} días`;
+        breakdown = { salarioBase, salarioDiario, dias };
+      }
+      break;
+
+    default:
+      valor = 0;
+      formula = 'Cálculo manual requerido';
+      break;
+  }
+
+  return {
+    valor: Math.round(valor),
+    formula,
+    breakdown
+  };
 };
 
 // Calculation helper

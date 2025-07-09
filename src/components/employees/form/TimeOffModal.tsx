@@ -35,6 +35,7 @@ export const TimeOffModal = ({
   const timeOffTypes = [
     { value: 'vacaciones', label: 'Vacaciones' },
     { value: 'licencia_remunerada', label: 'Licencia Remunerada' },
+    { value: 'licencia_no_remunerada', label: 'Licencia No Remunerada' },
     { value: 'ausencia', label: 'Ausencia' },
     { value: 'incapacidad', label: 'Incapacidad' }
   ];

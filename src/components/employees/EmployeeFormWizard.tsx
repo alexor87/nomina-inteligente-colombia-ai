@@ -1,601 +1,306 @@
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Employee } from '@/types';
-import { CONTRACT_TYPES, TIPOS_DOCUMENTO } from '@/types/employee-config';
-import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
-import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
+import { CheckCircle, Circle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { EmployeeUnified } from '@/types/employee-unified';
+import { PersonalInfoSection } from './form/PersonalInfoSection';
+import { LaborInfoSection } from './form/LaborInfoSection';
+import { BankingInfoSection } from './form/BankingInfoSection';
+import { AffiliationsSection } from './form/AffiliationsSection';
+import { TimeOffSection } from './form/TimeOffSection';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
-import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, User, Briefcase, CreditCard, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
-
-interface EmployeeFormData {
-  cedula: string;
-  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
-  nombre: string;
-  apellido: string;
-  email: string;
-  telefono: string;
-  salarioBase: number;
-  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
-  fechaIngreso: string;
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
-  eps: string;
-  afp: string;
-  arl: string;
-  cajaCompensacion: string;
-  cargo: string;
-  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
-  banco: string;
-  tipoCuenta: 'ahorros' | 'corriente';
-  numeroCuenta: string;
-  titularCuenta: string;
-  periodicidadPago: 'quincenal' | 'mensual';
-}
+import { useToast } from '@/hooks/use-toast';
 
 interface EmployeeFormWizardProps {
-  employee?: Employee;
-  onSuccess: () => void;
-  onCancel: () => void;
+  employee?: EmployeeUnified;
+  onSuccess?: (employee: EmployeeUnified) => void;
+  onCancel?: () => void;
 }
 
-const BANCOS_COLOMBIA = [
-  'Bancolombia', 'Banco de Bogotá', 'Davivienda', 'BBVA Colombia',
-  'Banco Popular', 'Banco de Occidente', 'Banco AV Villas', 'Bancoomeva',
-  'Banco Falabella', 'Banco Pichincha', 'Banco Caja Social', 'Nequi', 'Daviplata'
+const steps = [
+  { id: 'personal', title: 'Información Personal', icon: Circle },
+  { id: 'labor', title: 'Información Laboral', icon: Circle },
+  { id: 'banking', title: 'Información Bancaria', icon: Circle },
+  { id: 'affiliations', title: 'Afiliaciones', icon: Circle },
+  { id: 'timeoff', title: 'Tiempo Libre', icon: Circle }
 ];
 
-const STEPS = [
-  { id: 1, title: 'Información Personal', icon: User, description: 'Datos básicos del empleado' },
-  { id: 2, title: 'Información Laboral', icon: Briefcase, description: 'Cargo y condiciones de trabajo' },
-  { id: 3, title: 'Información Bancaria', icon: CreditCard, description: 'Datos para pagos' },
-  { id: 4, title: 'Afiliaciones', icon: Shield, description: 'EPS, AFP, ARL y Caja' }
-];
-
-export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFormWizardProps) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const { configuration } = useEmployeeGlobalConfiguration();
-  const { createEmployee, updateEmployee, isLoading } = useEmployeeCRUD();
+export const EmployeeFormWizard = ({ 
+  employee, 
+  onSuccess, 
+  onCancel 
+}: EmployeeFormWizardProps) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState<Partial<EmployeeUnified>>(
+    employee || {
+      empresaId: '',
+      cedula: '',
+      tipoDocumento: 'CC',
+      nombre: '',
+      apellido: '',
+      email: '',
+      telefono: '',
+      salarioBase: 0,
+      tipoContrato: 'indefinido',
+      fechaIngreso: new Date().toISOString().split('T')[0],
+      periodicidadPago: 'mensual',
+      cargo: '',
+      estado: 'activo',
+      banco: '',
+      tipoCuenta: 'ahorros',
+      numeroCuenta: '',
+      titularCuenta: '',
+      eps: '',
+      afp: '',
+      arl: '',
+      cajaCompensacion: '',
+      regimenSalud: 'contributivo',
+      estadoAfiliacion: 'pendiente',
+      tipoJornada: 'completa',
+      formaPago: 'dispersion',
+      custom_fields: {}
+    }
+  );
   
-  const { register, handleSubmit, formState: { errors }, setValue, watch, trigger } = useForm<EmployeeFormData>({
-    defaultValues: {
-      cedula: employee?.cedula || '',
-      tipoDocumento: employee?.tipoDocumento || 'CC',
-      nombre: employee?.nombre || '',
-      apellido: employee?.apellido || '',
-      email: employee?.email || '',
-      telefono: employee?.telefono || '',
-      salarioBase: employee?.salarioBase || 1300000,
-      tipoContrato: employee?.tipoContrato || 'indefinido',
-      fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
-      estado: employee?.estado || 'activo',
-      eps: employee?.eps || '',
-      afp: employee?.afp || '',
-      arl: employee?.arl || '',
-      cajaCompensacion: employee?.cajaCompensacion || '',
-      cargo: employee?.cargo || '',
-      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
-      banco: employee?.banco || '',
-      tipoCuenta: employee?.tipoCuenta || 'ahorros',
-      numeroCuenta: employee?.numeroCuenta || '',
-      titularCuenta: employee?.titularCuenta || '',
-      periodicidadPago: employee?.periodicidadPago || 'mensual'
+  const { createEmployee, updateEmployee, isCreating, isUpdating } = useEmployeeCRUD();
+  const { toast } = useToast();
+
+  const updateFormData = (section: string, data: Partial<EmployeeUnified>) => {
+    setFormData(prev => ({ ...prev, ...data }));
+  };
+
+  const validateStep = (stepIndex: number): boolean => {
+    switch (stepIndex) {
+      case 0: // Personal
+        return !!(formData.cedula && formData.nombre && formData.apellido);
+      case 1: // Labor
+        return !!(formData.salarioBase && formData.fechaIngreso && formData.cargo);
+      case 2: // Banking
+        return !!(formData.banco && formData.tipoCuenta);
+      case 3: // Affiliations
+        return !!(formData.eps && formData.afp);
+      case 4: // Time Off (always valid for now)
+        return true;
+      default:
+        return false;
     }
-  });
+  };
 
-  const watchedValues = watch();
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
+    }
+  };
 
-  useEffect(() => {
-    const loadCompanyId = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  const handlePrev = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 0));
+  };
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
+  const handleSubmit = async () => {
+    if (!validateStep(currentStep)) return;
 
-        if (profile?.company_id) {
-          setCompanyId(profile.company_id);
-        }
-      } catch (error) {
-        console.error('Error loading company ID:', error);
+    try {
+      // Ensure all required fields are present
+      const employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> = {
+        empresaId: formData.empresaId || '',
+        cedula: formData.cedula || '',
+        tipoDocumento: formData.tipoDocumento || 'CC',
+        nombre: formData.nombre || '',
+        segundoNombre: formData.segundoNombre,
+        apellido: formData.apellido || '',
+        email: formData.email,
+        telefono: formData.telefono,
+        sexo: formData.sexo,
+        fechaNacimiento: formData.fechaNacimiento,
+        direccion: formData.direccion,
+        ciudad: formData.ciudad,
+        departamento: formData.departamento,
+        salarioBase: formData.salarioBase || 0,
+        tipoContrato: formData.tipoContrato || 'indefinido',
+        fechaIngreso: formData.fechaIngreso || new Date().toISOString().split('T')[0],
+        periodicidadPago: formData.periodicidadPago || 'mensual',
+        cargo: formData.cargo,
+        codigoCIIU: formData.codigoCIIU,
+        nivelRiesgoARL: formData.nivelRiesgoARL,
+        estado: formData.estado || 'activo',
+        centroCostos: formData.centroCostos,
+        fechaFirmaContrato: formData.fechaFirmaContrato,
+        fechaFinalizacionContrato: formData.fechaFinalizacionContrato,
+        tipoJornada: formData.tipoJornada || 'completa',
+        diasTrabajo: formData.diasTrabajo,
+        horasTrabajo: formData.horasTrabajo,
+        beneficiosExtralegales: formData.beneficiosExtralegales,
+        clausulasEspeciales: formData.clausulasEspeciales,
+        banco: formData.banco,
+        tipoCuenta: formData.tipoCuenta || 'ahorros',
+        numeroCuenta: formData.numeroCuenta,
+        titularCuenta: formData.titularCuenta,
+        formaPago: formData.formaPago || 'dispersion',
+        eps: formData.eps,
+        afp: formData.afp,
+        arl: formData.arl,
+        cajaCompensacion: formData.cajaCompensacion,
+        tipoCotizanteId: formData.tipoCotizanteId,
+        subtipoCotizanteId: formData.subtipoCotizanteId,
+        regimenSalud: formData.regimenSalud || 'contributivo',
+        estadoAfiliacion: formData.estadoAfiliacion || 'pendiente',
+        custom_fields: formData.custom_fields || {}
+      };
+
+      let result;
+      if (employee?.id) {
+        result = await updateEmployee(employee.id, employeeData);
+      } else {
+        result = await createEmployee(employeeData);
       }
-    };
 
-    loadCompanyId();
-  }, []);
-
-  // Auto-fill titular cuenta based on nombre and apellido
-  useEffect(() => {
-    if (watchedValues.nombre && watchedValues.apellido) {
-      setValue('titularCuenta', `${watchedValues.nombre} ${watchedValues.apellido}`);
-    }
-  }, [watchedValues.nombre, watchedValues.apellido, setValue]);
-
-  const validateCurrentStep = async () => {
-    const fieldsToValidate = getFieldsForStep(currentStep);
-    const isValid = await trigger(fieldsToValidate);
-    
-    if (isValid && !completedSteps.includes(currentStep)) {
-      setCompletedSteps([...completedSteps, currentStep]);
-    }
-    
-    return isValid;
-  };
-
-  const getFieldsForStep = (step: number): (keyof EmployeeFormData)[] => {
-    switch (step) {
-      case 1: return ['tipoDocumento', 'cedula', 'nombre', 'apellido', 'email', 'telefono'];
-      case 2: return ['salarioBase', 'tipoContrato', 'fechaIngreso', 'cargo'];
-      case 3: return ['banco', 'tipoCuenta', 'numeroCuenta', 'titularCuenta'];
-      case 4: return ['eps', 'afp', 'arl', 'cajaCompensacion'];
-      default: return [];
+      if (result) {
+        toast({
+          title: "Empleado guardado exitosamente",
+          description: employee ? "Los datos se actualizaron correctamente" : "El empleado se creó correctamente"
+        });
+        onSuccess?.(result);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Ocurrió un error al guardar el empleado",
+        variant: "destructive"
+      });
     }
   };
 
-  const nextStep = async () => {
-    const isValid = await validateCurrentStep();
-    if (isValid && currentStep < 4) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const onSubmit = async (data: EmployeeFormData) => {
-    console.log('Submitting form data:', data);
-    
-    if (!companyId) {
-      console.error('No company ID available');
-      return;
-    }
-
-    // Crear el objeto de empleado con TODOS los campos incluyendo los bancarios
-    const employeeData = {
-      empresaId: companyId,
-      cedula: data.cedula,
-      tipoDocumento: data.tipoDocumento,
-      nombre: data.nombre,
-      apellido: data.apellido,
-      email: data.email,
-      telefono: data.telefono,
-      salarioBase: Number(data.salarioBase),
-      tipoContrato: data.tipoContrato,
-      fechaIngreso: data.fechaIngreso,
-      periodicidadPago: data.periodicidadPago,
-      estado: data.estado,
-      eps: data.eps,
-      afp: data.afp,
-      arl: data.arl,
-      cajaCompensacion: data.cajaCompensacion,
-      cargo: data.cargo,
-      estadoAfiliacion: data.estadoAfiliacion,
-      // Agregar campos bancarios
-      banco: data.banco,
-      tipoCuenta: data.tipoCuenta,
-      numeroCuenta: data.numeroCuenta,
-      titularCuenta: data.titularCuenta
-    };
-
-    console.log('Final employee data to create:', employeeData);
-
-    let result;
-    if (employee) {
-      result = await updateEmployee(employee.id, employeeData);
-    } else {
-      result = await createEmployee(employeeData);
-    }
-
-    console.log('Create/Update result:', result);
-
-    if (result.success) {
-      onSuccess();
-    }
-  };
-
-  const renderStepIndicator = () => (
-    <div className="flex items-center justify-between mb-8">
-      {STEPS.map((step, index) => (
-        <div key={step.id} className="flex items-center">
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
-            currentStep === step.id 
-              ? 'bg-primary border-primary text-primary-foreground' 
-              : completedSteps.includes(step.id)
-              ? 'bg-green-500 border-green-500 text-white'
-              : 'border-gray-300 text-gray-400'
-          }`}>
-            {completedSteps.includes(step.id) ? (
-              <CheckCircle className="w-5 h-5" />
-            ) : (
-              <step.icon className="w-5 h-5" />
-            )}
-          </div>
-          {index < STEPS.length - 1 && (
-            <div className={`h-0.5 w-16 mx-2 transition-all duration-200 ${
-              completedSteps.includes(step.id) ? 'bg-green-500' : 'bg-gray-200'
-            }`} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderStep1 = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-semibold text-gray-900">Información Personal</h3>
-        <p className="text-gray-600">Ingresa los datos básicos del empleado</p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="tipoDocumento" className="text-sm font-medium">Tipo de Documento *</Label>
-          <Select onValueChange={(value) => setValue('tipoDocumento', value as any)} defaultValue={watchedValues.tipoDocumento}>
-            <SelectTrigger className="h-12">
-              <SelectValue placeholder="Seleccionar tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS_DOCUMENTO.map((tipo) => (
-                <SelectItem key={tipo.value} value={tipo.value}>
-                  {tipo.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.tipoDocumento && <p className="text-red-500 text-sm">{errors.tipoDocumento.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="cedula" className="text-sm font-medium">Número de Documento *</Label>
-          <Input
-            id="cedula"
-            {...register('cedula', { required: 'El número de documento es requerido' })}
-            placeholder="1234567890"
-            className="h-12"
-          />
-          {errors.cedula && <p className="text-red-500 text-sm">{errors.cedula.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="nombre" className="text-sm font-medium">Nombre *</Label>
-          <Input
-            id="nombre"
-            {...register('nombre', { required: 'El nombre es requerido' })}
-            placeholder="Juan"
-            className="h-12"
-          />
-          {errors.nombre && <p className="text-red-500 text-sm">{errors.nombre.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="apellido" className="text-sm font-medium">Apellido *</Label>
-          <Input
-            id="apellido"
-            {...register('apellido', { required: 'El apellido es requerido' })}
-            placeholder="Pérez"
-            className="h-12"
-          />
-          {errors.apellido && <p className="text-red-500 text-sm">{errors.apellido.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium">Email *</Label>
-          <Input
-            id="email"
-            type="email"
-            {...register('email', { required: 'El email es requerido' })}
-            placeholder="juan.perez@empresa.com"
-            className="h-12"
-          />
-          {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="telefono" className="text-sm font-medium">Teléfono</Label>
-          <Input
-            id="telefono"
-            {...register('telefono')}
-            placeholder="3001234567"
-            className="h-12"
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderStep2 = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-semibold text-gray-900">Información Laboral</h3>
-        <p className="text-gray-600">Define el cargo y condiciones de trabajo</p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="cargo" className="text-sm font-medium">Cargo *</Label>
-          <Input
-            id="cargo"
-            {...register('cargo', { required: 'El cargo es requerido' })}
-            placeholder="Desarrollador Senior"
-            className="h-12"
-          />
-          {errors.cargo && <p className="text-red-500 text-sm">{errors.cargo.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="salarioBase" className="text-sm font-medium">Salario Base *</Label>
-          <Input
-            id="salarioBase"
-            type="number"
-            {...register('salarioBase', { required: 'El salario es requerido', min: 1 })}
-            placeholder="2500000"
-            className="h-12"
-          />
-          {errors.salarioBase && <p className="text-red-500 text-sm">{errors.salarioBase.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="tipoContrato" className="text-sm font-medium">Tipo de Contrato *</Label>
-          <Select onValueChange={(value) => setValue('tipoContrato', value as any)} defaultValue={watchedValues.tipoContrato}>
-            <SelectTrigger className="h-12">
-              <SelectValue placeholder="Seleccionar tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {CONTRACT_TYPES.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="fechaIngreso" className="text-sm font-medium">Fecha de Ingreso *</Label>
-          <Input
-            id="fechaIngreso"
-            type="date"
-            {...register('fechaIngreso', { required: 'La fecha de ingreso es requerida' })}
-            className="h-12"
-          />
-          {errors.fechaIngreso && <p className="text-red-500 text-sm">{errors.fechaIngreso.message}</p>}
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="estado" className="text-sm font-medium">Estado</Label>
-          <Select onValueChange={(value) => setValue('estado', value as any)} defaultValue={watchedValues.estado}>
-            <SelectTrigger className="h-12">
-              <SelectValue placeholder="Seleccionar estado" />
-            </SelectTrigger>
-            <SelectContent>
-              {ESTADOS_EMPLEADO.map((estado) => (
-                <SelectItem key={estado.value} value={estado.value}>
-                  {estado.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderStep3 = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-semibold text-gray-900">Información Bancaria</h3>
-        <p className="text-gray-600">Datos necesarios para realizar los pagos</p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="banco" className="text-sm font-medium">Banco *</Label>
-          <Select onValueChange={(value) => setValue('banco', value)} defaultValue={watchedValues.banco}>
-            <SelectTrigger className="h-12">
-              <SelectValue placeholder="Seleccionar banco" />
-            </SelectTrigger>
-            <SelectContent>
-              {BANCOS_COLOMBIA.map((banco) => (
-                <SelectItem key={banco} value={banco}>
-                  {banco}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.banco && <p className="text-red-500 text-sm">{errors.banco.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="tipoCuenta" className="text-sm font-medium">Tipo de Cuenta *</Label>
-          <Select onValueChange={(value) => setValue('tipoCuenta', value as any)} defaultValue={watchedValues.tipoCuenta}>
-            <SelectTrigger className="h-12">
-              <SelectValue placeholder="Seleccionar tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ahorros">Ahorros</SelectItem>
-              <SelectItem value="corriente">Corriente</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="numeroCuenta" className="text-sm font-medium">Número de Cuenta *</Label>
-          <Input
-            id="numeroCuenta"
-            {...register('numeroCuenta', { required: 'El número de cuenta es requerido' })}
-            placeholder="1234567890"
-            className="h-12"
-          />
-          {errors.numeroCuenta && <p className="text-red-500 text-sm">{errors.numeroCuenta.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="titularCuenta" className="text-sm font-medium">Titular de la Cuenta *</Label>
-          <Input
-            id="titularCuenta"
-            {...register('titularCuenta', { required: 'El titular de la cuenta es requerido' })}
-            placeholder="Juan Pérez"
-            className="h-12"
-          />
-          {errors.titularCuenta && <p className="text-red-500 text-sm">{errors.titularCuenta.message}</p>}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderStep4 = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-semibold text-gray-900">Afiliaciones</h3>
-        <p className="text-gray-600">Información de seguridad social y prestaciones</p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="eps" className="text-sm font-medium">EPS *</Label>
-          <Input
-            id="eps"
-            {...register('eps', { required: 'La EPS es requerida' })}
-            placeholder="Sura EPS"
-            className="h-12"
-          />
-          {errors.eps && <p className="text-red-500 text-sm">{errors.eps.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="afp" className="text-sm font-medium">AFP *</Label>
-          <Input
-            id="afp"
-            {...register('afp', { required: 'La AFP es requerida' })}
-            placeholder="Porvenir"
-            className="h-12"
-          />
-          {errors.afp && <p className="text-red-500 text-sm">{errors.afp.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="arl" className="text-sm font-medium">ARL *</Label>
-          <Input
-            id="arl"
-            {...register('arl', { required: 'La ARL es requerida' })}
-            placeholder="Sura ARL"
-            className="h-12"
-          />
-          {errors.arl && <p className="text-red-500 text-sm">{errors.arl.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="cajaCompensacion" className="text-sm font-medium">Caja de Compensación *</Label>
-          <Input
-            id="cajaCompensacion"
-            {...register('cajaCompensacion', { required: 'La caja de compensación es requerida' })}
-            placeholder="Compensar"
-            className="h-12"
-          />
-          {errors.cajaCompensacion && <p className="text-red-500 text-sm">{errors.cajaCompensacion.message}</p>}
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="estadoAfiliacion" className="text-sm font-medium">Estado Afiliación</Label>
-          <Select onValueChange={(value) => setValue('estadoAfiliacion', value as any)} defaultValue={watchedValues.estadoAfiliacion}>
-            <SelectTrigger className="h-12">
-              <SelectValue placeholder="Seleccionar estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="completa">Completa</SelectItem>
-              <SelectItem value="pendiente">Pendiente</SelectItem>
-              <SelectItem value="inconsistente">Inconsistente</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderCurrentStep = () => {
+  const renderStepContent = () => {
     switch (currentStep) {
-      case 1: return renderStep1();
-      case 2: return renderStep2();
-      case 3: return renderStep3();
-      case 4: return renderStep4();
-      default: return renderStep1();
+      case 0:
+        return (
+          <PersonalInfoSection
+            formData={formData}
+            updateFormData={(data) => updateFormData('personal', data)}
+            errors={{}}
+          />
+        );
+      case 1:
+        return (
+          <LaborInfoSection
+            formData={formData}
+            updateFormData={(data) => updateFormData('labor', data)}
+            errors={{}}
+          />
+        );
+      case 2:
+        return (
+          <BankingInfoSection
+            formData={formData}
+            updateFormData={(data) => updateFormData('banking', data)}
+            errors={{}}
+          />
+        );
+      case 3:
+        return (
+          <AffiliationsSection
+            formData={formData}
+            updateFormData={(data) => updateFormData('affiliations', data)}
+            errors={{}}
+          />
+        );
+      case 4:
+        return employee?.id ? (
+          <TimeOffSection
+            employeeId={employee.id}
+            isReadOnly={false}
+          />
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500">
+              El empleado debe ser guardado primero para gestionar tiempo libre
+            </p>
+          </div>
+        );
+      default:
+        return null;
     }
   };
+
+  const isLastStep = currentStep === steps.length - 1;
+  const canProceed = validateStep(currentStep);
 
   return (
-    <Card className="w-full max-w-4xl mx-auto border-0 shadow-none">
-      <CardContent className="space-y-8 p-0">
-        {renderStepIndicator()}
-        
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          <div className="min-h-[400px]">
-            {renderCurrentStep()}
-          </div>
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Step indicators */}
+      <div className="flex items-center justify-between">
+        {steps.map((step, index) => {
+          const isCompleted = index < currentStep;
+          const isCurrent = index === currentStep;
+          const isValid = validateStep(index);
           
-          <Separator />
-          
-          <div className="flex justify-between items-center pt-4">
-            <div className="flex gap-3">
-              {currentStep > 1 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={prevStep}
-                  className="flex items-center gap-2"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Anterior
-                </Button>
+          return (
+            <div key={step.id} className="flex items-center">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                isCompleted 
+                  ? 'bg-green-500 border-green-500 text-white' 
+                  : isCurrent 
+                    ? isValid 
+                      ? 'bg-blue-500 border-blue-500 text-white'
+                      : 'bg-white border-red-500 text-red-500'
+                    : 'bg-white border-gray-300 text-gray-500'
+              }`}>
+                {isCompleted ? (
+                  <CheckCircle className="w-5 h-5" />
+                ) : (
+                  <span className="text-sm font-medium">{index + 1}</span>
+                )}
+              </div>
+              <span className={`ml-2 text-sm font-medium ${
+                isCurrent ? 'text-gray-900' : 'text-gray-500'
+              }`}>
+                {step.title}
+              </span>
+              {index < steps.length - 1 && (
+                <div className="w-8 h-px bg-gray-300 mx-4" />
               )}
             </div>
-            
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancel}
-                disabled={isLoading}
-              >
-                Cancelar
-              </Button>
-              
-              {currentStep < 4 ? (
-                <Button
-                  type="button"
-                  onClick={nextStep}
-                  className="flex items-center gap-2"
-                >
-                  Siguiente
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-                >
-                  {isLoading ? 'Guardando...' : employee ? 'Actualizar Empleado' : 'Crear Empleado'}
-                </Button>
-              )}
-            </div>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          );
+        })}
+      </div>
+
+      {/* Step content */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            {steps[currentStep].title}
+            <Badge variant="outline">
+              {currentStep + 1} de {steps.length}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {renderStepContent()}
+        </CardContent>
+      </Card>
+
+      {/* Navigation */}
+      <div className="flex justify-between">
+        <Button
+          variant="outline"
+          onClick={currentStep === 0 ? onCancel : handlePrev}
+          className="flex items-center"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          {currentStep === 0 ? 'Cancelar' : 'Anterior'}
+        </Button>
+
+        <Button
+          onClick={isLastStep ? handleSubmit : handleNext}
+          disabled={!canProceed || isCreating || isUpdating}
+          className="flex items-center"
+        >
+          {isLastStep ? 'Guardar' : 'Siguiente'}
+          {!isLastStep && <ArrowRight className="w-4 h-4 ml-2" />}
+        </Button>
+      </div>
+    </div>
   );
 };

@@ -1,268 +1,334 @@
-import React, { useState } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Plus, 
-  Trash2, 
-  MoreHorizontal,
-  Edit3
-} from 'lucide-react';
-import { PayrollEmployee } from '@/types/payroll';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Eye, Search, Filter, FileText, Download, Calculator, Plus, Edit, Trash2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { PayrollPeriodEnhancedService } from '@/services/PayrollPeriodEnhancedService';
+import { PayrollCalculationEnhancedService } from '@/services/PayrollCalculationEnhancedService';
+import { NovedadType, NOVEDAD_TYPE_LABELS, calcularValorNovedad } from '@/types/novedades-enhanced';
+import { PayrollNovedad } from '@/types/novedades-enhanced';
 import { NovedadUnifiedModal } from './novedades/NovedadUnifiedModal';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
-import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
+import { formatCurrency } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { PayrollPeriod } from '@/types/payroll-period';
+import { EmployeeUnified } from '@/types/employee-unified';
+import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
+import { PayrollNovedadEnhancedService } from '@/services/PayrollNovedadEnhancedService';
 
 interface PayrollTableNewProps {
-  employees: PayrollEmployee[];
-  onRemoveEmployee: (employeeId: string) => void;
-  onCreateNovedad: (employeeId: string, data: CreateNovedadData) => void;
-  onRecalculate?: () => Promise<void>; // ✅ Fixed: no parameters needed
   periodId: string;
-  canEdit: boolean;
-  selectedEmployees: string[];
-  onToggleEmployee: (employeeId: string) => void;
-  onToggleAll: () => void;
+  companyId: string;
+  onPeriodRefresh?: () => void;
 }
 
-export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({
-  employees,
-  onRemoveEmployee,
-  onCreateNovedad,
-  onRecalculate, // ✅ Fixed signature
-  periodId,
-  canEdit,
-  selectedEmployees,
-  onToggleEmployee,
-  onToggleAll
-}) => {
-  const [showNovedadModal, setShowNovedadModal] = useState(false);
-  const [selectedEmployeeForNovedad, setSelectedEmployeeForNovedad] = useState<PayrollEmployee | null>(null);
-  const [isRecalculating, setIsRecalculating] = useState(false);
+export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, companyId, onPeriodRefresh }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
+  const [selectedNovedadType, setSelectedNovedadType] = useState<NovedadType | null>(null);
+  const [employeeSalary, setEmployeeSalary] = useState<number | undefined>(undefined);
+  const [startDate, setStartDate] = useState<string | undefined>(undefined);
+  const [endDate, setEndDate] = useState<string | undefined>(undefined);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeUnified | null>(null);
+  const { toast } = useToast();
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+  // Fetch payroll period details
+  const { data: period, isLoading: isPeriodLoading, error: periodError, refetch: refetchPeriod } = useQuery({
+    queryKey: ['payroll-period', periodId],
+    queryFn: () => PayrollPeriodEnhancedService.getPeriodById(periodId),
+    enabled: !!periodId,
+  });
 
-  const handleOpenNovedadModal = (employee: PayrollEmployee) => {
-    setSelectedEmployeeForNovedad(employee);
-    setShowNovedadModal(true);
-  };
+  // Fetch employees for the company
+  const { data: employeesData, isLoading: isEmployeesLoading, error: employeesError, refetch: refetchEmployees } = useQuery({
+    queryKey: ['employees-for-company', companyId],
+    queryFn: async () => {
+      const result = await EmployeeUnifiedService.getAll();
+      return result.data || [];
+    },
+    enabled: !!companyId,
+  });
 
-  const handleCreateNovedad = async (data: CreateNovedadData) => {
-    if (selectedEmployeeForNovedad) {
-      await onCreateNovedad(selectedEmployeeForNovedad.id, data);
-      setShowNovedadModal(false);
-      setSelectedEmployeeForNovedad(null);
-      
-      // ✅ Fixed: call without parameters
-      if (onRecalculate) {
-        setIsRecalculating(true);
-        try {
-          await onRecalculate();
-        } finally {
-          setIsRecalculating(false);
-        }
-      }
+  const employees = useMemo(() => {
+    return (employeesData || []).filter(employee =>
+      employee.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.cedula.includes(searchTerm)
+    );
+  }, [employeesData, searchTerm]);
+
+  // Fetch novedades for the period
+  const { data: novedades, isLoading: isNovedadesLoading, error: novedadesError, refetch: refetchNovedades } = useQuery({
+    queryKey: ['novedades-for-period', periodId],
+    queryFn: () => PayrollNovedadEnhancedService.getNovedadesByPeriodId(periodId),
+    enabled: !!periodId,
+  });
+
+  useEffect(() => {
+    if (period) {
+      setStartDate(period.fecha_inicio);
+      setEndDate(period.fecha_fin);
     }
+  }, [period]);
+
+  const handleOpenNovedadModal = (employeeId: string, employeeSalary: number, type?: NovedadType) => {
+    setSelectedEmployeeId(employeeId);
+    setEmployeeSalary(employeeSalary);
+    setSelectedNovedadType(type || null);
+    setIsNovedadModalOpen(true);
+
+    // Find and set the selected employee
+    const employee = employees.find(emp => emp.id === employeeId);
+    setSelectedEmployee(employee || null);
   };
 
-  // ✅ Fixed: call without parameters
-  const handleNovedadChange = async () => {
-    if (onRecalculate) {
-      setIsRecalculating(true);
-      console.log('🔄 Recalculando liquidación tras cambio en novedades...');
-      try {
-        await onRecalculate();
-        console.log('✅ Recálculo completado');
-      } catch (error) {
-        console.error('❌ Error en recálculo:', error);
-      } finally {
-        setIsRecalculating(false);
-      }
+  const handleCloseNovedadModal = () => {
+    setIsNovedadModalOpen(false);
+    setSelectedNovedadType(null);
+    setSelectedEmployeeId(null);
+    setSelectedEmployee(null);
+  };
+
+  const handleNovedadSubmit = async (data: any) => {
+    if (!selectedEmployeeId || !periodId) {
+      toast({
+        title: "Error",
+        description: "Faltan datos del empleado o período",
+        variant: "destructive",
+      });
+      return;
     }
-  };
 
-  const calculateSuggestedValue = (
-    tipo: string,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ): number | null => {
-    if (!selectedEmployeeForNovedad) return null;
-    
-    console.log('🧮 PayrollTableNew - Calculating suggested value:', {
-      tipo,
-      subtipo,
-      horas,
-      dias,
-      employeeSalary: selectedEmployeeForNovedad.baseSalary
-    });
-    
     try {
-      const fechaPeriodo = new Date();
-      const result = calcularValorNovedadEnhanced(
-        tipo as any,
-        subtipo,
-        selectedEmployeeForNovedad.baseSalary,
-        dias,
-        horas,
-        fechaPeriodo
-      );
-      
-      console.log(`💰 Calculation result: $${Math.round(result.valor).toLocaleString()}`);
-      return Math.round(result.valor);
-    } catch (error) {
-      console.error('❌ Error calculating suggested value:', error);
-      return null;
+      // ✅ NUEVO: Enviar también company_id
+      const submitData = {
+        ...data,
+        empleado_id: selectedEmployeeId,
+        periodo_id: periodId,
+        company_id: companyId
+      };
+
+      console.log('Saving novelty:', submitData);
+      await PayrollNovedadEnhancedService.createNovedad(submitData);
+
+      toast({
+        title: "Novedad guardada",
+        description: "La novedad se ha guardado correctamente",
+      });
+
+      // Refresh data
+      await refetchNovedades();
+      await refetchPeriod();
+      onPeriodRefresh?.();
+
+    } catch (error: any) {
+      console.error("Error creating novedad:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo guardar la novedad",
+        variant: "destructive",
+      });
+    } finally {
+      handleCloseNovedadModal();
     }
   };
 
-  const allSelected = employees.length > 0 && selectedEmployees.length === employees.length;
-  const someSelected = selectedEmployees.length > 0 && selectedEmployees.length < employees.length;
+  const handleEmployeeNovedadesChange = async (employeeId: string) => {
+    console.log('🔄 Refreshing novedades for employee:', employeeId);
+    await refetchNovedades();
+    await refetchPeriod();
+    onPeriodRefresh?.();
+  };
+
+  const getEmployeeNovedades = (employeeId: string): PayrollNovedad[] => {
+    return (novedades || []).filter(novedad => novedad.empleado_id === employeeId);
+  };
+
+  const calculateEmployeeTotal = (employeeId: string): number => {
+    const employeeNovedades = getEmployeeNovedades(employeeId);
+    return employeeNovedades.reduce((total, novedad) => total + (novedad.valor || 0), 0);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      'activo': 'bg-green-100 text-green-800',
+      'inactivo': 'bg-red-100 text-red-800',
+      'vacaciones': 'bg-blue-100 text-blue-800',
+      'incapacidad': 'bg-yellow-100 text-yellow-800'
+    };
+
+    const labels = {
+      'activo': 'Activo',
+      'inactivo': 'Inactivo',
+      'vacaciones': 'Vacaciones',
+      'incapacidad': 'Incapacidad'
+    };
+
+    return (
+      <Badge variant="outline" className={variants[status as keyof typeof variants] || 'bg-gray-100 text-gray-800'}>
+        {labels[status as keyof typeof labels] || status}
+      </Badge>
+    );
+  };
+
+  if (isPeriodLoading || isEmployeesLoading || isNovedadesLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (periodError || employeesError || novedadesError) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-red-600">
+            Error: {periodError?.message || employeesError?.message || novedadesError?.message}
+            <Button onClick={() => { refetchPeriod(); refetchEmployees(); refetchNovedades(); }} className="ml-4">
+              Reintentar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <>
-      <div className="border rounded-lg overflow-hidden bg-white">
-        {/* ✅ Indicador de recálculo */}
-        {isRecalculating && (
-          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
-            <div className="flex items-center gap-2 text-blue-700">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <span className="text-sm">Recalculando liquidación...</span>
-            </div>
-          </div>
-        )}
-
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50">
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={onToggleAll}
-                  ref={(el) => {
-                    if (el) {
-                      const input = el.querySelector('input[type="checkbox"]') as HTMLInputElement;
-                      if (input) {
-                        input.indeterminate = someSelected;
-                      }
-                    }
-                  }}
-                />
-              </TableHead>
-              <TableHead>Empleado</TableHead>
-              <TableHead className="text-right">Salario Base</TableHead>
-              <TableHead className="text-center">Novedades</TableHead>
-              <TableHead className="text-right">Neto a Pagar</TableHead>
-              <TableHead className="text-center">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {employees.map((employee) => (
-              <TableRow key={employee.id} className="hover:bg-gray-50">
-                <TableCell>
-                  <Checkbox
-                    checked={selectedEmployees.includes(employee.id)}
-                    onCheckedChange={() => onToggleEmployee(employee.id)}
-                  />
-                </TableCell>
-                
-                <TableCell>
-                  <div>
-                    <p className="font-medium text-gray-900">{employee.name}</p>
-                    <p className="text-sm text-gray-500">{employee.position}</p>
-                  </div>
-                </TableCell>
-                
-                <TableCell className="text-right">
-                  <span className="font-medium">
-                    {formatCurrency(employee.baseSalary)}
-                  </span>
-                </TableCell>
-                
-                <TableCell className="text-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenNovedadModal(employee)}
-                    className="h-8 w-8 p-0 rounded-full border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                  >
-                    <Plus className="h-4 w-4 text-blue-500" />
-                  </Button>
-                </TableCell>
-                
-                <TableCell className="text-right">
-                  <div className="text-right">
-                    <div className="font-semibold text-gray-900">
-                      {formatCurrency(employee.netPay)}
-                    </div>
-                    {employee.bonuses > 0 && (
-                      <div className="text-xs text-green-600">
-                        +{formatCurrency(employee.bonuses)}
-                      </div>
-                    )}
-                    {employee.deductions > 0 && (
-                      <div className="text-xs text-red-600">
-                        -{formatCurrency(employee.deductions)}
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                
-                <TableCell className="text-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleOpenNovedadModal(employee)}
-                      >
-                        <Edit3 className="h-4 w-4 mr-2" />
-                        Gestionar Novedades
-                      </DropdownMenuItem>
-                      {canEdit && (
-                        <DropdownMenuItem
-                          onClick={() => onRemoveEmployee(employee.id)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Quitar del período
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Nómina</h2>
+          <p className="text-gray-600">
+            Período: {period?.nombre} ({period?.estado})
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            type="search"
+            placeholder="Buscar empleado..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-xs"
+          />
+          <Button>
+            <Download className="w-4 h-4 mr-2" />
+            Descargar
+          </Button>
+        </div>
       </div>
 
-      {selectedEmployeeForNovedad && (
-        <NovedadUnifiedModal
-          open={showNovedadModal}
-          setOpen={setShowNovedadModal}
-          employeeId={selectedEmployeeForNovedad.id}
-          employeeSalary={selectedEmployeeForNovedad.baseSalary}
-          periodId={periodId}
-          onSubmit={handleCreateNovedad}
-          selectedNovedadType={null}
-          onClose={() => {
-            setShowNovedadModal(false);
-            setSelectedEmployeeForNovedad(null);
-          }}
-        />
-      )}
-    </>
+      {/* Employee Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Lista de Empleados
+            <Button onClick={refetchNovedades}>
+              <Calculator className="w-4 h-4 mr-2" />
+              Recalcular
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-4">Empleado</th>
+                  <th className="text-left p-4">Cédula</th>
+                  <th className="text-left p-4">Cargo</th>
+                  <th className="text-left p-4">Estado</th>
+                  <th className="text-left p-4">Novedades</th>
+                  <th className="text-left p-4">Total</th>
+                  <th className="text-left p-4">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map((employee) => (
+                  <tr key={employee.id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">
+                      <div>
+                        <div className="font-medium">
+                          {employee.nombre} {employee.apellido}
+                        </div>
+                        <div className="text-sm text-gray-600">{employee.email}</div>
+                      </div>
+                    </td>
+                    <td className="p-4">{employee.cedula}</td>
+                    <td className="p-4">{employee.cargo || 'No especificado'}</td>
+                    <td className="p-4">{getStatusBadge(employee.estado)}</td>
+                    <td className="p-4">
+                      <div className="flex flex-col gap-1">
+                        {getEmployeeNovedades(employee.id).map(novedad => (
+                          <Badge key={novedad.id} variant="secondary">
+                            {NOVEDAD_TYPE_LABELS[novedad.tipo_novedad]} +{formatCurrency(novedad.valor || 0)}
+                          </Badge>
+                        ))}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenNovedadModal(employee.id, employee.salarioBase)}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Agregar Novedad
+                        </Button>
+                      </div>
+                    </td>
+                    <td className="p-4 font-bold text-green-600">
+                      {formatCurrency(calculateEmployeeTotal(employee.id))}
+                    </td>
+                    <td className="p-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem>
+                            <Eye className="w-4 h-4 mr-2" />
+                            Ver Detalles
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenNovedadModal(employee.id, employee.salarioBase)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Editar Novedades
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <FileText className="w-4 h-4 mr-2" />
+                            Generar Comprobante
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <NovedadUnifiedModal
+        open={isNovedadModalOpen}
+        setOpen={setIsNovedadModalOpen}
+        employeeId={selectedEmployeeId}
+        employeeSalary={employeeSalary}
+        periodId={periodId}
+        onSubmit={handleNovedadSubmit}
+        onClose={handleCloseNovedadModal}
+        selectedNovedadType={selectedNovedadType}
+        onEmployeeNovedadesChange={handleEmployeeNovedadesChange}
+        startDate={startDate}
+        endDate={endDate}
+      />
+    </div>
   );
 };

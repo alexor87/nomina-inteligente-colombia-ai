@@ -1,136 +1,187 @@
 
-import { useQuery } from '@tanstack/react-query';
-import { useState, useMemo } from 'react';
-import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
+import { useState, useEffect, useMemo } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
+import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 
-interface EmployeeFilters {
-  search: string;
-  status: string;
-  department: string;
-  sortBy: 'name' | 'date' | 'salary';
-  sortOrder: 'asc' | 'desc';
+export interface EmployeeFilters {
+  searchTerm: string;
+  estado: string;
+  tipoContrato: string;
 }
 
-export const useEmployeeList = () => {
-  const [filters, setFilters] = useState<EmployeeFilters>({
-    search: '',
-    status: 'all',
-    department: 'all',
-    sortBy: 'name',
-    sortOrder: 'asc'
+export interface EmployeeListHook {
+  employees: EmployeeUnified[];
+  isLoading: boolean;
+  error: string | null;
+  filters: EmployeeFilters;
+  setFilters: (filters: Partial<EmployeeFilters>) => void;
+  selectedEmployees: string[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  };
+  clearFilters: () => void;
+  toggleEmployeeSelection: (id: string) => void;
+  toggleAllEmployees: () => void;
+  totalEmployees: number;
+  filteredCount: number;
+  refreshEmployees: () => Promise<void>;
+  forceCompleteRefresh: () => Promise<void>;
+  getComplianceIndicators: () => any;
+  clearSelection: () => void;
+  statistics: {
+    active: number;
+    inactive: number;
+    onVacation: number;
+    onLeave: number;
+  };
+}
+
+export const useEmployeeList = (): EmployeeListHook => {
+  const [employees, setEmployees] = useState<EmployeeUnified[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [filters, setFiltersState] = useState<EmployeeFilters>({
+    searchTerm: '',
+    estado: '',
+    tipoContrato: ''
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-  const { 
-    data: employees = [], 
-    isLoading, 
-    error, 
-    refetch 
-  } = useQuery({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      console.log('🔄 useEmployeeList: Fetching employees from service');
-      const result = await EmployeeUnifiedService.getAll();
-      
-      if (result.success && result.data) {
-        console.log('✅ useEmployeeList: Successfully fetched', result.data.length, 'employees');
-        return result.data;
-      } else {
-        console.error('❌ useEmployeeList: Error fetching employees:', result.error);
-        throw new Error(result.error || 'Error fetching employees');
-      }
-    },
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  });
-
-  // Convert EmployeeUnified to EmployeeWithStatus format
-  const employeesWithStatus = useMemo(() => {
-    return employees.map((employee: EmployeeUnified) => ({
-      ...employee,
-      // Ensure all required fields are present
-      id: employee.id,
-      empresaId: employee.empresaId,
-    }));
-  }, [employees]);
-
-  const filteredEmployees = useMemo(() => {
-    let filtered = [...employeesWithStatus];
-
-    // Apply search filter
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(employee =>
-        employee.nombre?.toLowerCase().includes(searchTerm) ||
-        employee.apellido?.toLowerCase().includes(searchTerm) ||
-        employee.cedula?.toLowerCase().includes(searchTerm) ||
-        employee.email?.toLowerCase().includes(searchTerm) ||
-        employee.cargo?.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Apply status filter
-    if (filters.status !== 'all') {
-      filtered = filtered.filter(employee => employee.estado === filters.status);
-    }
-
-    // Apply department filter (using cargo as department for now)
-    if (filters.department !== 'all') {
-      filtered = filtered.filter(employee => employee.cargo === filters.department);
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      
-      switch (filters.sortBy) {
-        case 'name':
-          comparison = (a.nombre || '').localeCompare(b.nombre || '');
-          break;
-        case 'date':
-          comparison = new Date(a.fechaIngreso || '').getTime() - new Date(b.fechaIngreso || '').getTime();
-          break;
-        case 'salary':
-          comparison = (a.salarioBase || 0) - (b.salarioBase || 0);
-          break;
-        default:
-          comparison = 0;
-      }
-
-      return filters.sortOrder === 'desc' ? -comparison : comparison;
-    });
-
-    return filtered;
-  }, [employeesWithStatus, filters]);
-
-  const updateFilters = (newFilters: Partial<EmployeeFilters>) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+  const setFilters = (newFilters: Partial<EmployeeFilters>) => {
+    setFiltersState(prev => ({ ...prev, ...newFilters }));
+    setCurrentPage(1); // Reset to first page when filtering
   };
 
-  const statistics = useMemo(() => {
-    const total = employeesWithStatus.length;
-    const active = employeesWithStatus.filter(emp => emp.estado === 'activo').length;
-    const inactive = employeesWithStatus.filter(emp => emp.estado === 'inactivo').length;
-    const onVacation = employeesWithStatus.filter(emp => emp.estado === 'vacaciones').length;
-    const onLeave = employeesWithStatus.filter(emp => emp.estado === 'incapacidad').length;
+  const clearFilters = () => {
+    setFiltersState({
+      searchTerm: '',
+      estado: '',
+      tipoContrato: ''
+    });
+    setCurrentPage(1);
+  };
 
+  const loadEmployees = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const result = await EmployeeUnifiedService.getAll();
+      if (result.success && result.data) {
+        setEmployees(result.data);
+      } else {
+        setError(result.error || 'Error loading employees');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error loading employees');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees();
+  }, []);
+
+  // Filter employees based on current filters
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(employee => {
+      const matchesSearch = !filters.searchTerm || 
+        employee.nombre.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        employee.apellido.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        employee.cedula.includes(filters.searchTerm);
+      
+      const matchesStatus = !filters.estado || employee.estado === filters.estado;
+      const matchesContract = !filters.tipoContrato || employee.tipoContrato === filters.tipoContrato;
+      
+      return matchesSearch && matchesStatus && matchesContract;
+    });
+  }, [employees, filters]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
+
+  const pagination = {
+    currentPage,
+    totalPages,
+    totalItems: filteredEmployees.length,
+    itemsPerPage
+  };
+
+  // Statistics
+  const statistics = useMemo(() => {
     return {
-      total,
-      active,
-      inactive,
-      onVacation,
-      onLeave
+      active: employees.filter(e => e.estado === 'activo').length,
+      inactive: employees.filter(e => e.estado === 'inactivo').length,
+      onVacation: employees.filter(e => e.estado === 'vacaciones').length,
+      onLeave: employees.filter(e => e.estado === 'incapacidad').length
     };
-  }, [employeesWithStatus]);
+  }, [employees]);
+
+  const toggleEmployeeSelection = (id: string) => {
+    setSelectedEmployees(prev =>
+      prev.includes(id)
+        ? prev.filter(empId => empId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleAllEmployees = () => {
+    const currentPageIds = paginatedEmployees.map(emp => emp.id);
+    const allSelected = currentPageIds.every(id => selectedEmployees.includes(id));
+    
+    if (allSelected) {
+      setSelectedEmployees(prev => prev.filter(id => !currentPageIds.includes(id)));
+    } else {
+      setSelectedEmployees(prev => [...new Set([...prev, ...currentPageIds])]);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedEmployees([]);
+  };
+
+  const refreshEmployees = async () => {
+    await loadEmployees();
+  };
+
+  const forceCompleteRefresh = async () => {
+    clearSelection();
+    await loadEmployees();
+  };
+
+  const getComplianceIndicators = () => {
+    return {
+      totalEmployees: employees.length,
+      completeProfiles: employees.filter(e => e.eps && e.afp && e.arl).length,
+      missingAffiliations: employees.filter(e => !e.eps || !e.afp || !e.arl).length
+    };
+  };
 
   return {
-    employees: filteredEmployees,
-    allEmployees: employeesWithStatus,
+    employees: paginatedEmployees,
     isLoading,
     error,
-    refetch,
     filters,
-    updateFilters,
+    setFilters,
+    selectedEmployees,
+    pagination,
+    clearFilters,
+    toggleEmployeeSelection,
+    toggleAllEmployees,
+    totalEmployees: employees.length,
+    filteredCount: filteredEmployees.length,
+    refreshEmployees,
+    forceCompleteRefresh,
+    getComplianceIndicators,
+    clearSelection,
     statistics
   };
 };
