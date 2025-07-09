@@ -114,11 +114,10 @@ export const TimeOffModal = ({
     setFormData({ type: '', start_date: '', end_date: '', observations: '' });
     setCalculatedDays(null);
     setIsSaving(false);
-    onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar Tiempo Libre</DialogTitle>
@@ -195,7 +194,10 @@ export const TimeOffModal = ({
 
           <div className="flex gap-2 justify-end pt-4">
             <Button
-              onClick={handleClose}
+              onClick={() => {
+                handleClose();
+                onClose();
+              }}
               variant="outline"
               disabled={isSaving}
             >
