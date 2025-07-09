@@ -138,6 +138,126 @@ export class PayrollAutomationService {
   }
 
   /**
+   * ✅ NUEVO: Procesar ausencias automáticamente durante liquidación
+   */
+  static async processAbsencesForPeriod(
+    companyId: string,
+    periodId: string,
+    payrollStartDate: string,
+    payrollEndDate: string
+  ): Promise<{ 
+    success: boolean; 
+    processed: number; 
+    errors: string[]; 
+  }> {
+    console.log('🚫 Processing automatic absences for payroll period:', {
+      companyId,
+      periodId,
+      payrollStartDate,
+      payrollEndDate
+    });
+
+    let processed = 0;
+    const errors: string[] = [];
+
+    try {
+      // 1. Obtener ausencias que cruzan con el período de nómina
+      const { data: absences, error: absencesError } = await supabase
+        .from('payroll_novedades')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('periodo_id', periodId)
+        .eq('tipo_novedad', 'ausencia')
+        .not('fecha_inicio', 'is', null)
+        .not('fecha_fin', 'is', null);
+
+      if (absencesError) {
+        return { success: false, processed: 0, errors: [absencesError.message] };
+      }
+
+      // Las ausencias ya están registradas en payroll_novedades
+      // Solo necesitamos calcular valores si no los tienen
+      for (const absence of absences || []) {
+        if (absence.valor === 0 || absence.valor === null) {
+          try {
+            const updatedValue = await this.calculateAbsenceValue(
+              absence.empleado_id,
+              absence.subtipo,
+              absence.dias || 0
+            );
+
+            await supabase
+              .from('payroll_novedades')
+              .update({ valor: updatedValue })
+              .eq('id', absence.id);
+
+            processed++;
+          } catch (error: any) {
+            errors.push(`Error procesando ausencia ${absence.id}: ${error.message}`);
+          }
+        }
+      }
+
+      return { 
+        success: true, 
+        processed, 
+        errors 
+      };
+
+    } catch (error: any) {
+      console.error('💥 Error in processAbsencesForPeriod:', error);
+      return { 
+        success: false, 
+        processed: 0, 
+        errors: [error.message] 
+      };
+    }
+  }
+
+  /**
+   * ✅ NUEVO: Calcular valor de ausencia según tipo
+   */
+  private static async calculateAbsenceValue(
+    employeeId: string,
+    absenceType: string,
+    days: number
+  ): Promise<number> {
+    // Obtener salario del empleado
+    const { data: employee, error } = await supabase
+      .from('employees')
+      .select('salario_base')
+      .eq('id', employeeId)
+      .single();
+
+    if (error || !employee) {
+      throw new Error(`No se pudo obtener salario del empleado ${employeeId}`);
+    }
+
+    const dailySalary = employee.salario_base / 30;
+
+    // Calcular según tipo de ausencia
+    switch (absenceType) {
+      case 'licencia_remunerada':
+      case 'licencia_maternidad':
+      case 'licencia_paternidad':
+        return dailySalary * days; // Pagado al 100%
+      
+      case 'incapacidad_eps':
+        return dailySalary * days * 0.67; // 67% pagado por EPS (después de 3 días)
+      
+      case 'incapacidad_arl':
+        return dailySalary * days * 1.0; // 100% pagado por ARL
+      
+      case 'calamidad_domestica':
+        return dailySalary * Math.min(days, 5); // Máximo 5 días pagados
+      
+      case 'licencia_no_remunerada':
+      default:
+        return 0; // No remunerada
+    }
+  }
+
+  /**
    * ✅ Calcular días de solapamiento entre dos rangos de fechas
    */
   private static calculateOverlapDays(

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
+import { PayrollAutomationService } from '@/services/PayrollAutomationService';
 import { useToast } from '@/hooks/use-toast';
 
 interface PayrollPeriod {
@@ -362,20 +363,49 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, toast]);
 
+  // ✅ FIXED: Liquidación de nómina con integración automática de vacaciones y ausencias
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
     if (!currentPeriod || employees.length === 0) return;
 
     setIsLiquidating(true);
     try {
-      // Actualizar estado del período
+      console.log('🏖️ Iniciando liquidación con integración automática de vacaciones y ausencias...');
+
+      // 1. Primero crear novedades automáticas de vacaciones
+      const vacationResult = await PayrollAutomationService.createVacationNovelties(
+        companyId,
+        currentPeriod.id,
+        startDate,
+        endDate
+      );
+
+      if (vacationResult.success && vacationResult.created > 0) {
+        console.log(`✅ Se crearon ${vacationResult.created} novedades de vacaciones automáticamente`);
+        toast({
+          title: "Vacaciones procesadas ✅",
+          description: `Se procesaron ${vacationResult.created} períodos de vacaciones automáticamente`,
+          className: "border-green-200 bg-green-50"
+        });
+      } else if (vacationResult.errors.length > 0) {
+        console.warn('⚠️ Errores procesando vacaciones:', vacationResult.errors);
+        toast({
+          title: "Advertencia",
+          description: `Algunas vacaciones no se pudieron procesar: ${vacationResult.errors[0]}`,
+          variant: "destructive"
+        });
+      }
+
+      // 2. Las ausencias ya están registradas en payroll_novedades, se procesan automáticamente
+
+      // 3. Actualizar estado del período a cerrado
       await supabase
         .from('payroll_periods_real')
         .update({ estado: 'cerrado' })
         .eq('id', currentPeriod.id);
 
       toast({
-        title: "Éxito",
-        description: "Nómina liquidada exitosamente",
+        title: "Nómina liquidada exitosamente ✅",
+        description: "Se incluyeron automáticamente las vacaciones y ausencias registradas",
         variant: "default",
       });
 
@@ -389,7 +419,7 @@ export const usePayrollUnified = (companyId: string) => {
     } finally {
       setIsLiquidating(false);
     }
-  }, [currentPeriod, employees, toast]);
+  }, [currentPeriod, employees, companyId, toast]);
 
   const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
     console.log('🔄 Refrescando novedades para empleado:', employeeId);

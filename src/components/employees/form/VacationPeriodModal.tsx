@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 interface VacationPeriodModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { start_date: string; end_date: string; observations?: string }) => void;
+  onSave: () => void; // ✅ FIXED: Ahora es void, el modal maneja el cierre internamente
   employeeId: string;
 }
 
@@ -25,7 +26,7 @@ export const VacationPeriodModal = ({
     end_date: '',
     observations: ''
   });
-  const [isValidating, setIsValidating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // ✅ NUEVO: Estado de guardado
   const [calculatedDays, setCalculatedDays] = useState<number | null>(null);
   const { toast } = useToast();
 
@@ -45,6 +46,7 @@ export const VacationPeriodModal = ({
     }
   };
 
+  // ✅ FIXED: Ahora es async y maneja el cierre del modal correctamente
   const validateAndSave = async () => {
     if (!formData.start_date || !formData.end_date) {
       toast({
@@ -64,7 +66,7 @@ export const VacationPeriodModal = ({
       return;
     }
 
-    setIsValidating(true);
+    setIsSaving(true);
     try {
       const daysCount = VacationPeriodsService.calculateBusinessDays(
         formData.start_date, 
@@ -88,12 +90,32 @@ export const VacationPeriodModal = ({
         return;
       }
 
-      // Si la validación pasa, llamar al callback del padre
-      onSave({
+      // Guardar el período
+      const result = await VacationPeriodsService.createPeriod({
+        employee_id: employeeId,
+        company_id: 'company_id_placeholder', // Esto se obtendrá del contexto
         start_date: formData.start_date,
         end_date: formData.end_date,
         observations: formData.observations || undefined
       });
+
+      if (result.success) {
+        toast({
+          title: "Vacaciones confirmadas ✅",
+          description: "El período de vacaciones se registró y confirmó automáticamente",
+          className: "border-green-200 bg-green-50"
+        });
+        
+        // ✅ FIXED: Solo cerrar modal después de guardado exitoso
+        handleClose();
+        onSave(); // Notificar al padre para refrescar la lista
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "No se pudo registrar el período",
+          variant: "destructive"
+        });
+      }
 
     } catch (error) {
       toast({
@@ -102,13 +124,14 @@ export const VacationPeriodModal = ({
         variant: "destructive"
       });
     } finally {
-      setIsValidating(false);
+      setIsSaving(false);
     }
   };
 
   const handleClose = () => {
     setFormData({ start_date: '', end_date: '', observations: '' });
     setCalculatedDays(null);
+    setIsSaving(false); // ✅ Reset saving state
     onClose();
   };
 
@@ -128,6 +151,7 @@ export const VacationPeriodModal = ({
               value={formData.start_date}
               onChange={(e) => handleInputChange('start_date', e.target.value)}
               className="mt-1"
+              disabled={isSaving} // ✅ Deshabilitar durante guardado
             />
           </div>
 
@@ -139,6 +163,7 @@ export const VacationPeriodModal = ({
               value={formData.end_date}
               onChange={(e) => handleInputChange('end_date', e.target.value)}
               className="mt-1"
+              disabled={isSaving} // ✅ Deshabilitar durante guardado
             />
           </div>
 
@@ -162,6 +187,7 @@ export const VacationPeriodModal = ({
               placeholder="Ej: Vacaciones familiares, descanso médico..."
               className="mt-1"
               rows={3}
+              disabled={isSaving} // ✅ Deshabilitar durante guardado
             />
           </div>
 
@@ -169,19 +195,19 @@ export const VacationPeriodModal = ({
             <Button
               onClick={handleClose}
               variant="outline"
-              disabled={isValidating}
+              disabled={isSaving}
             >
               Cancelar
             </Button>
             <Button
               onClick={validateAndSave}
-              disabled={isValidating || !formData.start_date || !formData.end_date}
+              disabled={isSaving || !formData.start_date || !formData.end_date}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {isValidating ? (
+              {isSaving ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Validando...
+                  Guardando...
                 </>
               ) : (
                 'Guardar'

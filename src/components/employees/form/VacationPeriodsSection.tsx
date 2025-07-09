@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, Trash2, CheckCircle2, Clock, Award } from 'lucide-react';
+import { Calendar, Plus, Trash2, CheckCircle2, Clock, Award, UserX } from 'lucide-react';
 import { VacationPeriodsService, VacationPeriod } from '@/services/VacationPeriodsService';
 import { VacationPeriodModal } from './VacationPeriodModal';
+import { AbsenceModal } from './AbsenceModal';
 import { useToast } from '@/hooks/use-toast';
 
 interface VacationPeriodsSectionProps {
@@ -20,7 +21,8 @@ export const VacationPeriodsSection = ({
 }: VacationPeriodsSectionProps) => {
   const [periods, setPeriods] = useState<VacationPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [showVacationModal, setShowVacationModal] = useState(false);
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,41 +49,16 @@ export const VacationPeriodsSection = ({
     }
   };
 
-  const handleAddPeriod = async (periodData: { 
-    start_date: string; 
-    end_date: string; 
-    observations?: string; 
-  }) => {
-    if (!employeeId) return;
+  const handleVacationSaved = () => {
+    loadPeriods();
+  };
 
-    try {
-      const result = await VacationPeriodsService.createPeriod({
-        employee_id: employeeId,
-        company_id: companyId,
-        ...periodData
-      });
-
-      if (result.success) {
-        toast({
-          title: "Vacaciones confirmadas ✅",
-          description: "El período de vacaciones se registró y confirmó automáticamente",
-          className: "border-green-200 bg-green-50"
-        });
-        loadPeriods();
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "No se pudo registrar el período",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Error inesperado al registrar el período",
-        variant: "destructive"
-      });
-    }
+  const handleAbsenceSaved = () => {
+    toast({
+      title: "Ausencia registrada ✅",
+      description: "La ausencia se registró correctamente para el período de nómina",
+      className: "border-green-200 bg-green-50"
+    });
   };
 
   const handleDeletePeriod = async (periodId: string) => {
@@ -151,12 +128,12 @@ export const VacationPeriodsSection = ({
         <CardHeader>
           <CardTitle className="text-lg font-medium text-gray-900 flex items-center">
             <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-            Vacaciones Confirmadas
+            Vacaciones y Ausencias
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-gray-500 text-center py-4">
-            Guarda el empleado primero para gestionar períodos de vacaciones
+            Guarda el empleado primero para gestionar períodos de vacaciones y ausencias
           </p>
         </CardContent>
       </Card>
@@ -169,20 +146,31 @@ export const VacationPeriodsSection = ({
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg font-medium text-gray-900 flex items-center">
             <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-            Vacaciones Confirmadas
+            Vacaciones y Ausencias
             <Badge variant="outline" className="ml-2 text-xs bg-green-50 text-green-700 border-green-200">
-              Flujo Directo
+              Registro Directo
             </Badge>
           </CardTitle>
           {!isReadOnly && (
-            <Button
-              onClick={() => setShowModal(true)}
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Registrar
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowAbsenceModal(true)}
+                size="sm"
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+              >
+                <UserX className="w-4 h-4 mr-1" />
+                Ausencia
+              </Button>
+              <Button
+                onClick={() => setShowVacationModal(true)}
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Vacaciones
+              </Button>
+            </div>
           )}
         </CardHeader>
         <CardContent>
@@ -195,10 +183,10 @@ export const VacationPeriodsSection = ({
             <div className="text-center py-6">
               <Award className="w-12 h-12 mx-auto text-gray-300 mb-2" />
               <p className="text-gray-500">
-                No hay períodos de vacaciones registrados
+                No hay períodos registrados
               </p>
               <p className="text-sm text-gray-400 mt-1">
-                Los períodos se confirman automáticamente al registrarlos
+                Registra vacaciones y ausencias desde aquí
               </p>
             </div>
           ) : (
@@ -240,10 +228,18 @@ export const VacationPeriodsSection = ({
       </Card>
 
       <VacationPeriodModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onSave={handleAddPeriod}
+        isOpen={showVacationModal}
+        onClose={() => setShowVacationModal(false)}
+        onSave={handleVacationSaved}
         employeeId={employeeId}
+      />
+
+      <AbsenceModal
+        isOpen={showAbsenceModal}
+        onClose={() => setShowAbsenceModal(false)}
+        onSave={handleAbsenceSaved}
+        employeeId={employeeId}
+        companyId={companyId}
       />
     </>
   );
