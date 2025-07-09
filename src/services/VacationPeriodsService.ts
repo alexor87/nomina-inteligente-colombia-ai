@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface VacationPeriod {
@@ -8,7 +9,7 @@ export interface VacationPeriod {
   end_date: string;
   days_count: number;
   observations?: string;
-  status: 'pendiente' | 'liquidado' | 'cancelado';
+  status: 'confirmado' | 'liquidado' | 'cancelado';
   created_by?: string;
   processed_in_period_id?: string;
   created_at: string;
@@ -25,7 +26,7 @@ export interface CreateVacationPeriodData {
 
 export class VacationPeriodsService {
   /**
-   * ✅ KISS: Crear nuevo período de vacaciones con validaciones
+   * ✅ KISS: Crear nuevo período de vacaciones con auto-confirmación directa
    */
   static async createPeriod(data: CreateVacationPeriodData): Promise<{ 
     success: boolean; 
@@ -33,7 +34,7 @@ export class VacationPeriodsService {
     error?: string 
   }> {
     try {
-      console.log('🏖️ Creating vacation period:', data);
+      console.log('🏖️ Creating vacation period (Direct Flow):', data);
 
       // Calcular días hábiles entre fechas
       const daysCount = this.calculateBusinessDays(data.start_date, data.end_date);
@@ -53,7 +54,7 @@ export class VacationPeriodsService {
           end_date: data.end_date,
           days_count: daysCount,
           observations: data.observations,
-          status: 'pendiente',
+          status: 'confirmado', // ✅ AUTO-CONFIRMAR: No requiere aprobación adicional
           created_by: (await supabase.auth.getUser()).data.user?.id
         })
         .select()
@@ -64,9 +65,8 @@ export class VacationPeriodsService {
         return { success: false, error: error.message };
       }
 
-      console.log('✅ Vacation period created successfully:', period);
-      // ✅ CORREGIDO: Cast del status
-      return { success: true, data: { ...period, status: period.status as 'pendiente' | 'liquidado' | 'cancelado' } };
+      console.log('✅ Vacation period auto-confirmed successfully:', period);
+      return { success: true, data: { ...period, status: period.status as 'confirmado' | 'liquidado' | 'cancelado' } };
 
     } catch (error: any) {
       console.error('💥 Error in createPeriod:', error);
@@ -94,10 +94,9 @@ export class VacationPeriodsService {
         return { success: false, error: error.message };
       }
 
-      // ✅ CORREGIDO: Cast del status para todos los períodos
       const typedPeriods = (periods || []).map(period => ({
         ...period,
-        status: period.status as 'pendiente' | 'liquidado' | 'cancelado'
+        status: period.status as 'confirmado' | 'liquidado' | 'cancelado'
       }));
 
       return { success: true, data: typedPeriods };
@@ -119,12 +118,12 @@ export class VacationPeriodsService {
     excludePeriodId?: string
   ): Promise<{ isValid: boolean; error?: string }> {
     try {
-      // 1. Validar solapamiento de fechas
+      // 1. Validar solapamiento de fechas con períodos confirmados
       let query = supabase
         .from('employee_vacation_periods')
         .select('id, start_date, end_date')
         .eq('employee_id', employeeId)
-        .eq('status', 'pendiente')
+        .eq('status', 'confirmado') // Solo períodos confirmados pueden solapar
         .or(`start_date.lte.${endDate},end_date.gte.${startDate}`);
 
       if (excludePeriodId) {
@@ -140,7 +139,7 @@ export class VacationPeriodsService {
       if (overlapping && overlapping.length > 0) {
         return { 
           isValid: false, 
-          error: `Las fechas se solapan con otro período existente (${overlapping[0].start_date} - ${overlapping[0].end_date})` 
+          error: `Las fechas se solapan con otro período confirmado (${overlapping[0].start_date} - ${overlapping[0].end_date})` 
         };
       }
 
@@ -151,15 +150,15 @@ export class VacationPeriodsService {
       if (balanceResult.success && balanceResult.data) {
         const availableDays = balanceResult.data.initial_balance || 0;
         
-        // Obtener días ya usados en otros períodos pendientes
-        const { data: pendingPeriods } = await supabase
+        // Obtener días ya usados en otros períodos confirmados
+        const { data: confirmedPeriods } = await supabase
           .from('employee_vacation_periods')
           .select('days_count')
           .eq('employee_id', employeeId)
-          .eq('status', 'pendiente')
+          .eq('status', 'confirmado')
           .neq('id', excludePeriodId || '');
 
-        const usedDays = (pendingPeriods || []).reduce((sum, p) => sum + (p.days_count || 0), 0);
+        const usedDays = (confirmedPeriods || []).reduce((sum, p) => sum + (p.days_count || 0), 0);
         const remainingDays = availableDays - usedDays;
 
         if (daysCount > remainingDays) {
@@ -217,17 +216,16 @@ export class VacationPeriodsService {
         .from('employee_vacation_periods')
         .select('*')
         .eq('company_id', companyId)
-        .eq('status', 'pendiente')
+        .eq('status', 'confirmado') // Solo períodos confirmados van a liquidación
         .or(`start_date.lte.${payrollEndDate},end_date.gte.${payrollStartDate}`);
 
       if (error) {
         return { success: false, error: error.message };
       }
 
-      // ✅ CORREGIDO: Cast del status para todos los períodos
       const typedPeriods = (periods || []).map(period => ({
         ...period,
-        status: period.status as 'pendiente' | 'liquidado' | 'cancelado'
+        status: period.status as 'confirmado' | 'liquidado' | 'cancelado'
       }));
 
       return { success: true, data: typedPeriods };
@@ -238,7 +236,7 @@ export class VacationPeriodsService {
   }
 
   /**
-   * ✅ KISS: Eliminar período (solo si está pendiente)
+   * ✅ KISS: Eliminar período (solo si está confirmado, no liquidado)
    */
   static async deletePeriod(periodId: string): Promise<{ success: boolean; error?: string }> {
     try {
@@ -246,7 +244,7 @@ export class VacationPeriodsService {
         .from('employee_vacation_periods')
         .delete()
         .eq('id', periodId)
-        .eq('status', 'pendiente');
+        .eq('status', 'confirmado'); // Solo períodos confirmados no liquidados
 
       if (error) {
         return { success: false, error: error.message };

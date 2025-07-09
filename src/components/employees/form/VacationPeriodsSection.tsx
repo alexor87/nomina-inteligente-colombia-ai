@@ -1,9 +1,10 @@
 
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, Trash2, Clock, CheckCircle } from 'lucide-react';
+import { Calendar, Plus, Trash2, CheckCircle2, Clock, Award } from 'lucide-react';
 import { VacationPeriodsService, VacationPeriod } from '@/services/VacationPeriodsService';
 import { VacationPeriodModal } from './VacationPeriodModal';
 import { useToast } from '@/hooks/use-toast';
@@ -64,8 +65,8 @@ export const VacationPeriodsSection = ({
 
       if (result.success) {
         toast({
-          title: "Período agregado",
-          description: "El período de vacaciones se agregó correctamente",
+          title: "Vacaciones confirmadas ✅",
+          description: "El período de vacaciones se registró y confirmó automáticamente",
           className: "border-green-200 bg-green-50"
         });
         loadPeriods();
@@ -73,14 +74,14 @@ export const VacationPeriodsSection = ({
       } else {
         toast({
           title: "Error",
-          description: result.error || "No se pudo agregar el período",
+          description: result.error || "No se pudo registrar el período",
           variant: "destructive"
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Error inesperado al agregar el período",
+        description: "Error inesperado al registrar el período",
         variant: "destructive"
       });
     }
@@ -122,12 +123,26 @@ export const VacationPeriodsSection = ({
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'pendiente':
-        return <Badge variant="outline" className="text-orange-600 border-orange-300"><Clock className="w-3 h-3 mr-1" />Pendiente</Badge>;
+      case 'confirmado':
+        return (
+          <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+            <Award className="w-3 h-3 mr-1" />
+            Confirmado
+          </Badge>
+        );
       case 'liquidado':
-        return <Badge variant="outline" className="text-green-600 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />Liquidado</Badge>;
+        return (
+          <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50">
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            Liquidado
+          </Badge>
+        );
       case 'cancelado':
-        return <Badge variant="outline" className="text-gray-600 border-gray-300">Cancelado</Badge>;
+        return (
+          <Badge variant="outline" className="text-gray-600 border-gray-300">
+            Cancelado
+          </Badge>
+        );
       default:
         return null;
     }
@@ -139,7 +154,7 @@ export const VacationPeriodsSection = ({
         <CardHeader>
           <CardTitle className="text-lg font-medium text-gray-900 flex items-center">
             <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-            Vacaciones Aprobadas
+            Vacaciones Confirmadas
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -157,7 +172,10 @@ export const VacationPeriodsSection = ({
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg font-medium text-gray-900 flex items-center">
             <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-            Vacaciones Aprobadas
+            Vacaciones Confirmadas
+            <Badge variant="outline" className="ml-2 text-xs bg-green-50 text-green-700 border-green-200">
+              Flujo Directo
+            </Badge>
           </CardTitle>
           {!isReadOnly && (
             <Button
@@ -166,7 +184,7 @@ export const VacationPeriodsSection = ({
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Plus className="w-4 h-4 mr-1" />
-              Agregar
+              Registrar
             </Button>
           )}
         </CardHeader>
@@ -177,9 +195,15 @@ export const VacationPeriodsSection = ({
               <p className="text-gray-500 mt-2">Cargando períodos...</p>
             </div>
           ) : periods.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">
-              No hay períodos de vacaciones registrados
-            </p>
+            <div className="text-center py-6">
+              <Award className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+              <p className="text-gray-500">
+                No hay períodos de vacaciones registrados
+              </p>
+              <p className="text-sm text-gray-400 mt-1">
+                Los períodos se confirman automáticamente al registrarlos
+              </p>
+            </div>
           ) : (
             <div className="space-y-3">
               {periods.map((period) => (
@@ -201,7 +225,7 @@ export const VacationPeriodsSection = ({
                       <p className="text-sm text-gray-600">{period.observations}</p>
                     )}
                   </div>
-                  {!isReadOnly && period.status === 'pendiente' && (
+                  {!isReadOnly && period.status === 'confirmado' && (
                     <Button
                       onClick={() => handleDeletePeriod(period.id)}
                       variant="ghost"

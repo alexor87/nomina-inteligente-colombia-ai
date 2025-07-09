@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { VacationPeriodsService, VacationPeriod } from './VacationPeriodsService';
 
@@ -27,7 +26,7 @@ export class PayrollAutomationService {
     const errors: string[] = [];
 
     try {
-      // 1. Obtener períodos de vacaciones que cruzan con el período de nómina
+      // 1. Obtener períodos de vacaciones confirmados que cruzan con el período de nómina
       const periodsResult = await VacationPeriodsService.getPeriodsForPayrollPeriod(
         companyId,
         payrollStartDate,
@@ -39,16 +38,16 @@ export class PayrollAutomationService {
       }
 
       const vacationPeriods = periodsResult.data;
-      console.log(`📋 Found ${vacationPeriods.length} vacation periods to process`);
+      console.log(`📋 Found ${vacationPeriods.length} confirmed vacation periods to process`);
 
-      // 2. Procesar cada período de vacaciones
+      // 2. Procesar cada período de vacaciones confirmado
       for (const period of vacationPeriods) {
         try {
           await this.processVacationPeriod(period, periodId, payrollStartDate, payrollEndDate);
           created++;
-          console.log(`✅ Processed vacation period ${period.id} for employee ${period.employee_id}`);
+          console.log(`✅ Processed confirmed vacation period ${period.id} for employee ${period.employee_id}`);
         } catch (error: any) {
-          const errorMsg = `Error procesando período ${period.id}: ${error.message}`;
+          const errorMsg = `Error procesando período confirmado ${period.id}: ${error.message}`;
           errors.push(errorMsg);
           console.error(`❌ ${errorMsg}`);
         }
@@ -99,7 +98,7 @@ export class PayrollAutomationService {
     );
 
     if (overlapDays <= 0) {
-      console.log(`ℹ️ No overlap found for period ${period.id}`);
+      console.log(`ℹ️ No overlap found for confirmed period ${period.id}`);
       return;
     }
 
@@ -107,7 +106,7 @@ export class PayrollAutomationService {
     const dailySalary = employee.salario_base / 30;
     const vacationValue = dailySalary * overlapDays;
 
-    console.log(`💰 Vacation calculation:`, {
+    console.log(`💰 Vacation calculation for confirmed period:`, {
       employeeId: period.employee_id,
       overlapDays,
       dailySalary,
@@ -126,7 +125,7 @@ export class PayrollAutomationService {
         fecha_fin: this.getMinDate(period.end_date, payrollEndDate),
         dias: overlapDays,
         valor: vacationValue,
-        observacion: `Vacaciones aprobadas automáticas (Período: ${period.start_date} - ${period.end_date})`,
+        observacion: `Vacaciones confirmadas automáticas (Período: ${period.start_date} - ${period.end_date})`,
         creado_por: null // Sistema automático
       });
 
@@ -134,7 +133,7 @@ export class PayrollAutomationService {
       throw new Error(`Error creando novedad: ${noveltyError.message}`);
     }
 
-    // 5. Marcar período como procesado
+    // 5. Marcar período confirmado como procesado
     await VacationPeriodsService.markAsProcessed(period.id, periodId);
   }
 
