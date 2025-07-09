@@ -6,62 +6,38 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { TimeOffService } from '@/services/TimeOffService';
 import { useToast } from '@/hooks/use-toast';
 
-interface AbsenceModalProps {
+interface TimeOffModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;
   employeeId: string;
-  companyId: string;
 }
 
-export const AbsenceModal = ({ 
+export const TimeOffModal = ({ 
   isOpen, 
   onClose, 
   onSave,
-  employeeId,
-  companyId
-}: AbsenceModalProps) => {
+  employeeId
+}: TimeOffModalProps) => {
   const [formData, setFormData] = useState({
+    type: '',
     start_date: '',
     end_date: '',
-    absence_type: '',
     observations: ''
   });
   const [isSaving, setIsSaving] = useState(false);
   const [calculatedDays, setCalculatedDays] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // Tipos de ausencias disponibles
-  const absenceTypes = [
+  const timeOffTypes = [
+    { value: 'vacaciones', label: 'Vacaciones' },
     { value: 'licencia_remunerada', label: 'Licencia Remunerada' },
-    { value: 'licencia_no_remunerada', label: 'Licencia No Remunerada' },
-    { value: 'incapacidad_eps', label: 'Incapacidad EPS' },
-    { value: 'incapacidad_arl', label: 'Incapacidad ARL' },
-    { value: 'licencia_maternidad', label: 'Licencia de Maternidad' },
-    { value: 'licencia_paternidad', label: 'Licencia de Paternidad' },
-    { value: 'calamidad_domestica', label: 'Calamidad Doméstica' }
+    { value: 'ausencia', label: 'Ausencia' },
+    { value: 'incapacidad', label: 'Incapacidad' }
   ];
-
-  const calculateBusinessDays = (startDate: string, endDate: string): number => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    let days = 0;
-    const current = new Date(start);
-
-    while (current <= end) {
-      const dayOfWeek = current.getDay();
-      // 0 = Domingo, 6 = Sábado
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        days++;
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
-    return days;
-  };
 
   const handleInputChange = (field: string, value: string) => {
     const newData = { ...formData, [field]: value };
@@ -69,7 +45,7 @@ export const AbsenceModal = ({
 
     // Calcular días cuando ambas fechas están completas
     if (newData.start_date && newData.end_date) {
-      const days = calculateBusinessDays(newData.start_date, newData.end_date);
+      const days = TimeOffService.calculateBusinessDays(newData.start_date, newData.end_date);
       setCalculatedDays(days);
     } else {
       setCalculatedDays(null);
@@ -77,10 +53,10 @@ export const AbsenceModal = ({
   };
 
   const validateAndSave = async () => {
-    if (!formData.start_date || !formData.end_date || !formData.absence_type) {
+    if (!formData.type || !formData.start_date || !formData.end_date) {
       toast({
         title: "Error",
-        description: "Debes completar las fechas y tipo de ausencia",
+        description: "Debes completar todos los campos obligatorios",
         variant: "destructive"
       });
       return;
@@ -97,60 +73,35 @@ export const AbsenceModal = ({
 
     setIsSaving(true);
     try {
-      const daysCount = calculateBusinessDays(formData.start_date, formData.end_date);
+      const result = await TimeOffService.createTimeOff({
+        employee_id: employeeId,
+        type: formData.type as any,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        observations: formData.observations || undefined
+      });
 
-      // TODO: Obtener período activo para asociar la ausencia
-      // Por ahora usaremos un período dummy, pero esto debe mejorarse
-      const { data: currentPeriod } = await supabase
-        .from('payroll_periods_real')
-        .select('id')
-        .eq('company_id', companyId)
-        .eq('estado', 'en_proceso')
-        .single();
-
-      if (!currentPeriod) {
+      if (result.success) {
+        toast({
+          title: "Registro creado ✅",
+          description: `${TimeOffService.getTypeLabel(formData.type)} registrado por ${calculatedDays} días`,
+          className: "border-green-200 bg-green-50"
+        });
+        
+        handleClose();
+        onSave();
+      } else {
         toast({
           title: "Error",
-          description: "No hay un período de nómina activo. Contacta al administrador.",
+          description: result.error || "No se pudo crear el registro",
           variant: "destructive"
         });
-        return;
       }
-
-      // Crear novedad de ausencia directamente en payroll_novedades
-      const { error } = await supabase
-        .from('payroll_novedades')
-        .insert({
-          company_id: companyId,
-          empleado_id: employeeId,
-          periodo_id: currentPeriod.id,
-          tipo_novedad: 'ausencia',
-          subtipo: formData.absence_type,
-          fecha_inicio: formData.start_date,
-          fecha_fin: formData.end_date,
-          dias: daysCount,
-          valor: 0, // Valor se calculará en liquidación según tipo
-          observacion: formData.observations || `${absenceTypes.find(t => t.value === formData.absence_type)?.label} registrada desde perfil empleado`,
-          creado_por: (await supabase.auth.getUser()).data.user?.id
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Ausencia registrada ✅",
-        description: `Se registró ${absenceTypes.find(t => t.value === formData.absence_type)?.label.toLowerCase()} por ${daysCount} días`,
-        className: "border-green-200 bg-green-50"
-      });
-      
-      handleClose();
-      onSave();
 
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Error inesperado al registrar la ausencia",
+        description: error.message || "Error inesperado al crear el registro",
         variant: "destructive"
       });
     } finally {
@@ -159,7 +110,7 @@ export const AbsenceModal = ({
   };
 
   const handleClose = () => {
-    setFormData({ start_date: '', end_date: '', absence_type: '', observations: '' });
+    setFormData({ type: '', start_date: '', end_date: '', observations: '' });
     setCalculatedDays(null);
     setIsSaving(false);
     onClose();
@@ -169,22 +120,22 @@ export const AbsenceModal = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Registrar Ausencia</DialogTitle>
+          <DialogTitle>Registrar Tiempo Libre</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
           <div>
-            <Label htmlFor="absence_type">Tipo de Ausencia</Label>
+            <Label htmlFor="type">Tipo</Label>
             <Select 
-              value={formData.absence_type} 
-              onValueChange={(value) => handleInputChange('absence_type', value)}
+              value={formData.type} 
+              onValueChange={(value) => handleInputChange('type', value)}
               disabled={isSaving}
             >
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecciona el tipo de ausencia" />
+                <SelectValue placeholder="Selecciona el tipo" />
               </SelectTrigger>
               <SelectContent>
-                {absenceTypes.map((type) => (
+                {timeOffTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
                     {type.label}
                   </SelectItem>
@@ -218,11 +169,11 @@ export const AbsenceModal = ({
           </div>
 
           {calculatedDays !== null && (
-            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-              <p className="text-sm font-medium text-orange-800">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm font-medium text-blue-800">
                 Días hábiles calculados: {calculatedDays}
               </p>
-              <p className="text-xs text-orange-600 mt-1">
+              <p className="text-xs text-blue-600 mt-1">
                 (Se excluyen fines de semana)
               </p>
             </div>
@@ -234,7 +185,7 @@ export const AbsenceModal = ({
               id="observations"
               value={formData.observations}
               onChange={(e) => handleInputChange('observations', e.target.value)}
-              placeholder="Ej: Certificado médico adjunto, motivo específico..."
+              placeholder="Ej: Vacaciones familiares, certificado médico..."
               className="mt-1"
               rows={3}
               disabled={isSaving}
@@ -251,16 +202,16 @@ export const AbsenceModal = ({
             </Button>
             <Button
               onClick={validateAndSave}
-              disabled={isSaving || !formData.start_date || !formData.end_date || !formData.absence_type}
-              className="bg-orange-600 hover:bg-orange-700"
+              disabled={isSaving || !formData.type || !formData.start_date || !formData.end_date}
+              className="bg-blue-600 hover:bg-blue-700"
             >
               {isSaving ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Registrando...
+                  Guardando...
                 </>
               ) : (
-                'Registrar'
+                'Guardar'
               )}
             </Button>
           </div>

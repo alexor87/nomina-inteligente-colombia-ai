@@ -4,7 +4,7 @@ import { LaborInfoSection } from './LaborInfoSection';
 import { BankingInfoSection } from './BankingInfoSection';
 import { AffiliationsSection } from './AffiliationsSection';
 import { CustomFieldsSection } from './CustomFieldsSection';
-import { VacationPeriodsSection } from './VacationPeriodsSection';
+import { TimeOffSection } from './TimeOffSection';
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { EmployeeFormData } from './types';
 
@@ -69,10 +69,9 @@ export const EmployeeFormContent = ({
           setValue={setValue}
         />
 
-        {/* ✅ NUEVO: Sección de Vacaciones Aprobadas */}
-        <VacationPeriodsSection
+        {/* ✅ KISS: Sección Simple de Tiempo Libre */}
+        <TimeOffSection
           employeeId={watchedValues.id}
-          companyId={watchedValues.empresaId || watchedValues.company_id || ''}
           isReadOnly={false}
         />
 
