@@ -118,7 +118,7 @@ export const TimeOffModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSaving && handleClose()}>
+    <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar Tiempo Libre</DialogTitle>
