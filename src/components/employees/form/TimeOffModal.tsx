@@ -121,8 +121,16 @@ export const TimeOffModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="max-w-md">
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={() => {}}
+      modal={true}
+    >
+      <DialogContent 
+        className="max-w-md"
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Registrar Tiempo Libre</DialogTitle>
         </DialogHeader>
