@@ -1,82 +1,105 @@
 
 import { useState } from 'react';
-import { Employee } from '@/types';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { EmployeeService } from '@/services/EmployeeService';
-import { EmployeeStatusService } from '@/services/EmployeeStatusService';
+import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
+import { EmployeeUnified } from '@/types/employee-unified';
 
 export const useEmployeeCRUD = () => {
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const createEmployee = async (employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const createEmployee = async (employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>) => {
     setIsLoading(true);
     try {
-      console.log('🚀 useEmployeeCRUD: Creating employee with data:', employeeData);
-      const data = await EmployeeService.create(employeeData);
+      console.log('🔄 useEmployeeCRUD: Creating employee with data:', employeeData);
+      
+      const result = await EmployeeUnifiedService.create(employeeData);
 
-      console.log('✅ Employee created successfully:', data);
+      if (result.success) {
+        console.log('✅ useEmployeeCRUD: Employee created successfully');
+        
+        toast({
+          title: "Empleado creado",
+          description: "El empleado se ha creado correctamente",
+          className: "border-green-200 bg-green-50"
+        });
 
-      toast({
-        title: "Empleado creado",
-        description: `${employeeData.nombre} ${employeeData.apellido} ha sido agregado exitosamente.`,
-      });
-
-      return { success: true, data };
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employee-statistics'] });
+        
+        return { success: true, data: result.data };
+      } else {
+        console.error('❌ useEmployeeCRUD: Error creating employee:', result.error);
+        
+        toast({
+          title: "Error al crear empleado",
+          description: result.error || "No se pudo crear el empleado",
+          variant: "destructive"
+        });
+        
+        return { success: false, error: result.error };
+      }
     } catch (error: any) {
-      console.error('❌ Error creating employee:', error);
-      
-      // Mostrar error específico al usuario
-      const errorMessage = error.message || "No se pudo crear el empleado. Intenta nuevamente.";
+      console.error('❌ useEmployeeCRUD: Exception in createEmployee:', error);
       
       toast({
-        title: "Error al crear empleado",
-        description: errorMessage,
+        title: "Error inesperado",
+        description: "Ocurrió un error inesperado al crear el empleado",
         variant: "destructive"
       });
       
-      return { success: false, error: errorMessage };
+      return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateEmployee = async (id: string, updates: Partial<Employee>) => {
+  const updateEmployee = async (id: string, employeeData: Partial<EmployeeUnified>) => {
     setIsLoading(true);
     try {
-      console.log('🔄 useEmployeeCRUD: Updating employee with data:', { id, updates });
+      console.log('🔄 useEmployeeCRUD: Updating employee with ID:', id);
       
-      if (!id) {
-        throw new Error('ID de empleado es requerido para actualizar');
-      }
+      const result = await EmployeeUnifiedService.update(id, employeeData);
 
-      const result = await EmployeeService.update(id, updates);
-      console.log('🔄 useEmployeeCRUD: Update result from service:', result);
-      
-      // Verificar que la actualización fue exitosa
-      if (!result || (Array.isArray(result) && result.length === 0)) {
-        throw new Error('No se pudo confirmar que la actualización se guardó correctamente');
-      }
-      
-      toast({
-        title: "Empleado actualizado",
-        description: "Los datos del empleado han sido actualizados correctamente.",
-      });
+      if (result.success) {
+        console.log('✅ useEmployeeCRUD: Employee updated successfully');
+        
+        toast({
+          title: "Empleado actualizado",
+          description: "Los datos del empleado se han actualizado correctamente",
+          className: "border-green-200 bg-green-50"
+        });
 
-      console.log('✅ useEmployeeCRUD: Employee updated successfully');
-      return { success: true, data: result };
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employee', id] });
+        queryClient.invalidateQueries({ queryKey: ['employee-statistics'] });
+        
+        return { success: true, data: result.data };
+      } else {
+        console.error('❌ useEmployeeCRUD: Error updating employee:', result.error);
+        
+        toast({
+          title: "Error al actualizar empleado",
+          description: result.error || "No se pudo actualizar el empleado",
+          variant: "destructive"
+        });
+        
+        return { success: false, error: result.error };
+      }
     } catch (error: any) {
-      console.error('❌ useEmployeeCRUD: Error updating employee:', error);
-      
-      const errorMessage = error.message || "No se pudo actualizar el empleado.";
+      console.error('❌ useEmployeeCRUD: Exception in updateEmployee:', error);
       
       toast({
-        title: "Error al actualizar",
-        description: errorMessage,
+        title: "Error inesperado",
+        description: "Ocurrió un error inesperado al actualizar el empleado",
         variant: "destructive"
       });
       
-      return { success: false, error: errorMessage };
+      return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
     }
@@ -85,21 +108,44 @@ export const useEmployeeCRUD = () => {
   const deleteEmployee = async (id: string) => {
     setIsLoading(true);
     try {
-      await EmployeeService.delete(id);
+      console.log('🔄 useEmployeeCRUD: Deleting employee with ID:', id);
+      
+      const result = await EmployeeUnifiedService.delete(id);
+
+      if (result.success) {
+        console.log('✅ useEmployeeCRUD: Employee deleted successfully');
+        
+        toast({
+          title: "Empleado eliminado",
+          description: "El empleado se ha eliminado correctamente",
+          className: "border-green-200 bg-green-50"
+        });
+
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employee-statistics'] });
+        
+        return { success: true };
+      } else {
+        console.error('❌ useEmployeeCRUD: Error deleting employee:', result.error);
+        
+        toast({
+          title: "Error al eliminar empleado",
+          description: result.error || "No se pudo eliminar el empleado",
+          variant: "destructive"
+        });
+        
+        return { success: false, error: result.error };
+      }
+    } catch (error: any) {
+      console.error('❌ useEmployeeCRUD: Exception in deleteEmployee:', error);
       
       toast({
-        title: "Empleado eliminado",
-        description: "El empleado ha sido eliminado del sistema.",
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error('Error deleting employee:', error);
-      toast({
-        title: "Error al eliminar",
-        description: error.message || "No se pudo eliminar el empleado.",
+        title: "Error inesperado",
+        description: "Ocurrió un error inesperado al eliminar el empleado",
         variant: "destructive"
       });
+      
       return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
@@ -109,77 +155,45 @@ export const useEmployeeCRUD = () => {
   const changeEmployeeStatus = async (id: string, newStatus: string) => {
     setIsLoading(true);
     try {
-      console.log('Changing employee status:', { id, newStatus });
+      console.log('🔄 useEmployeeCRUD: Changing employee status:', id, 'to', newStatus);
       
-      // Validate the status before sending
-      const validStatuses = ['activo', 'inactivo', 'vacaciones', 'incapacidad'];
-      if (!validStatuses.includes(newStatus)) {
-        throw new Error(`Estado inválido: ${newStatus}. Estados válidos: ${validStatuses.join(', ')}`);
+      const result = await EmployeeUnifiedService.changeStatus(id, newStatus);
+
+      if (result.success) {
+        console.log('✅ useEmployeeCRUD: Employee status changed successfully');
+        
+        toast({
+          title: "Estado actualizado",
+          description: "El estado del empleado se ha actualizado correctamente",
+          className: "border-green-200 bg-green-50"
+        });
+
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employee', id] });
+        queryClient.invalidateQueries({ queryKey: ['employee-statistics'] });
+        
+        return { success: true };
+      } else {
+        console.error('❌ useEmployeeCRUD: Error changing employee status:', result.error);
+        
+        toast({
+          title: "Error al cambiar estado",
+          description: result.error || "No se pudo cambiar el estado del empleado",
+          variant: "destructive"
+        });
+        
+        return { success: false, error: result.error };
       }
-      
-      await EmployeeService.changeStatus(id, newStatus as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad');
-      
-      toast({
-        title: "Estado actualizado",
-        description: `El estado del empleado ha sido cambiado a ${newStatus}.`,
-      });
-
-      return { success: true };
     } catch (error: any) {
-      console.error('Error changing employee status:', error);
+      console.error('❌ useEmployeeCRUD: Exception in changeEmployeeStatus:', error);
+      
       toast({
-        title: "Error al cambiar estado",
-        description: error.message || "No se pudo actualizar el estado del empleado.",
+        title: "Error inesperado",
+        description: "Ocurrió un error inesperado al cambiar el estado del empleado",
         variant: "destructive"
       });
-      return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const updateCentroCosto = async (id: string, centroCosto: string) => {
-    setIsLoading(true);
-    try {
-      await EmployeeStatusService.updateCentroCosto(id, centroCosto);
       
-      toast({
-        title: "Centro de costo actualizado",
-        description: "Se ha actualizado el centro de costo del empleado.",
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error('Error updating centro costo:', error);
-      toast({
-        title: "Error al actualizar centro de costo",
-        description: error.message || "No se pudo actualizar el centro de costo.",
-        variant: "destructive"
-      });
-      return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const updateNivelRiesgoARL = async (id: string, nivelRiesgo: 'I' | 'II' | 'III' | 'IV' | 'V') => {
-    setIsLoading(true);
-    try {
-      await EmployeeStatusService.updateNivelRiesgoARL(id, nivelRiesgo);
-      
-      toast({
-        title: "Nivel de riesgo ARL actualizado",
-        description: "Se ha actualizado el nivel de riesgo ARL del empleado.",
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error('Error updating ARL risk level:', error);
-      toast({
-        title: "Error al actualizar nivel de riesgo",
-        description: error.message || "No se pudo actualizar el nivel de riesgo ARL.",
-        variant: "destructive"
-      });
       return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
@@ -191,8 +205,6 @@ export const useEmployeeCRUD = () => {
     updateEmployee,
     deleteEmployee,
     changeEmployeeStatus,
-    updateCentroCosto,
-    updateNivelRiesgoARL,
     isLoading
   };
 };

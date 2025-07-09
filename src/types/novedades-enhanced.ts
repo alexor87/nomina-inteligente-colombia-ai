@@ -1,8 +1,8 @@
 
 import { Database } from '@/integrations/supabase/types';
 
-// Use the database enum directly
-export type NovedadType = Database['public']['Enums']['tipo_novedad_enum'];
+// Use the database enum directly from the correct path
+export type NovedadType = Database['public']['Enums']['novedad_type'];
 
 export const NOVEDAD_TYPE_LABELS: Record<NovedadType, string> = {
   // Income types
@@ -33,7 +33,7 @@ export interface CreateNovedadData {
   empleado_id: string;
   periodo_id: string;
   tipo_novedad: NovedadType;
-  valor?: number;
+  valor: number;
   dias?: number;
   horas?: number;
   observacion?: string;
@@ -163,4 +163,51 @@ export const isDeduccion = (tipo: NovedadType): boolean => {
 
 export const isTiempo = (tipo: NovedadType): boolean => {
   return ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'].includes(tipo);
+};
+
+// Calculation helper
+export const calcularValorNovedad = (params: NovedadCalculationParams): NovedadCalculationResult => {
+  const { employeeSalary, workingDays, workingHours, tipo_novedad, valor, dias, horas } = params;
+  
+  let calculatedValue = valor || 0;
+  let basis = 'Valor fijo';
+  let formula = `${calculatedValue}`;
+  
+  const breakdown = {
+    baseValue: employeeSalary,
+    multiplier: 1,
+    days: dias,
+    hours: horas
+  };
+
+  // Simple calculation based on type
+  switch (tipo_novedad) {
+    case 'horas_extra':
+      if (horas) {
+        const hourlyRate = employeeSalary / (workingDays * workingHours);
+        calculatedValue = hourlyRate * horas * 1.25; // 25% extra
+        basis = 'Horas trabajadas';
+        formula = `(${employeeSalary} / ${workingDays * workingHours}) * ${horas} * 1.25`;
+        breakdown.multiplier = 1.25;
+      }
+      break;
+    case 'vacaciones':
+      if (dias) {
+        const dailyRate = employeeSalary / workingDays;
+        calculatedValue = dailyRate * dias;
+        basis = 'Días de vacaciones';
+        formula = `(${employeeSalary} / ${workingDays}) * ${dias}`;
+      }
+      break;
+    default:
+      calculatedValue = valor || 0;
+      break;
+  }
+
+  return {
+    calculatedValue,
+    basis,
+    formula,
+    breakdown
+  };
 };

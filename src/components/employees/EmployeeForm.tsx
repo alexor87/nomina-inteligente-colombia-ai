@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { CONTRACT_TYPES, TIPOS_DOCUMENTO } from '@/types/employee-config';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
@@ -15,7 +16,7 @@ import { EmployeeFormData } from './form/types';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EmployeeFormProps {
-  employee?: Employee;
+  employee?: EmployeeUnified;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -52,25 +53,23 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       apellido: employee?.apellido || '',
       email: employee?.email || '',
       telefono: employee?.telefono || '',
-      sexo: (employee?.sexo === 'O' ? 'M' : employee?.sexo) || 'M',
+      sexo: employee?.sexo || 'M',
       fechaNacimiento: employee?.fechaNacimiento || '',
       direccion: employee?.direccion || '',
       ciudad: employee?.ciudad || '',
       departamento: employee?.departamento || '',
       salarioBase: employee?.salarioBase || 0,
-      tipoContrato: (employee?.tipoContrato === 'obra_labor' ? 'obra' : employee?.tipoContrato) || 'indefinido',
+      tipoContrato: employee?.tipoContrato || 'indefinido',
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
-      periodicidadPago: (employee?.periodicidadPago === 'semanal' ? 'quincenal' : employee?.periodicidadPago) || 'mensual',
+      periodicidadPago: employee?.periodicidadPago || 'mensual',
       cargo: employee?.cargo || '',
       codigo_ciiu: employee?.codigoCIIU || '',
       nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
-      estado: (employee?.estado === 'licencia' ? 'activo' : employee?.estado) || 'activo',
+      estado: employee?.estado || 'activo',
       centroCostos: employee?.centroCostos || '',
       fechaFirmaContrato: employee?.fechaFirmaContrato || '',
       fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
-      tipoJornada: (employee?.tipoJornada === 'medio_tiempo' ? 'parcial' : 
-                   employee?.tipoJornada === 'por_horas' ? 'horas' : 
-                   employee?.tipoJornada === 'flexible' ? 'completa' : employee?.tipoJornada) || 'completa',
+      tipoJornada: employee?.tipoJornada || 'completa',
       diasTrabajo: employee?.diasTrabajo || 30,
       horasTrabajo: employee?.horasTrabajo || 8,
       beneficiosExtralegales: employee?.beneficiosExtralegales || false,
@@ -79,7 +78,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       tipoCuenta: employee?.tipoCuenta || 'ahorros',
       numeroCuenta: employee?.numeroCuenta || '',
       titularCuenta: employee?.titularCuenta || '',
-      formaPago: (employee?.formaPago === 'cheque' || employee?.formaPago === 'efectivo' ? 'manual' : employee?.formaPago) || 'dispersion',
+      formaPago: employee?.formaPago || 'dispersion',
       eps: employee?.eps || '',
       afp: employee?.afp || '',
       arl: employee?.arl || '',
@@ -87,8 +86,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       tipoCotizanteId: employee?.tipoCotizanteId || '',
       subtipoCotizanteId: employee?.subtipoCotizanteId || '',
       regimenSalud: employee?.regimenSalud || 'contributivo',
-      estadoAfiliacion: (employee?.estadoAfiliacion === 'afiliado' ? 'completa' : 
-                        employee?.estadoAfiliacion === 'tramite' ? 'pendiente' : employee?.estadoAfiliacion) || 'pendiente'
+      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente'
     }
   });
 
@@ -127,8 +125,8 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
     console.log('Creando empleado para empresa:', companyId);
 
-    // Create the object with the structure expected by Employee type
-    const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
+    // Create the object with the structure expected by EmployeeUnified type
+    const employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> = {
       empresaId: companyId,
       cedula: data.cedula,
       tipoDocumento: data.tipoDocumento,
@@ -170,11 +168,12 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       tipoCotizanteId: data.tipoCotizanteId,
       subtipoCotizanteId: data.subtipoCotizanteId,
       regimenSalud: data.regimenSalud,
-      estadoAfiliacion: data.estadoAfiliacion
+      estadoAfiliacion: data.estadoAfiliacion,
+      custom_fields: data.custom_fields
     };
 
     let result;
-    if (employee) {
+    if (employee?.id) {
       result = await updateEmployee(employee.id, employeeData);
     } else {
       result = await createEmployee(employeeData);
@@ -305,7 +304,6 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
                   <SelectItem value="fijo">Término Fijo</SelectItem>
                   <SelectItem value="obra">Obra</SelectItem>
                   <SelectItem value="aprendizaje">Contrato de Aprendizaje</SelectItem>
-                  <SelectItem value="practicas">Prácticas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -343,12 +341,6 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
                     <span className="flex items-center">
                       <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                       En Vacaciones
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="licencia">
-                    <span className="flex items-center">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
-                      En Licencia
                     </span>
                   </SelectItem>
                   <SelectItem value="incapacidad">

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -132,7 +133,7 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
             empleado_id: employee.id,
             periodo_id: periodId,
             tipo_novedad: novedad.tipo_novedad,
-            valor: novedad.valor,
+            valor: novedad.valor || 0,
             observacion: novedad.observacion
           };
 
@@ -144,7 +145,7 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
           // Update existing novedad
           const updateData = {
             tipo_novedad: novedad.tipo_novedad,
-            valor: novedad.valor,
+            valor: novedad.valor || 0,
             observacion: novedad.observacion
           };
 

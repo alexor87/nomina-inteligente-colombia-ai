@@ -1,9 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Employee, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
+import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 
 export class EmployeeUnifiedService {
-  static async getAll(): Promise<{ success: boolean; data?: Employee[]; error?: string }> {
+  static async getAll(): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
     try {
       console.log('🔄 EmployeeUnifiedService: Fetching all employees');
       
@@ -29,7 +29,7 @@ export class EmployeeUnifiedService {
     }
   }
 
-  static async getById(id: string): Promise<{ success: boolean; data?: Employee | null; error?: string }> {
+  static async getById(id: string): Promise<{ success: boolean; data?: EmployeeUnified | null; error?: string }> {
     try {
       console.log('🔄 EmployeeUnifiedService: Fetching employee by ID:', id);
       
@@ -56,11 +56,11 @@ export class EmployeeUnifiedService {
     }
   }
 
-  static async getEmployeeById(id: string): Promise<{ success: boolean; data?: Employee | null; error?: string }> {
+  static async getEmployeeById(id: string): Promise<{ success: boolean; data?: EmployeeUnified | null; error?: string }> {
     return this.getById(id);
   }
 
-  static async create(employeeData: any): Promise<{ success: boolean; data?: Employee; error?: string }> {
+  static async create(employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     try {
       console.log('🔄 EmployeeUnifiedService: Creating employee with data:', employeeData);
       
@@ -73,17 +73,16 @@ export class EmployeeUnifiedService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // Prepare employee data without avatar field for database
-      const dbEmployeeData = {
+      // Map to database format
+      const dbData = mapUnifiedToDatabase({
         ...employeeData,
-        company_id: companyData,
-        // Remove avatar as it's not in the database schema
-        avatar: undefined
-      };
+        id: '',
+        company_id: companyData
+      } as EmployeeUnified);
 
       const { data, error } = await supabase
         .from('employees')
-        .insert([dbEmployeeData])
+        .insert([dbData])
         .select()
         .single();
 
@@ -107,19 +106,19 @@ export class EmployeeUnifiedService {
     }
   }
 
-  static async update(id: string, employeeData: any): Promise<{ success: boolean; data?: Employee; error?: string }> {
+  static async update(id: string, employeeData: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     try {
       console.log('🔄 EmployeeUnifiedService: Updating employee:', id, 'with data:', employeeData);
       
-      // Prepare employee data for database (remove avatar)
-      const dbEmployeeData = {
+      // Map to database format
+      const dbData = mapUnifiedToDatabase({
         ...employeeData,
-        avatar: undefined // Remove avatar as it's not in the database schema
-      };
+        id
+      } as EmployeeUnified);
       
       const { data, error } = await supabase
         .from('employees')
-        .update(dbEmployeeData)
+        .update(dbData)
         .eq('id', id)
         .select()
         .single();

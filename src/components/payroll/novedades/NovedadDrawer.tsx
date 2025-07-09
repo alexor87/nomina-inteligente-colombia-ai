@@ -101,7 +101,8 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
         ...data,
         company_id: companyId,
         empleado_id: employee.id,
-        periodo_id: periodId
+        periodo_id: periodId,
+        valor: data.valor || 0
       };
 
       const result = await NovedadesEnhancedService.createNovedad(createData);
@@ -131,7 +132,10 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
 
     setIsLoading(true);
     try {
-      const result = await NovedadesEnhancedService.updateNovedad(editingNovedad.id, data);
+      const result = await NovedadesEnhancedService.updateNovedad(editingNovedad.id, {
+        ...data,
+        valor: data.valor || 0
+      });
       if (result.success) {
         toast({
           title: "✅ Novedad actualizada",
@@ -157,15 +161,13 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
   const handleDeleteNovedad = async (novedadId: string) => {
     setIsLoading(true);
     try {
-      const result = await NovedadesEnhancedService.deleteNovedad(novedadId);
-      if (result.success) {
-        toast({
-          title: "✅ Novedad eliminada",
-          description: "La novedad se ha eliminado correctamente",
-          className: "border-green-200 bg-green-50"
-        });
-        await loadNovedades();
-      }
+      await NovedadesEnhancedService.deleteNovedad(novedadId);
+      toast({
+        title: "✅ Novedad eliminada",
+        description: "La novedad se ha eliminado correctamente",
+        className: "border-green-200 bg-green-50"
+      });
+      await loadNovedades();
     } catch (error) {
       console.error('Error deleting novedad:', error);
       toast({
