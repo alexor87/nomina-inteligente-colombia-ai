@@ -1,43 +1,49 @@
 
-import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
 import { Database } from '@/integrations/supabase/types';
 
-// ✅ USE DATABASE TYPE DIRECTLY FOR CONSISTENCY
-export type NovedadType = Database['public']['Enums']['novedad_type'];
+// Use the database enum directly
+export type NovedadType = Database['public']['Enums']['tipo_novedad_enum'];
 
-export const NOVEDAD_CATEGORIES: Record<NovedadType, 'devengado' | 'deduccion'> = {
-  horas_extra: 'devengado',
-  recargo_nocturno: 'devengado',
-  vacaciones: 'devengado',
-  licencia_remunerada: 'devengado',
-  licencia_no_remunerada: 'devengado', // ✅ AGREGADO
-  incapacidad: 'devengado',
-  bonificacion: 'devengado',
-  bonificacion_salarial: 'devengado',
-  bonificacion_no_salarial: 'devengado',
-  comision: 'devengado',
-  prima: 'devengado',
-  otros_ingresos: 'devengado',
-  auxilio_conectividad: 'devengado',
-  viaticos: 'devengado',
-  retroactivos: 'devengado',
-  compensacion_ordinaria: 'devengado',
-  libranza: 'deduccion',
-  multa: 'deduccion',
-  ausencia: 'deduccion',
-  descuento_voluntario: 'deduccion',
-  retencion_fuente: 'deduccion',
-  fondo_solidaridad: 'deduccion',
-  salud: 'deduccion',
-  pension: 'deduccion',
-  arl: 'deduccion',
-  caja_compensacion: 'deduccion',
-  icbf: 'deduccion',
-  sena: 'deduccion',
-  embargo: 'deduccion',
-  anticipo: 'deduccion',
-  aporte_voluntario: 'deduccion'
+export const NOVEDAD_TYPE_LABELS: Record<NovedadType, string> = {
+  // Income types
+  horas_extra: 'Horas Extra',
+  recargo_nocturno: 'Recargo Nocturno',
+  bonificacion: 'Bonificación',
+  comision: 'Comisión',
+  prima: 'Prima',
+  otros_ingresos: 'Otros Ingresos',
+  
+  // Time-related
+  vacaciones: 'Vacaciones',
+  incapacidad: 'Incapacidad',
+  licencia_remunerada: 'Licencia Remunerada',
+  licencia_no_remunerada: 'Licencia No Remunerada',
+  
+  // Deductions
+  salud: 'Descuento Salud',
+  pension: 'Descuento Pensión',
+  arl: 'Descuento ARL',
+  retencion_fuente: 'Retención en la Fuente',
+  fondo_solidaridad: 'Fondo de Solidaridad',
+  ausencia: 'Ausencia'
 };
+
+export interface CreateNovedadData {
+  company_id: string;
+  empleado_id: string;
+  periodo_id: string;
+  tipo_novedad: NovedadType;
+  valor?: number;
+  dias?: number;
+  horas?: number;
+  observacion?: string;
+  constitutivo_salario?: boolean;
+  base_calculo?: string;
+  subtipo?: string;
+  adjunto_url?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+}
 
 export interface PayrollNovedad {
   id: string;
@@ -45,377 +51,116 @@ export interface PayrollNovedad {
   empleado_id: string;
   periodo_id: string;
   tipo_novedad: NovedadType;
-  valor: number;
-  horas?: number;
+  valor?: number;
   dias?: number;
+  horas?: number;
   observacion?: string;
+  constitutivo_salario?: boolean;
+  base_calculo?: string;
+  subtipo?: string;
+  adjunto_url?: string;
   fecha_inicio?: string;
   fecha_fin?: string;
-  base_calculo?: any;
+  creado_por?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface CreateNovedadData {
-  empleado_id: string;
-  periodo_id: string;
+export interface NovedadValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface NovedadCalculationParams {
+  employeeSalary: number;
+  workingDays: number;
+  workingHours: number;
   tipo_novedad: NovedadType;
-  valor: number;
-  horas?: number;
+  valor?: number;
   dias?: number;
-  observacion?: string;
-  fecha_inicio?: string;
-  fecha_fin?: string;
-  base_calculo?: any;
-  subtipo?: string;
-  company_id: string; // ✅ REQUERIDO
+  horas?: number;
 }
 
-export interface BaseCalculoData {
-  salario_base: number;
-  tipo_calculo: string;
-  detalle_calculo: string;
-  factor_calculo: number;
-  jornada_legal?: {
-    horas_semanales: number;
-    divisor_horario: number;
-    ley: string;
-    fecha_vigencia: string;
+export interface NovedadCalculationResult {
+  calculatedValue: number;
+  basis: string;
+  formula: string;
+  breakdown: {
+    baseValue: number;
+    multiplier: number;
+    days?: number;
+    hours?: number;
   };
 }
 
-export interface CalculationResult {
-  valor: number;
-  baseCalculo: BaseCalculoData;
-}
+// Mapping utilities
+export const mapNovedadFromDB = (dbNovedad: any): PayrollNovedad => {
+  return {
+    id: dbNovedad.id,
+    company_id: dbNovedad.company_id,
+    empleado_id: dbNovedad.empleado_id,
+    periodo_id: dbNovedad.periodo_id,
+    tipo_novedad: dbNovedad.tipo_novedad,
+    valor: dbNovedad.valor,
+    dias: dbNovedad.dias,
+    horas: dbNovedad.horas,
+    observacion: dbNovedad.observacion,
+    constitutivo_salario: dbNovedad.constitutivo_salario,
+    base_calculo: dbNovedad.base_calculo,
+    subtipo: dbNovedad.subtipo,
+    adjunto_url: dbNovedad.adjunto_url,
+    fecha_inicio: dbNovedad.fecha_inicio,
+    fecha_fin: dbNovedad.fecha_fin,
+    creado_por: dbNovedad.creado_por,
+    created_at: dbNovedad.created_at,
+    updated_at: dbNovedad.updated_at
+  };
+};
 
-/**
- * Calcula el FSP con tarifas escalonadas según la normativa colombiana
- */
-const calcularFSP = (ibc: number, smmlv: number): number => {
-  const multiplicadorIBC = ibc / smmlv;
+export const mapNovedadToDB = (novedad: CreateNovedadData | Partial<PayrollNovedad>) => {
+  return {
+    company_id: novedad.company_id,
+    empleado_id: novedad.empleado_id,
+    periodo_id: novedad.periodo_id,
+    tipo_novedad: novedad.tipo_novedad,
+    valor: novedad.valor || 0,
+    dias: novedad.dias || null,
+    horas: novedad.horas || null,
+    observacion: novedad.observacion || null,
+    constitutivo_salario: novedad.constitutivo_salario || false,
+    base_calculo: novedad.base_calculo || null,
+    subtipo: novedad.subtipo || null,
+    adjunto_url: novedad.adjunto_url || null,
+    fecha_inicio: novedad.fecha_inicio || null,
+    fecha_fin: novedad.fecha_fin || null
+  };
+};
+
+// Helper functions
+export const getNovedadLabel = (tipo: NovedadType): string => {
+  return NOVEDAD_TYPE_LABELS[tipo] || tipo;
+};
+
+export const getNovedadColor = (tipo: NovedadType): string => {
+  const ingresos: NovedadType[] = ['horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'];
+  const deducciones: NovedadType[] = ['salud', 'pension', 'arl', 'retencion_fuente', 'fondo_solidaridad'];
+  const tiempos: NovedadType[] = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'];
   
-  if (multiplicadorIBC <= 4) return 0;
-  if (multiplicadorIBC <= 16) return ibc * 0.01;
-  if (multiplicadorIBC <= 17) return ibc * 0.012;
-  if (multiplicadorIBC <= 18) return ibc * 0.014;
-  if (multiplicadorIBC <= 19) return ibc * 0.016;
-  if (multiplicadorIBC <= 20) return ibc * 0.018;
-  return ibc * 0.02;
+  if (ingresos.includes(tipo)) return 'bg-green-100 text-green-800';
+  if (deducciones.includes(tipo)) return 'bg-red-100 text-red-800';
+  if (tiempos.includes(tipo)) return 'bg-blue-100 text-blue-800';
+  return 'bg-gray-100 text-gray-800';
 };
 
-/**
- * Validaciones legales obligatorias
- */
-const validarLimitesLegales = (
-  tipoNovedad: NovedadType,
-  valor: number,
-  horas?: number,
-  salarioBase?: number
-): { esValido: boolean; mensajes: string[] } => {
-  const mensajes: string[] = [];
-  let esValido = true;
-
-  switch (tipoNovedad) {
-    case 'horas_extra':
-      if (horas && horas > 12) {
-        esValido = false;
-        mensajes.push('Las horas extra no pueden superar 12 por día');
-      }
-      break;
-    
-    case 'auxilio_conectividad':
-      if (salarioBase && salarioBase > 2600000) { // 2 SMMLV aprox
-        esValido = false;
-        mensajes.push('El auxilio de conectividad solo aplica para salarios ≤ 2 SMMLV');
-      }
-      break;
-  }
-
-  return { esValido, mensajes };
+export const isIngreso = (tipo: NovedadType): boolean => {
+  return ['horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(tipo);
 };
 
-/**
- * Calcula el valor hora ordinaria para recargos usando la fórmula correcta
- * Según el artículo: salario / 30 / 7.3333
- */
-const calcularValorHoraRecargo = (salarioBase: number): number => {
-  return salarioBase / 30 / 7.3333;
+export const isDeduccion = (tipo: NovedadType): boolean => {
+  return ['salud', 'pension', 'arl', 'retencion_fuente', 'fondo_solidaridad'].includes(tipo);
 };
 
-/**
- * Versión mejorada de calcularValorNovedad que considera la jornada legal dinámica
- */
-export const calcularValorNovedadEnhanced = (
-  tipoNovedad: NovedadType,
-  subtipo: string | undefined,
-  salarioBase: number,
-  dias?: number,
-  horas?: number,
-  fechaPeriodo: Date = new Date()
-): CalculationResult => {
-  const jornadaLegal = getJornadaLegal(fechaPeriodo);
-  const hourlyDivisor = getHourlyDivisor(fechaPeriodo);
-  const valorHoraOrdinaria = salarioBase / hourlyDivisor;
-  const valorDiario = salarioBase / 30;
-  const valorHoraExtra = calcularValorHoraExtra(salarioBase, fechaPeriodo);
-  const valorHoraRecargo = calcularValorHoraRecargo(salarioBase);
-
-  console.log(`💰 Calculando novedad ${tipoNovedad} con jornada de ${jornadaLegal.horasSemanales}h semanales`);
-
-  const result: CalculationResult = {
-    valor: 0,
-    baseCalculo: {
-      salario_base: salarioBase,
-      tipo_calculo: tipoNovedad,
-      detalle_calculo: '',
-      factor_calculo: 1.0,
-      jornada_legal: {
-        horas_semanales: jornadaLegal.horasSemanales,
-        divisor_horario: hourlyDivisor,
-        ley: jornadaLegal.ley,
-        fecha_vigencia: fechaPeriodo.toISOString().split('T')[0]
-      }
-    }
-  };
-
-  // Validar límites legales
-  const validacion = validarLimitesLegales(tipoNovedad, 0, horas, salarioBase);
-  if (!validacion.esValido) {
-    result.baseCalculo.detalle_calculo = `Error: ${validacion.mensajes.join(', ')}`;
-    return result;
-  }
-
-  try {
-    switch (tipoNovedad) {
-      case 'horas_extra':
-        if (!horas || horas <= 0) {
-          throw new Error('Las horas extra deben ser mayor a 0');
-        }
-
-        // MULTIPLICADORES CORREGIDOS según especificación
-        let recargo = 0.25; // 25% por defecto (1.25 total)
-        let descripcionRecargo = 'diurnas (1.25x)';
-
-        if (subtipo && subtipo !== 'diurnas') {
-          switch (subtipo) {
-            case 'nocturnas':
-              recargo = 0.75; // 75% (1.75x total)
-              descripcionRecargo = 'nocturnas (1.75x)';
-              break;
-            case 'dominicales_diurnas':
-              recargo = 1.05; // 105% (2.05x total)
-              descripcionRecargo = 'dominicales diurnas (2.05x)';
-              break;
-            case 'dominicales_nocturnas':
-              recargo = 1.55; // 155% (2.55x total)
-              descripcionRecargo = 'dominicales nocturnas (2.55x)';
-              break;
-            case 'festivas_diurnas':
-              recargo = 1.05; // 105% (2.05x total)
-              descripcionRecargo = 'festivas diurnas (2.05x)';
-              break;
-            case 'festivas_nocturnas':
-              recargo = 1.55; // 155% (2.55x total)
-              descripcionRecargo = 'festivas nocturnas (2.55x)';
-              break;
-          }
-        }
-
-        result.valor = horas * valorHoraExtra * (1 + recargo);
-        result.baseCalculo.factor_calculo = (1 + recargo);
-        result.baseCalculo.detalle_calculo = 
-          `${horas} horas extra ${descripcionRecargo} × $${Math.round(valorHoraExtra)} × ${(1 + recargo)} = $${Math.round(result.valor)}`;
-        break;
-
-      case 'recargo_nocturno':
-        if (!horas || horas <= 0) {
-          throw new Error('Las horas de recargo deben ser mayor a 0');
-        }
-        
-        let factorRecargo = 0.35;
-        let descripcionTipoRecargo = 'nocturno (35%)';
-        
-        if (subtipo) {
-          switch (subtipo) {
-            case 'nocturno':
-              factorRecargo = 0.35;
-              descripcionTipoRecargo = 'nocturno (35%)';
-              break;
-            case 'dominical':
-              factorRecargo = 0.80;
-              descripcionTipoRecargo = 'dominical (80%)';
-              break;
-            case 'nocturno_dominical':
-              factorRecargo = 1.15;
-              descripcionTipoRecargo = 'nocturno dominical (115%)';
-              break;
-            case 'festivo':
-              factorRecargo = 0.75;
-              descripcionTipoRecargo = 'festivo (75%)';
-              break;
-            case 'nocturno_festivo':
-              factorRecargo = 1.10;
-              descripcionTipoRecargo = 'nocturno festivo (110%)';
-              break;
-          }
-        }
-        
-        result.valor = horas * valorHoraRecargo * factorRecargo;
-        result.baseCalculo.factor_calculo = factorRecargo;
-        result.baseCalculo.detalle_calculo = 
-          `${horas} horas recargo ${descripcionTipoRecargo} × $${Math.round(valorHoraRecargo)} × ${factorRecargo} = $${Math.round(result.valor)}`;
-        break;
-
-      case 'fondo_solidaridad':
-        // Implementar FSP con tarifas escalonadas
-        const smmlv = 1300000; // 2025
-        const fspCalculado = calcularFSP(salarioBase, smmlv);
-        result.valor = fspCalculado;
-        result.baseCalculo.detalle_calculo = 
-          `FSP calculado según IBC: $${Math.round(fspCalculado)} (IBC: ${(salarioBase/smmlv).toFixed(2)} SMMLV)`;
-        break;
-
-      case 'auxilio_conectividad':
-        if (salarioBase <= 2600000) { // 2 SMMLV aprox
-          result.valor = dias ? (dias * 50000 / 30) : 50000; // Valor mensual ejemplo
-          result.baseCalculo.detalle_calculo = 'Auxilio de conectividad digital';
-        } else {
-          throw new Error('Auxilio de conectividad solo aplica para salarios ≤ 2 SMMLV');
-        }
-        break;
-
-      case 'vacaciones':
-        if (!dias || dias <= 0) {
-          throw new Error('Los días de vacaciones deben ser mayor a 0');
-        }
-        
-        result.valor = dias * valorDiario;
-        result.baseCalculo.factor_calculo = 1.0;
-        result.baseCalculo.detalle_calculo = 
-          `${dias} días de vacaciones × $${Math.round(valorDiario)} = $${Math.round(result.valor)}`;
-        break;
-
-      case 'incapacidad':
-        if (!dias || dias <= 0) {
-          throw new Error('Los días de incapacidad deben ser mayor a 0');
-        }
-
-        let porcentajeIncapacidad = 0.667; // 66.7% por defecto (EPS común)
-        let entidadPagadora = 'EPS';
-        let tipoIncapacidad = 'común';
-
-        if (subtipo === 'laboral') {
-          porcentajeIncapacidad = 1.0; // 100% ARL
-          entidadPagadora = 'ARL';
-          tipoIncapacidad = 'laboral';
-        } else if (subtipo === 'maternidad') {
-          porcentajeIncapacidad = 1.0; // 100% EPS
-          entidadPagadora = 'EPS';
-          tipoIncapacidad = 'maternidad';
-        } else if (subtipo === 'comun') {
-          porcentajeIncapacidad = 0.667; // 66.7% EPS
-          entidadPagadora = 'EPS';
-          tipoIncapacidad = 'común';
-        }
-
-        result.valor = dias * valorDiario * porcentajeIncapacidad;
-        result.baseCalculo.factor_calculo = porcentajeIncapacidad;
-        result.baseCalculo.detalle_calculo = 
-          `${dias} días incapacidad ${tipoIncapacidad} × $${Math.round(valorDiario)} × ${porcentajeIncapacidad} (${entidadPagadora}) = $${Math.round(result.valor)}`;
-        break;
-
-      case 'licencia_remunerada':
-        if (!dias || dias <= 0) {
-          throw new Error('Los días de licencia deben ser mayor a 0');
-        }
-        
-        result.valor = dias * valorDiario;
-        result.baseCalculo.factor_calculo = 1.0;
-        result.baseCalculo.detalle_calculo = 
-          `${dias} días licencia remunerada × $${Math.round(valorDiario)} = $${Math.round(result.valor)}`;
-        break;
-
-      // ✅ NUEVA LÓGICA: Licencia no remunerada (valor siempre $0)
-      case 'licencia_no_remunerada':
-        result.valor = 0; // Siempre $0 por definición legal
-        result.baseCalculo.factor_calculo = 0;
-        if (dias && dias > 0) {
-          result.baseCalculo.detalle_calculo = `Licencia no remunerada: ${dias} días sin remuneración (Art. 51 CST). Suspende acumulación de prestaciones sociales.`;
-        } else {
-          result.baseCalculo.detalle_calculo = 'Licencia no remunerada: Sin remuneración por definición legal';
-        }
-        console.log('Resultado licencia no remunerada:', { dias, valor: 0 });
-        break;
-
-      case 'bonificacion':
-      case 'comision':
-      case 'prima':
-      case 'otros_ingresos':
-        // Para estos tipos, normalmente se ingresa el valor directamente
-        // pero si se especifican días u horas, se puede calcular
-        if (dias && dias > 0) {
-          result.valor = dias * valorDiario;
-          result.baseCalculo.factor_calculo = 1.0;
-          result.baseCalculo.detalle_calculo = `${dias} días × $${Math.round(valorDiario)} = $${Math.round(result.valor)}`;
-        } else if (horas && horas > 0) {
-          result.valor = horas * valorHoraOrdinaria;
-          result.baseCalculo.factor_calculo = 1.0;
-          result.baseCalculo.detalle_calculo = 
-            `${horas} horas × $${Math.round(valorHoraOrdinaria)} = $${Math.round(result.valor)}. ` +
-            `Jornada legal: ${jornadaLegal.horasSemanales}h semanales según ${jornadaLegal.ley}`;
-        } else {
-          result.baseCalculo.detalle_calculo = 'Valor a ingresar manualmente';
-        }
-        break;
-
-      // Deducciones
-      case 'libranza':
-      case 'multa':
-      case 'descuento_voluntario':
-      case 'retencion_fuente':
-      case 'salud':
-      case 'pension':
-      case 'arl':
-      case 'caja_compensacion':
-      case 'icbf':
-      case 'sena':
-      case 'ausencia':
-        result.baseCalculo.detalle_calculo = 'Valor fijo de deducción';
-        break;
-
-      case 'ausencia':
-        if (!dias || dias <= 0) {
-          throw new Error('Los días de ausencia deben ser mayor a 0');
-        }
-        
-        result.valor = dias * valorDiario;
-        result.baseCalculo.factor_calculo = 1.0;
-        result.baseCalculo.detalle_calculo = 
-          `${dias} días ausencia × $${Math.round(valorDiario)} = $${Math.round(result.valor)} (deducción)`;
-        break;
-      
-      default:
-        if (['bonificacion_salarial', 'bonificacion_no_salarial', 'viaticos', 'retroactivos', 'compensacion_ordinaria', 'embargo', 'anticipo', 'aporte_voluntario'].includes(tipoNovedad)) {
-          result.baseCalculo.detalle_calculo = `${tipoNovedad.replace('_', ' ')} - Valor a ingresar manualmente`;
-        } else {
-          throw new Error(`Tipo de novedad no soportado: ${tipoNovedad}`);
-        }
-    }
-
-    if (result.valor < 0) {
-      result.valor = 0;
-    }
-
-    console.log(`✅ Cálculo completado: $${Math.round(result.valor).toLocaleString()}`);
-    return result;
-
-  } catch (error) {
-    console.error('❌ Error en cálculo de novedad:', error);
-    result.baseCalculo.detalle_calculo = `Error: ${error.message}`;
-    return result;
-  }
+export const isTiempo = (tipo: NovedadType): boolean => {
+  return ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'].includes(tipo);
 };
-
-// Export the enhanced function as the main one
-export { calcularValorNovedadEnhanced as calcularValorNovedad };

@@ -1,460 +1,182 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Plus, 
-  Trash2, 
-  AlertCircle,
-  Loader2
-} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Trash2, Save, Calculator } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
-import { PayrollHistoryService } from '@/services/PayrollHistoryService';
-import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
-import { NovedadForm } from '@/components/payroll/novedades/NovedadForm';
-import { formatCurrency } from '@/lib/utils';
+import { NovedadType, CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 import { supabase } from '@/integrations/supabase/client';
-
-// ✅ USAR TIPO LOCAL UNIFICADO
-interface NovedadDisplay {
-  id: string;
-  tipo_novedad: NovedadType;
-  valor: number;
-  horas?: number;
-  dias?: number;
-  observacion?: string;
-  fecha_inicio?: string;
-  fecha_fin?: string;
-  base_calculo?: any;
-}
 
 interface DevengoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  employeeId: string;
-  employeeName: string;
-  employeeSalary: number;
-  payrollId: string;
   periodId: string;
-  modalType: 'devengado' | 'deduccion';
-  onNovedadCreated?: (employeeId: string, valor: number, tipo: 'devengado' | 'deduccion') => void;
+  employee: {
+    id: string;
+    nombre: string;
+    apellido: string;
+    salarioBase: number;
+  };
+  initialNovedades?: PayrollNovedad[];
+  onSave?: (novedades: PayrollNovedad[]) => void;
 }
 
-interface BasicConcepts {
-  salarioBase: number;
-  auxilioTransporte: number;
+interface NovedadDisplay {
+  id?: string;
+  tipo_novedad: NovedadType;
+  valor: number;
+  observacion: string;
+  isNew?: boolean;
 }
 
-export const DevengoModal = ({
+export const DevengoModal: React.FC<DevengoModalProps> = ({
   isOpen,
   onClose,
-  employeeId,
-  employeeName,
-  employeeSalary,
-  payrollId,
   periodId,
-  modalType,
-  onNovedadCreated
-}: DevengoModalProps) => {
+  employee,
+  initialNovedades = [],
+  onSave
+}) => {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [novedades, setNovedades] = useState<NovedadDisplay[]>([]);
-  const [basicConcepts, setBasicConcepts] = useState<BasicConcepts>({
-    salarioBase: 0,
-    auxilioTransporte: 0
-  });
-  const [showForm, setShowForm] = useState(false);
-  const [editingNovedad, setEditingNovedad] = useState<NovedadDisplay | null>(null);
-  const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(new Date());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [companyId, setCompanyId] = useState<string>('');
 
-  // Form state con valores por defecto mejorados
-  const [formData, setFormData] = useState<CreateNovedadData>({
-    empleado_id: employeeId,
-    periodo_id: periodId,
-    tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
-    subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
-    fecha_inicio: '',
-    fecha_fin: '',
-    dias: undefined,
-    horas: undefined,
-    valor: 0,
-    observacion: '',
-    company_id: '' // ✅ AGREGADO - Será llenado automáticamente
-  });
-
-  // ✅ CORRECCIÓN: Obtener company_id al cargar el modal
+  // Load company ID
   useEffect(() => {
-    const getCompanyId = async () => {
+    const loadCompanyId = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (profile?.company_id) {
-            setFormData(prev => ({
-              ...prev,
-              company_id: profile.company_id
-            }));
-          }
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile?.company_id) {
+          setCompanyId(profile.company_id);
         }
       } catch (error) {
-        console.error('Error getting company ID:', error);
+        console.error('Error loading company ID:', error);
       }
     };
 
     if (isOpen) {
-      getCompanyId();
+      loadCompanyId();
     }
   }, [isOpen]);
 
-  // Actualizar formData cuando cambien las props
+  // Load existing novedades
   useEffect(() => {
-    if (isOpen) {
-      setFormData(prev => ({
-        ...prev,
-        empleado_id: employeeId,
-        periodo_id: periodId,
-        tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
-        subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
-        fecha_inicio: '',
-        fecha_fin: '',
-        dias: undefined,
-        horas: undefined,
-        valor: 0,
-        observacion: ''
-      }));
-    }
-  }, [isOpen, employeeId, periodId, modalType]);
-
-  // Enhanced period date loading
-  useEffect(() => {
-    const loadPeriodDate = async () => {
-      try {
-        // First check payroll_periods_real table
-        const { data: periodDataReal } = await supabase
-          .from('payroll_periods_real')
-          .select('*')
-          .eq('id', periodId);
-
-        // Then check payroll_periods table as fallback
-        const { data: periodDataRegular } = await supabase
-          .from('payroll_periods')
-          .select('*')
-          .eq('id', periodId);
-
-        // Use the first period found
-        const periodData = periodDataReal?.[0] || periodDataRegular?.[0];
-
-        if (periodData?.fecha_inicio) {
-          const fechaPeriodo = new Date(periodData.fecha_inicio);
-          setCurrentPeriodDate(fechaPeriodo);
-        } else {
-          setCurrentPeriodDate(new Date());
-        }
-      } catch (error) {
-        console.error('❌ Error loading period date:', error);
-        setCurrentPeriodDate(new Date());
-      }
-    };
-
-    if (isOpen && periodId) {
-      loadPeriodDate();
-    }
-  }, [isOpen, periodId]);
-
-  // Load basic payroll concepts (salary + transport aid)
-  const loadBasicConcepts = useCallback(async () => {
-    if (!isOpen || !payrollId) return;
-    
-    try {
-      const { data: payrollData, error } = await supabase
-        .from('payrolls')
-        .select('salario_base, auxilio_transporte')
-        .eq('id', payrollId)
-        .single();
-
-      if (error) {
-        console.error('❌ Error loading payroll data:', error);
-        return;
-      }
-      
-      setBasicConcepts({
-        salarioBase: Number(payrollData?.salario_base || 0),
-        auxilioTransporte: Number(payrollData?.auxilio_transporte || 0)
-      });
-      
-    } catch (error) {
-      console.error('❌ Error loading basic concepts:', error);
-    }
-  }, [isOpen, payrollId]);
-
-  const loadNovedades = useCallback(async () => {
-    if (!isOpen || !employeeId || !periodId) return;
-    
-    try {
-      setIsLoading(true);
-      
-      // Try direct service call first
-      const data = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
-      
-      // Filtrar por tipo de modal y convertir a NovedadDisplay
-      const filteredNovedades = (data || []).filter(novedad => {
-        const isDevengado = ['horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
-                            'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(novedad.tipo_novedad);
-        
-        return modalType === 'devengado' ? isDevengado : !isDevengado;
-      }).map(novedad => ({
+    if (isOpen && initialNovedades.length > 0) {
+      const mappedNovedades: NovedadDisplay[] = initialNovedades.map(novedad => ({
         id: novedad.id,
-        tipo_novedad: novedad.tipo_novedad as NovedadType,
-        valor: novedad.valor,
-        horas: novedad.horas,
-        dias: novedad.dias,
-        observacion: novedad.observacion,
-        fecha_inicio: novedad.fecha_inicio,
-        fecha_fin: novedad.fecha_fin,
-        base_calculo: novedad.base_calculo
+        tipo_novedad: novedad.tipo_novedad,
+        valor: novedad.valor || 0,
+        observacion: novedad.observacion || '',
+        isNew: false
       }));
-      
-      setNovedades(filteredNovedades);
-      
-    } catch (error) {
-      console.error('❌ Error loading novedades:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las novedades",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+      setNovedades(mappedNovedades);
+    } else if (isOpen) {
+      setNovedades([]);
     }
-  }, [isOpen, employeeId, periodId, modalType, toast]);
+  }, [isOpen, initialNovedades]);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadBasicConcepts();
-      loadNovedades();
-    }
-  }, [loadBasicConcepts, loadNovedades, isOpen]);
-
-  const calculateSuggestedValue = useCallback((
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ): number | null => {
-    try {
-      if (!employeeSalary || employeeSalary <= 0) return null;
-      
-      const resultado = calcularValorNovedadEnhanced(
-        tipoNovedad,
-        subtipo,
-        employeeSalary,
-        dias,
-        horas,
-        currentPeriodDate
-      );
-      
-      return resultado.valor > 0 ? resultado.valor : null;
-    } catch (error) {
-      console.error('Error calculating suggested value:', error);
-      return null;
-    }
-  }, [employeeSalary, currentPeriodDate]);
-
-  const recalculateEmployeeTotals = async () => {
-    try {
-      await PayrollHistoryService.recalculateEmployeeTotalsWithNovedades(employeeId, periodId);
-    } catch (error) {
-      console.error('❌ Error recalculating employee totals:', error);
-    }
-  };
-
-  const handleCreateNovedad = async () => {
-    if (formData.valor <= 0) {
-      toast({
-        title: "Error",
-        description: "El valor debe ser mayor a 0",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!formData.empleado_id || !formData.periodo_id || !formData.company_id) {
-      toast({
-        title: "Error",
-        description: "Faltan datos requeridos (empleado, período o empresa)",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      
-      // ✅ CORRECCIÓN: El servicio ahora devuelve PayrollNovedad directamente
-      const newNovedad = await NovedadesEnhancedService.createNovedad(formData);
-
-      if (newNovedad) {
-        await recalculateEmployeeTotals();
-        await loadNovedades();
-        setShowForm(false);
-        setEditingNovedad(null);
-        
-        // Reset form
-        setFormData(prev => ({
-          ...prev,
-          tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
-          subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
-          fecha_inicio: '',
-          fecha_fin: '',
-          dias: undefined,
-          horas: undefined,
-          valor: 0,
-          observacion: ''
-        }));
-        
-        if (onNovedadCreated) {
-          onNovedadCreated(employeeId, newNovedad.valor, modalType);
-        }
-
-        toast({
-          title: "Novedad creada",
-          description: `Se ha creado la novedad de tipo ${formData.tipo_novedad} por ${formatCurrency(newNovedad.valor)}`,
-          duration: 3000
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error creating novedad:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear la novedad. Verifique los datos ingresados.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleUpdateNovedad = async () => {
-    if (!editingNovedad || formData.valor <= 0) return;
-
-    try {
-      setIsSubmitting(true);
-      
-      // ✅ CORRECCIÓN: El servicio ahora devuelve PayrollNovedad directamente
-      const updatedNovedad = await NovedadesEnhancedService.updateNovedad(
-        editingNovedad.id,
-        formData
-      );
-
-      if (updatedNovedad) {
-        await recalculateEmployeeTotals();
-        await loadNovedades();
-        setEditingNovedad(null);
-        setShowForm(false);
-
-        if (onNovedadCreated) {
-          onNovedadCreated(employeeId, updatedNovedad.valor, modalType);
-        }
-
-        toast({
-          title: "Novedad actualizada",
-          description: `La novedad se ha actualizado correctamente`,
-        });
-      }
-    } catch (error) {
-      console.error('Error updating novedad:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar la novedad",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDeleteNovedad = async (novedadId: string) => {
-    try {
-      setIsLoading(true);
-      await NovedadesEnhancedService.deleteNovedad(novedadId);
-      
-      await recalculateEmployeeTotals();
-      await loadNovedades();
-
-      if (onNovedadCreated) {
-        onNovedadCreated(employeeId, 0, modalType);
-      }
-
-      toast({
-        title: "Novedad eliminada",
-        description: `La novedad se ha eliminado correctamente`,
-      });
-    } catch (error) {
-      console.error('Error deleting novedad:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la novedad",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEditNovedad = (novedad: NovedadDisplay) => {
-    setEditingNovedad(novedad);
-    setFormData(prev => ({
-      ...prev,
-      tipo_novedad: novedad.tipo_novedad,
-      valor: novedad.valor,
-      horas: novedad.horas || undefined,
-      dias: novedad.dias || undefined,
-      observacion: novedad.observacion || '',
-      fecha_inicio: novedad.fecha_inicio || '',
-      fecha_fin: novedad.fecha_fin || '',
-      subtipo: (novedad as any).subtipo || ''
-    }));
-    setShowForm(true);
-  };
-
-  const handleCancelForm = () => {
-    setShowForm(false);
-    setEditingNovedad(null);
-    setFormData(prev => ({
-      ...prev,
-      tipo_novedad: modalType === 'devengado' ? 'horas_extra' as NovedadType : 'ausencia' as NovedadType,
-      subtipo: modalType === 'devengado' ? 'diurnas' : undefined,
-      fecha_inicio: '',
-      fecha_fin: '',
-      dias: undefined,
-      horas: undefined,
+  const addNovedad = () => {
+    const newNovedad: NovedadDisplay = {
+      tipo_novedad: 'bonificacion',
       valor: 0,
-      observacion: ''
-    }));
+      observacion: '',
+      isNew: true
+    };
+    setNovedades([...novedades, newNovedad]);
   };
 
-  const totalNovedades = novedades.reduce((sum, novedad) => sum + novedad.valor, 0);
-  const totalBasicConcepts = modalType === 'devengado' 
-    ? basicConcepts.salarioBase + basicConcepts.auxilioTransporte 
-    : 0;
-  const totalValue = totalBasicConcepts + totalNovedades;
+  const removeNovedad = (index: number) => {
+    setNovedades(novedades.filter((_, i) => i !== index));
+  };
 
-  // ✅ CORRECCIÓN: Complete all NovedadType labels to fix TS2740
-  const getNovedadLabel = (tipo: Database['public']['Enums']['novedad_type']): string => {
-    const labels: Record<Database['public']['Enums']['novedad_type'], string> = {
+  const updateNovedad = (index: number, field: keyof NovedadDisplay, value: any) => {
+    const updated = [...novedades];
+    updated[index] = { ...updated[index], [field]: value };
+    setNovedades(updated);
+  };
+
+  const handleSave = async () => {
+    if (!companyId) {
+      toast({
+        title: "Error",
+        description: "No se pudo obtener el ID de la empresa",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const savedNovedades: PayrollNovedad[] = [];
+
+      for (const novedad of novedades) {
+        if (novedad.isNew) {
+          // Create new novedad
+          const createData: CreateNovedadData = {
+            company_id: companyId,
+            empleado_id: employee.id,
+            periodo_id: periodId,
+            tipo_novedad: novedad.tipo_novedad,
+            valor: novedad.valor,
+            observacion: novedad.observacion
+          };
+
+          const result = await NovedadesEnhancedService.createNovedad(createData);
+          if (result.success && result.data) {
+            savedNovedades.push(result.data);
+          }
+        } else if (novedad.id) {
+          // Update existing novedad
+          const updateData = {
+            tipo_novedad: novedad.tipo_novedad,
+            valor: novedad.valor,
+            observacion: novedad.observacion
+          };
+
+          const result = await NovedadesEnhancedService.updateNovedad(novedad.id, updateData);
+          if (result.success && result.data) {
+            savedNovedades.push(result.data);
+          }
+        }
+      }
+
+      toast({
+        title: "✅ Novedades guardadas",
+        description: `Se guardaron ${savedNovedades.length} novedades correctamente`,
+        className: "border-green-200 bg-green-50"
+      });
+
+      onSave?.(savedNovedades);
+      onClose();
+    } catch (error) {
+      console.error('Error saving novedades:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudieron guardar las novedades",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getNovedadLabel = (tipo: NovedadType): string => {
+    const labels: Record<NovedadType, string> = {
       horas_extra: 'Horas Extra',
       recargo_nocturno: 'Recargo Nocturno',
       vacaciones: 'Vacaciones',
@@ -467,231 +189,156 @@ export const DevengoModal = ({
       otros_ingresos: 'Otros Ingresos',
       salud: 'Descuento Salud',
       pension: 'Descuento Pensión',
-      libranza: 'Libranza',
-      descuento_voluntario: 'Descuento Voluntario',
-      multa: 'Multa',
-      retencion_fuente: 'Retención en la Fuente'
+      arl: 'Descuento ARL',
+      retencion_fuente: 'Retención en la Fuente',
+      fondo_solidaridad: 'Fondo de Solidaridad',
+      ausencia: 'Ausencia'
     };
     return labels[tipo] || tipo;
   };
 
-  // ✅ CORRECCIÓN: Definir conceptsList correctamente
-  const conceptsList = React.useMemo(() => {
-    const concepts = [];
+  const getNovedadColor = (tipo: NovedadType): string => {
+    const ingresos: NovedadType[] = ['horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'];
+    const deducciones: NovedadType[] = ['salud', 'pension', 'arl', 'retencion_fuente', 'fondo_solidaridad'];
+    const tiempos: NovedadType[] = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'];
     
-    // Add basic concepts for devengado
-    if (modalType === 'devengado') {
-      if (basicConcepts.salarioBase > 0) {
-        concepts.push({
-          id: 'salario-base',
-          label: 'Salario Base',
-          value: basicConcepts.salarioBase,
-          isBasic: true
-        });
-      }
-      
-      if (basicConcepts.auxilioTransporte > 0) {
-        concepts.push({
-          id: 'auxilio-transporte', 
-          label: 'Auxilio Transporte',
-          value: basicConcepts.auxilioTransporte,
-          isBasic: true
-        });
-      }
-    }
-    
-    // Add novedades
-    novedades.forEach(novedad => {
-      concepts.push({
-        id: novedad.id,
-        label: getNovedadLabel(novedad.tipo_novedad),
-        value: novedad.valor,
-        isBasic: false,
-        novedad: novedad
-      });
-    });
-    
-    return concepts;
-  }, [modalType, basicConcepts, novedades]);
+    if (ingresos.includes(tipo)) return 'bg-green-100 text-green-800';
+    if (deducciones.includes(tipo)) return 'bg-red-100 text-red-800';
+    if (tiempos.includes(tipo)) return 'bg-blue-100 text-blue-800';
+    return 'bg-gray-100 text-gray-800';
+  };
 
-  const isFormValid = formData.valor > 0 && formData.empleado_id && formData.periodo_id && formData.company_id;
+  const totalDevengos = novedades.reduce((sum, novedad) => {
+    const tiposDevengos: NovedadType[] = [
+      'horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'
+    ];
+    return tiposDevengos.includes(novedad.tipo_novedad) ? sum + novedad.valor : sum;
+  }, 0);
+
+  const totalDeducciones = novedades.reduce((sum, novedad) => {
+    const tiposDeducciones: NovedadType[] = [
+      'salud', 'pension', 'arl', 'retencion_fuente'
+    ];
+    return tiposDeducciones.includes(novedad.tipo_novedad) ? sum + novedad.valor : sum;
+  }, 0);
+
+  if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
-        {/* Simplified Header */}
-        <div className="p-4 pb-3 border-b">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <div className="text-lg font-semibold">
-                {modalType === 'devengado' ? 'Devengados' : 'Deducciones'} - {employeeName}
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-        </div>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calculator className="w-5 h-5" />
+            Devengos y Deducciones - {employee.nombre} {employee.apellido}
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col min-h-0">
-          {!showForm ? (
-            <>
-              {/* Simplified summary header */}
-              <div className="px-4 py-3 bg-gray-50 border-b">
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold text-gray-900">
-                    Total: {formatCurrency(totalValue)}
-                  </div>
-                  <Button 
-                    onClick={() => setShowForm(true)}
-                    size="sm"
-                    className="flex items-center space-x-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Agregar</span>
-                  </Button>
-                </div>
-              </div>
+        <div className="space-y-4">
+          <Button variant="outline" onClick={addNovedad} className="mb-4">
+            <Plus className="w-4 h-4 mr-2" />
+            Agregar Novedad
+          </Button>
 
-              {/* Scrollable list */}
-              <ScrollArea className="flex-1 px-4">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : (
-                  <div className="py-4">
-                    {conceptsList.length === 0 ? (
-                      <div className="text-center py-8">
-                        <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                        <h3 className="text-sm font-medium text-gray-900 mb-1">
-                          {modalType === 'devengado' ? 'No hay conceptos de devengo' : 'No hay deducciones'}
-                        </h3>
-                        <p className="text-xs text-gray-600">
-                          Haz clic en "Agregar" para comenzar
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {conceptsList.map((concept) => (
-                          <div key={concept.id} className="flex items-center justify-between py-3 px-3 rounded-lg border hover:bg-gray-50">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2">
-                                <span className="font-medium text-sm">{concept.label}</span>
-                                {concept.isBasic && (
-                                  <Badge variant="outline" className="text-xs">Básico</Badge>
-                                )}
-                              </div>
-                              {concept.novedad?.observacion && (
-                                <div className="text-xs text-gray-600 mt-1">
-                                  {concept.novedad.observacion}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center space-x-3">
-                              <div className={`font-semibold text-sm ${
-                                modalType === 'devengado' ? 'text-green-700' : 'text-red-700'
-                              }`}>
-                                {modalType === 'devengado' ? '+' : '-'}{formatCurrency(concept.value)}
-                              </div>
-                              
-                              {!concept.isBasic && concept.novedad && (
-                                <div className="flex items-center space-x-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditNovedad(concept.novedad!)}
-                                    className="h-8 px-2 text-xs"
-                                  >
-                                    Editar
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteNovedad(concept.novedad!.id)}
-                                    className="h-8 px-2 text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+          {novedades.map((novedad, index) => (
+            <Card key={novedad.id || index}>
+              <CardContent className="p-4">
+                <div className="grid grid-cols-12 gap-4 items-center">
+                  <div className="col-span-3">
+                    <Label>Tipo de Novedad</Label>
+                    <Select
+                      value={novedad.tipo_novedad}
+                      onValueChange={(value: NovedadType) => updateNovedad(index, 'tipo_novedad', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[
+                          'horas_extra',
+                          'recargo_nocturno',
+                          'vacaciones',
+                          'licencia_remunerada',
+                          'licencia_no_remunerada',
+                          'incapacidad',
+                          'bonificacion',
+                          'comision',
+                          'prima',
+                          'otros_ingresos',
+                          'salud',
+                          'pension',
+                          'arl',
+                          'retencion_fuente',
+                          'fondo_solidaridad',
+                          'ausencia'
+                        ].map((tipo) => (
+                          <SelectItem key={tipo} value={tipo}>
+                            {getNovedadLabel(tipo as NovedadType)}
+                          </SelectItem>
                         ))}
-                      </div>
-                    )}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </ScrollArea>
-            </>
-          ) : (
-            <>
-              {/* Form header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b">
-                <h3 className="text-lg font-medium">
-                  {editingNovedad ? 'Editar' : 'Agregar'} {modalType}
-                </h3>
-              </div>
 
-              {/* Scrollable form */}
-              <ScrollArea className="flex-1 px-4">
-                <div className="py-4">
-                  <NovedadForm
-                    formData={formData}
-                    onFormDataChange={setFormData}
-                    initialData={editingNovedad ? {
-                      tipo_novedad: editingNovedad.tipo_novedad,
-                      valor: editingNovedad.valor,
-                      horas: editingNovedad.horas || undefined,
-                      dias: editingNovedad.dias || undefined,
-                      observacion: editingNovedad.observacion || '',
-                      fecha_inicio: editingNovedad.fecha_inicio || '',
-                      fecha_fin: editingNovedad.fecha_fin || ''
-                    } : undefined}
-                    employeeSalary={employeeSalary}
-                    calculateSuggestedValue={calculateSuggestedValue}
-                    modalType={modalType}
-                  />
+                  <div className="col-span-2">
+                    <Label>Valor</Label>
+                    <Input
+                      type="number"
+                      value={novedad.valor}
+                      onChange={(e) => updateNovedad(index, 'valor', Number(e.target.value))}
+                      min={0}
+                    />
+                  </div>
+
+                  <div className="col-span-5">
+                    <Label>Observación</Label>
+                    <Textarea
+                      value={novedad.observacion}
+                      onChange={(e) => updateNovedad(index, 'observacion', e.target.value)}
+                      rows={1}
+                    />
+                  </div>
+
+                  <div className="col-span-2 flex items-end space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeNovedad(index)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              </ScrollArea>
-            </>
-          )}
+              </CardContent>
+            </Card>
+          ))}
+
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-sm text-gray-600">Total Devengos</div>
+                <div className="text-2xl font-bold text-green-600">${totalDevengos.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-sm text-gray-600">Total Deducciones</div>
+                <div className="text-2xl font-bold text-red-600">${totalDeducciones.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {/* Simplified Footer */}
-        <div className="p-4 border-t bg-gray-50">
-          {showForm ? (
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={handleCancelForm}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={editingNovedad ? handleUpdateNovedad : handleCreateNovedad}
-                disabled={!isFormValid || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {editingNovedad ? 'Actualizando...' : 'Creando...'}
-                  </>
-                ) : (
-                  editingNovedad ? 'Actualizar' : 'Crear'
-                )}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex justify-between items-center">
-              <p className="text-sm text-gray-600">
-                {conceptsList.length} concepto{conceptsList.length !== 1 ? 's' : ''}
-              </p>
-              <Button variant="outline" onClick={onClose}>
-                Cerrar
-              </Button>
-            </div>
-          )}
-        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : 'Guardar Novedades'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
-
-export default DevengoModal;

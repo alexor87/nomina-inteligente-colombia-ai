@@ -52,23 +52,25 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       apellido: employee?.apellido || '',
       email: employee?.email || '',
       telefono: employee?.telefono || '',
-      sexo: employee?.sexo || 'M',
+      sexo: (employee?.sexo === 'O' ? 'M' : employee?.sexo) || 'M',
       fechaNacimiento: employee?.fechaNacimiento || '',
       direccion: employee?.direccion || '',
       ciudad: employee?.ciudad || '',
       departamento: employee?.departamento || '',
       salarioBase: employee?.salarioBase || 0,
-      tipoContrato: employee?.tipoContrato || 'indefinido',
+      tipoContrato: (employee?.tipoContrato === 'obra_labor' ? 'obra' : employee?.tipoContrato) || 'indefinido',
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
-      periodicidadPago: employee?.periodicidadPago || 'mensual',
+      periodicidadPago: (employee?.periodicidadPago === 'semanal' ? 'quincenal' : employee?.periodicidadPago) || 'mensual',
       cargo: employee?.cargo || '',
       codigo_ciiu: employee?.codigoCIIU || '',
       nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
-      estado: employee?.estado || 'activo',
+      estado: (employee?.estado === 'licencia' ? 'activo' : employee?.estado) || 'activo',
       centroCostos: employee?.centroCostos || '',
       fechaFirmaContrato: employee?.fechaFirmaContrato || '',
       fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
-      tipoJornada: employee?.tipoJornada || 'completa',
+      tipoJornada: (employee?.tipoJornada === 'medio_tiempo' ? 'parcial' : 
+                   employee?.tipoJornada === 'por_horas' ? 'horas' : 
+                   employee?.tipoJornada === 'flexible' ? 'completa' : employee?.tipoJornada) || 'completa',
       diasTrabajo: employee?.diasTrabajo || 30,
       horasTrabajo: employee?.horasTrabajo || 8,
       beneficiosExtralegales: employee?.beneficiosExtralegales || false,
@@ -77,7 +79,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       tipoCuenta: employee?.tipoCuenta || 'ahorros',
       numeroCuenta: employee?.numeroCuenta || '',
       titularCuenta: employee?.titularCuenta || '',
-      formaPago: employee?.formaPago || 'dispersion',
+      formaPago: (employee?.formaPago === 'cheque' || employee?.formaPago === 'efectivo' ? 'manual' : employee?.formaPago) || 'dispersion',
       eps: employee?.eps || '',
       afp: employee?.afp || '',
       arl: employee?.arl || '',
@@ -85,7 +87,8 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       tipoCotizanteId: employee?.tipoCotizanteId || '',
       subtipoCotizanteId: employee?.subtipoCotizanteId || '',
       regimenSalud: employee?.regimenSalud || 'contributivo',
-      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente'
+      estadoAfiliacion: (employee?.estadoAfiliacion === 'afiliado' ? 'completa' : 
+                        employee?.estadoAfiliacion === 'tramite' ? 'pendiente' : employee?.estadoAfiliacion) || 'pendiente'
     }
   });
 
@@ -300,7 +303,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
                 <SelectContent>
                   <SelectItem value="indefinido">Indefinido</SelectItem>
                   <SelectItem value="fijo">Término Fijo</SelectItem>
-                  <SelectItem value="obra_labor">Obra o Labor</SelectItem>
+                  <SelectItem value="obra">Obra</SelectItem>
                   <SelectItem value="aprendizaje">Contrato de Aprendizaje</SelectItem>
                   <SelectItem value="practicas">Prácticas</SelectItem>
                 </SelectContent>

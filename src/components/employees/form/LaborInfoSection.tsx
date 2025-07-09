@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { UseFormRegister, Control, UseFormWatch, FieldErrors, UseFormSetValue } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,30 +32,26 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
   const tipoContratoOptions = [
     { value: 'indefinido', label: 'Término Indefinido' },
     { value: 'fijo', label: 'Término Fijo' },
-    { value: 'obra_labor', label: 'Obra o Labor' },
-    { value: 'aprendizaje', label: 'Aprendizaje' },
-    { value: 'practicas', label: 'Prácticas' }
+    { value: 'obra', label: 'Obra o Labor' },
+    { value: 'aprendizaje', label: 'Aprendizaje' }
   ];
 
   const periodicidadPagoOptions = [
     { value: 'mensual', label: 'Mensual' },
-    { value: 'quincenal', label: 'Quincenal' },
-    { value: 'semanal', label: 'Semanal' }
+    { value: 'quincenal', label: 'Quincenal' }
   ];
 
   const estadoOptions = [
     { value: 'activo', label: 'Activo' },
     { value: 'inactivo', label: 'Inactivo' },
     { value: 'vacaciones', label: 'Vacaciones' },
-    { value: 'incapacidad', label: 'Incapacidad' },
-    { value: 'licencia', label: 'Licencia' }
+    { value: 'incapacidad', label: 'Incapacidad' }
   ];
 
   const tipoJornadaOptions = [
     { value: 'completa', label: 'Tiempo Completo' },
-    { value: 'medio_tiempo', label: 'Tiempo Parcial' },
-    { value: 'por_horas', label: 'Por Horas' },
-    { value: 'flexible', label: 'Horario Flexible' }
+    { value: 'parcial', label: 'Tiempo Parcial' },
+    { value: 'horas', label: 'Por Horas' }
   ];
 
   return (
@@ -96,7 +91,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <Label htmlFor="tipoContrato">Tipo de Contrato</Label>
               <Select 
                 value={watchedValues.tipoContrato} 
-                onValueChange={(value: "indefinido" | "fijo" | "obra_labor" | "aprendizaje" | "practicas") => setValue('tipoContrato', value)}
+                onValueChange={(value: "indefinido" | "fijo" | "obra" | "aprendizaje") => setValue('tipoContrato', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
@@ -104,9 +99,8 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
                 <SelectContent>
                   <SelectItem value="indefinido">Indefinido</SelectItem>
                   <SelectItem value="fijo">Término Fijo</SelectItem>
-                  <SelectItem value="obra_labor">Obra o Labor</SelectItem>
+                  <SelectItem value="obra">Obra o Labor</SelectItem>
                   <SelectItem value="aprendizaje">Contrato de Aprendizaje</SelectItem>
-                  <SelectItem value="practicas">Prácticas</SelectItem>
                 </SelectContent>
               </Select>
               {errors.tipoContrato && (
@@ -118,7 +112,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <Label htmlFor="estado">Estado</Label>
               <Select 
                 value={watchedValues.estado} 
-                onValueChange={(value: "activo" | "inactivo" | "vacaciones" | "incapacidad" | "licencia") => setValue('estado', value)}
+                onValueChange={(value: "activo" | "inactivo" | "vacaciones" | "incapacidad") => setValue('estado', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estado" />
@@ -140,12 +134,6 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
                     <span className="flex items-center">
                       <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                       En Vacaciones
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="licencia">
-                    <span className="flex items-center">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
-                      En Licencia
                     </span>
                   </SelectItem>
                   <SelectItem value="incapacidad">
@@ -236,7 +224,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <Label htmlFor="periodicidadPago">Periodicidad de Pago</Label>
               <Select 
                 value={watchedValues.periodicidadPago} 
-                onValueChange={(value: "mensual" | "quincenal" | "semanal") => setValue('periodicidadPago', value)}
+                onValueChange={(value: "mensual" | "quincenal") => setValue('periodicidadPago', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar periodicidad" />
@@ -244,7 +232,6 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
                 <SelectContent>
                   <SelectItem value="mensual">Mensual</SelectItem>
                   <SelectItem value="quincenal">Quincenal</SelectItem>
-                  <SelectItem value="semanal">Semanal</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -288,16 +275,15 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <Label htmlFor="tipoJornada">Tipo de Jornada</Label>
               <Select 
                 value={watchedValues.tipoJornada} 
-                onValueChange={(value: "completa" | "medio_tiempo" | "por_horas" | "flexible") => setValue('tipoJornada', value)}
+                onValueChange={(value: "completa" | "parcial" | "horas") => setValue('tipoJornada', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar jornada" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="completa">Jornada Completa</SelectItem>
-                  <SelectItem value="medio_tiempo">Medio Tiempo</SelectItem>
-                  <SelectItem value="por_horas">Por Horas</SelectItem>
-                  <SelectItem value="flexible">Flexible</SelectItem>
+                  <SelectItem value="parcial">Tiempo Parcial</SelectItem>
+                  <SelectItem value="horas">Por Horas</SelectItem>
                 </SelectContent>
               </Select>
             </div>

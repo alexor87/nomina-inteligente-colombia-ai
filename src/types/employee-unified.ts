@@ -1,8 +1,8 @@
 
 export interface EmployeeUnified {
-  id: string; // ✅ FIXED: Make id required to match Employee
+  id: string;
   company_id?: string;
-  empresaId?: string;
+  empresaId: string; // ✅ FIXED: Make required to match Employee
   
   // Personal Information
   cedula: string;
