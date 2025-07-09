@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
@@ -56,14 +55,9 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   // Use robust submission hook for better error handling
   const { 
-    handleSubmit: handleRobustSubmission, 
-    isLoading: isLoadingRobust,
-    error: submissionError
-  } = useEmployeeFormSubmissionRobust(
-    employee,
-    onSuccess, 
-    memoizedDataRefresh
-  );
+    submitEmployee, 
+    isSubmitting
+  } = useEmployeeFormSubmissionRobust();
 
   // Keep legacy edit submission for compatibility
   const { handleSubmit: handleEditSubmission, isSubmitting: isSubmittingEdit } = useEmployeeEditSubmission(
@@ -71,7 +65,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     onSuccess
   );
 
-  const isLoading = isLoadingRobust || isSubmittingEdit;
+  const isLoading = isSubmitting || isSubmittingEdit;
 
   const onSubmit = async (data: any) => {
     console.log('🚀 EmployeeFormModern: Form submission triggered');
@@ -92,15 +86,17 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     };
 
     // Use robust submission for both create and update operations
-    const result = await handleRobustSubmission(formDataWithCompany);
+    const result = await submitEmployee(formDataWithCompany);
     
-    if (!result.success) {
-      console.error('❌ Form submission failed:', result.error);
-      if (result.details) {
-        console.error('❌ Error details:', result.details);
+    if (result.success) {
+      console.log('✅ Form submission completed successfully');
+      onSuccess();
+      if (result.employeeId && memoizedDataRefresh) {
+        // Refresh with updated data if available
+        memoizedDataRefresh({ ...formDataWithCompany, id: result.employeeId } as EmployeeUnified);
       }
     } else {
-      console.log('✅ Form submission completed successfully');
+      console.error('❌ Form submission failed:', result.error);
     }
   };
 
@@ -109,17 +105,11 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     // TODO: Implement duplication logic
   };
 
-  // Show submission error if any
-  if (submissionError) {
-    console.log('⚠️  Submission error displayed:', submissionError);
-  }
-
   console.log('🎯 EmployeeFormModern: Rendering form with:', {
     id: employee?.id,
     name: employee ? `${employee.nombre} ${employee.apellido}` : 'New Employee',
     mode: isEditMode ? 'edit' : 'create',
     isLoading,
-    hasError: !!submissionError,
     customFieldsCount: configuration?.custom_fields?.length || 0
   });
 
@@ -137,14 +127,6 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           onCancel={onCancel}
           onDuplicate={handleDuplicate}
         />
-
-        {/* Show error message if submission failed */}
-        {submissionError && (
-          <div className="mx-8 mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-red-800 text-sm font-medium">Error al guardar empleado:</p>
-            <p className="text-red-700 text-sm">{submissionError}</p>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <EmployeeFormContent

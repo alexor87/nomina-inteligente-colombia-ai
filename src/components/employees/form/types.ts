@@ -7,10 +7,6 @@ export interface EmployeeFormData extends Omit<EmployeeUnified, 'id' | 'createdA
   
   // Campos personalizados dinámicos
   custom_fields: Record<string, any>;
-  
-  // ✅ NUEVO: Campos para vacaciones iniciales (Fase 1)
-  hasAccumulatedVacations: boolean;
-  initialVacationDays: number;
 }
 
 export interface EmployeeFormSection {
