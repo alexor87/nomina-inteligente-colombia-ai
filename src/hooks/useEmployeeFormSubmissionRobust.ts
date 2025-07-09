@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeFormData } from '@/components/employees/form/types';
 import { useToast } from '@/hooks/use-toast';
+import { EmployeeDataMapper } from '@/services/EmployeeDataMapper';
 
 export const useEmployeeFormSubmissionRobust = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -14,8 +15,6 @@ export const useEmployeeFormSubmissionRobust = () => {
     try {
       console.log('🚀 Iniciando envío de empleado con datos:', data);
 
-      const { custom_fields, ...employeeData } = data; // ✅ FIXED: Removed empresaId destructuring
-      
       // Obtener company_id del usuario actual
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -27,12 +26,10 @@ export const useEmployeeFormSubmissionRobust = () => {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      const finalEmployeeData = {
-        ...employeeData,
-        company_id: profile.company_id,
-        custom_fields: custom_fields || {},
-        salario_base: Number(employeeData.salarioBase) || 0
-      };
+      // ✅ KISS: Use EmployeeDataMapper for proper field conversion
+      const mappedData = EmployeeDataMapper.mapFormToDatabase(data, profile.company_id);
+      
+      console.log('📝 Datos mapeados para base de datos:', mappedData);
 
       let result;
       let actionText;
@@ -41,7 +38,7 @@ export const useEmployeeFormSubmissionRobust = () => {
         console.log('📝 Actualizando empleado existente:', data.id);
         const { data: updateResult, error } = await supabase
           .from('employees')
-          .update(finalEmployeeData)
+          .update(mappedData)
           .eq('id', data.id)
           .select()
           .single();
@@ -54,7 +51,7 @@ export const useEmployeeFormSubmissionRobust = () => {
         console.log('➕ Creando nuevo empleado');
         const { data: insertResult, error } = await supabase
           .from('employees')
-          .insert(finalEmployeeData)
+          .insert(mappedData)
           .select()
           .single();
         
@@ -68,7 +65,7 @@ export const useEmployeeFormSubmissionRobust = () => {
 
       toast({
         title: `Empleado ${actionText} ✅`,
-        description: `${finalEmployeeData.nombre} ${finalEmployeeData.apellido} ha sido ${actionText} exitosamente`,
+        description: `${data.nombre} ${data.apellido} ha sido ${actionText} exitosamente`,
         className: "border-green-200 bg-green-50"
       });
 
