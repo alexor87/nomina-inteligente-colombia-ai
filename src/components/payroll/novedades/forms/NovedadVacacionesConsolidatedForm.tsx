@@ -60,7 +60,7 @@ export const NovedadVacacionesConsolidatedForm: React.FC<NovedadVacacionesConsol
     const start = new Date(startDate);
     const end = new Date(endDate);
     const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     
     return Math.max(0, diffDays);
   };
@@ -139,21 +139,31 @@ export const NovedadVacacionesConsolidatedForm: React.FC<NovedadVacacionesConsol
   const totalValue = getTotalValue();
   const totalDays = entries.reduce((sum, entry) => sum + entry.dias, 0);
 
-  // Auto-calculate days when dates change
+  // 🔧 CORRECCIÓN: Recálculo automático cuando cambien fechas o días
   React.useEffect(() => {
     if (newEntry.fecha_inicio && newEntry.fecha_fin) {
       const calculatedDays = calculateDaysBetweenDates(newEntry.fecha_inicio, newEntry.fecha_fin);
       if (calculatedDays > 0) {
+        console.log('🔄 Auto-actualizando días calculados:', calculatedDays);
         setNewEntry(prev => ({ ...prev, dias: calculatedDays.toString() }));
         
-        // Auto-calculate value if available
+        // Auto-calcular valor
         const calculatedValue = calculateValueForEntry(calculatedDays);
-        if (calculatedValue && calculatedValue > 0 && !newEntry.valor) {
+        if (calculatedValue && calculatedValue > 0) {
+          console.log('🔄 Auto-actualizando valor calculado:', calculatedValue);
           setNewEntry(prev => ({ ...prev, valor: calculatedValue.toString() }));
         }
       }
+    } else if (newEntry.dias && parseInt(newEntry.dias) > 0) {
+      // Si se cambian los días manualmente, recalcular valor
+      const dias = parseInt(newEntry.dias);
+      const calculatedValue = calculateValueForEntry(dias);
+      if (calculatedValue && calculatedValue > 0) {
+        console.log('🔄 Auto-actualizando valor por días manuales:', calculatedValue);
+        setNewEntry(prev => ({ ...prev, valor: calculatedValue.toString() }));
+      }
     }
-  }, [newEntry.fecha_inicio, newEntry.fecha_fin]);
+  }, [newEntry.fecha_inicio, newEntry.fecha_fin, newEntry.dias, employeeSalary, calculateSuggestedValue]);
 
   return (
     <div className="space-y-6">

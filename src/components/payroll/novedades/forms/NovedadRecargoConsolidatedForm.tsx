@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,7 @@ interface NovedadRecargoConsolidatedFormProps {
   onBack: () => void;
   onSubmit: (formDataArray: any[]) => void;
   employeeSalary: number;
-  periodoFecha?: Date; // ✅ NUEVO: Fecha del período para jornada legal correcta
+  periodoFecha?: Date;
 }
 
 const RECARGO_SUBTIPOS = [
@@ -38,7 +39,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
   onBack,
   onSubmit,
   employeeSalary,
-  periodoFecha // ✅ NUEVO: Recibir fecha del período
+  periodoFecha
 }) => {
   const { entries, addEntry, removeEntry, getTotalValue } = useMultipleNovedadEntries<RecargoEntry>();
   
@@ -51,7 +52,6 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
 
   const [jornadaInfo, setJornadaInfo] = useState<any>(null);
 
-  // ✅ CORRECCIÓN: Usar fecha del período para jornada legal correcta
   const calculateValueForEntry = (subtipo: string, horas: number) => {
     if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
       return null;
@@ -64,7 +64,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         salarioBase: employeeSalary,
         tipoRecargo: subtipo as any,
         horas: horas,
-        fechaPeriodo: periodoFecha || new Date() // ✅ Usar fecha del período
+        fechaPeriodo: periodoFecha || new Date()
       });
       
       console.log('💰 Recargo calculado:', result);
@@ -131,15 +131,19 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
 
   const totalValue = getTotalValue();
 
-  // Calculate suggested value when hours or subtipo change
+  // 🔧 CORRECCIÓN: Recálculo automático sin condiciones que lo bloqueen
   React.useEffect(() => {
     if (newEntry.subtipo && newEntry.horas && parseFloat(newEntry.horas) > 0) {
       const calculatedValue = calculateValueForEntry(newEntry.subtipo, parseFloat(newEntry.horas));
-      if (calculatedValue && calculatedValue > 0 && !newEntry.valor) {
+      if (calculatedValue && calculatedValue > 0) {
+        console.log('🔄 Auto-actualizando valor calculado:', calculatedValue);
         setNewEntry(prev => ({ ...prev, valor: calculatedValue.toString() }));
       }
+    } else {
+      // Limpiar valor si no hay datos suficientes para calcular
+      setNewEntry(prev => ({ ...prev, valor: '' }));
     }
-  }, [newEntry.subtipo, newEntry.horas, employeeSalary, periodoFecha]); // ✅ Añadir periodoFecha como dependencia
+  }, [newEntry.subtipo, newEntry.horas, employeeSalary, periodoFecha]);
 
   return (
     <div className="space-y-6">
@@ -151,7 +155,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         <h3 className="text-lg font-semibold text-gray-900">Recargos</h3>
       </div>
 
-      {/* ✅ NUEVO: Información de jornada legal usada */}
+      {/* Información de jornada legal usada */}
       {jornadaInfo && (
         <div className="flex items-center gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
           <Info className="h-4 w-4" />

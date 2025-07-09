@@ -58,10 +58,10 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     calculateSuggestedValue
   });
 
-  // Calcular valor automáticamente cuando cambien horas o subtipo
+  // 🔧 CORRECCIÓN: Recálculo automático siempre cuando cambien horas o subtipo
   useEffect(() => {
     if (currentEntry.horas && parseFloat(currentEntry.horas) > 0) {
-      console.log('🔄 Calculating value for horas extra:', {
+      console.log('🔄 Auto-calculando valor para horas extra:', {
         subtipo: currentEntry.subtipo,
         horas: parseFloat(currentEntry.horas)
       });
@@ -73,6 +73,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         undefined
       );
     } else {
+      // Limpiar el valor calculado si no hay horas válidas
       calculateValue('horas_extra' as NovedadType, currentEntry.subtipo, 0, undefined);
     }
   }, [currentEntry.subtipo, currentEntry.horas, calculateValue]);

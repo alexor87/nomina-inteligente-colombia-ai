@@ -5,7 +5,7 @@ import { RecargosCalculationService } from '@/services/RecargosCalculationServic
 
 interface UseNovedadCalculationProps {
   employeeSalary: number;
-  periodoFecha?: Date; // ✅ NUEVO: Fecha del período para jornada legal correcta
+  periodoFecha?: Date;
   calculateSuggestedValue?: (
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
@@ -42,14 +42,14 @@ export const useNovedadCalculation = ({
       return null;
     }
 
-    // ✅ CORRECCIÓN: Usar fecha del período para jornada legal correcta
+    // Recargos usando fecha del período para jornada legal correcta
     if (tipoNovedad === 'recargo_nocturno' && subtipo && horas && horas > 0) {
       try {
         const result = RecargosCalculationService.calcularRecargo({
           salarioBase: employeeSalary,
           tipoRecargo: subtipo as any,
           horas: horas,
-          fechaPeriodo: periodoFecha || new Date() // ✅ Pasar fecha del período
+          fechaPeriodo: periodoFecha || new Date()
         });
         
         console.log('📊 Recargo calculation result:', result.valorRecargo);
