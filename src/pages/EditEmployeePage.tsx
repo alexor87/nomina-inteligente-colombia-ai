@@ -1,33 +1,18 @@
 
-import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { EmployeeService } from '@/services/EmployeeService';
 import { EmployeeFormModern } from '@/components/employees/EmployeeFormModern';
 import { Card } from '@/components/ui/card';
-import { useAutoSave } from '@/hooks/useAutoSave';
 
 const EditEmployeePage = () => {
   const navigate = useNavigate();
   const { employeeId } = useParams<{ employeeId: string }>();
-  
-  // SOLUCIÓN KISS: Estado para controlar auto-guardado cuando modal esté abierto
-  const [isTimeOffModalOpen, setIsTimeOffModalOpen] = useState(false);
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ['employee', employeeId],
     queryFn: () => EmployeeService.getEmployeeById(employeeId!),
     enabled: !!employeeId,
-  });
-
-  // Auto-guardado deshabilitado cuando modal de TimeOff esté abierto
-  const { triggerAutoSave, isSaving } = useAutoSave({
-    onSave: async () => {
-      console.log('✅ Auto-guardado funcionando (TimeOff modal cerrado)');
-      // Aquí iría la lógica de guardado del empleado
-    },
-    delay: 3000,
-    enabled: !isTimeOffModalOpen // CRÍTICO: deshabilitar cuando modal esté abierto
   });
 
   const handleSuccess = () => {
@@ -42,11 +27,6 @@ const EditEmployeePage = () => {
 
   const handleDataRefresh = (updatedEmployee: any) => {
     console.log('🔄 Employee data refreshed:', updatedEmployee);
-    
-    // Solo hacer auto-guardado si el modal de TimeOff NO está abierto
-    if (!isTimeOffModalOpen) {
-      triggerAutoSave();
-    }
   };
 
   if (isLoading) {

@@ -30,8 +30,6 @@ export const TimeOffModal = ({
   });
   const [isSaving, setIsSaving] = useState(false);
   const [calculatedDays, setCalculatedDays] = useState<number | null>(null);
-  // SOLUCIÓN KISS: Flag interno para controlar cuándo el modal puede cerrarse
-  const [canClose, setCanClose] = useState(false);
   const { toast } = useToast();
 
   const timeOffTypes = [
@@ -116,23 +114,11 @@ export const TimeOffModal = ({
     setFormData({ type: '', start_date: '', end_date: '', observations: '' });
     setCalculatedDays(null);
     setIsSaving(false);
-    setCanClose(true); // ✅ Permitir cerrar el modal
     onClose();
   };
 
-  const handleDialogOpenChange = (open: boolean) => {
-    // ✅ SOLUCIÓN KISS: Solo cerrar si es explícito (canClose = true) o si se está abriendo
-    if (!open && canClose) {
-      setCanClose(false); // Reset flag
-      onClose();
-    } else if (open) {
-      setCanClose(false); // Reset flag cuando se abre
-    }
-    // Si !open && !canClose, no hacer nada (mantener modal abierto)
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSaving && handleClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar Tiempo Libre</DialogTitle>

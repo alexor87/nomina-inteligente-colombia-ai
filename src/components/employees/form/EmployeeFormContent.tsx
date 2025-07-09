@@ -17,6 +17,7 @@ interface EmployeeFormContentProps {
   arlRiskLevels: { value: string; label: string; percentage: string }[];
   register: any;
   customFields: any[];
+  setIsTimeOffModalOpen: (isOpen: boolean) => void;
 }
 
 export const EmployeeFormContent = ({ 
@@ -27,7 +28,8 @@ export const EmployeeFormContent = ({
   watch, 
   arlRiskLevels, 
   register,
-  customFields = []
+  customFields = [],
+  setIsTimeOffModalOpen
 }: EmployeeFormContentProps) => {
   return (
     <div className="flex-1 overflow-y-auto">
@@ -69,10 +71,11 @@ export const EmployeeFormContent = ({
           setValue={setValue}
         />
 
-        {/* ✅ KISS: Sección Simple de Tiempo Libre */}
+        {/* ✅ KISS: Sección Simple de Tiempo Libre con comunicación directa */}
         <TimeOffSection
           employeeId={watchedValues.id}
           isReadOnly={false}
+          onModalStateChange={setIsTimeOffModalOpen}
         />
 
         {/* Custom Fields Section */}

@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+
+import { useMemo, useState } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
 import { useEmployeeFormSubmissionRobust } from '@/hooks/useEmployeeFormSubmissionRobust';
 import { useEmployeeEditSubmission } from '@/hooks/useEmployeeEditSubmission';
+import { useAutoSave } from '@/hooks/useAutoSave';
 
 // Import refactored components
 import { NavigationSidebar } from './form/NavigationSidebar';
@@ -25,6 +27,9 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   const isEditMode = !!employee;
   const { configuration } = useEmployeeGlobalConfiguration();
   
+  // ✅ KISS: Estado del modal TimeOff controlado aquí donde está el formulario
+  const [isTimeOffModalOpen, setIsTimeOffModalOpen] = useState(false);
+  
   const {
     register,
     handleSubmit,
@@ -45,13 +50,28 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     scrollToSection
   } = useEmployeeForm(employee);
 
+  // ✅ KISS: Auto-guardado donde está el formulario, deshabilitado cuando modal está abierto
+  const { triggerAutoSave, isSaving: isAutoSaving } = useAutoSave({
+    onSave: async () => {
+      console.log('✅ Auto-guardado funcionando (TimeOff modal cerrado)');
+      // Aquí iría la lógica de guardado del empleado si fuera necesaria
+    },
+    delay: 3000,
+    enabled: !isTimeOffModalOpen // CRÍTICO: deshabilitar cuando modal esté abierto
+  });
+
   // Memoize the data refresh handler to prevent unnecessary re-renders
   const memoizedDataRefresh = useMemo(() => {
     return (updatedEmployee: EmployeeUnified) => {
       console.log('🔄 EmployeeFormModern: Data refresh callback triggered');
       onDataRefresh?.(updatedEmployee);
+      
+      // Solo hacer auto-guardado si el modal de TimeOff NO está abierto
+      if (!isTimeOffModalOpen) {
+        triggerAutoSave();
+      }
     };
-  }, [onDataRefresh]);
+  }, [onDataRefresh, isTimeOffModalOpen, triggerAutoSave]);
 
   // Use robust submission hook for better error handling
   const { 
@@ -65,7 +85,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     onSuccess
   );
 
-  const isLoading = isSubmitting || isSubmittingEdit;
+  const isLoading = isSubmitting || isSubmittingEdit || isAutoSaving;
 
   const onSubmit = async (data: any) => {
     console.log('🚀 EmployeeFormModern: Form submission triggered');
@@ -111,7 +131,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     name: employee ? `${employee.nombre} ${employee.apellido}` : 'New Employee',
     mode: isEditMode ? 'edit' : 'create',
     isLoading,
-    customFieldsCount: configuration?.custom_fields?.length || 0
+    customFieldsCount: configuration?.custom_fields?.length || 0,
+    isTimeOffModalOpen
   });
 
   return (
@@ -139,6 +160,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
             arlRiskLevels={arlRiskLevels}
             register={register}
             customFields={configuration?.custom_fields || []}
+            setIsTimeOffModalOpen={setIsTimeOffModalOpen}
           />
         </form>
 
