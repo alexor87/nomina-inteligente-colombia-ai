@@ -73,7 +73,9 @@ export type NovedadType =
   | 'libranza'
   | 'ausencia'
   | 'multa'
-  | 'descuento_voluntario';
+  | 'descuento_voluntario'
+  // ✅ NUEVO: Licencia no remunerada (categoría neutral)
+  | 'licencia_no_remunerada';
 
 export const NOVEDAD_CATEGORIES = {
   devengados: {
@@ -134,7 +136,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: true,
         auto_calculo: true,
-        subtipos: ['paternidad', 'matrimonio', 'luto']
+        subtipos: ['paternidad', 'matrimonio', 'luto', 'estudio']
       },
       otros_ingresos: {
         label: 'Otros Ingresos',
@@ -164,11 +166,13 @@ export const NOVEDAD_CATEGORIES = {
         subtipos: ['disciplinaria', 'reglamentaria', 'contractual']
       },
       ausencia: {
-        label: 'Ausencia',
+        label: 'Ausencia Injustificada',
+        description: 'Ausencias que generan descuento salarial por incumplimiento laboral',
         requiere_horas: false,
         requiere_dias: true,
         auto_calculo: true,
-        subtipos: ['injustificada', 'permiso_no_remunerado', 'suspension']
+        legal_note: 'Genera descuento proporcional del salario según Art. 57 CST',
+        subtipos: ['injustificada', 'abandono_puesto', 'suspension_disciplinaria', 'tardanza_excesiva']
       },
       descuento_voluntario: {
         label: 'Descuento Voluntario',
@@ -190,6 +194,32 @@ export const NOVEDAD_CATEGORIES = {
         requiere_dias: false,
         auto_calculo: true,
         subtipos: []
+      }
+    }
+  },
+  // ✅ NUEVA CATEGORÍA: Licencias no remuneradas (categoría neutral)
+  licencias_no_remuneradas: {
+    label: 'Licencias No Remuneradas',
+    color: 'yellow',
+    description: 'Ausencias autorizadas sin remuneración que mantienen el vínculo laboral',
+    types: {
+      licencia_no_remunerada: {
+        label: 'Licencia No Remunerada',
+        description: 'Permiso autorizado sin pago que mantiene el contrato de trabajo',
+        requiere_horas: false,
+        requiere_dias: true,
+        auto_calculo: false, // Siempre valor $0
+        legal_note: 'Suspende temporalmente prestaciones sociales según Art. 51 CST',
+        affects_benefits: true,
+        subtipos: [
+          'personal', 
+          'estudios', 
+          'familiar', 
+          'salud_no_eps', 
+          'maternidad_extendida',
+          'cuidado_hijo_menor',
+          'emergencia_familiar'
+        ]
       }
     }
   }
@@ -314,7 +344,7 @@ export const calcularValorNovedad = (
           if (diasPagados > 0) {
             valor = Math.round(salarioDiario * 0.667 * diasPagados);
             factorCalculo = 0.667;
-            detalleCalculo = `(${salarioBase.toLocaleString()} / 30) × 66.7% × ${diasPagados} días (desde día 4) = ${valor.toLocaleString()}`;
+            detalleCalculo = `Incapacidad general: (${salarioBase.toLocaleString()} / 30) × 66.7% × ${diasPagados} días (desde día 4) = ${valor.toLocaleString()}`;
           } else {
             detalleCalculo = 'Incapacidad general: EPS paga desde el día 4';
           }
@@ -322,12 +352,12 @@ export const calcularValorNovedad = (
           // ARL paga 100% desde el día 1
           valor = Math.round(salarioDiario * dias);
           factorCalculo = 1;
-          detalleCalculo = `(${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
+          detalleCalculo = `Incapacidad laboral: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
         } else if (subtipo === 'maternidad') {
           // 100% del salario
           valor = Math.round(salarioDiario * dias);
           factorCalculo = 1;
-          detalleCalculo = `(${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
+          detalleCalculo = `Incapacidad maternidad: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
         }
         console.log('Resultado incapacidad:', { subtipo, dias, valor });
       } else {
@@ -340,7 +370,7 @@ export const calcularValorNovedad = (
         const salarioDiario = salarioBase / 30;
         valor = Math.round(salarioDiario * dias);
         factorCalculo = 1;
-        detalleCalculo = `(${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+        detalleCalculo = `Vacaciones: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
         console.log('Resultado vacaciones:', { dias, valor });
       } else {
         detalleCalculo = 'Ingrese los días de vacaciones';
@@ -352,22 +382,54 @@ export const calcularValorNovedad = (
         const salarioDiario = salarioBase / 30;
         valor = Math.round(salarioDiario * dias);
         factorCalculo = 1;
-        detalleCalculo = `(${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+        detalleCalculo = `Licencia remunerada: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
         console.log('Resultado licencia remunerada:', { dias, valor });
       } else {
         detalleCalculo = 'Ingrese los días de licencia';
       }
       break;
 
+    // ✅ NUEVA LÓGICA: Licencia no remunerada (valor siempre $0)
+    case 'licencia_no_remunerada':
+      valor = 0; // Siempre $0 por definición legal
+      factorCalculo = 0;
+      if (dias && dias > 0) {
+        detalleCalculo = `Licencia no remunerada: ${dias} días sin remuneración (Art. 51 CST). Suspende acumulación de prestaciones sociales.`;
+      } else {
+        detalleCalculo = 'Licencia no remunerada: Sin remuneración por definición legal';
+      }
+      console.log('Resultado licencia no remunerada:', { dias, valor: 0 });
+      break;
+
+    // ✅ DIFERENCIACIÓN: Ausencia injustificada (descuenta del salario)
     case 'ausencia':
       if (dias && dias > 0) {
         const salarioDiario = salarioBase / 30;
         valor = Math.round(salarioDiario * dias);
         factorCalculo = 1;
-        detalleCalculo = `(${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
-        console.log('Resultado ausencia:', { dias, valor });
+        
+        let tipoAusencia = '';
+        switch (subtipo) {
+          case 'injustificada':
+            tipoAusencia = 'Ausencia injustificada';
+            break;
+          case 'abandono_puesto':
+            tipoAusencia = 'Abandono del puesto';
+            break;
+          case 'suspension_disciplinaria':
+            tipoAusencia = 'Suspensión disciplinaria';
+            break;
+          case 'tardanza_excesiva':
+            tipoAusencia = 'Tardanza excesiva';
+            break;
+          default:
+            tipoAusencia = 'Ausencia';
+        }
+        
+        detalleCalculo = `${tipoAusencia}: Descuento de (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()} (Art. 57 CST)`;
+        console.log('Resultado ausencia injustificada:', { subtipo, dias, valor });
       } else {
-        detalleCalculo = 'Ingrese los días de ausencia';
+        detalleCalculo = 'Ingrese los días de ausencia injustificada';
       }
       break;
 
@@ -376,7 +438,7 @@ export const calcularValorNovedad = (
       if (salarioBase >= (1300000 * 4)) {
         valor = Math.round(salarioBase * 0.01); // 1%
         factorCalculo = 0.01;
-        detalleCalculo = `${salarioBase.toLocaleString()} × 1% = ${valor.toLocaleString()}`;
+        detalleCalculo = `Fondo de solidaridad: ${salarioBase.toLocaleString()} × 1% = ${valor.toLocaleString()}`;
       } else {
         detalleCalculo = 'Fondo de solidaridad aplica para salarios >= 4 SMMLV';
       }

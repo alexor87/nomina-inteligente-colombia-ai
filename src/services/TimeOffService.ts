@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface TimeOffRecord {
   id: string;
   employee_id: string;
-  type: 'vacaciones' | 'licencia_remunerada' | 'ausencia' | 'incapacidad';
+  type: 'vacaciones' | 'licencia_remunerada' | 'licencia_no_remunerada' | 'ausencia' | 'incapacidad';
   start_date: string;
   end_date: string;
   days: number;
@@ -14,7 +14,7 @@ export interface TimeOffRecord {
 
 export interface CreateTimeOffData {
   employee_id: string;
-  type: 'vacaciones' | 'licencia_remunerada' | 'ausencia' | 'incapacidad';
+  type: 'vacaciones' | 'licencia_remunerada' | 'licencia_no_remunerada' | 'ausencia' | 'incapacidad';
   start_date: string;
   end_date: string;
   observations?: string;
@@ -98,7 +98,7 @@ export class TimeOffService {
   }
 
   /**
-   * ✅ KISS: Obtener registros de un empleado - FILTRAR SOLO TIPOS DE TIEMPO LIBRE
+   * ✅ KISS: Obtener registros de un empleado - INCLUIR LICENCIAS NO REMUNERADAS
    */
   static async getEmployeeTimeOff(employeeId: string): Promise<{ 
     success: boolean; 
@@ -110,22 +110,28 @@ export class TimeOffService {
         .from('payroll_novedades')
         .select('*')
         .eq('empleado_id', employeeId)
-        .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'ausencia', 'incapacidad'])
+        .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia', 'incapacidad'])
         .order('fecha_inicio', { ascending: false });
 
       if (error) {
         return { success: false, error: error.message };
       }
 
-      // ✅ FIXED: Solo mapear registros que coincidan con nuestros tipos válidos
-      const validTimeOffTypes = ['vacaciones', 'licencia_remunerada', 'ausencia', 'incapacidad'];
+      // ✅ CORREGIDO: Incluir licencias no remuneradas en tipos válidos
+      const validTimeOffTypes = [
+        'vacaciones', 
+        'licencia_remunerada', 
+        'licencia_no_remunerada', 
+        'ausencia', 
+        'incapacidad'
+      ];
       
       const records = (novedades || [])
         .filter(novedad => validTimeOffTypes.includes(novedad.tipo_novedad))
         .map(novedad => ({
           id: novedad.id,
           employee_id: novedad.empleado_id,
-          type: novedad.tipo_novedad as 'vacaciones' | 'licencia_remunerada' | 'ausencia' | 'incapacidad',
+          type: novedad.tipo_novedad as 'vacaciones' | 'licencia_remunerada' | 'licencia_no_remunerada' | 'ausencia' | 'incapacidad',
           start_date: novedad.fecha_inicio || '',
           end_date: novedad.fecha_fin || '',
           days: novedad.dias || 0,
@@ -182,28 +188,44 @@ export class TimeOffService {
   }
 
   /**
-   * ✅ Obtener etiqueta del tipo
+   * ✅ Obtener etiqueta del tipo - ACTUALIZADA CON DIFERENCIACIÓN LEGAL
    */
   static getTypeLabel(type: string): string {
     const labels = {
       'vacaciones': 'Vacaciones',
       'licencia_remunerada': 'Licencia Remunerada',
-      'ausencia': 'Ausencia',
+      'licencia_no_remunerada': 'Licencia No Remunerada',
+      'ausencia': 'Ausencia Injustificada',
       'incapacidad': 'Incapacidad'
     };
     return labels[type as keyof typeof labels] || type;
   }
 
   /**
-   * ✅ Obtener color del tipo
+   * ✅ Obtener color del tipo - ACTUALIZADA CON DIFERENCIACIÓN LEGAL
    */
   static getTypeColor(type: string): string {
     const colors = {
       'vacaciones': 'text-blue-600 bg-blue-50 border-blue-200',
       'licencia_remunerada': 'text-green-600 bg-green-50 border-green-200',
-      'ausencia': 'text-orange-600 bg-orange-50 border-orange-200',
-      'incapacidad': 'text-red-600 bg-red-50 border-red-200'
+      'licencia_no_remunerada': 'text-yellow-600 bg-yellow-50 border-yellow-200',
+      'ausencia': 'text-red-600 bg-red-50 border-red-200',
+      'incapacidad': 'text-purple-600 bg-purple-50 border-purple-200'
     };
     return colors[type as keyof typeof colors] || 'text-gray-600 bg-gray-50 border-gray-200';
+  }
+
+  /**
+   * ✅ NUEVA: Obtener descripción legal del tipo
+   */
+  static getTypeLegalDescription(type: string): string {
+    const descriptions = {
+      'licencia_remunerada': 'Derecho del trabajador con pago del 100% del salario (Arts. 57, 230 CST)',
+      'licencia_no_remunerada': 'Permiso autorizado sin pago que mantiene el vínculo laboral (Art. 51 CST)',
+      'ausencia': 'Ausencia que genera descuento salarial por incumplimiento (Art. 57 CST)',
+      'vacaciones': 'Descanso remunerado anual (Arts. 186-192 CST)',
+      'incapacidad': 'Ausencia por enfermedad con cobertura de seguridad social'
+    };
+    return descriptions[type as keyof typeof descriptions] || '';
   }
 }
