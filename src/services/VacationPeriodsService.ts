@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface VacationPeriod {
@@ -66,7 +65,8 @@ export class VacationPeriodsService {
       }
 
       console.log('✅ Vacation period created successfully:', period);
-      return { success: true, data: period };
+      // ✅ CORREGIDO: Cast del status
+      return { success: true, data: { ...period, status: period.status as 'pendiente' | 'liquidado' | 'cancelado' } };
 
     } catch (error: any) {
       console.error('💥 Error in createPeriod:', error);
@@ -94,7 +94,13 @@ export class VacationPeriodsService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data: periods || [] };
+      // ✅ CORREGIDO: Cast del status para todos los períodos
+      const typedPeriods = (periods || []).map(period => ({
+        ...period,
+        status: period.status as 'pendiente' | 'liquidado' | 'cancelado'
+      }));
+
+      return { success: true, data: typedPeriods };
 
     } catch (error: any) {
       console.error('💥 Error in getPeriodsByEmployee:', error);
@@ -218,7 +224,13 @@ export class VacationPeriodsService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data: periods || [] };
+      // ✅ CORREGIDO: Cast del status para todos los períodos
+      const typedPeriods = (periods || []).map(period => ({
+        ...period,
+        status: period.status as 'pendiente' | 'liquidado' | 'cancelado'
+      }));
+
+      return { success: true, data: typedPeriods };
 
     } catch (error: any) {
       return { success: false, error: error.message };

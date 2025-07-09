@@ -1,3 +1,4 @@
+
 import { PersonalInfoSection } from './PersonalInfoSection';
 import { LaborInfoSection } from './LaborInfoSection';
 import { BankingInfoSection } from './BankingInfoSection';
@@ -36,7 +37,6 @@ export const EmployeeFormContent = ({
           control={control}
           errors={errors}
           watchedValues={watchedValues}
-          setValue={setValue}
         />
 
         {/* Labor Information Section */}
@@ -55,6 +55,9 @@ export const EmployeeFormContent = ({
           control={control}
           errors={errors}
           watchedValues={watchedValues}
+          setValue={setValue}
+          watch={watch}
+          register={register}
         />
 
         {/* Affiliations Section */}
@@ -62,12 +65,13 @@ export const EmployeeFormContent = ({
           control={control}
           errors={errors}
           watchedValues={watchedValues}
+          setValue={setValue}
         />
 
         {/* ✅ NUEVO: Sección de Vacaciones Aprobadas */}
         <VacationPeriodsSection
           employeeId={watchedValues.id}
-          companyId={watchedValues.empresaId || ''}
+          companyId={watchedValues.empresaId || watchedValues.company_id || ''}
           isReadOnly={false}
         />
 
@@ -77,7 +81,6 @@ export const EmployeeFormContent = ({
             customFields={customFields}
             control={control}
             errors={errors}
-            watchedValues={watchedValues}
           />
         )}
       </div>
