@@ -1,16 +1,16 @@
 
 import React from 'react';
-import { Control, FieldErrors, UseFormSetValue, UseFormWatch, UseFormRegister } from 'react-hook-form';
+import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { EmployeeFormData } from './types';
 
-// ✅ SIMPLIFIED: Support both wizard and form modes
+// ✅ FIXED: Added missing props to support both wizard and form modes
 interface BankingInfoSectionProps {
   control?: Control<EmployeeFormData>;
   errors?: FieldErrors<EmployeeFormData>;
   watchedValues?: EmployeeFormData;
   setValue?: UseFormSetValue<EmployeeFormData>;
   watch?: UseFormWatch<EmployeeFormData>;
-  register?: UseFormRegister<EmployeeFormData>;
+  register?: any;
   formData?: any;
   updateFormData?: (data: any) => void;
 }

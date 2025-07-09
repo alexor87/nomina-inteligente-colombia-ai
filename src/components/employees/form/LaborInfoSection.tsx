@@ -3,13 +3,15 @@ import React from 'react';
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { EmployeeFormData } from './types';
 
-// ✅ SIMPLIFIED: Support both wizard and form modes
+// ✅ FIXED: Added missing props to support both wizard and form modes
 interface LaborInfoSectionProps {
   control?: Control<EmployeeFormData>;
   errors?: FieldErrors<EmployeeFormData>;
   watchedValues?: EmployeeFormData;
   setValue?: UseFormSetValue<EmployeeFormData>;
   watch?: UseFormWatch<EmployeeFormData>;
+  arlRiskLevels?: { value: string; label: string; percentage: string }[];
+  register?: any;
   formData?: any;
   updateFormData?: (data: any) => void;
 }
@@ -20,6 +22,8 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
   watchedValues,
   setValue,
   watch,
+  arlRiskLevels = [],
+  register,
   formData,
   updateFormData
 }) => {
