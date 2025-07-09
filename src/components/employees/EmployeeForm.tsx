@@ -60,9 +60,9 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       salarioBase: employee?.salarioBase || 0,
       tipoContrato: employee?.tipoContrato || 'indefinido',
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
-      periodicidadPago: (employee?.periodicidadPago === 'quincenal' ? 'quincenal' : 'mensual') as 'quincenal' | 'mensual',
+      periodicidadPago: employee?.periodicidadPago || 'mensual',
       cargo: employee?.cargo || '',
-      codigoCIIU: employee?.codigoCIIU || '',
+      codigoCIIU: employee?.codigo_ciiu || '',
       nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
       estado: employee?.estado || 'activo',
       centroCostos: employee?.centroCostos || '',
@@ -124,7 +124,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
     console.log('Creando empleado para empresa:', companyId);
 
-    // Crear el objeto con la estructura que espera el tipo Employee
+    // Create the object with the structure expected by Employee type
     const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
       empresaId: companyId,
       cedula: data.cedula,
@@ -140,17 +140,21 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       ciudad: data.ciudad,
       departamento: data.departamento,
       salarioBase: Number(data.salarioBase),
-      tipoContrato: data.tipoContrato,
+      // ✅ Map form values to Employee type values
+      tipoContrato: data.tipoContrato === 'obra_labor' ? 'obra' : data.tipoContrato as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
       fechaIngreso: data.fechaIngreso,
-      periodicidadPago: data.periodicidadPago,
+      periodicidadPago: data.periodicidadPago === 'semanal' ? 'quincenal' : data.periodicidadPago as 'mensual' | 'quincenal',
       cargo: data.cargo,
-      codigoCIIU: data.codigoCIIU,
+      codigoCIIU: data.codigo_ciiu,
       nivelRiesgoARL: data.nivelRiesgoARL,
-      estado: data.estado,
+      estado: data.estado === 'licencia' ? 'inactivo' : data.estado as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad',
       centroCostos: data.centroCostos,
       fechaFirmaContrato: data.fechaFirmaContrato,
       fechaFinalizacionContrato: data.fechaFinalizacionContrato,
-      tipoJornada: data.tipoJornada,
+      // ✅ Map tipoJornada values
+      tipoJornada: data.tipoJornada === 'medio_tiempo' ? 'parcial' : 
+                  data.tipoJornada === 'por_horas' ? 'horas' : 
+                  data.tipoJornada === 'flexible' ? 'parcial' : 'completa',
       diasTrabajo: data.diasTrabajo,
       horasTrabajo: data.horasTrabajo,
       beneficiosExtralegales: data.beneficiosExtralegales,
@@ -293,16 +297,16 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
             <div>
               <Label htmlFor="tipoContrato">Tipo de Contrato *</Label>
-              <Select onValueChange={(value) => setValue('tipoContrato', value as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje')}>
+              <Select onValueChange={(value) => setValue('tipoContrato', value as EmployeeFormData['tipoContrato'])}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CONTRACT_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="indefinido">Indefinido</SelectItem>
+                  <SelectItem value="fijo">Término Fijo</SelectItem>
+                  <SelectItem value="obra_labor">Obra o Labor</SelectItem>
+                  <SelectItem value="aprendizaje">Contrato de Aprendizaje</SelectItem>
+                  <SelectItem value="practicas">Prácticas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -319,16 +323,41 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
             <div>
               <Label htmlFor="estado">Estado</Label>
-              <Select onValueChange={(value) => setValue('estado', value as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad')}>
+              <Select onValueChange={(value) => setValue('estado', value as EmployeeFormData['estado'])}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ESTADOS_EMPLEADO.map((estado) => (
-                    <SelectItem key={estado.value} value={estado.value}>
-                      {estado.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="activo">
+                    <span className="flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                      Activo
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="inactivo">
+                    <span className="flex items-center">
+                      <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                      Inactivo
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="vacaciones">
+                    <span className="flex items-center">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                      En Vacaciones
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="licencia">
+                    <span className="flex items-center">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                      En Licencia
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="incapacidad">
+                    <span className="flex items-center">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                      Incapacitado
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

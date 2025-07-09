@@ -1,309 +1,114 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Plus, 
-  Trash2, 
-  Calculator,
-  Clock,
-  AlertCircle,
-  Loader2
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { PayrollNovedad, CreateNovedadData, NovedadType, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
+import { X, Plus, Edit, Trash2, DollarSign, Clock, Calendar, FileText } from 'lucide-react';
+import { Employee, PayrollPeriod } from '@/types';
+import { NovedadType, PayrollNovedad } from '@/types/novedades-enhanced';
 import { NovedadForm } from './NovedadForm';
+import { useNovedades } from '@/hooks/useNovedades';
 import { formatCurrency } from '@/lib/utils';
-import { JornadaLegalTooltip } from '@/components/ui/JornadaLegalTooltip';
-import { supabase } from '@/integrations/supabase/client';
 
 interface NovedadDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  employeeName: string;
-  employeeId: string;
-  employeeSalary: number;
-  novedades: PayrollNovedad[];
-  onCreateNovedad: (data: CreateNovedadData) => Promise<void>;
-  onUpdateNovedad: (id: string, data: CreateNovedadData) => Promise<void>;
-  onDeleteNovedad: (id: string) => Promise<void>;
-  isLoading: boolean;
-  canEdit: boolean;
-  onRecalculatePayroll?: () => void;
+  employee: Employee | null;
+  period: PayrollPeriod | null;
 }
 
-export const NovedadDrawer = ({
-  isOpen,
-  onClose,
-  employeeName,
-  employeeId,
-  employeeSalary,
-  novedades,
-  onCreateNovedad,
-  onUpdateNovedad,
-  onDeleteNovedad,
-  isLoading,
-  canEdit,
-  onRecalculatePayroll
-}: NovedadDrawerProps) => {
-  const { toast } = useToast();
+export const NovedadDrawer = ({ isOpen, onClose, employee, period }: NovedadDrawerProps) => {
   const [showForm, setShowForm] = useState(false);
   const [editingNovedad, setEditingNovedad] = useState<PayrollNovedad | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(new Date());
-  const [companyId, setCompanyId] = useState<string>('');
+  
+  const { novedades, isLoading, createNovedad, loadNovedades, updateNovedad, deleteNovedad } = useNovedades(period?.id || '');
 
-  // ✅ CORRECCIÓN: Obtener company_id
+  // Load novedades when drawer opens or employee/period changes
   useEffect(() => {
-    const getCompanyId = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (profile?.company_id) {
-            setCompanyId(profile.company_id);
-          }
-        }
-      } catch (error) {
-        console.error('Error getting company ID:', error);
-      }
-    };
+    if (isOpen && employee && period) {
+      loadNovedades(employee.id);
+    }
+  }, [isOpen, employee, period, loadNovedades]);
 
-    if (isOpen) {
-      getCompanyId();
+  // Close form when drawer closes
+  useEffect(() => {
+    if (!isOpen) {
+      setShowForm(false);
+      setEditingNovedad(null);
     }
   }, [isOpen]);
 
-  // Form state con company_id incluido
-  const [formData, setFormData] = useState<CreateNovedadData>({
-    empleado_id: employeeId,
-    periodo_id: '',
-    tipo_novedad: 'horas_extra' as NovedadType,
-    subtipo: 'diurnas',
-    fecha_inicio: '',
-    fecha_fin: '',
-    dias: undefined,
-    horas: undefined,
-    valor: 0,
-    observacion: '',
-    company_id: '' // ✅ INCLUIDO
-  });
+  const handleCreateNovedad = async (novedadData: any) => {
+    if (!employee || !period) return;
 
-  // Update form data when companyId changes
-  useEffect(() => {
-    if (companyId && isOpen) {
-      setFormData(prev => ({
-        ...prev,
-        company_id: companyId,
-        empleado_id: employeeId
-      }));
-    }
-  }, [companyId, employeeId, isOpen]);
-
-  // Cargar fecha actual del período (en un drawer real tendríamos el periodId)
-  useEffect(() => {
-    // En un caso real, aquí cargaríamos la fecha del período específico
-    // Por ahora usamos la fecha actual, pero debería recibir periodId como prop
-    console.log('📅 Using current date for period calculations in drawer');
-    setCurrentPeriodDate(new Date());
-  }, []);
-
-  // Función de cálculo mejorada con jornada legal dinámica
-  const calculateSuggestedValue = useCallback((
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ): number | null => {
     try {
-      if (!employeeSalary || employeeSalary <= 0) return null;
-      
-      console.log('🧮 Calculating with period-specific legal workday in drawer');
-      console.log('📅 Using period date:', currentPeriodDate.toISOString().split('T')[0]);
-      console.log('💰 Employee salary:', employeeSalary);
-      
-      // Usar el sistema de cálculo mejorado con fecha del período
-      const resultado = calcularValorNovedadEnhanced(
-        tipoNovedad,
-        subtipo,
-        employeeSalary,
-        dias,
-        horas,
-        currentPeriodDate
-      );
-      
-      console.log(`💰 Calculated value with enhanced system for ${tipoNovedad}:`, resultado.valor);
-      console.log(`📊 Calculation details:`, resultado.baseCalculo.detalle_calculo);
-      
-      return resultado.valor > 0 ? resultado.valor : null;
-    } catch (error) {
-      console.error('Error calculating suggested value:', error);
-      return null;
-    }
-  }, [employeeSalary, currentPeriodDate]);
-
-  const handleCreateNovedad = async () => {
-    if (formData.valor <= 0 || !formData.company_id) return;
-
-    setIsSubmitting(true);
-    try {
-      await onCreateNovedad(formData);
+      await createNovedad({
+        ...novedadData,
+        empleado_id: employee.id,
+        periodo_id: period.id
+      });
       setShowForm(false);
-      setFormData({
-        empleado_id: employeeId,
-        periodo_id: '',
-        tipo_novedad: 'horas_extra' as NovedadType,
-        subtipo: 'diurnas',
-        fecha_inicio: '',
-        fecha_fin: '',
-        dias: undefined,
-        horas: undefined,
-        valor: 0,
-        observacion: '',
-        company_id: companyId // ✅ INCLUIR company_id
-      });
-      
-      if (onRecalculatePayroll) {
-        onRecalculatePayroll();
-      }
-
-      toast({
-        title: "Novedad creada",
-        description: `Se ha creado la novedad de tipo ${formData.tipo_novedad}`,
-        duration: 3000
-      });
     } catch (error) {
       console.error('Error creating novedad:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear la novedad",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  const handleUpdateNovedad = async () => {
-    if (!editingNovedad || formData.valor <= 0 || !formData.company_id) return;
+  const handleUpdateNovedad = async (novedadData: any) => {
+    if (!editingNovedad) return;
 
-    setIsSubmitting(true);
     try {
-      await onUpdateNovedad(editingNovedad.id, formData);
+      await updateNovedad(editingNovedad.id, novedadData);
       setEditingNovedad(null);
       setShowForm(false);
-
-      if (onRecalculatePayroll) {
-        onRecalculatePayroll();
-      }
-
-      toast({
-        title: "Novedad actualizada",
-        description: "La novedad se ha actualizado correctamente"
-      });
     } catch (error) {
       console.error('Error updating novedad:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar la novedad",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   const handleDeleteNovedad = async (novedadId: string) => {
     try {
-      await onDeleteNovedad(novedadId);
-
-      if (onRecalculatePayroll) {
-        onRecalculatePayroll();
-      }
-
-      toast({
-        title: "Novedad eliminada",
-        description: "La novedad se ha eliminado correctamente"
-      });
+      await deleteNovedad(novedadId);
     } catch (error) {
       console.error('Error deleting novedad:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la novedad",
-        variant: "destructive"
-      });
     }
   };
 
   const handleEditNovedad = (novedad: PayrollNovedad) => {
     setEditingNovedad(novedad);
-    setFormData({
-      empleado_id: novedad.empleado_id,
-      periodo_id: novedad.periodo_id,
-      tipo_novedad: novedad.tipo_novedad,
-      valor: novedad.valor,
-      horas: novedad.horas || undefined,
-      dias: novedad.dias || undefined,
-      observacion: novedad.observacion || '',
-      fecha_inicio: novedad.fecha_inicio || '',
-      fecha_fin: novedad.fecha_fin || '',
-      subtipo: (novedad as any).subtipo || '',
-      company_id: companyId // ✅ INCLUIR company_id
-    });
     setShowForm(true);
   };
 
-  const handleCancelForm = () => {
-    setShowForm(false);
-    setEditingNovedad(null);
-    setFormData({
-      empleado_id: employeeId,
-      periodo_id: '',
-      tipo_novedad: 'horas_extra' as NovedadType,
-      subtipo: 'diurnas',
-      fecha_inicio: '',
-      fecha_fin: '',
-      dias: undefined,
-      horas: undefined,
-      valor: 0,
-      observacion: '',
-      company_id: companyId // ✅ INCLUIR company_id
-    });
-  };
+  // Categorize novedades
+  const categorizedNovedades = useMemo(() => {
+    const devengados = novedades.filter(n => 
+      ['horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 'incapacidad', 
+       'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(n.tipo_novedad)
+    );
+    
+    const deducciones = novedades.filter(n => 
+      ['salud', 'pension', 'fondo_solidaridad', 'retencion_fuente', 'libranza', 
+       'ausencia', 'multa', 'descuento_voluntario'].includes(n.tipo_novedad)
+    );
 
-  // Separar devengados y deducciones
-  const devengados = novedades.filter(novedad => {
-    return ['horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
-            'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(novedad.tipo_novedad);
-  });
+    return { devengados, deducciones };
+  }, [novedades]);
 
-  const deducciones = novedades.filter(novedad => {
-    return !['horas_extra', 'recargo_nocturno', 'vacaciones', 'licencia_remunerada', 
-             'incapacidad', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(novedad.tipo_novedad);
-  });
+  const totals = useMemo(() => {
+    const totalDevengados = categorizedNovedades.devengados.reduce((sum, n) => sum + n.valor, 0);
+    const totalDeducciones = categorizedNovedades.deducciones.reduce((sum, n) => sum + n.valor, 0);
+    return { totalDevengados, totalDeducciones };
+  }, [categorizedNovedades]);
 
-  const totalDevengados = devengados.reduce((sum, novedad) => sum + novedad.valor, 0);
-  const totalDeducciones = deducciones.reduce((sum, novedad) => sum + novedad.valor, 0);
-
+  // ✅ CORRECCIÓN: Labels completos para todos los tipos de novedad
   const getNovedadLabel = (tipo: NovedadType): string => {
     const labels: Record<NovedadType, string> = {
       horas_extra: 'Horas Extra',
       recargo_nocturno: 'Recargo Nocturno',
       vacaciones: 'Vacaciones',
       licencia_remunerada: 'Licencia Remunerada',
+      licencia_no_remunerada: 'Licencia No Remunerada', // ✅ AGREGADO
       incapacidad: 'Incapacidad',
       bonificacion: 'Bonificación',
       bonificacion_salarial: 'Bonificación Salarial',
@@ -334,236 +139,203 @@ export const NovedadDrawer = ({
     return labels[tipo] || tipo;
   };
 
-  const renderNovedadList = (novedadesList: PayrollNovedad[], title: string, isDevengado: boolean) => (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="font-medium text-gray-900">{title}</h4>
-        <Badge 
-          variant={isDevengado ? 'default' : 'destructive'}
-          className="text-sm"
-        >
-          {formatCurrency(isDevengado ? totalDevengados : totalDeducciones)}
-        </Badge>
-      </div>
-      
-      {novedadesList.length === 0 ? (
-        <div className="text-center py-6 text-gray-500">
-          <AlertCircle className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-          <p>No hay {title.toLowerCase()} registradas</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {novedadesList.map((novedad) => (
-            <div key={novedad.id} className="border rounded-lg p-3 hover:bg-gray-50">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-medium text-sm">{getNovedadLabel(novedad.tipo_novedad)}</span>
-                    {(novedad.horas || novedad.dias) && (
-                      <div className="flex items-center space-x-1 text-xs text-gray-500">
-                        <Clock className="h-3 w-3" />
-                        <span>
-                          {novedad.horas && `${novedad.horas}h`}
-                          {novedad.horas && novedad.dias && ' - '}
-                          {novedad.dias && `${novedad.dias}d`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {novedad.observacion && (
-                    <p className="text-xs text-gray-600 mb-1">
-                      <strong>Obs:</strong> {novedad.observacion}
-                    </p>
-                  )}
-                  
-                  {novedad.base_calculo?.detalle_calculo && (
-                    <div className="text-xs bg-gray-100 p-1 rounded mt-1">
-                      {novedad.base_calculo.detalle_calculo}
-                    </div>
-                  )}
+  const NovedadCard = ({ novedad }: { novedad: PayrollNovedad }) => (
+    <Card className="mb-3">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-2">
+              <Badge variant="outline">
+                {getNovedadLabel(novedad.tipo_novedad)}
+              </Badge>
+              {novedad.horas && (
+                <div className="flex items-center text-sm text-gray-500">
+                  <Clock className="w-3 h-3 mr-1" />
+                  {novedad.horas}h
                 </div>
-
-                <div className="flex items-center space-x-2 ml-3">
-                  <div className="text-right">
-                    <div className={`font-semibold text-sm ${
-                      isDevengado ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {isDevengado ? '+' : '-'}{formatCurrency(novedad.valor)}
-                    </div>
-                  </div>
-                  
-                  {canEdit && (
-                    <div className="flex items-center space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditNovedad(novedad)}
-                        className="h-8 px-2 text-xs"
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteNovedad(novedad.id)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
+              )}
+              {novedad.dias && (
+                <div className="flex items-center text-sm text-gray-500">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  {novedad.dias} días
                 </div>
+              )}
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="text-lg font-semibold text-green-600">
+                {formatCurrency(novedad.valor)}
+              </div>
+              
+              <div className="flex items-center space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleEditNovedad(novedad)}
+                  className="h-8 w-8 p-0"
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteNovedad(novedad.id)}
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
               </div>
             </div>
-          ))}
+            
+            {novedad.observacion && (
+              <div className="flex items-start text-xs text-gray-500 mt-2">
+                <FileText className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" />
+                <span>{novedad.observacion}</span>
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 
-  const isFormValid = formData.valor > 0 && formData.company_id;
+  if (!employee || !period) return null;
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[600px] sm:w-[800px] flex flex-col p-0">
-        {/* Header */}
-        <div className="p-6 pb-4">
-          <SheetHeader>
-            <SheetTitle className="flex items-center justify-between">
+      <SheetContent className="w-full sm:max-w-2xl p-0">
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <SheetHeader className="px-6 py-4 border-b">
+            <div className="flex items-center justify-between">
               <div>
-                <span className="text-lg font-semibold">
-                  Novedades - {employeeName}
-                </span>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant="outline" className="text-xs">
-                    Salario: {formatCurrency(employeeSalary)}
-                  </Badge>
-                  <JornadaLegalTooltip fecha={currentPeriodDate} />
-                </div>
+                <SheetTitle className="text-xl">
+                  Novedades - {employee.nombre} {employee.apellido}
+                </SheetTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Período: {period.periodo}
+                </p>
               </div>
-              <Badge 
-                variant="secondary"
-                className="text-sm px-3 py-1"
-              >
-                {novedades.length} novedades
-              </Badge>
-            </SheetTitle>
-            <SheetDescription>
-              Gestiona las novedades del empleado para este período de nómina
-            </SheetDescription>
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </SheetHeader>
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col min-h-0">
-          {!showForm ? (
-            <>
-              {/* List header */}
-              <div className="flex justify-between items-center px-6 pb-4">
-                <div className="text-sm text-gray-600">
-                  Total: {devengados.length} devengados, {deducciones.length} deducciones
+          {/* Content */}
+          <div className="flex-1 overflow-hidden">
+            {showForm ? (
+              <div className="h-full flex flex-col">
+                <div className="px-6 py-4 border-b">
+                  <h3 className="text-lg font-medium">
+                    {editingNovedad ? 'Editar Novedad' : 'Nueva Novedad'}
+                  </h3>
                 </div>
-                {canEdit && (
-                  <Button 
-                    onClick={() => setShowForm(true)}
-                    className="flex items-center space-x-2"
-                    disabled={isLoading || !companyId}
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Agregar novedad</span>
-                  </Button>
-                )}
-              </div>
-
-              {/* Scrollable list */}
-              <ScrollArea className="flex-1 px-6">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : (
-                  <div className="space-y-6 pb-6">
-                    {renderNovedadList(devengados, 'Devengados', true)}
-                    <Separator />
-                    {renderNovedadList(deducciones, 'Deducciones', false)}
-                  </div>
-                )}
-              </ScrollArea>
-            </>
-          ) : (
-            <>
-              {/* Form header */}
-              <div className="flex items-center justify-between px-6 pb-4">
-                <h3 className="text-lg font-medium">
-                  {editingNovedad ? 'Editar' : 'Agregar'} novedad
-                </h3>
-              </div>
-
-              {/* Scrollable form */}
-              <ScrollArea className="flex-1 px-6">
-                <div className="pb-6">
+                
+                <div className="flex-1 overflow-auto px-6 py-4">
                   <NovedadForm
-                    formData={formData}
-                    onFormDataChange={setFormData}
-                    initialData={editingNovedad ? {
-                      tipo_novedad: editingNovedad.tipo_novedad,
-                      valor: editingNovedad.valor,
-                      horas: editingNovedad.horas || undefined,
-                      dias: editingNovedad.dias || undefined,
-                      observacion: editingNovedad.observacion || '',
-                      fecha_inicio: editingNovedad.fecha_inicio || '',
-                      fecha_fin: editingNovedad.fecha_fin || ''
-                    } : undefined}
-                    employeeSalary={employeeSalary}
-                    calculateSuggestedValue={calculateSuggestedValue}
+                    initialData={editingNovedad}
+                    employeeSalary={employee.salarioBase}
+                    onSubmit={editingNovedad ? handleUpdateNovedad : handleCreateNovedad}
+                    onCancel={() => {
+                      setShowForm(false);
+                      setEditingNovedad(null);
+                    }}
+                    isLoading={isLoading}
                   />
                 </div>
-              </ScrollArea>
-            </>
-          )}
-        </div>
-
-        {/* Fixed Footer */}
-        <div className="border-t bg-white p-6">
-          {showForm ? (
-            <div className="flex justify-end space-x-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancelForm}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={editingNovedad ? handleUpdateNovedad : handleCreateNovedad}
-                disabled={!isFormValid || isSubmitting}
-                className="min-w-[120px]"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  'Guardar'
-                )}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <Calculator className="h-4 w-4" />
-                <span>Cálculos actualizados con jornada legal dinámica</span>
               </div>
-              <Button variant="outline" onClick={onClose}>
-                Cerrar
-              </Button>
-            </div>
-          )}
+            ) : (
+              <div className="h-full flex flex-col">
+                {/* Action Bar */}
+                <div className="px-6 py-4 border-b bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-sm">
+                        <span className="font-medium text-green-600">
+                          Devengados: {formatCurrency(totals.totalDevengados)}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium text-red-600">
+                          Deducciones: {formatCurrency(totals.totalDeducciones)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <Button onClick={() => setShowForm(true)} size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva Novedad
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Novedades List */}
+                <ScrollArea className="flex-1 px-6 py-4">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Devengados */}
+                      {categorizedNovedades.devengados.length > 0 && (
+                        <div>
+                          <div className="flex items-center space-x-2 mb-4">
+                            <DollarSign className="w-4 h-4 text-green-600" />
+                            <h4 className="font-medium text-green-600">Devengados</h4>
+                            <Badge variant="secondary" className="bg-green-100 text-green-700">
+                              {categorizedNovedades.devengados.length}
+                            </Badge>
+                          </div>
+                          {categorizedNovedades.devengados.map((novedad) => (
+                            <NovedadCard key={novedad.id} novedad={novedad} />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Deducciones */}
+                      {categorizedNovedades.deducciones.length > 0 && (
+                        <div>
+                          <div className="flex items-center space-x-2 mb-4">
+                            <DollarSign className="w-4 h-4 text-red-600" />
+                            <h4 className="font-medium text-red-600">Deducciones</h4>
+                            <Badge variant="secondary" className="bg-red-100 text-red-700">
+                              {categorizedNovedades.deducciones.length}
+                            </Badge>
+                          </div>
+                          {categorizedNovedades.deducciones.map((novedad) => (
+                            <NovedadCard key={novedad.id} novedad={novedad} />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Empty State */}
+                      {novedades.length === 0 && (
+                        <div className="text-center py-12">
+                          <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">
+                            Sin novedades registradas
+                          </h3>
+                          <p className="text-gray-500 mb-4">
+                            No hay novedades de nómina para este empleado en el período actual.
+                          </p>
+                          <Button onClick={() => setShowForm(true)}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Agregar Primera Novedad
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
   );
 };
+
+export default NovedadDrawer;

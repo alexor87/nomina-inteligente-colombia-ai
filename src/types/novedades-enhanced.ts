@@ -1,38 +1,9 @@
-import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
-// ✅ TIPOS SINCRONIZADOS CON LA BASE DE DATOS REAL - ACTUALIZADO
-export type NovedadType =
-  | 'horas_extra'
-  | 'recargo_nocturno'
-  | 'vacaciones'
-  | 'licencia_remunerada'
-  | 'licencia_no_remunerada' // ✅ AGREGADO
-  | 'incapacidad'
-  | 'bonificacion'
-  | 'bonificacion_salarial'
-  | 'bonificacion_no_salarial'
-  | 'comision'
-  | 'prima'
-  | 'otros_ingresos'
-  | 'auxilio_conectividad'
-  | 'viaticos'
-  | 'retroactivos'
-  | 'compensacion_ordinaria'
-  | 'libranza'
-  | 'multa'
-  | 'ausencia'
-  | 'descuento_voluntario'
-  | 'retencion_fuente'
-  | 'fondo_solidaridad'
-  | 'salud'
-  | 'pension'
-  | 'arl'
-  | 'caja_compensacion'
-  | 'icbf'
-  | 'sena'
-  | 'embargo'
-  | 'anticipo'
-  | 'aporte_voluntario';
+import { getJornadaLegal, getHourlyDivisor, calcularValorHoraExtra } from '@/utils/jornadaLegal';
+import { Database } from '@/integrations/supabase/types';
+
+// ✅ USE DATABASE TYPE DIRECTLY FOR CONSISTENCY
+export type NovedadType = Database['public']['Enums']['novedad_type'];
 
 export const NOVEDAD_CATEGORIES: Record<NovedadType, 'devengado' | 'deduccion'> = {
   horas_extra: 'devengado',
@@ -367,8 +338,8 @@ export const calcularValorNovedadEnhanced = (
 
       // ✅ NUEVA LÓGICA: Licencia no remunerada (valor siempre $0)
       case 'licencia_no_remunerada':
-        valor = 0; // Siempre $0 por definición legal
-        factorCalculo = 0;
+        result.valor = 0; // Siempre $0 por definición legal
+        result.baseCalculo.factor_calculo = 0;
         if (dias && dias > 0) {
           result.baseCalculo.detalle_calculo = `Licencia no remunerada: ${dias} días sin remuneración (Art. 51 CST). Suspende acumulación de prestaciones sociales.`;
         } else {
