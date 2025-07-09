@@ -1,8 +1,7 @@
-
 export interface EmployeeUnified {
   id: string;
   company_id?: string;
-  empresaId: string; // ✅ FIXED: Make required to match Employee
+  empresaId: string;
   
   // Personal Information
   cedula: string;
@@ -12,25 +11,25 @@ export interface EmployeeUnified {
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F' | 'O'; // ✅ FIXED: Add 'O' to match Employee
+  sexo?: 'M' | 'F'; // ✅ SIMPLIFIED: Removed 'O' to match Employee type
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
   departamento?: string;
   
-  // Labor Information - Updated to match Employee model
+  // Labor Information
   salarioBase: number;
-  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje'; // ✅ FIXED: Match Employee type
+  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: 'mensual' | 'quincenal'; // ✅ FIXED: Remove 'semanal'
+  periodicidadPago: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
-  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V'; // ✅ FIXED: Use specific type
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'; // ✅ FIXED: Remove 'licencia'
+  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada: 'completa' | 'parcial' | 'horas'; // ✅ FIXED: Match Employee type
+  tipoJornada: 'completa' | 'parcial' | 'horas'; // ✅ MADE REQUIRED to match Employee
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
@@ -41,7 +40,7 @@ export interface EmployeeUnified {
   tipoCuenta: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
-  formaPago: 'dispersion' | 'manual'; // ✅ FIXED: Match Employee type
+  formaPago: 'dispersion' | 'manual';
   
   // Affiliations
   eps?: string;
@@ -51,7 +50,7 @@ export interface EmployeeUnified {
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
   regimenSalud: 'contributivo' | 'subsidiado';
-  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente'; // ✅ FIXED: Match Employee type
+  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
   
   // Custom fields
   custom_fields?: Record<string, any>;
@@ -61,7 +60,7 @@ export interface EmployeeUnified {
   updatedAt?: string;
 }
 
-// ✅ ADD: Missing mapping functions
+// ✅ KEEP: Mapping functions remain the same
 export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
   return {
     id: dbData.id,
@@ -90,7 +89,7 @@ export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
     centroCostos: dbData.centro_costos || undefined,
     fechaFirmaContrato: dbData.fecha_firma_contrato || undefined,
     fechaFinalizacionContrato: dbData.fecha_finalizacion_contrato || undefined,
-    tipoJornada: dbData.tipo_jornada || 'completa',
+    tipoJornada: dbData.tipo_jornada || 'completa', // ✅ DEFAULT VALUE
     diasTrabajo: Number(dbData.dias_trabajo) || 30,
     horasTrabajo: Number(dbData.horas_trabajo) || 8,
     beneficiosExtralegales: Boolean(dbData.beneficios_extralegales),

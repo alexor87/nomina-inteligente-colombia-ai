@@ -1,9 +1,9 @@
-
 import { Database } from '@/integrations/supabase/types';
 
-// Use the database enum directly from the correct path
+// ✅ SIMPLIFIED: Use exact database enum
 export type NovedadType = Database['public']['Enums']['novedad_type'];
 
+// ✅ CLEANED: Only valid types from database
 export const NOVEDAD_TYPE_LABELS: Record<NovedadType, string> = {
   // Income types
   horas_extra: 'Horas Extra',
@@ -19,13 +19,15 @@ export const NOVEDAD_TYPE_LABELS: Record<NovedadType, string> = {
   licencia_remunerada: 'Licencia Remunerada',
   licencia_no_remunerada: 'Licencia No Remunerada',
   
-  // Deductions
+  // Deductions - ✅ CLEANED: Only valid types
   salud: 'Descuento Salud',
   pension: 'Descuento Pensión',
-  arl: 'Descuento ARL',
   retencion_fuente: 'Retención en la Fuente',
   fondo_solidaridad: 'Fondo de Solidaridad',
-  ausencia: 'Ausencia'
+  ausencia: 'Ausencia',
+  libranza: 'Libranza',
+  multa: 'Multa',
+  descuento_voluntario: 'Descuento Voluntario'
 };
 
 export interface CreateNovedadData {
@@ -33,7 +35,7 @@ export interface CreateNovedadData {
   empleado_id: string;
   periodo_id: string;
   tipo_novedad: NovedadType;
-  valor: number; // Required field
+  valor: number;
   dias?: number;
   horas?: number;
   observacion?: string;
@@ -94,7 +96,6 @@ export interface NovedadCalculationResult {
   };
 }
 
-// Mapping utilities
 export const mapNovedadFromDB = (dbNovedad: any): PayrollNovedad => {
   return {
     id: dbNovedad.id,
@@ -144,7 +145,7 @@ export const getNovedadLabel = (tipo: NovedadType): string => {
 
 export const getNovedadColor = (tipo: NovedadType): string => {
   const ingresos: NovedadType[] = ['horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'];
-  const deducciones: NovedadType[] = ['salud', 'pension', 'arl', 'retencion_fuente', 'fondo_solidaridad'];
+  const deducciones: NovedadType[] = ['salud', 'pension', 'retencion_fuente', 'fondo_solidaridad', 'libranza', 'multa', 'descuento_voluntario'];
   const tiempos: NovedadType[] = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'];
   
   if (ingresos.includes(tipo)) return 'bg-green-100 text-green-800';
@@ -158,7 +159,7 @@ export const isIngreso = (tipo: NovedadType): boolean => {
 };
 
 export const isDeduccion = (tipo: NovedadType): boolean => {
-  return ['salud', 'pension', 'arl', 'retencion_fuente', 'fondo_solidaridad'].includes(tipo);
+  return ['salud', 'pension', 'retencion_fuente', 'fondo_solidaridad', 'libranza', 'multa', 'descuento_voluntario'].includes(tipo);
 };
 
 export const isTiempo = (tipo: NovedadType): boolean => {
@@ -192,7 +193,7 @@ export const calcularValorNovedadEnhanced = (
 
     case 'horas_extra':
       if (horas) {
-        const factor = subtipo === 'nocturna' ? 1.75 : 1.25; // Recargo nocturno vs diurno
+        const factor = subtipo === 'nocturna' ? 1.75 : 1.25;
         valor = salarioHora * horas * factor;
         formula = `(${salarioBase} / 240) * ${horas} * ${factor}`;
         breakdown = { salarioBase, salarioHora, horas, factor };
@@ -201,7 +202,6 @@ export const calcularValorNovedadEnhanced = (
 
     case 'incapacidad':
       if (dias) {
-        // Primeros 2 días: 0%, día 3 en adelante: 66.67%
         const diasPagados = Math.max(0, dias - 2);
         valor = salarioDiario * diasPagados * 0.6667;
         formula = `(${salarioBase} / 30) * ${diasPagados} días * 66.67%`;
@@ -219,7 +219,7 @@ export const calcularValorNovedadEnhanced = (
 
     case 'ausencia':
       if (dias) {
-        valor = -(salarioDiario * dias); // Negativo para descuentos
+        valor = -(salarioDiario * dias);
         formula = `-(${salarioBase} / 30) * ${dias} días`;
         breakdown = { salarioBase, salarioDiario, dias };
       }
@@ -253,12 +253,11 @@ export const calcularValorNovedad = (params: NovedadCalculationParams): NovedadC
     hours: horas
   };
 
-  // Simple calculation based on type
   switch (tipo_novedad) {
     case 'horas_extra':
       if (horas) {
         const hourlyRate = employeeSalary / (workingDays * workingHours);
-        calculatedValue = hourlyRate * horas * 1.25; // 25% extra
+        calculatedValue = hourlyRate * horas * 1.25;
         basis = 'Horas trabajadas';
         formula = `(${employeeSalary} / ${workingDays * workingHours}) * ${horas} * 1.25`;
         breakdown.multiplier = 1.25;

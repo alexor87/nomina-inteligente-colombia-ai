@@ -1,99 +1,68 @@
 
 import { NovedadType } from '@/types/novedades-enhanced';
 
-export interface ValidationResult {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}
-
 export class NovedadValidationService {
-  private static readonly SMMLV_2025 = 1300000;
-  private static readonly MAX_HORAS_EXTRA_DIA = 12;
-  private static readonly MAX_HORAS_EXTRA_SEMANA = 60;
-  private static readonly MAX_DEDUCCION_PORCENTAJE = 0.5;
-
-  static validateNovedad(
-    tipo: NovedadType,
-    valor: number,
-    salarioBase: number,
-    horas?: number,
-    dias?: number,
-    horasSemanales?: number
-  ): ValidationResult {
+  
+  static validateNovedadData(data: any): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
-    const warnings: string[] = [];
 
-    switch (tipo) {
-      case 'horas_extra':
-        if (horas) {
-          if (horas > this.MAX_HORAS_EXTRA_DIA) {
-            errors.push(`Las horas extra no pueden superar ${this.MAX_HORAS_EXTRA_DIA} por día`);
-          }
-          if (horasSemanales && horasSemanales > this.MAX_HORAS_EXTRA_SEMANA) {
-            errors.push(`Las horas extra no pueden superar ${this.MAX_HORAS_EXTRA_SEMANA} por semana`);
-          }
-        }
-        break;
-
-      case 'auxilio_conectividad':
-        if (salarioBase > this.SMMLV_2025 * 2) {
-          errors.push('El auxilio de conectividad solo aplica para salarios ≤ 2 SMMLV');
-        }
-        break;
-
-      case 'fondo_solidaridad':
-        const multiplicadorIBC = salarioBase / this.SMMLV_2025;
-        if (multiplicadorIBC <= 4) {
-          errors.push('El Fondo de Solidaridad Pensional solo aplica para IBC > 4 SMMLV');
-        }
-        break;
-
-      // Validaciones para deducciones
-      case 'embargo':
-      case 'anticipo':
-      case 'aporte_voluntario':
-      case 'descuento_voluntario':
-        const porcentajeDeduccion = valor / salarioBase;
-        if (porcentajeDeduccion > this.MAX_DEDUCCION_PORCENTAJE) {
-          errors.push('Las deducciones no pueden superar el 50% del salario neto');
-        }
-        break;
+    // Basic validation
+    if (!data.tipo_novedad) {
+      errors.push('Tipo de novedad es requerido');
     }
 
-    // Validaciones generales
-    if (valor < 0) {
-      errors.push('El valor no puede ser negativo');
+    if (!data.valor || data.valor <= 0) {
+      errors.push('El valor debe ser mayor a 0');
     }
 
-    if (horas && horas < 0) {
-      errors.push('Las horas no pueden ser negativas');
+    if (!data.empleado_id) {
+      errors.push('ID de empleado es requerido');
     }
 
-    if (dias && dias < 0) {
-      errors.push('Los días no pueden ser negativos');
+    if (!data.periodo_id) {
+      errors.push('ID de período es requerido');
+    }
+
+    // ✅ SIMPLIFIED: Only validate known types
+    const validTypes: NovedadType[] = [
+      'horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos',
+      'vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada',
+      'salud', 'pension', 'retencion_fuente', 'fondo_solidaridad', 'ausencia',
+      'libranza', 'multa', 'descuento_voluntario'
+    ];
+
+    if (data.tipo_novedad && !validTypes.includes(data.tipo_novedad)) {
+      errors.push(`Tipo de novedad no válido: ${data.tipo_novedad}`);
+    }
+
+    // Type-specific validations
+    const tiposRequierenHoras: NovedadType[] = ['horas_extra', 'recargo_nocturno'];
+    if (tiposRequierenHoras.includes(data.tipo_novedad) && (!data.horas || data.horas <= 0)) {
+      errors.push('Las horas son requeridas para este tipo de novedad');
+    }
+
+    const tiposRequierenDias: NovedadType[] = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'];
+    if (tiposRequierenDias.includes(data.tipo_novedad) && (!data.dias || data.dias <= 0)) {
+      errors.push('Los días son requeridos para este tipo de novedad');
     }
 
     return {
       isValid: errors.length === 0,
-      errors,
-      warnings
+      errors
     };
   }
 
-  static validateAuxilioTransporte(salarioBase: number): boolean {
-    return salarioBase <= this.SMMLV_2025 * 2;
-  }
-
-  static calculateFSP(ibc: number): number {
-    const multiplicador = ibc / this.SMMLV_2025;
+  static validateForSave(data: any): { canSave: boolean; errors: string[] } {
+    const validation = this.validateNovedadData(data);
     
-    if (multiplicador <= 4) return 0;
-    if (multiplicador <= 16) return ibc * 0.01;
-    if (multiplicador <= 17) return ibc * 0.012;
-    if (multiplicador <= 18) return ibc * 0.014;
-    if (multiplicador <= 19) return ibc * 0.016;
-    if (multiplicador <= 20) return ibc * 0.018;
-    return ibc * 0.02;
+    // Additional save validations
+    if (!data.company_id) {
+      validation.errors.push('ID de empresa es requerido');
+    }
+
+    return {
+      canSave: validation.errors.length === 0,
+      errors: validation.errors
+    };
   }
 }

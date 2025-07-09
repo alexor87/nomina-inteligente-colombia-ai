@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -180,6 +179,7 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
     }
   };
 
+  // ✅ FIXED: Only valid NovedadType values
   const getNovedadTypeLabel = (tipo: NovedadType): string => {
     const labels: Record<NovedadType, string> = {
       horas_extra: 'Horas Extra',
@@ -196,14 +196,17 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
       pension: 'Descuento Pensión',
       retencion_fuente: 'Retención en la Fuente',
       fondo_solidaridad: 'Fondo de Solidaridad',
-      ausencia: 'Ausencia'
+      ausencia: 'Ausencia',
+      libranza: 'Libranza',
+      multa: 'Multa',
+      descuento_voluntario: 'Descuento Voluntario'
     };
     return labels[tipo] || tipo;
   };
 
   const getNovedadColor = (tipo: NovedadType): string => {
     const ingresos: NovedadType[] = ['horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'];
-    const deducciones: NovedadType[] = ['salud', 'pension', 'retencion_fuente', 'fondo_solidaridad'];
+    const deducciones: NovedadType[] = ['salud', 'pension', 'retencion_fuente', 'fondo_solidaridad', 'libranza', 'multa', 'descuento_voluntario'];
     const tiempos: NovedadType[] = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'];
     
     if (ingresos.includes(tipo)) return 'bg-green-100 text-green-800';
@@ -251,7 +254,9 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
               <CardContent className="p-4">
                 <div className="text-sm text-gray-600">Total Ingresos</div>
                 <div className="text-2xl font-bold text-green-600">
-                  ${ingresos.toLocaleString()}
+                  ${novedades.filter(n => 
+                    ['horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'].includes(n.tipo_novedad)
+                  ).reduce((sum, n) => sum + (n.valor || 0), 0).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -259,7 +264,9 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
               <CardContent className="p-4">
                 <div className="text-sm text-gray-600">Total Deducciones</div>
                 <div className="text-2xl font-bold text-red-600">
-                  ${deducciones.toLocaleString()}
+                  ${novedades.filter(n => 
+                    ['salud', 'pension', 'retencion_fuente', 'fondo_solidaridad', 'libranza', 'multa', 'descuento_voluntario'].includes(n.tipo_novedad)
+                  ).reduce((sum, n) => sum + (n.valor || 0), 0).toLocaleString()}
                 </div>
               </CardContent>
             </Card>

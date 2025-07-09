@@ -1,171 +1,233 @@
 
 import React from 'react';
+import { Control, FieldErrors } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { EmployeeUnified } from '@/types/employee-unified';
+import { Controller } from 'react-hook-form';
+import { EmployeeFormData } from './types';
 
 interface PersonalInfoSectionProps {
-  formData: Partial<EmployeeUnified>;
-  updateFormData: (data: Partial<EmployeeUnified>) => void;
-  errors: Record<string, string>;
+  control: Control<EmployeeFormData>;
+  errors: FieldErrors<EmployeeFormData>; // ✅ FIXED: Use proper type
 }
 
-export const PersonalInfoSection = ({ formData, updateFormData, errors }: PersonalInfoSectionProps) => {
+const TIPOS_DOCUMENTO = [
+  { value: 'CC', label: 'Cédula de Ciudadanía' },
+  { value: 'TI', label: 'Tarjeta de Identidad' },
+  { value: 'CE', label: 'Cédula de Extranjería' },
+  { value: 'PA', label: 'Pasaporte' },
+  { value: 'RC', label: 'Registro Civil' },
+  { value: 'NIT', label: 'NIT' },
+  { value: 'PEP', label: 'PEP' },
+  { value: 'PPT', label: 'PPT' }
+];
+
+export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
+  control,
+  errors
+}) => {
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="tipoDocumento">Tipo de Documento *</Label>
-          <Select 
-            value={formData.tipoDocumento || 'CC'} 
-            onValueChange={(value) => updateFormData({ tipoDocumento: value as any })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CC">Cédula de Ciudadanía</SelectItem>
-              <SelectItem value="TI">Tarjeta de Identidad</SelectItem>
-              <SelectItem value="CE">Cédula de Extranjería</SelectItem>
-              <SelectItem value="PA">Pasaporte</SelectItem>
-              <SelectItem value="RC">Registro Civil</SelectItem>
-              <SelectItem value="NIT">NIT</SelectItem>
-              <SelectItem value="PEP">PEP</SelectItem>
-              <SelectItem value="PPT">PPT</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.tipoDocumento && <p className="text-red-500 text-sm">{errors.tipoDocumento}</p>}
-        </div>
-
-        <div>
-          <Label htmlFor="cedula">Número de Documento *</Label>
-          <Input
-            id="cedula"
-            value={formData.cedula || ''}
-            onChange={(e) => updateFormData({ cedula: e.target.value })}
-            placeholder="Ingrese el número de documento"
-          />
-          {errors.cedula && <p className="text-red-500 text-sm">{errors.cedula}</p>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="nombre">Primer Nombre *</Label>
-          <Input
-            id="nombre"
-            value={formData.nombre || ''}
-            onChange={(e) => updateFormData({ nombre: e.target.value })}
-            placeholder="Ingrese el primer nombre"
-          />
-          {errors.nombre && <p className="text-red-500 text-sm">{errors.nombre}</p>}
-        </div>
-
-        <div>
-          <Label htmlFor="segundoNombre">Segundo Nombre</Label>
-          <Input
-            id="segundoNombre"
-            value={formData.segundoNombre || ''}
-            onChange={(e) => updateFormData({ segundoNombre: e.target.value })}
-            placeholder="Ingrese el segundo nombre (opcional)"
-          />
-        </div>
-      </div>
-
+    <div className="space-y-6">
       <div>
-        <Label htmlFor="apellido">Apellidos *</Label>
-        <Input
-          id="apellido"
-          value={formData.apellido || ''}
-          onChange={(e) => updateFormData({ apellido: e.target.value })}
-          placeholder="Ingrese los apellidos"
-        />
-        {errors.apellido && <p className="text-red-500 text-sm">{errors.apellido}</p>}
-      </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Información Personal</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="tipoDocumento">Tipo de Documento *</Label>
+            <Controller
+              name="tipoDocumento"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_DOCUMENTO.map((tipo) => (
+                      <SelectItem key={tipo.value} value={tipo.value}>
+                        {tipo.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.tipoDocumento && (
+              <p className="text-red-500 text-sm">{errors.tipoDocumento.message}</p>
+            )}
+          </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="email">Correo Electrónico</Label>
-          <Input
-            id="email"
-            type="email"
-            value={formData.email || ''}
-            onChange={(e) => updateFormData({ email: e.target.value })}
-            placeholder="correo@ejemplo.com"
-          />
-          {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="cedula">Número de Documento *</Label>
+            <Controller
+              name="cedula"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="12345678"
+                />
+              )}
+            />
+            {errors.cedula && (
+              <p className="text-red-500 text-sm">{errors.cedula.message}</p>
+            )}
+          </div>
 
-        <div>
-          <Label htmlFor="telefono">Teléfono</Label>
-          <Input
-            id="telefono"
-            value={formData.telefono || ''}
-            onChange={(e) => updateFormData({ telefono: e.target.value })}
-            placeholder="Ingrese el teléfono"
-          />
-        </div>
-      </div>
+          <div className="space-y-2">
+            <Label htmlFor="nombre">Nombre *</Label>
+            <Controller
+              name="nombre"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="Juan"
+                />
+              )}
+            />
+            {errors.nombre && (
+              <p className="text-red-500 text-sm">{errors.nombre.message}</p>
+            )}
+          </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <Label htmlFor="sexo">Sexo</Label>
-          <Select 
-            value={formData.sexo || ''} 
-            onValueChange={(value) => updateFormData({ sexo: value as 'M' | 'F' | 'O' })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="M">Masculino</SelectItem>
-              <SelectItem value="F">Femenino</SelectItem>
-              <SelectItem value="O">Otro</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="segundoNombre">Segundo Nombre</Label>
+            <Controller
+              name="segundoNombre"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="Carlos"
+                />
+              )}
+            />
+          </div>
 
-        <div>
-          <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
-          <Input
-            id="fechaNacimiento"
-            type="date"
-            value={formData.fechaNacimiento || ''}
-            onChange={(e) => updateFormData({ fechaNacimiento: e.target.value })}
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="apellido">Apellido *</Label>
+            <Controller
+              name="apellido"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="Pérez"
+                />
+              )}
+            />
+            {errors.apellido && (
+              <p className="text-red-500 text-sm">{errors.apellido.message}</p>
+            )}
+          </div>
 
-        <div>
-          <Label htmlFor="direccion">Dirección</Label>
-          <Input
-            id="direccion"
-            value={formData.direccion || ''}
-            onChange={(e) => updateFormData({ direccion: e.target.value })}
-            placeholder="Dirección de residencia"
-          />
-        </div>
-      </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email *</Label>
+            <Controller
+              name="email"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  type="email"
+                  placeholder="juan.perez@empresa.com"
+                />
+              )}
+            />
+            {errors.email && (
+              <p className="text-red-500 text-sm">{errors.email.message}</p>
+            )}
+          </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="ciudad">Ciudad</Label>
-          <Input
-            id="ciudad"
-            value={formData.ciudad || ''}
-            onChange={(e) => updateFormData({ ciudad: e.target.value })}
-            placeholder="Ciudad de residencia"
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="telefono">Teléfono</Label>
+            <Controller
+              name="telefono"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="3001234567"
+                />
+              )}
+            />
+          </div>
 
-        <div>
-          <Label htmlFor="departamento">Departamento</Label>
-          <Input
-            id="departamento"
-            value={formData.departamento || ''}
-            onChange={(e) => updateFormData({ departamento: e.target.value })}
-            placeholder="Departamento"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="sexo">Sexo</Label>
+            <Controller
+              name="sexo"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="M">Masculino</SelectItem>
+                    <SelectItem value="F">Femenino</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
+            <Controller
+              name="fechaNacimiento"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  type="date"
+                />
+              )}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="direccion">Dirección</Label>
+            <Controller
+              name="direccion"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="Calle 123 #45-67"
+                />
+              )}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ciudad">Ciudad</Label>
+            <Controller
+              name="ciudad"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="Bogotá"
+                />
+              )}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="departamento">Departamento</Label>
+            <Controller
+              name="departamento"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="Cundinamarca"
+                />
+              )}
+            />
+          </div>
         </div>
       </div>
     </div>
