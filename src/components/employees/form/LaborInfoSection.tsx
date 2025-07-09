@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { UseFormRegister, Control, UseFormWatch } from 'react-hook-form';
+import { UseFormRegister, Control, UseFormWatch, FieldErrors, UseFormSetValue } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,14 +15,20 @@ interface LaborInfoSectionProps {
   register: UseFormRegister<EmployeeFormData>;
   control: Control<EmployeeFormData>;
   watch: UseFormWatch<EmployeeFormData>;
-  errors: any;
+  errors: FieldErrors<EmployeeFormData>;
+  watchedValues: EmployeeFormData;
+  setValue: UseFormSetValue<EmployeeFormData>;
+  arlRiskLevels: { value: string; label: string; percentage: string }[];
 }
 
 export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
   register,
   control,
   watch,
-  errors
+  errors,
+  watchedValues,
+  setValue,
+  arlRiskLevels
 }) => {
   const tipoContratoOptions = [
     { value: 'indefinido', label: 'Término Indefinido' },
@@ -76,10 +83,10 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             </div>
 
             <div>
-              <Label htmlFor="centroCostos">Centro de Costos</Label>
+              <Label htmlFor="centro_costos">Centro de Costos</Label>
               <Input
-                id="centroCostos"
-                {...register('centroCostos')}
+                id="centro_costos"
+                {...register('centro_costos')}
                 placeholder="Ej: Tecnología"
               />
             </div>
@@ -87,8 +94,8 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             <div>
               <Label htmlFor="tipoContrato">Tipo de Contrato</Label>
               <Select 
-                value={watch('tipoContrato')} 
-                onValueChange={(value) => register('tipoContrato').onChange({ target: { value } })}
+                value={watchedValues.tipoContrato} 
+                onValueChange={(value) => setValue('tipoContrato', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
@@ -110,8 +117,8 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             <div>
               <Label htmlFor="estado">Estado</Label>
               <Select 
-                value={watch('estado')} 
-                onValueChange={(value) => register('estado').onChange({ target: { value } })}
+                value={watchedValues.estado} 
+                onValueChange={(value) => setValue('estado', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estado" />
@@ -188,7 +195,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               />
             </div>
 
-            {watch('tipoContrato') === 'fijo' && (
+            {watchedValues.tipoContrato === 'fijo' && (
               <div>
                 <Label htmlFor="fechaFinalizacionContrato">Fecha Finalización</Label>
                 <Input
@@ -228,8 +235,8 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             <div>
               <Label htmlFor="periodicidadPago">Periodicidad de Pago</Label>
               <Select 
-                value={watch('periodicidadPago')} 
-                onValueChange={(value) => register('periodicidadPago').onChange({ target: { value } })}
+                value={watchedValues.periodicidadPago} 
+                onValueChange={(value) => setValue('periodicidadPago', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar periodicidad" />
@@ -246,16 +253,16 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <div className="flex items-center space-x-2">
                 <Switch
                   id="beneficiosExtralegales"
-                  checked={watch('beneficiosExtralegales')}
+                  checked={watchedValues.beneficiosExtralegales}
                   onCheckedChange={(checked) => 
-                    register('beneficiosExtralegales').onChange({ target: { value: checked } })
+                    setValue('beneficiosExtralegales', checked)
                   }
                 />
                 <Label htmlFor="beneficiosExtralegales" className="text-sm">
                   ¿Tiene beneficios extralegales?
                 </Label>
               </div>
-              {watch('beneficiosExtralegales') && (
+              {watchedValues.beneficiosExtralegales && (
                 <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
                   <p className="text-sm text-blue-700">
                     <strong>Nota:</strong> Los beneficios extralegales serán considerados para el cálculo de prestaciones sociales según la normativa vigente.
@@ -280,8 +287,8 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             <div>
               <Label htmlFor="tipoJornada">Tipo de Jornada</Label>
               <Select 
-                value={watch('tipoJornada')} 
-                onValueChange={(value) => register('tipoJornada').onChange({ target: { value } })}
+                value={watchedValues.tipoJornada} 
+                onValueChange={(value) => setValue('tipoJornada', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar jornada" />
@@ -320,7 +327,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             </div>
           </div>
 
-          {watch('tipoJornada') !== 'completa' && (
+          {watchedValues.tipoJornada !== 'completa' && (
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
               <p className="text-sm text-yellow-700">
                 <strong>Nota:</strong> Para jornadas diferentes a tiempo completo, verifique el cumplimiento de la normativa laboral vigente sobre jornadas especiales.
@@ -350,10 +357,10 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
           </div>
 
           <div>
-            <Label htmlFor="codigoCiiu">Código CIIU</Label>
+            <Label htmlFor="codigo_ciiu">Código CIIU</Label>
             <Input
-              id="codigoCiiu"
-              {...register('codigoCiiu')}
+              id="codigo_ciiu"
+              {...register('codigo_ciiu')}
               placeholder="Ej: 6201"
             />
           </div>

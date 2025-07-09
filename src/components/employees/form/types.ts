@@ -7,11 +7,8 @@ export interface EmployeeFormData extends Omit<EmployeeUnified, 'id' | 'createdA
   
   // Campos personalizados dinámicos
   custom_fields: Record<string, any>;
-}
-
-export interface EmployeeFormSection {
-  id: string;
-  title: string;
-  icon: React.ReactNode;
-  isComplete: boolean;
+  
+  // ✅ CORREGIR: Mapear campos con nombres correctos
+  centro_costos?: string;
+  codigo_ciiu?: string;
 }

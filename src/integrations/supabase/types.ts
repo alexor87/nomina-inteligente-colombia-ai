@@ -1919,6 +1919,7 @@ export type Database = {
         | "ausencia"
         | "multa"
         | "descuento_voluntario"
+        | "licencia_no_remunerada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2071,6 +2072,7 @@ export const Constants = {
         "ausencia",
         "multa",
         "descuento_voluntario",
+        "licencia_no_remunerada",
       ],
     },
   },
