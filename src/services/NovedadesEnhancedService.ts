@@ -1,6 +1,41 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
+import { Database } from '@/integrations/supabase/types';
+
+// ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS PARA EVITAR CONFLICTOS
+type DatabaseNovedadType = Database['public']['Enums']['novedad_type'];
+
+export interface CreateNovedadData {
+  empleado_id: string;
+  periodo_id: string;
+  tipo_novedad: DatabaseNovedadType;
+  valor: number;
+  horas?: number;
+  dias?: number;
+  observacion?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  base_calculo?: any;
+  subtipo?: string;
+  company_id: string;
+}
+
+export interface PayrollNovedad {
+  id: string;
+  company_id: string;
+  empleado_id: string;
+  periodo_id: string;
+  tipo_novedad: DatabaseNovedadType;
+  valor: number;
+  horas?: number;
+  dias?: number;
+  observacion?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  base_calculo?: any;
+  created_at: string;
+  updated_at: string;
+}
 
 /**
  * ✅ SERVICIO DE NOVEDADES REPARADO - FASE 3 CRÍTICA
@@ -24,7 +59,7 @@ export class NovedadesEnhancedService {
       }
 
       console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
-      return novedades || [];
+      return (novedades || []) as PayrollNovedad[];
       
     } catch (error) {
       console.error('💥 Error crítico en getNovedadesByEmployee:', error);
@@ -55,11 +90,10 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
-      // ✅ CORRECCIÓN: Cast tipo_novedad to database compatible string
       const insertData = {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
-        tipo_novedad: novedadData.tipo_novedad as any, // Cast to bypass strict typing
+        tipo_novedad: novedadData.tipo_novedad,
         valor: novedadData.valor,
         dias: novedadData.dias,
         horas: novedadData.horas,
@@ -95,24 +129,9 @@ export class NovedadesEnhancedService {
     try {
       console.log(`🔄 Actualizando novedad ${novedadId}:`, updates);
       
-      // ✅ CORRECCIÓN: Build update data object with proper type casting
-      const updateData: Record<string, any> = {};
-      
-      // Copy all defined properties and cast tipo_novedad if present
-      Object.keys(updates).forEach(key => {
-        const value = updates[key as keyof CreateNovedadData];
-        if (value !== undefined) {
-          if (key === 'tipo_novedad') {
-            updateData[key] = value as any; // Cast to bypass strict typing
-          } else {
-            updateData[key] = value;
-          }
-        }
-      });
-      
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
-        .update(updateData)
+        .update(updates as any)
         .eq('id', novedadId)
         .select()
         .single();

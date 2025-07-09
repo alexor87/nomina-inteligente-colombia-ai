@@ -1,5 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+
+// ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS
+type DatabaseNovedadType = Database['public']['Enums']['novedad_type'];
 
 export interface TimeOffRecord {
   id: string;
@@ -56,14 +60,14 @@ export class TimeOffService {
         return { success: false, error: 'No hay período de nómina activo' };
       }
 
-      // Crear novedad directamente
+      // ✅ CORREGIR: Usar el tipo correcto de la base de datos
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
         .insert({
           company_id: employee.company_id,
           empleado_id: data.employee_id,
           periodo_id: activePeriod.id,
-          tipo_novedad: data.type,
+          tipo_novedad: data.type as DatabaseNovedadType,
           fecha_inicio: data.start_date,
           fecha_fin: data.end_date,
           dias: days,
@@ -110,7 +114,7 @@ export class TimeOffService {
         .from('payroll_novedades')
         .select('*')
         .eq('empleado_id', employeeId)
-        .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia', 'incapacidad'])
+        .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia', 'incapacidad'] as DatabaseNovedadType[])
         .order('fecha_inicio', { ascending: false });
 
       if (error) {

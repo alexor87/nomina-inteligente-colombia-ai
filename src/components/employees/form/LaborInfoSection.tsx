@@ -33,7 +33,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
   const tipoContratoOptions = [
     { value: 'indefinido', label: 'Término Indefinido' },
     { value: 'fijo', label: 'Término Fijo' },
-    { value: 'obra', label: 'Obra o Labor' },
+    { value: 'obra_labor', label: 'Obra o Labor' },
     { value: 'aprendizaje', label: 'Aprendizaje' },
     { value: 'practicas', label: 'Prácticas' }
   ];
@@ -54,7 +54,8 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
 
   const tipoJornadaOptions = [
     { value: 'completa', label: 'Tiempo Completo' },
-    { value: 'parcial', label: 'Tiempo Parcial' },
+    { value: 'medio_tiempo', label: 'Tiempo Parcial' },
+    { value: 'por_horas', label: 'Por Horas' },
     { value: 'flexible', label: 'Horario Flexible' }
   ];
 
@@ -95,7 +96,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <Label htmlFor="tipoContrato">Tipo de Contrato</Label>
               <Select 
                 value={watchedValues.tipoContrato} 
-                onValueChange={(value) => setValue('tipoContrato', value)}
+                onValueChange={(value: "indefinido" | "fijo" | "obra_labor" | "aprendizaje" | "practicas") => setValue('tipoContrato', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
@@ -104,9 +105,8 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
                   <SelectItem value="indefinido">Indefinido</SelectItem>
                   <SelectItem value="fijo">Término Fijo</SelectItem>
                   <SelectItem value="obra_labor">Obra o Labor</SelectItem>
-                  <SelectItem value="prestacion_servicios">Prestación de Servicios</SelectItem>
                   <SelectItem value="aprendizaje">Contrato de Aprendizaje</SelectItem>
-                  <SelectItem value="temporal">Temporal</SelectItem>
+                  <SelectItem value="practicas">Prácticas</SelectItem>
                 </SelectContent>
               </Select>
               {errors.tipoContrato && (
@@ -118,7 +118,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <Label htmlFor="estado">Estado</Label>
               <Select 
                 value={watchedValues.estado} 
-                onValueChange={(value) => setValue('estado', value)}
+                onValueChange={(value: "activo" | "inactivo" | "vacaciones" | "incapacidad" | "licencia") => setValue('estado', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estado" />
@@ -236,7 +236,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <Label htmlFor="periodicidadPago">Periodicidad de Pago</Label>
               <Select 
                 value={watchedValues.periodicidadPago} 
-                onValueChange={(value) => setValue('periodicidadPago', value)}
+                onValueChange={(value: "mensual" | "quincenal" | "semanal") => setValue('periodicidadPago', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar periodicidad" />
@@ -288,7 +288,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
               <Label htmlFor="tipoJornada">Tipo de Jornada</Label>
               <Select 
                 value={watchedValues.tipoJornada} 
-                onValueChange={(value) => setValue('tipoJornada', value)}
+                onValueChange={(value: "completa" | "medio_tiempo" | "por_horas" | "flexible") => setValue('tipoJornada', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar jornada" />

@@ -1,15 +1,31 @@
-import { supabase } from '@/integrations/supabase/client';
-import { CreateNovedadData, NovedadType } from '@/types/novedades-enhanced';
 
-// Export the interface for use in other files
-export type { CreateNovedadData } from '@/types/novedades-enhanced';
+import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+
+// ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS PARA EVITAR CONFLICTOS
+type DatabaseNovedadType = Database['public']['Enums']['novedad_type'];
+
+export interface CreateNovedadData {
+  empleado_id: string;
+  periodo_id: string;
+  tipo_novedad: DatabaseNovedadType;
+  valor?: number;
+  horas?: number;
+  dias?: number;
+  observacion?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  base_calculo?: any;
+  subtipo?: string;
+  company_id?: string;
+}
 
 export interface PayrollNovedad {
   id: string;
   company_id: string;
   empleado_id: string;
   periodo_id: string;
-  tipo_novedad: NovedadType;
+  tipo_novedad: DatabaseNovedadType;
   valor: number;
   horas?: number;
   dias?: number;
@@ -42,14 +58,14 @@ export class NovedadesBackupService {
 
       if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
       
-      // Cast the tipo_novedad to the database type to avoid TypeScript errors
+      // ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS
       const { data: result, error } = await supabase
         .from('payroll_novedades')
         .insert({
           company_id: profile.company_id,
           empleado_id: data.empleado_id,
           periodo_id: data.periodo_id,
-          tipo_novedad: data.tipo_novedad as any, // Cast to avoid type conflicts
+          tipo_novedad: data.tipo_novedad,
           valor: data.valor || 0,
           dias: data.dias,
           horas: data.horas,
@@ -69,7 +85,7 @@ export class NovedadesBackupService {
       }
 
       console.log('✅ Novedad created successfully:', result);
-      return result;
+      return result as PayrollNovedad;
     } catch (error) {
       console.error('❌ Error in createNovedad:', error);
       throw error;
@@ -86,7 +102,7 @@ export class NovedadesBackupService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as PayrollNovedad[];
     } catch (error) {
       console.error('❌ Error getting novedades by employee:', error);
       return [];
@@ -95,21 +111,15 @@ export class NovedadesBackupService {
 
   static async updateNovedad(id: string, updates: Partial<CreateNovedadData>): Promise<PayrollNovedad | null> {
     try {
-      // Cast the updates to avoid type conflicts
-      const updateData = { ...updates };
-      if (updateData.tipo_novedad) {
-        (updateData as any).tipo_novedad = updateData.tipo_novedad as any;
-      }
-
       const { data, error } = await supabase
         .from('payroll_novedades')
-        .update(updateData as any)
+        .update(updates as any)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      return data as PayrollNovedad;
     } catch (error) {
       console.error('❌ Error updating novedad:', error);
       throw error;
