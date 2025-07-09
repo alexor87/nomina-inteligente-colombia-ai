@@ -1,33 +1,32 @@
-
 import { ValidatedEmployeeData } from '@/schemas/employeeValidation';
 import { Employee } from '@/types';
 
 export class EmployeeDataMapper {
+  /**
+   * Helper function to clean date fields - KISS approach
+   */
+  private static cleanDateValue(value: any): string | null {
+    if (!value || value === '' || value === undefined || value === null) {
+      return null;
+    }
+    return String(value);
+  }
+
+  /**
+   * Helper function to clean text fields
+   */
+  private static cleanTextField(value: any): string | null {
+    if (value === '' || value === undefined || value === null) return null;
+    const cleaned = String(value).trim();
+    return cleaned === '' ? null : cleaned;
+  }
+
   /**
    * Maps form data to database format with comprehensive validation
    */
   static mapFormToDatabase(formData: ValidatedEmployeeData, companyId: string): any {
     console.log('🔄 EmployeeDataMapper: Mapping form data to database format');
     console.log('📋 Form data received:', formData);
-    
-    // Helper function to clean text fields
-    const cleanTextField = (value: any): string | null => {
-      if (value === '' || value === undefined || value === null) return null;
-      const cleaned = String(value).trim();
-      return cleaned === '' ? null : cleaned;
-    };
-
-    // Helper function to clean date fields
-    const cleanDateField = (value: any): string | null => {
-      if (!value || value === '') return null;
-      // Validate date format (YYYY-MM-DD)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(value)) {
-        console.warn('⚠️  Invalid date format, setting to null:', value);
-        return null;
-      }
-      return value;
-    };
 
     const mappedData = {
       // Required fields
@@ -43,44 +42,44 @@ export class EmployeeDataMapper {
       estado: formData.estado || 'activo',
 
       // Optional personal information
-      segundo_nombre: cleanTextField(formData.segundoNombre),
-      email: cleanTextField(formData.email),
-      telefono: cleanTextField(formData.telefono),
+      segundo_nombre: this.cleanTextField(formData.segundoNombre),
+      email: this.cleanTextField(formData.email),
+      telefono: this.cleanTextField(formData.telefono),
       sexo: formData.sexo || null,
-      fecha_nacimiento: cleanDateField(formData.fechaNacimiento),
-      direccion: cleanTextField(formData.direccion),
-      ciudad: cleanTextField(formData.ciudad),
-      departamento: cleanTextField(formData.departamento),
+      fecha_nacimiento: this.cleanDateValue(formData.fechaNacimiento),
+      direccion: this.cleanTextField(formData.direccion),
+      ciudad: this.cleanTextField(formData.ciudad),
+      departamento: this.cleanTextField(formData.departamento),
 
       // Optional labor information
-      cargo: cleanTextField(formData.cargo),
-      codigo_ciiu: cleanTextField(formData.codigoCIIU),
+      cargo: this.cleanTextField(formData.cargo),
+      codigo_ciiu: this.cleanTextField(formData.codigoCIIU),
       nivel_riesgo_arl: formData.nivelRiesgoARL || null,
-      centro_costos: cleanTextField(formData.centroCostos),
+      centro_costos: this.cleanTextField(formData.centroCostos),
 
-      // Contract details
-      fecha_firma_contrato: cleanDateField(formData.fechaFirmaContrato),
-      fecha_finalizacion_contrato: cleanDateField(formData.fechaFinalizacionContrato),
+      // Contract details - FIXED: Clean date fields properly
+      fecha_firma_contrato: this.cleanDateValue(formData.fechaFirmaContrato),
+      fecha_finalizacion_contrato: this.cleanDateValue(formData.fechaFinalizacionContrato),
       tipo_jornada: formData.tipoJornada || 'completa',
       dias_trabajo: Number(formData.diasTrabajo) || 30,
       horas_trabajo: Number(formData.horasTrabajo) || 8,
       beneficios_extralegales: Boolean(formData.beneficiosExtralegales),
-      clausulas_especiales: cleanTextField(formData.clausulasEspeciales),
+      clausulas_especiales: this.cleanTextField(formData.clausulasEspeciales),
 
       // Banking information
-      banco: cleanTextField(formData.banco),
+      banco: this.cleanTextField(formData.banco),
       tipo_cuenta: formData.tipoCuenta || 'ahorros',
-      numero_cuenta: cleanTextField(formData.numeroCuenta),
-      titular_cuenta: cleanTextField(formData.titularCuenta),
+      numero_cuenta: this.cleanTextField(formData.numeroCuenta),
+      titular_cuenta: this.cleanTextField(formData.titularCuenta),
       forma_pago: formData.formaPago || 'dispersion',
 
       // Affiliations
-      eps: cleanTextField(formData.eps),
-      afp: cleanTextField(formData.afp),
-      arl: cleanTextField(formData.arl),
-      caja_compensacion: cleanTextField(formData.cajaCompensacion),
-      tipo_cotizante_id: cleanTextField(formData.tipoCotizanteId),
-      subtipo_cotizante_id: cleanTextField(formData.subtipoCotizanteId),
+      eps: this.cleanTextField(formData.eps),
+      afp: this.cleanTextField(formData.afp),
+      arl: this.cleanTextField(formData.arl),
+      caja_compensacion: this.cleanTextField(formData.cajaCompensacion),
+      tipo_cotizante_id: this.cleanTextField(formData.tipoCotizanteId),
+      subtipo_cotizante_id: this.cleanTextField(formData.subtipoCotizanteId),
       regimen_salud: formData.regimenSalud || 'contributivo',
       estado_afiliacion: formData.estadoAfiliacion || 'pendiente'
     };

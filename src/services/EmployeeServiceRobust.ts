@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
+import { EmployeeDataMapper } from './EmployeeDataMapper';
 
 interface EmployeeServiceResponse {
   success: boolean;
@@ -13,6 +14,19 @@ interface EmployeeServiceResponse {
 export class EmployeeServiceRobust {
   
   /**
+   * Helper to clean data before database operations - KISS approach
+   */
+  private static cleanEmployeeData(employeeData: Partial<EmployeeUnified>): any {
+    // Use EmployeeDataMapper for proper cleaning
+    if (employeeData.empresaId || employeeData.company_id) {
+      return EmployeeDataMapper.mapFormToDatabase(employeeData as any, employeeData.empresaId || employeeData.company_id!);
+    }
+    
+    // Fallback for direct mapping
+    return mapUnifiedToDatabase(employeeData as EmployeeUnified);
+  }
+
+  /**
    * Crear un nuevo empleado con campos personalizados
    */
   static async createEmployee(employeeData: Partial<EmployeeUnified>): Promise<EmployeeServiceResponse> {
@@ -22,15 +36,15 @@ export class EmployeeServiceRobust {
       // Separar custom_fields del resto de datos
       const { custom_fields, ...standardFields } = employeeData;
 
-      // Preparar datos para inserción usando el mapper
-      const dbData = mapUnifiedToDatabase({
+      // KISS: Limpiar datos usando el mapper mejorado
+      const cleanedData = this.cleanEmployeeData({
         ...standardFields,
         custom_fields: custom_fields || {}
-      } as EmployeeUnified);
+      });
 
       // Asegurar que campos requeridos estén presentes
       const dataToInsert = {
-        ...dbData,
+        ...cleanedData,
         company_id: employeeData.empresaId || employeeData.company_id,
         cedula: employeeData.cedula || '',
         nombre: employeeData.nombre || '',
@@ -87,15 +101,15 @@ export class EmployeeServiceRobust {
       // Separar custom_fields del resto de datos
       const { custom_fields, ...standardFields } = employeeData;
 
-      // Preparar datos para actualización usando el mapper
-      const dbData = mapUnifiedToDatabase({
+      // KISS: Limpiar datos usando el mapper mejorado
+      const cleanedData = this.cleanEmployeeData({
         ...standardFields,
         custom_fields: custom_fields || {}
-      } as EmployeeUnified);
+      });
 
       // Preparar datos para actualización
       const dataToUpdate = {
-        ...dbData,
+        ...cleanedData,
         company_id: employeeData.empresaId || employeeData.company_id,
         custom_fields: custom_fields || {},
         updated_at: new Date().toISOString()
@@ -189,9 +203,6 @@ export class EmployeeServiceRobust {
     return {};
   }
 
-  /**
-   * Aplicar valores por defecto a empleados existentes cuando se agrega un nuevo campo
-   */
   static async applyDefaultValuesToExistingEmployees(
     companyId: string, 
     fieldKey: string, 
