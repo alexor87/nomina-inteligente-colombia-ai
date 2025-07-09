@@ -12,7 +12,7 @@ export interface EmployeeUnified {
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F'; // ✅ FIXED: Remove 'O' to match Employee
+  sexo?: 'M' | 'F' | 'O'; // ✅ FIXED: Add 'O' to match Employee
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;

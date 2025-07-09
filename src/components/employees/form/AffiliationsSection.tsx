@@ -1,181 +1,97 @@
 
-import { Control, FieldErrors } from 'react-hook-form';
-import { FormField } from './FormField';
-import { EmployeeFormData } from './types';
-import { useAffiliationEntities } from '@/hooks/useAffiliationEntities';
+import React from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EmployeeUnified } from '@/types/employee-unified';
 
 interface AffiliationsSectionProps {
-  control: Control<EmployeeFormData>;
-  errors: FieldErrors<EmployeeFormData>;
-  watchedValues: EmployeeFormData;
-  setValue: (name: keyof EmployeeFormData, value: any) => void;
+  formData: Partial<EmployeeUnified>;
+  updateFormData: (data: Partial<EmployeeUnified>) => void;
+  errors: Record<string, string>;
 }
 
-export const AffiliationsSection = ({ 
-  control, 
-  errors, 
-  watchedValues, 
-  setValue 
-}: AffiliationsSectionProps) => {
-  // Get the selected tipo cotizante to filter subtipos
-  const selectedTipoCotizanteId = watchedValues.tipoCotizanteId;
-  
-  const {
-    epsOptions,
-    afpOptions,
-    arlOptions,
-    compensationOptions,
-    tipoCotizanteOptions,
-    subtipoCotizanteOptions,
-    isLoading
-  } = useAffiliationEntities(selectedTipoCotizanteId);
-
-  const regimenSaludOptions = [
-    { value: 'contributivo', label: 'Contributivo' },
-    { value: 'subsidiado', label: 'Subsidiado' }
-  ];
-
-  const estadoAfiliacionOptions = [
-    { value: 'completa', label: 'Completa' },
-    { value: 'pendiente', label: 'Pendiente' },
-    { value: 'inconsistente', label: 'Inconsistente' }
-  ];
-
-  // Handle tipo cotizante change to reset subtipo
-  const handleTipoCotizanteChange = (value: string) => {
-    setValue('tipoCotizanteId', value);
-    // Clear subtipo when tipo changes
-    setValue('subtipoCotizanteId', '');
-  };
-
-  if (isLoading) {
-    return (
-      <div className="border-t border-gray-100 pt-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-6">Información de Afiliaciones</h2>
-        <div className="flex items-center justify-center py-8">
-          <div className="text-gray-500">Cargando opciones de afiliación...</div>
-        </div>
-      </div>
-    );
-  }
-
+export const AffiliationsSection = ({ formData, updateFormData, errors }: AffiliationsSectionProps) => {
   return (
-    <div className="border-t border-gray-100 pt-8">
-      <h2 className="text-lg font-medium text-gray-900 mb-6">Información de Afiliaciones</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* EPS */}
-        <FormField
-          name="eps"
-          label="EPS"
-          type="select"
-          control={control}
-          errors={errors}
-          options={epsOptions}
-          placeholder="Seleccionar EPS"
-        />
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="eps">EPS *</Label>
+          <Input
+            id="eps"
+            value={formData.eps || ''}
+            onChange={(e) => updateFormData({ eps: e.target.value })}
+            placeholder="Ingrese la EPS"
+          />
+          {errors.eps && <p className="text-red-500 text-sm">{errors.eps}</p>}
+        </div>
 
-        {/* AFP */}
-        <FormField
-          name="afp"
-          label="AFP/Fondo de Pensiones"
-          type="select"
-          control={control}
-          errors={errors}
-          options={afpOptions}
-          placeholder="Seleccionar AFP"
-        />
+        <div>
+          <Label htmlFor="afp">AFP/Pensión *</Label>
+          <Input
+            id="afp"
+            value={formData.afp || ''}
+            onChange={(e) => updateFormData({ afp: e.target.value })}
+            placeholder="Ingrese el fondo de pensiones"
+          />
+          {errors.afp && <p className="text-red-500 text-sm">{errors.afp}</p>}
+        </div>
+      </div>
 
-        {/* ARL */}
-        <FormField
-          name="arl"
-          label="ARL"
-          type="select"
-          control={control}
-          errors={errors}
-          options={arlOptions}
-          placeholder="Seleccionar ARL"
-        />
-
-        {/* Caja de Compensación */}
-        <FormField
-          name="cajaCompensacion"
-          label="Caja de Compensación"
-          type="select"
-          control={control}
-          errors={errors}
-          options={compensationOptions}
-          placeholder="Seleccionar Caja de Compensación"
-        />
-
-        {/* Régimen de Salud */}
-        <FormField
-          name="regimenSalud"
-          label="Régimen de Salud"
-          type="select"
-          control={control}
-          errors={errors}
-          options={regimenSaludOptions}
-          required
-        />
-
-        {/* Estado de Afiliación */}
-        <FormField
-          name="estadoAfiliacion"
-          label="Estado de Afiliación"
-          type="select"
-          control={control}
-          errors={errors}
-          options={estadoAfiliacionOptions}
-          required
-        />
-
-        {/* Tipo Cotizante */}
-        <div className="space-y-1.5">
-          <FormField
-            name="tipoCotizanteId"
-            label="Tipo de Cotizante"
-            type="select"
-            control={control}
-            errors={errors}
-            options={tipoCotizanteOptions}
-            placeholder="Seleccionar Tipo de Cotizante"
-            onValueChange={handleTipoCotizanteChange}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="arl">ARL</Label>
+          <Input
+            id="arl"
+            value={formData.arl || ''}
+            onChange={(e) => updateFormData({ arl: e.target.value })}
+            placeholder="Ingrese la ARL"
           />
         </div>
 
-        {/* Subtipo Cotizante - Solo se muestra si hay un tipo seleccionado */}
-        <div className="space-y-1.5">
-          <FormField
-            name="subtipoCotizanteId"
-            label="Subtipo de Cotizante"
-            type="select"
-            control={control}
-            errors={errors}
-            options={subtipoCotizanteOptions}
-            placeholder={
-              selectedTipoCotizanteId 
-                ? "Seleccionar Subtipo de Cotizante" 
-                : "Primero seleccione un Tipo de Cotizante"
-            }
-            disabled={!selectedTipoCotizanteId}
+        <div>
+          <Label htmlFor="cajaCompensacion">Caja de Compensación</Label>
+          <Input
+            id="cajaCompensacion"
+            value={formData.cajaCompensacion || ''}
+            onChange={(e) => updateFormData({ cajaCompensacion: e.target.value })}
+            placeholder="Ingrese la caja de compensación"
           />
         </div>
       </div>
 
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <div className="flex">
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-blue-800">
-              Información sobre Afiliaciones
-            </h3>
-            <div className="mt-2 text-sm text-blue-700">
-              <p>
-                Complete la información de afiliaciones del empleado para asegurar el cumplimiento 
-                de las obligaciones de seguridad social.
-              </p>
-            </div>
-          </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="regimenSalud">Régimen de Salud</Label>
+          <Select 
+            value={formData.regimenSalud || 'contributivo'} 
+            onValueChange={(value) => updateFormData({ regimenSalud: value as any })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contributivo">Contributivo</SelectItem>
+              <SelectItem value="subsidiado">Subsidiado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="estadoAfiliacion">Estado de Afiliación</Label>
+          <Select 
+            value={formData.estadoAfiliacion || 'pendiente'} 
+            onValueChange={(value) => updateFormData({ estadoAfiliacion: value as any })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="completa">Completa</SelectItem>
+              <SelectItem value="pendiente">Pendiente</SelectItem>
+              <SelectItem value="inconsistente">Inconsistente</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </div>

@@ -71,9 +71,9 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
   const loadNovedades = async () => {
     try {
       const result = await NovedadesEnhancedService.getNovedadesByEmployee(employee.id, periodId);
-      if (result.success && result.data) {
-        setNovedades(result.data);
-        onNovedadesChange?.(result.data);
+      if (result && Array.isArray(result)) {
+        setNovedades(result);
+        onNovedadesChange?.(result);
       }
     } catch (error) {
       console.error('Error loading novedades:', error);
@@ -106,7 +106,7 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
       };
 
       const result = await NovedadesEnhancedService.createNovedad(createData);
-      if (result.success) {
+      if (result) {
         toast({
           title: "✅ Novedad creada",
           description: "La novedad se ha creado correctamente",
@@ -136,7 +136,7 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
         ...data,
         valor: data.valor || 0
       });
-      if (result.success) {
+      if (result) {
         toast({
           title: "✅ Novedad actualizada",
           description: "La novedad se ha actualizado correctamente",
@@ -194,7 +194,6 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
       otros_ingresos: 'Otros Ingresos',
       salud: 'Descuento Salud',
       pension: 'Descuento Pensión',
-      arl: 'Descuento ARL',
       retencion_fuente: 'Retención en la Fuente',
       fondo_solidaridad: 'Fondo de Solidaridad',
       ausencia: 'Ausencia'
@@ -204,7 +203,7 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
 
   const getNovedadColor = (tipo: NovedadType): string => {
     const ingresos: NovedadType[] = ['horas_extra', 'recargo_nocturno', 'bonificacion', 'comision', 'prima', 'otros_ingresos'];
-    const deducciones: NovedadType[] = ['salud', 'pension', 'arl', 'retencion_fuente', 'fondo_solidaridad'];
+    const deducciones: NovedadType[] = ['salud', 'pension', 'retencion_fuente', 'fondo_solidaridad'];
     const tiempos: NovedadType[] = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'];
     
     if (ingresos.includes(tipo)) return 'bg-green-100 text-green-800';
@@ -219,7 +218,7 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
     ).reduce((sum, n) => sum + (n.valor || 0), 0);
     
     const deducciones = novedades.filter(n => 
-      ['salud', 'pension', 'arl', 'retencion_fuente', 'fondo_solidaridad'].includes(n.tipo_novedad)
+      ['salud', 'pension', 'retencion_fuente', 'fondo_solidaridad'].includes(n.tipo_novedad)
     ).reduce((sum, n) => sum + (n.valor || 0), 0);
     
     return { ingresos, deducciones };

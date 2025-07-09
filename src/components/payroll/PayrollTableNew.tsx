@@ -1,22 +1,17 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Search, Filter, FileText, Download, Calculator, Plus, Edit, Trash2 } from 'lucide-react';
+import { Eye, Search, Download, Calculator, Plus, Edit } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { PayrollPeriodEnhancedService } from '@/services/PayrollPeriodEnhancedService';
-import { PayrollCalculationEnhancedService } from '@/services/PayrollCalculationEnhancedService';
-import { NovedadType, NOVEDAD_TYPE_LABELS, calcularValorNovedad } from '@/types/novedades-enhanced';
+import { NovedadType, NOVEDAD_TYPE_LABELS } from '@/types/novedades-enhanced';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
-import { NovedadUnifiedModal } from './novedades/NovedadUnifiedModal';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { PayrollPeriod } from '@/types/payroll-period';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
-import { PayrollNovedadEnhancedService } from '@/services/PayrollNovedadEnhancedService';
 
 interface PayrollTableNewProps {
   periodId: string;
@@ -26,21 +21,7 @@ interface PayrollTableNewProps {
 
 export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, companyId, onPeriodRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
-  const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
-  const [selectedNovedadType, setSelectedNovedadType] = useState<NovedadType | null>(null);
-  const [employeeSalary, setEmployeeSalary] = useState<number | undefined>(undefined);
-  const [startDate, setStartDate] = useState<string | undefined>(undefined);
-  const [endDate, setEndDate] = useState<string | undefined>(undefined);
-  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeUnified | null>(null);
   const { toast } = useToast();
-
-  // Fetch payroll period details
-  const { data: period, isLoading: isPeriodLoading, error: periodError, refetch: refetchPeriod } = useQuery({
-    queryKey: ['payroll-period', periodId],
-    queryFn: () => PayrollPeriodEnhancedService.getPeriodById(periodId),
-    enabled: !!periodId,
-  });
 
   // Fetch employees for the company
   const { data: employeesData, isLoading: isEmployeesLoading, error: employeesError, refetch: refetchEmployees } = useQuery({
@@ -59,98 +40,6 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, comp
       employee.cedula.includes(searchTerm)
     );
   }, [employeesData, searchTerm]);
-
-  // Fetch novedades for the period
-  const { data: novedades, isLoading: isNovedadesLoading, error: novedadesError, refetch: refetchNovedades } = useQuery({
-    queryKey: ['novedades-for-period', periodId],
-    queryFn: () => PayrollNovedadEnhancedService.getNovedadesByPeriodId(periodId),
-    enabled: !!periodId,
-  });
-
-  useEffect(() => {
-    if (period) {
-      setStartDate(period.fecha_inicio);
-      setEndDate(period.fecha_fin);
-    }
-  }, [period]);
-
-  const handleOpenNovedadModal = (employeeId: string, employeeSalary: number, type?: NovedadType) => {
-    setSelectedEmployeeId(employeeId);
-    setEmployeeSalary(employeeSalary);
-    setSelectedNovedadType(type || null);
-    setIsNovedadModalOpen(true);
-
-    // Find and set the selected employee
-    const employee = employees.find(emp => emp.id === employeeId);
-    setSelectedEmployee(employee || null);
-  };
-
-  const handleCloseNovedadModal = () => {
-    setIsNovedadModalOpen(false);
-    setSelectedNovedadType(null);
-    setSelectedEmployeeId(null);
-    setSelectedEmployee(null);
-  };
-
-  const handleNovedadSubmit = async (data: any) => {
-    if (!selectedEmployeeId || !periodId) {
-      toast({
-        title: "Error",
-        description: "Faltan datos del empleado o período",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // ✅ NUEVO: Enviar también company_id
-      const submitData = {
-        ...data,
-        empleado_id: selectedEmployeeId,
-        periodo_id: periodId,
-        company_id: companyId
-      };
-
-      console.log('Saving novelty:', submitData);
-      await PayrollNovedadEnhancedService.createNovedad(submitData);
-
-      toast({
-        title: "Novedad guardada",
-        description: "La novedad se ha guardado correctamente",
-      });
-
-      // Refresh data
-      await refetchNovedades();
-      await refetchPeriod();
-      onPeriodRefresh?.();
-
-    } catch (error: any) {
-      console.error("Error creating novedad:", error);
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo guardar la novedad",
-        variant: "destructive",
-      });
-    } finally {
-      handleCloseNovedadModal();
-    }
-  };
-
-  const handleEmployeeNovedadesChange = async (employeeId: string) => {
-    console.log('🔄 Refreshing novedades for employee:', employeeId);
-    await refetchNovedades();
-    await refetchPeriod();
-    onPeriodRefresh?.();
-  };
-
-  const getEmployeeNovedades = (employeeId: string): PayrollNovedad[] => {
-    return (novedades || []).filter(novedad => novedad.empleado_id === employeeId);
-  };
-
-  const calculateEmployeeTotal = (employeeId: string): number => {
-    const employeeNovedades = getEmployeeNovedades(employeeId);
-    return employeeNovedades.reduce((total, novedad) => total + (novedad.valor || 0), 0);
-  };
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -174,7 +63,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, comp
     );
   };
 
-  if (isPeriodLoading || isEmployeesLoading || isNovedadesLoading) {
+  if (isEmployeesLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -182,13 +71,13 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, comp
     );
   }
 
-  if (periodError || employeesError || novedadesError) {
+  if (employeesError) {
     return (
       <Card>
         <CardContent className="p-6">
           <div className="text-center text-red-600">
-            Error: {periodError?.message || employeesError?.message || novedadesError?.message}
-            <Button onClick={() => { refetchPeriod(); refetchEmployees(); refetchNovedades(); }} className="ml-4">
+            Error: {employeesError.message}
+            <Button onClick={() => refetchEmployees()} className="ml-4">
               Reintentar
             </Button>
           </div>
@@ -204,7 +93,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, comp
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Nómina</h2>
           <p className="text-gray-600">
-            Período: {period?.nombre} ({period?.estado})
+            Período: {periodId}
           </p>
         </div>
         <div className="flex gap-2">
@@ -227,9 +116,9 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, comp
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             Lista de Empleados
-            <Button onClick={refetchNovedades}>
+            <Button onClick={() => refetchEmployees()}>
               <Calculator className="w-4 h-4 mr-2" />
-              Recalcular
+              Actualizar
             </Button>
           </CardTitle>
         </CardHeader>
@@ -242,8 +131,7 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, comp
                   <th className="text-left p-4">Cédula</th>
                   <th className="text-left p-4">Cargo</th>
                   <th className="text-left p-4">Estado</th>
-                  <th className="text-left p-4">Novedades</th>
-                  <th className="text-left p-4">Total</th>
+                  <th className="text-left p-4">Salario Base</th>
                   <th className="text-left p-4">Acciones</th>
                 </tr>
               </thead>
@@ -261,52 +149,18 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, comp
                     <td className="p-4">{employee.cedula}</td>
                     <td className="p-4">{employee.cargo || 'No especificado'}</td>
                     <td className="p-4">{getStatusBadge(employee.estado)}</td>
+                    <td className="p-4 font-bold text-green-600">
+                      {formatCurrency(employee.salarioBase)}
+                    </td>
                     <td className="p-4">
-                      <div className="flex flex-col gap-1">
-                        {getEmployeeNovedades(employee.id).map(novedad => (
-                          <Badge key={novedad.id} variant="secondary">
-                            {NOVEDAD_TYPE_LABELS[novedad.tipo_novedad]} +{formatCurrency(novedad.valor || 0)}
-                          </Badge>
-                        ))}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenNovedadModal(employee.id, employee.salarioBase)}
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Agregar Novedad
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <Edit className="w-4 h-4" />
                         </Button>
                       </div>
-                    </td>
-                    <td className="p-4 font-bold text-green-600">
-                      {formatCurrency(calculateEmployeeTotal(employee.id))}
-                    </td>
-                    <td className="p-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            Ver Detalles
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleOpenNovedadModal(employee.id, employee.salarioBase)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar Novedades
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <FileText className="w-4 h-4 mr-2" />
-                            Generar Comprobante
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}
@@ -315,20 +169,6 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, comp
           </div>
         </CardContent>
       </Card>
-
-      <NovedadUnifiedModal
-        open={isNovedadModalOpen}
-        setOpen={setIsNovedadModalOpen}
-        employeeId={selectedEmployeeId}
-        employeeSalary={employeeSalary}
-        periodId={periodId}
-        onSubmit={handleNovedadSubmit}
-        onClose={handleCloseNovedadModal}
-        selectedNovedadType={selectedNovedadType}
-        onEmployeeNovedadesChange={handleEmployeeNovedadesChange}
-        startDate={startDate}
-        endDate={endDate}
-      />
     </div>
   );
 };

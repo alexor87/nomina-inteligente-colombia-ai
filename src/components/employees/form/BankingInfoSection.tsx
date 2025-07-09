@@ -1,114 +1,85 @@
 
-import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
-import { FormField } from './FormField';
-import { EmployeeFormData } from './types';
+import React from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EmployeeUnified } from '@/types/employee-unified';
 
 interface BankingInfoSectionProps {
-  control: Control<EmployeeFormData>;
-  errors: FieldErrors<EmployeeFormData>;
-  watchedValues: EmployeeFormData;
-  setValue: UseFormSetValue<EmployeeFormData>;
-  watch: UseFormWatch<EmployeeFormData>;
-  register: any;
+  formData: Partial<EmployeeUnified>;
+  updateFormData: (data: Partial<EmployeeUnified>) => void;
+  errors: Record<string, string>;
 }
 
-export const BankingInfoSection = ({ 
-  control, 
-  errors, 
-  watchedValues, 
-  setValue, 
-  watch,
-  register 
-}: BankingInfoSectionProps) => {
-  const tipoCuentaOptions = [
-    { value: 'ahorros', label: 'Ahorros' },
-    { value: 'corriente', label: 'Corriente' }
-  ];
-
-  const formaPagoOptions = [
-    { value: 'dispersion', label: 'Dispersión Bancaria' },
-    { value: 'efectivo', label: 'Efectivo' },
-    { value: 'cheque', label: 'Cheque' }
-  ];
-
-  const bancoOptions = [
-    { value: 'bancolombia', label: 'Bancolombia' },
-    { value: 'banco_bogota', label: 'Banco de Bogotá' },
-    { value: 'banco_popular', label: 'Banco Popular' },
-    { value: 'bbva', label: 'BBVA Colombia' },
-    { value: 'banco_occidente', label: 'Banco de Occidente' },
-    { value: 'banco_santander', label: 'Banco Santander' },
-    { value: 'banco_caja_social', label: 'Banco Caja Social' },
-    { value: 'banco_av_villas', label: 'Banco AV Villas' },
-    { value: 'banco_davivienda', label: 'Banco Davivienda' },
-    { value: 'banco_falabella', label: 'Banco Falabella' },
-    { value: 'banco_pichincha', label: 'Banco Pichincha' },
-    { value: 'banco_gnb_sudameris', label: 'Banco GNB Sudameris' },
-    { value: 'banco_itau', label: 'Banco Itaú' },
-    { value: 'banco_agrario', label: 'Banco Agrario' },
-    { value: 'nequi', label: 'Nequi' },
-    { value: 'daviplata', label: 'DaviPlata' },
-    { value: 'otro', label: 'Otro' }
-  ];
-
+export const BankingInfoSection = ({ formData, updateFormData, errors }: BankingInfoSectionProps) => {
   return (
-    <div className="space-y-8">
-      <div className="border-t border-gray-100 pt-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-6">Información Bancaria</h2>
-        
-        <div className="space-y-6">
-          {/* Forma de Pago */}
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-            <FormField
-              name="formaPago"
-              label="Forma de Pago"
-              type="select"
-              control={control}
-              errors={errors}
-              options={formaPagoOptions}
-            />
-          </div>
-
-          {/* Información Bancaria */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              name="banco"
-              label="Banco"
-              type="select"
-              control={control}
-              errors={errors}
-              options={bancoOptions}
-            />
-            
-            <FormField
-              name="tipoCuenta"
-              label="Tipo de Cuenta"
-              type="select"
-              control={control}
-              errors={errors}
-              options={tipoCuentaOptions}
-            />
-          </div>
-
-          {/* Número de Cuenta y Titular */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              name="numeroCuenta"
-              label="Número de Cuenta"
-              type="text"
-              control={control}
-              errors={errors}
-            />
-            
-            <FormField
-              name="titularCuenta"
-              label="Titular de la Cuenta"
-              type="text"
-              control={control}
-              errors={errors}
-            />
-          </div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="banco">Banco *</Label>
+          <Input
+            id="banco"
+            value={formData.banco || ''}
+            onChange={(e) => updateFormData({ banco: e.target.value })}
+            placeholder="Ingrese el banco"
+          />
+          {errors.banco && <p className="text-red-500 text-sm">{errors.banco}</p>}
         </div>
+
+        <div>
+          <Label htmlFor="tipoCuenta">Tipo de Cuenta *</Label>
+          <Select 
+            value={formData.tipoCuenta || 'ahorros'} 
+            onValueChange={(value) => updateFormData({ tipoCuenta: value as any })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ahorros">Ahorros</SelectItem>
+              <SelectItem value="corriente">Corriente</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.tipoCuenta && <p className="text-red-500 text-sm">{errors.tipoCuenta}</p>}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="numeroCuenta">Número de Cuenta</Label>
+          <Input
+            id="numeroCuenta"
+            value={formData.numeroCuenta || ''}
+            onChange={(e) => updateFormData({ numeroCuenta: e.target.value })}
+            placeholder="Ingrese el número de cuenta"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="titularCuenta">Titular de la Cuenta</Label>
+          <Input
+            id="titularCuenta"
+            value={formData.titularCuenta || ''}
+            onChange={(e) => updateFormData({ titularCuenta: e.target.value })}
+            placeholder="Nombre del titular"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="formaPago">Forma de Pago</Label>
+        <Select 
+          value={formData.formaPago || 'dispersion'} 
+          onValueChange={(value) => updateFormData({ formaPago: value as any })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="dispersion">Dispersión Bancaria</SelectItem>
+            <SelectItem value="manual">Manual</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

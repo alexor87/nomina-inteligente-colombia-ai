@@ -7,11 +7,14 @@ import { EmployeeUnified } from '@/types/employee-unified';
 
 export const useEmployeeCRUD = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const createEmployee = async (employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>) => {
     setIsLoading(true);
+    setIsCreating(true);
     try {
       console.log('🔄 useEmployeeCRUD: Creating employee with data:', employeeData);
       
@@ -54,11 +57,13 @@ export const useEmployeeCRUD = () => {
       return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
+      setIsCreating(false);
     }
   };
 
   const updateEmployee = async (id: string, employeeData: Partial<EmployeeUnified>) => {
     setIsLoading(true);
+    setIsUpdating(true);
     try {
       console.log('🔄 useEmployeeCRUD: Updating employee with ID:', id);
       
@@ -102,6 +107,7 @@ export const useEmployeeCRUD = () => {
       return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
+      setIsUpdating(false);
     }
   };
 
@@ -205,6 +211,8 @@ export const useEmployeeCRUD = () => {
     updateEmployee,
     deleteEmployee,
     changeEmployeeStatus,
-    isLoading
+    isLoading,
+    isCreating,
+    isUpdating
   };
 };
