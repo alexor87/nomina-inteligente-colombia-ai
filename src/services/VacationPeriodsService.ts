@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { VacationService } from './VacationService';
 
 export interface VacationPeriod {
   id: string;
@@ -143,8 +144,7 @@ export class VacationPeriodsService {
         };
       }
 
-      // 2. Validar saldo disponible
-      const { VacationService } = await import('./VacationService');
+      // 2. Validar saldo disponible - ✅ FIXED: Static import
       const balanceResult = await VacationService.getVacationBalance(employeeId);
       
       if (balanceResult.success && balanceResult.data) {
