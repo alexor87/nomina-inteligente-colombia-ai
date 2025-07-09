@@ -89,6 +89,9 @@ export const populateFormWithEmployee = async (employee: EmployeeUnified): Promi
   }
   
   return {
+    // ✅ SOLUCIÓN KISS: Agregar el ID que faltaba
+    id: employee.id,
+    
     // Información personal
     tipoDocumento: employee.tipoDocumento || 'CC',
     cedula: employee.cedula || '',
