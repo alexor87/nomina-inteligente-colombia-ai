@@ -52,7 +52,9 @@ export const useEmployeeFormSubmissionRobust = (
       console.log('📤 Employee data being submitted:', dataToSubmit);
 
       let result;
-      if (employee?.id) {
+      const isEditing = !!employee?.id;
+      
+      if (isEditing) {
         // Actualizar empleado existente
         console.log('🔄 Updating existing employee:', employee.id);
         result = await EmployeeServiceRobust.updateEmployee(employee.id, dataToSubmit);
@@ -65,28 +67,47 @@ export const useEmployeeFormSubmissionRobust = (
       if (result.success && result.employee) {
         console.log('✅ Employee saved successfully:', result.employee.id);
         
-        // ✅ NUEVO: Crear o actualizar balance de vacaciones (Fase 1 - KISS)
+        // ✅ CORREGIDO: Lógica diferente para edición vs creación
         if (hasAccumulatedVacations && initialVacationDays > 0) {
-          console.log('🏖️ Creating vacation balance:', { 
-            employeeId: result.employee.id, 
-            companyId: formData.empresaId, 
-            initialDays: initialVacationDays 
-          });
-          
-          const vacationResult = await VacationService.createVacationBalance(
-            result.employee.id,
-            formData.empresaId,
-            initialVacationDays
-          );
-          
-          if (vacationResult.success) {
-            console.log('✅ Vacation balance created successfully');
+          if (isEditing) {
+            // Para edición: actualizar balance existente
+            console.log('🏖️ Updating vacation balance:', { 
+              employeeId: result.employee.id, 
+              initialDays: initialVacationDays 
+            });
+            
+            const vacationResult = await VacationService.updateInitialBalance(
+              result.employee.id,
+              initialVacationDays
+            );
+            
+            if (vacationResult.success) {
+              console.log('✅ Vacation balance updated successfully');
+            } else {
+              console.warn('⚠️ Warning: Could not update vacation balance:', vacationResult.error);
+            }
           } else {
-            console.warn('⚠️ Warning: Could not create vacation balance:', vacationResult.error);
-            // No fallar el proceso completo por esto en Fase 1
+            // Para creación: crear nuevo balance
+            console.log('🏖️ Creating vacation balance:', { 
+              employeeId: result.employee.id, 
+              companyId: formData.empresaId, 
+              initialDays: initialVacationDays 
+            });
+            
+            const vacationResult = await VacationService.createVacationBalance(
+              result.employee.id,
+              formData.empresaId,
+              initialVacationDays
+            );
+            
+            if (vacationResult.success) {
+              console.log('✅ Vacation balance created successfully');
+            } else {
+              console.warn('⚠️ Warning: Could not create vacation balance:', vacationResult.error);
+            }
           }
-        } else {
-          // Crear balance con 0 días iniciales para consistencia
+        } else if (!isEditing) {
+          // Solo para empleados nuevos: crear balance con 0 días para consistencia
           console.log('🏖️ Creating default vacation balance (0 days)');
           const vacationResult = await VacationService.createVacationBalance(
             result.employee.id,
@@ -102,9 +123,12 @@ export const useEmployeeFormSubmissionRobust = (
         }
 
         // Mostrar toast de éxito
+        const actionText = isEditing ? 'actualizado' : 'creado';
+        const vacationText = hasAccumulatedVacations ? ` con ${initialVacationDays} días de vacaciones iniciales` : '';
+        
         toast({
-          title: employee?.id ? "Empleado actualizado" : "Empleado creado",
-          description: `${result.employee.nombre} ${result.employee.apellido} ha sido ${employee?.id ? 'actualizado' : 'creado'} exitosamente${hasAccumulatedVacations ? ` con ${initialVacationDays} días de vacaciones iniciales` : ''}`,
+          title: `Empleado ${actionText}`,
+          description: `${result.employee.nombre} ${result.employee.apellido} ha sido ${actionText} exitosamente${vacationText}`,
           className: "border-green-200 bg-green-50"
         });
 
