@@ -1,15 +1,20 @@
 
 import React from 'react';
-import { Control, FieldErrors } from 'react-hook-form';
+import { Control, FieldErrors, UseFormWatch } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Controller } from 'react-hook-form';
 import { EmployeeFormData } from './types';
 
+// ✅ FIXED: Simplified interface to match actual usage
 interface PersonalInfoSectionProps {
   control: Control<EmployeeFormData>;
-  errors: FieldErrors<EmployeeFormData>; // ✅ FIXED: Use proper type
+  errors: FieldErrors<EmployeeFormData>;
+  watchedValues?: EmployeeFormData;
+  watch?: UseFormWatch<EmployeeFormData>;
+  formData?: any; // For EmployeeFormWizard compatibility
+  updateFormData?: (data: any) => void; // For EmployeeFormWizard compatibility
 }
 
 const TIPOS_DOCUMENTO = [
@@ -25,8 +30,100 @@ const TIPOS_DOCUMENTO = [
 
 export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
   control,
-  errors
+  errors,
+  watchedValues,
+  watch,
+  formData,
+  updateFormData
 }) => {
+  // ✅ SIMPLIFIED: Use formData if available (for wizard), otherwise use control
+  const isWizardMode = !!formData && !!updateFormData;
+
+  if (isWizardMode) {
+    // Wizard mode - use formData and updateFormData
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Información Personal</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="tipoDocumento">Tipo de Documento *</Label>
+              <Select 
+                value={formData.tipoDocumento || 'CC'} 
+                onValueChange={(value) => updateFormData({ tipoDocumento: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS_DOCUMENTO.map((tipo) => (
+                    <SelectItem key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cedula">Número de Documento *</Label>
+              <Input
+                value={formData.cedula || ''}
+                onChange={(e) => updateFormData({ cedula: e.target.value })}
+                placeholder="12345678"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nombre">Nombre *</Label>
+              <Input
+                value={formData.nombre || ''}
+                onChange={(e) => updateFormData({ nombre: e.target.value })}
+                placeholder="Juan"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apellido">Apellido *</Label>
+              <Input
+                value={formData.apellido || ''}
+                onChange={(e) => updateFormData({ apellido: e.target.value })}
+                placeholder="Pérez"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                type="email"
+                value={formData.email || ''}
+                onChange={(e) => updateFormData({ email: e.target.value })}
+                placeholder="juan.perez@empresa.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sexo">Sexo</Label>
+              <Select 
+                value={formData.sexo || ''} 
+                onValueChange={(value) => updateFormData({ sexo: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="M">Masculino</SelectItem>
+                  <SelectItem value="F">Femenino</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal mode - use react-hook-form control
   return (
     <div className="space-y-6">
       <div>

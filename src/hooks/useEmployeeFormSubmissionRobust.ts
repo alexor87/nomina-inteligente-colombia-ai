@@ -14,7 +14,7 @@ export const useEmployeeFormSubmissionRobust = () => {
     try {
       console.log('🚀 Iniciando envío de empleado con datos:', data);
 
-      const { custom_fields, empresaId, ...employeeData } = data;
+      const { custom_fields, ...employeeData } = data; // ✅ FIXED: Removed empresaId destructuring
       
       // Obtener company_id del usuario actual
       const { data: profile, error: profileError } = await supabase

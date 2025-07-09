@@ -12,7 +12,7 @@ export interface Employee {
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F' | 'O';
+  sexo?: 'M' | 'F'; // ✅ FIXED: Removed 'O' to match EmployeeUnified
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
@@ -36,7 +36,7 @@ export interface Employee {
   // Contract details
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada?: 'completa' | 'parcial' | 'horas';
+  tipoJornada: 'completa' | 'parcial' | 'horas'; // ✅ FIXED: Made required to match EmployeeUnified
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
@@ -59,7 +59,7 @@ export interface Employee {
   regimenSalud?: 'contributivo' | 'subsidiado';
   estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   
-  // Custom fields - AGREGADO
+  // Custom fields
   custom_fields?: Record<string, any>;
   
   // UI/Display properties
