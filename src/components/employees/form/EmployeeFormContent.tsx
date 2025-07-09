@@ -37,6 +37,7 @@ export const EmployeeFormContent = ({
           control={control}
           errors={errors}
           watchedValues={watchedValues}
+          watch={watch}
         />
 
         {/* Labor Information Section */}
@@ -81,6 +82,7 @@ export const EmployeeFormContent = ({
             customFields={customFields}
             control={control}
             errors={errors}
+            setValue={setValue}
           />
         )}
       </div>
