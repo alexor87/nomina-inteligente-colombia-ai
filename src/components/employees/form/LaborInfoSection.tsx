@@ -186,6 +186,44 @@ export const LaborInfoSection = ({
               options={estadoOptions}
             />
           </div>
+
+          {/* ✅ NUEVO: Sección de Vacaciones Iniciales (Fase 1 - KISS) */}
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-md font-medium text-gray-800 mb-4">Vacaciones Iniciales</h3>
+            
+            <div className="space-y-4">
+              {/* Checkbox para vacaciones acumuladas */}
+              <div className="flex items-center space-x-3">
+                <input
+                  id="hasAccumulatedVacations"
+                  type="checkbox"
+                  {...register('hasAccumulatedVacations')}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="hasAccumulatedVacations" className="text-sm font-medium text-gray-700">
+                  ¿El empleado tiene vacaciones acumuladas de trabajos anteriores?
+                </label>
+              </div>
+
+              {/* Campo condicional para días de vacaciones */}
+              {watchedValues.hasAccumulatedVacations && (
+                <div className="ml-7">
+                  <FormField
+                    name="initialVacationDays"
+                    label="Días de vacaciones acumulados"
+                    type="number"
+                    control={control}
+                    errors={errors}
+                    placeholder="0"
+                    className="max-w-xs"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Días de vacaciones que el empleado ya tenía acumulados
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

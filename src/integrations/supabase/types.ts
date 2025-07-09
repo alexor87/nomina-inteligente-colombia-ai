@@ -644,6 +644,54 @@ export type Database = {
           },
         ]
       }
+      employee_vacation_balances: {
+        Row: {
+          accumulated_days: number | null
+          company_id: string
+          created_at: string | null
+          employee_id: string
+          id: string
+          initial_balance: number | null
+          last_calculated: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accumulated_days?: number | null
+          company_id: string
+          created_at?: string | null
+          employee_id: string
+          id?: string
+          initial_balance?: number | null
+          last_calculated?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accumulated_days?: number | null
+          company_id?: string
+          created_at?: string | null
+          employee_id?: string
+          id?: string
+          initial_balance?: number | null
+          last_calculated?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_vacation_balances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_vacation_balances_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           afp: string | null

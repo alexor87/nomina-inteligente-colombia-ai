@@ -1,66 +1,61 @@
 
-import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeFormData } from './types';
 
-export const getEmployeeFormDefaults = (employee?: EmployeeUnified): Partial<EmployeeFormData> => {
-  const baseDefaults: Partial<EmployeeFormData> = {
-    // Información Personal
-    cedula: employee?.cedula || '',
-    tipoDocumento: employee?.tipoDocumento || 'CC',
-    nombre: employee?.nombre || '',
-    segundoNombre: employee?.segundoNombre || '',
-    apellido: employee?.apellido || '',
-    email: employee?.email || '',
-    telefono: employee?.telefono || '',
-    sexo: employee?.sexo || 'M',
-    fechaNacimiento: employee?.fechaNacimiento || '',
-    direccion: employee?.direccion || '',
-    ciudad: employee?.ciudad || '',
-    departamento: employee?.departamento || '',
+export const getEmployeeFormDefaults = (): Partial<EmployeeFormData> => {
+  return {
+    // Información personal
+    tipoDocumento: 'CC',
+    nombre: '',
+    segundoNombre: '',
+    apellido: '',
+    email: '',
+    telefono: '',
+    sexo: 'M',
+    fechaNacimiento: '',
+    direccion: '',
+    ciudad: '',
+    departamento: '',
     
-    // Información Laboral
-    salarioBase: employee?.salarioBase || 0,
-    tipoContrato: employee?.tipoContrato || 'indefinido',
-    fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
-    periodicidadPago: (employee?.periodicidadPago === 'quincenal' ? 'quincenal' : 'mensual') as 'quincenal' | 'mensual',
-    cargo: employee?.cargo || '',
-    codigoCIIU: employee?.codigoCIIU || '',
-    nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
-    estado: employee?.estado || 'activo',
-    centroCostos: employee?.centroCostos || '',
-    fechaFirmaContrato: employee?.fechaFirmaContrato || '',
-    fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
-    tipoJornada: employee?.tipoJornada || 'completa',
-    diasTrabajo: employee?.diasTrabajo || 30,
-    horasTrabajo: employee?.horasTrabajo || 8,
-    beneficiosExtralegales: employee?.beneficiosExtralegales || false,
-    clausulasEspeciales: employee?.clausulasEspeciales || '',
+    // Información laboral
+    salarioBase: 0,
+    tipoContrato: 'indefinido',
+    fechaIngreso: new Date().toISOString().split('T')[0],
+    periodicidadPago: 'mensual',
+    cargo: '',
+    codigoCIIU: '',
+    nivelRiesgoARL: 'I',
+    estado: 'activo',
+    centroCostos: '',
+    fechaFirmaContrato: '',
+    fechaFinalizacionContrato: '',
+    tipoJornada: 'completa',
+    diasTrabajo: 30,
+    horasTrabajo: 8,
+    beneficiosExtralegales: false,
+    clausulasEspeciales: '',
     
-    // Información Bancaria
-    banco: employee?.banco || '',
-    tipoCuenta: employee?.tipoCuenta || 'ahorros',
-    numeroCuenta: employee?.numeroCuenta || '',
-    titularCuenta: employee?.titularCuenta || '',
-    formaPago: employee?.formaPago || 'dispersion',
+    // Información bancaria
+    banco: '',
+    tipoCuenta: 'ahorros',
+    numeroCuenta: '',
+    titularCuenta: '',
+    formaPago: 'dispersion',
     
     // Afiliaciones
-    eps: employee?.eps || '',
-    afp: employee?.afp || '',
-    arl: employee?.arl || '',
-    cajaCompensacion: employee?.cajaCompensacion || '',
-    tipoCotizanteId: employee?.tipoCotizanteId || '',
-    subtipoCotizanteId: employee?.subtipoCotizanteId || '',
-    regimenSalud: employee?.regimenSalud || 'contributivo',
-    estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
+    eps: '',
+    afp: '',
+    arl: '',
+    cajaCompensacion: '',
+    tipoCotizanteId: '',
+    subtipoCotizanteId: '',
+    regimenSalud: 'contributivo',
+    estadoAfiliacion: 'pendiente',
     
-    // Campos Personalizados - Asegurar que siempre sea un objeto
-    custom_fields: employee?.custom_fields || {}
+    // Campos personalizados
+    custom_fields: {},
+    
+    // ✅ NUEVO: Vacaciones iniciales (Fase 1 - KISS)
+    hasAccumulatedVacations: false,
+    initialVacationDays: 0
   };
-
-  return baseDefaults;
-};
-
-// Función para poblar el formulario con datos del empleado
-export const populateFormWithEmployee = (employee: EmployeeUnified): Partial<EmployeeFormData> => {
-  return getEmployeeFormDefaults(employee);
 };
