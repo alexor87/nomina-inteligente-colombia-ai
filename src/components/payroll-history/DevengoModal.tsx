@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -454,39 +453,24 @@ export const DevengoModal = ({
   const totalValue = totalBasicConcepts + totalNovedades;
 
   // ✅ CORRECCIÓN: Complete all NovedadType labels to fix TS2740
-  const getNovedadLabel = (tipo: NovedadType): string => {
-    const labels: Record<NovedadType, string> = {
+  const getNovedadLabel = (tipo: Database['public']['Enums']['novedad_type']): string => {
+    const labels: Record<Database['public']['Enums']['novedad_type'], string> = {
       horas_extra: 'Horas Extra',
       recargo_nocturno: 'Recargo Nocturno',
       vacaciones: 'Vacaciones',
       licencia_remunerada: 'Licencia Remunerada',
-      licencia_no_remunerada: 'Licencia No Remunerada', // ✅ AGREGADO
+      licencia_no_remunerada: 'Licencia No Remunerada',
       incapacidad: 'Incapacidad',
       bonificacion: 'Bonificación',
-      bonificacion_salarial: 'Bonificación Salarial',
-      bonificacion_no_salarial: 'Bonificación No Salarial',
       comision: 'Comisión',
       prima: 'Prima',
       otros_ingresos: 'Otros Ingresos',
-      auxilio_conectividad: 'Auxilio de Conectividad',
-      viaticos: 'Viáticos',
-      retroactivos: 'Retroactivos',
-      compensacion_ordinaria: 'Compensación Ordinaria',
+      salud: 'Descuento Salud',
+      pension: 'Descuento Pensión',
       libranza: 'Libranza',
-      multa: 'Multa',
-      ausencia: 'Ausencia',
       descuento_voluntario: 'Descuento Voluntario',
-      retencion_fuente: 'Retención en la Fuente',
-      fondo_solidaridad: 'Fondo de Solidaridad',
-      salud: 'Salud',
-      pension: 'Pensión',
-      arl: 'ARL',
-      caja_compensacion: 'Caja de Compensación',
-      icbf: 'ICBF',
-      sena: 'SENA',
-      embargo: 'Embargo',
-      anticipo: 'Anticipo',
-      aporte_voluntario: 'Aporte Voluntario'
+      multa: 'Multa',
+      retencion_fuente: 'Retención en la Fuente'
     };
     return labels[tipo] || tipo;
   };

@@ -242,24 +242,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         return <NovedadVacacionesConsolidatedForm {...baseProps} />;
         
       case 'bonificacion':
-      case 'bonificacion_salarial':
-      case 'bonificacion_no_salarial':
         return <NovedadBonificacionesConsolidatedForm {...baseProps} />;
         
       case 'otros_ingresos':
-      case 'auxilio_conectividad':
-      case 'viaticos':
-      case 'retroactivos':
-      case 'compensacion_ordinaria':
         return <NovedadIngresosAdicionalesConsolidatedForm {...baseProps} />;
         
       case 'libranza':
-      case 'anticipo':
         return <NovedadPrestamosConsolidatedForm {...baseProps} />;
         
       case 'descuento_voluntario':
       case 'multa':
-      case 'embargo':
         return <NovedadDeduccionesConsolidatedForm {...baseProps} />;
 
       case 'incapacidad':
