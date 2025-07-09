@@ -60,10 +60,9 @@ export const TimeOffModal = ({
           className: "border-green-200 bg-green-50"
         });
         
-        setTimeout(() => {
-          onSave();
-          handleClose();
-        }, 2000);
+        // ✅ KISS: Flujo inmediato y simple
+        onSave(); // Refresca los datos inmediatamente
+        handleClose(); // Cierra el modal inmediatamente
       } else {
         toast({
           title: "Error",
