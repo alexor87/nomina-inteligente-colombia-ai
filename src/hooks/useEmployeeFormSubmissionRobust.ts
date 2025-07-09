@@ -38,6 +38,8 @@ export const useEmployeeFormSubmissionRobust = (
       const hasAccumulatedVacations = formData.hasAccumulatedVacations || false;
       const initialVacationDays = formData.initialVacationDays || 0;
 
+      console.log('🏖️ Vacation data extracted:', { hasAccumulatedVacations, initialVacationDays });
+
       // Preparar datos del empleado (sin los campos de vacaciones)
       const { hasAccumulatedVacations: _, initialVacationDays: __, ...employeeData } = formData;
       
@@ -85,6 +87,7 @@ export const useEmployeeFormSubmissionRobust = (
           }
         } else {
           // Crear balance con 0 días iniciales para consistencia
+          console.log('🏖️ Creating default vacation balance (0 days)');
           const vacationResult = await VacationService.createVacationBalance(
             result.employee.id,
             formData.empresaId,

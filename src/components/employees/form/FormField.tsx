@@ -16,6 +16,7 @@ interface FormFieldProps {
   placeholder?: string;
   disabled?: boolean;
   onValueChange?: (value: string) => void;
+  className?: string; // ✅ NUEVO: Agregar soporte para className
 }
 
 export const FormField = ({
@@ -28,10 +29,11 @@ export const FormField = ({
   required = false,
   placeholder,
   disabled = false,
-  onValueChange
+  onValueChange,
+  className
 }: FormFieldProps) => {
   return (
-    <div className="space-y-1.5">
+    <div className={`space-y-1.5 ${className || ''}`}>
       <Label className="text-sm font-normal text-gray-600">
         {label}
         {required && <span className="text-red-400 ml-1">*</span>}
