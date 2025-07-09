@@ -42,6 +42,14 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
   const { toast } = useToast();
 
+  // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
+  const getPeriodDate = () => {
+    if (startDate) {
+      return new Date(startDate);
+    }
+    return new Date();
+  };
+
   const {
     loadNovedadesTotals,
     createNovedad,
@@ -60,7 +68,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     }
   }, [employees, currentPeriodId, loadNovedadesTotals]);
 
-  // Calcular días trabajados basado en las fechas del período
   const calculateWorkedDays = () => {
     if (!startDate || !endDate) return 30;
     
@@ -82,6 +89,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   const handleOpenNovedadModal = (employee: PayrollEmployee) => {
     console.log('📝 Abriendo modal de novedades para:', employee.name);
+    console.log('📅 Fecha del período:', startDate);
     setSelectedEmployee(employee);
     setNovedadModalOpen(true);
   };
@@ -263,6 +271,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           selectedNovedadType={null}
           onClose={handleCloseNovedadModal}
           onEmployeeNovedadesChange={handleNovedadChange}
+          startDate={startDate}
+          endDate={endDate}
         />
       )}
 

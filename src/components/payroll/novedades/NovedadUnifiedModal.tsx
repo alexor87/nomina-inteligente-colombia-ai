@@ -26,6 +26,8 @@ interface NovedadUnifiedModalProps {
   onClose?: () => void;
   selectedNovedadType: NovedadType | null;
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
+  startDate?: string;
+  endDate?: string;
 }
 
 // Mapping from categories to specific novedad types
@@ -52,7 +54,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   onSubmit,
   selectedNovedadType,
   onClose,
-  onEmployeeNovedadesChange
+  onEmployeeNovedadesChange,
+  startDate,
+  endDate
 }) => {
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
@@ -60,6 +64,17 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  // Calcular fecha del período para jornada legal
+  const getPeriodDate = useCallback(() => {
+    if (startDate) {
+      const date = new Date(startDate);
+      console.log('📅 Usando fecha del período para cálculos:', date.toISOString().split('T')[0]);
+      return date;
+    }
+    console.log('⚠️ No hay startDate, usando fecha actual');
+    return new Date();
+  }, [startDate]);
 
   // Initialize step based on whether a specific type was provided
   useEffect(() => {
@@ -190,13 +205,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
 
     try {
-      const { valor } = calcularValorNovedadEnhanced(tipoNovedad, subtipo, employeeSalary, dias, horas);
+      // Usar fecha del período para cálculos
+      const fechaPeriodo = getPeriodDate();
+      const { valor } = calcularValorNovedadEnhanced(tipoNovedad, subtipo, employeeSalary, dias, horas, fechaPeriodo);
       return valor;
     } catch (error) {
       console.error('Error al calcular el valor sugerido:', error);
       return null;
     }
-  }, [employeeSalary]);
+  }, [employeeSalary, getPeriodDate]);
 
   const renderNovedadForm = () => {
     if (!selectedType || !employeeId) return null;
@@ -214,7 +231,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         return <NovedadHorasExtraConsolidatedForm {...baseProps} />;
       
       case 'recargo_nocturno':
-        return <NovedadRecargoConsolidatedForm {...baseProps} />;
+        return (
+          <NovedadRecargoConsolidatedForm 
+            {...baseProps} 
+            periodoFecha={getPeriodDate()}
+          />
+        );
         
       case 'vacaciones':
         return <NovedadVacacionesConsolidatedForm {...baseProps} />;

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Trash2, Calculator } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Calculator, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useMultipleNovedadEntries } from '@/hooks/useMultipleNovedadEntries';
 import { RecargosCalculationService } from '@/services/RecargosCalculationService';
@@ -24,6 +23,7 @@ interface NovedadRecargoConsolidatedFormProps {
   onBack: () => void;
   onSubmit: (formDataArray: any[]) => void;
   employeeSalary: number;
+  periodoFecha?: Date; // ✅ NUEVO: Fecha del período para jornada legal correcta
 }
 
 const RECARGO_SUBTIPOS = [
@@ -37,7 +37,8 @@ const RECARGO_SUBTIPOS = [
 export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidatedFormProps> = ({
   onBack,
   onSubmit,
-  employeeSalary
+  employeeSalary,
+  periodoFecha // ✅ NUEVO: Recibir fecha del período
 }) => {
   const { entries, addEntry, removeEntry, getTotalValue } = useMultipleNovedadEntries<RecargoEntry>();
   
@@ -48,19 +49,26 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     observacion: ''
   });
 
-  // ✅ SOLUCIÓN KISS: Usar servicio unificado
+  const [jornadaInfo, setJornadaInfo] = useState<any>(null);
+
+  // ✅ CORRECCIÓN: Usar fecha del período para jornada legal correcta
   const calculateValueForEntry = (subtipo: string, horas: number) => {
     if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
       return null;
     }
 
     try {
+      console.log('💰 Calculando recargo con fecha del período:', periodoFecha?.toISOString().split('T')[0]);
+      
       const result = RecargosCalculationService.calcularRecargo({
         salarioBase: employeeSalary,
         tipoRecargo: subtipo as any,
-        horas: horas
+        horas: horas,
+        fechaPeriodo: periodoFecha || new Date() // ✅ Usar fecha del período
       });
       
+      console.log('💰 Recargo calculado:', result);
+      setJornadaInfo(result.jornadaInfo);
       return result.valorRecargo;
     } catch (error) {
       console.error('❌ Error calculando recargo:', error);
@@ -131,7 +139,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         setNewEntry(prev => ({ ...prev, valor: calculatedValue.toString() }));
       }
     }
-  }, [newEntry.subtipo, newEntry.horas, employeeSalary]);
+  }, [newEntry.subtipo, newEntry.horas, employeeSalary, periodoFecha]); // ✅ Añadir periodoFecha como dependencia
 
   return (
     <div className="space-y-6">
@@ -142,6 +150,17 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         </Button>
         <h3 className="text-lg font-semibold text-gray-900">Recargos</h3>
       </div>
+
+      {/* ✅ NUEVO: Información de jornada legal usada */}
+      {jornadaInfo && (
+        <div className="flex items-center gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
+          <Info className="h-4 w-4" />
+          <span>
+            Jornada legal: {jornadaInfo.horasSemanales}h semanales = {jornadaInfo.divisorHorario}h mensuales
+            {periodoFecha && ` (vigente desde ${periodoFecha.toLocaleDateString()})`}
+          </span>
+        </div>
+      )}
 
       {/* Form to add new entry */}
       <div className="bg-blue-50 p-4 rounded-lg space-y-4">
