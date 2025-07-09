@@ -18,22 +18,27 @@ export const useEmployeeFormPopulation = (
 
     console.log('🔄 useEmployeeFormPopulation: Populating form with employee data:', employee.nombre, employee.apellido);
     
-    try {
-      const formData = populateFormWithEmployee(employee);
-      
-      // Set all form values
-      Object.entries(formData).forEach(([key, value]) => {
-        setValue(key as keyof EmployeeFormData, value);
-      });
+    // ✅ CORREGIDO: Usar async/await para manejar la consulta de vacaciones
+    const populateForm = async () => {
+      try {
+        const formData = await populateFormWithEmployee(employee);
+        
+        // Set all form values
+        Object.entries(formData).forEach(([key, value]) => {
+          setValue(key as keyof EmployeeFormData, value);
+        });
 
-      // Trigger validation after setting values
-      setTimeout(() => {
-        trigger();
-      }, 100);
+        // Trigger validation after setting values
+        setTimeout(() => {
+          trigger();
+        }, 100);
 
-      console.log('✅ useEmployeeFormPopulation: Form populated successfully');
-    } catch (error) {
-      console.error('❌ useEmployeeFormPopulation: Error populating form:', error);
-    }
+        console.log('✅ useEmployeeFormPopulation: Form populated successfully with vacation data');
+      } catch (error) {
+        console.error('❌ useEmployeeFormPopulation: Error populating form:', error);
+      }
+    };
+    
+    populateForm();
   }, [employee, setValue, trigger]);
 };
