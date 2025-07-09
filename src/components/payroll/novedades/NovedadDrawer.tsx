@@ -4,14 +4,15 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { NovedadForm } from './forms/NovedadForm';
 import { useNovedadCRUD } from '@/hooks/useNovedadCRUD';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
 interface CreateNovedadData {
   company_id: string;
   empleado_id: string;
   periodo_id: string;
-  tipo_novedad: string;
-  fecha_inicio?: Date;
-  fecha_fin?: Date;
+  tipo_novedad: Database["public"]["Enums"]["novedad_type"];
+  fecha_inicio?: string;
+  fecha_fin?: string;
   dias?: number;
   horas?: number;
   valor: number;
@@ -45,14 +46,18 @@ export const NovedadDrawer: React.FC<NovedadDrawerProps> = ({
   const handleSubmit = async (formData: any) => {
     setIsLoading(true);
     try {
-      // ✅ FIXED: Map form data to CreateNovedadData format
+      // Convert Date objects to strings if they exist
       const novedadData: CreateNovedadData = {
         company_id: companyId,
         empleado_id: employeeId,
         periodo_id: periodId,
         tipo_novedad: formData.tipo_novedad,
-        fecha_inicio: formData.fecha_inicio,
-        fecha_fin: formData.fecha_fin,
+        fecha_inicio: formData.fecha_inicio instanceof Date 
+          ? formData.fecha_inicio.toISOString().split('T')[0] 
+          : formData.fecha_inicio,
+        fecha_fin: formData.fecha_fin instanceof Date 
+          ? formData.fecha_fin.toISOString().split('T')[0] 
+          : formData.fecha_fin,
         dias: formData.dias,
         horas: formData.horas,
         valor: formData.valor,

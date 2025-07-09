@@ -1,14 +1,15 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 
 interface CreateNovedadData {
   company_id: string;
   empleado_id: string;
   periodo_id: string;
-  tipo_novedad: string;
-  fecha_inicio?: Date;
-  fecha_fin?: Date;
+  tipo_novedad: Database["public"]["Enums"]["novedad_type"];
+  fecha_inicio?: string;
+  fecha_fin?: string;
   dias?: number;
   horas?: number;
   valor: number;
@@ -26,11 +27,11 @@ export const useNovedadCRUD = () => {
     try {
       const { data: result, error } = await supabase
         .from('payroll_novedades')
-        .insert([{
+        .insert({
           company_id: data.company_id,
           empleado_id: data.empleado_id,
           periodo_id: data.periodo_id,
-          tipo_novedad: data.tipo_novedad as any,
+          tipo_novedad: data.tipo_novedad,
           fecha_inicio: data.fecha_inicio,
           fecha_fin: data.fecha_fin,
           dias: data.dias,
@@ -40,7 +41,7 @@ export const useNovedadCRUD = () => {
           constitutivo_salario: data.constitutivo_salario,
           base_calculo: data.base_calculo,
           subtipo: data.subtipo
-        }])
+        })
         .select()
         .single();
 
@@ -58,7 +59,7 @@ export const useNovedadCRUD = () => {
     }
   };
 
-  const updateNovedad = async (id: string, data: Partial<CreateNovedadData>) => {
+  const updateNovedad = async (id: string, data: Partial<Omit<CreateNovedadData, 'company_id' | 'empleado_id' | 'periodo_id'>>) => {
     setIsLoading(true);
     try {
       const { data: result, error } = await supabase
