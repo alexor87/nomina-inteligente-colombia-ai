@@ -89,8 +89,11 @@ export const TimeOffModal = ({
           className: "border-green-200 bg-green-50"
         });
         
-        handleClose();
-        onSave();
+        // ✅ SOLUCIÓN DEFINITIVA: Delay para ver el toast antes de cerrar
+        setTimeout(() => {
+          handleClose();
+          onSave();
+        }, 2000);
       } else {
         toast({
           title: "Error",
