@@ -98,7 +98,7 @@ export class TimeOffService {
   }
 
   /**
-   * ✅ KISS: Obtener registros de un empleado
+   * ✅ KISS: Obtener registros de un empleado - FILTRAR SOLO TIPOS DE TIEMPO LIBRE
    */
   static async getEmployeeTimeOff(employeeId: string): Promise<{ 
     success: boolean; 
@@ -117,16 +117,21 @@ export class TimeOffService {
         return { success: false, error: error.message };
       }
 
-      const records = (novedades || []).map(novedad => ({
-        id: novedad.id,
-        employee_id: novedad.empleado_id,
-        type: novedad.tipo_novedad,
-        start_date: novedad.fecha_inicio || '',
-        end_date: novedad.fecha_fin || '',
-        days: novedad.dias || 0,
-        observations: novedad.observacion,
-        created_at: novedad.created_at
-      }));
+      // ✅ FIXED: Solo mapear registros que coincidan con nuestros tipos válidos
+      const validTimeOffTypes = ['vacaciones', 'licencia_remunerada', 'ausencia', 'incapacidad'];
+      
+      const records = (novedades || [])
+        .filter(novedad => validTimeOffTypes.includes(novedad.tipo_novedad))
+        .map(novedad => ({
+          id: novedad.id,
+          employee_id: novedad.empleado_id,
+          type: novedad.tipo_novedad as 'vacaciones' | 'licencia_remunerada' | 'ausencia' | 'incapacidad',
+          start_date: novedad.fecha_inicio || '',
+          end_date: novedad.fecha_fin || '',
+          days: novedad.dias || 0,
+          observations: novedad.observacion,
+          created_at: novedad.created_at
+        }));
 
       return { success: true, data: records };
 

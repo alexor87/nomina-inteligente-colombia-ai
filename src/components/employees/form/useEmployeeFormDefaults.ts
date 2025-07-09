@@ -1,7 +1,6 @@
 
 import { EmployeeFormData } from './types';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { VacationService } from '@/services/VacationService';
 
 export const getEmployeeFormDefaults = (): Partial<EmployeeFormData> => {
   return {
@@ -54,39 +53,13 @@ export const getEmployeeFormDefaults = (): Partial<EmployeeFormData> => {
     estadoAfiliacion: 'pendiente',
     
     // Campos personalizados
-    custom_fields: {},
-    
-    // ✅ NUEVO: Vacaciones iniciales (Fase 1 - KISS)
-    hasAccumulatedVacations: false,
-    initialVacationDays: 0
+    custom_fields: {}
   };
 };
 
-// ✅ CORREGIDO: Función para poblar formulario con datos de empleado existente + vacaciones
+// ✅ SIMPLIFICADO: Solo mapear datos del empleado sin lógica compleja de vacaciones
 export const populateFormWithEmployee = async (employee: EmployeeUnified): Promise<EmployeeFormData> => {
   console.log('🔄 populateFormWithEmployee: Mapping employee data to form format');
-  
-  // ✅ NUEVO: Consultar balance de vacaciones si el empleado existe
-  let hasAccumulatedVacations = false;
-  let initialVacationDays = 0;
-  
-  if (employee.id) {
-    console.log('🏖️ Consultando balance de vacaciones para empleado:', employee.id);
-    const vacationResult = await VacationService.getVacationBalance(employee.id);
-    
-    if (vacationResult.success && vacationResult.data) {
-      const balance = vacationResult.data;
-      initialVacationDays = balance.initial_balance || 0;
-      hasAccumulatedVacations = initialVacationDays > 0;
-      
-      console.log('✅ Balance de vacaciones encontrado:', { 
-        initialVacationDays, 
-        hasAccumulatedVacations 
-      });
-    } else {
-      console.log('ℹ️ No se encontró balance de vacaciones para el empleado');
-    }
-  }
   
   return {
     // ✅ SOLUCIÓN KISS: Agregar el ID que faltaba
@@ -143,10 +116,6 @@ export const populateFormWithEmployee = async (employee: EmployeeUnified): Promi
     empresaId: employee.empresaId || employee.company_id || '',
     
     // Campos personalizados
-    custom_fields: employee.custom_fields || {},
-    
-    // ✅ CORREGIDO: Vacaciones reales desde la base de datos
-    hasAccumulatedVacations,
-    initialVacationDays
+    custom_fields: employee.custom_fields || {}
   };
 };

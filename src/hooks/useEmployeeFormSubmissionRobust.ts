@@ -1,175 +1,105 @@
 
-import { useState, useCallback } from 'react';
-import { EmployeeUnified } from '@/types/employee-unified';
-import { EmployeeServiceRobust } from '@/services/EmployeeServiceRobust';
-import { VacationService } from '@/services/VacationService';
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { EmployeeFormData } from '@/components/employees/form/types';
 import { useToast } from '@/hooks/use-toast';
 
-interface SubmissionResult {
-  success: boolean;
-  error?: string;
-  details?: any;
-  employee?: EmployeeUnified;
-}
-
-export const useEmployeeFormSubmissionRobust = (
-  employee?: EmployeeUnified,
-  onSuccess?: () => void,
-  onDataRefresh?: (employee: EmployeeUnified) => void
-) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export const useEmployeeFormSubmissionRobust = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = useCallback(async (formData: any): Promise<SubmissionResult> => {
-    console.log('🚀 useEmployeeFormSubmissionRobust: Starting submission');
-    console.log('📝 Form data received:', formData);
+  const submitEmployee = async (data: EmployeeFormData): Promise<{ success: boolean; employeeId?: string; error?: string }> => {
+    setIsSubmitting(true);
     
-    setIsLoading(true);
-    setError(null);
-
     try {
-      // Validar que tenemos companyId
-      if (!formData.empresaId) {
-        throw new Error('Company ID is required');
+      console.log('🚀 Iniciando envío de empleado con datos:', data);
+
+      const { custom_fields, empresaId, ...employeeData } = data;
+      
+      // Obtener company_id del usuario actual
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+
+      if (profileError || !profile?.company_id) {
+        throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // ✅ NUEVO: Extraer datos de vacaciones antes de enviar al empleado
-      const hasAccumulatedVacations = formData.hasAccumulatedVacations || false;
-      const initialVacationDays = formData.initialVacationDays || 0;
-
-      console.log('🏖️ Vacation data extracted:', { hasAccumulatedVacations, initialVacationDays });
-
-      // Preparar datos del empleado (sin los campos de vacaciones)
-      const { hasAccumulatedVacations: _, initialVacationDays: __, ...employeeData } = formData;
-      
-      // Asegurar que custom_fields está presente
-      const dataToSubmit = {
+      const finalEmployeeData = {
         ...employeeData,
-        custom_fields: employeeData.custom_fields || {}
+        company_id: profile.company_id,
+        custom_fields: custom_fields || {},
+        salario_base: Number(employeeData.salarioBase) || 0
       };
 
-      console.log('📤 Employee data being submitted:', dataToSubmit);
-
       let result;
-      const isEditing = !!employee?.id;
-      
-      if (isEditing) {
-        // Actualizar empleado existente
-        console.log('🔄 Updating existing employee:', employee.id);
-        result = await EmployeeServiceRobust.updateEmployee(employee.id, dataToSubmit);
+      let actionText;
+
+      if (data.id) {
+        console.log('📝 Actualizando empleado existente:', data.id);
+        const { data: updateResult, error } = await supabase
+          .from('employees')
+          .update(finalEmployeeData)
+          .eq('id', data.id)
+          .select()
+          .single();
+        
+        result = updateResult;
+        actionText = 'actualizado';
+        
+        if (error) throw error;
       } else {
-        // Crear nuevo empleado
-        console.log('➕ Creating new employee');
-        result = await EmployeeServiceRobust.createEmployee(dataToSubmit);
+        console.log('➕ Creando nuevo empleado');
+        const { data: insertResult, error } = await supabase
+          .from('employees')
+          .insert(finalEmployeeData)
+          .select()
+          .single();
+        
+        result = insertResult;
+        actionText = 'creado';
+        
+        if (error) throw error;
       }
 
-      if (result.success && result.employee) {
-        console.log('✅ Employee saved successfully:', result.employee.id);
-        
-        // ✅ CORREGIDO: Lógica diferente para edición vs creación
-        if (hasAccumulatedVacations && initialVacationDays > 0) {
-          if (isEditing) {
-            // Para edición: actualizar balance existente
-            console.log('🏖️ Updating vacation balance:', { 
-              employeeId: result.employee.id, 
-              initialDays: initialVacationDays 
-            });
-            
-            const vacationResult = await VacationService.updateInitialBalance(
-              result.employee.id,
-              initialVacationDays
-            );
-            
-            if (vacationResult.success) {
-              console.log('✅ Vacation balance updated successfully');
-            } else {
-              console.warn('⚠️ Warning: Could not update vacation balance:', vacationResult.error);
-            }
-          } else {
-            // Para creación: crear nuevo balance
-            console.log('🏖️ Creating vacation balance:', { 
-              employeeId: result.employee.id, 
-              companyId: formData.empresaId, 
-              initialDays: initialVacationDays 
-            });
-            
-            const vacationResult = await VacationService.createVacationBalance(
-              result.employee.id,
-              formData.empresaId,
-              initialVacationDays
-            );
-            
-            if (vacationResult.success) {
-              console.log('✅ Vacation balance created successfully');
-            } else {
-              console.warn('⚠️ Warning: Could not create vacation balance:', vacationResult.error);
-            }
-          }
-        } else if (!isEditing) {
-          // Solo para empleados nuevos: crear balance con 0 días para consistencia
-          console.log('🏖️ Creating default vacation balance (0 days)');
-          const vacationResult = await VacationService.createVacationBalance(
-            result.employee.id,
-            formData.empresaId,
-            0
-          );
-          
-          if (vacationResult.success) {
-            console.log('✅ Default vacation balance created (0 days)');
-          } else {
-            console.warn('⚠️ Warning: Could not create default vacation balance:', vacationResult.error);
-          }
-        }
+      console.log(`✅ Empleado ${actionText} exitosamente:`, result);
 
-        // Mostrar toast de éxito
-        const actionText = isEditing ? 'actualizado' : 'creado';
-        const vacationText = hasAccumulatedVacations ? ` con ${initialVacationDays} días de vacaciones iniciales` : '';
-        
-        toast({
-          title: `Empleado ${actionText}`,
-          description: `${result.employee.nombre} ${result.employee.apellido} ha sido ${actionText} exitosamente${vacationText}`,
-          className: "border-green-200 bg-green-50"
-        });
+      toast({
+        title: `Empleado ${actionText} ✅`,
+        description: `${finalEmployeeData.nombre} ${finalEmployeeData.apellido} ha sido ${actionText} exitosamente`,
+        className: "border-green-200 bg-green-50"
+      });
 
-        // Llamar callbacks
-        onDataRefresh?.(result.employee);
-        onSuccess?.();
-
-        return {
-          success: true,
-          employee: result.employee
-        };
-      } else {
-        throw new Error(result.message || 'Error unknown');
-      }
+      return { 
+        success: true, 
+        employeeId: result?.id 
+      };
 
     } catch (error: any) {
-      console.error('❌ Submission failed:', error);
+      console.error('💥 Error en submitEmployee:', error);
       
-      const errorMessage = error.message || 'Error desconocido al guardar empleado';
-      setError(errorMessage);
-
-      // Mostrar toast de error
+      const errorMessage = error.message || 'Error desconocido al procesar empleado';
+      
       toast({
-        title: "Error al guardar",
+        title: "Error",
         description: errorMessage,
         variant: "destructive"
       });
 
-      return {
-        success: false,
-        error: errorMessage,
-        details: error
+      return { 
+        success: false, 
+        error: errorMessage 
       };
+
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
-  }, [employee, onSuccess, onDataRefresh, toast]);
+  };
 
   return {
-    handleSubmit,
-    isLoading,
-    error
+    submitEmployee,
+    isSubmitting
   };
 };
