@@ -2,9 +2,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
-// ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS
-type DatabaseNovedadType = Database['public']['Enums']['novedad_type'];
-
 export interface TimeOffRecord {
   id: string;
   employee_id: string;
@@ -26,7 +23,8 @@ export interface CreateTimeOffData {
 
 export class TimeOffService {
   /**
-   * ✅ KISS: Crear registro directo en payroll_novedades
+   * ✅ ARQUITECTURA CORRECTA: Crear registro independiente en employee_vacation_periods
+   * No requiere período de nómina activo - estos son registros históricos del empleado
    */
   static async createTimeOff(data: CreateTimeOffData): Promise<{ 
     success: boolean; 
@@ -34,75 +32,70 @@ export class TimeOffService {
     error?: string 
   }> {
     try {
+      console.log('🎯 Creating time off record:', data);
+      
       // Calcular días hábiles
       const days = this.calculateBusinessDays(data.start_date, data.end_date);
       
-      // Obtener período activo de la empresa
-      const { data: employee } = await supabase
+      // Obtener company_id del empleado
+      const { data: employee, error: employeeError } = await supabase
         .from('employees')
         .select('company_id')
         .eq('id', data.employee_id)
         .single();
 
-      if (!employee) {
+      if (employeeError || !employee) {
+        console.error('❌ Employee not found:', employeeError);
         return { success: false, error: 'Empleado no encontrado' };
       }
 
-      // Buscar período activo
-      const { data: activePeriod } = await supabase
-        .from('payroll_periods_real')
-        .select('id')
-        .eq('company_id', employee.company_id)
-        .eq('estado', 'en_proceso')
-        .single();
+      console.log('✅ Employee found:', employee);
 
-      if (!activePeriod) {
-        return { success: false, error: 'No hay período de nómina activo' };
-      }
-
-      // ✅ CORREGIR: Usar el tipo correcto de la base de datos
-      const { data: novedad, error } = await supabase
-        .from('payroll_novedades')
+      // ✅ CREAR REGISTRO EN TABLA CORRECTA - employee_vacation_periods
+      const { data: timeOffRecord, error } = await supabase
+        .from('employee_vacation_periods')
         .insert({
+          employee_id: data.employee_id,
           company_id: employee.company_id,
-          empleado_id: data.employee_id,
-          periodo_id: activePeriod.id,
-          tipo_novedad: data.type as DatabaseNovedadType,
-          fecha_inicio: data.start_date,
-          fecha_fin: data.end_date,
-          dias: days,
-          valor: 0, // Se calculará en liquidación
-          observacion: data.observations || `${this.getTypeLabel(data.type)} registrada desde perfil empleado`,
-          creado_por: (await supabase.auth.getUser()).data.user?.id
+          start_date: data.start_date,
+          end_date: data.end_date,
+          days_count: days,
+          observations: data.observations || `${this.getTypeLabel(data.type)} registrada desde perfil empleado`,
+          status: 'pendiente', // Se procesará en la liquidación
+          created_by: (await supabase.auth.getUser()).data.user?.id
         })
         .select()
         .single();
 
       if (error) {
+        console.error('❌ Error creating time off record:', error);
         return { success: false, error: error.message };
       }
+
+      console.log('✅ Time off record created successfully:', timeOffRecord);
 
       return { 
         success: true, 
         data: {
-          id: novedad.id,
+          id: timeOffRecord.id,
           employee_id: data.employee_id,
           type: data.type,
           start_date: data.start_date,
           end_date: data.end_date,
           days: days,
           observations: data.observations,
-          created_at: novedad.created_at
+          created_at: timeOffRecord.created_at
         }
       };
 
     } catch (error: any) {
+      console.error('❌ Unexpected error in createTimeOff:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * ✅ KISS: Obtener registros de un empleado - INCLUIR LICENCIAS NO REMUNERADAS
+   * ✅ ARQUITECTURA CORRECTA: Obtener registros históricos del empleado
    */
   static async getEmployeeTimeOff(employeeId: string): Promise<{ 
     success: boolean; 
@@ -110,69 +103,68 @@ export class TimeOffService {
     error?: string 
   }> {
     try {
-      const { data: novedades, error } = await supabase
-        .from('payroll_novedades')
+      console.log('🔍 Loading time off records for employee:', employeeId);
+
+      const { data: records, error } = await supabase
+        .from('employee_vacation_periods')
         .select('*')
-        .eq('empleado_id', employeeId)
-        .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia', 'incapacidad'] as DatabaseNovedadType[])
-        .order('fecha_inicio', { ascending: false });
+        .eq('employee_id', employeeId)
+        .order('start_date', { ascending: false });
 
       if (error) {
+        console.error('❌ Error loading time off records:', error);
         return { success: false, error: error.message };
       }
 
-      // ✅ CORREGIDO: Incluir licencias no remuneradas en tipos válidos
-      const validTimeOffTypes = [
-        'vacaciones', 
-        'licencia_remunerada', 
-        'licencia_no_remunerada', 
-        'ausencia', 
-        'incapacidad'
-      ];
-      
-      const records = (novedades || [])
-        .filter(novedad => validTimeOffTypes.includes(novedad.tipo_novedad))
-        .map(novedad => ({
-          id: novedad.id,
-          employee_id: novedad.empleado_id,
-          type: novedad.tipo_novedad as 'vacaciones' | 'licencia_remunerada' | 'licencia_no_remunerada' | 'ausencia' | 'incapacidad',
-          start_date: novedad.fecha_inicio || '',
-          end_date: novedad.fecha_fin || '',
-          days: novedad.dias || 0,
-          observations: novedad.observacion,
-          created_at: novedad.created_at
-        }));
+      console.log('✅ Time off records loaded:', records);
 
-      return { success: true, data: records };
+      const timeOffRecords = (records || []).map(record => ({
+        id: record.id,
+        employee_id: record.employee_id,
+        type: this.mapVacationTypeToTimeOffType(record), // Mapear según el contexto
+        start_date: record.start_date,
+        end_date: record.end_date,
+        days: record.days_count,
+        observations: record.observations,
+        created_at: record.created_at
+      }));
+
+      return { success: true, data: timeOffRecords };
 
     } catch (error: any) {
+      console.error('❌ Unexpected error in getEmployeeTimeOff:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * ✅ KISS: Eliminar registro
+   * ✅ ARQUITECTURA CORRECTA: Eliminar registro independiente
    */
   static async deleteTimeOff(id: string): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log('🗑️ Deleting time off record:', id);
+
       const { error } = await supabase
-        .from('payroll_novedades')
+        .from('employee_vacation_periods')
         .delete()
         .eq('id', id);
 
       if (error) {
+        console.error('❌ Error deleting time off record:', error);
         return { success: false, error: error.message };
       }
 
+      console.log('✅ Time off record deleted successfully');
       return { success: true };
 
     } catch (error: any) {
+      console.error('❌ Unexpected error in deleteTimeOff:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * ✅ Calcular días hábiles
+   * ✅ Calcular días hábiles (sin cambios)
    */
   static calculateBusinessDays(startDate: string, endDate: string): number {
     const start = new Date(startDate);
@@ -192,7 +184,21 @@ export class TimeOffService {
   }
 
   /**
-   * ✅ Obtener etiqueta del tipo - ACTUALIZADA CON DIFERENCIACIÓN LEGAL
+   * ✅ Mapear tipo de vacación a tipo de tiempo libre
+   */
+  private static mapVacationTypeToTimeOffType(record: any): 'vacaciones' | 'licencia_remunerada' | 'licencia_no_remunerada' | 'ausencia' | 'incapacidad' {
+    // Por ahora asumimos que son vacaciones, pero esto se puede extender
+    // cuando se implemente una clasificación más detallada
+    if (record.observations?.includes('Licencia Remunerada')) return 'licencia_remunerada';
+    if (record.observations?.includes('Licencia No Remunerada')) return 'licencia_no_remunerada';
+    if (record.observations?.includes('Ausencia')) return 'ausencia';
+    if (record.observations?.includes('Incapacidad')) return 'incapacidad';
+    
+    return 'vacaciones'; // Por defecto
+  }
+
+  /**
+   * ✅ Obtener etiqueta del tipo
    */
   static getTypeLabel(type: string): string {
     const labels = {
@@ -206,7 +212,7 @@ export class TimeOffService {
   }
 
   /**
-   * ✅ Obtener color del tipo - ACTUALIZADA CON DIFERENCIACIÓN LEGAL
+   * ✅ Obtener color del tipo
    */
   static getTypeColor(type: string): string {
     const colors = {
@@ -220,7 +226,7 @@ export class TimeOffService {
   }
 
   /**
-   * ✅ NUEVA: Obtener descripción legal del tipo
+   * ✅ Obtener descripción legal del tipo
    */
   static getTypeLegalDescription(type: string): string {
     const descriptions = {
@@ -231,5 +237,45 @@ export class TimeOffService {
       'incapacidad': 'Ausencia por enfermedad con cobertura de seguridad social'
     };
     return descriptions[type as keyof typeof descriptions] || '';
+  }
+
+  /**
+   * ✅ NUEVA FUNCIÓN: Obtener registros para procesamiento en nómina
+   * Esta función se usará durante la liquidación para consultar tiempo libre
+   */
+  static async getTimeOffForPayrollProcessing(
+    employeeId: string, 
+    periodStart: string, 
+    periodEnd: string
+  ): Promise<TimeOffRecord[]> {
+    try {
+      const { data: records, error } = await supabase
+        .from('employee_vacation_periods')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('status', 'pendiente')
+        .gte('start_date', periodStart)
+        .lte('end_date', periodEnd);
+
+      if (error) {
+        console.error('❌ Error loading time off for payroll:', error);
+        return [];
+      }
+
+      return (records || []).map(record => ({
+        id: record.id,
+        employee_id: record.employee_id,
+        type: this.mapVacationTypeToTimeOffType(record),
+        start_date: record.start_date,
+        end_date: record.end_date,
+        days: record.days_count,
+        observations: record.observations,
+        created_at: record.created_at
+      }));
+
+    } catch (error) {
+      console.error('❌ Error in getTimeOffForPayrollProcessing:', error);
+      return [];
+    }
   }
 }
