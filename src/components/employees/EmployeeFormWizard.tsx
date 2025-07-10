@@ -9,7 +9,6 @@ import { PersonalInfoSection } from './form/PersonalInfoSection';
 import { LaborInfoSection } from './form/LaborInfoSection';
 import { BankingInfoSection } from './form/BankingInfoSection';
 import { AffiliationsSection } from './form/AffiliationsSection';
-import { TimeOffSection } from './form/TimeOffSection';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
 import { useToast } from '@/hooks/use-toast';
 
@@ -23,8 +22,7 @@ const steps = [
   { id: 'personal', title: 'Información Personal', icon: Circle },
   { id: 'labor', title: 'Información Laboral', icon: Circle },
   { id: 'banking', title: 'Información Bancaria', icon: Circle },
-  { id: 'affiliations', title: 'Afiliaciones', icon: Circle },
-  { id: 'timeoff', title: 'Tiempo Libre', icon: Circle }
+  { id: 'affiliations', title: 'Afiliaciones', icon: Circle }
 ];
 
 export const EmployeeFormWizard = ({ 
@@ -81,8 +79,6 @@ export const EmployeeFormWizard = ({
         return !!(formData.banco && formData.tipoCuenta);
       case 3: // Affiliations
         return !!(formData.eps && formData.afp);
-      case 4: // Time Off (always valid for now)
-        return true;
       default:
         return false;
     }
@@ -205,19 +201,6 @@ export const EmployeeFormWizard = ({
             updateFormData={(data) => updateFormData('affiliations', data)}
             errors={{}}
           />
-        );
-      case 4:
-        return employee?.id ? (
-          <TimeOffSection
-            employeeId={employee.id}
-            isReadOnly={false}
-          />
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-gray-500">
-              El empleado debe ser guardado primero para gestionar tiempo libre
-            </p>
-          </div>
         );
       default:
         return null;

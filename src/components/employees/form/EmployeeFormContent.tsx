@@ -4,7 +4,6 @@ import { LaborInfoSection } from './LaborInfoSection';
 import { BankingInfoSection } from './BankingInfoSection';
 import { AffiliationsSection } from './AffiliationsSection';
 import { CustomFieldsSection } from './CustomFieldsSection';
-import { TimeOffSection } from './TimeOffSection';
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { EmployeeFormData } from './types';
 
@@ -67,12 +66,6 @@ export const EmployeeFormContent = ({
           errors={errors}
           watchedValues={watchedValues}
           setValue={setValue}
-        />
-
-        {/* ✅ KISS: Sección Simple de Tiempo Libre completamente autónoma */}
-        <TimeOffSection
-          employeeId={watchedValues.id}
-          isReadOnly={false}
         />
 
         {/* Custom Fields Section */}
