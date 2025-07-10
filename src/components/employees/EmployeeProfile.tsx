@@ -93,9 +93,6 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
   const [contractChanges, setContractChanges] = useState<ContractChange[]>([]);
   const [communications, setCommunications] = useState<Communication[]>([]);
   
-  // SOLUCIÓN KISS: Estado para controlar auto-guardado
-  const [isTimeOffModalOpen, setIsTimeOffModalOpen] = useState(false);
-  
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -390,10 +387,9 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
-            {/* Sección de Tiempo Libre con control de auto-guardado */}
+            {/* ✅ KISS: Sección de Tiempo Libre completamente autónoma */}
             <TimeOffSection 
               employeeId={employee.id} 
-              onModalStateChange={setIsTimeOffModalOpen}
             />
             
             {/* Tabs principales */}
