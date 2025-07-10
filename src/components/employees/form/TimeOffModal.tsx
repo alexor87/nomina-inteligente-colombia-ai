@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { TimeOffService } from '@/services/TimeOffService';
 import { useToast } from '@/hooks/use-toast';
 import { TimeOffForm } from './timeoff/TimeOffForm';
@@ -90,7 +90,6 @@ export const TimeOffModal = ({
           variant: "destructive"
         });
         
-        // ✅ CRÍTICO: NO cerrar el modal cuando hay error
         console.log('⚠️ Error occurred, keeping modal open');
       }
 
@@ -102,7 +101,6 @@ export const TimeOffModal = ({
         variant: "destructive"
       });
       
-      // ✅ CRÍTICO: NO cerrar el modal cuando hay error
       console.log('⚠️ Exception occurred, keeping modal open');
     } finally {
       console.log('🏁 Setting saving state to false');
@@ -117,45 +115,22 @@ export const TimeOffModal = ({
     onClose();
   };
 
-  // ✅ SOLUCIÓN: Control más explícito del modal
-  const handleOpenChange = (open: boolean) => {
-    console.log('🔄 Modal openChange event:', open, 'isSaving:', isSaving);
-    
-    // Solo permitir cerrar si no estamos guardando
-    if (!open && !isSaving) {
-      console.log('✅ Allowing modal to close');
-      handleClose();
-    } else if (!open && isSaving) {
-      console.log('❌ Preventing modal close - save in progress');
-      // No hacer nada, mantener modal abierto
-    }
-  };
-
   return (
     <Dialog 
       open={isOpen} 
-      onOpenChange={handleOpenChange}
-      modal={true}
+      onOpenChange={(open) => {
+        console.log('🔄 Modal openChange event:', open, 'isSaving:', isSaving);
+        if (!open && !isSaving) {
+          handleClose();
+        }
+      }}
     >
-      <DialogContent 
-        className="max-w-md"
-        // ✅ Permitir escape solo si no estamos guardando
-        onEscapeKeyDown={(e) => {
-          if (isSaving) {
-            console.log('❌ Preventing escape - save in progress');
-            e.preventDefault();
-          }
-        }}
-        // ✅ Permitir click outside solo si no estamos guardando
-        onPointerDownOutside={(e) => {
-          if (isSaving) {
-            console.log('❌ Preventing outside click - save in progress');
-            e.preventDefault();
-          }
-        }}
-      >
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar Tiempo Libre</DialogTitle>
+          <DialogDescription>
+            Completa el formulario para registrar vacaciones, licencias u otros tipos de tiempo libre para el empleado.
+          </DialogDescription>
         </DialogHeader>
         
         <TimeOffForm
