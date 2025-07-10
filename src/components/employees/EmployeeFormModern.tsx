@@ -25,9 +25,6 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   const isEditMode = !!employee;
   const { configuration } = useEmployeeGlobalConfiguration();
   
-  // ✅ KISS: Estado del modal TimeOff controlado aquí donde está el formulario
-  const [isTimeOffModalOpen, setIsTimeOffModalOpen] = useState(false);
-  
   const {
     register,
     handleSubmit,
@@ -114,8 +111,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     name: employee ? `${employee.nombre} ${employee.apellido}` : 'New Employee',
     mode: isEditMode ? 'edit' : 'create',
     isLoading,
-    customFieldsCount: configuration?.custom_fields?.length || 0,
-    isTimeOffModalOpen
+    customFieldsCount: configuration?.custom_fields?.length || 0
   });
 
   return (
@@ -143,7 +139,6 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
             arlRiskLevels={arlRiskLevels}
             register={register}
             customFields={configuration?.custom_fields || []}
-            setIsTimeOffModalOpen={setIsTimeOffModalOpen}
           />
         </form>
 

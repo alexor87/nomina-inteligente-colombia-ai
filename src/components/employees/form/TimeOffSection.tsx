@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,13 +11,11 @@ import { useToast } from '@/hooks/use-toast';
 interface TimeOffSectionProps {
   employeeId?: string;
   isReadOnly?: boolean;
-  onModalStateChange?: (isOpen: boolean) => void;
 }
 
 export const TimeOffSection = ({ 
   employeeId, 
-  isReadOnly = false,
-  onModalStateChange
+  isReadOnly = false
 }: TimeOffSectionProps) => {
   const [records, setRecords] = useState<TimeOffRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,11 +27,6 @@ export const TimeOffSection = ({
       loadRecords();
     }
   }, [employeeId]);
-
-  // Notificar cambios en el estado del modal
-  useEffect(() => {
-    onModalStateChange?.(showModal);
-  }, [showModal, onModalStateChange]);
 
   const loadRecords = async () => {
     if (!employeeId) return;
