@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,12 +45,12 @@ export const useAuth = () => {
   return context;
 };
 
-// Matriz de permisos por rol
+// Matriz de permisos por rol - ACTUALIZADA con vacations-absences
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
-  administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings'],
-  rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports'],
-  contador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
-  visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports'],
+  administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences'],
+  rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
+  contador: ['dashboard', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
+  visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
   soporte: ['dashboard', 'reports', 'employees']
 };
 
