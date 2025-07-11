@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,9 +9,16 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  console.log('🪝 useVacationsAbsences initialized', { filters, userId: user?.id });
+
   // Función para obtener las vacaciones y ausencias
   const fetchVacationsAbsences = async (): Promise<VacationAbsence[]> => {
-    if (!user) throw new Error('Usuario no autenticado');
+    if (!user) {
+      console.log('❌ No user authenticated');
+      throw new Error('Usuario no autenticado');
+    }
+
+    console.log('🔍 Fetching vacations absences with filters:', filters);
 
     let query = supabase
       .from('employee_vacation_periods')
@@ -52,9 +58,11 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching vacations absences:', error);
+      console.error('❌ Error fetching vacations absences:', error);
       throw error;
     }
+
+    console.log('✅ Fetched vacations absences:', data?.length || 0);
 
     // Transformar los datos para asegurar que el status sea del tipo correcto
     return (data || []).map(item => ({

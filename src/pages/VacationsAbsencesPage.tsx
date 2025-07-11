@@ -17,6 +17,8 @@ const VacationsAbsencesPage = () => {
   const [editingVacation, setEditingVacation] = useState<VacationAbsence | null>(null);
   const [selectedVacation, setSelectedVacation] = useState<VacationAbsence | null>(null);
 
+  console.log('🏖️ VacationsAbsencesPage rendered');
+
   const {
     vacationsAbsences,
     isLoading,
@@ -28,6 +30,12 @@ const VacationsAbsencesPage = () => {
     isDeleting
   } = useVacationsAbsences(filters);
 
+  console.log('📊 Vacations data:', {
+    count: vacationsAbsences.length,
+    isLoading,
+    filters
+  });
+
   // Estadísticas básicas
   const stats = {
     total: vacationsAbsences.length,
@@ -37,43 +45,64 @@ const VacationsAbsencesPage = () => {
   };
 
   const handleNewVacation = () => {
+    console.log('➕ Opening new vacation form');
     setEditingVacation(null);
     setIsFormOpen(true);
   };
 
   const handleEditVacation = (vacation: VacationAbsence) => {
+    console.log('✏️ Editing vacation:', vacation.id);
     setEditingVacation(vacation);
     setIsFormOpen(true);
   };
 
   const handleViewVacation = (vacation: VacationAbsence) => {
+    console.log('👁️ Viewing vacation:', vacation.id);
     setSelectedVacation(vacation);
     setIsDetailOpen(true);
   };
 
   const handleFormSubmit = async (formData: any) => {
-    if (editingVacation) {
-      await updateVacationAbsence({
-        id: editingVacation.id,
-        formData
-      });
-    } else {
-      await createVacationAbsence(formData);
+    console.log('💾 Submitting form:', formData);
+    try {
+      if (editingVacation) {
+        await updateVacationAbsence({
+          id: editingVacation.id,
+          formData
+        });
+      } else {
+        await createVacationAbsence(formData);
+      }
+      setIsFormOpen(false);
+      setEditingVacation(null);
+    } catch (error) {
+      console.error('❌ Form submission error:', error);
     }
   };
 
   const handleDeleteVacation = async (id: string) => {
     if (confirm('¿Está seguro de que desea eliminar esta ausencia?')) {
-      await deleteVacationAbsence(id);
+      console.log('🗑️ Deleting vacation:', id);
+      try {
+        await deleteVacationAbsence(id);
+      } catch (error) {
+        console.error('❌ Delete error:', error);
+      }
     }
   };
 
   const clearFilters = () => {
+    console.log('🧹 Clearing filters');
     setFilters({});
   };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* Debug info */}
+      <div className="text-xs text-muted-foreground mb-2">
+        Vacaciones y Ausencias - Total: {stats.total} registros
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -156,20 +185,29 @@ const VacationsAbsencesPage = () => {
           <CardTitle>Registros de Vacaciones y Ausencias</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <VacationAbsenceTable
-            vacationsAbsences={vacationsAbsences}
-            onView={handleViewVacation}
-            onEdit={handleEditVacation}
-            onDelete={handleDeleteVacation}
-            isLoading={isLoading}
-          />
+          {isLoading ? (
+            <div className="p-8 text-center text-muted-foreground">
+              Cargando vacaciones...
+            </div>
+          ) : (
+            <VacationAbsenceTable
+              vacationsAbsences={vacationsAbsences}
+              onView={handleViewVacation}
+              onEdit={handleEditVacation}
+              onDelete={handleDeleteVacation}
+              isLoading={isLoading}
+            />
+          )}
         </CardContent>
       </Card>
 
       {/* Modales */}
       <VacationAbsenceForm
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingVacation(null);
+        }}
         onSubmit={handleFormSubmit}
         editingVacation={editingVacation}
         isSubmitting={isCreating || isUpdating}
@@ -177,7 +215,10 @@ const VacationsAbsencesPage = () => {
 
       <VacationAbsenceDetailModal
         isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
+        onClose={() => {
+          setIsDetailOpen(false);
+          setSelectedVacation(null);
+        }}
         vacation={selectedVacation}
         onEdit={handleEditVacation}
         onDelete={handleDeleteVacation}
