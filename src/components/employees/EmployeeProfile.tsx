@@ -16,7 +16,6 @@ import { EmployeeWithStatus } from '@/types/employee-extended';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { TimeOffSection } from './form/TimeOffSection';
 
 interface EmployeeProfileProps {
   employee: EmployeeWithStatus;
@@ -387,11 +386,6 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
-            {/* ✅ KISS: Sección de Tiempo Libre completamente autónoma */}
-            <TimeOffSection 
-              employeeId={employee.id} 
-            />
-            
             {/* Tabs principales */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="sticky top-0 bg-gray-50 pb-4 z-10">
