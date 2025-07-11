@@ -7,7 +7,8 @@ import {
   FileBarChart,
   Settings,
   Building2,
-  Calculator
+  Calculator,
+  Calendar
 } from "lucide-react";
 
 import {
@@ -38,6 +39,11 @@ const navigationItems = [
     title: "Liquidación",
     url: "/app/payroll",
     icon: Calculator,
+  },
+  {
+    title: "Vacaciones y Ausencias",
+    url: "/app/vacations-absences",
+    icon: Calendar,
   },
   {
     title: "Reportes",
