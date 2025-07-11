@@ -49,6 +49,11 @@ export const VacationFormFields = ({
             ))}
           </SelectContent>
         </Select>
+        {employees.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No hay empleados activos disponibles
+          </p>
+        )}
       </div>
 
       {/* Date Fields */}

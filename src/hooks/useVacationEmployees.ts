@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,10 +23,18 @@ export const useVacationEmployees = (isOpen: boolean) => {
 
       console.log('✅ Employees fetched for form:', data?.length || 0);
       
-      // Filter duplicates by ID as safety measure
-      const uniqueEmployees = data?.filter((employee, index, array) => 
-        array.findIndex(e => e.id === employee.id) === index
-      ) || [];
+      // Double security: Filter any remaining duplicates by cedula as safety measure
+      // This should not be needed after the SQL cleanup, but provides extra protection
+      const uniqueEmployees = data?.filter((employee, index, array) => {
+        // Keep only the first occurrence of each cedula
+        const firstIndex = array.findIndex(e => e.cedula === employee.cedula);
+        return firstIndex === index;
+      }) || [];
+
+      // Log if any duplicates were filtered out (should be 0 after cleanup)
+      if (data && uniqueEmployees.length !== data.length) {
+        console.warn('⚠️ Filtered out duplicate employees:', data.length - uniqueEmployees.length);
+      }
 
       return uniqueEmployees;
     },
