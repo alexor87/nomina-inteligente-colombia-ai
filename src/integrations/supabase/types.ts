@@ -705,6 +705,7 @@ export type Database = {
           processed_in_period_id: string | null
           start_date: string
           status: string
+          type: Database["public"]["Enums"]["novedad_type"]
           updated_at: string
         }
         Insert: {
@@ -719,6 +720,7 @@ export type Database = {
           processed_in_period_id?: string | null
           start_date: string
           status?: string
+          type?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
         }
         Update: {
@@ -733,6 +735,7 @@ export type Database = {
           processed_in_period_id?: string | null
           start_date?: string
           status?: string
+          type?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
         }
         Relationships: [

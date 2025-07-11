@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,7 +25,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
       .from('employee_vacation_periods')
       .select(`
         *,
-        type,
         employee:employees!inner(
           id,
           nombre,
