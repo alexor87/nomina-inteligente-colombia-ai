@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { VacationAbsence, VacationAbsenceFilters, VacationAbsenceFormData } from '@/types/vacations';
+import { VacationAbsence, VacationAbsenceFilters, VacationAbsenceFormData, VacationAbsenceStatus } from '@/types/vacations';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -56,7 +56,11 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
       throw error;
     }
 
-    return data || [];
+    // Transformar los datos para asegurar que el status sea del tipo correcto
+    return (data || []).map(item => ({
+      ...item,
+      status: item.status as VacationAbsenceStatus
+    }));
   };
 
   // Query para obtener datos
@@ -104,10 +108,27 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     return (data && data.length > 0) || false;
   };
 
+  // Obtener company_id del usuario
+  const getCompanyId = async (): Promise<string> => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user?.id)
+      .single();
+    
+    if (!profile?.company_id) {
+      throw new Error('Usuario no tiene empresa asignada');
+    }
+    
+    return profile.company_id;
+  };
+
   // Mutación para crear vacación/ausencia
   const createMutation = useMutation({
     mutationFn: async (formData: VacationAbsenceFormData) => {
       if (!user) throw new Error('Usuario no autenticado');
+
+      const companyId = await getCompanyId();
 
       // Calcular días
       const days = calculateDays(formData.start_date, formData.end_date);
@@ -126,6 +147,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
       const { data, error } = await supabase
         .from('employee_vacation_periods')
         .insert({
+          company_id: companyId,
           employee_id: formData.employee_id,
           start_date: formData.start_date,
           end_date: formData.end_date,
@@ -218,7 +240,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
 
   // Mutación para cambiar estado
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'pendiente' | 'liquidada' | 'cancelada' }) => {
+    mutationFn: async ({ id, status }: { id: string; status: VacationAbsenceStatus }) => {
       const { data, error } = await supabase
         .from('employee_vacation_periods')
         .update({ 
