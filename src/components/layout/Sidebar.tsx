@@ -14,13 +14,15 @@ import {
   Receipt,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  Calendar
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, module: 'dashboard' },
   { name: 'Empleados', href: '/app/employees', icon: Users, module: 'employees' },
   { name: 'Liquidar Nómina', href: '/app/payroll', icon: Calculator, module: 'payroll' },
+  { name: 'Vacaciones y Ausencias', href: '/app/vacations-absences', icon: Calendar, module: 'vacations-absences' },
   { name: 'Historial Nómina', href: '/app/payroll-history', icon: History, module: 'payroll-history' },
   { name: 'Reportes', href: '/app/reports', icon: BarChart3, module: 'reports' },
   { name: 'Configuración', href: '/app/settings', icon: Settings, module: 'settings' },
@@ -35,6 +37,14 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
   const { hasModuleAccess, isSuperAdmin, roles, loading } = useAuth();
 
+  console.log('🧭 Sidebar Debug:', {
+    currentPath: location.pathname,
+    collapsed,
+    loading,
+    isSuperAdmin,
+    totalNavigationItems: navigation.length
+  });
+
   // Mostrar elementos básicos mientras carga
   const getFilteredNavigation = () => {
     if (loading) {
@@ -43,8 +53,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     }
 
     if (!hasModuleAccess) {
-      // Si no hay función de acceso, mostrar navegación básica
-      return navigation.filter(item => ['dashboard', 'employees'].includes(item.module));
+      // Si no hay función de acceso, mostrar navegación básica incluyendo vacaciones
+      return navigation.filter(item => ['dashboard', 'employees', 'vacations-absences'].includes(item.module));
     }
 
     // SuperAdmin ve todo
@@ -58,14 +68,9 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
   const filteredNavigation = getFilteredNavigation();
 
-  console.log('🧭 Sidebar navigation state:', {
-    loading,
-    isSuperAdmin,
-    rolesCount: roles.length,
-    totalItems: navigation.length,
-    filteredItems: filteredNavigation.length,
-    hasModuleAccessFunction: !!hasModuleAccess,
-    filteredNavigation: filteredNavigation.map(n => n.name)
+  console.log('🔍 Filtered Navigation:', {
+    totalFiltered: filteredNavigation.length,
+    items: filteredNavigation.map(n => ({ name: n.name, module: n.module }))
   });
 
   return (
@@ -110,6 +115,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         {filteredNavigation.length > 0 ? (
           filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href;
+            console.log(`📍 Navigation item: ${item.name}, isActive: ${isActive}, path: ${item.href}`);
+            
             return (
               <Link
                 key={item.name}

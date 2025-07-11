@@ -1,93 +1,42 @@
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
-import Header from './Header';
+import { useAuth } from '@/contexts/AuthContext';
+import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 
 export const Layout = () => {
-  const { loading } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
+  const { loading } = useAuth();
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
+  console.log('🏗️ Layout rendered with sidebar collapsed:', sidebarCollapsed);
 
-  // Handle click outside sidebar on mobile
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        sidebarRef.current &&
-        !sidebarRef.current.contains(event.target as Node) &&
-        !sidebarCollapsed &&
-        window.innerWidth < 768 // Only on mobile
-      ) {
-        setSidebarCollapsed(true);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [sidebarCollapsed]);
-
-  // Handle responsive behavior
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setSidebarCollapsed(true);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    handleResize(); // Check on mount
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
-  // Mostrar loading mínimo mientras se carga la autenticación
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Cargando...</p>
-        </div>
-      </div>
+      <LoadingWithTimeout 
+        message="Cargando aplicación..."
+        timeout={10}
+        redirectTo="/login"
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/30 flex">
-      <div ref={sidebarRef}>
-        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
-      </div>
+    <div className="flex min-h-screen bg-gray-50">
+      <Sidebar 
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
       
-      <div 
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+      <main 
+        className={`flex-1 transition-all duration-300 ${
           sidebarCollapsed ? 'ml-16' : 'ml-64'
         }`}
       >
-        <Header />
-        
-        <main className="flex-1 p-6 bg-white/50">
-          <div className="max-w-7xl mx-auto">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-      
-      {/* Overlay para móvil cuando sidebar está abierto */}
-      {!sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth < 768 && (
-        <div 
-          className="fixed inset-0 bg-black/20 z-40 md:hidden"
-          onClick={() => setSidebarCollapsed(true)}
-        />
-      )}
+        <div className="min-h-screen">
+          <Outlet />
+        </div>
+      </main>
     </div>
   );
 };
