@@ -1,5 +1,5 @@
 
-import { VacationAbsence } from '@/types/vacations';
+import { VacationAbsence, ABSENCE_TYPE_LABELS, ABSENCE_TYPE_COLORS } from '@/types/vacations';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,18 @@ export const VacationAbsenceTable = ({
     }
   };
 
+  // ✅ NUEVA FUNCIÓN PARA MOSTRAR EL TIPO DE AUSENCIA
+  const getTypeBadge = (type: string) => {
+    const colorClass = ABSENCE_TYPE_COLORS[type as keyof typeof ABSENCE_TYPE_COLORS] || 'bg-gray-100 text-gray-700';
+    const label = ABSENCE_TYPE_LABELS[type as keyof typeof ABSENCE_TYPE_LABELS] || type;
+    
+    return (
+      <Badge variant="outline" className={colorClass}>
+        {label}
+      </Badge>
+    );
+  };
+
   const formatDate = (dateString: string) => {
     try {
       return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
@@ -51,6 +63,7 @@ export const VacationAbsenceTable = ({
           <TableHeader>
             <TableRow>
               <TableHead>Empleado</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Fecha Inicio</TableHead>
               <TableHead>Fecha Fin</TableHead>
               <TableHead>Días</TableHead>
@@ -62,6 +75,7 @@ export const VacationAbsenceTable = ({
           <TableBody>
             {[...Array(5)].map((_, index) => (
               <TableRow key={index}>
+                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
                 <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
                 <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
                 <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
@@ -84,6 +98,7 @@ export const VacationAbsenceTable = ({
           <TableHeader>
             <TableRow>
               <TableHead>Empleado</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Fecha Inicio</TableHead>
               <TableHead>Fecha Fin</TableHead>
               <TableHead>Días</TableHead>
@@ -94,7 +109,7 @@ export const VacationAbsenceTable = ({
           </TableHeader>
           <TableBody>
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                 No se encontraron registros de vacaciones o ausencias
               </TableCell>
             </TableRow>
@@ -110,6 +125,7 @@ export const VacationAbsenceTable = ({
         <TableHeader>
           <TableRow>
             <TableHead>Empleado</TableHead>
+            <TableHead>Tipo</TableHead>
             <TableHead>Fecha Inicio</TableHead>
             <TableHead>Fecha Fin</TableHead>
             <TableHead>Días</TableHead>
@@ -131,6 +147,7 @@ export const VacationAbsenceTable = ({
                   </div>
                 </div>
               </TableCell>
+              <TableCell>{getTypeBadge(vacation.type)}</TableCell>
               <TableCell>{formatDate(vacation.start_date)}</TableCell>
               <TableCell>{formatDate(vacation.end_date)}</TableCell>
               <TableCell>

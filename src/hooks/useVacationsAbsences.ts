@@ -24,6 +24,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
       .from('employee_vacation_periods')
       .select(`
         *,
+        type,
         employee:employees!inner(
           id,
           nombre,
@@ -36,6 +37,10 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     // Aplicar filtros
     if (filters.status) {
       query = query.eq('status', filters.status);
+    }
+
+    if (filters.type) {
+      query = query.eq('type', filters.type);
     }
 
     if (filters.date_from) {
@@ -67,7 +72,8 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     // Transformar los datos para asegurar que el status sea del tipo correcto
     return (data || []).map(item => ({
       ...item,
-      status: item.status as VacationAbsenceStatus
+      status: item.status as VacationAbsenceStatus,
+      type: item.type
     }));
   };
 
@@ -157,6 +163,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .insert({
           company_id: companyId,
           employee_id: formData.employee_id,
+          type: formData.type,
           start_date: formData.start_date,
           end_date: formData.end_date,
           days_count: days,
@@ -203,6 +210,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .from('employee_vacation_periods')
         .update({
           employee_id: formData.employee_id,
+          type: formData.type,
           start_date: formData.start_date,
           end_date: formData.end_date,
           days_count: days,
