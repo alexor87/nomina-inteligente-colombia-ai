@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { VacationAbsence, VacationAbsenceFilters, VacationAbsenceFormData, VacationAbsenceStatus } from '@/types/vacations';
+import { VacationAbsence, VacationAbsenceFilters, VacationAbsenceFormData, VacationAbsenceStatus, VacationAbsenceType } from '@/types/vacations';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -11,6 +10,18 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
   const queryClient = useQueryClient();
 
   console.log('🪝 useVacationsAbsences initialized', { filters, userId: user?.id });
+
+  // Helper function to check if a novedad_type is a valid vacation/absence type
+  const isValidVacationAbsenceType = (type: string): type is VacationAbsenceType => {
+    const validTypes: VacationAbsenceType[] = [
+      'vacaciones',
+      'licencia_remunerada', 
+      'licencia_no_remunerada',
+      'incapacidad',
+      'ausencia'
+    ];
+    return validTypes.includes(type as VacationAbsenceType);
+  };
 
   // Función para obtener las vacaciones y ausencias
   const fetchVacationsAbsences = async (): Promise<VacationAbsence[]> => {
@@ -69,12 +80,14 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
 
     console.log('✅ Fetched vacations absences:', data?.length || 0);
 
-    // Transformar los datos para asegurar que el status sea del tipo correcto
-    return (data || []).map(item => ({
-      ...item,
-      status: item.status as VacationAbsenceStatus,
-      type: item.type
-    }));
+    // Filter and transform the data to ensure only valid vacation/absence types
+    return (data || [])
+      .filter(item => isValidVacationAbsenceType(item.type))
+      .map(item => ({
+        ...item,
+        status: item.status as VacationAbsenceStatus,
+        type: item.type as VacationAbsenceType
+      }));
   };
 
   // Query para obtener datos
