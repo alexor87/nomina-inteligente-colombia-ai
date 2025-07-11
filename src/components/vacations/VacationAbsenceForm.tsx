@@ -36,20 +36,36 @@ export const VacationAbsenceForm = ({
   });
   const [calculatedDays, setCalculatedDays] = useState<number>(0);
 
-  // Obtener lista de empleados activos
+  // Obtener lista de empleados activos con configuración optimizada
   const { data: employees = [] } = useQuery({
-    queryKey: ['active-employees'],
+    queryKey: ['vacation-form-employees', user?.id],
     queryFn: async () => {
+      console.log('🔍 Fetching employees for vacation form...');
+      
       const { data, error } = await supabase
         .from('employees')
         .select('id, nombre, apellido, cedula')
         .eq('estado', 'activo')
-        .order('nombre');
+        .order('nombre', { ascending: true });
 
-      if (error) throw error;
-      return data || [];
+      if (error) {
+        console.error('❌ Error fetching employees:', error);
+        throw error;
+      }
+
+      console.log('✅ Employees fetched for form:', data?.length || 0);
+      
+      // Filtrar duplicados por ID como medida de seguridad
+      const uniqueEmployees = data?.filter((employee, index, array) => 
+        array.findIndex(e => e.id === employee.id) === index
+      ) || [];
+
+      return uniqueEmployees;
     },
     enabled: isOpen && !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    cacheTime: 10 * 60 * 1000, // 10 minutos
+    refetchOnWindowFocus: false,
   });
 
   // Cargar datos de edición
@@ -138,7 +154,7 @@ export const VacationAbsenceForm = ({
             </SelectTrigger>
             <SelectContent>
               {employees.map((employee) => (
-                <SelectItem key={employee.id} value={employee.id}>
+                <SelectItem key={`employee-${employee.id}`} value={employee.id}>
                   {employee.nombre} {employee.apellido} - {employee.cedula}
                 </SelectItem>
               ))}
