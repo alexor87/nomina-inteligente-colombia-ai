@@ -1,6 +1,5 @@
 
 import { Button } from '@/components/ui/button';
-import { Save, X } from 'lucide-react';
 import { VacationAbsence, VacationAbsenceFormData } from '@/types/vacations';
 
 interface VacationFormActionsProps {
@@ -16,30 +15,23 @@ export const VacationFormActions = ({
   editingVacation,
   onClose
 }: VacationFormActionsProps) => {
-  const handleClose = () => {
-    if (!isSubmitting) {
-      onClose();
-    }
-  };
-
-  const isFormValid = formData.employee_id && formData.start_date && formData.end_date;
+  const isFormValid = formData.employee_id && formData.type && formData.start_date && formData.end_date;
 
   return (
-    <div className="flex justify-end gap-3 pt-6 border-t">
+    <div className="flex justify-end space-x-4 pt-4 border-t">
       <Button
         type="button"
         variant="outline"
-        onClick={handleClose}
+        onClick={onClose}
         disabled={isSubmitting}
       >
-        <X className="h-4 w-4 mr-2" />
         Cancelar
       </Button>
       <Button
         type="submit"
-        disabled={isSubmitting || !isFormValid}
+        disabled={!isFormValid || isSubmitting}
+        className="min-w-[120px]"
       >
-        <Save className="h-4 w-4 mr-2" />
         {isSubmitting ? 'Guardando...' : editingVacation ? 'Actualizar' : 'Crear'}
       </Button>
     </div>

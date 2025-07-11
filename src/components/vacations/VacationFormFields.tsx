@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarDays } from 'lucide-react';
-import { VacationAbsenceFormData } from '@/types/vacations';
+import { VacationAbsenceFormData, ABSENCE_TYPE_LABELS, VacationAbsenceType } from '@/types/vacations';
 
 interface Employee {
   id: string;
@@ -54,6 +54,27 @@ export const VacationFormFields = ({
             No hay empleados activos disponibles
           </p>
         )}
+      </div>
+
+      {/* ✅ NUEVO: Tipo de Ausencia */}
+      <div className="space-y-2">
+        <Label htmlFor="type">Tipo de Ausencia *</Label>
+        <Select
+          value={formData.type}
+          onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as VacationAbsenceType }))}
+          disabled={isSubmitting}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Seleccionar tipo de ausencia..." />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(ABSENCE_TYPE_LABELS).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Date Fields */}

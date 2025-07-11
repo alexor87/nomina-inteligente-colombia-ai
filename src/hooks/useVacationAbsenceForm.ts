@@ -8,6 +8,7 @@ export const useVacationAbsenceForm = (
 ) => {
   const [formData, setFormData] = useState<VacationAbsenceFormData>({
     employee_id: '',
+    type: 'vacaciones', // ✅ AGREGADO: Valor por defecto
     start_date: '',
     end_date: '',
     observations: ''
@@ -19,6 +20,7 @@ export const useVacationAbsenceForm = (
     if (editingVacation) {
       setFormData({
         employee_id: editingVacation.employee_id,
+        type: editingVacation.type || 'vacaciones', // ✅ AGREGADO: Cargar tipo
         start_date: editingVacation.start_date,
         end_date: editingVacation.end_date,
         observations: editingVacation.observations || ''
@@ -26,6 +28,7 @@ export const useVacationAbsenceForm = (
     } else {
       setFormData({
         employee_id: '',
+        type: 'vacaciones', // ✅ AGREGADO: Valor por defecto
         start_date: '',
         end_date: '',
         observations: ''

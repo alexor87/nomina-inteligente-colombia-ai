@@ -28,7 +28,8 @@ export const VacationAbsenceForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.employee_id || !formData.start_date || !formData.end_date) {
+    // ✅ ACTUALIZADO: Validar tipo también
+    if (!formData.employee_id || !formData.type || !formData.start_date || !formData.end_date) {
       return;
     }
 

@@ -12,6 +12,7 @@ export interface VacationAbsence {
   id: string;
   employee_id: string;
   company_id: string;
+  type: VacationAbsenceType; // ✅ AGREGADO: Campo tipo
   start_date: string;
   end_date: string;
   days_count: number;
@@ -41,7 +42,26 @@ export interface VacationAbsenceFilters {
 
 export interface VacationAbsenceFormData {
   employee_id: string;
+  type: VacationAbsenceType; // ✅ AGREGADO: Campo tipo
   start_date: string;
   end_date: string;
   observations?: string;
 }
+
+// ✅ AGREGADO: Labels para los tipos de ausencia
+export const ABSENCE_TYPE_LABELS: Record<VacationAbsenceType, string> = {
+  vacaciones: 'Vacaciones',
+  licencia_remunerada: 'Licencia Remunerada',
+  licencia_no_remunerada: 'Licencia No Remunerada',
+  ausencia: 'Ausencia Injustificada',
+  incapacidad: 'Incapacidad'
+};
+
+// ✅ AGREGADO: Colores para los tipos de ausencia
+export const ABSENCE_TYPE_COLORS: Record<VacationAbsenceType, string> = {
+  vacaciones: 'bg-blue-100 text-blue-800',
+  licencia_remunerada: 'bg-green-100 text-green-800',
+  licencia_no_remunerada: 'bg-yellow-100 text-yellow-800',
+  ausencia: 'bg-red-100 text-red-800',
+  incapacidad: 'bg-purple-100 text-purple-800'
+};
