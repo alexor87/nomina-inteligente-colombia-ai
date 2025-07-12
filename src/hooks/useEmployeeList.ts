@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
+import { useToast } from '@/hooks/use-toast';
 
 export interface EmployeeFilters {
   searchTerm: string;
@@ -31,6 +32,9 @@ export interface EmployeeListHook {
   forceCompleteRefresh: () => Promise<void>;
   getComplianceIndicators: () => any;
   clearSelection: () => void;
+  deleteEmployee: (id: string) => Promise<void>;
+  deleteMultipleEmployees: (ids: string[]) => Promise<void>;
+  isDeleting: boolean;
   statistics: {
     active: number;
     inactive: number;
@@ -40,8 +44,10 @@ export interface EmployeeListHook {
 }
 
 export const useEmployeeList = (): EmployeeListHook => {
+  const { toast } = useToast();
   const [employees, setEmployees] = useState<EmployeeUnified[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [filters, setFiltersState] = useState<EmployeeFilters>({
@@ -81,6 +87,88 @@ export const useEmployeeList = (): EmployeeListHook => {
       setError(err.message || 'Error loading employees');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const deleteEmployee = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      const result = await EmployeeUnifiedService.delete(id);
+      
+      if (result.success) {
+        toast({
+          title: "Empleado eliminado",
+          description: "El empleado ha sido eliminado exitosamente.",
+        });
+        
+        // Remove from selected employees if it was selected
+        setSelectedEmployees(prev => prev.filter(empId => empId !== id));
+        
+        // Refresh the list
+        await loadEmployees();
+      } else {
+        toast({
+          title: "Error al eliminar",
+          description: result.error || "No se pudo eliminar el empleado.",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error al eliminar",
+        description: err.message || "No se pudo eliminar el empleado.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const deleteMultipleEmployees = async (ids: string[]) => {
+    try {
+      setIsDeleting(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const id of ids) {
+        try {
+          const result = await EmployeeUnifiedService.delete(id);
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Eliminación completada",
+          description: `${successCount} empleados eliminados exitosamente${errorCount > 0 ? `. ${errorCount} no pudieron ser eliminados.` : '.'}`,
+        });
+        
+        // Clear selection
+        setSelectedEmployees([]);
+        
+        // Refresh the list
+        await loadEmployees();
+      } else {
+        toast({
+          title: "Error en eliminación",
+          description: "No se pudo eliminar ningún empleado.",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error en eliminación múltiple",
+        description: err.message || "Ocurrió un error durante la eliminación.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -168,6 +256,7 @@ export const useEmployeeList = (): EmployeeListHook => {
   return {
     employees: paginatedEmployees,
     isLoading,
+    isDeleting,
     error,
     filters,
     setFilters,
@@ -182,6 +271,8 @@ export const useEmployeeList = (): EmployeeListHook => {
     forceCompleteRefresh,
     getComplianceIndicators,
     clearSelection,
+    deleteEmployee,
+    deleteMultipleEmployees,
     statistics
   };
 };

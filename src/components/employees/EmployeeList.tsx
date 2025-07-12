@@ -6,9 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
+import { EmployeeBulkDeleteActions } from './EmployeeBulkDeleteActions';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,6 +24,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
   const {
     employees,
     isLoading,
+    isDeleting,
     error,
     filters,
     setFilters,
@@ -36,10 +39,13 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     forceCompleteRefresh,
     getComplianceIndicators,
     clearSelection,
+    deleteEmployee,
+    deleteMultipleEmployees,
     statistics
   } = useEmployeeList();
 
   const [showFilters, setShowFilters] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -69,6 +75,16 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     } else {
       navigate(`/app/employees/${employee.id}/edit`);
     }
+  };
+
+  const handleEditEmployee = (e: React.MouseEvent, employeeId: string) => {
+    e.stopPropagation();
+    navigate(`/app/employees/${employeeId}/edit`);
+  };
+
+  const handleDeleteEmployee = async (employeeId: string) => {
+    await deleteEmployee(employeeId);
+    setDeleteConfirmId(null);
   };
 
   if (isLoading) {
@@ -115,6 +131,15 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
           </Button>
         </div>
       </div>
+
+      {/* Bulk Delete Actions */}
+      <EmployeeBulkDeleteActions
+        selectedCount={selectedEmployees.length}
+        selectedEmployeeIds={selectedEmployees}
+        onBulkDelete={deleteMultipleEmployees}
+        onClearSelection={clearSelection}
+        isDeleting={isDeleting}
+      />
 
       {/* Filters */}
       {showFilters && (
@@ -239,8 +264,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                 {employees.map((employee) => (
                   <tr
                     key={employee.id}
-                    className="border-b hover:bg-gray-50 cursor-pointer"
-                    onClick={() => handleEmployeeClick(employee)}
+                    className="border-b hover:bg-gray-50"
                   >
                     <td className="p-4">
                       <Checkbox
@@ -249,7 +273,10 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
-                    <td className="p-4">
+                    <td 
+                      className="p-4 cursor-pointer"
+                      onClick={() => handleEmployeeClick(employee)}
+                    >
                       <div>
                         <div className="font-medium">
                           {employee.nombre} {employee.apellido}
@@ -257,10 +284,28 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                         <div className="text-sm text-gray-600">{employee.email}</div>
                       </div>
                     </td>
-                    <td className="p-4">{employee.cedula}</td>
-                    <td className="p-4">{employee.cargo || 'No especificado'}</td>
-                    <td className="p-4">{getStatusBadge(employee.estado)}</td>
-                    <td className="p-4">
+                    <td 
+                      className="p-4 cursor-pointer"
+                      onClick={() => handleEmployeeClick(employee)}
+                    >
+                      {employee.cedula}
+                    </td>
+                    <td 
+                      className="p-4 cursor-pointer"
+                      onClick={() => handleEmployeeClick(employee)}
+                    >
+                      {employee.cargo || 'No especificado'}
+                    </td>
+                    <td 
+                      className="p-4 cursor-pointer"
+                      onClick={() => handleEmployeeClick(employee)}
+                    >
+                      {getStatusBadge(employee.estado)}
+                    </td>
+                    <td 
+                      className="p-4 cursor-pointer"
+                      onClick={() => handleEmployeeClick(employee)}
+                    >
                       ${employee.salarioBase?.toLocaleString() || '0'}
                     </td>
                     <td className="p-4">
@@ -271,7 +316,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => navigate(`/app/employees/${employee.id}/edit`)}>
+                          <DropdownMenuItem onClick={(e) => handleEditEmployee(e, employee.id)}>
                             <Edit className="w-4 h-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
@@ -279,10 +324,36 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                             <Mail className="w-4 h-4 mr-2" />
                             Enviar Comprobante
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  ¿Estás seguro de que quieres eliminar a {employee.nombre} {employee.apellido}? 
+                                  Esta acción no se puede deshacer.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleDeleteEmployee(employee.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                  disabled={isDeleting}
+                                >
+                                  {isDeleting ? "Eliminando..." : "Eliminar"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
