@@ -3,10 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { CheckCircle2, Save } from 'lucide-react';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 
 interface EmployeeFormFooterProps {
-  employee?: Employee;
+  employee?: EmployeeUnified;
   completionPercentage: number;
   isDraft: boolean;
   setIsDraft: (value: boolean) => void;
@@ -20,17 +20,29 @@ export const EmployeeFormFooter = ({
   setIsDraft,
   isLoading
 }: EmployeeFormFooterProps) => {
+  console.log('🔥 FOOTER RENDER - Completion:', completionPercentage, 'IsLoading:', isLoading, 'IsDraft:', isDraft);
+
   const handleDraftSave = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log('💾 Saving as draft...');
-    // This will trigger form submission with draft flag
+    console.log('🔥 DRAFT BUTTON CLICKED');
+    console.log('💾 Setting draft mode and submitting...');
+    
     setIsDraft(true);
-    // Submit the form programmatically
+    
+    // Get the form element and submit it
     const form = e.currentTarget.closest('form');
+    console.log('🔥 Form element found:', !!form);
+    
     if (form) {
+      console.log('📋 Submitting form programmatically');
       form.requestSubmit();
+    } else {
+      console.error('❌ No form element found for draft save');
     }
   };
+
+  const isMainButtonDisabled = isLoading || (completionPercentage < 80 && !isDraft);
+  console.log('🔥 Main button disabled?', isMainButtonDisabled, 'Reason: loading=', isLoading, 'completion=', completionPercentage);
 
   return (
     <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-4">
@@ -47,7 +59,10 @@ export const EmployeeFormFooter = ({
             <Switch 
               id="isDraft"
               checked={isDraft}
-              onCheckedChange={setIsDraft}
+              onCheckedChange={(checked) => {
+                console.log('🔥 Switch changed to:', checked);
+                setIsDraft(checked);
+              }}
             />
             <Label htmlFor="isDraft" className="text-sm">Guardar como borrador</Label>
           </div>
@@ -64,16 +79,18 @@ export const EmployeeFormFooter = ({
             Guardar Borrador
           </Button>
           
-          {!isDraft && (
-            <Button 
-              type="submit"
-              disabled={isLoading || completionPercentage < 80}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              {isLoading ? 'Guardando...' : employee ? 'Actualizar y Activar' : 'Crear y Activar'}
-            </Button>
-          )}
+          <Button 
+            type="submit"
+            disabled={isMainButtonDisabled}
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => {
+              console.log('🔥 MAIN SUBMIT BUTTON CLICKED');
+              console.log('🔥 Current state - isDraft:', isDraft, 'isLoading:', isLoading);
+            }}
+          >
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            {isLoading ? 'Guardando...' : employee ? 'Actualizar y Activar' : 'Crear y Activar'}
+          </Button>
         </div>
       </div>
     </div>

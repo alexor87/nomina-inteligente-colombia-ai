@@ -20,10 +20,12 @@ interface EmployeeFormModernProps {
 }
 
 export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefresh }: EmployeeFormModernProps) => {
-  console.log('🔄 EmployeeFormModern: Component rendered');
-  console.log('🔄 EmployeeFormModern: Received employee:', employee ? `${employee.nombre} ${employee.apellido} (${employee.id})` : 'undefined');
+  console.log('🔥 EMPLOYEE FORM MODERN - RENDER START');
+  console.log('🔥 Employee data:', employee ? `${employee.nombre} ${employee.apellido} (${employee.id})` : 'undefined');
   
   const isEditMode = !!employee;
+  console.log('🔥 Edit mode:', isEditMode);
+  
   const { configuration } = useEmployeeGlobalConfiguration();
   
   const {
@@ -46,10 +48,17 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     scrollToSection
   } = useEmployeeForm(employee);
 
+  console.log('🔥 Form state:', {
+    completionPercentage,
+    isDraft,
+    companyId,
+    errorsCount: Object.keys(errors).length
+  });
+
   // Memoize the data refresh handler to prevent unnecessary re-renders
   const memoizedDataRefresh = useMemo(() => {
     return (updatedEmployee: EmployeeUnified) => {
-      console.log('🔄 EmployeeFormModern: Data refresh callback triggered');
+      console.log('🔄 Data refresh callback triggered');
       onDataRefresh?.(updatedEmployee);
     };
   }, [onDataRefresh]);
@@ -67,17 +76,19 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   } = useEmployeeFormSubmissionRobust();
 
   const isLoading = isEditMode ? isSubmittingEdit : isSubmittingCreate;
+  console.log('🔥 Loading state:', isLoading, 'Mode:', isEditMode ? 'edit' : 'create');
 
   const onSubmit = async (data: any) => {
-    console.log('🚀 EmployeeFormModern: Form submission triggered');
-    console.log('📝 Form data:', data);
-    console.log('🎯 Submission mode:', isEditMode ? 'edit' : 'create');
+    console.log('🔥🔥🔥 FORM SUBMISSION TRIGGERED 🔥🔥🔥');
+    console.log('🔥 Form data received:', data);
+    console.log('🔥 Submission mode:', isEditMode ? 'edit' : 'create');
+    console.log('🔥 IsDraft:', isDraft);
     
     if (isEditMode) {
-      // Use edit submission for existing employees
+      console.log('🔥 Using edit submission');
       await handleEditSubmission(data);
     } else {
-      // Use robust submission for new employees
+      console.log('🔥 Using create submission');
       if (!companyId) {
         console.error('❌ No company ID available');
         return;
@@ -109,7 +120,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     // TODO: Implement duplication logic
   };
 
-  console.log('🎯 EmployeeFormModern: Rendering form with:', {
+  console.log('🎯 Rendering form with final state:', {
     id: employee?.id,
     name: employee ? `${employee.nombre} ${employee.apellido}` : 'New Employee',
     mode: isEditMode ? 'edit' : 'create',
@@ -128,7 +139,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
         />
       </div>
       
-      {/* Main Content Area - Now includes the form wrapper */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         <EmployeeFormHeader
           employee={employee}
@@ -136,7 +147,10 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           onDuplicate={handleDuplicate}
         />
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1">
+        <form 
+          onSubmit={handleSubmit(onSubmit)} 
+          className="flex flex-col flex-1"
+        >
           <div className="flex-1 overflow-y-auto">
             <EmployeeFormContent
               control={control}

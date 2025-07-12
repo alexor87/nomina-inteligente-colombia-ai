@@ -2,37 +2,46 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 
 export const useEmployeeEditSubmission = (
-  employee: Employee | null,
+  employee: EmployeeUnified | null,
   onSuccess: () => void
 ) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (formData: any) => {
+    console.log('🔥 EMPLOYEE EDIT SUBMISSION - STARTING');
+    console.log('🔥 Employee:', employee ? `${employee.nombre} ${employee.apellido} (${employee.id})` : 'null');
+    console.log('🔥 Form data keys:', Object.keys(formData || {}));
+    console.log('🔥 Form data:', formData);
+
     if (!employee) {
-      console.error('❌ No employee provided for edit submission');
+      console.error('❌ CRITICAL: No employee provided for edit submission');
+      toast({
+        title: "Error crítico",
+        description: "No se encontró información del empleado",
+        variant: "destructive"
+      });
       return;
     }
 
     console.log('🚀 Starting employee edit submission for:', employee.id);
-    console.log('📝 Form data received:', formData);
-
     setIsSubmitting(true);
     
     try {
       // Clean the form data before sending
       const cleanedData = {
         ...formData,
-        id: employee.id, // Ensure we have the employee ID
-        company_id: employee.company_id || formData.empresaId || formData.company_id
+        id: employee.id,
+        company_id: employee.company_id || employee.empresaId
       };
 
-      console.log('📤 Sending cleaned data:', cleanedData);
+      console.log('📤 Sending cleaned data to service:', cleanedData);
       
       const result = await EmployeeUnifiedService.update(employee.id, cleanedData);
+      console.log('📥 Service response:', result);
       
       if (result.success && result.data) {
         console.log('✅ Employee updated successfully:', result.data);
@@ -43,6 +52,7 @@ export const useEmployeeEditSubmission = (
           className: "border-green-200 bg-green-50"
         });
         
+        console.log('🎉 Calling onSuccess callback');
         onSuccess();
       } else {
         console.error('❌ Error updating employee:', result.error);
@@ -62,6 +72,7 @@ export const useEmployeeEditSubmission = (
         variant: "destructive"
       });
     } finally {
+      console.log('🏁 Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };
