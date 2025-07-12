@@ -60,7 +60,6 @@ export const EmployeeFormContent = ({
 
         {/* Labor Information Section */}
         <LaborInfoSection
-          control={control}
           errors={simpleErrors}
           watchedValues={watchedValues}
           setValue={setValue}

@@ -1,7 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { useToast } from '@/hooks/use-toast';
 
 export class EmployeeServiceRobust {
   static async createEmployee(employeeData: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
@@ -64,7 +63,7 @@ export class EmployeeServiceRobust {
         telefono: data.telefono,
         tipoContrato: data.tipo_contrato || 'indefinido',
         periodicidadPago: data.periodicidad_pago || 'mensual',
-        customFields: data.custom_fields || {},
+        customFields: (data.custom_fields && typeof data.custom_fields === 'object') ? data.custom_fields as Record<string, any> : {},
         createdAt: data.created_at,
         updatedAt: data.updated_at
       };
@@ -134,7 +133,7 @@ export class EmployeeServiceRobust {
         telefono: data.telefono,
         tipoContrato: data.tipo_contrato || 'indefinido',
         periodicidadPago: data.periodicidad_pago || 'mensual',
-        customFields: data.custom_fields || {},
+        customFields: (data.custom_fields && typeof data.custom_fields === 'object') ? data.custom_fields as Record<string, any> : {},
         createdAt: data.created_at,
         updatedAt: data.updated_at
       };

@@ -1,3 +1,4 @@
+
 import { Employee, EmployeeWithStatus } from '@/types';
 
 export class EmployeeTransformationService {
@@ -42,13 +43,13 @@ export class EmployeeTransformationService {
       fechaFinalizacionContrato: employee.fechaFinalizacionContrato || employee.fecha_finalizacion_contrato,
       beneficiosExtralegales: Boolean(employee.beneficiosExtralegales || employee.beneficios_extralegales),
       clausulasEspeciales: employee.clausulasEspeciales || employee.clausulas_especiales,
-      codigoCiiu: employee.codigoCiiu || employee.codigo_ciiu,
+      codigoCIIU: employee.codigoCIIU || employee.codigo_ciiu, // ✅ FIXED: Use correct property name for Employee type
       tipoCotizanteId: employee.tipoCotizanteId || employee.tipo_cotizante_id,
       subtipoCotizanteId: employee.subtipoCotizanteId || employee.subtipo_cotizante_id,
       regimenSalud: employee.regimenSalud || employee.regimen_salud || 'contributivo',
       estadoAfiliacion: employee.estadoAfiliacion || employee.estado_afiliacion || 'pendiente',
       customFields: employee.customFields || employee.custom_fields || {},
-      empresaId: employee.empresaId,
+      empresaId: employee.empresaId || employee.company_id,
       company_id: employee.company_id,
       contratoVencimiento: employee.contratoVencimiento
     };
@@ -95,7 +96,7 @@ export class EmployeeTransformationService {
       fechaFinalizacionContrato: employee.fechaFinalizacionContrato || employee.fecha_finalizacion_contrato,
       beneficiosExtralegales: Boolean(employee.beneficiosExtralegales || employee.beneficios_extralegales),
       clausulasEspeciales: employee.clausulasEspeciales || employee.clausulas_especiales,
-      codigoCiiu: employee.codigoCiiu || employee.codigo_ciiu,
+      codigoCIIU: employee.codigoCIIU || employee.codigo_ciiu,
       tipoCotizanteId: employee.tipoCotizanteId || employee.tipo_cotizante_id,
       subtipoCotizanteId: employee.subtipoCotizanteId || employee.subtipo_cotizante_id,
       regimenSalud: employee.regimenSalud || employee.regimen_salud || 'contributivo',

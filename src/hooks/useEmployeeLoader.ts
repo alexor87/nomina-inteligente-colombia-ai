@@ -47,7 +47,7 @@ export const useEmployeeLoader = () => {
       console.log('📋 Raw employee data from database:', rawData);
       
       // Transform raw employee data to EmployeeWithStatus format
-      const transformedData = EmployeeTransformationService.transformEmployeeData(rawData);
+      const transformedData = rawData.map(emp => EmployeeTransformationService.transformToEmployeeWithStatus(emp));
       
       console.log('✅ All employees transformed, total:', transformedData.length);
       setEmployees(transformedData);

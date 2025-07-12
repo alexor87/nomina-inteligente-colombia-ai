@@ -5,6 +5,52 @@ import { EmployeeFormData } from '@/components/employees/form/types';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeDataMapper } from '@/services/EmployeeDataMapper';
 
+// Define ValidatedEmployeeData interface to match mapper expectations
+interface ValidatedEmployeeData {
+  cedula: string;
+  tipoDocumento: "CC" | "TI" | "CE" | "PA" | "RC" | "NIT" | "PEP" | "PPT";
+  nombre: string;
+  apellido: string;
+  segundoNombre?: string;
+  email?: string;
+  telefono?: string;
+  sexo?: "M" | "F" | "O";
+  fechaNacimiento?: string;
+  direccion?: string;
+  ciudad?: string;
+  departamento?: string;
+  salarioBase: number;
+  tipoContrato: "indefinido" | "fijo" | "obra" | "aprendizaje";
+  fechaIngreso: string;
+  periodicidadPago: "mensual" | "quincenal";
+  cargo?: string;
+  codigoCIIU?: string;
+  nivelRiesgoARL?: "I" | "II" | "III" | "IV" | "V";
+  estado: "activo" | "inactivo" | "vacaciones" | "incapacidad";
+  centroCostos?: string;
+  fechaFirmaContrato?: string;
+  fechaFinalizacionContrato?: string;
+  tipoJornada: "completa" | "parcial" | "horas";
+  diasTrabajo?: number;
+  horasTrabajo?: number;
+  beneficiosExtralegales?: boolean;
+  clausulasEspeciales?: string;
+  banco?: string;
+  tipoCuenta: "ahorros" | "corriente";
+  numeroCuenta?: string;
+  titularCuenta?: string;
+  formaPago: "dispersion" | "manual";
+  eps?: string;
+  afp?: string;
+  arl?: string;
+  cajaCompensacion?: string;
+  tipoCotizanteId?: string;
+  subtipoCotizanteId?: string;
+  regimenSalud: "contributivo" | "subsidiado";
+  estadoAfiliacion: "completa" | "pendiente" | "inconsistente";
+  customFields?: Record<string, any>;
+}
+
 export const useEmployeeFormSubmissionRobust = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -26,14 +72,50 @@ export const useEmployeeFormSubmissionRobust = () => {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // ✅ FIXED: Create a compatible data object with proper field mapping
-      const compatibleData = {
-        ...data,
-        // Map form fields to ValidatedEmployeeData format expected by mapper
+      // ✅ FIXED: Create a compatible data object with proper field mapping and type casting
+      const compatibleData: ValidatedEmployeeData = {
+        cedula: data.cedula,
+        tipoDocumento: (data.tipoDocumento || 'CC') as "CC" | "TI" | "CE" | "PA" | "RC" | "NIT" | "PEP" | "PPT",
+        nombre: data.nombre,
+        apellido: data.apellido,
+        segundoNombre: data.segundoNombre,
+        email: data.email,
+        telefono: data.telefono,
+        sexo: (data.sexo || 'M') as "M" | "F" | "O",
+        fechaNacimiento: data.fechaNacimiento,
+        direccion: data.direccion,
+        ciudad: data.ciudad,
+        departamento: data.departamento,
+        salarioBase: data.salarioBase || 0,
+        tipoContrato: (data.tipoContrato || 'indefinido') as "indefinido" | "fijo" | "obra" | "aprendizaje",
+        fechaIngreso: data.fechaIngreso,
+        periodicidadPago: (data.periodicidadPago || 'mensual') as "mensual" | "quincenal",
+        cargo: data.cargo,
         codigoCIIU: data.codigoCiiu, // Map from form field name to expected mapper field name
-        nivelRiesgoARL: data.nivelRiesgoArl, // Map from form field name to expected mapper field name
-        // Cast estado to the expected union type for the mapper
-        estado: data.estado as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'
+        nivelRiesgoARL: (data.nivelRiesgoArl || 'I') as "I" | "II" | "III" | "IV" | "V", // Map from form field name to expected mapper field name
+        estado: (data.estado || 'activo') as "activo" | "inactivo" | "vacaciones" | "incapacidad",
+        centroCostos: data.centroCostos,
+        fechaFirmaContrato: data.fechaFirmaContrato,
+        fechaFinalizacionContrato: data.fechaFinalizacionContrato,
+        tipoJornada: (data.tipoJornada || 'completa') as "completa" | "parcial" | "horas",
+        diasTrabajo: data.diasTrabajo,
+        horasTrabajo: data.horasTrabajo,
+        beneficiosExtralegales: data.beneficiosExtralegales,
+        clausulasEspeciales: data.clausulasEspeciales,
+        banco: data.banco,
+        tipoCuenta: (data.tipoCuenta || 'ahorros') as "ahorros" | "corriente",
+        numeroCuenta: data.numeroCuenta,
+        titularCuenta: data.titularCuenta,
+        formaPago: (data.formaPago || 'dispersion') as "dispersion" | "manual",
+        eps: data.eps,
+        afp: data.afp,
+        arl: data.arl,
+        cajaCompensacion: data.cajaCompensacion,
+        tipoCotizanteId: data.tipoCotizanteId,
+        subtipoCotizanteId: data.subtipoCotizanteId,
+        regimenSalud: (data.regimenSalud || 'contributivo') as "contributivo" | "subsidiado",
+        estadoAfiliacion: (data.estadoAfiliacion || 'pendiente') as "completa" | "pendiente" | "inconsistente",
+        customFields: data.customFields || {}
       };
 
       // ✅ KISS: Use EmployeeDataMapper for proper field conversion

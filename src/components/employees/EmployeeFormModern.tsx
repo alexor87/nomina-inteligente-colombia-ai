@@ -60,40 +60,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     isSubmitting
   } = useEmployeeFormSubmissionRobust();
 
-  // ✅ FIXED: Create a simplified legacy employee object for compatibility
-  const legacyEmployee = employee ? {
-    id: employee.id,
-    empresaId: employee.company_id,
-    company_id: employee.company_id,
-    nombre: employee.nombre,
-    apellido: employee.apellido,
-    cedula: employee.cedula,
-    tipoDocumento: (employee.tipoDocumento || 'CC') as "CC" | "TI" | "CE" | "PA" | "RC" | "NIT" | "PEP" | "PPT",
-    email: employee.email || '',
-    telefono: employee.telefono || '',
-    salarioBase: employee.salarioBase,
-    tipoContrato: (employee.tipoContrato || 'indefinido') as "indefinido" | "fijo" | "obra" | "aprendizaje",
-    fechaIngreso: employee.fechaIngreso,
-    periodicidadPago: (employee.periodicidadPago || 'mensual') as "mensual" | "quincenal",
-    estado: employee.estado as "activo" | "inactivo" | "vacaciones" | "incapacidad" | "eliminado",
-    createdAt: employee.createdAt || new Date().toISOString(),
-    updatedAt: employee.updatedAt || new Date().toISOString(),
-    // Add other required fields with safe defaults
-    sexo: (employee.sexo || 'M') as "M" | "F",
-    tipoJornada: (employee.tipoJornada || 'completa') as "completa" | "parcial" | "horas",
-    tipoCuenta: (employee.tipoCuenta || 'ahorros') as "ahorros" | "corriente",
-    formaPago: (employee.formaPago || 'dispersion') as "dispersion" | "manual",
-    regimenSalud: (employee.regimenSalud || 'contributivo') as "contributivo" | "subsidiado",
-    estadoAfiliacion: (employee.estadoAfiliacion || 'pendiente') as "completa" | "pendiente" | "inconsistente"
-  } : null;
-
-  // Keep legacy edit submission for compatibility
-  const { handleSubmit: handleEditSubmission, isSubmitting: isSubmittingEdit } = useEmployeeEditSubmission(
-    legacyEmployee,
-    onSuccess
-  );
-
-  const isLoading = isSubmitting || isSubmittingEdit;
+  const isLoading = isSubmitting;
 
   const onSubmit = async (data: any) => {
     console.log('🚀 EmployeeFormModern: Form submission triggered');
@@ -108,8 +75,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     // Add company ID to form data
     const formDataWithCompany = {
       ...data,
-      empresaId: companyId,
-      company_id: companyId, // ✅ ADDED: Ensure both properties are set
+      company_id: companyId,
       // Asegurar que custom_fields está presente y es un objeto
       customFields: data.customFields || {}
     };

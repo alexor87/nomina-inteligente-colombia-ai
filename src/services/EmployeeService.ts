@@ -1,7 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
-import { EmployeeDataMapper } from './EmployeeDataMapper';
 
 export class EmployeeService {
   /**
@@ -94,10 +93,19 @@ export class EmployeeService {
       // Map to database format
       const dbData = mapUnifiedToDatabase(requiredData);
 
-      // ✅ FIXED: Use single object instead of array for insert
+      // ✅ FIXED: Ensure required fields are present for database insertion
+      const insertData = {
+        ...dbData,
+        company_id: requiredData.company_id,
+        nombre: requiredData.nombre,
+        apellido: requiredData.apellido,
+        cedula: requiredData.cedula,
+        salario_base: requiredData.salarioBase
+      };
+
       const { data, error } = await supabase
         .from('employees')
-        .insert(dbData)
+        .insert(insertData)
         .select()
         .single();
 
