@@ -12,14 +12,27 @@ export const useEmployeeEditSubmission = (
   const { toast } = useToast();
 
   const handleSubmit = async (formData: any) => {
-    if (!employee) return;
+    if (!employee) {
+      console.error('❌ No employee provided for edit submission');
+      return;
+    }
+
+    console.log('🚀 Starting employee edit submission for:', employee.id);
+    console.log('📝 Form data received:', formData);
 
     setIsSubmitting(true);
     
     try {
-      console.log('🚀 Submitting employee update:', formData);
+      // Clean the form data before sending
+      const cleanedData = {
+        ...formData,
+        id: employee.id, // Ensure we have the employee ID
+        company_id: employee.company_id || formData.empresaId || formData.company_id
+      };
+
+      console.log('📤 Sending cleaned data:', cleanedData);
       
-      const result = await EmployeeUnifiedService.update(employee.id, formData);
+      const result = await EmployeeUnifiedService.update(employee.id, cleanedData);
       
       if (result.success && result.data) {
         console.log('✅ Employee updated successfully:', result.data);
@@ -27,6 +40,7 @@ export const useEmployeeEditSubmission = (
         toast({
           title: "Empleado actualizado",
           description: `${result.data.nombre} ${result.data.apellido} ha sido actualizado correctamente.`,
+          className: "border-green-200 bg-green-50"
         });
         
         onSuccess();

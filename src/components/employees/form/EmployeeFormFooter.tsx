@@ -11,7 +11,6 @@ interface EmployeeFormFooterProps {
   isDraft: boolean;
   setIsDraft: (value: boolean) => void;
   isLoading: boolean;
-  onSubmit: () => void;
 }
 
 export const EmployeeFormFooter = ({
@@ -19,9 +18,20 @@ export const EmployeeFormFooter = ({
   completionPercentage,
   isDraft,
   setIsDraft,
-  isLoading,
-  onSubmit
+  isLoading
 }: EmployeeFormFooterProps) => {
+  const handleDraftSave = (e: React.MouseEvent) => {
+    e.preventDefault();
+    console.log('💾 Saving as draft...');
+    // This will trigger form submission with draft flag
+    setIsDraft(true);
+    // Submit the form programmatically
+    const form = e.currentTarget.closest('form');
+    if (form) {
+      form.requestSubmit();
+    }
+  };
+
   return (
     <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-4">
       <div className="flex items-center justify-between">
@@ -47,17 +57,16 @@ export const EmployeeFormFooter = ({
           <Button 
             type="button" 
             variant="outline" 
-            onClick={onSubmit}
+            onClick={handleDraftSave}
             disabled={isLoading}
           >
             <Save className="w-4 h-4 mr-2" />
-            {isDraft ? 'Guardar Borrador' : 'Guardar'}
+            Guardar Borrador
           </Button>
           
           {!isDraft && (
             <Button 
               type="submit"
-              onClick={onSubmit}
               disabled={isLoading || completionPercentage < 80}
               className="bg-blue-600 hover:bg-blue-700"
             >

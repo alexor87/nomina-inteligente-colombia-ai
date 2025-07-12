@@ -54,51 +54,53 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     };
   }, [onDataRefresh]);
 
-  // Use robust submission hook for better error handling
-  const { 
-    submitEmployee, 
-    isSubmitting
-  } = useEmployeeFormSubmissionRobust();
-
-  // Keep legacy edit submission for compatibility
+  // Use edit submission hook for employee updates
   const { handleSubmit: handleEditSubmission, isSubmitting: isSubmittingEdit } = useEmployeeEditSubmission(
     employee || null,
     onSuccess
   );
 
-  const isLoading = isSubmitting || isSubmittingEdit;
+  // Use robust submission hook for new employees
+  const { 
+    submitEmployee, 
+    isSubmitting: isSubmittingCreate
+  } = useEmployeeFormSubmissionRobust();
+
+  const isLoading = isEditMode ? isSubmittingEdit : isSubmittingCreate;
 
   const onSubmit = async (data: any) => {
     console.log('🚀 EmployeeFormModern: Form submission triggered');
     console.log('📝 Form data:', data);
     console.log('🎯 Submission mode:', isEditMode ? 'edit' : 'create');
     
-    if (!companyId) {
-      console.error('❌ No company ID available');
-      return;
-    }
-
-    // Add company ID to form data
-    const formDataWithCompany = {
-      ...data,
-      empresaId: companyId,
-      // Asegurar que custom_fields está presente y es un objeto
-      custom_fields: data.custom_fields || {}
-    };
-
-    // Use robust submission for both create and update operations
-    const result = await submitEmployee(formDataWithCompany);
-    
-    if (result.success) {
-      console.log('✅ Form submission completed successfully');
-      onSuccess();
-      if (result.employeeId && memoizedDataRefresh) {
-        // Refresh with updated data if available - ✅ FIXED: Cast with required id
-        const updatedEmployee: EmployeeUnified = { ...formDataWithCompany, id: result.employeeId } as EmployeeUnified;
-        memoizedDataRefresh(updatedEmployee);
-      }
+    if (isEditMode) {
+      // Use edit submission for existing employees
+      await handleEditSubmission(data);
     } else {
-      console.error('❌ Form submission failed:', result.error);
+      // Use robust submission for new employees
+      if (!companyId) {
+        console.error('❌ No company ID available');
+        return;
+      }
+
+      const formDataWithCompany = {
+        ...data,
+        empresaId: companyId,
+        custom_fields: data.custom_fields || {}
+      };
+
+      const result = await submitEmployee(formDataWithCompany);
+      
+      if (result.success) {
+        console.log('✅ Form submission completed successfully');
+        onSuccess();
+        if (result.employeeId && memoizedDataRefresh) {
+          const updatedEmployee: EmployeeUnified = { ...formDataWithCompany, id: result.employeeId } as EmployeeUnified;
+          memoizedDataRefresh(updatedEmployee);
+        }
+      } else {
+        console.error('❌ Form submission failed:', result.error);
+      }
     }
   };
 
@@ -126,7 +128,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
         />
       </div>
       
-      {/* Main Content Area - Scrollable */}
+      {/* Main Content Area - Now includes the form wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
         <EmployeeFormHeader
           employee={employee}
@@ -134,8 +136,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           onDuplicate={handleDuplicate}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1">
+          <div className="flex-1 overflow-y-auto">
             <EmployeeFormContent
               control={control}
               errors={errors}
@@ -146,17 +148,16 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
               register={register}
               customFields={configuration?.custom_fields || []}
             />
-          </form>
-        </div>
+          </div>
 
-        <EmployeeFormFooter
-          employee={employee}
-          completionPercentage={completionPercentage}
-          isDraft={isDraft}
-          setIsDraft={setIsDraft}
-          isLoading={isLoading}
-          onSubmit={handleSubmit(onSubmit)}
-        />
+          <EmployeeFormFooter
+            employee={employee}
+            completionPercentage={completionPercentage}
+            isDraft={isDraft}
+            setIsDraft={setIsDraft}
+            isLoading={isLoading}
+          />
+        </form>
       </div>
     </div>
   );
