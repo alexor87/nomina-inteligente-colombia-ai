@@ -107,44 +107,4 @@ export class EmployeeSoftDeleteService {
       };
     }
   }
-
-  /**
-   * Permanently delete an employee (hard delete)
-   * This should only be used in special cases and by administrators
-   */
-  static async permanentlyDeleteEmployee(employeeId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      console.log('💀 Permanently deleting employee:', employeeId);
-      
-      // First check if employee is soft deleted
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('estado')
-        .eq('id', employeeId)
-        .single();
-
-      if (employee?.estado !== 'eliminado') {
-        throw new Error('Employee must be soft deleted before permanent deletion');
-      }
-
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', employeeId);
-
-      if (error) {
-        console.error('❌ Error permanently deleting employee:', error);
-        throw error;
-      }
-
-      console.log('✅ Employee permanently deleted:', employeeId);
-      return { success: true };
-    } catch (error) {
-      console.error('❌ EmployeeSoftDeleteService error:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error desconocido' 
-      };
-    }
-  }
 }

@@ -182,11 +182,4 @@ export class EmployeeService {
   static async restoreEmployee(id: string): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     return EmployeeSoftDeleteService.restoreEmployee(id);
   }
-
-  /**
-   * Permanently delete an employee (hard delete - use with caution)
-   */
-  static async permanentlyDeleteEmployee(id: string): Promise<{ success: boolean; error?: string }> {
-    return EmployeeSoftDeleteService.permanentlyDeleteEmployee(id);
-  }
 }
