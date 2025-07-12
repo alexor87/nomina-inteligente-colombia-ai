@@ -22,9 +22,12 @@ export const VacationAbsenceFiltersComponent = ({
   const [localFilters, setLocalFilters] = useState<VacationAbsenceFilters>(filters);
 
   const handleFilterChange = (key: keyof VacationAbsenceFilters, value: string) => {
+    // Handle special "ALL" values
+    const actualValue = value === 'ALL_TYPES' || value === 'ALL_STATUSES' ? undefined : value;
+    
     const newFilters = {
       ...localFilters,
-      [key]: value || undefined
+      [key]: actualValue || undefined
     };
     setLocalFilters(newFilters);
     onFiltersChange(newFilters);
@@ -52,14 +55,14 @@ export const VacationAbsenceFiltersComponent = ({
           <div className="space-y-2">
             <Label>Tipo de Ausencia</Label>
             <Select
-              value={localFilters.type || ''}
+              value={localFilters.type || 'ALL_TYPES'}
               onValueChange={(value) => handleFilterChange('type', value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos los tipos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los tipos</SelectItem>
+                <SelectItem value="ALL_TYPES">Todos los tipos</SelectItem>
                 {availableTypes.map((type) => (
                   <SelectItem key={type} value={type}>
                     {ABSENCE_TYPE_LABELS[type]}
@@ -73,14 +76,14 @@ export const VacationAbsenceFiltersComponent = ({
           <div className="space-y-2">
             <Label>Estado</Label>
             <Select
-              value={localFilters.status || ''}
+              value={localFilters.status || 'ALL_STATUSES'}
               onValueChange={(value) => handleFilterChange('status', value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos los estados" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="ALL_STATUSES">Todos los estados</SelectItem>
                 <SelectItem value="pendiente">Pendiente</SelectItem>
                 <SelectItem value="liquidada">Liquidada</SelectItem>
                 <SelectItem value="cancelada">Cancelada</SelectItem>

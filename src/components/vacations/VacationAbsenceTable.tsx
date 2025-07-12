@@ -1,10 +1,10 @@
 
-import { VacationAbsence, ABSENCE_TYPE_LABELS, ABSENCE_TYPE_COLORS } from '@/types/vacations';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { VacationAbsence } from '@/types/vacations';
+import { ABSENCE_TYPE_LABELS, ABSENCE_TYPE_COLORS } from '@/types/vacations';
+import { Eye, Edit, Trash2, Calendar, User, Clock, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -13,7 +13,7 @@ interface VacationAbsenceTableProps {
   onView: (vacation: VacationAbsence) => void;
   onEdit: (vacation: VacationAbsence) => void;
   onDelete: (id: string) => void;
-  isLoading?: boolean;
+  isLoading: boolean;
 }
 
 export const VacationAbsenceTable = ({
@@ -23,171 +23,151 @@ export const VacationAbsenceTable = ({
   onDelete,
   isLoading
 }: VacationAbsenceTableProps) => {
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pendiente':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pendiente</Badge>;
-      case 'liquidada':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Liquidada</Badge>;
-      case 'cancelada':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Cancelada</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  // ✅ NUEVA FUNCIÓN PARA MOSTRAR EL TIPO DE AUSENCIA
-  const getTypeBadge = (type: string) => {
-    const colorClass = ABSENCE_TYPE_COLORS[type as keyof typeof ABSENCE_TYPE_COLORS] || 'bg-gray-100 text-gray-700';
-    const label = ABSENCE_TYPE_LABELS[type as keyof typeof ABSENCE_TYPE_LABELS] || type;
-    
-    return (
-      <Badge variant="outline" className={colorClass}>
-        {label}
-      </Badge>
-    );
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
-    } catch {
-      return dateString;
-    }
-  };
-
   if (isLoading) {
     return (
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Empleado</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Fecha Inicio</TableHead>
-              <TableHead>Fecha Fin</TableHead>
-              <TableHead>Días</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Observaciones</TableHead>
-              <TableHead className="w-[70px]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {[...Array(5)].map((_, index) => (
-              <TableRow key={index}>
-                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando ausencias...</p>
+        </div>
       </div>
     );
   }
 
   if (vacationsAbsences.length === 0) {
     return (
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Empleado</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Fecha Inicio</TableHead>
-              <TableHead>Fecha Fin</TableHead>
-              <TableHead>Días</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Observaciones</TableHead>
-              <TableHead className="w-[70px]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                No se encontraron registros de vacaciones o ausencias
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">No hay ausencias registradas</h3>
+          <p className="text-muted-foreground">
+            Comienza agregando la primera ausencia o vacación
+          </p>
+        </div>
       </div>
     );
   }
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pendiente: { variant: 'secondary' as const, label: 'Pendiente' },
+      liquidada: { variant: 'default' as const, label: 'Liquidada' },
+      cancelada: { variant: 'destructive' as const, label: 'Cancelada' }
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pendiente;
+    
+    return (
+      <Badge variant={config.variant}>
+        {config.label}
+      </Badge>
+    );
+  };
 
   return (
     <div className="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Empleado</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Fecha Inicio</TableHead>
-            <TableHead>Fecha Fin</TableHead>
-            <TableHead>Días</TableHead>
+            <TableHead>
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Empleado
+              </div>
+            </TableHead>
+            <TableHead>
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Tipo
+              </div>
+            </TableHead>
+            <TableHead>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Período
+              </div>
+            </TableHead>
+            <TableHead>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Días
+              </div>
+            </TableHead>
             <TableHead>Estado</TableHead>
             <TableHead>Observaciones</TableHead>
-            <TableHead className="w-[70px]">Acciones</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {vacationsAbsences.map((vacation) => (
             <TableRow key={vacation.id}>
-              <TableCell>
+              <TableCell className="font-medium">
                 <div>
-                  <div className="font-medium">
+                  <div className="font-semibold">
                     {vacation.employee?.nombre} {vacation.employee?.apellido}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {vacation.employee?.cedula}
+                    CC: {vacation.employee?.cedula}
                   </div>
                 </div>
               </TableCell>
-              <TableCell>{getTypeBadge(vacation.type)}</TableCell>
-              <TableCell>{formatDate(vacation.start_date)}</TableCell>
-              <TableCell>{formatDate(vacation.end_date)}</TableCell>
               <TableCell>
-                <Badge variant="secondary">{vacation.days_count}</Badge>
+                <Badge 
+                  variant="outline" 
+                  className={ABSENCE_TYPE_COLORS[vacation.type]}
+                >
+                  {ABSENCE_TYPE_LABELS[vacation.type]}
+                </Badge>
               </TableCell>
-              <TableCell>{getStatusBadge(vacation.status)}</TableCell>
-              <TableCell className="max-w-[200px]">
-                <div className="truncate" title={vacation.observations}>
-                  {vacation.observations || '-'}
+              <TableCell>
+                <div className="text-sm">
+                  <div>
+                    <strong>Desde:</strong> {format(new Date(vacation.start_date), 'dd/MM/yyyy', { locale: es })}
+                  </div>
+                  <div>
+                    <strong>Hasta:</strong> {format(new Date(vacation.end_date), 'dd/MM/yyyy', { locale: es })}
+                  </div>
                 </div>
               </TableCell>
               <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onView(vacation)}>
-                      <Eye className="mr-2 h-4 w-4" />
-                      Ver detalles
-                    </DropdownMenuItem>
-                    {vacation.status === 'pendiente' && (
-                      <>
-                        <DropdownMenuItem onClick={() => onEdit(vacation)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => onDelete(vacation.id)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{vacation.days_count}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                {getStatusBadge(vacation.status)}
+              </TableCell>
+              <TableCell>
+                <div className="max-w-xs truncate text-sm text-muted-foreground">
+                  {vacation.observations || 'Sin observaciones'}
+                </div>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onView(vacation)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEdit(vacation)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDelete(vacation.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}

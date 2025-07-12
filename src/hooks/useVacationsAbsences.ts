@@ -45,12 +45,12 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
       `)
       .order('created_at', { ascending: false });
 
-    // Aplicar filtros
-    if (filters.status) {
+    // Aplicar filtros - solo si tienen valores válidos (no undefined y no son valores especiales)
+    if (filters.status && filters.status !== 'ALL_STATUSES') {
       query = query.eq('status', filters.status);
     }
 
-    if (filters.type) {
+    if (filters.type && filters.type !== 'ALL_TYPES') {
       query = query.eq('type', filters.type);
     }
 
