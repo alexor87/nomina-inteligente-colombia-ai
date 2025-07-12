@@ -1,3 +1,4 @@
+
 import { cn } from '@/lib/utils';
 
 interface NavigationSidebarProps {
@@ -21,7 +22,7 @@ export const NavigationSidebar = ({
   ];
 
   return (
-    <div className="w-72 bg-gray-50 border-r border-gray-200 min-h-screen p-6">
+    <div className="w-72 bg-gray-50 border-r border-gray-200 h-screen p-6 overflow-y-auto">
       <div className="mb-8">
         <h3 className="text-sm font-medium text-gray-900 mb-4">Progreso del formulario</h3>
         <div className="w-full bg-gray-200 rounded-full h-2">
