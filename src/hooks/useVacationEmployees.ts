@@ -23,6 +23,6 @@ export const useVacationEmployees = (enabled: boolean = true) => {
     enabled: enabled && !!user,
     // Forzar refresco de datos para mostrar la lista limpia
     staleTime: 0,
-    cacheTime: 0,
+    gcTime: 0,
   });
 };
