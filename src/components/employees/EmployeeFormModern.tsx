@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
@@ -117,24 +116,20 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
 
   return (
     <div className="flex min-h-screen bg-white">
-      {/* Fixed Navigation Sidebar */}
-      <div className="fixed left-0 top-0 h-screen z-50">
-        <NavigationSidebar 
-          activeSection={activeSection}
-          completionPercentage={completionPercentage}
-          scrollToSection={scrollToSection}
-        />
-      </div>
+      <NavigationSidebar 
+        activeSection={activeSection}
+        completionPercentage={completionPercentage}
+        scrollToSection={scrollToSection}
+      />
       
-      {/* Main Content Area with left margin to account for fixed sidebar */}
-      <div className="flex-1 ml-72 flex flex-col min-h-screen">
+      <div className="flex-1">
         <EmployeeFormHeader
           employee={employee}
           onCancel={onCancel}
           onDuplicate={handleDuplicate}
         />
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col">
+        <form onSubmit={handleSubmit(onSubmit)}>
           <EmployeeFormContent
             control={control}
             errors={errors}
