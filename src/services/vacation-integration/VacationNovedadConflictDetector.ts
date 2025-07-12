@@ -1,4 +1,3 @@
-
 export interface ConflictRecord {
   id: string;
   employeeId: string;
@@ -31,6 +30,9 @@ export interface ConflictReport {
 }
 
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+type NovedadType = Database['public']['Enums']['novedad_type'];
 
 export class VacationNovedadConflictDetector {
   /**
@@ -150,8 +152,8 @@ export class VacationNovedadConflictDetector {
     periodId?: string
   ): Promise<ConflictRecord[]> {
     try {
-      // Tipos de novedad que representan ausencias/vacaciones
-      const absenceTypes = [
+      // Tipos de novedad que representan ausencias/vacaciones - properly typed
+      const absenceTypes: NovedadType[] = [
         'vacaciones',
         'licencia_remunerada',
         'licencia_no_remunerada',
