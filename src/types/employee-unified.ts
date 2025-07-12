@@ -58,9 +58,9 @@ export interface EmployeeUnified {
   clausulasEspeciales?: string;
   customFields?: Record<string, any>;
   
-  // Metadata
-  createdAt: string;
-  updatedAt: string;
+  // Metadata - made optional to fix compatibility issues
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 type DatabaseEmployee = Database['public']['Tables']['employees']['Row'];

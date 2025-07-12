@@ -1,7 +1,8 @@
+
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeFormData } from '@/components/employees/form/types';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeCRUD } from './useEmployeeCRUD';
 
 export const useEmployeeFormSubmission = () => {
@@ -9,57 +10,58 @@ export const useEmployeeFormSubmission = () => {
   const { toast } = useToast();
   const { createEmployee, updateEmployee } = useEmployeeCRUD();
 
-  const mapFormDataToEmployee = (formData: EmployeeFormData, companyId: string): Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> => {
+  const mapFormDataToEmployee = (formData: EmployeeFormData, companyId: string): Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> => {
     return {
-      empresaId: companyId,
+      company_id: companyId,
       cedula: formData.cedula,
-      tipoDocumento: formData.tipoDocumento,
+      tipoDocumento: formData.tipoDocumento as string,
       nombre: formData.nombre,
       segundoNombre: formData.segundoNombre,
       apellido: formData.apellido,
       email: formData.email,
       telefono: formData.telefono,
-      sexo: formData.sexo,
+      sexo: formData.sexo as string,
       fechaNacimiento: formData.fechaNacimiento,
       direccion: formData.direccion,
       ciudad: formData.ciudad,
       departamento: formData.departamento,
       salarioBase: Number(formData.salarioBase),
-      tipoContrato: formData.tipoContrato, // ✅ FIXED: Direct assignment
+      tipoContrato: formData.tipoContrato as string,
       fechaIngreso: formData.fechaIngreso,
-      periodicidadPago: formData.periodicidadPago, // ✅ FIXED: Direct assignment
+      periodicidadPago: formData.periodicidadPago as string,
       cargo: formData.cargo,
-      codigoCIIU: formData.codigo_ciiu,
-      nivelRiesgoARL: formData.nivelRiesgoARL || 'I', // ✅ FIXED: Ensure valid ARL level
-      estado: formData.estado, // ✅ FIXED: Direct assignment
+      codigoCiiu: formData.codigoCiiu,
+      nivelRiesgoArl: formData.nivelRiesgoArl,
+      estado: formData.estado as any,
       centroCostos: formData.centroCostos,
       fechaFirmaContrato: formData.fechaFirmaContrato,
       fechaFinalizacionContrato: formData.fechaFinalizacionContrato,
-      tipoJornada: formData.tipoJornada, // ✅ FIXED: Direct assignment
+      tipoJornada: formData.tipoJornada as string,
       diasTrabajo: formData.diasTrabajo,
       horasTrabajo: formData.horasTrabajo,
       beneficiosExtralegales: formData.beneficiosExtralegales,
       clausulasEspeciales: formData.clausulasEspeciales,
       banco: formData.banco,
-      tipoCuenta: formData.tipoCuenta,
+      tipoCuenta: formData.tipoCuenta as string,
       numeroCuenta: formData.numeroCuenta,
       titularCuenta: formData.titularCuenta,
-      formaPago: formData.formaPago, // ✅ FIXED: Direct assignment
+      formaPago: formData.formaPago as string,
       eps: formData.eps,
       afp: formData.afp,
       arl: formData.arl,
       cajaCompensacion: formData.cajaCompensacion,
       tipoCotizanteId: formData.tipoCotizanteId,
       subtipoCotizanteId: formData.subtipoCotizanteId,
-      regimenSalud: formData.regimenSalud,
-      estadoAfiliacion: formData.estadoAfiliacion // ✅ FIXED: Direct assignment
+      regimenSalud: formData.regimenSalud as string,
+      estadoAfiliacion: formData.estadoAfiliacion as string,
+      customFields: formData.customFields || {}
     };
   };
 
   const submitEmployeeForm = async (
     formData: EmployeeFormData,
     companyId: string,
-    existingEmployee?: Employee
+    existingEmployee?: EmployeeUnified
   ) => {
     setIsSubmitting(true);
     
@@ -68,7 +70,7 @@ export const useEmployeeFormSubmission = () => {
       
       let result;
       if (existingEmployee) {
-        result = await updateEmployee(existingEmployee.id, employeeData as Partial<Employee>);
+        result = await updateEmployee(existingEmployee.id, employeeData as Partial<EmployeeUnified>);
       } else {
         result = await createEmployee(employeeData);
       }

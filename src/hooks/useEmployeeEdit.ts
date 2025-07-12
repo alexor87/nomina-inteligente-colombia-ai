@@ -1,11 +1,11 @@
 
 import { useEffect, useState } from 'react';
-import { Employee } from '@/types';
-import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
+import { EmployeeUnified } from '@/types/employee-unified';
+import { EmployeeService } from '@/services/EmployeeService';
 import { useToast } from '@/hooks/use-toast';
 
 export const useEmployeeEdit = (employeeId?: string) => {
-  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [employee, setEmployee] = useState<EmployeeUnified | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -19,18 +19,14 @@ export const useEmployeeEdit = (employeeId?: string) => {
         setError(null);
         console.log('🔍 Loading employee for editing:', employeeId);
         
-        const result = await EmployeeUnifiedService.getEmployeeById(employeeId);
+        const result = await EmployeeService.getEmployeeById(employeeId);
         
-        if (!result.success) {
-          throw new Error(result.error || 'Empleado no encontrado');
-        }
-
-        if (!result.data) {
+        if (!result) {
           throw new Error('Empleado no encontrado');
         }
 
-        console.log('✅ Employee loaded for editing:', result.data);
-        setEmployee(result.data);
+        console.log('✅ Employee loaded for editing:', result);
+        setEmployee(result);
       } catch (err) {
         console.error('❌ Error loading employee:', err);
         const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
