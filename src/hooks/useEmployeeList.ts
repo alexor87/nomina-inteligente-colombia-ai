@@ -270,7 +270,7 @@ export const useEmployeeList = (): EmployeeListHook => {
     itemsPerPage
   };
 
-  // Statistics
+  // Statistics - now properly handles 'eliminado' status
   const statistics = useMemo(() => {
     return {
       active: employees.filter(e => e.estado === 'activo').length,
