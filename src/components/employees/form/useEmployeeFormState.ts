@@ -8,28 +8,44 @@ export const useEmployeeFormState = () => {
   const [isDraft, setIsDraft] = useState(false);
 
   const scrollToSection = (sectionId: string) => {
+    console.log('🔍 Scrolling to section:', sectionId);
     setActiveSection(sectionId);
+    
     const element = document.getElementById(`section-${sectionId}`);
+    console.log('📍 Found element:', element);
+    
     if (element) {
-      // Find the scrollable container (the form content area)
-      const scrollContainer = element.closest('.overflow-y-auto') || window;
+      // Buscar el contenedor de scroll más cercano
+      const scrollContainer = element.closest('.overflow-y-auto');
+      console.log('📦 Found scroll container:', scrollContainer);
       
-      if (scrollContainer === window) {
-        // Default window scroll behavior
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        // Custom scroll for container with offset for better positioning
-        const containerRect = (scrollContainer as Element).getBoundingClientRect();
-        const elementRect = element.getBoundingClientRect();
-        const offset = 80; // Offset for better visual positioning
-        
-        const scrollTop = elementRect.top - containerRect.top + (scrollContainer as Element).scrollTop - offset;
-        
-        (scrollContainer as Element).scrollTo({
-          top: scrollTop,
-          behavior: 'smooth'
+      if (scrollContainer) {
+        // Usar scrollIntoView directamente en el elemento
+        element.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest'
         });
+        
+        // Ajuste adicional para compensar cualquier header
+        setTimeout(() => {
+          const elementRect = element.getBoundingClientRect();
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const currentScrollTop = scrollContainer.scrollTop;
+          const elementTop = elementRect.top - containerRect.top + currentScrollTop;
+          const offset = 20; // Pequeño offset para mejor visualización
+          
+          scrollContainer.scrollTo({
+            top: elementTop - offset,
+            behavior: 'smooth'
+          });
+        }, 100);
+      } else {
+        // Fallback a scroll normal de la ventana
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+    } else {
+      console.error('❌ Element not found:', `section-${sectionId}`);
     }
   };
 

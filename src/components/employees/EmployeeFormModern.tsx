@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
@@ -115,32 +116,38 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
   });
 
   return (
-    <div className="flex min-h-screen bg-white">
-      <NavigationSidebar 
-        activeSection={activeSection}
-        completionPercentage={completionPercentage}
-        scrollToSection={scrollToSection}
-      />
+    <div className="flex h-screen bg-white">
+      {/* Fixed Sidebar */}
+      <div className="flex-shrink-0">
+        <NavigationSidebar 
+          activeSection={activeSection}
+          completionPercentage={completionPercentage}
+          scrollToSection={scrollToSection}
+        />
+      </div>
       
-      <div className="flex-1">
+      {/* Main Content Area - Scrollable */}
+      <div className="flex-1 flex flex-col min-w-0">
         <EmployeeFormHeader
           employee={employee}
           onCancel={onCancel}
           onDuplicate={handleDuplicate}
         />
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <EmployeeFormContent
-            control={control}
-            errors={errors}
-            watchedValues={watchedValues}
-            setValue={setValue}
-            watch={watch}
-            arlRiskLevels={arlRiskLevels}
-            register={register}
-            customFields={configuration?.custom_fields || []}
-          />
-        </form>
+        <div className="flex-1 overflow-y-auto">
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <EmployeeFormContent
+              control={control}
+              errors={errors}
+              watchedValues={watchedValues}
+              setValue={setValue}
+              watch={watch}
+              arlRiskLevels={arlRiskLevels}
+              register={register}
+              customFields={configuration?.custom_fields || []}
+            />
+          </form>
+        </div>
 
         <EmployeeFormFooter
           employee={employee}

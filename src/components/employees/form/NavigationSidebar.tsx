@@ -1,3 +1,4 @@
+
 import { cn } from '@/lib/utils';
 
 interface NavigationSidebarProps {
@@ -20,8 +21,13 @@ export const NavigationSidebar = ({
     { id: 'personalizados', title: 'Campos Personalizados', icon: '⚙️' }
   ];
 
+  const handleSectionClick = (sectionId: string) => {
+    console.log('🖱️ Clicked section:', sectionId);
+    scrollToSection(sectionId);
+  };
+
   return (
-    <div className="w-72 bg-gray-50 border-r border-gray-200 min-h-screen p-6">
+    <div className="w-72 bg-gray-50 border-r border-gray-200 h-full p-6">
       <div className="mb-8">
         <h3 className="text-sm font-medium text-gray-900 mb-4">Progreso del formulario</h3>
         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -37,7 +43,7 @@ export const NavigationSidebar = ({
         {sections.map((section) => (
           <button
             key={section.id}
-            onClick={() => scrollToSection(section.id)}
+            onClick={() => handleSectionClick(section.id)}
             className={cn(
               "w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-left",
               activeSection === section.id
