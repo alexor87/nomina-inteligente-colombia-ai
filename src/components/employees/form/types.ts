@@ -26,7 +26,7 @@ export interface EmployeeFormData {
   cargo?: string;
   codigo_ciiu?: string;
   nivelRiesgoARL?: "I" | "II" | "III" | "IV" | "V";
-  estado: "activo" | "inactivo" | "vacaciones" | "incapacidad";
+  estado: "activo" | "inactivo" | "vacaciones" | "incapacidad" | "eliminado"; // ✅ FIXED: Added 'eliminado'
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
