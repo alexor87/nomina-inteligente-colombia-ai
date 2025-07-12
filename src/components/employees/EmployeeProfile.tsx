@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { VacationBalanceCard } from './VacationBalanceCard';
 import { 
   User, Calendar, DollarSign, FileText, Shield, Clock, 
   Mail, Download, Eye, Send, CheckCircle, XCircle,
@@ -389,7 +390,7 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
             {/* Tabs principales */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="sticky top-0 bg-gray-50 pb-4 z-10">
-                <TabsList className={`grid w-full ${isMobile ? 'grid-cols-3' : 'grid-cols-6'} bg-white border shadow-sm`}>
+                <TabsList className={`grid w-full ${isMobile ? 'grid-cols-4' : 'grid-cols-7'} bg-white border shadow-sm`}>
                   <TabsTrigger value="nomina" className="flex items-center space-x-1 lg:space-x-2 text-xs lg:text-sm">
                     <DollarSign className="h-3 w-3 lg:h-4 lg:w-4" />
                     <span className={isMobile ? 'hidden' : 'block'}>Nómina</span>
@@ -401,6 +402,10 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
                   <TabsTrigger value="aportes" className="flex items-center space-x-1 lg:space-x-2 text-xs lg:text-sm">
                     <Shield className="h-3 w-3 lg:h-4 lg:w-4" />
                     <span className={isMobile ? 'hidden' : 'block'}>Aportes</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="vacaciones" className="flex items-center space-x-1 lg:space-x-2 text-xs lg:text-sm">
+                    <Calendar className="h-3 w-3 lg:h-4 lg:w-4" />
+                    <span className={isMobile ? 'hidden' : 'block'}>Vacaciones</span>
                   </TabsTrigger>
                   {!isMobile && (
                     <>
@@ -650,6 +655,11 @@ export const EmployeeProfile = ({ employee, onClose }: EmployeeProfileProps) => 
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* Tab Content: Vacaciones */}
+              <TabsContent value="vacaciones" className="mt-0">
+                <VacationBalanceCard employee={employee} />
               </TabsContent>
 
               {/* Tabs adicionales solo en desktop */}

@@ -3,6 +3,7 @@ import { PersonalInfoSection } from './PersonalInfoSection';
 import { LaborInfoSection } from './LaborInfoSection';
 import { BankingInfoSection } from './BankingInfoSection';
 import { AffiliationsSection } from './AffiliationsSection';
+import { VacationInfoSection } from './VacationInfoSection';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { EmployeeFormData } from './types';
@@ -66,6 +67,12 @@ export const EmployeeFormContent = ({
           errors={errors}
           watchedValues={watchedValues}
           setValue={setValue}
+        />
+
+        {/* Vacation Information Section */}
+        <VacationInfoSection
+          control={control}
+          errors={errors}
         />
 
         {/* Custom Fields Section */}

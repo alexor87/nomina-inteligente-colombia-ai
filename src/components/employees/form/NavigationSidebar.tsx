@@ -1,4 +1,3 @@
-
 import { cn } from '@/lib/utils';
 
 interface NavigationSidebarProps {
@@ -17,6 +16,7 @@ export const NavigationSidebar = ({
     { id: 'laboral', title: 'Información Laboral', icon: '💼' },
     { id: 'afiliaciones', title: 'Afiliaciones', icon: '🏥' },
     { id: 'bancaria', title: 'Información Bancaria', icon: '🏦' },
+    { id: 'vacaciones', title: 'Vacaciones', icon: '🏖️' },
     { id: 'personalizados', title: 'Campos Personalizados', icon: '⚙️' }
   ];
 
