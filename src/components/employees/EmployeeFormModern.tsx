@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
@@ -59,12 +60,31 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     isSubmitting
   } = useEmployeeFormSubmissionRobust();
 
-  // ✅ FIXED: Create compatible employee object for legacy hooks
+  // ✅ FIXED: Create a simplified legacy employee object for compatibility
   const legacyEmployee = employee ? {
-    ...employee,
+    id: employee.id,
     empresaId: employee.company_id,
+    company_id: employee.company_id,
+    nombre: employee.nombre,
+    apellido: employee.apellido,
+    cedula: employee.cedula,
+    tipoDocumento: (employee.tipoDocumento || 'CC') as "CC" | "TI" | "CE" | "PA" | "RC" | "NIT" | "PEP" | "PPT",
+    email: employee.email || '',
+    telefono: employee.telefono || '',
+    salarioBase: employee.salarioBase,
+    tipoContrato: (employee.tipoContrato || 'indefinido') as "indefinido" | "fijo" | "obra" | "aprendizaje",
+    fechaIngreso: employee.fechaIngreso,
+    periodicidadPago: (employee.periodicidadPago || 'mensual') as "mensual" | "quincenal",
+    estado: employee.estado as "activo" | "inactivo" | "vacaciones" | "incapacidad" | "eliminado",
     createdAt: employee.createdAt || new Date().toISOString(),
-    updatedAt: employee.updatedAt || new Date().toISOString()
+    updatedAt: employee.updatedAt || new Date().toISOString(),
+    // Add other required fields with safe defaults
+    sexo: (employee.sexo || 'M') as "M" | "F",
+    tipoJornada: (employee.tipoJornada || 'completa') as "completa" | "parcial" | "horas",
+    tipoCuenta: (employee.tipoCuenta || 'ahorros') as "ahorros" | "corriente",
+    formaPago: (employee.formaPago || 'dispersion') as "dispersion" | "manual",
+    regimenSalud: (employee.regimenSalud || 'contributivo') as "contributivo" | "subsidiado",
+    estadoAfiliacion: (employee.estadoAfiliacion || 'pendiente') as "completa" | "pendiente" | "inconsistente"
   } : null;
 
   // Keep legacy edit submission for compatibility
@@ -101,13 +121,58 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
       console.log('✅ Form submission completed successfully');
       onSuccess();
       if (result.employeeId && memoizedDataRefresh) {
-        // Refresh with updated data if available - ✅ FIXED: Cast with required id
+        // ✅ FIXED: Create updated employee with proper casting
         const updatedEmployee: EmployeeUnified = { 
-          ...formDataWithCompany, 
           id: result.employeeId,
+          company_id: companyId,
           empresaId: companyId,
-          company_id: companyId
-        } as EmployeeUnified;
+          nombre: formDataWithCompany.nombre || '',
+          apellido: formDataWithCompany.apellido || '',
+          cedula: formDataWithCompany.cedula || '',
+          tipoDocumento: formDataWithCompany.tipoDocumento || 'CC',
+          email: formDataWithCompany.email,
+          telefono: formDataWithCompany.telefono,
+          salarioBase: formDataWithCompany.salarioBase || 0,
+          tipoContrato: formDataWithCompany.tipoContrato || 'indefinido',
+          fechaIngreso: formDataWithCompany.fechaIngreso || new Date().toISOString().split('T')[0],
+          periodicidadPago: formDataWithCompany.periodicidadPago || 'mensual',
+          estado: formDataWithCompany.estado || 'activo',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          // Add other optional fields
+          segundoNombre: formDataWithCompany.segundoNombre,
+          fechaNacimiento: formDataWithCompany.fechaNacimiento,
+          sexo: formDataWithCompany.sexo,
+          direccion: formDataWithCompany.direccion,
+          ciudad: formDataWithCompany.ciudad,
+          departamento: formDataWithCompany.departamento,
+          cargo: formDataWithCompany.cargo,
+          eps: formDataWithCompany.eps,
+          afp: formDataWithCompany.afp,
+          arl: formDataWithCompany.arl,
+          cajaCompensacion: formDataWithCompany.cajaCompensacion,
+          banco: formDataWithCompany.banco,
+          tipoCuenta: formDataWithCompany.tipoCuenta || 'ahorros',
+          numeroCuenta: formDataWithCompany.numeroCuenta,
+          titularCuenta: formDataWithCompany.titularCuenta,
+          formaPago: formDataWithCompany.formaPago || 'dispersion',
+          regimenSalud: formDataWithCompany.regimenSalud || 'contributivo',
+          estadoAfiliacion: formDataWithCompany.estadoAfiliacion || 'pendiente',
+          customFields: formDataWithCompany.customFields || {},
+          // Handle other fields with proper defaults
+          fechaFirmaContrato: formDataWithCompany.fechaFirmaContrato,
+          fechaFinalizacionContrato: formDataWithCompany.fechaFinalizacionContrato,
+          tipoJornada: formDataWithCompany.tipoJornada || 'completa',
+          diasTrabajo: formDataWithCompany.diasTrabajo || 30,
+          horasTrabajo: formDataWithCompany.horasTrabajo || 8,
+          beneficiosExtralegales: formDataWithCompany.beneficiosExtralegales || false,
+          codigoCiiu: formDataWithCompany.codigoCiiu,
+          nivelRiesgoArl: formDataWithCompany.nivelRiesgoArl,
+          centroCostos: formDataWithCompany.centroCostos,
+          clausulasEspeciales: formDataWithCompany.clausulasEspeciales,
+          tipoCotizanteId: formDataWithCompany.tipoCotizanteId,
+          subtipoCotizanteId: formDataWithCompany.subtipoCotizanteId
+        };
         memoizedDataRefresh(updatedEmployee);
       }
     } else {

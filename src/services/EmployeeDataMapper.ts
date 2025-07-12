@@ -54,8 +54,8 @@ export class EmployeeDataMapper {
 
       // Optional labor information
       cargo: this.cleanTextField(formData.cargo),
-      codigo_ciiu: this.cleanTextField(formData.codigoCiiu), // ✅ FIXED: Use correct property name
-      nivel_riesgo_arl: formData.nivelRiesgoArl || null, // ✅ FIXED: Use correct property name
+      codigo_ciiu: this.cleanTextField(formData.codigoCIIU), // ✅ FIXED: Use correct property name from ValidatedEmployeeData
+      nivel_riesgo_arl: formData.nivelRiesgoARL || null, // ✅ FIXED: Use correct property name from ValidatedEmployeeData
       centro_costos: this.cleanTextField(formData.centroCostos),
 
       // Contract details - FIXED: Clean date fields properly
@@ -100,13 +100,13 @@ export class EmployeeDataMapper {
     return {
       id: dbData.id,
       cedula: dbData.cedula || '',
-      tipoDocumento: dbData.tipo_documento || 'CC',
+      tipoDocumento: (dbData.tipo_documento || 'CC') as "CC" | "TI" | "CE" | "PA" | "RC" | "NIT" | "PEP" | "PPT",
       nombre: dbData.nombre || '',
       segundoNombre: dbData.segundo_nombre || undefined,
       apellido: dbData.apellido || '',
       email: dbData.email || undefined,
       telefono: dbData.telefono || undefined,
-      sexo: dbData.sexo || undefined,
+      sexo: (dbData.sexo || 'M') as "M" | "F",
       fechaNacimiento: dbData.fecha_nacimiento || undefined,
       direccion: dbData.direccion || undefined,
       ciudad: dbData.ciudad || undefined,
@@ -114,34 +114,34 @@ export class EmployeeDataMapper {
       empresaId: dbData.company_id,
       company_id: dbData.company_id,
       salarioBase: Number(dbData.salario_base || 0),
-      tipoContrato: dbData.tipo_contrato || 'indefinido',
+      tipoContrato: (dbData.tipo_contrato || 'indefinido') as "indefinido" | "fijo" | "obra" | "aprendizaje",
       fechaIngreso: dbData.fecha_ingreso || new Date().toISOString().split('T')[0],
-      periodicidadPago: dbData.periodicidad_pago || 'mensual',
+      periodicidadPago: (dbData.periodicidad_pago || 'mensual') as "mensual" | "quincenal",
       cargo: dbData.cargo || undefined,
-      codigoCiiu: dbData.codigo_ciiu || undefined, // ✅ FIXED: Use correct property name
-      nivelRiesgoArl: dbData.nivel_riesgo_arl || undefined, // ✅ FIXED: Use correct property name
-      estado: dbData.estado || 'activo',
+      codigoCIIU: dbData.codigo_ciiu || undefined, // ✅ FIXED: Use correct property name for Employee type
+      nivelRiesgoARL: dbData.nivel_riesgo_arl || undefined, // ✅ FIXED: Use correct property name for Employee type
+      estado: (dbData.estado || 'activo') as "activo" | "inactivo" | "vacaciones" | "incapacidad" | "eliminado",
       centroCostos: dbData.centro_costos || undefined,
       fechaFirmaContrato: dbData.fecha_firma_contrato || undefined,
       fechaFinalizacionContrato: dbData.fecha_finalizacion_contrato || undefined,
-      tipoJornada: dbData.tipo_jornada || 'completa',
+      tipoJornada: (dbData.tipo_jornada || 'completa') as "completa" | "parcial" | "horas",
       diasTrabajo: Number(dbData.dias_trabajo) || 30,
       horasTrabajo: Number(dbData.horas_trabajo) || 8,
       beneficiosExtralegales: Boolean(dbData.beneficios_extralegales),
       clausulasEspeciales: dbData.clausulas_especiales || undefined,
       banco: dbData.banco || undefined,
-      tipoCuenta: dbData.tipo_cuenta || 'ahorros',
+      tipoCuenta: (dbData.tipo_cuenta || 'ahorros') as "ahorros" | "corriente",
       numeroCuenta: dbData.numero_cuenta || undefined,
       titularCuenta: dbData.titular_cuenta || undefined,
-      formaPago: dbData.forma_pago || 'dispersion',
+      formaPago: (dbData.forma_pago || 'dispersion') as "dispersion" | "manual",
       eps: dbData.eps || undefined,
       afp: dbData.afp || undefined,
       arl: dbData.arl || undefined,
       cajaCompensacion: dbData.caja_compensacion || undefined,
       tipoCotizanteId: dbData.tipo_cotizante_id || undefined,
       subtipoCotizanteId: dbData.subtipo_cotizante_id || undefined,
-      regimenSalud: dbData.regimen_salud || 'contributivo',
-      estadoAfiliacion: dbData.estado_afiliacion || 'pendiente',
+      regimenSalud: (dbData.regimen_salud || 'contributivo') as "contributivo" | "subsidiado",
+      estadoAfiliacion: (dbData.estado_afiliacion || 'pendiente') as "completa" | "pendiente" | "inconsistente",
       createdAt: dbData.created_at,
       updatedAt: dbData.updated_at
     };

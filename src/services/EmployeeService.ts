@@ -94,9 +94,10 @@ export class EmployeeService {
       // Map to database format
       const dbData = mapUnifiedToDatabase(requiredData);
 
+      // ✅ FIXED: Use single object instead of array for insert
       const { data, error } = await supabase
         .from('employees')
-        .insert([dbData]) // ✅ FIXED: Wrap in array for insert
+        .insert(dbData)
         .select()
         .single();
 
@@ -131,7 +132,7 @@ export class EmployeeService {
       // ✅ FIXED: Ensure company_id is handled correctly
       const updateData = {
         ...updates,
-        company_id: updates.company_id || updates.empresaId || ''
+        company_id: updates.company_id || ''
       };
 
       // Map to database format, but only the fields that are being updated

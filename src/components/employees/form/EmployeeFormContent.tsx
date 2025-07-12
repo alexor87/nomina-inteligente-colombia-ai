@@ -18,6 +18,22 @@ interface EmployeeFormContentProps {
   customFields: any[];
 }
 
+// ✅ FIXED: Convert FieldErrors to simple error record for compatibility
+const convertFieldErrorsToRecord = (errors: FieldErrors<EmployeeFormData>): Record<string, string> => {
+  const errorRecord: Record<string, string> = {};
+  
+  Object.keys(errors).forEach(key => {
+    const error = errors[key as keyof EmployeeFormData];
+    if (error && typeof error === 'object' && 'message' in error) {
+      errorRecord[key] = error.message || 'Error de validación';
+    } else if (typeof error === 'string') {
+      errorRecord[key] = error;
+    }
+  });
+  
+  return errorRecord;
+};
+
 export const EmployeeFormContent = ({ 
   control, 
   errors, 
@@ -28,13 +44,16 @@ export const EmployeeFormContent = ({
   register,
   customFields = []
 }: EmployeeFormContentProps) => {
+  // Convert field errors to simple record for legacy components
+  const simpleErrors = convertFieldErrorsToRecord(errors);
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto p-8 space-y-8">
         {/* Personal Information Section */}
         <PersonalInfoSection 
           control={control}
-          errors={errors}
+          errors={simpleErrors}
           watchedValues={watchedValues}
           watch={watch}
         />
@@ -42,7 +61,7 @@ export const EmployeeFormContent = ({
         {/* Labor Information Section */}
         <LaborInfoSection
           control={control}
-          errors={errors}
+          errors={simpleErrors}
           watchedValues={watchedValues}
           setValue={setValue}
           watch={watch}
@@ -53,7 +72,7 @@ export const EmployeeFormContent = ({
         {/* Banking Information Section */}
         <BankingInfoSection
           control={control}
-          errors={errors}
+          errors={simpleErrors}
           watchedValues={watchedValues}
           setValue={setValue}
           watch={watch}
@@ -63,7 +82,7 @@ export const EmployeeFormContent = ({
         {/* Affiliations Section */}
         <AffiliationsSection
           control={control}
-          errors={errors}
+          errors={simpleErrors}
           watchedValues={watchedValues}
           setValue={setValue}
         />
@@ -73,7 +92,7 @@ export const EmployeeFormContent = ({
           <CustomFieldsSection
             customFields={customFields}
             control={control}
-            errors={errors}
+            errors={simpleErrors}
             setValue={setValue}
           />
         )}

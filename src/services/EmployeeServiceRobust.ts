@@ -1,261 +1,151 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
-import { EmployeeDataMapper } from './EmployeeDataMapper';
-
-interface EmployeeServiceResponse {
-  success: boolean;
-  employee?: EmployeeUnified;
-  message?: string;
-  error?: any;
-}
+import { useToast } from '@/hooks/use-toast';
 
 export class EmployeeServiceRobust {
-  
-  /**
-   * Helper to clean data before database operations - KISS approach
-   */
-  private static cleanEmployeeData(employeeData: Partial<EmployeeUnified>): any {
-    // Use EmployeeDataMapper for proper cleaning
-    if (employeeData.empresaId || employeeData.company_id) {
-      return EmployeeDataMapper.mapFormToDatabase(employeeData as any, employeeData.empresaId || employeeData.company_id!);
-    }
-    
-    // Fallback for direct mapping
-    return mapUnifiedToDatabase(employeeData as EmployeeUnified);
-  }
-
-  /**
-   * Crear un nuevo empleado con campos personalizados
-   */
-  static async createEmployee(employeeData: Partial<EmployeeUnified>): Promise<EmployeeServiceResponse> {
+  static async createEmployee(employeeData: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     try {
-      console.log('🏢 EmployeeServiceRobust: Creating employee with data:', employeeData);
+      console.log('🚀 EmployeeServiceRobust: Creating employee', employeeData);
 
-      // Separar custom_fields del resto de datos
-      const { custom_fields, ...standardFields } = employeeData;
-
-      // KISS: Limpiar datos usando el mapper mejorado
-      const cleanedData = this.cleanEmployeeData({
-        ...standardFields,
-        custom_fields: custom_fields || {}
-      });
-
-      // Asegurar que campos requeridos estén presentes
-      const dataToInsert = {
-        ...cleanedData,
-        company_id: employeeData.empresaId || employeeData.company_id,
-        cedula: employeeData.cedula || '',
+      // ✅ FIXED: Ensure required fields are present
+      const requiredData = {
+        ...employeeData,
+        company_id: employeeData.company_id || '', // Use company_id instead of empresaId
         nombre: employeeData.nombre || '',
         apellido: employeeData.apellido || '',
-        custom_fields: custom_fields || {}
+        cedula: employeeData.cedula || '',
+        salario_base: Number(employeeData.salarioBase) || 0,
+        fecha_ingreso: employeeData.fechaIngreso || new Date().toISOString().split('T')[0],
+        estado: employeeData.estado || 'activo'
       };
 
-      console.log('📤 Inserting employee data:', dataToInsert);
-
-      const { data, error } = await supabase
-        .from('employees')
-        .insert(dataToInsert)
-        .select('*')
-        .single();
-
-      if (error) {
-        console.error('❌ Database error:', error);
-        throw error;
-      }
-
-      if (!data) {
-        throw new Error('No data returned from database');
-      }
-
-      console.log('✅ Employee created successfully:', data.id);
-
-      // Mapear datos de vuelta al formato esperado
-      const createdEmployee = mapDatabaseToUnified(data);
-
-      return {
-        success: true,
-        employee: createdEmployee,
-        message: 'Empleado creado exitosamente'
-      };
-
-    } catch (error: any) {
-      console.error('❌ Error creating employee:', error);
-      return {
-        success: false,
-        message: error.message || 'Error creating employee',
-        error
-      };
-    }
-  }
-
-  /**
-   * Actualizar un empleado existente con campos personalizados
-   */
-  static async updateEmployee(employeeId: string, employeeData: Partial<EmployeeUnified>): Promise<EmployeeServiceResponse> {
-    try {
-      console.log('🔄 EmployeeServiceRobust: Updating employee:', employeeId);
-      console.log('📝 Update data:', employeeData);
-
-      // Separar custom_fields del resto de datos
-      const { custom_fields, ...standardFields } = employeeData;
-
-      // KISS: Limpiar datos usando el mapper mejorado
-      const cleanedData = this.cleanEmployeeData({
-        ...standardFields,
-        custom_fields: custom_fields || {}
-      });
-
-      // Preparar datos para actualización
-      const dataToUpdate = {
-        ...cleanedData,
-        company_id: employeeData.empresaId || employeeData.company_id,
-        custom_fields: custom_fields || {},
-        updated_at: new Date().toISOString()
-      };
-
-      // Remover campos que no deben actualizarse
-      delete dataToUpdate.id;
-      delete dataToUpdate.created_at;
-
-      console.log('📤 Updating employee data:', dataToUpdate);
-
-      const { data, error } = await supabase
-        .from('employees')
-        .update(dataToUpdate)
-        .eq('id', employeeId)
-        .select('*')
-        .single();
-
-      if (error) {
-        console.error('❌ Database error:', error);
-        throw error;
-      }
-
-      if (!data) {
-        throw new Error('No data returned from database');
-      }
-
-      console.log('✅ Employee updated successfully:', data.id);
-
-      // Mapear datos de vuelta al formato esperado
-      const updatedEmployee = mapDatabaseToUnified(data);
-
-      return {
-        success: true,
-        employee: updatedEmployee,
-        message: 'Empleado actualizado exitosamente'
-      };
-
-    } catch (error: any) {
-      console.error('❌ Error updating employee:', error);
-      return {
-        success: false,
-        message: error.message || 'Error updating employee',
-        error
-      };
-    }
-  }
-
-  /**
-   * Obtener un empleado por ID
-   */
-  static async getEmployeeById(employeeId: string): Promise<EmployeeUnified | null> {
-    try {
-      console.log('🔍 EmployeeServiceRobust: Getting employee by ID:', employeeId);
-
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('id', employeeId)
-        .single();
-
-      if (error) {
-        console.error('❌ Database error:', error);
-        throw error;
-      }
-
-      if (!data) {
-        return null;
-      }
-
-      // Mapear datos al formato esperado
-      const employee = mapDatabaseToUnified(data);
-
-      console.log('✅ Employee found:', employee.id);
-      return employee;
-
-    } catch (error: any) {
-      console.error('❌ Error getting employee:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Helper function to safely get custom fields as object
-   */
-  private static getCustomFieldsAsObject(customFields: any): Record<string, any> {
-    if (!customFields) return {};
-    if (typeof customFields === 'object' && !Array.isArray(customFields) && customFields !== null) {
-      return customFields as Record<string, any>;
-    }
-    return {};
-  }
-
-  static async applyDefaultValuesToExistingEmployees(
-    companyId: string, 
-    fieldKey: string, 
-    defaultValue: any
-  ): Promise<boolean> {
-    try {
-      console.log(`🔄 Applying default value for field ${fieldKey} to existing employees`);
-
-      // Obtener empleados que no tienen este campo personalizado
-      const { data: employees, error: fetchError } = await supabase
-        .from('employees')
-        .select('id, custom_fields')
-        .eq('company_id', companyId);
-
-      if (fetchError) {
-        console.error('❌ Error fetching employees:', fetchError);
-        return false;
-      }
-
-      // Filtrar empleados que no tienen el campo o tienen valor null/undefined
-      const employeesToUpdate = employees?.filter(emp => {
-        const customFields = this.getCustomFieldsAsObject(emp.custom_fields);
-        return customFields[fieldKey] === null || 
-               customFields[fieldKey] === undefined || 
-               !(fieldKey in customFields);
-      }) || [];
-
-      console.log(`📊 Found ${employeesToUpdate.length} employees to update`);
-
-      // Actualizar cada empleado con el valor por defecto
-      for (const employee of employeesToUpdate) {
-        const currentCustomFields = this.getCustomFieldsAsObject(employee.custom_fields);
-        const updatedCustomFields = {
-          ...currentCustomFields,
-          [fieldKey]: defaultValue
-        };
-
-        const { error: updateError } = await supabase
-          .from('employees')
-          .update({ custom_fields: updatedCustomFields })
-          .eq('id', employee.id);
-
-        if (updateError) {
-          console.error(`❌ Error updating employee ${employee.id}:`, updateError);
+      // Clean up the data object - ensure we're not sending undefined values
+      const cleanData = Object.keys(requiredData).reduce((acc, key) => {
+        const value = requiredData[key as keyof typeof requiredData];
+        if (value !== undefined && value !== null) {
+          acc[key] = value;
         }
+        return acc;
+      }, {} as any);
+
+      // Handle custom fields properly
+      if (employeeData.customFields) {
+        cleanData.custom_fields = employeeData.customFields; // ✅ FIXED: Use correct database field name
       }
 
-      console.log('✅ Default values applied successfully');
-      return true;
+      const { data, error } = await supabase
+        .from('employees')
+        .insert(cleanData)
+        .select()
+        .single();
 
+      if (error) {
+        console.error('❌ EmployeeServiceRobust: Database error:', error);
+        throw error;
+      }
+
+      console.log('✅ EmployeeServiceRobust: Employee created successfully:', data);
+      
+      // Map the response back to EmployeeUnified format
+      const unifiedEmployee: EmployeeUnified = {
+        id: data.id,
+        company_id: data.company_id,
+        empresaId: data.company_id, // For backward compatibility
+        nombre: data.nombre,
+        apellido: data.apellido,
+        cedula: data.cedula,
+        salarioBase: Number(data.salario_base),
+        fechaIngreso: data.fecha_ingreso,
+        estado: data.estado as any,
+        // Add other mapped fields as needed
+        tipoDocumento: data.tipo_documento || 'CC',
+        email: data.email,
+        telefono: data.telefono,
+        tipoContrato: data.tipo_contrato || 'indefinido',
+        periodicidadPago: data.periodicidad_pago || 'mensual',
+        customFields: data.custom_fields || {},
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+
+      return { success: true, data: unifiedEmployee };
     } catch (error: any) {
-      console.error('❌ Error applying default values:', error);
-      return false;
+      console.error('❌ EmployeeServiceRobust: Error creating employee:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Error desconocido al crear empleado' 
+      };
+    }
+  }
+
+  static async updateEmployee(id: string, updates: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
+    try {
+      console.log('🚀 EmployeeServiceRobust: Updating employee', id, updates);
+
+      // Clean up the updates object
+      const cleanUpdates = Object.keys(updates).reduce((acc, key) => {
+        const value = updates[key as keyof typeof updates];
+        if (value !== undefined && value !== null) {
+          // Map EmployeeUnified fields to database fields
+          if (key === 'salarioBase') {
+            acc.salario_base = Number(value);
+          } else if (key === 'fechaIngreso') {
+            acc.fecha_ingreso = value;
+          } else if (key === 'tipoDocumento') {
+            acc.tipo_documento = value;
+          } else if (key === 'customFields') {
+            acc.custom_fields = value; // ✅ FIXED: Use correct database field name
+          } else if (key !== 'empresaId') { // Skip empresaId as it's for compatibility only
+            acc[key] = value;
+          }
+        }
+        return acc;
+      }, {} as any);
+
+      const { data, error } = await supabase
+        .from('employees')
+        .update(cleanUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ EmployeeServiceRobust: Database error:', error);
+        throw error;
+      }
+
+      console.log('✅ EmployeeServiceRobust: Employee updated successfully:', data);
+      
+      // Map the response back to EmployeeUnified format
+      const unifiedEmployee: EmployeeUnified = {
+        id: data.id,
+        company_id: data.company_id,
+        empresaId: data.company_id, // For backward compatibility
+        nombre: data.nombre,
+        apellido: data.apellido,
+        cedula: data.cedula,
+        salarioBase: Number(data.salario_base),
+        fechaIngreso: data.fecha_ingreso,
+        estado: data.estado as any,
+        // Add other mapped fields as needed
+        tipoDocumento: data.tipo_documento || 'CC',
+        email: data.email,
+        telefono: data.telefono,
+        tipoContrato: data.tipo_contrato || 'indefinido',
+        periodicidadPago: data.periodicidad_pago || 'mensual',
+        customFields: data.custom_fields || {},
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+
+      return { success: true, data: unifiedEmployee };
+    } catch (error: any) {
+      console.error('❌ EmployeeServiceRobust: Error updating employee:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Error desconocido al actualizar empleado' 
+      };
     }
   }
 }

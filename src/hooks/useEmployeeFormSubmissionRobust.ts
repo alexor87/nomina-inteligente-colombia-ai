@@ -26,9 +26,12 @@ export const useEmployeeFormSubmissionRobust = () => {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // ✅ FIXED: Create a compatible data object with proper estado field
+      // ✅ FIXED: Create a compatible data object with proper field mapping
       const compatibleData = {
         ...data,
+        // Map form fields to ValidatedEmployeeData format expected by mapper
+        codigoCIIU: data.codigoCiiu, // Map from form field name to expected mapper field name
+        nivelRiesgoARL: data.nivelRiesgoArl, // Map from form field name to expected mapper field name
         // Cast estado to the expected union type for the mapper
         estado: data.estado as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'
       };
