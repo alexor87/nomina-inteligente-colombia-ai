@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
 import { PayrollAutomationService } from '@/services/PayrollAutomationService';
 import { useToast } from '@/hooks/use-toast';
+import { useVacationIntegration } from '@/hooks/useVacationIntegration';
 
 interface PayrollPeriod {
   id: string;
@@ -18,6 +19,7 @@ export const usePayrollUnified = (companyId: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLiquidating, setIsLiquidating] = useState(false);
   const { toast } = useToast();
+  const { processVacationsForPayroll } = useVacationIntegration();
 
   // Función simple para limpiar duplicados
   const cleanDuplicates = useCallback(async () => {
@@ -276,6 +278,47 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [companyId, findOrCreatePeriod, toast]);
 
+  // ✅ NUEVA FUNCIÓN: Cargar empleados con integración automática de vacaciones
+  const loadEmployeesWithVacations = useCallback(async (startDate: string, endDate: string) => {
+    setIsLoading(true);
+    try {
+      console.log('🏖️ Cargando empleados con integración de vacaciones...');
+
+      // 1. Cargar empleados normalmente
+      await loadEmployees(startDate, endDate);
+
+      // 2. Si hay período activo, procesar vacaciones automáticamente
+      if (currentPeriod) {
+        console.log('🔄 Procesando vacaciones para período:', currentPeriod.id);
+        
+        const integrationResult = await processVacationsForPayroll({
+          periodId: currentPeriod.id,
+          companyId: companyId,
+          startDate: startDate,
+          endDate: endDate
+        });
+
+        if (integrationResult.success && integrationResult.processedVacations > 0) {
+          toast({
+            title: "✅ Vacaciones integradas",
+            description: `Se procesaron ${integrationResult.processedVacations} ausencias automáticamente`,
+            className: "border-green-200 bg-green-50"
+          });
+        }
+      }
+
+    } catch (error) {
+      console.error('Error en loadEmployeesWithVacations:', error);
+      toast({
+        title: "Error",
+        description: "Error en la integración con vacaciones",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadEmployees, currentPeriod, processVacationsForPayroll, companyId, toast]);
+
   const addEmployees = useCallback(async (employeeIds: string[]) => {
     if (!currentPeriod) return;
 
@@ -412,6 +455,7 @@ export const usePayrollUnified = (companyId: string) => {
     isLoading,
     isLiquidating,
     loadEmployees,
+    loadEmployeesWithVacations,
     addEmployees,
     removeEmployee,
     liquidatePayroll,

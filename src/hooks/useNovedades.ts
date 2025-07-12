@@ -1,13 +1,18 @@
-
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { supabase } from '@/integrations/supabase/client';
+import { 
+  DisplayNovedad, 
+  convertVacationToDisplay, 
+  convertNovedadToDisplay 
+} from '@/types/vacation-integration';
 
 export const useNovedades = (periodoId: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const [novedades, setNovedades] = useState<PayrollNovedad[]>([]);
+  const [integratedNovedades, setIntegratedNovedades] = useState<DisplayNovedad[]>([]);
   const { toast } = useToast();
 
   const createNovedad = useCallback(async (data: CreateNovedadData, showSuccessToast = true) => {
@@ -143,6 +148,66 @@ export const useNovedades = (periodoId: string) => {
     }
   }, [periodoId]);
 
+  const loadIntegratedNovedades = useCallback(async (employeeId: string) => {
+    if (!employeeId || !periodoId) return [];
+    
+    setIsLoading(true);
+    try {
+      console.log('🔄 Loading integrated novedades for employee:', employeeId);
+
+      // 1. Obtener salario del empleado para cálculos
+      const { data: employee, error: empError } = await supabase
+        .from('employees')
+        .select('salario_base')
+        .eq('id', employeeId)
+        .single();
+
+      if (empError) {
+        console.error('Error obteniendo empleado:', empError);
+        return [];
+      }
+
+      const employeeSalary = Number(employee?.salario_base) || 0;
+
+      // 2. Cargar novedades existentes
+      const novedadesData = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodoId);
+      
+      // 3. Cargar ausencias/vacaciones que aplican al período
+      const { data: vacationsData, error: vacError } = await supabase
+        .from('employee_vacation_periods')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .in('status', ['pendiente', 'liquidada']);
+
+      if (vacError) {
+        console.error('Error obteniendo vacaciones:', vacError);
+      }
+
+      // 4. Convertir novedades a formato display
+      const displayNovedades: DisplayNovedad[] = novedadesData.map(convertNovedadToDisplay);
+
+      // 5. Convertir vacaciones a formato display
+      const displayVacations: DisplayNovedad[] = (vacationsData || []).map(vacation => 
+        convertVacationToDisplay(vacation, employeeSalary)
+      );
+
+      // 6. Combinar y ordenar por fecha de creación
+      const integrated = [...displayNovedades, ...displayVacations]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      console.log(`✅ Integrated view loaded: ${displayNovedades.length} novedades + ${displayVacations.length} vacaciones`);
+      
+      setIntegratedNovedades(integrated);
+      return integrated;
+
+    } catch (error) {
+      console.error('❌ Error loading integrated novedades:', error);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }, [periodoId]);
+
   const updateNovedad = useCallback(async (id: string, updates: Partial<CreateNovedadData>) => {
     setIsLoading(true);
     try {
@@ -221,9 +286,11 @@ export const useNovedades = (periodoId: string) => {
 
   return {
     novedades,
+    integratedNovedades,
     isLoading,
     createNovedad,
     loadNovedades,
+    loadIntegratedNovedades,
     updateNovedad,
     deleteNovedad
   };
