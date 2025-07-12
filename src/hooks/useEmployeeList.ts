@@ -8,6 +8,7 @@ export interface EmployeeFilters {
   searchTerm: string;
   estado: string;
   tipoContrato: string;
+  showDeleted: boolean; // Nueva opción para mostrar eliminados
 }
 
 export interface EmployeeListHook {
@@ -34,12 +35,15 @@ export interface EmployeeListHook {
   clearSelection: () => void;
   deleteEmployee: (id: string) => Promise<void>;
   deleteMultipleEmployees: (ids: string[]) => Promise<void>;
+  restoreEmployee: (id: string) => Promise<void>; // Nueva función
+  physicalDeleteEmployee: (id: string) => Promise<void>; // Nueva función
   isDeleting: boolean;
   statistics: {
     active: number;
     inactive: number;
     onVacation: number;
     onLeave: number;
+    deleted: number; // Nueva estadística
   };
 }
 
@@ -53,7 +57,8 @@ export const useEmployeeList = (): EmployeeListHook => {
   const [filters, setFiltersState] = useState<EmployeeFilters>({
     searchTerm: '',
     estado: '',
-    tipoContrato: ''
+    tipoContrato: '',
+    showDeleted: false
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -67,7 +72,8 @@ export const useEmployeeList = (): EmployeeListHook => {
     setFiltersState({
       searchTerm: '',
       estado: '',
-      tipoContrato: ''
+      tipoContrato: '',
+      showDeleted: false
     });
     setCurrentPage(1);
   };
@@ -77,7 +83,7 @@ export const useEmployeeList = (): EmployeeListHook => {
       setIsLoading(true);
       setError(null);
       
-      const result = await EmployeeUnifiedService.getAll();
+      const result = await EmployeeUnifiedService.getAll(filters.showDeleted);
       if (result.success && result.data) {
         setEmployees(result.data);
       } else {
@@ -98,7 +104,7 @@ export const useEmployeeList = (): EmployeeListHook => {
       if (result.success) {
         toast({
           title: "Empleado eliminado",
-          description: "El empleado ha sido eliminado exitosamente.",
+          description: "El empleado ha sido marcado como eliminado y ocultado de la lista.",
         });
         
         // Remove from selected employees if it was selected
@@ -172,9 +178,70 @@ export const useEmployeeList = (): EmployeeListHook => {
     }
   };
 
+  const restoreEmployee = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      const result = await EmployeeUnifiedService.restore(id);
+      
+      if (result.success) {
+        toast({
+          title: "Empleado restaurado",
+          description: "El empleado ha sido restaurado exitosamente.",
+        });
+        
+        await loadEmployees();
+      } else {
+        toast({
+          title: "Error al restaurar",
+          description: result.error || "No se pudo restaurar el empleado.",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error al restaurar",
+        description: err.message || "No se pudo restaurar el empleado.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const physicalDeleteEmployee = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      const result = await EmployeeUnifiedService.physicalDelete(id);
+      
+      if (result.success) {
+        toast({
+          title: "Empleado eliminado permanentemente",
+          description: "El empleado y todos sus datos han sido eliminados de forma permanente.",
+        });
+        
+        setSelectedEmployees(prev => prev.filter(empId => empId !== id));
+        await loadEmployees();
+      } else {
+        toast({
+          title: "Error al eliminar permanentemente",
+          description: result.error || "No se pudo eliminar permanentemente el empleado.",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error al eliminar permanentemente",
+        description: err.message || "No se pudo eliminar permanentemente el empleado.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   useEffect(() => {
     loadEmployees();
-  }, []);
+  }, [filters.showDeleted]);
 
   // Filter employees based on current filters
   const filteredEmployees = useMemo(() => {
@@ -209,7 +276,8 @@ export const useEmployeeList = (): EmployeeListHook => {
       active: employees.filter(e => e.estado === 'activo').length,
       inactive: employees.filter(e => e.estado === 'inactivo').length,
       onVacation: employees.filter(e => e.estado === 'vacaciones').length,
-      onLeave: employees.filter(e => e.estado === 'incapacidad').length
+      onLeave: employees.filter(e => e.estado === 'incapacidad').length,
+      deleted: employees.filter(e => e.estado === 'eliminado').length
     };
   }, [employees]);
 
@@ -273,6 +341,8 @@ export const useEmployeeList = (): EmployeeListHook => {
     clearSelection,
     deleteEmployee,
     deleteMultipleEmployees,
+    restoreEmployee,
+    physicalDeleteEmployee,
     statistics
   };
 };

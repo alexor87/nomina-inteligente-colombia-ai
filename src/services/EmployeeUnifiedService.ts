@@ -1,16 +1,22 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 
 export class EmployeeUnifiedService {
-  static async getAll(): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
+  static async getAll(includeDeleted: boolean = false): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
     try {
       console.log('🔄 EmployeeUnifiedService: Fetching all employees');
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Por defecto, excluir empleados eliminados
+      if (!includeDeleted) {
+        query = query.neq('estado', 'eliminado');
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('❌ Error fetching employees:', error);
@@ -145,24 +151,169 @@ export class EmployeeUnifiedService {
 
   static async delete(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('🔄 EmployeeUnifiedService: Deleting employee:', id);
+      console.log('🔄 EmployeeUnifiedService: Logically deleting employee:', id);
       
+      // Verificar si el empleado tiene registros relacionados
+      const hasRelatedRecords = await this.checkRelatedRecords(id);
+      
+      if (hasRelatedRecords.hasRecords) {
+        console.log('⚠️ Employee has related records:', hasRelatedRecords.details);
+      }
+
+      // Cambiar estado a 'eliminado' en lugar de eliminar físicamente
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          estado: 'eliminado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error logically deleting employee:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ EmployeeUnifiedService: Employee logically deleted successfully:', id);
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService delete error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async physicalDelete(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🔄 EmployeeUnifiedService: Physically deleting employee:', id);
+      
+      // Verificar registros relacionados antes de eliminación física
+      const hasRelatedRecords = await this.checkRelatedRecords(id);
+      
+      if (hasRelatedRecords.hasRecords) {
+        return { 
+          success: false, 
+          error: `No se puede eliminar físicamente: el empleado tiene ${hasRelatedRecords.details.join(', ')}` 
+        };
+      }
+
       const { error } = await supabase
         .from('employees')
         .delete()
         .eq('id', id);
 
       if (error) {
-        console.error('❌ Error deleting employee:', error);
+        console.error('❌ Error physically deleting employee:', error);
         return { success: false, error: error.message };
       }
 
-      console.log('✅ EmployeeUnifiedService: Employee deleted successfully:', id);
+      console.log('✅ EmployeeUnifiedService: Employee physically deleted successfully:', id);
       
       return { success: true };
     } catch (error: any) {
-      console.error('❌ EmployeeUnifiedService delete error:', error);
+      console.error('❌ EmployeeUnifiedService physicalDelete error:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  static async restore(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🔄 EmployeeUnifiedService: Restoring employee:', id);
+      
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          estado: 'activo',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error restoring employee:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ EmployeeUnifiedService: Employee restored successfully:', id);
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService restore error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async checkRelatedRecords(employeeId: string): Promise<{ 
+    hasRecords: boolean; 
+    details: string[];
+    counts: Record<string, number>;
+  }> {
+    try {
+      const details: string[] = [];
+      const counts: Record<string, number> = {};
+
+      // Verificar registros de nómina
+      const { count: payrollCount } = await supabase
+        .from('payrolls')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId);
+
+      if (payrollCount && payrollCount > 0) {
+        details.push(`${payrollCount} registros de nómina`);
+        counts.payrolls = payrollCount;
+      }
+
+      // Verificar notas del empleado
+      const { count: notesCount } = await supabase
+        .from('employee_notes')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId);
+
+      if (notesCount && notesCount > 0) {
+        details.push(`${notesCount} notas`);
+        counts.notes = notesCount;
+      }
+
+      // Verificar balances de vacaciones
+      const { count: balancesCount } = await supabase
+        .from('employee_vacation_balances')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId);
+
+      if (balancesCount && balancesCount > 0) {
+        details.push(`${balancesCount} balances de vacaciones`);
+        counts.vacation_balances = balancesCount;
+      }
+
+      // Verificar períodos de vacaciones
+      const { count: vacationPeriodsCount } = await supabase
+        .from('employee_vacation_periods')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId);
+
+      if (vacationPeriodsCount && vacationPeriodsCount > 0) {
+        details.push(`${vacationPeriodsCount} períodos de vacaciones`);
+        counts.vacation_periods = vacationPeriodsCount;
+      }
+
+      // Verificar comprobantes de nómina
+      const { count: vouchersCount } = await supabase
+        .from('payroll_vouchers')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId);
+
+      if (vouchersCount && vouchersCount > 0) {
+        details.push(`${vouchersCount} comprobantes de nómina`);
+        counts.vouchers = vouchersCount;
+      }
+
+      return {
+        hasRecords: details.length > 0,
+        details,
+        counts
+      };
+    } catch (error) {
+      console.error('❌ Error checking related records:', error);
+      return { hasRecords: false, details: [], counts: {} };
     }
   }
 
