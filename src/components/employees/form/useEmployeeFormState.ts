@@ -11,7 +11,25 @@ export const useEmployeeFormState = () => {
     setActiveSection(sectionId);
     const element = document.getElementById(`section-${sectionId}`);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Find the scrollable container (the form content area)
+      const scrollContainer = element.closest('.overflow-y-auto') || window;
+      
+      if (scrollContainer === window) {
+        // Default window scroll behavior
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        // Custom scroll for container with offset for better positioning
+        const containerRect = (scrollContainer as Element).getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+        const offset = 80; // Offset for better visual positioning
+        
+        const scrollTop = elementRect.top - containerRect.top + (scrollContainer as Element).scrollTop - offset;
+        
+        (scrollContainer as Element).scrollTo({
+          top: scrollTop,
+          behavior: 'smooth'
+        });
+      }
     }
   };
 

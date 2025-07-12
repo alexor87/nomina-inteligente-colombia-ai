@@ -13,7 +13,7 @@ interface VacationInfoSectionProps {
 
 export const VacationInfoSection = ({ control, errors }: VacationInfoSectionProps) => {
   return (
-    <Card id="vacaciones" className="scroll-mt-8">
+    <Card className="scroll-mt-8">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Calendar className="h-5 w-5 text-blue-600" />

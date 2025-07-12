@@ -33,56 +33,68 @@ export const EmployeeFormContent = ({
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto p-8 space-y-8">
         {/* Personal Information Section */}
-        <PersonalInfoSection 
-          control={control}
-          errors={errors}
-          watchedValues={watchedValues}
-          watch={watch}
-        />
+        <div id="section-personal" className="scroll-mt-8">
+          <PersonalInfoSection 
+            control={control}
+            errors={errors}
+            watchedValues={watchedValues}
+            watch={watch}
+          />
+        </div>
 
         {/* Labor Information Section */}
-        <LaborInfoSection
-          control={control}
-          errors={errors}
-          watchedValues={watchedValues}
-          setValue={setValue}
-          watch={watch}
-          arlRiskLevels={arlRiskLevels}
-          register={register}
-        />
+        <div id="section-laboral" className="scroll-mt-8">
+          <LaborInfoSection
+            control={control}
+            errors={errors}
+            watchedValues={watchedValues}
+            setValue={setValue}
+            watch={watch}
+            arlRiskLevels={arlRiskLevels}
+            register={register}
+          />
+        </div>
 
         {/* Banking Information Section */}
-        <BankingInfoSection
-          control={control}
-          errors={errors}
-          watchedValues={watchedValues}
-          setValue={setValue}
-          watch={watch}
-          register={register}
-        />
+        <div id="section-bancaria" className="scroll-mt-8">
+          <BankingInfoSection
+            control={control}
+            errors={errors}
+            watchedValues={watchedValues}
+            setValue={setValue}
+            watch={watch}
+            register={register}
+          />
+        </div>
 
         {/* Affiliations Section */}
-        <AffiliationsSection
-          control={control}
-          errors={errors}
-          watchedValues={watchedValues}
-          setValue={setValue}
-        />
+        <div id="section-afiliaciones" className="scroll-mt-8">
+          <AffiliationsSection
+            control={control}
+            errors={errors}
+            watchedValues={watchedValues}
+            setValue={setValue}
+          />
+        </div>
 
         {/* Vacation Information Section */}
-        <VacationInfoSection
-          control={control}
-          errors={errors}
-        />
+        <div id="section-vacaciones" className="scroll-mt-8">
+          <VacationInfoSection
+            control={control}
+            errors={errors}
+          />
+        </div>
 
         {/* Custom Fields Section */}
         {customFields.length > 0 && (
-          <CustomFieldsSection
-            customFields={customFields}
-            control={control}
-            errors={errors}
-            setValue={setValue}
-          />
+          <div id="section-personalizados" className="scroll-mt-8">
+            <CustomFieldsSection
+              customFields={customFields}
+              control={control}
+              errors={errors}
+              setValue={setValue}
+            />
+          </div>
         )}
       </div>
     </div>
