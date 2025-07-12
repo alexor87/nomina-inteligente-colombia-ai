@@ -17,8 +17,11 @@ export interface DisplayNovedad {
   
   // Metadatos de origen y estado
   origen: 'novedades' | 'vacaciones';
-  status: 'pendiente' | 'liquidada' | 'cancelada';
+  status: 'pendiente' | 'procesada' | 'cancelada' | 'registrada';
   processed_in_period_id?: string;
+  
+  // ✅ NUEVO: Flag para distinguir valores confirmados vs estimados
+  isConfirmed: boolean;
   
   // Permisos y visualización
   canEdit: boolean;
@@ -31,6 +34,32 @@ export interface DisplayNovedad {
   created_at: string;
   updated_at: string;
 }
+
+// ✅ ACTUALIZADO: Mapeo de estados unificados
+export const UNIFIED_STATUS_MAPPING = {
+  // Estados de vacaciones
+  'pendiente': {
+    display: 'Pendiente',
+    color: 'bg-yellow-100 text-yellow-800',
+    isConfirmed: false
+  },
+  'liquidada': {
+    display: 'Procesada', // ✅ CAMBIO: liquidada → Procesada
+    color: 'bg-green-100 text-green-800',
+    isConfirmed: true
+  },
+  'cancelada': {
+    display: 'Cancelada',
+    color: 'bg-gray-100 text-gray-800',
+    isConfirmed: false
+  },
+  // Estados de novedades (siempre confirmadas)
+  'registrada': {
+    display: 'Registrada',
+    color: 'bg-blue-100 text-blue-800',
+    isConfirmed: true
+  }
+};
 
 // ✅ Configuración de mapeo visual
 export const VACATION_VISUAL_CONFIG: Record<VacationAbsenceType, {
@@ -72,13 +101,17 @@ export const NOVEDAD_VISUAL_CONFIG = {
   badge: { icon: '📋', label: 'Novedad', color: 'bg-blue-100 text-blue-800' }
 };
 
-// ✅ Helpers para conversión y cálculo
+// ✅ ACTUALIZADO: Helpers para conversión con estados unificados
 export const convertVacationToDisplay = (
   vacation: any, 
   employeeSalary: number
 ): DisplayNovedad => {
   const config = VACATION_VISUAL_CONFIG[vacation.type as VacationAbsenceType];
   const valor = config.calculation(employeeSalary, vacation.days_count);
+  
+  // ✅ Determinar estado unificado
+  const unifiedStatus = vacation.status === 'liquidada' ? 'procesada' : vacation.status;
+  const statusConfig = UNIFIED_STATUS_MAPPING[unifiedStatus] || UNIFIED_STATUS_MAPPING['pendiente'];
   
   return {
     id: vacation.id,
@@ -92,15 +125,18 @@ export const convertVacationToDisplay = (
     fecha_fin: vacation.end_date,
     
     origen: 'vacaciones',
-    status: vacation.status,
+    status: unifiedStatus,
     processed_in_period_id: vacation.processed_in_period_id,
+    
+    // ✅ NUEVO: Estado confirmado basado en el status
+    isConfirmed: statusConfig.isConfirmed,
     
     canEdit: false, // Vacaciones se editan en su módulo
     canDelete: vacation.status === 'pendiente',
     badgeColor: config.badge.color,
     badgeIcon: config.badge.icon,
     badgeLabel: config.badge.label,
-    statusColor: getStatusColor(vacation.status),
+    statusColor: statusConfig.color,
     
     created_at: vacation.created_at,
     updated_at: vacation.updated_at
@@ -108,6 +144,8 @@ export const convertVacationToDisplay = (
 };
 
 export const convertNovedadToDisplay = (novedad: any): DisplayNovedad => {
+  const statusConfig = UNIFIED_STATUS_MAPPING['registrada'];
+  
   return {
     id: novedad.id,
     empleado_id: novedad.empleado_id,
@@ -121,28 +159,38 @@ export const convertNovedadToDisplay = (novedad: any): DisplayNovedad => {
     fecha_fin: novedad.fecha_fin,
     
     origen: 'novedades',
-    status: 'liquidada', // Las novedades ya están en proceso
+    status: 'registrada', // Las novedades siempre están registradas
+    
+    // ✅ NUEVO: Las novedades siempre están confirmadas
+    isConfirmed: true,
     
     canEdit: true,
     canDelete: true,
     badgeColor: NOVEDAD_VISUAL_CONFIG.badge.color,
     badgeIcon: NOVEDAD_VISUAL_CONFIG.badge.icon,
     badgeLabel: NOVEDAD_VISUAL_CONFIG.badge.label,
-    statusColor: 'bg-green-100 text-green-800',
+    statusColor: statusConfig.color,
     
     created_at: novedad.created_at,
     updated_at: novedad.updated_at
   };
 };
 
-const getStatusColor = (status: string): string => {
-  switch (status) {
-    case 'pendiente': return 'bg-yellow-100 text-yellow-800';
-    case 'liquidada': return 'bg-green-100 text-green-800';
-    case 'cancelada': return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
+// ✅ NUEVO: Tipos para totales separados
+export interface SeparatedTotals {
+  confirmed: {
+    devengos: number;
+    deducciones: number;
+    neto: number;
+    count: number;
+  };
+  estimated: {
+    devengos: number;
+    deducciones: number;
+    neto: number;
+    count: number;
+  };
+}
 
 // ✅ Tipos para el servicio de integración
 export interface VacationIntegrationResult {

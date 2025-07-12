@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Edit, Plus, Eye, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNovedades } from '@/hooks/useNovedades';
-import { DisplayNovedad } from '@/types/vacation-integration';
+import { DisplayNovedad, SeparatedTotals } from '@/types/vacation-integration';
 import { useToast } from '@/hooks/use-toast';
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
 import { supabase } from '@/integrations/supabase/client';
@@ -256,16 +255,25 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     }).format(value);
   };
 
-  const getTotalDevengos = () => {
-    return integratedData
-      .filter(n => n.valor > 0)
-      .reduce((sum, n) => sum + n.valor, 0);
-  };
+  // ✅ NUEVO: Calcular totales separados por confirmación
+  const getSeparatedTotals = (): SeparatedTotals => {
+    const confirmed = integratedData.filter(n => n.isConfirmed);
+    const estimated = integratedData.filter(n => !n.isConfirmed);
 
-  const getTotalDeducciones = () => {
-    return Math.abs(integratedData
-      .filter(n => n.valor < 0)
-      .reduce((sum, n) => sum + n.valor, 0));
+    return {
+      confirmed: {
+        devengos: confirmed.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
+        deducciones: Math.abs(confirmed.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
+        neto: confirmed.reduce((sum, n) => sum + n.valor, 0),
+        count: confirmed.length
+      },
+      estimated: {
+        devengos: estimated.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
+        deducciones: Math.abs(estimated.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
+        neto: estimated.reduce((sum, n) => sum + n.valor, 0),
+        count: estimated.length
+      }
+    };
   };
 
   const getActionButtons = (item: DisplayNovedad) => {
@@ -338,6 +346,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     );
   }
 
+  const separatedTotals = getSeparatedTotals();
+
   return (
     <>
       <div className="p-6">
@@ -373,30 +383,69 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           </Card>
         ) : (
           <>
-            {/* Resumen integrado */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(getTotalDevengos())}
+            {/* ✅ NUEVO: Resumen integrado con totales separados */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* Valores Confirmados */}
+              <Card className="border-green-200 bg-green-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
+                    ✅ Valores Confirmados
+                    <Badge variant="outline" className="text-xs">
+                      {separatedTotals.confirmed.count}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-green-700">Devengos:</span>
+                    <span className="font-semibold text-green-800">
+                      {formatCurrency(separatedTotals.confirmed.devengos)}
+                    </span>
                   </div>
-                  <p className="text-xs text-gray-600">Total Devengos</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-green-700">Deducciones:</span>
+                    <span className="font-semibold text-red-600">
+                      {formatCurrency(separatedTotals.confirmed.deducciones)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-green-200">
+                    <span className="text-sm font-medium text-green-800">Neto:</span>
+                    <span className="font-bold text-green-900">
+                      {formatCurrency(separatedTotals.confirmed.neto)}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-red-600">
-                    {formatCurrency(getTotalDeducciones())}
+
+              {/* Valores Estimados */}
+              <Card className="border-yellow-200 bg-yellow-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-yellow-800 flex items-center gap-2">
+                    ⏳ Valores Estimados
+                    <Badge variant="outline" className="text-xs">
+                      {separatedTotals.estimated.count}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-yellow-700">Devengos:</span>
+                    <span className="font-semibold text-yellow-800">
+                      {formatCurrency(separatedTotals.estimated.devengos)}
+                    </span>
                   </div>
-                  <p className="text-xs text-gray-600">Total Deducciones</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {formatCurrency(getTotalDevengos() - getTotalDeducciones())}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-yellow-700">Deducciones:</span>
+                    <span className="font-semibold text-red-600">
+                      {formatCurrency(separatedTotals.estimated.deducciones)}
+                    </span>
                   </div>
-                  <p className="text-xs text-gray-600">Neto Total</p>
+                  <div className="flex justify-between items-center pt-2 border-t border-yellow-200">
+                    <span className="text-sm font-medium text-yellow-800">Neto:</span>
+                    <span className="font-bold text-yellow-900">
+                      {formatCurrency(separatedTotals.estimated.neto)}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -404,7 +453,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
             {/* Lista integrada mejorada */}
             <div className="space-y-3">
               {integratedData.map((item) => (
-                <Card key={`${item.origen}-${item.id}`} className="hover:shadow-md transition-shadow">
+                <Card key={`${item.origen}-${item.id}`} className={`hover:shadow-md transition-shadow ${!item.isConfirmed ? 'border-yellow-200 bg-yellow-50' : ''}`}>
                   <CardContent className="pt-4">
                     <div className="grid grid-cols-12 gap-4 items-center">
                       {/* Columna 1: Origen y tipo */}
@@ -415,8 +464,17 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                               {item.badgeIcon} {item.badgeLabel}
                             </Badge>
                             <Badge variant="outline" className={item.statusColor}>
-                              {item.status}
+                              {item.status === 'procesada' ? 'Procesada' : 
+                               item.status === 'pendiente' ? 'Pendiente' :
+                               item.status === 'registrada' ? 'Registrada' : 
+                               item.status}
                             </Badge>
+                            {/* ✅ NUEVO: Indicador de confirmación */}
+                            {!item.isConfirmed && (
+                              <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800">
+                                Estimado
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-sm font-medium text-gray-900">
                             {item.tipo_novedad.replace('_', ' ')}
