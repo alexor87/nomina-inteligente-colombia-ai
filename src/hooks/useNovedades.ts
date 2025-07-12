@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DisplayNovedad, convertVacationToDisplay, convertNovedadToDisplay } from '@/types/vacation-integration';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 
 export const useNovedades = (periodId: string) => {
@@ -86,6 +87,75 @@ export const useNovedades = (periodId: string) => {
     }
   }, [periodId, toast]);
 
+  const createNovedad = useCallback(async (data: CreateNovedadData, showToast: boolean = true) => {
+    try {
+      setIsLoading(true);
+      console.log('📝 Creando novedad:', data);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+
+      const insertData = {
+        company_id: profile.company_id,
+        empleado_id: data.empleado_id,
+        periodo_id: data.periodo_id,
+        tipo_novedad: data.tipo_novedad,
+        valor: Number(data.valor) || 0,
+        horas: data.horas ? Number(data.horas) : null,
+        dias: data.dias || null,
+        observacion: data.observacion || null,
+        fecha_inicio: data.fecha_inicio || null,
+        fecha_fin: data.fecha_fin || null,
+        subtipo: data.subtipo || null,
+        constitutivo_salario: data.constitutivo_salario || false,
+        base_calculo: data.base_calculo ? JSON.stringify(data.base_calculo) : null,
+        creado_por: user.id
+      };
+
+      const { data: novedad, error } = await supabase
+        .from('payroll_novedades')
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (showToast) {
+        toast({
+          title: "✅ Novedad creada",
+          description: "La novedad se ha creado exitosamente",
+          className: "border-green-200 bg-green-50"
+        });
+      }
+
+      console.log('✅ Novedad creada exitosamente:', novedad);
+      return novedad;
+
+    } catch (error) {
+      console.error('❌ Error creando novedad:', error);
+      
+      if (showToast) {
+        toast({
+          title: "❌ Error",
+          description: error instanceof Error ? error.message : "No se pudo crear la novedad",
+          variant: "destructive"
+        });
+      }
+      
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
   const deleteNovedad = useCallback(async (novedadId: string) => {
     try {
       const { error } = await supabase
@@ -105,6 +175,7 @@ export const useNovedades = (periodId: string) => {
   return {
     isLoading,
     loadIntegratedNovedades,
+    createNovedad,
     deleteNovedad
   };
 };
