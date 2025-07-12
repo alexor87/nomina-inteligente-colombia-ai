@@ -12,15 +12,15 @@ export interface Employee {
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F';
+  sexo?: 'M' | 'F'; // ✅ FIXED: Removed 'O' to match EmployeeUnified
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
   departamento?: string;
   
   // Company relationship
-  empresaId: string; // ✅ FIXED: Made required
-  company_id: string; // ✅ FIXED: Made required to match EmployeeUnified
+  empresaId: string;
+  company_id?: string;
   
   // Labor information
   salarioBase: number;
@@ -30,13 +30,13 @@ export interface Employee {
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // ✅ FIXED: Added 'eliminado'
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
   centroCostos?: string;
   
   // Contract details
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada: 'completa' | 'parcial' | 'horas';
+  tipoJornada: 'completa' | 'parcial' | 'horas'; // ✅ FIXED: Made required to match EmployeeUnified
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
@@ -59,7 +59,7 @@ export interface Employee {
   regimenSalud?: 'contributivo' | 'subsidiado';
   estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   
-  // Custom fields - ✅ FIXED: Use correct property name
+  // Custom fields
   custom_fields?: Record<string, any>;
   
   // UI/Display properties
@@ -71,14 +71,6 @@ export interface Employee {
   // Timestamps
   createdAt?: string;
   updatedAt?: string;
-}
-
-// ✅ FIXED: Add EmployeeWithStatus export
-export interface EmployeeWithStatus extends Employee {
-  hasExpiredContract: boolean;
-  hasPendingDocuments: boolean;
-  hasIncompleteAffiliations: boolean;
-  statusFlags: string[];
 }
 
 // Payroll related types

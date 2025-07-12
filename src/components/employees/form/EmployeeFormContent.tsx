@@ -18,34 +18,6 @@ interface EmployeeFormContentProps {
   customFields: any[];
 }
 
-// ✅ FIXED: Improved error conversion function with proper type checking
-const convertFieldErrorsToRecord = (errors: FieldErrors<EmployeeFormData>): Record<string, string> => {
-  const errorRecord: Record<string, string> = {};
-  
-  Object.keys(errors).forEach(key => {
-    const error = errors[key as keyof EmployeeFormData];
-    if (error) {
-      // Handle different error types properly
-      if (typeof error === 'string') {
-        errorRecord[key] = error;
-      } else if (typeof error === 'object' && error !== null) {
-        // Check if it's a FieldError with message
-        if ('message' in error && typeof error.message === 'string') {
-          errorRecord[key] = error.message;
-        } else if ('message' in error && error.message) {
-          errorRecord[key] = String(error.message);
-        } else {
-          errorRecord[key] = 'Error de validación';
-        }
-      } else {
-        errorRecord[key] = 'Error de validación';
-      }
-    }
-  });
-  
-  return errorRecord;
-};
-
 export const EmployeeFormContent = ({ 
   control, 
   errors, 
@@ -56,23 +28,22 @@ export const EmployeeFormContent = ({
   register,
   customFields = []
 }: EmployeeFormContentProps) => {
-  // Convert field errors to simple record for legacy components
-  const simpleErrors = convertFieldErrorsToRecord(errors);
-
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto p-8 space-y-8">
         {/* Personal Information Section */}
         <PersonalInfoSection 
           control={control}
-          errors={simpleErrors}
+          errors={errors}
           watchedValues={watchedValues}
           watch={watch}
         />
 
-        {/* Labor Information Section - ✅ FIXED: Remove unsupported props */}
+        {/* Labor Information Section */}
         <LaborInfoSection
-          errors={simpleErrors}
+          control={control}
+          errors={errors}
+          watchedValues={watchedValues}
           setValue={setValue}
           watch={watch}
           arlRiskLevels={arlRiskLevels}
@@ -82,7 +53,7 @@ export const EmployeeFormContent = ({
         {/* Banking Information Section */}
         <BankingInfoSection
           control={control}
-          errors={simpleErrors}
+          errors={errors}
           watchedValues={watchedValues}
           setValue={setValue}
           watch={watch}
@@ -92,7 +63,7 @@ export const EmployeeFormContent = ({
         {/* Affiliations Section */}
         <AffiliationsSection
           control={control}
-          errors={simpleErrors}
+          errors={errors}
           watchedValues={watchedValues}
           setValue={setValue}
         />
@@ -102,7 +73,7 @@ export const EmployeeFormContent = ({
           <CustomFieldsSection
             customFields={customFields}
             control={control}
-            errors={simpleErrors}
+            errors={errors}
             setValue={setValue}
           />
         )}

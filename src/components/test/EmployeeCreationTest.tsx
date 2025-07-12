@@ -37,7 +37,7 @@ export const EmployeeCreationTest = () => {
 
     addLog('info', '🧪 Iniciando simulación de creación de empleado');
 
-    // ✅ FIXED: Added missing company_id field
+    // ✅ FIXED: Added missing tipoJornada field
     const testEmployeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
       cedula: '12345678',
       tipoDocumento: 'CC',
@@ -56,8 +56,7 @@ export const EmployeeCreationTest = () => {
       arl: 'SURA ARL',
       cajaCompensacion: 'Compensar',
       cargo: 'Desarrollador Senior',
-      empresaId: '', // ✅ FIXED: Will be set by the hook
-      company_id: '', // ✅ ADDED: Required field
+      empresaId: '',
       estadoAfiliacion: 'completa'
     };
 

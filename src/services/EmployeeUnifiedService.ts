@@ -13,30 +13,23 @@ export class EmployeeUnifiedService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ EmployeeUnifiedService: Error fetching employees:', error);
-        throw error;
+        console.error('❌ Error fetching employees:', error);
+        return { success: false, error: error.message };
       }
 
-      if (!data) {
-        console.log('⚠️ EmployeeUnifiedService: No employees found');
-        return { success: true, data: [] };
-      }
-
-      // Map database records to EmployeeUnified format
-      const employees = data.map(mapDatabaseToUnified);
+      console.log('✅ EmployeeUnifiedService: Fetched', data?.length || 0, 'employees');
       
-      console.log(`✅ EmployeeUnifiedService: Successfully fetched ${employees.length} employees`);
-      return { success: true, data: employees };
-    } catch (error) {
-      console.error('❌ EmployeeUnifiedService: Error in getAll:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error desconocido' 
+      return {
+        success: true,
+        data: (data || []).map(mapDatabaseToUnified)
       };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService getAll error:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  static async getById(id: string): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
+  static async getById(id: string): Promise<{ success: boolean; data?: EmployeeUnified | null; error?: string }> {
     try {
       console.log('🔄 EmployeeUnifiedService: Fetching employee by ID:', id);
       
@@ -47,105 +40,105 @@ export class EmployeeUnifiedService {
         .single();
 
       if (error) {
-        console.error('❌ EmployeeUnifiedService: Error fetching employee:', error);
-        throw error;
+        console.error('❌ Error fetching employee:', error);
+        return { success: false, error: error.message };
       }
 
-      if (!data) {
-        console.log('⚠️ EmployeeUnifiedService: Employee not found:', id);
-        return { success: false, error: 'Empleado no encontrado' };
-      }
-
-      const employee = mapDatabaseToUnified(data);
-      console.log('✅ EmployeeUnifiedService: Successfully fetched employee:', employee.nombre, employee.apellido);
-      return { success: true, data: employee };
-    } catch (error) {
-      console.error('❌ EmployeeUnifiedService: Error in getById:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error desconocido' 
+      console.log('✅ EmployeeUnifiedService: Fetched employee:', data?.nombre, data?.apellido);
+      
+      return {
+        success: true,
+        data: data ? mapDatabaseToUnified(data) : null
       };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService getById error:', error);
+      return { success: false, error: error.message };
     }
+  }
+
+  static async getEmployeeById(id: string): Promise<{ success: boolean; data?: EmployeeUnified | null; error?: string }> {
+    return this.getById(id);
   }
 
   static async create(employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     try {
-      console.log('🔄 EmployeeUnifiedService: Creating employee:', employeeData.nombre, employeeData.apellido);
+      console.log('🔄 EmployeeUnifiedService: Creating employee with data:', employeeData);
       
-      // Map to database format
-      const dbData = mapUnifiedToDatabase(employeeData);
+      // Get current user's company ID
+      const { data: companyData, error: companyError } = await supabase
+        .rpc('get_current_user_company_id');
 
-      // ✅ FIXED: Ensure required fields for insertion
-      const insertData = {
-        ...dbData,
-        company_id: employeeData.company_id,
-        nombre: employeeData.nombre,
-        apellido: employeeData.apellido,
-        cedula: employeeData.cedula,
-        salario_base: employeeData.salarioBase
-      };
+      if (companyError || !companyData) {
+        console.error('❌ Error getting company ID:', companyError);
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+
+      // Map to database format
+      const dbData = mapUnifiedToDatabase({
+        ...employeeData,
+        id: '',
+        company_id: companyData
+      } as EmployeeUnified);
 
       const { data, error } = await supabase
         .from('employees')
-        .insert([insertData]) // ✅ FIXED: Use array format
+        .insert([dbData])
         .select()
         .single();
 
       if (error) {
-        console.error('❌ EmployeeUnifiedService: Error creating employee:', error);
+        console.error('❌ Error creating employee:', error);
         throw error;
       }
 
-      if (!data) {
-        throw new Error('No data returned from employee creation');
-      }
-
-      const employee = mapDatabaseToUnified(data);
-      console.log('✅ EmployeeUnifiedService: Successfully created employee:', employee.nombre, employee.apellido);
-      return { success: true, data: employee };
-    } catch (error) {
-      console.error('❌ EmployeeUnifiedService: Error in create:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error desconocido' 
+      console.log('✅ EmployeeUnifiedService: Employee created successfully:', data);
+      
+      return {
+        success: true,
+        data: mapDatabaseToUnified(data)
+      };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService create error:', error);
+      return {
+        success: false,
+        error: error.message || 'Error creating employee'
       };
     }
   }
 
-  static async update(id: string, updates: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
+  static async update(id: string, employeeData: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     try {
-      console.log('🔄 EmployeeUnifiedService: Updating employee:', id);
+      console.log('🔄 EmployeeUnifiedService: Updating employee:', id, 'with data:', employeeData);
       
-      // Map to database format, but only the fields that are being updated
-      const dbUpdates = mapUnifiedToDatabase(updates);
-
-      // Remove fields that shouldn't be updated
-      delete dbUpdates.id; // ID shouldn't change
+      // Map to database format
+      const dbData = mapUnifiedToDatabase({
+        ...employeeData,
+        id
+      } as EmployeeUnified);
       
       const { data, error } = await supabase
         .from('employees')
-        .update(dbUpdates)
+        .update(dbData)
         .eq('id', id)
         .select()
         .single();
 
       if (error) {
-        console.error('❌ EmployeeUnifiedService: Error updating employee:', error);
-        throw error;
+        console.error('❌ Error updating employee:', error);
+        return { success: false, error: error.message };
       }
 
-      if (!data) {
-        throw new Error('No data returned from employee update');
-      }
-
-      const employee = mapDatabaseToUnified(data);
-      console.log('✅ EmployeeUnifiedService: Successfully updated employee:', employee.nombre, employee.apellido);
-      return { success: true, data: employee };
-    } catch (error) {
-      console.error('❌ EmployeeUnifiedService: Error in update:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error desconocido' 
+      console.log('✅ EmployeeUnifiedService: Employee updated successfully:', data);
+      
+      return {
+        success: true,
+        data: mapDatabaseToUnified(data)
+      };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService update error:', error);
+      return {
+        success: false,
+        error: error.message || 'Error updating employee'
       };
     }
   }
@@ -160,18 +153,38 @@ export class EmployeeUnifiedService {
         .eq('id', id);
 
       if (error) {
-        console.error('❌ EmployeeUnifiedService: Error deleting employee:', error);
-        throw error;
+        console.error('❌ Error deleting employee:', error);
+        return { success: false, error: error.message };
       }
 
-      console.log('✅ EmployeeUnifiedService: Successfully deleted employee:', id);
+      console.log('✅ EmployeeUnifiedService: Employee deleted successfully:', id);
+      
       return { success: true };
-    } catch (error) {
-      console.error('❌ EmployeeUnifiedService: Error in delete:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error desconocido' 
-      };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService delete error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async changeStatus(id: string, newStatus: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🔄 EmployeeUnifiedService: Changing employee status:', id, 'to', newStatus);
+      
+      const { error } = await supabase
+        .from('employees')
+        .update({ estado: newStatus })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error changing employee status:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ EmployeeUnifiedService: Employee status changed successfully');
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ EmployeeUnifiedService changeStatus error:', error);
+      return { success: false, error: error.message };
     }
   }
 }

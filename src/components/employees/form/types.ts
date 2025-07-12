@@ -1,18 +1,18 @@
 
 import { EmployeeUnified } from '@/types/employee-unified';
 
-// ✅ FIXED: Updated interface with proper type definitions that match EmployeeUnified
+// ✅ SIMPLIFIED: Direct interface without confusion
 export interface EmployeeFormData {
   // Basic required fields
   id?: string;
   cedula: string;
-  tipoDocumento: string; // ✅ FIXED: Changed to string to accept any value
+  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
   segundoNombre?: string;
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: string; // ✅ FIXED: Changed to string to accept any value
+  sexo?: 'M' | 'F'; // ✅ SIMPLIFIED: Removed 'O'
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
@@ -20,17 +20,17 @@ export interface EmployeeFormData {
   
   // Labor Information
   salarioBase: number;
-  tipoContrato: string; // ✅ FIXED: Changed to string
+  tipoContrato: "indefinido" | "fijo" | "obra" | "aprendizaje";
   fechaIngreso: string;
-  periodicidadPago: string; // ✅ FIXED: Changed to string
+  periodicidadPago: "mensual" | "quincenal";
   cargo?: string;
-  codigoCiiu?: string; // ✅ FIXED: Changed property name to match EmployeeUnified
-  nivelRiesgoArl?: string; // ✅ FIXED: Changed property name to match EmployeeUnified
-  estado: string; // ✅ FIXED: Changed to string to accept 'eliminado'
+  codigo_ciiu?: string;
+  nivelRiesgoARL?: "I" | "II" | "III" | "IV" | "V";
+  estado: "activo" | "inactivo" | "vacaciones" | "incapacidad";
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada: string; // ✅ FIXED: Changed to string
+  tipoJornada: "completa" | "parcial" | "horas"; // ✅ REQUIRED
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
@@ -38,10 +38,10 @@ export interface EmployeeFormData {
   
   // Banking Information
   banco?: string;
-  tipoCuenta: string; // ✅ FIXED: Changed to string
+  tipoCuenta: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
-  formaPago: string; // ✅ FIXED: Changed to string
+  formaPago: "dispersion" | "manual";
   
   // Affiliations
   eps?: string;
@@ -50,9 +50,9 @@ export interface EmployeeFormData {
   cajaCompensacion?: string;
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
-  regimenSalud: string; // ✅ FIXED: Changed to string
-  estadoAfiliacion: string; // ✅ FIXED: Changed to string
+  regimenSalud: "contributivo" | "subsidiado";
+  estadoAfiliacion: "completa" | "pendiente" | "inconsistente";
   
   // Custom fields
-  customFields?: Record<string, any>; // ✅ FIXED: Changed property name to match EmployeeUnified
+  custom_fields?: Record<string, any>;
 }

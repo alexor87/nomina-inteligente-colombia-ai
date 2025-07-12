@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -62,8 +63,8 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
       periodicidadPago: employee?.periodicidadPago || 'mensual',
       cargo: employee?.cargo || '',
-      codigoCiiu: employee?.codigoCiiu || '',
-      nivelRiesgoArl: employee?.nivelRiesgoArl || 'I',
+      codigo_ciiu: employee?.codigoCIIU || '',
+      nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
       estado: employee?.estado || 'activo',
       centroCostos: employee?.centroCostos || '',
       fechaFirmaContrato: employee?.fechaFirmaContrato || '',
@@ -126,7 +127,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
     // Create the object with the structure expected by EmployeeUnified type
     const employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> = {
-      company_id: companyId,
+      empresaId: companyId,
       cedula: data.cedula,
       tipoDocumento: data.tipoDocumento,
       nombre: data.nombre,
@@ -144,9 +145,9 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       fechaIngreso: data.fechaIngreso,
       periodicidadPago: data.periodicidadPago,
       cargo: data.cargo,
-      codigoCiiu: data.codigoCiiu,
-      nivelRiesgoArl: data.nivelRiesgoArl,
-      estado: data.estado as any,
+      codigoCIIU: data.codigo_ciiu,
+      nivelRiesgoARL: data.nivelRiesgoARL,
+      estado: data.estado,
       centroCostos: data.centroCostos,
       fechaFirmaContrato: data.fechaFirmaContrato,
       fechaFinalizacionContrato: data.fechaFinalizacionContrato,
@@ -168,7 +169,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       subtipoCotizanteId: data.subtipoCotizanteId,
       regimenSalud: data.regimenSalud,
       estadoAfiliacion: data.estadoAfiliacion,
-      customFields: data.customFields || {}
+      custom_fields: data.custom_fields
     };
 
     let result;
@@ -202,7 +203,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="tipoDocumento">Tipo de Documento *</Label>
-              <Select onValueChange={(value) => setValue('tipoDocumento', value)}>
+              <Select onValueChange={(value) => setValue('tipoDocumento', value as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>
@@ -294,7 +295,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
             <div>
               <Label htmlFor="tipoContrato">Tipo de Contrato *</Label>
-              <Select onValueChange={(value) => setValue('tipoContrato', value)}>
+              <Select onValueChange={(value) => setValue('tipoContrato', value as EmployeeFormData['tipoContrato'])}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>
@@ -319,7 +320,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
             <div>
               <Label htmlFor="estado">Estado</Label>
-              <Select onValueChange={(value) => setValue('estado', value)}>
+              <Select onValueChange={(value) => setValue('estado', value as EmployeeFormData['estado'])}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
@@ -385,7 +386,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
 
             <div>
               <Label htmlFor="tipoCuenta">Tipo de Cuenta *</Label>
-              <Select onValueChange={(value) => setValue('tipoCuenta', value)}>
+              <Select onValueChange={(value) => setValue('tipoCuenta', value as 'ahorros' | 'corriente')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>

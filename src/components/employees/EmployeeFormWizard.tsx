@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +33,7 @@ export const EmployeeFormWizard = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Partial<EmployeeUnified>>(
     employee || {
-      company_id: '',
+      empresaId: '',
       cedula: '',
       tipoDocumento: 'CC',
       nombre: '',
@@ -57,7 +58,7 @@ export const EmployeeFormWizard = ({
       estadoAfiliacion: 'pendiente',
       tipoJornada: 'completa',
       formaPago: 'dispersion',
-      customFields: {}
+      custom_fields: {}
     }
   );
   
@@ -99,7 +100,7 @@ export const EmployeeFormWizard = ({
     try {
       // Ensure all required fields are present
       const employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> = {
-        company_id: formData.company_id || '',
+        empresaId: formData.empresaId || '',
         cedula: formData.cedula || '',
         tipoDocumento: formData.tipoDocumento || 'CC',
         nombre: formData.nombre || '',
@@ -117,8 +118,8 @@ export const EmployeeFormWizard = ({
         fechaIngreso: formData.fechaIngreso || new Date().toISOString().split('T')[0],
         periodicidadPago: formData.periodicidadPago || 'mensual',
         cargo: formData.cargo,
-        codigoCiiu: formData.codigoCiiu,
-        nivelRiesgoArl: formData.nivelRiesgoArl,
+        codigoCIIU: formData.codigoCIIU,
+        nivelRiesgoARL: formData.nivelRiesgoARL,
         estado: formData.estado || 'activo',
         centroCostos: formData.centroCostos,
         fechaFirmaContrato: formData.fechaFirmaContrato,
@@ -141,7 +142,7 @@ export const EmployeeFormWizard = ({
         subtipoCotizanteId: formData.subtipoCotizanteId,
         regimenSalud: formData.regimenSalud || 'contributivo',
         estadoAfiliacion: formData.estadoAfiliacion || 'pendiente',
-        customFields: formData.customFields || {}
+        custom_fields: formData.custom_fields || {}
       };
 
       let result;

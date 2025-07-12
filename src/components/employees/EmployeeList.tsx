@@ -6,12 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2, RotateCcw, Trash } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
-import { EmployeeBulkDeleteActions } from './EmployeeBulkDeleteActions';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,7 +22,6 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
   const {
     employees,
     isLoading,
-    isDeleting,
     error,
     filters,
     setFilters,
@@ -40,32 +36,24 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     forceCompleteRefresh,
     getComplianceIndicators,
     clearSelection,
-    deleteEmployee,
-    deleteMultipleEmployees,
-    restoreEmployee,
-    physicalDeleteEmployee,
     statistics
   } = useEmployeeList();
 
   const [showFilters, setShowFilters] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [physicalDeleteConfirmId, setPhysicalDeleteConfirmId] = useState<string | null>(null);
 
   const getStatusBadge = (status: string) => {
     const variants = {
       'activo': 'bg-green-100 text-green-800',
       'inactivo': 'bg-red-100 text-red-800',
       'vacaciones': 'bg-blue-100 text-blue-800',
-      'incapacidad': 'bg-yellow-100 text-yellow-800',
-      'eliminado': 'bg-gray-100 text-gray-800'
+      'incapacidad': 'bg-yellow-100 text-yellow-800'
     };
     
     const labels = {
       'activo': 'Activo',
       'inactivo': 'Inactivo',
       'vacaciones': 'Vacaciones',
-      'incapacidad': 'Incapacidad',
-      'eliminado': 'Eliminado'
+      'incapacidad': 'Incapacidad'
     };
 
     return (
@@ -78,28 +66,9 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
   const handleEmployeeClick = (employee: EmployeeUnified) => {
     if (selectionMode && onEmployeeSelect) {
       onEmployeeSelect(employee);
-    } else if (employee.estado !== 'eliminado') {
+    } else {
       navigate(`/app/employees/${employee.id}/edit`);
     }
-  };
-
-  const handleEditEmployee = (e: React.MouseEvent, employeeId: string) => {
-    e.stopPropagation();
-    navigate(`/app/employees/${employeeId}/edit`);
-  };
-
-  const handleDeleteEmployee = async (employeeId: string) => {
-    await deleteEmployee(employeeId);
-    setDeleteConfirmId(null);
-  };
-
-  const handleRestoreEmployee = async (employeeId: string) => {
-    await restoreEmployee(employeeId);
-  };
-
-  const handlePhysicalDeleteEmployee = async (employeeId: string) => {
-    await physicalDeleteEmployee(employeeId);
-    setPhysicalDeleteConfirmId(null);
   };
 
   if (isLoading) {
@@ -133,9 +102,6 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
           <h2 className="text-2xl font-bold text-gray-900">Empleados</h2>
           <p className="text-gray-600">
             {totalEmployees} empleados • {filteredCount} mostrados
-            {filters.showDeleted && statistics.deleted > 0 && (
-              <span className="text-red-600"> • {statistics.deleted} eliminados</span>
-            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -150,20 +116,11 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
         </div>
       </div>
 
-      {/* Bulk Delete Actions */}
-      <EmployeeBulkDeleteActions
-        selectedCount={selectedEmployees.length}
-        selectedEmployeeIds={selectedEmployees}
-        onBulkDelete={deleteMultipleEmployees}
-        onClearSelection={clearSelection}
-        isDeleting={isDeleting}
-      />
-
       {/* Filters */}
       {showFilters && (
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
@@ -187,7 +144,6 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                   <SelectItem value="inactivo">Inactivo</SelectItem>
                   <SelectItem value="vacaciones">Vacaciones</SelectItem>
                   <SelectItem value="incapacidad">Incapacidad</SelectItem>
-                  {filters.showDeleted && <SelectItem value="eliminado">Eliminado</SelectItem>}
                 </SelectContent>
               </Select>
 
@@ -207,17 +163,6 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                 </SelectContent>
               </Select>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="show-deleted"
-                  checked={filters.showDeleted}
-                  onCheckedChange={(checked) => setFilters({ showDeleted: checked })}
-                />
-                <label htmlFor="show-deleted" className="text-sm">
-                  Mostrar eliminados
-                </label>
-              </div>
-
               <Button variant="outline" onClick={clearFilters}>
                 Limpiar
               </Button>
@@ -227,7 +172,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
       )}
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-green-600">{statistics.active}</div>
@@ -250,12 +195,6 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-yellow-600">{statistics.onLeave}</div>
             <div className="text-sm text-gray-600">Incapacidad</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-gray-600">{statistics.deleted}</div>
-            <div className="text-sm text-gray-600">Eliminados</div>
           </CardContent>
         </Card>
       </div>
@@ -300,7 +239,8 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                 {employees.map((employee) => (
                   <tr
                     key={employee.id}
-                    className={`border-b hover:bg-gray-50 ${employee.estado === 'eliminado' ? 'opacity-60' : ''}`}
+                    className="border-b hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleEmployeeClick(employee)}
                   >
                     <td className="p-4">
                       <Checkbox
@@ -309,10 +249,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
-                    <td 
-                      className={`p-4 ${employee.estado !== 'eliminado' ? 'cursor-pointer' : ''}`}
-                      onClick={() => handleEmployeeClick(employee)}
-                    >
+                    <td className="p-4">
                       <div>
                         <div className="font-medium">
                           {employee.nombre} {employee.apellido}
@@ -320,28 +257,10 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                         <div className="text-sm text-gray-600">{employee.email}</div>
                       </div>
                     </td>
-                    <td 
-                      className={`p-4 ${employee.estado !== 'eliminado' ? 'cursor-pointer' : ''}`}
-                      onClick={() => handleEmployeeClick(employee)}
-                    >
-                      {employee.cedula}
-                    </td>
-                    <td 
-                      className={`p-4 ${employee.estado !== 'eliminado' ? 'cursor-pointer' : ''}`}
-                      onClick={() => handleEmployeeClick(employee)}
-                    >
-                      {employee.cargo || 'No especificado'}
-                    </td>
-                    <td 
-                      className={`p-4 ${employee.estado !== 'eliminado' ? 'cursor-pointer' : ''}`}
-                      onClick={() => handleEmployeeClick(employee)}
-                    >
-                      {getStatusBadge(employee.estado)}
-                    </td>
-                    <td 
-                      className={`p-4 ${employee.estado !== 'eliminado' ? 'cursor-pointer' : ''}`}
-                      onClick={() => handleEmployeeClick(employee)}
-                    >
+                    <td className="p-4">{employee.cedula}</td>
+                    <td className="p-4">{employee.cargo || 'No especificado'}</td>
+                    <td className="p-4">{getStatusBadge(employee.estado)}</td>
+                    <td className="p-4">
                       ${employee.salarioBase?.toLocaleString() || '0'}
                     </td>
                     <td className="p-4">
@@ -352,93 +271,18 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          {employee.estado !== 'eliminado' ? (
-                            <>
-                              <DropdownMenuItem onClick={(e) => handleEditEmployee(e, employee.id)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Mail className="w-4 h-4 mr-2" />
-                                Enviar Comprobante
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem 
-                                    className="text-red-600"
-                                    onSelect={(e) => e.preventDefault()}
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Eliminar
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      ¿Estás seguro de que quieres eliminar a {employee.nombre} {employee.apellido}? 
-                                      El empleado será marcado como eliminado y ocultado de la lista principal.
-                                      Podrás restaurarlo más tarde si es necesario.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction 
-                                      onClick={() => handleDeleteEmployee(employee.id)}
-                                      className="bg-red-600 hover:bg-red-700"
-                                      disabled={isDeleting}
-                                    >
-                                      {isDeleting ? "Eliminando..." : "Eliminar"}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </>
-                          ) : (
-                            <>
-                              <DropdownMenuItem 
-                                onClick={() => handleRestoreEmployee(employee.id)}
-                                className="text-green-600"
-                              >
-                                <RotateCcw className="w-4 h-4 mr-2" />
-                                Restaurar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem 
-                                    className="text-red-600"
-                                    onSelect={(e) => e.preventDefault()}
-                                  >
-                                    <Trash className="w-4 h-4 mr-2" />
-                                    Eliminar Permanentemente
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirmar eliminación permanente</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      ⚠️ <strong>ADVERTENCIA:</strong> Estás a punto de eliminar permanentemente a {employee.nombre} {employee.apellido}.
-                                      <br /><br />
-                                      Esta acción es <strong>IRREVERSIBLE</strong> y eliminará todos los datos relacionados.
-                                      Solo procede si estás completamente seguro y el empleado no tiene registros de nómina o otros datos importantes.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction 
-                                      onClick={() => handlePhysicalDeleteEmployee(employee.id)}
-                                      className="bg-red-600 hover:bg-red-700"
-                                      disabled={isDeleting}
-                                    >
-                                      {isDeleting ? "Eliminando..." : "Eliminar Permanentemente"}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </>
-                          )}
+                          <DropdownMenuItem onClick={() => navigate(`/app/employees/${employee.id}/edit`)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Mail className="w-4 h-4 mr-2" />
+                            Enviar Comprobante
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -450,9 +294,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
           
           {employees.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-gray-500">
-                {filters.showDeleted ? 'No se encontraron empleados eliminados' : 'No se encontraron empleados'}
-              </p>
+              <p className="text-gray-500">No se encontraron empleados</p>
             </div>
           )}
         </CardContent>
