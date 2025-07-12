@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 export class PayrollDeletionService {
   /**
    * Elimina un empleado directamente de la base de datos para un período específico
+   * Now also considers soft deleted employees
    */
   static async deleteEmployeeFromPeriod(
     periodId: string, 
@@ -17,6 +18,17 @@ export class PayrollDeletionService {
     });
 
     try {
+      // Check if employee is soft deleted
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('estado')
+        .eq('id', employeeId)
+        .single();
+
+      if (employee?.estado === 'eliminado') {
+        console.warn('⚠️ Attempting to delete payroll for soft deleted employee:', employeeId);
+      }
+
       // Eliminación directa en la base de datos
       const { error: deleteError } = await supabase
         .from('payrolls')
@@ -39,6 +51,7 @@ export class PayrollDeletionService {
 
   /**
    * Valida si un empleado existe en un período antes de eliminarlo
+   * Now excludes soft deleted employees from validation
    */
   static async validateEmployeeInPeriod(
     periodId: string, 
@@ -46,6 +59,18 @@ export class PayrollDeletionService {
     companyId: string
   ): Promise<boolean> {
     try {
+      // First check if employee is not soft deleted
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('estado')
+        .eq('id', employeeId)
+        .single();
+
+      if (employee?.estado === 'eliminado') {
+        console.log('⚠️ Employee is soft deleted, validation failed:', employeeId);
+        return false;
+      }
+
       const { data, error } = await supabase
         .from('payrolls')
         .select('id')

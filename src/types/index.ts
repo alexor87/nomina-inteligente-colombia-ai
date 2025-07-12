@@ -12,7 +12,7 @@ export interface Employee {
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F'; // ✅ FIXED: Removed 'O' to match EmployeeUnified
+  sexo?: 'M' | 'F';
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
@@ -30,13 +30,13 @@ export interface Employee {
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // ✅ ADDED eliminado
   centroCostos?: string;
   
   // Contract details
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada: 'completa' | 'parcial' | 'horas'; // ✅ FIXED: Made required to match EmployeeUnified
+  tipoJornada: 'completa' | 'parcial' | 'horas';
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;

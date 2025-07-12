@@ -6,11 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2, Undo2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { EmployeeUnified } from '@/types/employee-unified';
+import { EmployeeService } from '@/services/EmployeeService';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 interface EmployeeListProps {
   onEmployeeSelect?: (employee: EmployeeUnified) => void;
@@ -19,6 +21,7 @@ interface EmployeeListProps {
 
 export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: EmployeeListProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const {
     employees,
     isLoading,
@@ -40,20 +43,24 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
   } = useEmployeeList();
 
   const [showFilters, setShowFilters] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedEmployees, setDeletedEmployees] = useState<EmployeeUnified[]>([]);
 
   const getStatusBadge = (status: string) => {
     const variants = {
       'activo': 'bg-green-100 text-green-800',
       'inactivo': 'bg-red-100 text-red-800',
       'vacaciones': 'bg-blue-100 text-blue-800',
-      'incapacidad': 'bg-yellow-100 text-yellow-800'
+      'incapacidad': 'bg-yellow-100 text-yellow-800',
+      'eliminado': 'bg-gray-100 text-gray-800' // ✅ ADDED eliminado status
     };
     
     const labels = {
       'activo': 'Activo',
       'inactivo': 'Inactivo',
       'vacaciones': 'Vacaciones',
-      'incapacidad': 'Incapacidad'
+      'incapacidad': 'Incapacidad',
+      'eliminado': 'Eliminado' // ✅ ADDED eliminado label
     };
 
     return (
@@ -69,6 +76,75 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     } else {
       navigate(`/app/employees/${employee.id}/edit`);
     }
+  };
+
+  const handleSoftDelete = async (employeeId: string, employeeName: string) => {
+    try {
+      const result = await EmployeeService.deleteEmployee(employeeId);
+      if (result.success) {
+        toast({
+          title: "Empleado eliminado",
+          description: `${employeeName} ha sido eliminado correctamente.`,
+        });
+        await refreshEmployees();
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "No se pudo eliminar el empleado",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error inesperado al eliminar empleado",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRestoreEmployee = async (employeeId: string, employeeName: string) => {
+    try {
+      const result = await EmployeeService.restoreEmployee(employeeId);
+      if (result.success) {
+        toast({
+          title: "Empleado restaurado",
+          description: `${employeeName} ha sido restaurado correctamente.`,
+        });
+        await loadDeletedEmployees();
+        await refreshEmployees();
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "No se pudo restaurar el empleado",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error inesperado al restaurar empleado",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const loadDeletedEmployees = async () => {
+    try {
+      const result = await EmployeeService.getDeletedEmployees();
+      if (result.success && result.data) {
+        setDeletedEmployees(result.data);
+      }
+    } catch (error) {
+      console.error('Error loading deleted employees:', error);
+    }
+  };
+
+  const toggleDeletedView = async () => {
+    if (!showDeleted) {
+      await loadDeletedEmployees();
+    }
+    setShowDeleted(!showDeleted);
   };
 
   if (isLoading) {
@@ -94,30 +170,48 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     );
   }
 
+  const currentEmployees = showDeleted ? deletedEmployees : employees;
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Empleados</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {showDeleted ? 'Empleados Eliminados' : 'Empleados'}
+          </h2>
           <p className="text-gray-600">
-            {totalEmployees} empleados • {filteredCount} mostrados
+            {showDeleted 
+              ? `${deletedEmployees.length} empleados eliminados`
+              : `${totalEmployees} empleados • ${filteredCount} mostrados`
+            }
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
-            <Filter className="w-4 h-4 mr-2" />
-            Filtros
+          <Button 
+            variant={showDeleted ? "default" : "outline"} 
+            onClick={toggleDeletedView}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            {showDeleted ? 'Ver Activos' : 'Ver Eliminados'}
           </Button>
-          <Button onClick={() => navigate('/app/employees/new')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Empleado
-          </Button>
+          {!showDeleted && (
+            <>
+              <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+                <Filter className="w-4 h-4 mr-2" />
+                Filtros
+              </Button>
+              <Button onClick={() => navigate('/app/employees/new')}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Empleado
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Filters */}
-      {showFilters && (
+      {showFilters && !showDeleted && (
         <Card>
           <CardContent className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -171,40 +265,42 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
         </Card>
       )}
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{statistics.active}</div>
-            <div className="text-sm text-gray-600">Activos</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{statistics.inactive}</div>
-            <div className="text-sm text-gray-600">Inactivos</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{statistics.onVacation}</div>
-            <div className="text-sm text-gray-600">En Vacaciones</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{statistics.onLeave}</div>
-            <div className="text-sm text-gray-600">Incapacidad</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Statistics (only for active employees) */}
+      {!showDeleted && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-600">{statistics.active}</div>
+              <div className="text-sm text-gray-600">Activos</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-red-600">{statistics.inactive}</div>
+              <div className="text-sm text-gray-600">Inactivos</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-600">{statistics.onVacation}</div>
+              <div className="text-sm text-gray-600">En Vacaciones</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-yellow-600">{statistics.onLeave}</div>
+              <div className="text-sm text-gray-600">Incapacidad</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Employee Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            Lista de Empleados
-            {selectedEmployees.length > 0 && (
+            {showDeleted ? 'Lista de Empleados Eliminados' : 'Lista de Empleados'}
+            {!showDeleted && selectedEmployees.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">
                   {selectedEmployees.length} seleccionados
@@ -221,12 +317,14 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-4">
-                    <Checkbox
-                      checked={employees.length > 0 && employees.every(emp => selectedEmployees.includes(emp.id))}
-                      onCheckedChange={toggleAllEmployees}
-                    />
-                  </th>
+                  {!showDeleted && (
+                    <th className="text-left p-4">
+                      <Checkbox
+                        checked={currentEmployees.length > 0 && currentEmployees.every(emp => selectedEmployees.includes(emp.id))}
+                        onCheckedChange={toggleAllEmployees}
+                      />
+                    </th>
+                  )}
                   <th className="text-left p-4">Empleado</th>
                   <th className="text-left p-4">Cédula</th>
                   <th className="text-left p-4">Cargo</th>
@@ -236,19 +334,21 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                 </tr>
               </thead>
               <tbody>
-                {employees.map((employee) => (
+                {currentEmployees.map((employee) => (
                   <tr
                     key={employee.id}
                     className="border-b hover:bg-gray-50 cursor-pointer"
-                    onClick={() => handleEmployeeClick(employee)}
+                    onClick={() => !showDeleted && handleEmployeeClick(employee)}
                   >
-                    <td className="p-4">
-                      <Checkbox
-                        checked={selectedEmployees.includes(employee.id)}
-                        onCheckedChange={() => toggleEmployeeSelection(employee.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
+                    {!showDeleted && (
+                      <td className="p-4">
+                        <Checkbox
+                          checked={selectedEmployees.includes(employee.id)}
+                          onCheckedChange={() => toggleEmployeeSelection(employee.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                    )}
                     <td className="p-4">
                       <div>
                         <div className="font-medium">
@@ -271,18 +371,33 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => navigate(`/app/employees/${employee.id}/edit`)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Mail className="w-4 h-4 mr-2" />
-                            Enviar Comprobante
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
+                          {showDeleted ? (
+                            <DropdownMenuItem 
+                              onClick={() => handleRestoreEmployee(employee.id, `${employee.nombre} ${employee.apellido}`)}
+                              className="text-green-600"
+                            >
+                              <Undo2 className="w-4 h-4 mr-2" />
+                              Restaurar
+                            </DropdownMenuItem>
+                          ) : (
+                            <>
+                              <DropdownMenuItem onClick={() => navigate(`/app/employees/${employee.id}/edit`)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Mail className="w-4 h-4 mr-2" />
+                                Enviar Comprobante
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleSoftDelete(employee.id, `${employee.nombre} ${employee.apellido}`)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -292,9 +407,11 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
             </table>
           </div>
           
-          {employees.length === 0 && (
+          {currentEmployees.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-gray-500">No se encontraron empleados</p>
+              <p className="text-gray-500">
+                {showDeleted ? 'No hay empleados eliminados' : 'No se encontraron empleados'}
+              </p>
             </div>
           )}
         </CardContent>

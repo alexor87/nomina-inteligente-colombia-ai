@@ -1,11 +1,11 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
-import { EmployeeDataMapper } from './EmployeeDataMapper';
+import { EmployeeSoftDeleteService } from './EmployeeSoftDeleteService';
 
 export class EmployeeService {
   /**
-   * Get all employees for the current company
+   * Get all employees for the current company (excluding soft deleted)
    */
   static async getEmployees(): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
     try {
@@ -14,6 +14,7 @@ export class EmployeeService {
       const { data, error } = await supabase
         .from('employees')
         .select('*')
+        .neq('estado', 'eliminado') // ✅ EXCLUDE soft deleted employees
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -41,7 +42,7 @@ export class EmployeeService {
   }
 
   /**
-   * Get employee by ID
+   * Get employee by ID (excluding soft deleted)
    */
   static async getEmployeeById(id: string): Promise<EmployeeUnified | null> {
     try {
@@ -51,6 +52,7 @@ export class EmployeeService {
         .from('employees')
         .select('*')
         .eq('id', id)
+        .neq('estado', 'eliminado') // ✅ EXCLUDE soft deleted employees
         .single();
 
       if (error) {
@@ -134,6 +136,7 @@ export class EmployeeService {
         .from('employees')
         .update(dbUpdates)
         .eq('id', id)
+        .neq('estado', 'eliminado') // ✅ PREVENT updating soft deleted employees
         .select()
         .single();
 
@@ -159,30 +162,31 @@ export class EmployeeService {
   }
 
   /**
-   * Delete employee
+   * Delete employee (soft delete - changes status to 'eliminado')
    */
   static async deleteEmployee(id: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      console.log('🔄 EmployeeService: Deleting employee:', id);
-      
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', id);
+    console.log('🔄 EmployeeService: Soft deleting employee:', id);
+    return EmployeeSoftDeleteService.softDeleteEmployee(id);
+  }
 
-      if (error) {
-        console.error('❌ EmployeeService: Error deleting employee:', error);
-        throw error;
-      }
+  /**
+   * Get deleted employees (for recovery purposes)
+   */
+  static async getDeletedEmployees(): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
+    return EmployeeSoftDeleteService.getDeletedEmployees();
+  }
 
-      console.log('✅ EmployeeService: Successfully deleted employee:', id);
-      return { success: true };
-    } catch (error) {
-      console.error('❌ EmployeeService: Error in deleteEmployee:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error desconocido' 
-      };
-    }
+  /**
+   * Restore a soft deleted employee
+   */
+  static async restoreEmployee(id: string): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
+    return EmployeeSoftDeleteService.restoreEmployee(id);
+  }
+
+  /**
+   * Permanently delete an employee (hard delete - use with caution)
+   */
+  static async permanentlyDeleteEmployee(id: string): Promise<{ success: boolean; error?: string }> {
+    return EmployeeSoftDeleteService.permanentlyDeleteEmployee(id);
   }
 }

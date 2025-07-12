@@ -26,24 +26,24 @@ export interface EmployeeUnified {
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // ✅ ADDED eliminado
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada: 'completa' | 'parcial' | 'horas'; // ✅ REQUIRED to match Employee
+  tipoJornada: 'completa' | 'parcial' | 'horas';
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
   clausulasEspeciales?: string;
   
-  // Banking Information - ✅ MADE OPTIONAL to match Employee
+  // Banking Information
   banco?: string;
   tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
   formaPago?: 'dispersion' | 'manual';
   
-  // Affiliations - ✅ MADE OPTIONAL to match Employee
+  // Affiliations
   eps?: string;
   afp?: string;
   arl?: string;
@@ -90,24 +90,24 @@ export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
     centroCostos: dbData.centro_costos || undefined,
     fechaFirmaContrato: dbData.fecha_firma_contrato || undefined,
     fechaFinalizacionContrato: dbData.fecha_finalizacion_contrato || undefined,
-    tipoJornada: dbData.tipo_jornada || 'completa', // ✅ DEFAULT VALUE
+    tipoJornada: dbData.tipo_jornada || 'completa',
     diasTrabajo: Number(dbData.dias_trabajo) || 30,
     horasTrabajo: Number(dbData.horas_trabajo) || 8,
     beneficiosExtralegales: Boolean(dbData.beneficios_extralegales),
     clausulasEspeciales: dbData.clausulas_especiales || undefined,
     banco: dbData.banco || undefined,
-    tipoCuenta: dbData.tipo_cuenta || undefined, // ✅ NO DEFAULT - OPTIONAL
+    tipoCuenta: dbData.tipo_cuenta || undefined,
     numeroCuenta: dbData.numero_cuenta || undefined,
     titularCuenta: dbData.titular_cuenta || undefined,
-    formaPago: dbData.forma_pago || undefined, // ✅ NO DEFAULT - OPTIONAL
+    formaPago: dbData.forma_pago || undefined,
     eps: dbData.eps || undefined,
     afp: dbData.afp || undefined,
     arl: dbData.arl || undefined,
     cajaCompensacion: dbData.caja_compensacion || undefined,
     tipoCotizanteId: dbData.tipo_cotizante_id || undefined,
     subtipoCotizanteId: dbData.subtipo_cotizante_id || undefined,
-    regimenSalud: dbData.regimen_salud || undefined, // ✅ NO DEFAULT - OPTIONAL
-    estadoAfiliacion: dbData.estado_afiliacion || undefined, // ✅ NO DEFAULT - OPTIONAL
+    regimenSalud: dbData.regimen_salud || undefined,
+    estadoAfiliacion: dbData.estado_afiliacion || undefined,
     custom_fields: dbData.custom_fields || {},
     createdAt: dbData.created_at,
     updatedAt: dbData.updated_at
