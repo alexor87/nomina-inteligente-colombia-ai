@@ -26,8 +26,15 @@ export const useEmployeeFormSubmissionRobust = () => {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
+      // ✅ FIXED: Create a compatible data object with proper estado field
+      const compatibleData = {
+        ...data,
+        // Cast estado to the expected union type for the mapper
+        estado: data.estado as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'
+      };
+
       // ✅ KISS: Use EmployeeDataMapper for proper field conversion
-      const mappedData = EmployeeDataMapper.mapFormToDatabase(data, profile.company_id);
+      const mappedData = EmployeeDataMapper.mapFormToDatabase(compatibleData, profile.company_id);
       
       console.log('📝 Datos mapeados para base de datos:', mappedData);
 

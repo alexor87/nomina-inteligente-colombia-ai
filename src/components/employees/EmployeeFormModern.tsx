@@ -59,9 +59,17 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     isSubmitting
   } = useEmployeeFormSubmissionRobust();
 
+  // ✅ FIXED: Create compatible employee object for legacy hooks
+  const legacyEmployee = employee ? {
+    ...employee,
+    empresaId: employee.company_id,
+    createdAt: employee.createdAt || new Date().toISOString(),
+    updatedAt: employee.updatedAt || new Date().toISOString()
+  } : null;
+
   // Keep legacy edit submission for compatibility
   const { handleSubmit: handleEditSubmission, isSubmitting: isSubmittingEdit } = useEmployeeEditSubmission(
-    employee || null,
+    legacyEmployee,
     onSuccess
   );
 
@@ -81,8 +89,9 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     const formDataWithCompany = {
       ...data,
       empresaId: companyId,
+      company_id: companyId, // ✅ ADDED: Ensure both properties are set
       // Asegurar que custom_fields está presente y es un objeto
-      custom_fields: data.custom_fields || {}
+      customFields: data.customFields || {}
     };
 
     // Use robust submission for both create and update operations
@@ -93,7 +102,12 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
       onSuccess();
       if (result.employeeId && memoizedDataRefresh) {
         // Refresh with updated data if available - ✅ FIXED: Cast with required id
-        const updatedEmployee: EmployeeUnified = { ...formDataWithCompany, id: result.employeeId } as EmployeeUnified;
+        const updatedEmployee: EmployeeUnified = { 
+          ...formDataWithCompany, 
+          id: result.employeeId,
+          empresaId: companyId,
+          company_id: companyId
+        } as EmployeeUnified;
         memoizedDataRefresh(updatedEmployee);
       }
     } else {

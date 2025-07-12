@@ -7,6 +7,7 @@ export type EmployeeStatus = 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad
 export interface EmployeeUnified {
   id: string;
   company_id: string;
+  empresaId?: string; // ✅ ADDED: For backward compatibility with legacy Employee type
   nombre: string;
   apellido: string;
   segundoNombre?: string;
@@ -69,6 +70,7 @@ export const mapDatabaseToUnified = (dbEmployee: DatabaseEmployee): EmployeeUnif
   return {
     id: dbEmployee.id,
     company_id: dbEmployee.company_id,
+    empresaId: dbEmployee.company_id, // ✅ ADDED: Map company_id to empresaId for compatibility
     nombre: dbEmployee.nombre,
     apellido: dbEmployee.apellido,
     segundoNombre: dbEmployee.segundo_nombre || undefined,
@@ -124,7 +126,7 @@ export const mapDatabaseToUnified = (dbEmployee: DatabaseEmployee): EmployeeUnif
 export const mapUnifiedToDatabase = (employee: Partial<EmployeeUnified>): Partial<DatabaseEmployee> => {
   return {
     id: employee.id,
-    company_id: employee.company_id,
+    company_id: employee.company_id || employee.empresaId, // ✅ FIXED: Use company_id or fall back to empresaId
     nombre: employee.nombre,
     apellido: employee.apellido,
     segundo_nombre: employee.segundoNombre,

@@ -1,3 +1,4 @@
+
 import { ValidatedEmployeeData } from '@/schemas/employeeValidation';
 import { Employee } from '@/types';
 
@@ -53,8 +54,8 @@ export class EmployeeDataMapper {
 
       // Optional labor information
       cargo: this.cleanTextField(formData.cargo),
-      codigo_ciiu: this.cleanTextField(formData.codigoCIIU),
-      nivel_riesgo_arl: formData.nivelRiesgoARL || null,
+      codigo_ciiu: this.cleanTextField(formData.codigoCiiu), // ✅ FIXED: Use correct property name
+      nivel_riesgo_arl: formData.nivelRiesgoArl || null, // ✅ FIXED: Use correct property name
       centro_costos: this.cleanTextField(formData.centroCostos),
 
       // Contract details - FIXED: Clean date fields properly
@@ -117,8 +118,8 @@ export class EmployeeDataMapper {
       fechaIngreso: dbData.fecha_ingreso || new Date().toISOString().split('T')[0],
       periodicidadPago: dbData.periodicidad_pago || 'mensual',
       cargo: dbData.cargo || undefined,
-      codigoCIIU: dbData.codigo_ciiu || undefined,
-      nivelRiesgoARL: dbData.nivel_riesgo_arl || undefined,
+      codigoCiiu: dbData.codigo_ciiu || undefined, // ✅ FIXED: Use correct property name
+      nivelRiesgoArl: dbData.nivel_riesgo_arl || undefined, // ✅ FIXED: Use correct property name
       estado: dbData.estado || 'activo',
       centroCostos: dbData.centro_costos || undefined,
       fechaFirmaContrato: dbData.fecha_firma_contrato || undefined,
