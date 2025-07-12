@@ -87,7 +87,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
       console.log('✅ Form submission completed successfully');
       onSuccess();
       if (result.employeeId && memoizedDataRefresh) {
-        // ✅ FIXED: Create updated employee with proper casting
+        // ✅ FIXED: Create updated employee with proper casting and type compatibility
         const updatedEmployee: EmployeeUnified = { 
           id: result.employeeId,
           company_id: companyId,
@@ -95,20 +95,20 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           nombre: formDataWithCompany.nombre || '',
           apellido: formDataWithCompany.apellido || '',
           cedula: formDataWithCompany.cedula || '',
-          tipoDocumento: formDataWithCompany.tipoDocumento || 'CC',
+          tipoDocumento: (formDataWithCompany.tipoDocumento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT', // ✅ FIXED: Proper type casting
           email: formDataWithCompany.email,
           telefono: formDataWithCompany.telefono,
           salarioBase: formDataWithCompany.salarioBase || 0,
-          tipoContrato: formDataWithCompany.tipoContrato || 'indefinido',
+          tipoContrato: (formDataWithCompany.tipoContrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje', // ✅ FIXED: Type casting
           fechaIngreso: formDataWithCompany.fechaIngreso || new Date().toISOString().split('T')[0],
-          periodicidadPago: formDataWithCompany.periodicidadPago || 'mensual',
-          estado: formDataWithCompany.estado || 'activo',
+          periodicidadPago: (formDataWithCompany.periodicidadPago || 'mensual') as 'mensual' | 'quincenal', // ✅ FIXED: Type casting
+          estado: (formDataWithCompany.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado', // ✅ FIXED: Type casting
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          // Add other optional fields
+          // Add other optional fields with proper type casting
           segundoNombre: formDataWithCompany.segundoNombre,
           fechaNacimiento: formDataWithCompany.fechaNacimiento,
-          sexo: formDataWithCompany.sexo,
+          sexo: formDataWithCompany.sexo as 'M' | 'F' | 'O' | undefined, // ✅ FIXED: Type casting
           direccion: formDataWithCompany.direccion,
           ciudad: formDataWithCompany.ciudad,
           departamento: formDataWithCompany.departamento,
@@ -118,22 +118,22 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           arl: formDataWithCompany.arl,
           cajaCompensacion: formDataWithCompany.cajaCompensacion,
           banco: formDataWithCompany.banco,
-          tipoCuenta: formDataWithCompany.tipoCuenta || 'ahorros',
+          tipoCuenta: (formDataWithCompany.tipoCuenta || 'ahorros') as 'ahorros' | 'corriente', // ✅ FIXED: Type casting
           numeroCuenta: formDataWithCompany.numeroCuenta,
           titularCuenta: formDataWithCompany.titularCuenta,
-          formaPago: formDataWithCompany.formaPago || 'dispersion',
-          regimenSalud: formDataWithCompany.regimenSalud || 'contributivo',
-          estadoAfiliacion: formDataWithCompany.estadoAfiliacion || 'pendiente',
+          formaPago: (formDataWithCompany.formaPago || 'dispersion') as 'dispersion' | 'manual', // ✅ FIXED: Type casting
+          regimenSalud: (formDataWithCompany.regimenSalud || 'contributivo') as 'contributivo' | 'subsidiado', // ✅ FIXED: Type casting
+          estadoAfiliacion: (formDataWithCompany.estadoAfiliacion || 'pendiente') as 'completa' | 'pendiente' | 'inconsistente', // ✅ FIXED: Type casting
           customFields: formDataWithCompany.customFields || {},
-          // Handle other fields with proper defaults
+          // Handle other fields with proper defaults and type casting
           fechaFirmaContrato: formDataWithCompany.fechaFirmaContrato,
           fechaFinalizacionContrato: formDataWithCompany.fechaFinalizacionContrato,
-          tipoJornada: formDataWithCompany.tipoJornada || 'completa',
+          tipoJornada: (formDataWithCompany.tipoJornada || 'completa') as 'completa' | 'parcial' | 'horas', // ✅ FIXED: Type casting
           diasTrabajo: formDataWithCompany.diasTrabajo || 30,
           horasTrabajo: formDataWithCompany.horasTrabajo || 8,
           beneficiosExtralegales: formDataWithCompany.beneficiosExtralegales || false,
           codigoCiiu: formDataWithCompany.codigoCiiu,
-          nivelRiesgoArl: formDataWithCompany.nivelRiesgoArl,
+          nivelRiesgoArl: formDataWithCompany.nivelRiesgoArl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined, // ✅ FIXED: Type casting
           centroCostos: formDataWithCompany.centroCostos,
           clausulasEspeciales: formDataWithCompany.clausulasEspeciales,
           tipoCotizanteId: formDataWithCompany.tipoCotizanteId,

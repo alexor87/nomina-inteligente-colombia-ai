@@ -59,7 +59,7 @@ export interface Employee {
   regimenSalud?: 'contributivo' | 'subsidiado';
   estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   
-  // Custom fields
+  // Custom fields - ✅ FIXED: Use correct property name
   custom_fields?: Record<string, any>;
   
   // UI/Display properties
@@ -71,6 +71,14 @@ export interface Employee {
   // Timestamps
   createdAt?: string;
   updatedAt?: string;
+}
+
+// ✅ FIXED: Add EmployeeWithStatus export
+export interface EmployeeWithStatus extends Employee {
+  hasExpiredContract: boolean;
+  hasPendingDocuments: boolean;
+  hasIncompleteAffiliations: boolean;
+  statusFlags: string[];
 }
 
 // Payroll related types

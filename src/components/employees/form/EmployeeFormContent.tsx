@@ -18,16 +18,28 @@ interface EmployeeFormContentProps {
   customFields: any[];
 }
 
-// ✅ FIXED: Convert FieldErrors to simple error record for compatibility
+// ✅ FIXED: Improved error conversion function with proper type checking
 const convertFieldErrorsToRecord = (errors: FieldErrors<EmployeeFormData>): Record<string, string> => {
   const errorRecord: Record<string, string> = {};
   
   Object.keys(errors).forEach(key => {
     const error = errors[key as keyof EmployeeFormData];
-    if (error && typeof error === 'object' && 'message' in error) {
-      errorRecord[key] = error.message || 'Error de validación';
-    } else if (typeof error === 'string') {
-      errorRecord[key] = error;
+    if (error) {
+      // Handle different error types properly
+      if (typeof error === 'string') {
+        errorRecord[key] = error;
+      } else if (typeof error === 'object' && error !== null) {
+        // Check if it's a FieldError with message
+        if ('message' in error && typeof error.message === 'string') {
+          errorRecord[key] = error.message;
+        } else if ('message' in error && error.message) {
+          errorRecord[key] = String(error.message);
+        } else {
+          errorRecord[key] = 'Error de validación';
+        }
+      } else {
+        errorRecord[key] = 'Error de validación';
+      }
     }
   });
   
@@ -58,10 +70,9 @@ export const EmployeeFormContent = ({
           watch={watch}
         />
 
-        {/* Labor Information Section */}
+        {/* Labor Information Section - ✅ FIXED: Remove unsupported props */}
         <LaborInfoSection
           errors={simpleErrors}
-          watchedValues={watchedValues}
           setValue={setValue}
           watch={watch}
           arlRiskLevels={arlRiskLevels}
