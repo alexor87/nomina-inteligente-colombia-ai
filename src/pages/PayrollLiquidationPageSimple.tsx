@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Loader2 } from 'lucide-react';
+import { Calculator, Users, Loader2, AlertTriangle } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
+import { ConflictResolutionPanel } from '@/components/vacation-integration/ConflictResolutionPanel';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { usePayrollUnified } from '@/hooks/usePayrollUnified';
+import { usePayrollLiquidationWithVacations } from '@/hooks/usePayrollLiquidationWithVacations';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 
 const PayrollLiquidationPageSimple = () => {
@@ -26,19 +27,31 @@ const PayrollLiquidationPageSimple = () => {
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
-    currentPeriodId
-  } = usePayrollUnified(companyId || '');
+    currentPeriodId,
+    
+    // Nuevas propiedades para conflictos
+    conflictDetectionStep,
+    conflictReport,
+    hasConflicts,
+    isDetectingConflicts,
+    isResolvingConflicts,
+    resolveConflictsAndContinue,
+    cancelConflictResolution,
+    canProceedWithLiquidation,
+    needsConflictResolution,
+    isLoadingWithConflicts
+  } = usePayrollLiquidationWithVacations(companyId || '');
 
   const handlePeriodSelection = async (period: SelectablePeriod) => {
     console.log('🎯 Período seleccionado:', period.label);
     setSelectedPeriod(period);
     
-    // Cargar empleados inmediatamente
+    // Cargar empleados con detección de conflictos
     await loadEmployees(period.startDate, period.endDate);
   };
 
   const handleLiquidate = async () => {
-    if (!selectedPeriod || employees.length === 0) {
+    if (!selectedPeriod || employees.length === 0 || !canProceedWithLiquidation) {
       return;
     }
 
@@ -62,26 +75,70 @@ const PayrollLiquidationPageSimple = () => {
     setSelectedPeriod(null);
   };
 
+  const handleConflictResolution = async (resolutions: any[]) => {
+    if (!selectedPeriod) return;
+    
+    await resolveConflictsAndContinue(
+      resolutions,
+      selectedPeriod.startDate,
+      selectedPeriod.endDate
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Calculator className="h-6 w-6 text-blue-600" />
           <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
+          {isLoadingWithConflicts && (
+            <div className="flex items-center space-x-1 text-blue-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-medium">
+                {isDetectingConflicts ? 'Detectando conflictos...' : 'Cargando...'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Selector de Período */}
-      {companyId && !selectedPeriod && (
+      {companyId && !selectedPeriod && !needsConflictResolution && (
         <SimplePeriodSelector
           companyId={companyId}
           onPeriodSelected={handlePeriodSelection}
-          disabled={isLoading}
+          disabled={isLoading || isLoadingWithConflicts}
         />
       )}
 
+      {/* Panel de Resolución de Conflictos */}
+      {needsConflictResolution && conflictReport && (
+        <div className="space-y-4">
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-orange-600" />
+                <div>
+                  <h3 className="font-medium text-orange-800">Resolución de Conflictos Requerida</h3>
+                  <p className="text-orange-700 text-sm">
+                    Período: {selectedPeriod?.label} - Se detectaron conflictos entre ausencias y novedades
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <ConflictResolutionPanel
+            conflictReport={conflictReport}
+            onResolveConflicts={handleConflictResolution}
+            onCancel={cancelConflictResolution}
+            isResolving={isResolvingConflicts}
+          />
+        </div>
+      )}
+
       {/* Información del Período Seleccionado */}
-      {selectedPeriod && currentPeriod && (
+      {selectedPeriod && currentPeriod && !needsConflictResolution && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -89,6 +146,11 @@ const PayrollLiquidationPageSimple = () => {
                 <h3 className="font-medium text-green-800">Período Activo</h3>
                 <p className="text-green-700">{selectedPeriod.label}</p>
                 <p className="text-sm text-green-600">ID: {currentPeriod.id}</p>
+                {conflictDetectionStep === 'completed' && (
+                  <p className="text-xs text-green-500 mt-1">
+                    ✅ Sin conflictos detectados entre ausencias y novedades
+                  </p>
+                )}
               </div>
               <Button
                 variant="outline"
@@ -104,19 +166,21 @@ const PayrollLiquidationPageSimple = () => {
       )}
 
       {/* Loading State */}
-      {isLoading && (
+      {(isLoading || isLoadingWithConflicts) && !needsConflictResolution && (
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-center space-x-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Cargando empleados...</span>
+              <span>
+                {isDetectingConflicts ? 'Detectando conflictos entre ausencias y novedades...' : 'Cargando empleados...'}
+              </span>
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Tabla de Empleados */}
-      {employees.length > 0 && selectedPeriod && currentPeriod && (
+      {employees.length > 0 && selectedPeriod && currentPeriod && canProceedWithLiquidation && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -132,7 +196,7 @@ const PayrollLiquidationPageSimple = () => {
                 </Button>
                 <Button 
                   onClick={handleLiquidate}
-                  disabled={isLiquidating || employees.length === 0}
+                  disabled={isLiquidating || employees.length === 0 || !canProceedWithLiquidation}
                   className="bg-green-600 hover:bg-green-700"
                 >
                   {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
