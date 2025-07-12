@@ -1,8 +1,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Control, FieldErrors } from 'react-hook-form';
+import { Label } from '@/components/ui/label';
+import { Control, FieldErrors, Controller } from 'react-hook-form';
 import { EmployeeFormData } from './types';
 import { Calendar } from 'lucide-react';
 
@@ -22,43 +22,55 @@ export const VacationInfoSection = ({ control, errors }: VacationInfoSectionProp
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={control}
-            name="initialVacationBalance"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Balance Inicial de Vacaciones (días)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="365"
-                    placeholder="15"
-                    {...field}
-                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-normal text-gray-600">
+              Balance Inicial de Vacaciones (días)
+            </Label>
+            <Controller
+              name="initialVacationBalance"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  type="number"
+                  min="0"
+                  max="365"
+                  placeholder="15"
+                  className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md"
+                  {...field}
+                  value={field.value?.toString() || ''}
+                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                />
+              )}
+            />
+            {errors.initialVacationBalance && (
+              <p className="text-red-400 text-xs mt-1">
+                {errors.initialVacationBalance.message}
+              </p>
             )}
-          />
+          </div>
 
-          <FormField
-            control={control}
-            name="lastVacationCalculation"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Fecha Último Cálculo (opcional)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="date"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-normal text-gray-600">
+              Fecha Último Cálculo (opcional)
+            </Label>
+            <Controller
+              name="lastVacationCalculation"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  type="date"
+                  className="h-9 border-gray-200 hover:border-gray-300 focus:border-gray-400 focus:ring-0 bg-white transition-colors rounded-md"
+                  {...field}
+                  value={field.value || ''}
+                />
+              )}
+            />
+            {errors.lastVacationCalculation && (
+              <p className="text-red-400 text-xs mt-1">
+                {errors.lastVacationCalculation.message}
+              </p>
             )}
-          />
+          </div>
         </div>
         
         <div className="bg-blue-50 p-4 rounded-lg">
