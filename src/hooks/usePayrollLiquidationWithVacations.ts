@@ -23,13 +23,25 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
       console.log('👥 Loading employees with complete vacation integration...');
       setConflictDetectionStep('detecting');
 
-      // 1. Detectar conflictos antes de cargar empleados
-      const conflictReport = await conflictHook.detectConflicts(
-        companyId,
-        startDate,
-        endDate,
-        payrollHook.currentPeriodId
-      );
+      // 1. Detectar conflictos antes de cargar empleados (con manejo robusto de errores)
+      let conflictReport;
+      try {
+        conflictReport = await conflictHook.detectConflicts(
+          companyId,
+          startDate,
+          endDate,
+          payrollHook.currentPeriodId
+        );
+      } catch (conflictError) {
+        console.warn('⚠️ Conflict detection failed, continuing without conflict check:', conflictError);
+        // Continuar sin detección de conflictos
+        conflictReport = {
+          hasConflicts: false,
+          totalConflicts: 0,
+          conflictGroups: [],
+          summary: { duplicates: 0, overlaps: 0, typeMismatches: 0 }
+        };
+      }
 
       // 2. Si hay conflictos, pausar y mostrar panel de resolución
       if (conflictReport.hasConflicts) {
@@ -65,7 +77,24 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
     } catch (error) {
       console.error('❌ Error in loadEmployeesWithConflictDetection:', error);
       setConflictDetectionStep('idle');
-      throw error;
+      
+      // En caso de error, intentar cargar empleados sin detección de conflictos
+      try {
+        console.log('🔄 Fallback: Loading employees without conflict detection...');
+        await payrollHook.loadEmployees(startDate, endDate);
+        
+        toast({
+          title: "⚠️ Carga con Advertencia",
+          description: "Empleados cargados sin verificación de conflictos",
+          variant: "destructive"
+        });
+        
+        setConflictDetectionStep('completed');
+        return true;
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+        throw error;
+      }
     }
   }, [companyId, payrollHook, conflictHook, integrationHook, toast]);
 
@@ -80,7 +109,11 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
       setConflictDetectionStep('resolving');
 
       // 1. Resolver conflictos
-      await conflictHook.resolveConflicts(resolutions);
+      const success = await conflictHook.resolveConflicts(resolutions);
+      
+      if (!success) {
+        throw new Error('Failed to resolve conflicts');
+      }
 
       // 2. Continuar con la carga de empleados + integración automática
       setConflictDetectionStep('completed');

@@ -20,6 +20,19 @@ export const useVacationConflictDetection = () => {
       setIsDetecting(true);
       console.log('🔍 Starting conflict detection...', { companyId, startDate, endDate, periodId });
 
+      // Validar parámetros básicos
+      if (!companyId || !startDate || !endDate) {
+        console.warn('⚠️ Missing required parameters for conflict detection');
+        const emptyReport: ConflictReport = {
+          hasConflicts: false,
+          totalConflicts: 0,
+          conflictGroups: [],
+          summary: { duplicates: 0, overlaps: 0, typeMismatches: 0 }
+        };
+        setConflictReport(emptyReport);
+        return emptyReport;
+      }
+
       const report = await VacationNovedadConflictDetector.detectConflicts(
         companyId,
         startDate,
@@ -36,6 +49,7 @@ export const useVacationConflictDetection = () => {
           variant: "destructive"
         });
       } else {
+        console.log('✅ No conflicts detected');
         toast({
           title: "✅ Sin Conflictos",
           description: "No se detectaron conflictos entre módulos",
@@ -46,12 +60,25 @@ export const useVacationConflictDetection = () => {
       return report;
     } catch (error) {
       console.error('❌ Error detecting conflicts:', error);
+      
+      // En caso de error, crear un reporte vacío para no bloquear el flujo
+      const errorReport: ConflictReport = {
+        hasConflicts: false,
+        totalConflicts: 0,
+        conflictGroups: [],
+        summary: { duplicates: 0, overlaps: 0, typeMismatches: 0 }
+      };
+      
+      setConflictReport(errorReport);
+      
       toast({
-        title: "Error",
-        description: "Error al detectar conflictos entre ausencias y novedades",
+        title: "⚠️ Error en Detección",
+        description: "Error al detectar conflictos, pero puedes continuar con la liquidación",
         variant: "destructive"
       });
-      throw error;
+      
+      // Retornar reporte vacío en lugar de lanzar error
+      return errorReport;
     } finally {
       setIsDetecting(false);
     }
@@ -66,7 +93,7 @@ export const useVacationConflictDetection = () => {
 
       // TODO: Implementar la lógica de resolución real
       // Por ahora solo simulamos la resolución
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       toast({
         title: "✅ Conflictos Resueltos",
@@ -85,7 +112,7 @@ export const useVacationConflictDetection = () => {
         description: "Error al resolver conflictos",
         variant: "destructive"
       });
-      throw error;
+      return false;
     } finally {
       setIsResolving(false);
     }

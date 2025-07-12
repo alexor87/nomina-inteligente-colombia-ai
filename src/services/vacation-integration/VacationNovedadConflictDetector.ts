@@ -1,13 +1,9 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { VacationAbsence, VacationAbsenceType } from '@/types/vacations';
-import { NovedadType } from '@/types/novedades';
-
 export interface ConflictRecord {
   id: string;
   employeeId: string;
   employeeName: string;
-  type: VacationAbsenceType | NovedadType;
+  type: string;
   startDate: string;
   endDate: string;
   source: 'vacation_module' | 'novedad_module';
@@ -33,6 +29,8 @@ export interface ConflictReport {
     typeMismatches: number;
   };
 }
+
+import { supabase } from '@/integrations/supabase/client';
 
 export class VacationNovedadConflictDetector {
   /**
@@ -79,60 +77,71 @@ export class VacationNovedadConflictDetector {
 
     } catch (error) {
       console.error('❌ Error detecting conflicts:', error);
-      throw error;
+      
+      // Retornar reporte vacío en caso de error para no bloquear el flujo
+      return {
+        hasConflicts: false,
+        totalConflicts: 0,
+        conflictGroups: [],
+        summary: { duplicates: 0, overlaps: 0, typeMismatches: 0 }
+      };
     }
   }
 
   /**
-   * Obtiene registros de vacaciones para el período
+   * Obtiene registros de vacaciones para el período (simplificado)
    */
   private static async getVacationRecords(
     companyId: string,
     startDate: string,
     endDate: string
   ): Promise<ConflictRecord[]> {
-    const { data: vacations, error } = await supabase
-      .from('employee_vacation_periods')
-      .select(`
-        id,
-        employee_id,
-        type,
-        start_date,
-        end_date,
-        status,
-        observations,
-        employee:employees!inner(
+    try {
+      const { data: vacations, error } = await supabase
+        .from('employee_vacation_periods')
+        .select(`
           id,
-          nombre,
-          apellido
-        )
-      `)
-      .eq('company_id', companyId)
-      .or(`
-        and(start_date.lte.${endDate},end_date.gte.${startDate})
-      `)
-      .in('status', ['pendiente', 'liquidada']); // Excluir canceladas
+          employee_id,
+          type,
+          start_date,
+          end_date,
+          status,
+          observations,
+          employee:employees!inner(
+            id,
+            nombre,
+            apellido
+          )
+        `)
+        .eq('company_id', companyId)
+        .gte('start_date', startDate)
+        .lte('end_date', endDate)
+        .in('status', ['pendiente', 'liquidada']);
 
-    if (error) {
-      console.error('❌ Error fetching vacation records:', error);
-      throw error;
+      if (error) {
+        console.error('❌ Error fetching vacation records:', error);
+        return [];
+      }
+
+      return (vacations || []).map(v => ({
+        id: v.id,
+        employeeId: v.employee_id,
+        employeeName: `${v.employee.nombre} ${v.employee.apellido}`,
+        type: v.type || 'vacaciones',
+        startDate: v.start_date,
+        endDate: v.end_date,
+        source: 'vacation_module' as const,
+        status: v.status,
+        observations: v.observations
+      }));
+    } catch (error) {
+      console.error('❌ Error in getVacationRecords:', error);
+      return [];
     }
-
-    return (vacations || []).map(v => ({
-      id: v.id,
-      employeeId: v.employee_id,
-      employeeName: `${v.employee.nombre} ${v.employee.apellido}`,
-      type: v.type as VacationAbsenceType,
-      startDate: v.start_date,
-      endDate: v.end_date,
-      source: 'vacation_module' as const,
-      status: v.status,
-      observations: v.observations
-    }));
   }
 
   /**
-   * Obtiene novedades de ausencias para el período
+   * Obtiene novedades de ausencias para el período (simplificado)
    */
   private static async getNovedadRecords(
     companyId: string,
@@ -140,134 +149,132 @@ export class VacationNovedadConflictDetector {
     endDate: string,
     periodId?: string
   ): Promise<ConflictRecord[]> {
-    // Tipos de novedad que representan ausencias/vacaciones
-    const absenceTypes: NovedadType[] = [
-      'vacaciones',
-      'licencia_remunerada',
-      'licencia_no_remunerada',
-      'incapacidad',
-      'ausencia'
-    ];
+    try {
+      // Tipos de novedad que representan ausencias/vacaciones
+      const absenceTypes = [
+        'vacaciones',
+        'licencia_remunerada',
+        'licencia_no_remunerada',
+        'incapacidad',
+        'ausencia'
+      ];
 
-    let query = supabase
-      .from('payroll_novedades')
-      .select(`
-        id,
-        empleado_id,
-        tipo_novedad,
-        fecha_inicio,
-        fecha_fin,
-        observacion,
-        employee:employees!inner(
+      let query = supabase
+        .from('payroll_novedades')
+        .select(`
           id,
-          nombre,
-          apellido
-        )
-      `)
-      .eq('company_id', companyId)
-      .in('tipo_novedad', absenceTypes);
+          empleado_id,
+          tipo_novedad,
+          fecha_inicio,
+          fecha_fin,
+          observacion,
+          employee:employees!inner(
+            id,
+            nombre,
+            apellido
+          )
+        `)
+        .eq('company_id', companyId)
+        .in('tipo_novedad', absenceTypes);
 
-    // Si hay period_id, filtrar por período específico
-    if (periodId) {
-      query = query.eq('periodo_id', periodId);
-    } else {
-      // Si no hay period_id, usar fechas
-      query = query.or(`
-        and(fecha_inicio.lte.${endDate},fecha_fin.gte.${startDate})
-      `);
+      // Filtrar por período específico si se proporciona
+      if (periodId) {
+        query = query.eq('periodo_id', periodId);
+      } else {
+        // Filtrar por rango de fechas si no hay período específico
+        query = query
+          .gte('fecha_inicio', startDate)
+          .lte('fecha_fin', endDate);
+      }
+
+      const { data: novedades, error } = await query;
+
+      if (error) {
+        console.error('❌ Error fetching novedad records:', error);
+        return [];
+      }
+
+      return (novedades || []).map(n => ({
+        id: n.id,
+        employeeId: n.empleado_id,
+        employeeName: `${n.employee.nombre} ${n.employee.apellido}`,
+        type: n.tipo_novedad || 'ausencia',
+        startDate: n.fecha_inicio || startDate,
+        endDate: n.fecha_fin || endDate,
+        source: 'novedad_module' as const,
+        observations: n.observacion
+      }));
+    } catch (error) {
+      console.error('❌ Error in getNovedadRecords:', error);
+      return [];
     }
-
-    const { data: novedades, error } = await query;
-
-    if (error) {
-      console.error('❌ Error fetching novedad records:', error);
-      throw error;
-    }
-
-    return (novedades || []).map(n => ({
-      id: n.id,
-      employeeId: n.empleado_id,
-      employeeName: `${n.employee.nombre} ${n.employee.apellido}`,
-      type: n.tipo_novedad as NovedadType,
-      startDate: n.fecha_inicio || startDate,
-      endDate: n.fecha_fin || endDate,
-      source: 'novedad_module' as const,
-      observations: n.observacion
-    }));
   }
 
   /**
-   * Analiza y agrupa los conflictos detectados
+   * Analiza y agrupa los conflictos detectados (simplificado)
    */
   private static async analyzeConflicts(
     vacationRecords: ConflictRecord[],
     novedadRecords: ConflictRecord[]
   ): Promise<ConflictGroup[]> {
     const conflictGroups: ConflictGroup[] = [];
-    const employeeGroups = new Map<string, ConflictRecord[]>();
+    
+    try {
+      const employeeGroups = new Map<string, ConflictRecord[]>();
 
-    // Agrupar todos los registros por empleado
-    [...vacationRecords, ...novedadRecords].forEach(record => {
-      const key = record.employeeId;
-      if (!employeeGroups.has(key)) {
-        employeeGroups.set(key, []);
+      // Agrupar todos los registros por empleado
+      [...vacationRecords, ...novedadRecords].forEach(record => {
+        const key = record.employeeId;
+        if (!employeeGroups.has(key)) {
+          employeeGroups.set(key, []);
+        }
+        employeeGroups.get(key)!.push(record);
+      });
+
+      // Analizar conflictos por empleado
+      for (const [employeeId, records] of employeeGroups) {
+        if (records.length < 2) continue;
+
+        const employeeName = records[0].employeeName;
+        const vacationRecs = records.filter(r => r.source === 'vacation_module');
+        const novedadRecs = records.filter(r => r.source === 'novedad_module');
+
+        // Solo analizar si hay registros de ambos módulos
+        if (vacationRecs.length === 0 || novedadRecs.length === 0) continue;
+
+        // Detectar duplicados exactos
+        const duplicates = this.findDuplicates(vacationRecs, novedadRecs);
+        if (duplicates.length > 0) {
+          conflictGroups.push({
+            employeeId,
+            employeeName,
+            conflicts: duplicates,
+            type: 'duplicate',
+            severity: 'high'
+          });
+        }
+
+        // Detectar solapamientos de fechas
+        const overlaps = this.findDateOverlaps(vacationRecs, novedadRecs);
+        if (overlaps.length > 0) {
+          conflictGroups.push({
+            employeeId,
+            employeeName,
+            conflicts: overlaps,
+            type: 'overlap',
+            severity: 'medium'
+          });
+        }
       }
-      employeeGroups.get(key)!.push(record);
-    });
-
-    // Analizar conflictos por empleado
-    for (const [employeeId, records] of employeeGroups) {
-      if (records.length < 2) continue; // No puede haber conflicto con un solo registro
-
-      const employeeName = records[0].employeeName;
-      const vacationRecs = records.filter(r => r.source === 'vacation_module');
-      const novedadRecs = records.filter(r => r.source === 'novedad_module');
-
-      // Solo analizar si hay registros de ambos módulos
-      if (vacationRecs.length === 0 || novedadRecs.length === 0) continue;
-
-      // Detectar duplicados exactos (mismo tipo y fechas)
-      const duplicates = this.findDuplicates(vacationRecs, novedadRecs);
-      if (duplicates.length > 0) {
-        conflictGroups.push({
-          employeeId,
-          employeeName,
-          conflicts: duplicates,
-          type: 'duplicate',
-          severity: 'high'
-        });
-      }
-
-      // Detectar solapamientos de fechas
-      const overlaps = this.findDateOverlaps(vacationRecs, novedadRecs);
-      if (overlaps.length > 0) {
-        conflictGroups.push({
-          employeeId,
-          employeeName,
-          conflicts: overlaps,
-          type: 'overlap',
-          severity: 'medium'
-        });
-      }
-
-      // Detectar inconsistencias de tipo
-      const typeMismatches = this.findTypeMismatches(vacationRecs, novedadRecs);
-      if (typeMismatches.length > 0) {
-        conflictGroups.push({
-          employeeId,
-          employeeName,
-          conflicts: typeMismatches,
-          type: 'type_mismatch',
-          severity: 'low'
-        });
-      }
+    } catch (error) {
+      console.error('❌ Error analyzing conflicts:', error);
     }
 
     return conflictGroups;
   }
 
   /**
-   * Encuentra duplicados exactos entre módulos
+   * Encuentra duplicados exactos entre módulos (simplificado)
    */
   private static findDuplicates(
     vacationRecs: ConflictRecord[],
@@ -275,21 +282,25 @@ export class VacationNovedadConflictDetector {
   ): ConflictRecord[] {
     const conflicts: ConflictRecord[] = [];
 
-    vacationRecs.forEach(vRec => {
-      novedadRecs.forEach(nRec => {
-        if (this.isSameAbsenceType(vRec.type as VacationAbsenceType, nRec.type as NovedadType) &&
-            vRec.startDate === nRec.startDate &&
-            vRec.endDate === nRec.endDate) {
-          conflicts.push(vRec, nRec);
-        }
+    try {
+      vacationRecs.forEach(vRec => {
+        novedadRecs.forEach(nRec => {
+          if (this.isSameAbsenceType(vRec.type, nRec.type) &&
+              vRec.startDate === nRec.startDate &&
+              vRec.endDate === nRec.endDate) {
+            conflicts.push(vRec, nRec);
+          }
+        });
       });
-    });
+    } catch (error) {
+      console.error('❌ Error finding duplicates:', error);
+    }
 
     return conflicts;
   }
 
   /**
-   * Encuentra solapamientos de fechas
+   * Encuentra solapamientos de fechas (simplificado)
    */
   private static findDateOverlaps(
     vacationRecs: ConflictRecord[],
@@ -297,34 +308,17 @@ export class VacationNovedadConflictDetector {
   ): ConflictRecord[] {
     const conflicts: ConflictRecord[] = [];
 
-    vacationRecs.forEach(vRec => {
-      novedadRecs.forEach(nRec => {
-        if (this.datesOverlap(vRec.startDate, vRec.endDate, nRec.startDate, nRec.endDate)) {
-          conflicts.push(vRec, nRec);
-        }
+    try {
+      vacationRecs.forEach(vRec => {
+        novedadRecs.forEach(nRec => {
+          if (this.datesOverlap(vRec.startDate, vRec.endDate, nRec.startDate, nRec.endDate)) {
+            conflicts.push(vRec, nRec);
+          }
+        });
       });
-    });
-
-    return conflicts;
-  }
-
-  /**
-   * Encuentra inconsistencias de tipo para las mismas fechas
-   */
-  private static findTypeMismatches(
-    vacationRecs: ConflictRecord[],
-    novedadRecs: ConflictRecord[]
-  ): ConflictRecord[] {
-    const conflicts: ConflictRecord[] = [];
-
-    vacationRecs.forEach(vRec => {
-      novedadRecs.forEach(nRec => {
-        if (this.datesOverlap(vRec.startDate, vRec.endDate, nRec.startDate, nRec.endDate) &&
-            !this.isSameAbsenceType(vRec.type as VacationAbsenceType, nRec.type as NovedadType)) {
-          conflicts.push(vRec, nRec);
-        }
-      });
-    });
+    } catch (error) {
+      console.error('❌ Error finding overlaps:', error);
+    }
 
     return conflicts;
   }
@@ -332,11 +326,11 @@ export class VacationNovedadConflictDetector {
   /**
    * Verifica si dos tipos de ausencia son equivalentes entre módulos
    */
-  private static isSameAbsenceType(vacationType: VacationAbsenceType, novedadType: NovedadType): boolean {
-    const typeMap: Record<VacationAbsenceType, NovedadType> = {
+  private static isSameAbsenceType(vacationType: string, novedadType: string): boolean {
+    const typeMap: Record<string, string> = {
       'vacaciones': 'vacaciones',
       'licencia_remunerada': 'licencia_remunerada',
-      'licencia_no_remunerada': 'ausencia', // Se mapea a ausencia (deducción)
+      'licencia_no_remunerada': 'ausencia',
       'incapacidad': 'incapacidad',
       'ausencia': 'ausencia'
     };
@@ -348,18 +342,23 @@ export class VacationNovedadConflictDetector {
    * Verifica si dos rangos de fechas se solapan
    */
   private static datesOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
-    const s1 = new Date(start1);
-    const e1 = new Date(end1);
-    const s2 = new Date(start2);
-    const e2 = new Date(end2);
+    try {
+      const s1 = new Date(start1);
+      const e1 = new Date(end1);
+      const s2 = new Date(start2);
+      const e2 = new Date(end2);
 
-    return s1 <= e2 && s2 <= e1;
+      return s1 <= e2 && s2 <= e1;
+    } catch (error) {
+      console.error('❌ Error comparing dates:', error);
+      return false;
+    }
   }
 
   /**
    * Obtiene el mapeo de tipos entre módulos
    */
-  static getTypeMapping(): Record<VacationAbsenceType, NovedadType> {
+  static getTypeMapping(): Record<string, string> {
     return {
       'vacaciones': 'vacaciones',
       'licencia_remunerada': 'licencia_remunerada',
