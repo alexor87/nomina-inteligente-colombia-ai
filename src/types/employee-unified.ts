@@ -25,7 +25,7 @@ export interface EmployeeUnified {
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
   tipoContrato?: string;
-  estado: EmployeeStatus; // Updated to use extended type
+  estado: EmployeeStatus;
   cargo?: string;
   salarioBase: number;
   periodicidadPago?: string;
@@ -86,7 +86,7 @@ export const mapDatabaseToUnified = (dbEmployee: DatabaseEmployee): EmployeeUnif
     fechaFirmaContrato: dbEmployee.fecha_firma_contrato || undefined,
     fechaFinalizacionContrato: dbEmployee.fecha_finalizacion_contrato || undefined,
     tipoContrato: dbEmployee.tipo_contrato || undefined,
-    estado: (dbEmployee.estado as EmployeeStatus) || 'activo', // Type assertion with our extended type
+    estado: (dbEmployee.estado as EmployeeStatus) || 'activo',
     cargo: dbEmployee.cargo || undefined,
     salarioBase: Number(dbEmployee.salario_base) || 0,
     periodicidadPago: dbEmployee.periodicidad_pago || undefined,

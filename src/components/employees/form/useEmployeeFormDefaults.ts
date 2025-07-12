@@ -1,4 +1,3 @@
-
 import { EmployeeFormData } from './types';
 import { EmployeeUnified } from '@/types/employee-unified';
 
@@ -12,7 +11,7 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     apellido: employee?.apellido || '',
     email: employee?.email || '',
     telefono: employee?.telefono || '',
-    sexo: employee?.sexo, // ✅ FIXED: No conversion needed, both use 'M' | 'F'
+    sexo: employee?.sexo || 'M',
     fechaNacimiento: employee?.fechaNacimiento || '',
     direccion: employee?.direccion || '',
     ciudad: employee?.ciudad || '',
@@ -22,8 +21,8 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
     periodicidadPago: employee?.periodicidadPago || 'mensual',
     cargo: employee?.cargo || '',
-    codigo_ciiu: employee?.codigoCIIU || '',
-    nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
+    codigoCiiu: employee?.codigoCiiu || '',
+    nivelRiesgoArl: employee?.nivelRiesgoArl || 'I',
     estado: employee?.estado || 'activo',
     centroCostos: employee?.centroCostos || '',
     fechaFirmaContrato: employee?.fechaFirmaContrato || '',
@@ -46,7 +45,7 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     subtipoCotizanteId: employee?.subtipoCotizanteId || '',
     regimenSalud: employee?.regimenSalud || 'contributivo',
     estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
-    custom_fields: employee?.custom_fields || {}
+    customFields: employee?.customFields || {}
   };
 };
 
