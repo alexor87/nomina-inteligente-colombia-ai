@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calculator, Users, Loader2, Settings, Bug } from 'lucide-react';
-import { PayrollLiquidationEmployeesTable } from '@/components/payroll/liquidation/PayrollLiquidationEmployeesTable';
+import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
 import { PayrollDiagnosticPanel } from '@/components/payroll/diagnostic/PayrollDiagnosticPanel';
@@ -165,42 +166,46 @@ const PayrollLiquidationPage = () => {
 
           {/* Tabla de Empleados */}
           {employees.length > 0 && selectedPeriod && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-4">
-                  <AutoSaveIndicator 
-                    isSaving={isAutoSaving}
-                    lastSaveTime={lastAutoSaveTime}
-                  />
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-4">
+                    <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
+                    <AutoSaveIndicator 
+                      isSaving={isAutoSaving}
+                      lastSaveTime={lastAutoSaveTime}
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button 
+                      onClick={() => setShowAddEmployeeModal(true)}
+                      variant="outline"
+                      disabled={isLoading || !currentPeriodId || isRemovingEmployee}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Agregar Empleado
+                    </Button>
+                    <Button 
+                      onClick={handleLiquidate}
+                      disabled={isLiquidating || employees.length === 0 || isRemovingEmployee}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex space-x-2">
-                  <Button 
-                    onClick={() => setShowAddEmployeeModal(true)}
-                    variant="outline"
-                    disabled={isLoading || !currentPeriodId || isRemovingEmployee}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Agregar Empleado
-                  </Button>
-                  <Button 
-                    onClick={handleLiquidate}
-                    disabled={isLiquidating || employees.length === 0 || isRemovingEmployee}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
-                  </Button>
-                </div>
-              </div>
-
-              <PayrollLiquidationEmployeesTable
-                employees={employees}
-                startDate={selectedPeriod.startDate}
-                endDate={selectedPeriod.endDate}
-                currentPeriodId={currentPeriodId}
-                onRemoveEmployee={removeEmployee}
-                onEmployeeNovedadesChange={refreshEmployeeNovedades}
-              />
-            </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <PayrollLiquidationTable
+                  employees={employees}
+                  startDate={selectedPeriod.startDate}
+                  endDate={selectedPeriod.endDate}
+                  currentPeriodId={currentPeriodId}
+                  onRemoveEmployee={removeEmployee}
+                  onEmployeeNovedadesChange={refreshEmployeeNovedades}
+                />
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
         

@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -5,7 +6,6 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { formatCurrency } from '@/lib/utils';
 import { PeriodNumberCalculationService } from '@/services/payroll-intelligent/PeriodNumberCalculationService';
-import { useVacationIntegration } from '@/hooks/useVacationIntegration';
 
 interface EmployeePayrollData {
   employeeId: string;
@@ -29,7 +29,6 @@ export const usePayrollLiquidation = () => {
   const [currentPeriodId, setCurrentPeriodId] = useState<string | null>(null);
   const [isRemovingEmployee, setIsRemovingEmployee] = useState(false);
   const { toast } = useToast();
-  const { processVacationsForPayroll } = useVacationIntegration();
 
   // Auto-save functionality
   const { triggerAutoSave, isSaving: isAutoSaving, lastSaveTime: lastAutoSaveTime } = useAutoSave({
@@ -163,22 +162,6 @@ export const usePayrollLiquidation = () => {
 
       setCurrentPeriodId(existingPeriod.id);
 
-      // 🏖️ NUEVO: Procesar vacaciones automáticamente al cargar el período
-      console.log('🏖️ Procesando vacaciones para el período...');
-      try {
-        await processVacationsForPayroll({
-          periodId: existingPeriod.id,
-          companyId: profile.company_id,
-          startDate,
-          endDate,
-          forceProcess: false
-        });
-        console.log('✅ Vacaciones procesadas exitosamente');
-      } catch (vacationError) {
-        console.warn('⚠️ Error procesando vacaciones:', vacationError);
-        // No bloquear la carga por errores de vacaciones
-      }
-
       // Cargar empleados de la empresa
       const { data: companyEmployees, error: employeesError } = await supabase
         .from('employees')
@@ -209,7 +192,7 @@ export const usePayrollLiquidation = () => {
           disabilities: 0, // Valor por defecto
           bonuses: 0,      // Valor por defecto
           absences: 0,     // Valor por defecto
-          transportAllowance: 0, // Valor por defecto
+          transportAllowance: 0, // Valor por defecto - no existe auxilio_transporte en el schema
           additionalDeductions: 0, // Valor por defecto
           eps: employee.eps,
           afp: employee.afp,
@@ -232,7 +215,7 @@ export const usePayrollLiquidation = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, processVacationsForPayroll]);
+  }, [toast]);
 
   const addEmployees = useCallback(async (employeeIds: string[]) => {
     if (!currentPeriodId) {
