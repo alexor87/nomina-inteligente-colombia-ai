@@ -1,9 +1,7 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useEmployeeNovedades } from '@/hooks/useEmployeeNovedades';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
@@ -65,106 +63,85 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Nombre
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Salario Base
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Días Trabajados
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Novedades
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total a Pagar Período
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {employees.map((employee) => {
-                  const novedadesCount = getEmployeeNovedadesCount(employee.id);
-                  const novedadesTotals = getEmployeeNovedadesTotal(employee.id);
-                  const totalNeto = novedadesTotals.devengos - novedadesTotals.deducciones;
-                  const totalToPay = calculateTotalToPay(employee);
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Empleados a Liquidar ({employees.length})</h3>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                  Nombre
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                  Salario Base
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                  Días Trabajados
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                  Novedades
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                  Total a Pagar Período
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {employees.map((employee) => {
+                const totalToPay = calculateTotalToPay(employee);
 
-                  return (
-                    <tr key={employee.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {employee.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {employee.position}
-                          </div>
+                return (
+                  <tr key={employee.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {employee.name}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(employee.baseSalary)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {employee.workedDays} días
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          {novedadesCount > 0 && (
-                            <Badge variant="secondary" className="text-xs">
-                              {novedadesCount} novedades
-                            </Badge>
-                          )}
-                          {totalNeto !== 0 && (
-                            <Badge 
-                              variant={totalNeto > 0 ? "default" : "destructive"}
-                              className="text-xs"
-                            >
-                              {formatCurrency(totalNeto)}
-                            </Badge>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 w-6 rounded-full p-0"
-                            onClick={() => handleAddNovedades(employee.id)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
+                        <div className="text-sm text-gray-500">
+                          {employee.position}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatCurrency(totalToPay)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onRemoveEmployee(employee.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(employee.baseSalary)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {employee.workedDays} días
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 rounded-full p-0 border-2"
+                        onClick={() => handleAddNovedades(employee.id)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {formatCurrency(totalToPay)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onRemoveEmployee(employee.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Novedades Modal */}
       {showNovedadesModal && selectedEmployeeId && (
