@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 
@@ -17,27 +18,51 @@ export class NovedadesCalculationService {
     try {
       console.log(`🧮 Calculating novelties for employee ${employeeId} in period ${periodId}`);
       
-      const { data: novedades, error } = await supabase
+      // Get regular novedades
+      const { data: novedades, error: novedadesError } = await supabase
         .from('payroll_novedades')
         .select('*')
         .eq('empleado_id', employeeId)
         .eq('periodo_id', periodId);
 
-      if (error) {
-        console.error('❌ Error getting novelties:', error);
+      if (novedadesError) {
+        console.error('❌ Error getting novelties:', novedadesError);
         return this.getEmptyTotals();
       }
 
-      if (!novedades || novedades.length === 0) {
-        console.log(`ℹ️ No novelties found for employee ${employeeId}`);
+      // Get vacation/absence periods processed in this period
+      const { data: vacationPeriods, error: vacationError } = await supabase
+        .from('employee_vacation_periods')
+        .select(`
+          *,
+          employees!inner(salario_base)
+        `)
+        .eq('employee_id', employeeId)
+        .eq('processed_in_period_id', periodId);
+
+      if (vacationError) {
+        console.error('❌ Error getting vacation periods:', vacationError);
+      }
+
+      const allNovedades = novedades || [];
+      const allVacationPeriods = vacationPeriods || [];
+
+      if (allNovedades.length === 0 && allVacationPeriods.length === 0) {
+        console.log(`ℹ️ No novelties or vacation periods found for employee ${employeeId}`);
         const emptyTotals = this.getEmptyTotals();
         this.cache.set(cacheKey, emptyTotals);
         return emptyTotals;
       }
 
-      console.log(`📊 Found ${novedades.length} novelties:`, novedades);
+      console.log(`📊 Found ${allNovedades.length} novelties and ${allVacationPeriods.length} vacation periods:`, {
+        novedades: allNovedades,
+        vacationPeriods: allVacationPeriods
+      });
       
-      const totals = this.calculateTotalsFromNovedades(novedades as PayrollNovedad[]);
+      const totals = this.calculateTotalsFromNovedadesAndVacations(
+        allNovedades as PayrollNovedad[], 
+        allVacationPeriods
+      );
       this.cache.set(cacheKey, totals);
       
       console.log(`✅ Totals calculated for ${employeeId}:`, totals);
@@ -69,17 +94,19 @@ export class NovedadesCalculationService {
     return results;
   }
 
-  private static calculateTotalsFromNovedades(novedades: PayrollNovedad[]): NovedadesTotals {
+  private static calculateTotalsFromNovedadesAndVacations(
+    novedades: PayrollNovedad[], 
+    vacationPeriods: any[]
+  ): NovedadesTotals {
     let totalDevengos = 0;
     let totalDeducciones = 0;
 
+    // Process regular novedades
     novedades.forEach(novedad => {
-      // IMPROVED: Better number handling
       const valor = Number(novedad.valor) || 0;
       
       console.log(`💰 Processing novelty: ${novedad.tipo_novedad} = $${valor}`);
       
-      // Classify by novelty type
       if (this.isDevengado(novedad.tipo_novedad)) {
         totalDevengos += valor;
         console.log(`➕ Added to earnings: $${valor} (total: $${totalDevengos})`);
@@ -89,17 +116,67 @@ export class NovedadesCalculationService {
       }
     });
 
+    // Process vacation/absence periods
+    vacationPeriods.forEach(period => {
+      const salarioBase = period.employees?.salario_base || 0;
+      const dias = period.days_count || 0;
+      const valor = this.calculateVacationAbsenceValue(period.type, salarioBase, dias);
+      
+      console.log(`🏖️ Processing vacation/absence: ${period.type} = $${valor} (${dias} days)`);
+      
+      if (this.isVacationDevengo(period.type)) {
+        totalDevengos += valor;
+        console.log(`➕ Added vacation to earnings: $${valor} (total: $${totalDevengos})`);
+      } else if (this.isVacationDeduccion(period.type)) {
+        totalDeducciones += valor;
+        console.log(`➖ Added absence to deductions: $${valor} (total: $${totalDeducciones})`);
+      }
+    });
+
     const totalNeto = totalDevengos - totalDeducciones;
+    const hasItems = novedades.length > 0 || vacationPeriods.length > 0;
 
     const result = {
       totalDevengos,
       totalDeducciones,
       totalNeto,
-      hasNovedades: novedades.length > 0
+      hasNovedades: hasItems
     };
 
     console.log(`📈 Final calculation result:`, result);
     return result;
+  }
+
+  private static calculateVacationAbsenceValue(type: string, salarioBase: number, dias: number): number {
+    const dailySalary = salarioBase / 30;
+    
+    switch (type) {
+      case 'vacaciones':
+      case 'licencia_remunerada':
+        // These are paid, so they're devengos
+        return dailySalary * dias;
+      
+      case 'incapacidad':
+        // First 2 days unpaid, rest paid at 66.67%
+        const payableDays = Math.max(0, dias - 2);
+        return dailySalary * payableDays * 0.6667;
+      
+      case 'ausencia':
+      case 'licencia_no_remunerada':
+        // These are deductions from salary
+        return dailySalary * dias;
+      
+      default:
+        return 0;
+    }
+  }
+
+  private static isVacationDevengo(type: string): boolean {
+    return ['vacaciones', 'licencia_remunerada', 'incapacidad'].includes(type);
+  }
+
+  private static isVacationDeduccion(type: string): boolean {
+    return ['ausencia', 'licencia_no_remunerada'].includes(type);
   }
 
   private static isDevengado(tipoNovedad: string): boolean {
