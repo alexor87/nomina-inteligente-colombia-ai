@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,11 +56,19 @@ export const NovedadVacacionesConsolidatedForm: React.FC<NovedadVacacionesConsol
   const calculateDaysBetweenDates = (startDate: string, endDate: string): number => {
     if (!startDate || !endDate) return 0;
     
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    // Parsear fechas como fechas locales para evitar problemas de UTC
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
     
+    // Crear fechas usando constructor local (mes es 0-indexado)
+    const start = new Date(startYear, startMonth - 1, startDay);
+    const end = new Date(endYear, endMonth - 1, endDay);
+    
+    // Calcular diferencia en milisegundos y convertir a días
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
+    
+    console.log('📅 Vacaciones - Calculating days:', { startDate, endDate, diffDays });
     return Math.max(0, diffDays);
   };
 

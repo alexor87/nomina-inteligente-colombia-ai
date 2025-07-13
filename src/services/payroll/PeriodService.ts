@@ -490,12 +490,23 @@ export class PeriodService {
   }
 
   /**
-   * Calcular días entre fechas
+   * ✅ CORREGIDO: Calcular días entre fechas SIN problemas de UTC
    */
   private static calculateDaysBetween(startDate: string, endDate: string): number {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    // Parsear fechas como fechas locales para evitar problemas de UTC
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+    
+    // Crear fechas usando constructor local (mes es 0-indexado)
+    const start = new Date(startYear, startMonth - 1, startDay);
+    const end = new Date(endYear, endMonth - 1, endDay);
+    
+    // Calcular diferencia en milisegundos y convertir a días
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
+    
+    console.log('📅 PeriodService - Calculating days:', { startDate, endDate, diffDays });
+    return diffDays;
   }
 
   /**
@@ -504,8 +515,12 @@ export class PeriodService {
   private static isValidDateRange(startDate: string, endDate: string): boolean {
     if (!startDate || !endDate) return false;
     
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Usar parsing local para evitar problemas de UTC
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+    
+    const start = new Date(startYear, startMonth - 1, startDay);
+    const end = new Date(endYear, endMonth - 1, endDay);
     
     return start <= end && !isNaN(start.getTime()) && !isNaN(end.getTime());
   }
