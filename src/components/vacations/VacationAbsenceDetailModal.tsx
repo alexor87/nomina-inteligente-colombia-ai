@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Calendar, User, Clock, FileText, Edit, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { formatDateForDisplay, formatDateTimeForDisplay } from '@/utils/dateUtils';
 
 interface VacationAbsenceDetailModalProps {
   isOpen: boolean;
@@ -24,22 +23,6 @@ export const VacationAbsenceDetailModal = ({
   onDelete
 }: VacationAbsenceDetailModalProps) => {
   if (!vacation) return null;
-
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
-    } catch {
-      return dateString;
-    }
-  };
-
-  const formatDateTime = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: es });
-    } catch {
-      return dateString;
-    }
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -91,11 +74,11 @@ export const VacationAbsenceDetailModal = ({
           <div className="pl-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <div className="text-sm text-muted-foreground">Fecha de inicio</div>
-              <div className="font-medium">{formatDate(vacation.start_date)}</div>
+              <div className="font-medium">{formatDateForDisplay(vacation.start_date)}</div>
             </div>
             <div>
               <div className="text-sm text-muted-foreground">Fecha de fin</div>
-              <div className="font-medium">{formatDate(vacation.end_date)}</div>
+              <div className="font-medium">{formatDateForDisplay(vacation.end_date)}</div>
             </div>
           </div>
           <div className="pl-6">
@@ -143,11 +126,11 @@ export const VacationAbsenceDetailModal = ({
           <div className="pl-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <div className="text-muted-foreground">Creado el</div>
-              <div>{formatDateTime(vacation.created_at)}</div>
+              <div>{formatDateTimeForDisplay(vacation.created_at)}</div>
             </div>
             <div>
               <div className="text-muted-foreground">Última actualización</div>
-              <div>{formatDateTime(vacation.updated_at)}</div>
+              <div>{formatDateTimeForDisplay(vacation.updated_at)}</div>
             </div>
           </div>
         </div>

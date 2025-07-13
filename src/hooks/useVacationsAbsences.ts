@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsence, VacationAbsenceFilters, VacationAbsenceFormData, VacationAbsenceStatus, VacationAbsenceType } from '@/types/vacations';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { calculateDaysBetween } from '@/utils/dateUtils';
 
 export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
   const { user } = useAuth();
@@ -102,24 +103,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     enabled: !!user,
   });
 
-  // ✅ CORREGIDO: Función para calcular días entre fechas SIN problemas de UTC
-  const calculateDays = (startDate: string, endDate: string): number => {
-    // Parsear fechas como fechas locales para evitar problemas de UTC
-    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
-    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
-    
-    // Crear fechas usando constructor local (mes es 0-indexado)
-    const start = new Date(startYear, startMonth - 1, startDay);
-    const end = new Date(endYear, endMonth - 1, endDay);
-    
-    // Calcular diferencia en milisegundos y convertir a días
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
-    
-    console.log('📅 Calculating days:', { startDate, endDate, diffDays });
-    return diffDays;
-  };
-
   // Función para validar solapamientos
   const validateOverlap = async (
     employeeId: string, 
@@ -166,8 +149,8 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
 
       const companyId = await getCompanyId();
 
-      // Calcular días
-      const days = calculateDays(formData.start_date, formData.end_date);
+      // Use the centralized date calculation utility
+      const days = calculateDaysBetween(formData.start_date, formData.end_date);
 
       // Validar solapamiento
       const hasOverlap = await validateOverlap(
@@ -214,7 +197,8 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     mutationFn: async ({ id, formData }: { id: string; formData: VacationAbsenceFormData }) => {
       if (!user) throw new Error('Usuario no autenticado');
 
-      const days = calculateDays(formData.start_date, formData.end_date);
+      // Use the centralized date calculation utility
+      const days = calculateDaysBetween(formData.start_date, formData.end_date);
 
       // Validar solapamiento excluyendo el registro actual
       const hasOverlap = await validateOverlap(
@@ -314,6 +298,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
-    calculateDays,
+    calculateDays: calculateDaysBetween,
   };
 };

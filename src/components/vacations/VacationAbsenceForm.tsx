@@ -6,6 +6,7 @@ import { useVacationAbsenceForm } from '@/hooks/useVacationAbsenceForm';
 import { useVacationEmployees } from '@/hooks/useVacationEmployees';
 import { VacationFormFields } from './VacationFormFields';
 import { VacationFormActions } from './VacationFormActions';
+import { isValidDateRange } from '@/utils/dateUtils';
 
 interface VacationAbsenceFormProps {
   isOpen: boolean;
@@ -28,12 +29,12 @@ export const VacationAbsenceForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // ✅ ACTUALIZADO: Validar tipo también
     if (!formData.employee_id || !formData.type || !formData.start_date || !formData.end_date) {
       return;
     }
 
-    if (new Date(formData.end_date) < new Date(formData.start_date)) {
+    // Use the centralized date validation utility
+    if (!isValidDateRange(formData.start_date, formData.end_date)) {
       alert('La fecha de fin debe ser posterior a la fecha de inicio');
       return;
     }

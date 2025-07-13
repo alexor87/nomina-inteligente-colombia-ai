@@ -5,8 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { VacationAbsence } from '@/types/vacations';
 import { ABSENCE_TYPE_LABELS, ABSENCE_TYPE_COLORS } from '@/types/vacations';
 import { Eye, Edit, Trash2, Calendar, User, Clock, FileText } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { formatDateForDisplay } from '@/utils/dateUtils';
 
 interface VacationAbsenceTableProps {
   vacationsAbsences: VacationAbsence[];
@@ -122,10 +121,10 @@ export const VacationAbsenceTable = ({
               <TableCell>
                 <div className="text-sm">
                   <div>
-                    <strong>Desde:</strong> {format(new Date(vacation.start_date), 'dd/MM/yyyy', { locale: es })}
+                    <strong>Desde:</strong> {formatDateForDisplay(vacation.start_date)}
                   </div>
                   <div>
-                    <strong>Hasta:</strong> {format(new Date(vacation.end_date), 'dd/MM/yyyy', { locale: es })}
+                    <strong>Hasta:</strong> {formatDateForDisplay(vacation.end_date)}
                   </div>
                 </div>
               </TableCell>

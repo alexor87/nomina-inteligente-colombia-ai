@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { VacationAbsence, VacationAbsenceFormData } from '@/types/vacations';
+import { calculateDaysBetween } from '@/utils/dateUtils';
 
 export const useVacationAbsenceForm = (
   editingVacation?: VacationAbsence | null,
@@ -8,7 +9,7 @@ export const useVacationAbsenceForm = (
 ) => {
   const [formData, setFormData] = useState<VacationAbsenceFormData>({
     employee_id: '',
-    type: 'vacaciones', // ✅ AGREGADO: Valor por defecto
+    type: 'vacaciones',
     start_date: '',
     end_date: '',
     observations: ''
@@ -20,7 +21,7 @@ export const useVacationAbsenceForm = (
     if (editingVacation) {
       setFormData({
         employee_id: editingVacation.employee_id,
-        type: editingVacation.type || 'vacaciones', // ✅ AGREGADO: Cargar tipo
+        type: editingVacation.type || 'vacaciones',
         start_date: editingVacation.start_date,
         end_date: editingVacation.end_date,
         observations: editingVacation.observations || ''
@@ -28,7 +29,7 @@ export const useVacationAbsenceForm = (
     } else {
       setFormData({
         employee_id: '',
-        type: 'vacaciones', // ✅ AGREGADO: Valor por defecto
+        type: 'vacaciones',
         start_date: '',
         end_date: '',
         observations: ''
@@ -36,19 +37,16 @@ export const useVacationAbsenceForm = (
     }
   }, [editingVacation, isOpen]);
 
-  // Calculate days automatically
+  // Calculate days automatically using the centralized utility
   useEffect(() => {
     if (formData.start_date && formData.end_date) {
-      const start = new Date(formData.start_date);
-      const end = new Date(formData.end_date);
-      
-      if (end >= start) {
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        setCalculatedDays(diffDays);
-      } else {
-        setCalculatedDays(0);
-      }
+      const days = calculateDaysBetween(formData.start_date, formData.end_date);
+      setCalculatedDays(days);
+      console.log('📅 Hook - Calculated days:', { 
+        start: formData.start_date, 
+        end: formData.end_date, 
+        days 
+      });
     } else {
       setCalculatedDays(0);
     }
