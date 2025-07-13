@@ -70,22 +70,22 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                  Nombre
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
+                  Empleado
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
                   Salario Base
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                  Días Trabajados
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
+                  Días Trab.
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
                   Novedades
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
                   Total a Pagar Período
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
                   Acciones
                 </th>
               </tr>
@@ -96,7 +96,7 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
 
                 return (
                   <tr key={employee.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
                           {employee.name}
@@ -106,13 +106,13 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(employee.baseSalary)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {employee.workedDays} días
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {employee.workedDays}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <Button
                         size="sm"
                         variant="outline"
@@ -122,10 +122,10 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
                         <Plus className="h-4 w-4" />
                       </Button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {formatCurrency(totalToPay)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <Button
                         size="sm"
                         variant="outline"
