@@ -35,7 +35,7 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
     empleado_id: employee?.id || '',
     periodo_id: periodId || '',
     tipo_novedad: 'bonificacion',
-    valor: 0
+    valor: 0 // ✅ Ensure valor always has a value
   });
 
   useEffect(() => {
@@ -87,10 +87,15 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // ✅ FIXED: Handle service response properly
-      const result = await NovedadesEnhancedService.createNovedad(formData);
+      // ✅ Ensure valor is never undefined
+      const submitData = {
+        ...formData,
+        valor: formData.valor || 0
+      };
       
-      if (result) { // ✅ SIMPLIFIED: Just check if result exists
+      const result = await NovedadesEnhancedService.createNovedad(submitData);
+      
+      if (result) {
         toast({
           title: "✅ Devengo creado",
           description: "El devengo se ha creado correctamente",
@@ -112,12 +117,17 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
   };
 
   const handleUpdate = async () => {
-    // Similar fix for update
     setIsSubmitting(true);
     try {
-      const result = await NovedadesEnhancedService.updateNovedad(formData.empleado_id, formData);
+      // ✅ Ensure valor is never undefined
+      const updateData = {
+        ...formData,
+        valor: formData.valor || 0
+      };
       
-      if (result) { // ✅ SIMPLIFIED
+      const result = await NovedadesEnhancedService.updateNovedad(formData.empleado_id, updateData);
+      
+      if (result) {
         toast({
           title: "✅ Devengo actualizado",
           description: "El devengo se ha actualizado correctamente",

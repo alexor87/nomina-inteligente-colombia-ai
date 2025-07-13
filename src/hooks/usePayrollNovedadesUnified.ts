@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
@@ -70,7 +69,7 @@ export const usePayrollNovedadesUnified = (periodId: string) => {
         const createData: CreateNovedadData = {
           ...novedadData,
           periodo_id: periodId,
-          valor: Number(novedadData.valor) || 0,
+          valor: Number(novedadData.valor) || 0, // ✅ Ensure valor is always a number
           horas: novedadData.horas ? Number(novedadData.horas) : undefined,
           dias: novedadData.dias ? Number(novedadData.dias) : undefined
         };

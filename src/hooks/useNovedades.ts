@@ -1,181 +1,98 @@
+import { useState, useEffect, useCallback } from 'react';
+import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
+import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from './use-toast';
 
-import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { DisplayNovedad, convertVacationToDisplay, convertNovedadToDisplay } from '@/types/vacation-integration';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
-import { useToast } from '@/hooks/use-toast';
-
-export const useNovedades = (periodId: string) => {
-  const [isLoading, setIsLoading] = useState(false);
+export const useNovedades = (companyId: string, periodId?: string) => {
+  const [novedades, setNovedades] = useState<PayrollNovedad[]>([]);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const loadIntegratedNovedades = useCallback(async (employeeId: string): Promise<DisplayNovedad[]> => {
-    try {
-      setIsLoading(true);
-      console.log('🔄 Cargando novedades integradas para empleado:', employeeId);
-
-      // 1. Cargar novedades del período
-      const { data: novedades, error: novedadesError } = await supabase
-        .from('payroll_novedades')
-        .select('*')
-        .eq('empleado_id', employeeId)
-        .eq('periodo_id', periodId);
-
-      if (novedadesError) throw novedadesError;
-
-      // 2. Cargar ausencias/vacaciones que intersectan con el período
-      const { data: periodData } = await supabase
-        .from('payroll_periods_real')
-        .select('fecha_inicio, fecha_fin')
-        .eq('id', periodId)
-        .single();
-
-      if (!periodData) {
-        console.warn('No se encontró información del período');
-        return (novedades || []).map(convertNovedadToDisplay);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['novedades', companyId, periodId],
+    queryFn: async () => {
+      if (!companyId || !periodId) return [];
+      try {
+        const novedades = await NovedadesEnhancedService.getNovedades(companyId, periodId);
+        setNovedades(novedades);
+        return novedades;
+      } catch (error) {
+        console.error("Error fetching novedades:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch novedades",
+          variant: "destructive",
+        });
+        return [];
       }
+    },
+    enabled: !!companyId && !!periodId,
+  });
 
-      const { data: vacations, error: vacationsError } = await supabase
-        .from('employee_vacation_periods')
-        .select(`
-          *,
-          employees!inner(salario_base)
-        `)
-        .eq('employee_id', employeeId)
-        .or(`start_date.lte.${periodData.fecha_fin},end_date.gte.${periodData.fecha_inicio}`);
-
-      if (vacationsError) throw vacationsError;
-
-      // 3. Obtener salario del empleado para cálculos
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('salario_base')
-        .eq('id', employeeId)
-        .single();
-
-      const employeeSalary = Number(employee?.salario_base || 0);
-
-      // 4. Convertir y combinar datos
-      const novedadesDisplay = (novedades || []).map(convertNovedadToDisplay);
-      const vacationsDisplay = (vacations || []).map(v => 
-        convertVacationToDisplay(v, employeeSalary)
-      );
-
-      const combined = [...novedadesDisplay, ...vacationsDisplay];
-      
-      // 5. Ordenar por fecha de creación más reciente
-      combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      console.log('✅ Datos integrados cargados:', {
-        novedades: novedadesDisplay.length,
-        vacaciones: vacationsDisplay.length,
-        total: combined.length
-      });
-
-      return combined;
-
-    } catch (error) {
-      console.error('❌ Error cargando novedades integradas:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las novedades integradas",
-        variant: "destructive",
-      });
-      return [];
-    } finally {
-      setIsLoading(false);
+  const createNovedad = useCallback(async (data: CreateNovedadData) => {
+    if (!companyId) {
+      throw new Error('Company ID is required');
     }
-  }, [periodId, toast]);
 
-  const createNovedad = useCallback(async (data: CreateNovedadData, showToast: boolean = true) => {
     try {
-      setIsLoading(true);
-      console.log('📝 Creando novedad:', data);
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
-
-      const insertData = {
-        company_id: profile.company_id,
-        empleado_id: data.empleado_id,
-        periodo_id: data.periodo_id,
-        tipo_novedad: data.tipo_novedad,
-        valor: Number(data.valor) || 0,
-        horas: data.horas ? Number(data.horas) : null,
-        dias: data.dias || null,
-        observacion: data.observacion || null,
-        fecha_inicio: data.fecha_inicio || null,
-        fecha_fin: data.fecha_fin || null,
-        subtipo: data.subtipo || null,
-        constitutivo_salario: data.constitutivo_salario || false,
-        base_calculo: data.base_calculo ? JSON.stringify(data.base_calculo) : null,
-        creado_por: user.id
+      // ✅ Ensure all required fields are present and handle constitutivo_salario
+      const createData: CreateNovedadData = {
+        ...data,
+        company_id: companyId,
+        valor: data.valor || 0, // Ensure valor is never undefined
+        constitutivo_salario: data.constitutivo_salario || false // Provide default value
       };
 
-      const { data: novedad, error } = await supabase
-        .from('payroll_novedades')
-        .insert(insertData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      if (showToast) {
-        toast({
-          title: "✅ Novedad creada",
-          description: "La novedad se ha creado exitosamente",
-          className: "border-green-200 bg-green-50"
-        });
-      }
-
-      console.log('✅ Novedad creada exitosamente:', novedad);
-      return novedad;
-
-    } catch (error) {
-      console.error('❌ Error creando novedad:', error);
+      const result = await NovedadesEnhancedService.createNovedad(createData);
       
-      if (showToast) {
-        toast({
-          title: "❌ Error",
-          description: error instanceof Error ? error.message : "No se pudo crear la novedad",
-          variant: "destructive"
-        });
+      if (result) {
+        // Refresh the list after creation
+        await refetch();
+        return { success: true, data: result };
       }
       
-      throw error;
-    } finally {
-      setIsLoading(false);
+      return { success: false, error: 'Failed to create novedad' };
+    } catch (error: any) {
+      console.error('Error creating novedad:', error);
+      return { success: false, error: error.message };
     }
-  }, [toast]);
+  }, [companyId, refetch]);
 
-  const deleteNovedad = useCallback(async (novedadId: string) => {
+  const updateNovedad = useCallback(async (id: string, data: CreateNovedadData) => {
     try {
-      const { error } = await supabase
-        .from('payroll_novedades')
-        .delete()
-        .eq('id', novedadId);
-
-      if (error) throw error;
-
-      console.log('✅ Novedad eliminada:', novedadId);
-    } catch (error) {
-      console.error('❌ Error eliminando novedad:', error);
-      throw error;
+      const result = await NovedadesEnhancedService.updateNovedad(id, data);
+      if (result) {
+        // Refresh the list after update
+        await refetch();
+        return { success: true, data: result };
+      }
+      return { success: false, error: 'Failed to update novedad' };
+    } catch (error: any) {
+      console.error('Error updating novedad:', error);
+      return { success: false, error: error.message };
     }
-  }, []);
+  }, [refetch]);
+
+  const deleteNovedad = useCallback(async (id: string) => {
+    try {
+      await NovedadesEnhancedService.deleteNovedad(id);
+      // Refresh the list after deletion
+      await refetch();
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error deleting novedad:', error);
+      return { success: false, error: error.message };
+    }
+  }, [refetch]);
 
   return {
+    novedades,
     isLoading,
-    loadIntegratedNovedades,
+    error,
     createNovedad,
-    deleteNovedad
+    updateNovedad,
+    deleteNovedad,
+    refetch
   };
 };

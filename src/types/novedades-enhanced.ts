@@ -1,4 +1,3 @@
-
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -38,10 +37,11 @@ export interface CreateNovedadData {
   fecha_fin?: string;
   dias?: number;
   horas?: number;
-  valor?: number;
+  valor: number;
   base_calculo?: BaseCalculoData;
   observacion?: string;
   adjunto_url?: string;
+  constitutivo_salario?: boolean;
 }
 
 export interface NovedadFormData {
@@ -76,6 +76,28 @@ export type NovedadType =
   | 'ausencia'
   | 'multa'
   | 'descuento_voluntario';
+
+// ✅ Re-export the missing NOVEDAD_TYPE_LABELS
+export const NOVEDAD_TYPE_LABELS: Record<NovedadType, string> = {
+  horas_extra: 'Horas Extra',
+  recargo_nocturno: 'Recargo Nocturno',
+  vacaciones: 'Vacaciones',
+  licencia_remunerada: 'Licencia Remunerada',
+  licencia_no_remunerada: 'Licencia No Remunerada',
+  incapacidad: 'Incapacidad',
+  bonificacion: 'Bonificación',
+  comision: 'Comisión',
+  prima: 'Prima',
+  otros_ingresos: 'Otros Ingresos',
+  salud: 'Salud',
+  pension: 'Pensión',
+  fondo_solidaridad: 'Fondo de Solidaridad',
+  retencion_fuente: 'Retención en la Fuente',
+  libranza: 'Libranza',
+  ausencia: 'Ausencia',
+  multa: 'Multa',
+  descuento_voluntario: 'Descuento Voluntario'
+};
 
 export const NOVEDAD_CATEGORIES = {
   devengados: {
