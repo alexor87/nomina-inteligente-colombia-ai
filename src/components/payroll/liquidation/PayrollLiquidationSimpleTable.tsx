@@ -217,7 +217,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                 </TableCell>
                 
                 <TableCell className="text-center">
-                  <div className="flex items-center justify-center space-x-2">
+                  <div className="flex items-center justify-start space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
