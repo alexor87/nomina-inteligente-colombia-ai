@@ -14,12 +14,14 @@ interface NovedadVacacionesFormProps {
   onBack: () => void;
   onSubmit: (formData: any) => void;
   employeeSalary: number;
+  periodoFecha?: Date;
 }
 
 export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
   onBack,
   onSubmit,
-  employeeSalary
+  employeeSalary,
+  periodoFecha
 }) => {
   const [formData, setFormData] = useState({
     dias: '',
@@ -35,7 +37,8 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
   useEffect(() => {
     if (formData.dias && parseInt(formData.dias) > 0) {
       console.log('🔄 Calculating value for vacaciones:', {
-        dias: parseInt(formData.dias)
+        dias: parseInt(formData.dias),
+        periodoFecha: periodoFecha || new Date()
       });
       
       calculateNovedadDebounced(
@@ -43,7 +46,7 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
           tipoNovedad: 'vacaciones' as NovedadType,
           salarioBase: employeeSalary,
           dias: parseInt(formData.dias),
-          fechaPeriodo: new Date()
+          fechaPeriodo: periodoFecha || new Date()
         },
         (result) => {
           if (result && result.valor > 0) {
@@ -53,7 +56,7 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
         }
       );
     }
-  }, [formData.dias, employeeSalary, calculateNovedadDebounced]);
+  }, [formData.dias, employeeSalary, calculateNovedadDebounced, periodoFecha]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));

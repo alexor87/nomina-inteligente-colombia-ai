@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +15,7 @@ interface NovedadIncapacidadFormProps {
   onSubmit: (formData: any) => void;
   employeeSalary: number;
   isSubmitting: boolean;
+  periodoFecha?: Date;
 }
 
 const INCAPACIDAD_SUBTIPOS = [
@@ -43,7 +43,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  isSubmitting
+  isSubmitting,
+  periodoFecha
 }) => {
   const [formData, setFormData] = useState({
     subtipo: 'general',
@@ -61,7 +62,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     if (formData.dias && parseInt(formData.dias) > 0) {
       console.log('🔄 Calculating value for incapacidad:', {
         subtipo: formData.subtipo,
-        dias: parseInt(formData.dias)
+        dias: parseInt(formData.dias),
+        periodoFecha: periodoFecha || new Date()
       });
       
       calculateNovedadDebounced(
@@ -70,7 +72,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           subtipo: formData.subtipo,
           salarioBase: employeeSalary,
           dias: parseInt(formData.dias),
-          fechaPeriodo: new Date()
+          fechaPeriodo: periodoFecha || new Date()
         },
         (result) => {
           if (result && result.valor > 0) {
@@ -80,7 +82,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         }
       );
     }
-  }, [formData.subtipo, formData.dias, employeeSalary, calculateNovedadDebounced]);
+  }, [formData.subtipo, formData.dias, employeeSalary, calculateNovedadDebounced, periodoFecha]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));

@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
+import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -239,7 +240,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         );
         
       case 'vacaciones':
-        return <NovedadVacacionesConsolidatedForm {...baseProps} />;
+        return (
+          <NovedadVacacionesForm
+            onBack={handleBackToSelector}
+            onSubmit={handleFormSubmit}
+            employeeSalary={employeeSalary || 0}
+            periodoFecha={getPeriodDate()}
+          />
+        );
         
       case 'bonificacion':
         return <NovedadBonificacionesConsolidatedForm {...baseProps} />;
@@ -261,6 +269,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onSubmit={handleFormSubmit}
             employeeSalary={employeeSalary || 0}
             isSubmitting={isSubmitting}
+            periodoFecha={getPeriodDate()}
           />
         );
         
