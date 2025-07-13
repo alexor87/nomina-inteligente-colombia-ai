@@ -4,6 +4,7 @@ import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useNovedades = (periodId: string) => {
   const [novedades, setNovedades] = useState<PayrollNovedad[]>([]);
@@ -122,7 +123,7 @@ export const useNovedades = (periodId: string) => {
       
       const novedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
       
-      // Transform to expected format
+      // Transform to expected format with all required properties
       return novedades.map(novedad => ({
         id: novedad.id,
         tipo_novedad: novedad.tipo_novedad,
@@ -138,7 +139,12 @@ export const useNovedades = (periodId: string) => {
         badgeIcon: '📋',
         badgeColor: 'bg-blue-100 text-blue-800',
         status: 'registrada',
-        statusColor: 'text-blue-600'
+        statusColor: 'text-blue-600',
+        // Add missing required properties
+        canEdit: true,
+        canDelete: true,
+        created_at: novedad.created_at,
+        updated_at: novedad.updated_at
       }));
     } catch (error) {
       console.error('Error loading integrated novedades:', error);
