@@ -102,12 +102,21 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     enabled: !!user,
   });
 
-  // Función para calcular días entre fechas
+  // ✅ CORREGIDO: Función para calcular días entre fechas SIN problemas de UTC
   const calculateDays = (startDate: string, endDate: string): number => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
+    // Parsear fechas como fechas locales para evitar problemas de UTC
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+    
+    // Crear fechas usando constructor local (mes es 0-indexado)
+    const start = new Date(startYear, startMonth - 1, startDay);
+    const end = new Date(endYear, endMonth - 1, endDay);
+    
+    // Calcular diferencia en milisegundos y convertir a días
+    const diffTime = end.getTime() - start.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
+    
+    console.log('📅 Calculating days:', { startDate, endDate, diffDays });
     return diffDays;
   };
 
