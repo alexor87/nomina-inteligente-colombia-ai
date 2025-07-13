@@ -6,103 +6,94 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Trash2, Calculator } from 'lucide-react';
+import { ArrowLeft, Clock, Plus, Trash2, Calculator } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { useNovedadCalculation } from '@/hooks/useNovedadCalculation';
-import { NovedadType } from '@/types/novedades-enhanced';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface HorasExtraEntry {
   id: string;
-  subtipo: string;
+  fecha: string;
+  tipo: string;
   horas: number;
   valor: number;
   observacion?: string;
 }
 
+const tiposHorasExtra = [
+  { value: 'diurnas', label: 'Diurnas (25%)', factor: 1.25 },
+  { value: 'nocturnas', label: 'Nocturnas (75%)', factor: 1.75 },
+  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', factor: 2.0 },
+  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', factor: 2.5 },
+  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', factor: 2.0 },
+  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', factor: 2.5 }
+];
+
 interface NovedadHorasExtraConsolidatedFormProps {
   onBack: () => void;
-  onSubmit: (formDataArray: any[]) => void;
+  onSubmit: (entries: HorasExtraEntry[]) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => number | null;
+  isSubmitting?: boolean;
+  periodoFecha?: Date;
 }
-
-const HORAS_EXTRA_SUBTIPOS = [
-  { value: 'diurnas', label: 'Diurnas (25%)', description: '6:00 AM - 10:00 PM' },
-  { value: 'nocturnas', label: 'Nocturnas (75%)', description: '10:00 PM - 6:00 AM' },
-  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', description: 'Domingos 6:00 AM - 10:00 PM' },
-  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', description: 'Domingos 10:00 PM - 6:00 AM' },
-  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', description: 'Festivos 6:00 AM - 10:00 PM' },
-  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', description: 'Festivos 10:00 PM - 6:00 AM' }
-];
 
 export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsolidatedFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  calculateSuggestedValue
+  isSubmitting = false,
+  periodoFecha
 }) => {
   const [entries, setEntries] = useState<HorasExtraEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState({
-    subtipo: 'diurnas',
+    fecha: '',
+    tipo: '',
     horas: '',
     observacion: ''
   });
 
-  const { calculatedValue, calculateValue } = useNovedadCalculation({
-    employeeSalary,
-    calculateSuggestedValue
-  });
+  const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
 
-  // 🔧 CORRECCIÓN: Recálculo automático siempre cuando cambien horas o subtipo
-  useEffect(() => {
-    if (currentEntry.horas && parseFloat(currentEntry.horas) > 0) {
-      console.log('🔄 Auto-calculando valor para horas extra:', {
-        subtipo: currentEntry.subtipo,
-        horas: parseFloat(currentEntry.horas)
+  const calculateHorasExtraValue = async (tipo: string, horas: number) => {
+    if (!tipo || horas <= 0) return 0;
+
+    try {
+      const result = await calculateNovedad({
+        tipoNovedad: 'horas_extra',
+        subtipo: tipo,
+        salarioBase: employeeSalary,
+        horas: horas,
+        fechaPeriodo: periodoFecha || new Date()
       });
-      
-      calculateValue(
-        'horas_extra' as NovedadType,
-        currentEntry.subtipo,
-        parseFloat(currentEntry.horas),
-        undefined
-      );
-    } else {
-      // Limpiar el valor calculado si no hay horas válidas
-      calculateValue('horas_extra' as NovedadType, currentEntry.subtipo, 0, undefined);
-    }
-  }, [currentEntry.subtipo, currentEntry.horas, calculateValue]);
 
-  const handleAddEntry = () => {
-    if (!currentEntry.horas || parseFloat(currentEntry.horas) <= 0) {
-      alert('Por favor ingrese las horas');
+      return result?.valor || 0;
+    } catch (error) {
+      console.error('Error calculating hours extra:', error);
+      return 0;
+    }
+  };
+
+  const handleAddEntry = async () => {
+    if (!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0) {
       return;
     }
 
-    if (!calculatedValue || calculatedValue <= 0) {
-      alert('Error en el cálculo del valor');
-      return;
-    }
+    const horas = parseFloat(currentEntry.horas);
+    const valor = await calculateHorasExtraValue(currentEntry.tipo, horas);
 
     const newEntry: HorasExtraEntry = {
       id: Date.now().toString(),
-      subtipo: currentEntry.subtipo,
-      horas: parseFloat(currentEntry.horas),
-      valor: calculatedValue,
-      observacion: currentEntry.observacion || undefined
+      fecha: currentEntry.fecha,
+      tipo: currentEntry.tipo,
+      horas: horas,
+      valor: valor,
+      observacion: currentEntry.observacion
     };
 
-    console.log('➕ Adding horas extra entry:', newEntry);
     setEntries(prev => [...prev, newEntry]);
-    
-    // Reset form
     setCurrentEntry({
-      subtipo: 'diurnas',
+      fecha: '',
+      tipo: '',
       horas: '',
       observacion: ''
     });
@@ -113,33 +104,15 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
   };
 
   const handleSubmit = () => {
-    if (entries.length === 0) {
-      alert('Agregue al menos una entrada de horas extra');
-      return;
-    }
-
-    const formDataArray = entries.map(entry => ({
-      tipo_novedad: 'horas_extra',
-      subtipo: entry.subtipo,
-      horas: entry.horas,
-      valor: entry.valor,
-      observacion: entry.observacion
-    }));
-
-    console.log('📤 Submitting horas extra entries:', formDataArray);
-    onSubmit(formDataArray);
+    if (entries.length === 0) return;
+    onSubmit(entries);
   };
 
-  const getTotalValue = () => {
-    return entries.reduce((sum, entry) => sum + entry.valor, 0);
-  };
+  const totalHoras = entries.reduce((sum, entry) => sum + entry.horas, 0);
+  const totalValor = entries.reduce((sum, entry) => sum + entry.valor, 0);
 
-  const getTotalHours = () => {
-    return entries.reduce((sum, entry) => sum + entry.horas, 0);
-  };
-
-  const getSubtipoLabel = (subtipo: string) => {
-    return HORAS_EXTRA_SUBTIPOS.find(s => s.value === subtipo)?.label || subtipo;
+  const getTipoLabel = (tipo: string) => {
+    return tiposHorasExtra.find(t => t.value === tipo)?.label || tipo;
   };
 
   return (
@@ -148,138 +121,143 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">Horas Extra - Registro Consolidado</h3>
+        <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
-      {/* Formulario para nueva entrada */}
-      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
-        <h4 className="font-medium text-blue-800">Agregar Horas Extra</h4>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Tipo de Horas Extra</Label>
-            <Select
-              value={currentEntry.subtipo}
-              onValueChange={(value) => setCurrentEntry(prev => ({ ...prev, subtipo: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {HORAS_EXTRA_SUBTIPOS.map((subtipo) => (
-                  <SelectItem key={subtipo.value} value={subtipo.value}>
-                    <div>
-                      <div className="font-medium">{subtipo.label}</div>
-                      <div className="text-xs text-gray-500">{subtipo.description}</div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Cantidad de Horas</Label>
-            <Input
-              type="number"
-              min="0"
-              max="12"
-              step="0.5"
-              value={currentEntry.horas}
-              onChange={(e) => setCurrentEntry(prev => ({ ...prev, horas: e.target.value }))}
-              placeholder="0"
-            />
-          </div>
-        </div>
-
-        {/* Valor calculado */}
-        {calculatedValue && calculatedValue > 0 && (
-          <div className="flex items-center justify-between bg-green-50 p-3 rounded">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">Valor calculado:</span>
-            </div>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              {formatCurrency(calculatedValue)}
-            </Badge>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Label>Observaciones (opcional)</Label>
-          <Textarea
-            value={currentEntry.observacion}
-            onChange={(e) => setCurrentEntry(prev => ({ ...prev, observacion: e.target.value }))}
-            placeholder="Observaciones adicionales..."
-            rows={2}
-          />
-        </div>
-
-        <Button 
-          onClick={handleAddEntry}
-          disabled={!currentEntry.horas || !calculatedValue}
-          className="w-full"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Entrada
-        </Button>
-      </div>
-
-      {/* Lista de entradas agregadas */}
-      {entries.length > 0 && (
-        <div className="space-y-4">
-          <h4 className="font-medium">Entradas Agregadas ({entries.length})</h4>
+      {/* Current Entry Form */}
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <h4 className="font-medium text-blue-800">Agregar Horas Extra</h4>
           
-          <div className="space-y-2">
-            {entries.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <div className="font-medium">{getSubtipoLabel(entry.subtipo)}</div>
-                  <div className="text-sm text-gray-600">
-                    {entry.horas} horas - {formatCurrency(entry.valor)}
-                  </div>
-                  {entry.observacion && (
-                    <div className="text-xs text-gray-500 mt-1">{entry.observacion}</div>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveEntry(entry.id)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Fecha *</Label>
+              <Input
+                type="date"
+                value={currentEntry.fecha}
+                onChange={(e) => setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }))}
+              />
+            </div>
 
-          {/* Resumen total */}
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="flex justify-between items-center">
-              <div>
-                <div className="font-medium">Total: {getTotalHours()} horas</div>
-                <div className="text-sm text-gray-600">{entries.length} entradas</div>
-              </div>
-              <div className="text-xl font-bold text-blue-700">
-                {formatCurrency(getTotalValue())}
-              </div>
+            <div className="space-y-2">
+              <Label>Tipo de Horas Extra *</Label>
+              <Select value={currentEntry.tipo} onValueChange={(value) => setCurrentEntry(prev => ({ ...prev, tipo: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiposHorasExtra.map((tipo) => (
+                    <SelectItem key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Horas *</Label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={currentEntry.horas}
+                  onChange={(e) => setCurrentEntry(prev => ({ ...prev, horas: e.target.value }))}
+                  className="pl-10"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Observaciones</Label>
+              <Input
+                value={currentEntry.observacion}
+                onChange={(e) => setCurrentEntry(prev => ({ ...prev, observacion: e.target.value }))}
+                placeholder="Descripción opcional"
+              />
+            </div>
+          </div>
+
+          <Button 
+            onClick={handleAddEntry}
+            disabled={!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0 || isCalculating}
+            className="w-full"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {isCalculating ? 'Calculando...' : 'Agregar Entrada'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Entries List */}
+      {entries.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <h4 className="font-medium text-green-800 mb-4">Horas Extra Registradas ({entries.length})</h4>
+            
+            <div className="space-y-3">
+              {entries.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-xs">
+                        {entry.fecha}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {getTipoLabel(entry.tipo)}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {entry.horas} horas - {formatCurrency(entry.valor)}
+                      {entry.observacion && (
+                        <span className="block text-xs mt-1 italic">{entry.observacion}</span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveEntry(entry.id)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Summary */}
+            <div className="mt-4 pt-4 border-t bg-green-50 p-3 rounded">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Total:</span>
+                <div className="text-right">
+                  <div className="font-medium">{totalHoras} horas</div>
+                  <div className="text-lg font-bold text-green-700">
+                    {formatCurrency(totalValor)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Botones de acción */}
+      {/* Action Buttons */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack}>
           Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={entries.length === 0}
-          className="bg-blue-600 hover:bg-blue-700"
+          disabled={entries.length === 0 || isSubmitting}
+          className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
         >
-          Guardar Horas Extra ({entries.length})
+          {isSubmitting ? 'Guardando...' : `Guardar ${entries.length} Entrada${entries.length > 1 ? 's' : ''}`}
         </Button>
       </div>
     </div>

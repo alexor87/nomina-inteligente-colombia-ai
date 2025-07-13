@@ -1,315 +1,260 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Trash2, Calculator, Info } from 'lucide-react';
+import { ArrowLeft, Clock, Calculator, Plus, Trash2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { useMultipleNovedadEntries } from '@/hooks/useMultipleNovedadEntries';
-import { RecargosCalculationService } from '@/services/RecargosCalculationService';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface RecargoEntry {
   id: string;
-  tipo_novedad: string;
-  subtipo: string;
+  fecha: string;
+  tipo: string;
   horas: number;
   valor: number;
   observacion?: string;
 }
 
+const tiposRecargo = [
+  { value: 'nocturno', label: 'Recargo Nocturno (35%)', factor: 0.35 },
+  { value: 'nocturno_dominical', label: 'Nocturno Dominical', factor: 0.35 },
+  { value: 'nocturno_festivo', label: 'Nocturno Festivo', factor: 0.35 }
+];
+
 interface NovedadRecargoConsolidatedFormProps {
   onBack: () => void;
-  onSubmit: (formDataArray: any[]) => void;
+  onSubmit: (entries: RecargoEntry[]) => void;
   employeeSalary: number;
+  isSubmitting?: boolean;
   periodoFecha?: Date;
 }
-
-const RECARGO_SUBTIPOS = [
-  { value: 'nocturno', label: 'Nocturno (35%)', description: '10:00 PM - 6:00 AM' },
-  { value: 'dominical', label: 'Dominical (80%)', description: 'Trabajo en domingo' },
-  { value: 'nocturno_dominical', label: 'Nocturno Dominical (115%)', description: 'Domingo 10:00 PM - 6:00 AM' },
-  { value: 'festivo', label: 'Festivo (75%)', description: 'Trabajo en día festivo' },
-  { value: 'nocturno_festivo', label: 'Nocturno Festivo (110%)', description: 'Festivo 10:00 PM - 6:00 AM' }
-];
 
 export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidatedFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
+  isSubmitting = false,
   periodoFecha
 }) => {
-  const { entries, addEntry, removeEntry, getTotalValue } = useMultipleNovedadEntries<RecargoEntry>();
-  
-  const [newEntry, setNewEntry] = useState({
-    subtipo: 'nocturno',
+  const [entries, setEntries] = useState<RecargoEntry[]>([]);
+  const [currentEntry, setCurrentEntry] = useState({
+    fecha: '',
+    tipo: 'nocturno',
     horas: '',
-    valor: '',
     observacion: ''
   });
 
-  const [jornadaInfo, setJornadaInfo] = useState<any>(null);
+  const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
 
-  const calculateValueForEntry = (subtipo: string, horas: number) => {
-    if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
-      return null;
-    }
+  const calculateRecargoValue = async (tipo: string, horas: number) => {
+    if (!tipo || horas <= 0) return 0;
 
     try {
-      console.log('💰 Calculando recargo con fecha del período:', periodoFecha?.toISOString().split('T')[0]);
-      
-      const result = RecargosCalculationService.calcularRecargo({
+      const result = await calculateNovedad({
+        tipoNovedad: 'recargo_nocturno',
+        subtipo: tipo,
         salarioBase: employeeSalary,
-        tipoRecargo: subtipo as any,
         horas: horas,
         fechaPeriodo: periodoFecha || new Date()
       });
-      
-      console.log('💰 Recargo calculado:', result);
-      setJornadaInfo(result.jornadaInfo);
-      return result.valorRecargo;
+
+      return result?.valor || 0;
     } catch (error) {
-      console.error('❌ Error calculando recargo:', error);
-      return null;
+      console.error('Error calculating recargo:', error);
+      return 0;
     }
   };
 
-  const handleAddEntry = () => {
-    if (!newEntry.subtipo || !newEntry.horas || parseFloat(newEntry.horas) <= 0) {
-      alert('Por favor complete todos los campos requeridos');
+  const handleAddEntry = async () => {
+    if (!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0) {
       return;
     }
 
-    const horas = parseFloat(newEntry.horas);
-    const calculatedValue = calculateValueForEntry(newEntry.subtipo, horas);
-    const valor = newEntry.valor ? parseFloat(newEntry.valor) : (calculatedValue || 0);
+    const horas = parseFloat(currentEntry.horas);
+    const valor = await calculateRecargoValue(currentEntry.tipo, horas);
 
-    if (valor <= 0) {
-      alert('El valor debe ser mayor a 0');
-      return;
-    }
-
-    addEntry({
-      tipo_novedad: 'recargo_nocturno',
-      subtipo: newEntry.subtipo,
+    const newEntry: RecargoEntry = {
+      id: Date.now().toString(),
+      fecha: currentEntry.fecha,
+      tipo: currentEntry.tipo,
       horas: horas,
       valor: valor,
-      observacion: newEntry.observacion || undefined
-    });
+      observacion: currentEntry.observacion
+    };
 
-    // Reset form
-    setNewEntry({
-      subtipo: 'nocturno',
+    setEntries(prev => [...prev, newEntry]);
+    setCurrentEntry({
+      fecha: '',
+      tipo: 'nocturno',
       horas: '',
-      valor: '',
       observacion: ''
     });
   };
 
+  const handleRemoveEntry = (id: string) => {
+    setEntries(prev => prev.filter(entry => entry.id !== id));
+  };
+
   const handleSubmit = () => {
-    if (entries.length === 0) {
-      alert('Agregue al menos un recargo');
-      return;
-    }
-
-    const formDataArray = entries.map(entry => ({
-      tipo_novedad: 'recargo_nocturno',
-      subtipo: entry.subtipo,
-      horas: entry.horas,
-      valor: entry.valor,
-      observacion: entry.observacion
-    }));
-
-    onSubmit(formDataArray);
+    if (entries.length === 0) return;
+    onSubmit(entries);
   };
 
-  const getSubtipoInfo = (subtipo: string) => {
-    return RECARGO_SUBTIPOS.find(s => s.value === subtipo);
+  const totalHoras = entries.reduce((sum, entry) => sum + entry.horas, 0);
+  const totalValor = entries.reduce((sum, entry) => sum + entry.valor, 0);
+
+  const getTipoLabel = (tipo: string) => {
+    return tiposRecargo.find(t => t.value === tipo)?.label || tipo;
   };
-
-  const totalValue = getTotalValue();
-
-  // 🔧 CORRECCIÓN: Recálculo automático sin condiciones que lo bloqueen
-  React.useEffect(() => {
-    if (newEntry.subtipo && newEntry.horas && parseFloat(newEntry.horas) > 0) {
-      const calculatedValue = calculateValueForEntry(newEntry.subtipo, parseFloat(newEntry.horas));
-      if (calculatedValue && calculatedValue > 0) {
-        console.log('🔄 Auto-actualizando valor calculado:', calculatedValue);
-        setNewEntry(prev => ({ ...prev, valor: calculatedValue.toString() }));
-      }
-    } else {
-      // Limpiar valor si no hay datos suficientes para calcular
-      setNewEntry(prev => ({ ...prev, valor: '' }));
-    }
-  }, [newEntry.subtipo, newEntry.horas, employeeSalary, periodoFecha]);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b bg-white">
+      <div className="flex items-center gap-3 pb-4 border-b">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold text-gray-900">Recargos</h3>
+        <h3 className="text-lg font-semibold">Recargo Nocturno</h3>
       </div>
 
-      {/* Información de jornada legal usada */}
-      {jornadaInfo && (
-        <div className="flex items-center gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
-          <Info className="h-4 w-4" />
-          <span>
-            Jornada legal: {jornadaInfo.horasSemanales}h semanales = {jornadaInfo.divisorHorario}h mensuales
-            {periodoFecha && ` (vigente desde ${periodoFecha.toLocaleDateString()})`}
-          </span>
-        </div>
-      )}
-
-      {/* Form to add new entry */}
-      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
-        <h4 className="text-blue-800 font-medium">Agregar Nuevo Recargo</h4>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="tipo" className="text-gray-700">Tipo de Recargo</Label>
-            <Select 
-              value={newEntry.subtipo} 
-              onValueChange={(value) => setNewEntry(prev => ({ ...prev, subtipo: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {RECARGO_SUBTIPOS.map((subtipo) => (
-                  <SelectItem key={subtipo.value} value={subtipo.value}>
-                    <div>
-                      <div className="font-medium">{subtipo.label}</div>
-                      <div className="text-xs text-gray-500">{subtipo.description}</div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="horas" className="text-gray-700">Cantidad de Horas</Label>
-            <Input
-              type="number"
-              placeholder="0"
-              value={newEntry.horas}
-              onChange={(e) => setNewEntry(prev => ({ ...prev, horas: e.target.value }))}
-              min="0"
-              max="8"
-              step="0.5"
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              Máximo 8 horas por jornada
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="valor" className="text-gray-700">Valor</Label>
-          <Input
-            type="number"
-            placeholder="0"
-            value={newEntry.valor}
-            onChange={(e) => setNewEntry(prev => ({ ...prev, valor: e.target.value }))}
-            min="0"
-            step="1000"
-          />
-          {newEntry.valor && parseFloat(newEntry.valor) > 0 && (
-            <div className="mt-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                {formatCurrency(parseFloat(newEntry.valor))}
-              </Badge>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="observacion" className="text-gray-700">Observaciones</Label>
-          <Textarea
-            placeholder="Turno, horario específico, etc..."
-            value={newEntry.observacion}
-            onChange={(e) => setNewEntry(prev => ({ ...prev, observacion: e.target.value }))}
-            rows={2}
-          />
-        </div>
-
-        <Button 
-          onClick={handleAddEntry}
-          disabled={!newEntry.subtipo || !newEntry.horas || parseFloat(newEntry.horas) <= 0}
-          className="w-full bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Recargo
-        </Button>
-      </div>
-
-      {/* List of added entries */}
-      {entries.length > 0 && (
-        <div className="space-y-4">
-          <h4 className="font-medium text-gray-900">Recargos Agregados ({entries.length})</h4>
+      {/* Current Entry Form */}
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <h4 className="font-medium text-blue-800">Agregar Recargo Nocturno</h4>
           
-          <div className="space-y-2">
-            {entries.map((entry) => {
-              const typeInfo = getSubtipoInfo(entry.subtipo);
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Fecha *</Label>
+              <Input
+                type="date"
+                value={currentEntry.fecha}
+                onChange={(e) => setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }))}
+              />
+            </div>
 
-              return (
-                <div key={entry.id} className="flex justify-between items-start p-3 border rounded-lg bg-white">
+            <div className="space-y-2">
+              <Label>Tipo de Recargo *</Label>
+              <Select value={currentEntry.tipo} onValueChange={(value) => setCurrentEntry(prev => ({ ...prev, tipo: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiposRecargo.map((tipo) => (
+                    <SelectItem key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Horas *</Label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={currentEntry.horas}
+                  onChange={(e) => setCurrentEntry(prev => ({ ...prev, horas: e.target.value }))}
+                  className="pl-10"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Observaciones</Label>
+              <Input
+                value={currentEntry.observacion}
+                onChange={(e) => setCurrentEntry(prev => ({ ...prev, observacion: e.target.value }))}
+                placeholder="Descripción opcional"
+              />
+            </div>
+          </div>
+
+          <Button 
+            onClick={handleAddEntry}
+            disabled={!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0 || isCalculating}
+            className="w-full"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {isCalculating ? 'Calculando...' : 'Agregar Entrada'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Entries List */}
+      {entries.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <h4 className="font-medium text-green-800 mb-4">Recargos Registrados ({entries.length})</h4>
+            
+            <div className="space-y-3">
+              {entries.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
                   <div className="flex-1">
-                    <div className="font-medium">{typeInfo?.label}</div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-xs">
+                        {entry.fecha}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {getTipoLabel(entry.tipo)}
+                      </Badge>
+                    </div>
                     <div className="text-sm text-gray-600">
                       {entry.horas} horas - {formatCurrency(entry.valor)}
+                      {entry.observacion && (
+                        <span className="block text-xs mt-1 italic">{entry.observacion}</span>
+                      )}
                     </div>
-                    {entry.observacion && (
-                      <div className="text-xs text-gray-500 mt-1">{entry.observacion}</div>
-                    )}
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeEntry(entry.id)}
+                    onClick={() => handleRemoveEntry(entry.id)}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
 
-          {/* Total */}
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="flex justify-between items-center font-semibold">
-              <span>Total Recargos:</span>
-              <div className="text-right">
-                <div className="text-xl font-bold text-blue-700">
-                  {formatCurrency(totalValue)}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {entries.reduce((sum, entry) => sum + entry.horas, 0)} horas totales
+            {/* Summary */}
+            <div className="mt-4 pt-4 border-t bg-green-50 p-3 rounded">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Total:</span>
+                <div className="text-right">
+                  <div className="font-medium">{totalHoras} horas</div>
+                  <div className="text-lg font-bold text-green-700">
+                    {formatCurrency(totalValor)}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Actions */}
+      {/* Action Buttons */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack}>
           Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={entries.length === 0}
-          className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+          disabled={entries.length === 0 || isSubmitting}
+          className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
         >
-          Guardar {entries.length} Recargo{entries.length !== 1 ? 's' : ''}
+          {isSubmitting ? 'Guardando...' : `Guardar ${entries.length} Entrada${entries.length > 1 ? 's' : ''}`}
         </Button>
       </div>
     </div>

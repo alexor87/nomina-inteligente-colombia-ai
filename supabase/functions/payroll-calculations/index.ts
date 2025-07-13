@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -15,6 +16,15 @@ interface PayrollCalculationInput {
   absences: number;
   periodType: 'quincenal' | 'mensual' | 'semanal';
   periodDate?: string;
+}
+
+interface NovedadCalculationInput {
+  tipoNovedad: string;
+  subtipo?: string;
+  salarioBase: number;
+  horas?: number;
+  dias?: number;
+  fechaPeriodo?: string;
 }
 
 interface JornadaLegalInfo {
@@ -74,6 +84,16 @@ const JORNADAS_LEGALES = [
   }
 ];
 
+// Factores de horas extra según legislación colombiana
+const HORAS_EXTRA_FACTORS = {
+  diurnas: 1.25,
+  nocturnas: 1.75,
+  dominicales_diurnas: 2.0,
+  dominicales_nocturnas: 2.5,
+  festivas_diurnas: 2.0,
+  festivas_nocturnas: 2.5
+} as const;
+
 function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
   const jornadaVigente = JORNADAS_LEGALES
     .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
@@ -83,7 +103,7 @@ function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
     const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
     return {
       horasSemanales: jornadaTradicional.horasSemanales,
-      horasMensuales: (jornadaTradicional.horasSemanales / 6) * 30, // ✅ FÓRMULA CORREGIDA
+      horasMensuales: (jornadaTradicional.horasSemanales / 6) * 30,
       fechaVigencia: jornadaTradicional.fechaInicio,
       descripcion: jornadaTradicional.descripcion,
       ley: 'Código Sustantivo del Trabajo'
@@ -92,7 +112,7 @@ function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
 
   return {
     horasSemanales: jornadaVigente.horasSemanales,
-    horasMensuales: (jornadaVigente.horasSemanales / 6) * 30, // ✅ FÓRMULA CORREGIDA
+    horasMensuales: (jornadaVigente.horasSemanales / 6) * 30,
     fechaVigencia: jornadaVigente.fechaInicio,
     descripcion: jornadaVigente.descripcion,
     ley: 'Ley 2101 de 2021'
@@ -102,6 +122,199 @@ function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
 function getHourlyDivisor(fecha: Date = new Date()): number {
   const jornadaInfo = getJornadaLegal(fecha);
   return Math.round(jornadaInfo.horasMensuales);
+}
+
+// ✅ NUEVA FUNCIÓN: Calcular novedades con jornada legal dinámica
+function calculateNovedad(input: NovedadCalculationInput) {
+  const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
+  const fechaCalculo = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+  const jornadaLegal = getJornadaLegal(fechaCalculo);
+  const divisorHorario = getHourlyDivisor(fechaCalculo);
+  
+  console.log(`🧮 Calculando novedad: ${tipoNovedad}, subtipo: ${subtipo}, fecha: ${fechaCalculo.toISOString().split('T')[0]}`);
+  console.log(`📊 Jornada legal: ${jornadaLegal.horasSemanales}h/semana, divisor: ${divisorHorario}`);
+  
+  let valor = 0;
+  let factorCalculo = 0;
+  let detalleCalculo = '';
+
+  switch (tipoNovedad) {
+    case 'horas_extra':
+      if (horas && horas > 0 && subtipo) {
+        const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
+        if (factor) {
+          const tarifaHora = salarioBase / divisorHorario;
+          valor = Math.round(tarifaHora * factor * horas);
+          factorCalculo = factor;
+          
+          let tipoDescripcion = '';
+          switch (subtipo) {
+            case 'diurnas':
+              tipoDescripcion = 'Horas extra diurnas (25% recargo)';
+              break;
+            case 'nocturnas':
+              tipoDescripcion = 'Horas extra nocturnas (75% recargo)';
+              break;
+            case 'dominicales_diurnas':
+              tipoDescripcion = 'Horas dominicales diurnas (100% recargo)';
+              break;
+            case 'dominicales_nocturnas':
+              tipoDescripcion = 'Horas dominicales nocturnas (150% recargo)';
+              break;
+            case 'festivas_diurnas':
+              tipoDescripcion = 'Horas festivas diurnas (100% recargo)';
+              break;
+            case 'festivas_nocturnas':
+              tipoDescripcion = 'Horas festivas nocturnas (150% recargo)';
+              break;
+            default:
+              tipoDescripcion = `Horas extra ${subtipo}`;
+          }
+          
+          detalleCalculo = `${tipoDescripcion}: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
+        } else {
+          detalleCalculo = 'Subtipo de horas extra no válido';
+        }
+      } else {
+        detalleCalculo = 'Ingrese horas y seleccione subtipo';
+      }
+      break;
+
+    case 'recargo_nocturno':
+      if (horas && horas > 0) {
+        const tarifaHora = salarioBase / divisorHorario;
+        const factor = 0.35; // 35% adicional para recargo nocturno
+        valor = Math.round(tarifaHora * factor * horas);
+        factorCalculo = factor;
+        detalleCalculo = `Recargo nocturno: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × 35% × ${horas} horas = ${valor.toLocaleString()}`;
+      } else {
+        detalleCalculo = 'Ingrese las horas de recargo nocturno';
+      }
+      break;
+
+    case 'vacaciones':
+      if (dias && dias > 0) {
+        const salarioDiario = salarioBase / 30;
+        valor = Math.round(salarioDiario * dias);
+        factorCalculo = 1;
+        detalleCalculo = `Vacaciones: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+      } else {
+        detalleCalculo = 'Ingrese los días de vacaciones';
+      }
+      break;
+
+    case 'incapacidad':
+      if (dias && dias > 0 && subtipo) {
+        const salarioDiario = salarioBase / 30;
+        
+        if (subtipo === 'general') {
+          const diasPagados = Math.max(0, dias - 3);
+          if (diasPagados > 0) {
+            valor = Math.round(salarioDiario * 0.667 * diasPagados);
+            factorCalculo = 0.667;
+            detalleCalculo = `Incapacidad general: (${salarioBase.toLocaleString()} / 30) × 66.7% × ${diasPagados} días (desde día 4) = ${valor.toLocaleString()}`;
+          } else {
+            detalleCalculo = 'Incapacidad general: EPS paga desde el día 4';
+          }
+        } else if (subtipo === 'laboral') {
+          valor = Math.round(salarioDiario * dias);
+          factorCalculo = 1;
+          detalleCalculo = `Incapacidad laboral: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
+        } else if (subtipo === 'maternidad') {
+          valor = Math.round(salarioDiario * dias);
+          factorCalculo = 1;
+          detalleCalculo = `Incapacidad maternidad: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
+        }
+      } else {
+        detalleCalculo = 'Ingrese días y seleccione tipo de incapacidad';
+      }
+      break;
+
+    case 'licencia_remunerada':
+      if (dias && dias > 0) {
+        const salarioDiario = salarioBase / 30;
+        valor = Math.round(salarioDiario * dias);
+        factorCalculo = 1;
+        detalleCalculo = `Licencia remunerada: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+      } else {
+        detalleCalculo = 'Ingrese los días de licencia';
+      }
+      break;
+
+    case 'licencia_no_remunerada':
+      valor = 0;
+      factorCalculo = 0;
+      if (dias && dias > 0) {
+        detalleCalculo = `Licencia no remunerada: ${dias} días sin remuneración (Art. 51 CST). Suspende acumulación de prestaciones sociales.`;
+      } else {
+        detalleCalculo = 'Licencia no remunerada: Sin remuneración por definición legal';
+      }
+      break;
+
+    case 'ausencia':
+      if (dias && dias > 0) {
+        const salarioDiario = salarioBase / 30;
+        valor = Math.round(salarioDiario * dias);
+        factorCalculo = 1;
+        
+        let tipoAusencia = '';
+        switch (subtipo) {
+          case 'injustificada':
+            tipoAusencia = 'Ausencia injustificada';
+            break;
+          case 'abandono_puesto':
+            tipoAusencia = 'Abandono del puesto';
+            break;
+          case 'suspension_disciplinaria':
+            tipoAusencia = 'Suspensión disciplinaria';
+            break;
+          case 'tardanza_excesiva':
+            tipoAusencia = 'Tardanza excesiva';
+            break;
+          default:
+            tipoAusencia = 'Ausencia';
+        }
+        
+        detalleCalculo = `${tipoAusencia}: Descuento de (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()} (Art. 57 CST)`;
+      } else {
+        detalleCalculo = 'Ingrese los días de ausencia injustificada';
+      }
+      break;
+
+    case 'bonificacion':
+    case 'comision':
+    case 'prima':
+    case 'otros_ingresos':
+      detalleCalculo = 'Ingrese el valor manualmente para este tipo de novedad';
+      break;
+
+    case 'fondo_solidaridad':
+      if (salarioBase >= (DEFAULT_CONFIG_2025.salarioMinimo * 4)) {
+        valor = Math.round(salarioBase * 0.01);
+        factorCalculo = 0.01;
+        detalleCalculo = `Fondo de solidaridad: ${salarioBase.toLocaleString()} × 1% = ${valor.toLocaleString()}`;
+      } else {
+        detalleCalculo = 'Fondo de solidaridad aplica para salarios >= 4 SMMLV';
+      }
+      break;
+
+    default:
+      detalleCalculo = 'Tipo de novedad no reconocido';
+  }
+
+  return {
+    valor,
+    factorCalculo,
+    detalleCalculo,
+    jornadaInfo: {
+      horasSemanales: jornadaLegal.horasSemanales,
+      horasMensuales: Math.round(jornadaLegal.horasMensuales),
+      divisorHorario,
+      valorHoraOrdinaria: Math.round(salarioBase / divisorHorario),
+      ley: jornadaLegal.ley,
+      descripcion: jornadaLegal.descripcion
+    }
+  };
 }
 
 function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: string) {
@@ -136,7 +349,6 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
     errors.push('Los días trabajados no pueden ser negativos');
   }
 
-  // Validación mejorada de horas extra con jornada legal dinámica
   const maxHorasExtraSemanales = jornadaLegal.horasSemanales * 0.25;
   let horasExtraSemanalesEstimadas: number;
   
@@ -194,47 +406,31 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const jornadaLegal = getJornadaLegal(periodDate);
   const hourlyDivisor = getHourlyDivisor(periodDate);
   
-  console.log(`🔧 EDGE FUNCTION ALELUYA - Período: ${input.periodType}, Días: ${input.workedDays}`);
+  console.log(`🔧 EDGE FUNCTION - Período: ${input.periodType}, Días: ${input.workedDays}`);
   
-  // ✅ CORRECCIÓN ALELUYA: Cálculo proporcional exacto
-  const dailySalary = input.baseSalary / 30; // Siempre usar 30 como Aleluya
+  const dailySalary = input.baseSalary / 30;
   const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
   const regularPay = Math.round(dailySalary * effectiveWorkedDays);
 
-  // Usar divisor horario dinámico basado en jornada legal
   const hourlyRate = input.baseSalary / hourlyDivisor;
   const extraPay = Math.round(input.extraHours * hourlyRate * 1.25);
 
-  // ✅ CORRECCIÓN ALELUYA: Auxilio de transporte proporcional
   let transportAllowance = 0;
   if (input.baseSalary <= (config.salarioMinimo * 2)) {
     const dailyTransportAllowance = config.auxilioTransporte / 30;
     transportAllowance = Math.round(dailyTransportAllowance * input.workedDays);
   }
 
-  // Total devengado
-  const grossPay = regularPay + extraPay + input.bonuses + transportAllowance;
-
-  // ✅ CORRECCIÓN ALELUYA: Deducciones solo sobre salario proporcional (sin auxilio)
-  const payrollBase = regularPay + extraPay + input.bonuses; // Sin auxilio de transporte
+  const grossSalary = regularPay + extraPay + input.bonuses;
+  const grossPay = grossSalary + transportAllowance;
+  
+  const payrollBase = regularPay + extraPay + input.bonuses;
   const healthDeduction = Math.round(payrollBase * config.porcentajes.saludEmpleado);
   const pensionDeduction = Math.round(payrollBase * config.porcentajes.pensionEmpleado);
   const totalDeductions = healthDeduction + pensionDeduction;
 
   const netPay = grossPay - totalDeductions;
 
-  console.log(`💰 EDGE FUNCTION ALELUYA - Resultado:`, {
-    regularPay,
-    transportAllowance,
-    grossPay,
-    payrollBase,
-    healthDeduction,
-    pensionDeduction,
-    totalDeductions,
-    netPay
-  });
-
-  // Aportes del empleador (sobre base sin auxilio)
   const employerHealth = Math.round(payrollBase * config.porcentajes.saludEmpleador);
   const employerPension = Math.round(payrollBase * config.porcentajes.pensionEmpleador);
   const employerArl = Math.round(payrollBase * config.porcentajes.arl);
@@ -264,7 +460,6 @@ function calculatePayroll(input: PayrollCalculationInput) {
     employerSena,
     employerContributions,
     totalPayrollCost,
-    // Información adicional sobre jornada legal
     jornadaInfo: {
       horasSemanales: jornadaLegal.horasSemanales,
       horasMensuales: Math.round(jornadaLegal.horasMensuales),
@@ -300,6 +495,13 @@ serve(async (req) => {
       case 'batch-calculate':
         const batchResults = data.inputs.map((input: PayrollCalculationInput) => calculatePayroll(input));
         return new Response(JSON.stringify({ success: true, data: batchResults }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      // ✅ NUEVO ENDPOINT: Calcular novedades
+      case 'calculate-novedad':
+        const novedadResult = calculateNovedad(data);
+        return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 

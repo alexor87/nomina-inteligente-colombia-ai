@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadType } from '@/types/novedades-enhanced';
-import { RecargosCalculationService } from '@/services/RecargosCalculationService';
+import { useNovedadBackendCalculation } from './useNovedadBackendCalculation';
 
 interface UseNovedadCalculationProps {
   employeeSalary: number;
@@ -17,9 +17,10 @@ interface UseNovedadCalculationProps {
 export const useNovedadCalculation = ({
   employeeSalary,
   periodoFecha,
-  calculateSuggestedValue
+  calculateSuggestedValue // ⚠️ DEPRECATED - mantenido por compatibilidad
 }: UseNovedadCalculationProps) => {
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
+  const { calculateNovedad, calculateNovedadDebounced, isLoading, error } = useNovedadBackendCalculation();
 
   const calculateValue = useCallback((
     tipoNovedad: NovedadType,
@@ -42,67 +43,33 @@ export const useNovedadCalculation = ({
       return null;
     }
 
-    // Recargos usando fecha del período para jornada legal correcta
-    if (tipoNovedad === 'recargo_nocturno' && subtipo && horas && horas > 0) {
-      try {
-        const result = RecargosCalculationService.calcularRecargo({
-          salarioBase: employeeSalary,
-          tipoRecargo: subtipo as any,
-          horas: horas,
-          fechaPeriodo: periodoFecha || new Date()
-        });
-        
-        console.log('📊 Recargo calculation result:', result.valorRecargo);
-        setCalculatedValue(result.valorRecargo);
-        return result.valorRecargo;
-      } catch (error) {
-        console.error('❌ Error in recargo calculation:', error);
-        setCalculatedValue(null);
-        return null;
+    // ✅ USAR BACKEND CALCULATION
+    calculateNovedadDebounced(
+      {
+        tipoNovedad,
+        subtipo,
+        salarioBase: employeeSalary,
+        horas: horas || undefined,
+        dias: dias || undefined,
+        fechaPeriodo: periodoFecha || new Date()
+      },
+      (result) => {
+        if (result) {
+          console.log('📊 Backend calculation result:', result.valor);
+          setCalculatedValue(result.valor);
+        } else {
+          setCalculatedValue(null);
+        }
       }
-    }
+    );
 
-    // Skip calculation if required inputs are missing
-    const requiresHours = ['horas_extra'].includes(tipoNovedad);
-    const requiresDays = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'ausencia'].includes(tipoNovedad);
-
-    if (requiresHours && (!horas || horas <= 0)) {
-      console.log('⏳ Waiting for hours input');
-      setCalculatedValue(null);
-      return null;
-    }
-
-    if (requiresDays && (!dias || dias <= 0)) {
-      console.log('⏳ Waiting for days input');
-      setCalculatedValue(null);
-      return null;
-    }
-
-    try {
-      if (calculateSuggestedValue) {
-        const result = calculateSuggestedValue(
-          tipoNovedad,
-          subtipo,
-          horas || undefined,
-          dias || undefined
-        );
-        
-        console.log('📊 Calculation result:', result);
-        setCalculatedValue(result);
-        return result;
-      }
-    } catch (error) {
-      console.error('❌ Error in calculation:', error);
-      setCalculatedValue(null);
-      return null;
-    }
-
-    setCalculatedValue(null);
-    return null;
-  }, [employeeSalary, periodoFecha, calculateSuggestedValue]);
+    return null; // El resultado llegará de forma asíncrona
+  }, [employeeSalary, periodoFecha, calculateNovedadDebounced]);
 
   return {
     calculatedValue,
-    calculateValue
+    calculateValue,
+    isLoading,
+    error
   };
 };

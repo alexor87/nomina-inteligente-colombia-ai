@@ -1,338 +1,197 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Trash2, Calendar, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useMultipleNovedadEntries } from '@/hooks/useMultipleNovedadEntries';
-
-interface VacacionesEntry {
-  id: string;
-  tipo_novedad: string;
-  dias: number;
-  fecha_inicio: string;
-  fecha_fin: string;
-  valor: number;
-  observacion?: string;
-}
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface NovedadVacacionesConsolidatedFormProps {
   onBack: () => void;
-  onSubmit: (formDataArray: any[]) => void;
+  onSubmit: (formData: any) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (
-    tipoNovedad: string,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => number | null;
+  isSubmitting?: boolean;
 }
 
 export const NovedadVacacionesConsolidatedForm: React.FC<NovedadVacacionesConsolidatedFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  calculateSuggestedValue
+  isSubmitting = false
 }) => {
-  const { entries, addEntry, updateEntry, removeEntry, getTotalValue } = useMultipleNovedadEntries<VacacionesEntry>();
-  
-  const [newEntry, setNewEntry] = useState({
+  const [formData, setFormData] = useState({
     dias: '',
     fecha_inicio: '',
     fecha_fin: '',
-    valor: '',
+    valor: 0,
     observacion: ''
   });
 
-  const calculateValueForEntry = (dias: number) => {
-    if (calculateSuggestedValue) {
-      return calculateSuggestedValue('vacaciones', undefined, undefined, dias);
-    }
-    return null;
-  };
+  const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
 
-  const calculateDaysBetweenDates = (startDate: string, endDate: string): number => {
-    if (!startDate || !endDate) return 0;
-    
-    // Parsear fechas como fechas locales para evitar problemas de UTC
-    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
-    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
-    
-    // Crear fechas usando constructor local (mes es 0-indexado)
-    const start = new Date(startYear, startMonth - 1, startDay);
-    const end = new Date(endYear, endMonth - 1, endDay);
-    
-    // Calcular diferencia en milisegundos y convertir a días
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
-    
-    console.log('📅 Vacaciones - Calculating days:', { startDate, endDate, diffDays });
-    return Math.max(0, diffDays);
-  };
+  // Calcular valor automáticamente cuando cambien los días
+  useEffect(() => {
+    const calculateVacationValue = async () => {
+      if (formData.dias && parseInt(formData.dias) > 0) {
+        console.log('🔄 Calculating vacation value via backend');
+        
+        try {
+          const result = await calculateNovedad({
+            tipoNovedad: 'vacaciones',
+            salarioBase: employeeSalary,
+            dias: parseInt(formData.dias)
+          });
 
-  const handleAddEntry = () => {
-    if (!newEntry.fecha_inicio || !newEntry.fecha_fin) {
-      alert('Por favor seleccione las fechas de inicio y fin');
-      return;
-    }
-
-    const calculatedDays = newEntry.dias ? parseInt(newEntry.dias) : calculateDaysBetweenDates(newEntry.fecha_inicio, newEntry.fecha_fin);
-    
-    if (calculatedDays <= 0) {
-      alert('Los días de vacaciones deben ser mayor a 0');
-      return;
-    }
-
-    if (calculatedDays > 15) {
-      if (!window.confirm(`Las vacaciones exceden 15 días hábiles (${calculatedDays} días). ¿Desea continuar?`)) {
-        return;
+          if (result) {
+            console.log('💰 Applying calculated vacation value:', result.valor);
+            setFormData(prev => ({ ...prev, valor: result.valor }));
+          }
+        } catch (error) {
+          console.error('❌ Error calculating vacation value:', error);
+        }
+      } else {
+        setFormData(prev => ({ ...prev, valor: 0 }));
       }
+    };
+
+    calculateVacationValue();
+  }, [formData.dias, employeeSalary, calculateNovedad]);
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = () => {
+    if (!formData.dias || parseInt(formData.dias) <= 0) {
+      alert('Por favor ingrese los días de vacaciones');
+      return;
     }
 
-    const calculatedValue = calculateValueForEntry(calculatedDays);
-    const valor = newEntry.valor ? parseFloat(newEntry.valor) : (calculatedValue || 0);
+    if (!formData.fecha_inicio) {
+      alert('Por favor seleccione la fecha de inicio');
+      return;
+    }
 
-    if (valor <= 0) {
+    if (!formData.fecha_fin) {
+      alert('Por favor seleccione la fecha de fin');
+      return;
+    }
+
+    if (formData.valor <= 0) {
       alert('El valor debe ser mayor a 0');
       return;
     }
 
-    addEntry({
+    const submitData = {
       tipo_novedad: 'vacaciones',
-      dias: calculatedDays,
-      fecha_inicio: newEntry.fecha_inicio,
-      fecha_fin: newEntry.fecha_fin,
-      valor: valor,
-      observacion: newEntry.observacion || undefined
-    });
+      dias: parseInt(formData.dias),
+      fecha_inicio: formData.fecha_inicio,
+      fecha_fin: formData.fecha_fin,
+      valor: formData.valor,
+      observacion: formData.observacion || undefined
+    };
 
-    // Reset form
-    setNewEntry({
-      dias: '',
-      fecha_inicio: '',
-      fecha_fin: '',
-      valor: '',
-      observacion: ''
-    });
+    console.log('📤 Submitting vacation data:', submitData);
+    onSubmit(submitData);
   };
-
-  const handleSubmit = () => {
-    if (entries.length === 0) {
-      alert('Agregue al menos un período de vacaciones');
-      return;
-    }
-
-    const totalDays = entries.reduce((sum, entry) => sum + entry.dias, 0);
-    if (totalDays > 30) {
-      if (!window.confirm(`El total de días de vacaciones (${totalDays}) excede 30 días por año. ¿Desea continuar?`)) {
-        return;
-      }
-    }
-
-    const formDataArray = entries.map(entry => ({
-      tipo_novedad: 'vacaciones',
-      dias: entry.dias,
-      fecha_inicio: entry.fecha_inicio,
-      fecha_fin: entry.fecha_fin,
-      valor: entry.valor,
-      observacion: entry.observacion
-    }));
-
-    onSubmit(formDataArray);
-  };
-
-  const totalValue = getTotalValue();
-  const totalDays = entries.reduce((sum, entry) => sum + entry.dias, 0);
-
-  // 🔧 CORRECCIÓN: Recálculo automático cuando cambien fechas o días
-  React.useEffect(() => {
-    if (newEntry.fecha_inicio && newEntry.fecha_fin) {
-      const calculatedDays = calculateDaysBetweenDates(newEntry.fecha_inicio, newEntry.fecha_fin);
-      if (calculatedDays > 0) {
-        console.log('🔄 Auto-actualizando días calculados:', calculatedDays);
-        setNewEntry(prev => ({ ...prev, dias: calculatedDays.toString() }));
-        
-        // Auto-calcular valor
-        const calculatedValue = calculateValueForEntry(calculatedDays);
-        if (calculatedValue && calculatedValue > 0) {
-          console.log('🔄 Auto-actualizando valor calculado:', calculatedValue);
-          setNewEntry(prev => ({ ...prev, valor: calculatedValue.toString() }));
-        }
-      }
-    } else if (newEntry.dias && parseInt(newEntry.dias) > 0) {
-      // Si se cambian los días manualmente, recalcular valor
-      const dias = parseInt(newEntry.dias);
-      const calculatedValue = calculateValueForEntry(dias);
-      if (calculatedValue && calculatedValue > 0) {
-        console.log('🔄 Auto-actualizando valor por días manuales:', calculatedValue);
-        setNewEntry(prev => ({ ...prev, valor: calculatedValue.toString() }));
-      }
-    }
-  }, [newEntry.fecha_inicio, newEntry.fecha_fin, newEntry.dias, employeeSalary, calculateSuggestedValue]);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b bg-white">
+      <div className="flex items-center gap-3 pb-4 border-b">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold text-gray-900">Vacaciones</h3>
+        <h3 className="text-lg font-semibold">Vacaciones</h3>
       </div>
 
-      {/* Form to add new entry */}
-      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
-        <h4 className="text-blue-800 font-medium">Agregar Período de Vacaciones</h4>
-        
+      <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="fecha_inicio" className="text-gray-700">Fecha Inicio</Label>
+          <div className="space-y-2">
+            <Label>Fecha Inicio *</Label>
             <Input
               type="date"
-              value={newEntry.fecha_inicio}
-              onChange={(e) => setNewEntry(prev => ({ ...prev, fecha_inicio: e.target.value }))}
+              value={formData.fecha_inicio}
+              onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
             />
           </div>
 
-          <div>
-            <Label htmlFor="fecha_fin" className="text-gray-700">Fecha Fin</Label>
+          <div className="space-y-2">
+            <Label>Fecha Fin *</Label>
             <Input
               type="date"
-              value={newEntry.fecha_fin}
-              onChange={(e) => setNewEntry(prev => ({ ...prev, fecha_fin: e.target.value }))}
+              value={formData.fecha_fin}
+              onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
             />
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="dias" className="text-gray-700">Días de Vacaciones</Label>
+        <div className="space-y-2">
+          <Label>Días de Vacaciones *</Label>
           <Input
             type="number"
-            placeholder="0"
-            value={newEntry.dias}
-            onChange={(e) => setNewEntry(prev => ({ ...prev, dias: e.target.value }))}
             min="1"
             max="15"
-          />
-          <div className="text-xs text-gray-500 mt-1">
-            Máximo 15 días hábiles por período. Se calcula automáticamente según las fechas.
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="valor" className="text-gray-700">Valor</Label>
-          <Input
-            type="number"
+            value={formData.dias}
+            onChange={(e) => handleInputChange('dias', e.target.value)}
             placeholder="0"
-            value={newEntry.valor}
-            onChange={(e) => setNewEntry(prev => ({ ...prev, valor: e.target.value }))}
-            min="0"
-            step="1000"
           />
-          {newEntry.valor && parseFloat(newEntry.valor) > 0 && (
-            <div className="mt-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                {formatCurrency(parseFloat(newEntry.valor))}
-              </Badge>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="observacion" className="text-gray-700">Observaciones</Label>
-          <Textarea
-            placeholder="Período de vacaciones, resolución, etc..."
-            value={newEntry.observacion}
-            onChange={(e) => setNewEntry(prev => ({ ...prev, observacion: e.target.value }))}
-            rows={2}
-            className="resize-none"
-          />
-        </div>
-
-        <Button 
-          onClick={handleAddEntry}
-          disabled={!newEntry.fecha_inicio || !newEntry.fecha_fin}
-          className="w-full bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Período
-        </Button>
-      </div>
-
-      {/* List of added entries */}
-      {entries.length > 0 && (
-        <div className="space-y-4">
-          <h4 className="font-medium text-gray-900">Períodos de Vacaciones Agregados ({entries.length})</h4>
-          
-          <div className="space-y-2">
-            {entries.map((entry) => {
-              return (
-                <div key={entry.id} className="flex justify-between items-start p-3 border rounded-lg bg-white">
-                  <div className="flex-1">
-                    <div className="font-medium flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      {entry.dias} días de vacaciones
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {entry.fecha_inicio} al {entry.fecha_fin}
-                    </div>
-                    <div className="text-sm font-medium text-green-600">
-                      {formatCurrency(entry.valor)}
-                    </div>
-                    {entry.observacion && (
-                      <div className="text-xs text-gray-500 mt-1">{entry.observacion}</div>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeEntry(entry.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              );
-            })}
+          <div className="text-xs text-gray-500">
+            Máximo 15 días hábiles por período
           </div>
+        </div>
 
-          {/* Total */}
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="flex justify-between items-center font-semibold">
-              <span>Total Vacaciones:</span>
-              <div className="text-right">
-                <div className="text-xl font-bold text-blue-700">
-                  {formatCurrency(totalValue)}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {totalDays} días totales
-                </div>
-              </div>
+        {/* Valor calculado automáticamente */}
+        {(formData.valor > 0 || isCalculating) && (
+          <div className="flex items-center justify-between bg-green-50 p-3 rounded">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-700">
+                {isCalculating ? 'Calculando valor...' : 'Valor calculado automáticamente:'}
+              </span>
             </div>
-            
-            {totalDays > 30 && (
-              <div className="mt-2 p-2 bg-amber-50 rounded text-amber-700 text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                El total excede 30 días anuales de vacaciones
-              </div>
+            {!isCalculating && (
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                {formatCurrency(formData.valor)}
+              </Badge>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Actions */}
+        <div className="space-y-2">
+          <Label>Observaciones</Label>
+          <Textarea
+            value={formData.observacion}
+            onChange={(e) => handleInputChange('observacion', e.target.value)}
+            placeholder="Período de vacaciones, resolución, etc..."
+            rows={3}
+          />
+        </div>
+
+        {/* Preview */}
+        {formData.valor > 0 && !isCalculating && (
+          <div className="p-3 bg-gray-50 rounded text-center">
+            <Badge variant="default" className="text-sm px-3 py-1">
+              +{formatCurrency(formData.valor)}
+            </Badge>
+            <div className="text-xs text-gray-500 mt-1">
+              {formData.dias} días de vacaciones
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack}>
           Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={entries.length === 0}
-          className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+          disabled={!formData.dias || !formData.fecha_inicio || !formData.fecha_fin || formData.valor <= 0 || isCalculating || isSubmitting}
         >
-          Guardar {entries.length} Período{entries.length !== 1 ? 's' : ''} de Vacaciones
+          {isSubmitting ? 'Guardando...' : 'Guardar Vacaciones'}
         </Button>
       </div>
     </div>
