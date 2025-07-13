@@ -18,9 +18,9 @@ export class PayrollPDFService {
     const voucherData: VoucherData = {
       employee: {
         id: employee.id,
-        nombre: employee.nombre,
-        apellido: employee.apellido,
-        cedula: employee.cedula
+        nombre: employee.name, // Usar 'name' en lugar de 'nombre'
+        apellido: '', // PayrollEmployee no tiene apellido separado
+        cedula: employee.id // Usar ID como cedula temporal
       },
       period,
       company: companyInfo || {
