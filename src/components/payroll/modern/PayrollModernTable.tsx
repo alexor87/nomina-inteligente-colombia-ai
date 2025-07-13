@@ -1,406 +1,326 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { PayrollEmployee } from '@/types/payroll';
+import { Input } from '@/components/ui/input';
+import { Search, Filter, ChevronDown, ChevronUp, Plus, FileText, Download, Calculator, Users, DollarSign, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { 
-  Plus, 
-  UserPlus, 
-  MoreHorizontal, 
-  Calculator, 
-  FileText, 
-  Send, 
-  Trash2, 
-  DollarSign,
-  StickyNote,
-  X,
-  Edit
-} from 'lucide-react';
-import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
-import { EmployeeLiquidationModal } from '@/components/payroll/modals/EmployeeLiquidationModal';
-import { EmployeeCalculationModal } from '@/components/payroll/modals/EmployeeCalculationModal';
-import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
-import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
-import { EmployeeNotesModal } from '@/components/payroll/notes/EmployeeNotesModal';
-import { useNovedades } from '@/hooks/useNovedades';
-import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
-import { useEmployeeSelection } from '@/hooks/useEmployeeSelection';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
-import { calcularValorHoraExtra, getDailyHours, getHourlyDivisor } from '@/utils/jornadaLegal';
+import { usePayrollModern } from '@/hooks/usePayrollModern';
+import { PayrollEmployeeRow } from './PayrollEmployeeRow';
+import { PayrollModernFilters } from './PayrollModernFilters';
+import { PayrollModernStats } from './PayrollModernStats';
+import { PayrollEmployeeModern } from '@/types/payroll-modern';
+import { useToast } from '@/hooks/use-toast';
 
 interface PayrollModernTableProps {
-  employees: PayrollEmployee[];
-  onUpdateEmployee: (id: string, updates: Partial<PayrollEmployee>) => void;
-  onRecalculate: () => void;
-  isLoading: boolean;
-  canEdit: boolean;
-  periodoId: string;
-  onRefreshEmployees?: () => void;
-  onDeleteEmployee?: (id: string) => void;
-  onDeleteMultipleEmployees?: (employeeIds: string[]) => Promise<void>;
+  periodId: string;
 }
 
-type ActiveModal = 'novedades' | 'liquidation' | 'calculation' | 'voucherPreview' | 'voucherSend' | 'notes' | null;
+export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({ periodId }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [sortConfig, setSortConfig] = useState<{
+    field: keyof PayrollEmployeeModern;
+    direction: 'asc' | 'desc';
+  }>({
+    field: 'nombre',
+    direction: 'asc'
+  });
 
-export const PayrollModernTable: React.FC<PayrollModernTableProps> = ({
-  employees,
-  onUpdateEmployee,
-  onRecalculate,
-  isLoading,
-  canEdit,
-  periodoId,
-  onRefreshEmployees,
-  onDeleteEmployee,
-  onDeleteMultipleEmployees
-}) => {
-  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const { toast } = useToast();
 
   const {
-    selectedEmployees,
-    toggleEmployeeSelection,
-    toggleAllEmployees,
-    clearSelection
-  } = useEmployeeSelection();
+    employees,
+    isLoading,
+    error,
+    totals,
+    loadEmployees,
+    updateEmployee,
+    bulkUpdateEmployees,
+    exportPayroll,
+    refreshNovedades
+  } = usePayrollModern(periodId);
 
-  const {
-    createNovedad,
-    isLoading: novedadesLoading
-  } = useNovedades(periodoId);
-
-  const {
-    loadNovedadesTotals,
-    refreshEmployeeNovedades,
-    getEmployeeNovedades
-  } = usePayrollNovedades(periodoId);
-
-  // Cargar novedades al montar el componente
   useEffect(() => {
-    if (employees.length > 0) {
-      const employeeIds = employees.map(emp => emp.id);
-      loadNovedadesTotals(employeeIds);
+    if (periodId) {
+      loadEmployees();
     }
-  }, [employees, loadNovedadesTotals]);
+  }, [periodId, loadEmployees]);
 
-  const handleOpenModal = (modalType: ActiveModal, employee: PayrollEmployee) => {
-    console.log('🔓 Abriendo modal:', modalType, 'para empleado:', employee.name);
-    setActiveModal(modalType);
-    setSelectedEmployee(employee);
-  };
+  const filteredEmployees = useMemo(() => {
+    let filtered = employees.filter(emp =>
+      emp.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.cedula.includes(searchTerm)
+    );
 
-  const handleCloseModal = () => {
-    console.log('🔒 Cerrando modal:', activeModal);
-    setActiveModal(null);
-    setSelectedEmployee(null);
-  };
-
-  const handleCreateNovedad = async (data: CreateNovedadData) => {
-    if (!selectedEmployee) return;
-    
-    console.log('🔄 PayrollModernTable - Creating novedad with data:', data);
-    
-    const createData: CreateNovedadData = {
-      empleado_id: selectedEmployee.id,
-      periodo_id: periodoId,
-      ...data
-    };
-    
-    await createNovedad(createData, true);
-    
-    // Actualizar novedades para este empleado específico
-    await refreshEmployeeNovedades(selectedEmployee.id);
-    
-    // Trigger recalculation
-    onRecalculate();
-  };
-
-  const handleDeleteEmployee = async (employeeId: string) => {
-    if (onDeleteEmployee) {
-      await onDeleteEmployee(employeeId);
-      setShowDeleteConfirm(null);
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (onDeleteMultipleEmployees && selectedEmployees.length > 0) {
-      await onDeleteMultipleEmployees(selectedEmployees);
-      clearSelection();
-      setShowBulkDeleteConfirm(false);
-    }
-  };
-
-  const calculateSuggestedValue = (
-    tipo: string,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ): number | null => {
-    if (!selectedEmployee) return null;
-    
-    console.log('🧮 PayrollModernTable - Calculating suggested value:', {
-      tipo,
-      subtipo,
-      horas,
-      dias,
-      employeeSalary: selectedEmployee.baseSalary,
-      periodoId: periodoId
+    // Sort
+    filtered.sort((a, b) => {
+      const aValue = a[sortConfig.field];
+      const bValue = b[sortConfig.field];
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortConfig.direction === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc' 
+          ? aValue - bValue 
+          : bValue - aValue;
+      }
+      
+      return 0;
     });
-    
-    const fechaPeriodo = new Date();
-    const salarioDiario = selectedEmployee.baseSalary / 30;
-    const valorHoraExtra = calcularValorHoraExtra(selectedEmployee.baseSalary, fechaPeriodo);
-    const valorHoraRecargo = selectedEmployee.baseSalary / 30 / 7.3333; // Fórmula correcta
-    
-    switch (tipo) {
-      case 'horas_extra':
-        if (!horas || !subtipo) return null;
-        // MULTIPLICADORES CORREGIDOS según especificación
-        const factors: Record<string, number> = {
-          'diurnas': 1.25,
-          'nocturnas': 1.75,
-          'dominicales_diurnas': 2.05,  // Corregido de 2.0 a 2.05
-          'dominicales_nocturnas': 2.55, // Corregido de 2.5 a 2.55
-          'festivas_diurnas': 2.05,     // Corregido de 2.0 a 2.05
-          'festivas_nocturnas': 2.55    // Corregido de 2.5 a 2.55
-        };
-        const result = Math.round(valorHoraExtra * factors[subtipo] * horas);
-        console.log(`💰 Overtime calculation: $${Math.round(valorHoraExtra)} × ${factors[subtipo]} × ${horas}h = $${result}`);
-        return result;
-        
-      case 'recargo_nocturno':
-        if (!horas || !subtipo) return null;
-        const recargoFactors: Record<string, number> = {
-          'nocturno': 0.35,
-          'dominical': 0.80,
-          'nocturno_dominical': 1.15,
-          'festivo': 0.75,
-          'nocturno_festivo': 1.10
-        };
-        const recargoResult = Math.round(valorHoraRecargo * recargoFactors[subtipo] * horas);
-        console.log(`💰 Recargo calculation: $${Math.round(valorHoraRecargo)} × ${recargoFactors[subtipo]} × ${horas}h = $${recargoResult}`);
-        return recargoResult;
-        
-      case 'vacaciones':
-        if (!dias) return null;
-        return Math.round(salarioDiario * dias);
-        
-      case 'incapacidad':
-        if (!dias || !subtipo) return null;
-        const percentages: Record<string, number> = {
-          'comun': 0.667,
-          'laboral': 1.0,
-          'maternidad': 1.0
-        };
-        const diasPagados = subtipo === 'comun' ? Math.max(0, dias - 3) : dias;
-        return Math.round(salarioDiario * percentages[subtipo] * diasPagados);
-        
-      case 'licencia_remunerada':
-        if (!dias) return null;
-        return Math.round(salarioDiario * dias);
-        
-      case 'ausencia':
-        if (!dias) return null;
-        return Math.round(salarioDiario * dias);
-        
-      default:
-        return null;
+
+    return filtered;
+  }, [employees, searchTerm, sortConfig]);
+
+  const handleSort = (field: keyof PayrollEmployeeModern) => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const handleSelectRow = (employeeId: string) => {
+    setSelectedRows(prev => 
+      prev.includes(employeeId) 
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedRows.length === filteredEmployees.length) {
+      setSelectedRows([]);
+    } else {
+      setSelectedRows(filteredEmployees.map(emp => emp.id));
     }
   };
 
-  const allSelected = employees.length > 0 && employees.every(emp => selectedEmployees.includes(emp.id));
-  const someSelected = selectedEmployees.length > 0;
+  const handleBulkAction = async (action: string) => {
+    if (selectedRows.length === 0) {
+      toast({
+        title: "Selección requerida",
+        description: "Selecciona al menos un empleado",
+        variant: "destructive"
+      });
+      return;
+    }
 
-  if (employees.length === 0) {
+    try {
+      switch (action) {
+        case 'export':
+          await exportPayroll(selectedRows);
+          break;
+        case 'calculate':
+          await bulkUpdateEmployees(selectedRows);
+          break;
+        default:
+          break;
+      }
+      
+      toast({
+        title: "Acción completada",
+        description: `Se procesaron ${selectedRows.length} empleados`,
+      });
+      
+      setSelectedRows([]);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo completar la acción",
+        variant: "destructive"
+      });
+    }
+  };
+
+  if (isLoading) {
     return (
-      <div className="bg-white min-h-96">
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-            <UserPlus className="w-8 h-8 text-gray-400" />
+      <div className="space-y-4">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded mb-4"></div>
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
           </div>
-          <h3 className="text-xl font-medium text-gray-900 mb-2">
-            No has agregado personas
-          </h3>
-          <p className="text-gray-500 mb-8 text-center max-w-md">
-            Para liquidar tu primera nómina debes agregar al menos una persona
-          </p>
         </div>
       </div>
     );
   }
 
-  // Get period info for modals
-  const periodInfo = {
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-    type: 'mensual'
-  };
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-red-600">
+            <p>Error cargando la nómina: {error.message}</p>
+            <Button onClick={() => loadEmployees()} variant="outline" className="mt-4">
+              Reintentar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <>
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="w-12 px-4 py-3">
-                <Checkbox
-                  checked={employees.length > 0 && selectedEmployees.length === employees.length}
-                  onCheckedChange={() => toggleAllEmployees(employees.map(e => e.id))}
+    <div className="space-y-6">
+      {/* Stats */}
+      <PayrollModernStats totals={totals} />
+
+      {/* Controls */}
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            <div className="flex items-center gap-4 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar empleado..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
                 />
-              </th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">
-                Empleado
-              </th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
-                Salario Base
-              </th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">
-                Novedades
-              </th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">
-                Neto a Pagar
-              </th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {employees.map((employee) => {
-              const novedades = getEmployeeNovedades(employee.id);
-              const hasNovedades = novedades.hasNovedades;
-              const novedadesValue = novedades.totalNeto;
+              </div>
               
-              return (
-                <tr key={employee.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <Checkbox
-                      checked={selectedEmployees.includes(employee.id)}
-                      onCheckedChange={() => toggleEmployeeSelection(employee.id)}
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="shrink-0"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filtros
+                {showFilters ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedRows.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {selectedRows.length} seleccionados
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkAction('calculate')}
+                  >
+                    <Calculator className="h-4 w-4 mr-1" />
+                    Calcular
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkAction('export')}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Exportar
+                  </Button>
+                </div>
+              )}
+              
+              <Button onClick={() => exportPayroll()}>
+                <FileText className="h-4 w-4 mr-2" />
+                Exportar Todo
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        {showFilters && (
+          <CardContent className="pt-0">
+            <PayrollModernFilters />
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="p-4 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedRows.length === filteredEmployees.length && filteredEmployees.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300"
                     />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>
-                      <div className="font-medium text-gray-900">{employee.name}</div>
-                      <div className="text-sm text-gray-500">{employee.position}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-gray-900">
-                    {formatCurrency(employee.baseSalary)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center space-x-2">
-                      {hasNovedades && (
-                        <div className="text-center">
-                          <div className={`text-sm font-medium ${
-                            novedadesValue >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {formatCurrency(novedadesValue)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {novedades.totalDevengos > 0 && `+${formatCurrency(novedades.totalDevengos)}`}
-                            {novedades.totalDeducciones > 0 && ` -${formatCurrency(novedades.totalDeducciones)}`}
-                          </div>
-                        </div>
+                  </th>
+                  <th 
+                    className="p-4 text-left font-medium text-gray-900 cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('nombre')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Empleado
+                      {sortConfig.field === 'nombre' && (
+                        sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenModal('novedades', employee)}
-                        className={`h-8 w-8 p-0 rounded-full border-dashed border-2 ${
-                          hasNovedades 
-                            ? 'border-purple-300 text-purple-600 hover:border-purple-500 hover:text-purple-700 hover:bg-purple-50'
-                            : 'border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50'
-                        }`}
-                        disabled={!canEdit}
-                      >
-                        {hasNovedades ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                      </Button>
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">
-                    {formatCurrency(employee.netPay + novedadesValue)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenModal('novedades', employee)}>
-                          <DollarSign className="mr-2 h-4 w-4" />
-                          Novedades
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenModal('liquidation', employee)}>
-                          <Calculator className="mr-2 h-4 w-4" />
-                          Liquidación
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenModal('notes', employee)}>
-                          <StickyNote className="mr-2 h-4 w-4" />
-                          Notas
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => setShowDeleteConfirm(employee.id)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
+                  </th>
+                  <th 
+                    className="p-4 text-right font-medium text-gray-900 cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('salarioBase')}
+                  >
+                    <div className="flex items-center justify-end gap-2">
+                      Salario Base
+                      {sortConfig.field === 'salarioBase' && (
+                        sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th className="p-4 text-right font-medium text-gray-900">Devengos</th>
+                  <th className="p-4 text-right font-medium text-gray-900">Deducciones</th>
+                  <th 
+                    className="p-4 text-right font-medium text-gray-900 cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('totalNeto')}
+                  >
+                    <div className="flex items-center justify-end gap-2">
+                      Neto a Pagar
+                      {sortConfig.field === 'totalNeto' && (
+                        sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th className="p-4 text-center font-medium text-gray-900">Estado</th>
+                  <th className="p-4 text-center font-medium text-gray-900">Acciones</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredEmployees.map((employee) => (
+                  <PayrollEmployeeRow
+                    key={employee.id}
+                    employee={employee}
+                    isSelected={selectedRows.includes(employee.id)}
+                    onSelect={() => handleSelectRow(employee.id)}
+                    onUpdate={updateEmployee}
+                    periodId={periodId}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      {/* Modales */}
-      {selectedEmployee && (
-        <>
-          <NovedadUnifiedModal
-            open={activeModal === 'novedades'}
-            setOpen={(open) => open ? setActiveModal('novedades') : handleCloseModal()}
-            employeeId={selectedEmployee.id}
-            employeeSalary={selectedEmployee.baseSalary}
-            periodId={periodoId}
-            onSubmit={handleCreateNovedad}
-            selectedNovedadType={null}
-            onClose={handleCloseModal}
-          />
-          
-          <EmployeeLiquidationModal
-            isOpen={activeModal === 'liquidation'}
-            onClose={handleCloseModal}
-            employee={selectedEmployee}
-            periodId={periodoId}
-            onUpdateEmployee={onUpdateEmployee}
-            canEdit={canEdit}
-          />
-
-          <EmployeeNotesModal
-            isOpen={activeModal === 'notes'}
-            onClose={handleCloseModal}
-            employeeId={selectedEmployee.id}
-            employeeName={selectedEmployee.name}
-            periodId={periodoId}
-            periodName={`Período ${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`}
-          />
-        </>
-      )}
-    </>
+          {filteredEmployees.length === 0 && (
+            <div className="text-center py-12">
+              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                No se encontraron empleados
+              </h3>
+              <p className="text-gray-600">
+                {searchTerm ? 'Intenta con otros términos de búsqueda' : 'No hay empleados en este período'}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };

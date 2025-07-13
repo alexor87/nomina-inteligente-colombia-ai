@@ -27,17 +27,18 @@ export interface BaseCalculoData {
   detalle_calculo: string;
 }
 
+// ✅ UNIFIED: Usar la misma interfaz que el servicio
 export interface CreateNovedadData {
   empleado_id: string;
   periodo_id: string;
-  company_id?: string;
+  company_id: string; // ✅ Required field
   tipo_novedad: NovedadType;
   subtipo?: string;
   fecha_inicio?: string;
   fecha_fin?: string;
   dias?: number;
   horas?: number;
-  valor: number;
+  valor: number; // ✅ Required field
   base_calculo?: BaseCalculoData;
   observacion?: string;
   adjunto_url?: string;

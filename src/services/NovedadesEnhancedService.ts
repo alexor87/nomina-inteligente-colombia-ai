@@ -17,7 +17,8 @@ export interface CreateNovedadData {
   fecha_fin?: string;
   base_calculo?: any;
   subtipo?: string;
-  company_id: string;
+  company_id: string; // ✅ Required field
+  constitutivo_salario?: boolean;
 }
 
 export interface PayrollNovedad {
@@ -42,6 +43,31 @@ export interface PayrollNovedad {
  * Implementación real para conectar con base de datos
  */
 export class NovedadesEnhancedService {
+  
+  // ✅ NUEVO: Método para obtener novedades por empresa y período
+  static async getNovedades(companyId: string, periodId: string): Promise<PayrollNovedad[]> {
+    try {
+      console.log(`🔍 Obteniendo novedades para empresa ${companyId} en período ${periodId}`);
+      
+      const { data: novedades, error } = await supabase
+        .from('payroll_novedades')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('periodo_id', periodId);
+
+      if (error) {
+        console.error('❌ Error obteniendo novedades:', error);
+        return [];
+      }
+
+      console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
+      return (novedades || []) as PayrollNovedad[];
+      
+    } catch (error) {
+      console.error('💥 Error crítico en getNovedades:', error);
+      return [];
+    }
+  }
   
   static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<PayrollNovedad[]> {
     try {
@@ -102,7 +128,8 @@ export class NovedadesEnhancedService {
         creado_por: (await supabase.auth.getUser()).data.user?.id,
         fecha_inicio: novedadData.fecha_inicio,
         fecha_fin: novedadData.fecha_fin,
-        base_calculo: novedadData.base_calculo
+        base_calculo: novedadData.base_calculo,
+        constitutivo_salario: novedadData.constitutivo_salario || false
       };
 
       const { data: novedad, error } = await supabase

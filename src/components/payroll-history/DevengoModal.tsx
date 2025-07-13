@@ -87,9 +87,10 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // ✅ Ensure valor is never undefined
-      const submitData = {
+      // ✅ Ensure all required fields are present
+      const submitData: CreateNovedadData = {
         ...formData,
+        company_id: companyId, // ✅ Ensure company_id is always present
         valor: formData.valor || 0
       };
       
@@ -119,9 +120,10 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
   const handleUpdate = async () => {
     setIsSubmitting(true);
     try {
-      // ✅ Ensure valor is never undefined
-      const updateData = {
+      // ✅ Ensure all required fields are present
+      const updateData: CreateNovedadData = {
         ...formData,
+        company_id: companyId, // ✅ Ensure company_id is always present
         valor: formData.valor || 0
       };
       

@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 
@@ -127,8 +128,9 @@ class NovedadesCalculationServiceClass {
     try {
       console.log(`📋 Fetching novedades for employee ${employeeId} in period ${periodId}`);
       
+      // ✅ FIXED: Use correct table name 'payroll_novedades'
       const { data, error } = await supabase
-        .from('payroll_novedades_enhanced')
+        .from('payroll_novedades')
         .select('*')
         .eq('empleado_id', employeeId)
         .eq('periodo_id', periodId)

@@ -1,20 +1,34 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './use-toast';
 
-export const useNovedades = (companyId: string, periodId?: string) => {
+export const useNovedades = (periodId: string) => {
   const [novedades, setNovedades] = useState<PayrollNovedad[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // ✅ FIXED: Updated to match actual service method signature
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['novedades', companyId, periodId],
+    queryKey: ['novedades', periodId],
     queryFn: async () => {
-      if (!companyId || !periodId) return [];
+      if (!periodId) return [];
       try {
-        const novedades = await NovedadesEnhancedService.getNovedades(companyId, periodId);
+        // Get company ID from user profile
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (!profile?.company_id) return [];
+
+        const novedades = await NovedadesEnhancedService.getNovedades(profile.company_id, periodId);
         setNovedades(novedades);
         return novedades;
       } catch (error) {
@@ -27,19 +41,34 @@ export const useNovedades = (companyId: string, periodId?: string) => {
         return [];
       }
     },
-    enabled: !!companyId && !!periodId,
+    enabled: !!periodId,
   });
 
   const createNovedad = useCallback(async (data: CreateNovedadData) => {
-    if (!companyId) {
+    // ✅ FIXED: Ensure company_id is present
+    if (!data.company_id) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (profile?.company_id) {
+          data.company_id = profile.company_id;
+        }
+      }
+    }
+
+    if (!data.company_id) {
       throw new Error('Company ID is required');
     }
 
     try {
-      // ✅ Ensure all required fields are present and handle constitutivo_salario
+      // ✅ Ensure all required fields are present
       const createData: CreateNovedadData = {
         ...data,
-        company_id: companyId,
         valor: data.valor || 0, // Ensure valor is never undefined
         constitutivo_salario: data.constitutivo_salario || false // Provide default value
       };
@@ -57,7 +86,7 @@ export const useNovedades = (companyId: string, periodId?: string) => {
       console.error('Error creating novedad:', error);
       return { success: false, error: error.message };
     }
-  }, [companyId, refetch]);
+  }, [refetch]);
 
   const updateNovedad = useCallback(async (id: string, data: CreateNovedadData) => {
     try {
@@ -86,6 +115,37 @@ export const useNovedades = (companyId: string, periodId?: string) => {
     }
   }, [refetch]);
 
+  // ✅ ADDED: Missing method that components expect
+  const loadIntegratedNovedades = useCallback(async (employeeId: string) => {
+    try {
+      if (!periodId) return [];
+      
+      const novedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
+      
+      // Transform to expected format
+      return novedades.map(novedad => ({
+        id: novedad.id,
+        tipo_novedad: novedad.tipo_novedad,
+        valor: novedad.valor || 0,
+        dias: novedad.dias,
+        horas: novedad.horas,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        observacion: novedad.observacion,
+        origen: 'novedades' as const,
+        isConfirmed: true,
+        badgeLabel: 'Novedad',
+        badgeIcon: '📋',
+        badgeColor: 'bg-blue-100 text-blue-800',
+        status: 'registrada',
+        statusColor: 'text-blue-600'
+      }));
+    } catch (error) {
+      console.error('Error loading integrated novedades:', error);
+      return [];
+    }
+  }, [periodId]);
+
   return {
     novedades,
     isLoading,
@@ -93,6 +153,7 @@ export const useNovedades = (companyId: string, periodId?: string) => {
     createNovedad,
     updateNovedad,
     deleteNovedad,
-    refetch
+    refetch,
+    loadIntegratedNovedades
   };
 };

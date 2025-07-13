@@ -1,8 +1,10 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
+import { supabase } from '@/integrations/supabase/client';
 
 export const usePayrollNovedadesUnified = (periodId: string) => {
   const [novedadesTotals, setNovedadesTotals] = useState<Record<string, NovedadesTotals>>({});
@@ -64,14 +66,34 @@ export const usePayrollNovedadesUnified = (periodId: string) => {
     try {
       console.log(`🚀 Creating ${novedadesArray.length} novelties`);
       
+      // Get company_id if not provided
+      let companyId = novedadesArray[0]?.company_id;
+      if (!companyId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single();
+          companyId = profile?.company_id;
+        }
+      }
+
+      if (!companyId) {
+        throw new Error('No se pudo determinar la empresa');
+      }
+      
       // Crear cada novedad
       for (const novedadData of novedadesArray) {
         const createData: CreateNovedadData = {
           ...novedadData,
           periodo_id: periodId,
+          company_id: companyId, // ✅ Ensure company_id is always present
           valor: Number(novedadData.valor) || 0, // ✅ Ensure valor is always a number
           horas: novedadData.horas ? Number(novedadData.horas) : undefined,
-          dias: novedadData.dias ? Number(novedadData.dias) : undefined
+          dias: novedadData.dias ? Number(novedadData.dias) : undefined,
+          constitutivo_salario: novedadData.constitutivo_salario || false
         };
 
         console.log('💾 Creating novelty:', createData);
