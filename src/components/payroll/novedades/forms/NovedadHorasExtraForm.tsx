@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Calculator, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { getJornadaLegal, getDailyHours } from '@/utils/jornadaLegal';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface NovedadHorasExtraFormProps {
   onBack: () => void;
   onSubmit: (data: any) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number) => number | null;
+  periodoFecha?: Date;
+  calculateSuggestedValue?: never; // ⚠️ ELIMINADO - ya no se usa
 }
 
 const horasExtraSubtipos = [
@@ -29,7 +30,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  calculateSuggestedValue
+  periodoFecha
 }) => {
   const [subtipo, setSubtipo] = useState<string>('');
   const [horas, setHoras] = useState<string>('');
@@ -37,20 +38,37 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   const [valorManual, setValorManual] = useState<string>('');
   const [useManualValue, setUseManualValue] = useState(false);
   const [observacion, setObservacion] = useState<string>('');
+  
+  // ✅ SOLO BACKEND CALCULATION
+  const { calculateNovedad, isLoading } = useNovedadBackendCalculation();
 
-  // Get current legal workday info for display
-  const jornadaLegal = getJornadaLegal();
-  const horasPorDia = getDailyHours();
-
+  // ✅ BACKEND CALCULATION - eliminar completamente cálculos frontend
   useEffect(() => {
-    if (subtipo && horas && parseFloat(horas) > 0 && calculateSuggestedValue) {
-      const calculatedValue = calculateSuggestedValue('horas_extra', subtipo, parseFloat(horas));
-      if (calculatedValue && calculatedValue > 0) {
-        setValorCalculado(calculatedValue);
-        setUseManualValue(false);
-      }
+    if (subtipo && horas && parseFloat(horas) > 0) {
+      console.log('🔄 Calculating hours extra via backend:', { subtipo, horas: parseFloat(horas) });
+      
+      calculateNovedad({
+        tipoNovedad: 'horas_extra',
+        subtipo,
+        salarioBase: employeeSalary,
+        horas: parseFloat(horas),
+        fechaPeriodo: periodoFecha || new Date()
+      }).then(result => {
+        if (result && result.valor > 0) {
+          console.log('✅ Backend calculation result:', result.valor);
+          setValorCalculado(result.valor);
+          setUseManualValue(false);
+        } else {
+          setValorCalculado(0);
+        }
+      }).catch(error => {
+        console.error('❌ Error calculating via backend:', error);
+        setValorCalculado(0);
+      });
+    } else {
+      setValorCalculado(0);
     }
-  }, [subtipo, horas, calculateSuggestedValue]);
+  }, [subtipo, horas, employeeSalary, periodoFecha, calculateNovedad]);
 
   const handleSubmit = () => {
     const finalValue = useManualValue && valorManual ? parseFloat(valorManual) : valorCalculado;
@@ -64,7 +82,6 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
     });
   };
 
-  // More flexible validation - button enabled when basic fields are filled
   const isValid = subtipo && horas && parseFloat(horas) > 0 && (
     (valorCalculado > 0) || 
     (useManualValue && valorManual && parseFloat(valorManual) > 0)
@@ -82,13 +99,13 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
-      {/* Legal workday info */}
+      {/* Backend calculation info */}
       <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
         <div className="flex items-start gap-2 text-blue-700">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div className="text-sm">
-            <p className="font-medium">Jornada legal vigente: {jornadaLegal.horasSemanales} horas semanales</p>
-            <p>Horas por día: {horasPorDia.toFixed(2)} según {jornadaLegal.ley}</p>
+            <p className="font-medium">Cálculo automático con jornada legal dinámica</p>
+            <p>Los valores se calculan automáticamente en el backend usando la legislación vigente para la fecha del período.</p>
           </div>
         </div>
       </div>
@@ -127,52 +144,60 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           />
         </div>
 
-        {/* Value calculation section */}
-        <div className="space-y-3">
-          {valorCalculado > 0 && (
-            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-              <div className="flex items-center gap-2 text-green-700">
-                <Calculator className="h-4 w-4" />
-                <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
-              </div>
+        {/* Backend calculation result */}
+        {isLoading && (
+          <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div className="flex items-center gap-2 text-yellow-700">
+              <Calculator className="h-4 w-4 animate-spin" />
+              <span className="font-medium">Calculando en backend...</span>
             </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="useManualValue"
-              checked={useManualValue}
-              onChange={(e) => setUseManualValue(e.target.checked)}
-              className="rounded"
-            />
-            <Label htmlFor="useManualValue" className="text-sm">
-              Usar valor manual
-            </Label>
           </div>
+        )}
 
-          {useManualValue && (
-            <div>
-              <Label htmlFor="valorManual">Valor Manual</Label>
-              <Input
-                id="valorManual"
-                type="number"
-                placeholder="0"
-                value={valorManual}
-                onChange={(e) => setValorManual(e.target.value)}
-                min="0"
-              />
+        {valorCalculado > 0 && !isLoading && (
+          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+            <div className="flex items-center gap-2 text-green-700">
+              <Calculator className="h-4 w-4" />
+              <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
             </div>
-          )}
+            <div className="text-xs text-green-600 mt-1">Calculado con jornada legal dinámica</div>
+          </div>
+        )}
 
-          {finalValue > 0 && (
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-center gap-2 text-blue-700">
-                <span className="font-medium">Valor Final: {formatCurrency(finalValue)}</span>
-              </div>
-            </div>
-          )}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="useManualValue"
+            checked={useManualValue}
+            onChange={(e) => setUseManualValue(e.target.checked)}
+            className="rounded"
+          />
+          <Label htmlFor="useManualValue" className="text-sm">
+            Usar valor manual
+          </Label>
         </div>
+
+        {useManualValue && (
+          <div>
+            <Label htmlFor="valorManual">Valor Manual</Label>
+            <Input
+              id="valorManual"
+              type="number"
+              placeholder="0"
+              value={valorManual}
+              onChange={(e) => setValorManual(e.target.value)}
+              min="0"
+            />
+          </div>
+        )}
+
+        {finalValue > 0 && (
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center gap-2 text-blue-700">
+              <span className="font-medium">Valor Final: {formatCurrency(finalValue)}</span>
+            </div>
+          </div>
+        )}
 
         <div>
           <Label htmlFor="observacion">Observaciones (Opcional)</Label>
@@ -193,10 +218,10 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid}
+          disabled={!isValid || isLoading}
           className="min-w-[120px]"
         >
-          Agregar Novedad
+          {isLoading ? 'Calculando...' : 'Agregar Novedad'}
         </Button>
       </div>
     </div>

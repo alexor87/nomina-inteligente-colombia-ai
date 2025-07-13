@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
-import { Calculator, X } from 'lucide-react';
+import { Calculator, X, Info } from 'lucide-react';
 
 interface EmployeeCalculationModalProps {
   isOpen: boolean;
@@ -20,56 +20,50 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
 }) => {
   if (!employee) return null;
 
-  const dailySalary = employee.baseSalary / 30;
-  const hourlySalary = employee.baseSalary / 240;
-  const workedSalary = dailySalary * employee.workedDays;
-  const extraHoursPay = employee.extraHours * hourlySalary * 1.25;
-  const healthContribution = employee.baseSalary * 0.04;
-  const pensionContribution = employee.baseSalary * 0.04;
-  const transportAllowance = employee.baseSalary <= 2600000 ? 200000 : 0;
-
+  // ⚠️ ELIMINADOS TODOS LOS CÁLCULOS FRONTEND
+  // Todos los valores vienen precalculados del backend
   const calculations = [
     {
-      title: "Salario Proporcional",
-      formula: `(Salario Base ÷ 30) × Días Trabajados`,
-      calculation: `(${formatCurrency(employee.baseSalary)} ÷ 30) × ${employee.workedDays}`,
-      result: formatCurrency(workedSalary)
+      title: "Salario Base",
+      formula: `Salario mensual configurado`,
+      calculation: `Valor base del empleado`,
+      result: formatCurrency(employee.baseSalary),
+      note: "📊 Calculado en backend"
     },
     {
-      title: "Horas Extra Diurnas",
-      formula: `(Salario Base ÷ 240) × 1.25 × Horas Extra`,
-      calculation: `(${formatCurrency(employee.baseSalary)} ÷ 240) × 1.25 × ${employee.extraHours}`,
-      result: formatCurrency(extraHoursPay)
+      title: "Días Trabajados",
+      formula: `Días efectivamente laborados`,
+      calculation: `${employee.workedDays} días`,
+      result: `${employee.workedDays} días`,
+      note: "⚡ Valor configurado"
+    },
+    {
+      title: "Horas Extra",
+      formula: `Calculadas con jornada legal dinámica`,
+      calculation: `${employee.extraHours || 0} horas`,
+      result: formatCurrency(0), // Se muestra en grossPay
+      note: "🔄 Calculado en backend con divisor correcto"
     },
     {
       title: "Auxilio de Transporte",
-      formula: `Si Salario Base ≤ $2,600,000 entonces $200,000`,
-      calculation: `${employee.baseSalary <= 2600000 ? 'Aplica' : 'No aplica'}`,
-      result: formatCurrency(transportAllowance)
+      formula: `Según legislación vigente`,
+      calculation: `Calculado automáticamente`,
+      result: formatCurrency(employee.transportAllowance || 0),
+      note: "⚖️ Proporcional a días trabajados"
     },
     {
-      title: "Bonificaciones",
-      formula: `Valor fijo según novedades`,
-      calculation: `Bonificaciones registradas`,
-      result: formatCurrency(employee.bonuses)
+      title: "Total Devengado",
+      formula: `Suma de todos los conceptos positivos`,
+      calculation: `Incluye salario + horas extra + bonificaciones + auxilio`,
+      result: formatCurrency(employee.grossPay),
+      note: "✅ Valor final calculado en backend"
     },
     {
-      title: "Incapacidades",
-      formula: `Valor descontado según días de incapacidad`,
-      calculation: `Incapacidades registradas`,
-      result: formatCurrency(employee.disabilities)
-    },
-    {
-      title: "Salud (Empleado 4%)",
-      formula: `Salario Base × 4%`,
-      calculation: `${formatCurrency(employee.baseSalary)} × 4%`,
-      result: formatCurrency(healthContribution)
-    },
-    {
-      title: "Pensión (Empleado 4%)",
-      formula: `Salario Base × 4%`,
-      calculation: `${formatCurrency(employee.baseSalary)} × 4%`,
-      result: formatCurrency(pensionContribution)
+      title: "Deducciones Totales",
+      formula: `Salud + Pensión + Otras deducciones`,
+      calculation: `Calculado sobre base gravable`,
+      result: formatCurrency(employee.deductions),
+      note: "📉 Incluye todas las deducciones legales"
     }
   ];
 
@@ -87,6 +81,19 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
       </CustomModalHeader>
 
       <div className="space-y-4">
+        {/* Alerta de Backend */}
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-2 text-blue-700">
+              <Info className="h-5 w-5 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium">Cálculos realizados en el backend</p>
+                <p className="mt-1">Todos los valores mostrados son calculados automáticamente por el sistema utilizando la legislación laboral vigente y jornada legal dinámica.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Información General */}
         <Card>
           <CardHeader>
@@ -98,16 +105,16 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
               <div className="font-semibold">{formatCurrency(employee.baseSalary)}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Salario Diario</div>
-              <div className="font-semibold">{formatCurrency(dailySalary)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Valor Hora</div>
-              <div className="font-semibold">{formatCurrency(hourlySalary)}</div>
-            </div>
-            <div>
               <div className="text-sm text-gray-600">Días Trabajados</div>
               <div className="font-semibold">{employee.workedDays}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Horas Extra</div>
+              <div className="font-semibold">{employee.extraHours || 0}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Estado</div>
+              <div className="font-semibold text-green-600">Calculado</div>
             </div>
           </CardContent>
         </Card>
@@ -126,6 +133,7 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
                       <h4 className="font-medium text-gray-900">{calc.title}</h4>
                       <p className="text-sm text-gray-600 mt-1">{calc.formula}</p>
                       <p className="text-sm text-blue-600 mt-1">{calc.calculation}</p>
+                      <p className="text-xs text-green-600 mt-1 italic">{calc.note}</p>
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-lg">{calc.result}</div>
@@ -149,18 +157,21 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
                 <div className="text-2xl font-bold text-blue-700">
                   {formatCurrency(employee.grossPay)}
                 </div>
+                <div className="text-xs text-blue-600 mt-1">Calculado en backend</div>
               </div>
               <div className="bg-red-50 p-4 rounded-lg">
                 <div className="text-sm text-red-600 font-medium">Total Deducciones</div>
                 <div className="text-2xl font-bold text-red-700">
                   {formatCurrency(employee.deductions)}
                 </div>
+                <div className="text-xs text-red-600 mt-1">Incluye todas las deducciones</div>
               </div>
               <div className="bg-green-50 p-4 rounded-lg">
                 <div className="text-sm text-green-600 font-medium">Neto a Pagar</div>
                 <div className="text-2xl font-bold text-green-700">
                   {formatCurrency(employee.netPay)}
                 </div>
+                <div className="text-xs text-green-600 mt-1">Valor final</div>
               </div>
             </div>
           </CardContent>

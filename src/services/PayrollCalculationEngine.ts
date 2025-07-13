@@ -1,8 +1,8 @@
 
 /**
- * ✅ MOTOR DE CÁLCULOS DE NÓMINA - ARQUITECTURA CRÍTICA  
- * Motor de cálculos puro, sin efectos secundarios
- * Basado en legislación colombiana 2025
+ * ✅ MOTOR DE CÁLCULOS DE NÓMINA - SOLO BACKEND
+ * ⚠️ ELIMINADOS TODOS LOS CÁLCULOS FRONTEND
+ * Todos los cálculos ahora se realizan exclusivamente en el backend
  */
 
 export interface PayrollCalculationInput {
@@ -35,116 +35,51 @@ export interface PayrollCalculationResult {
 
 export class PayrollCalculationEngine {
   
-  // Constantes legales 2025
+  // Constantes legales 2025 - SOLO para referencia
   private static readonly SMMLV_2025 = 1300000;
   private static readonly TRANSPORT_ALLOWANCE_2025 = 162000;
-  private static readonly HEALTH_RATE = 0.04; // 4%
-  private static readonly PENSION_RATE = 0.04; // 4%
-  private static readonly EMPLOYER_HEALTH_RATE = 0.085; // 8.5%
-  private static readonly EMPLOYER_PENSION_RATE = 0.12; // 12%
-  private static readonly EMPLOYER_ARL_RATE = 0.00522; // 0.522%
 
   /**
-   * Calcular nómina completa para un empleado
+   * ⚠️ MÉTODO DEPRECADO - USAR BACKEND
+   * @deprecated Todos los cálculos se realizan ahora en el backend
    */
   async calculateEmployeePayroll(input: PayrollCalculationInput): Promise<PayrollCalculationResult> {
-    try {
-      console.log('🧮 Calculating payroll for:', input);
-      
-      // Cálculos base
-      const proportionalSalary = this.calculateProportionalSalary(
-        input.baseSalary, 
-        input.workedDays
-      );
-      
-      const extraHoursValue = input.extraHours ? 
-        this.calculateExtraHours(input.baseSalary, input.extraHours) : 0;
-      
-      const transportAllowance = this.calculateTransportAllowance(input.baseSalary);
-      
-      const grossSalary = proportionalSalary + extraHoursValue + (input.bonuses || 0);
-      const grossPay = grossSalary + transportAllowance;
-      
-      // Deducciones empleado
-      const healthDeduction = grossSalary * PayrollCalculationEngine.HEALTH_RATE;
-      const pensionDeduction = grossSalary * PayrollCalculationEngine.PENSION_RATE;
-      const totalDeductions = healthDeduction + pensionDeduction;
-      
-      // Aportes empleador
-      const employerHealth = grossSalary * PayrollCalculationEngine.EMPLOYER_HEALTH_RATE;
-      const employerPension = grossSalary * PayrollCalculationEngine.EMPLOYER_PENSION_RATE;
-      const employerARL = grossSalary * PayrollCalculationEngine.EMPLOYER_ARL_RATE;
-      const employerContributions = employerHealth + employerPension + employerARL;
-      
-      const netPay = grossPay - totalDeductions;
-
-      const result: PayrollCalculationResult = {
-        grossPay: Math.round(grossPay),
-        totalDeductions: Math.round(totalDeductions),
-        netPay: Math.round(netPay),
-        transportAllowance: Math.round(transportAllowance),
-        employerContributions: Math.round(employerContributions),
-        breakdown: {
-          salaryBase: Math.round(proportionalSalary),
-          extraHours: Math.round(extraHoursValue),
-          bonuses: Math.round(input.bonuses || 0),
-          transportAllowance: Math.round(transportAllowance),
-          healthEmployee: Math.round(healthDeduction),
-          pensionEmployee: Math.round(pensionDeduction),
-          totalGross: Math.round(grossSalary),
-          totalDeductions: Math.round(totalDeductions),
-          netPayable: Math.round(netPay)
-        }
-      };
-
-      console.log('✅ Calculation completed:', result);
-      return result;
-
-    } catch (error) {
-      console.error('❌ Error in payroll calculation:', error);
-      throw new Error('Error calculando nómina: ' + (error as Error).message);
-    }
+    console.error('❌ PayrollCalculationEngine.calculateEmployeePayroll está deprecado');
+    console.error('🔄 Usar PayrollCalculationEnhancedService o backend calculations');
+    
+    throw new Error('PayrollCalculationEngine deprecado. Usar backend calculations.');
   }
 
   /**
-   * Calcular salario proporcional según días trabajados
+   * ⚠️ MÉTODO DEPRECADO - USAR BACKEND
+   * @deprecated Usar backend para cálculos de salario proporcional
    */
   private calculateProportionalSalary(baseSalary: number, workedDays: number): number {
-    if (workedDays >= 30) return baseSalary;
-    return (baseSalary / 30) * workedDays;
+    console.error('❌ calculateProportionalSalary eliminado del frontend');
+    throw new Error('Usar backend para cálculos de salario proporcional');
   }
 
   /**
-   * Calcular valor de horas extra
+   * ⚠️ MÉTODO ELIMINADO - USAR BACKEND
+   * @deprecated Las horas extra se calculan exclusivamente en el backend con jornada legal dinámica
    */
   private calculateExtraHours(baseSalary: number, hours: number): number {
-    const hourlyRate = baseSalary / 240; // 240 horas mensuales (8h x 30 días)
-    const extraHourRate = hourlyRate * 1.25; // 25% adicional
-    return hours * extraHourRate;
+    console.error('❌ calculateExtraHours eliminado del frontend');
+    console.error('🔄 Usar useNovedadBackendCalculation para horas extra');
+    throw new Error('Cálculos de horas extra movidos al backend');
   }
 
   /**
-   * Calcular auxilio de transporte
+   * ⚠️ MÉTODO ELIMINADO - USAR BACKEND
+   * @deprecated Auxilio de transporte se calcula en el backend
    */
   private calculateTransportAllowance(baseSalary: number): number {
-    // Solo aplica para salarios hasta 2 SMMLV
-    if (baseSalary > (PayrollCalculationEngine.SMMLV_2025 * 2)) {
-      return 0;
-    }
-    return PayrollCalculationEngine.TRANSPORT_ALLOWANCE_2025;
+    console.error('❌ calculateTransportAllowance eliminado del frontend');
+    throw new Error('Usar backend para auxilio de transporte');
   }
 
   /**
-   * Calcular lote de empleados (para optimización)
-   */
-  async calculateBatch(inputs: PayrollCalculationInput[]): Promise<PayrollCalculationResult[]> {
-    return Promise.all(
-      inputs.map(input => this.calculateEmployeePayroll(input))
-    );
-  }
-
-  /**
-   * Validar datos de entrada
+   * Validar datos de entrada - ÚNICO método que permanece
    */
   static validateInput(input: PayrollCalculationInput): { valid: boolean; errors: string[] } {
     const errors: string[] = [];

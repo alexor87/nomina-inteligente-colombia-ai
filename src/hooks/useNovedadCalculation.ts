@@ -1,4 +1,11 @@
 
+/**
+ * ⚠️ HOOK COMPLETAMENTE DEPRECADO
+ * @deprecated Este hook ha sido eliminado completamente. 
+ * USAR useNovedadBackendCalculation en su lugar.
+ * Todos los cálculos ahora se realizan exclusivamente en el backend.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { useNovedadBackendCalculation } from './useNovedadBackendCalculation';
@@ -6,18 +13,12 @@ import { useNovedadBackendCalculation } from './useNovedadBackendCalculation';
 interface UseNovedadCalculationProps {
   employeeSalary: number;
   periodoFecha?: Date;
-  calculateSuggestedValue?: (
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => number | null;
+  calculateSuggestedValue?: never; // ⚠️ DEPRECATED - eliminado completamente
 }
 
 export const useNovedadCalculation = ({
   employeeSalary,
-  periodoFecha,
-  calculateSuggestedValue // ⚠️ DEPRECATED - mantenido por compatibilidad
+  periodoFecha
 }: UseNovedadCalculationProps) => {
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
   const { calculateNovedad, calculateNovedadDebounced, isLoading, error } = useNovedadBackendCalculation();
@@ -28,22 +29,15 @@ export const useNovedadCalculation = ({
     horas?: number | null,
     dias?: number | null
   ) => {
-    console.log('🧮 useNovedadCalculation - Calculating:', { 
-      tipoNovedad, 
-      subtipo, 
-      horas, 
-      dias, 
-      employeeSalary,
-      periodoFecha: periodoFecha?.toISOString().split('T')[0]
-    });
-
+    console.warn('⚠️ useNovedadCalculation está deprecado. Usar useNovedadBackendCalculation directamente.');
+    
     if (!employeeSalary || employeeSalary <= 0) {
       console.log('❌ Invalid salary for calculation');
       setCalculatedValue(null);
       return null;
     }
 
-    // ✅ USAR BACKEND CALCULATION
+    // ✅ SOLO BACKEND CALCULATION - sin cálculos frontend
     calculateNovedadDebounced(
       {
         tipoNovedad,
