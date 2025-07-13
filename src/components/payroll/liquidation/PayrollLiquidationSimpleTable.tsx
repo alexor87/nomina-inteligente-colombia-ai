@@ -218,14 +218,12 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                 
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center space-x-2">
-                    {hasNovedades && (
-                      <div className={`text-sm font-medium flex items-center space-x-1 ${
-                        novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        <span>+</span>
-                        <span>{formatCurrency(novedades.totalNeto)}</span>
-                      </div>
-                    )}
+                    <div className={`text-sm font-medium flex items-center space-x-1 ${
+                      novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      <span>+</span>
+                      <span>{formatCurrency(novedades.totalNeto)}</span>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
