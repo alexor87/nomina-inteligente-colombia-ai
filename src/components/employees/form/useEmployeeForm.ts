@@ -26,9 +26,21 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
   } = useEmployeeFormState();
 
   // Initialize form with defaults or employee data
-  const { register, handleSubmit, formState: { errors }, setValue, watch, trigger, reset, control } = useForm<EmployeeFormData>({
+  const formMethods = useForm<EmployeeFormData>({
     defaultValues: getEmployeeFormDefaults(),
     mode: 'onChange' // Enable real-time validation
+  });
+
+  const { register, handleSubmit, formState, setValue, watch, trigger, reset, control } = formMethods;
+  const { errors, isValid, isDirty, isSubmitting } = formState;
+
+  // Log form state for debugging
+  console.log('📋 Form state:', {
+    isValid,
+    isDirty,
+    isSubmitting,
+    errorsCount: Object.keys(errors).length,
+    errors: errors
   });
 
   const watchedValues = watch();
@@ -45,12 +57,36 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
   // Handle form effects (auto-fill, completion calculation)
   useEmployeeFormEffects(watchedValues, setValue, setCompletionPercentage);
 
+  // Enhanced handleSubmit with debugging
+  const enhancedHandleSubmit = (onSubmit: (data: EmployeeFormData) => void | Promise<void>) => {
+    console.log('🚀 Creating enhanced handleSubmit wrapper');
+    
+    return handleSubmit(async (data, event) => {
+      console.log('🔥🔥🔥 ENHANCED HANDLE SUBMIT EXECUTED 🔥🔥🔥');
+      console.log('📊 Form data received:', data);
+      console.log('📊 Form validation state:', { isValid, isDirty, errorsCount: Object.keys(errors).length });
+      console.log('📊 Event details:', event);
+      
+      try {
+        console.log('✅ Calling onSubmit function...');
+        await onSubmit(data);
+        console.log('✅ onSubmit completed successfully');
+      } catch (error) {
+        console.error('❌ Error in onSubmit:', error);
+        throw error;
+      }
+    }, (errors, event) => {
+      console.error('❌ Form validation failed:', errors);
+      console.error('❌ Validation event:', event);
+    });
+  };
+
   console.log('✅ useEmployeeForm: Hook completed, returning form methods');
 
   return {
     // Form methods
     register,
-    handleSubmit,
+    handleSubmit: enhancedHandleSubmit,
     errors,
     setValue,
     watch,
@@ -58,6 +94,12 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
     reset,
     control,
     watchedValues,
+    
+    // Form state
+    formState,
+    isValid,
+    isDirty,
+    isSubmitting,
     
     // State
     companyId,
