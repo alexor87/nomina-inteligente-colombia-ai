@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -59,9 +58,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     isCreating,
     lastRefreshTime
   } = usePayrollNovedadesUnified(currentPeriodId || '');
-
-  // ✅ CAMBIO CRÍTICO: ELIMINAR completamente el procesamiento automático de vacaciones
-  // Las vacaciones ahora aparecen en cálculos pero mantienen estado "pendiente"
 
   // Cargar novedades cuando se monten los empleados o cambie el período
   useEffect(() => {
@@ -223,10 +219,11 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center space-x-2">
                     {hasNovedades && (
-                      <div className={`text-sm font-medium ${
+                      <div className={`text-sm font-medium flex items-center space-x-1 ${
                         novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {novedades.totalNeto >= 0 ? '+' : ''}{formatCurrency(novedades.totalNeto)}
+                        {novedades.totalNeto >= 0 && <span>+</span>}
+                        <span>{formatCurrency(novedades.totalNeto)}</span>
                       </div>
                     )}
                     <Button
