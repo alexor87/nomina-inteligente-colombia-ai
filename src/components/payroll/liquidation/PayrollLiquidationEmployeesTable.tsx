@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useEmployeeNovedades } from '@/hooks/useEmployeeNovedades';
-import { NovedadesModal } from '@/components/payroll/modals/NovedadesModal';
+import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 
 interface PayrollEmployee {
   id: string;
@@ -59,7 +59,8 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
   const calculateTotalToPay = (employee: PayrollEmployee) => {
     const basePay = employee.baseSalary;
     const novedadesTotals = getEmployeeNovedadesTotal(employee.id);
-    return basePay + novedadesTotals.totalNeto;
+    const totalNeto = novedadesTotals.devengos - novedadesTotals.deducciones;
+    return basePay + totalNeto;
   };
 
   return (
@@ -97,6 +98,7 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
                 {employees.map((employee) => {
                   const novedadesCount = getEmployeeNovedadesCount(employee.id);
                   const novedadesTotals = getEmployeeNovedadesTotal(employee.id);
+                  const totalNeto = novedadesTotals.devengos - novedadesTotals.deducciones;
                   const totalToPay = calculateTotalToPay(employee);
 
                   return (
@@ -124,12 +126,12 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
                               {novedadesCount} novedades
                             </Badge>
                           )}
-                          {novedadesTotals.totalNeto !== 0 && (
+                          {totalNeto !== 0 && (
                             <Badge 
-                              variant={novedadesTotals.totalNeto > 0 ? "default" : "destructive"}
+                              variant={totalNeto > 0 ? "default" : "destructive"}
                               className="text-xs"
                             >
-                              {formatCurrency(novedadesTotals.totalNeto)}
+                              {formatCurrency(totalNeto)}
                             </Badge>
                           )}
                           <Button
@@ -166,11 +168,21 @@ export const PayrollLiquidationEmployeesTable: React.FC<PayrollLiquidationEmploy
 
       {/* Novedades Modal */}
       {showNovedadesModal && selectedEmployeeId && (
-        <NovedadesModal
-          isOpen={showNovedadesModal}
-          onClose={handleNovedadesModalClose}
+        <NovedadUnifiedModal
+          open={showNovedadesModal}
+          setOpen={setShowNovedadesModal}
           employeeId={selectedEmployeeId}
+          employeeSalary={employees.find(emp => emp.id === selectedEmployeeId)?.baseSalary}
           periodId={currentPeriodId || ''}
+          onSubmit={async (data) => {
+            // Handle novedad submission
+            console.log('Novedad submitted:', data);
+          }}
+          onClose={handleNovedadesModalClose}
+          selectedNovedadType={null}
+          onEmployeeNovedadesChange={async (employeeId: string) => {
+            onEmployeeNovedadesChange(employeeId);
+          }}
           startDate={startDate}
           endDate={endDate}
         />
