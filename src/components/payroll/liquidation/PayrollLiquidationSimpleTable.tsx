@@ -1,14 +1,24 @@
-
 import React, { useState, useEffect } from 'react';
-import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, Trash2 } from 'lucide-react';
 import { PayrollEmployee } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
+import { formatCurrency } from '@/lib/utils';
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { EmployeeRow } from './EmployeeRow';
-import { DeleteEmployeeDialog } from './DeleteEmployeeDialog';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -32,14 +42,24 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
   const { toast } = useToast();
 
+  // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
+  const getPeriodDate = () => {
+    if (startDate) {
+      return new Date(startDate);
+    }
+    return new Date();
+  };
+
   const {
     loadNovedadesTotals,
     createNovedad,
     getEmployeeNovedades,
-    isCreating
+    refreshEmployeeNovedades,
+    isCreating,
+    lastRefreshTime
   } = usePayrollNovedadesUnified(currentPeriodId || '');
 
-  // Load novedades when employees mount or period changes
+  // Cargar novedades cuando se monten los empleados o cambie el período
   useEffect(() => {
     if (employees.length > 0 && currentPeriodId) {
       console.log('📊 Cargando novedades para empleados, período:', currentPeriodId);
@@ -61,6 +81,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   const workedDays = calculateWorkedDays();
 
+  // Obtener configuración legal actual
   const getCurrentYearConfig = () => {
     const currentYear = new Date().getFullYear().toString();
     return ConfigurationService.getConfiguration(currentYear);
@@ -75,6 +96,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   const handleCloseNovedadModal = async () => {
     if (selectedEmployee) {
+      // Asegurar sincronización final al cerrar el modal
       console.log('🔄 Sincronización final al cerrar modal para:', selectedEmployee.name);
       await onEmployeeNovedadesChange(selectedEmployee.id);
     }
@@ -98,7 +120,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       });
       
       if (result) {
+        // Cerrar modal
         handleCloseNovedadModal();
+        
         console.log('✅ Novedad creada y sincronizada exitosamente');
       }
     } catch (error) {
@@ -106,6 +130,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     }
   };
 
+  // Callback para manejar cambios desde el modal (eliminaciones, etc.)
   const handleNovedadChange = async (employeeId: string) => {
     console.log('🔄 Novedad modificada para empleado:', employeeId);
     await onEmployeeNovedadesChange(employeeId);
@@ -135,23 +160,23 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     const config = getCurrentYearConfig();
     const novedades = getEmployeeNovedades(employee.id);
     
-    // Proportional salary according to worked days
+    // Salario proporcional según días trabajados
     const salarioProporcional = (employee.baseSalary / 30) * workedDays;
     
-    // Taxable base: proportional salary + net novedades
+    // Base gravable: salario proporcional + novedades netas
     const baseGravable = salarioProporcional + novedades.totalNeto;
     
-    // Legal deductions on taxable base
+    // Deducciones de ley sobre base gravable
     const saludEmpleado = baseGravable * config.porcentajes.saludEmpleado;
     const pensionEmpleado = baseGravable * config.porcentajes.pensionEmpleado;
     const totalDeducciones = saludEmpleado + pensionEmpleado;
     
-    // Proportional transportation allowance (only if salary ≤ 2 SMMLV)
+    // Auxilio de transporte proporcional (solo si salario ≤ 2 SMMLV)
     const auxilioTransporte = employee.baseSalary <= (config.salarioMinimo * 2) 
       ? (config.auxilioTransporte / 30) * workedDays 
       : 0;
     
-    // Total to pay = taxable base - deductions + transportation allowance
+    // Total a pagar = base gravable - deducciones + auxilio de transporte
     const totalNeto = baseGravable - totalDeducciones + auxilioTransporte;
     
     return Math.max(0, totalNeto);
@@ -174,18 +199,62 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           {employees.map((employee) => {
             const novedades = getEmployeeNovedades(employee.id);
             const totalToPay = calculateTotalToPay(employee);
+            const hasNovedades = novedades.hasNovedades;
 
             return (
-              <EmployeeRow
-                key={employee.id}
-                employee={employee}
-                workedDays={workedDays}
-                novedades={novedades}
-                totalToPay={totalToPay}
-                isCreating={isCreating}
-                onOpenNovedadModal={handleOpenNovedadModal}
-                onRemoveEmployee={onRemoveEmployee ? handleDeleteEmployee : undefined}
-              />
+              <TableRow key={employee.id}>
+                <TableCell>
+                  <div className="font-medium">{employee.name}</div>
+                  <div className="text-sm text-gray-500">{employee.position}</div>
+                </TableCell>
+                
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(employee.baseSalary)}
+                </TableCell>
+                
+                <TableCell className="text-center font-medium">
+                  {workedDays} días
+                </TableCell>
+                
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center space-x-2">
+                    {hasNovedades && (
+                      <div className={`text-sm font-medium flex items-center space-x-1 ${
+                        novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {novedades.totalNeto >= 0 && <span>+</span>}
+                        <span>{formatCurrency(novedades.totalNeto)}</span>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenNovedadModal(employee)}
+                      disabled={isCreating}
+                      className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+                
+                <TableCell className="text-right font-semibold text-lg">
+                  {formatCurrency(totalToPay)}
+                </TableCell>
+
+                <TableCell className="text-center">
+                  {onRemoveEmployee && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteEmployee(employee)}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
             );
           })}
         </TableBody>
@@ -209,12 +278,28 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       )}
 
       {/* Confirmation Dialog for Delete */}
-      <DeleteEmployeeDialog
-        employee={employeeToDelete}
-        isOpen={!!employeeToDelete}
-        onConfirm={confirmDeleteEmployee}
-        onCancel={cancelDeleteEmployee}
-      />
+      <AlertDialog open={!!employeeToDelete} onOpenChange={cancelDeleteEmployee}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Remover empleado de la liquidación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas remover a <strong>{employeeToDelete?.name}</strong> de esta liquidación? 
+              Esta acción no afectará el registro del empleado en el módulo de empleados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDeleteEmployee}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteEmployee}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
