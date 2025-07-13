@@ -30,7 +30,37 @@ export class NovedadesCalculationService {
         return this.getEmptyTotals();
       }
 
-      // Get vacation/absence periods processed in this period
+      // Get current user company for vacation filtering
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ No authenticated user');
+        return this.getEmptyTotals();
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) {
+        console.error('❌ No company found for user');
+        return this.getEmptyTotals();
+      }
+
+      // Get period dates to filter vacation periods
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('fecha_inicio, fecha_fin')
+        .eq('id', periodId)
+        .single();
+
+      if (!period) {
+        console.error('❌ Period not found');
+        return this.getEmptyTotals();
+      }
+
+      // ✅ CAMBIO CRÍTICO: Solo incluir vacaciones/ausencias PENDIENTES que caigan en el período
       const { data: vacationPeriods, error: vacationError } = await supabase
         .from('employee_vacation_periods')
         .select(`
@@ -38,7 +68,10 @@ export class NovedadesCalculationService {
           employees!inner(salario_base)
         `)
         .eq('employee_id', employeeId)
-        .eq('processed_in_period_id', periodId);
+        .eq('company_id', profile.company_id)
+        .eq('status', 'pendiente')
+        .gte('start_date', period.fecha_inicio)
+        .lte('end_date', period.fecha_fin);
 
       if (vacationError) {
         console.error('❌ Error getting vacation periods:', vacationError);
@@ -54,7 +87,7 @@ export class NovedadesCalculationService {
         return emptyTotals;
       }
 
-      console.log(`📊 Found ${allNovedades.length} novelties and ${allVacationPeriods.length} vacation periods:`, {
+      console.log(`📊 Found ${allNovedades.length} novelties and ${allVacationPeriods.length} pending vacation periods:`, {
         novedades: allNovedades,
         vacationPeriods: allVacationPeriods
       });
@@ -122,7 +155,7 @@ export class NovedadesCalculationService {
       const dias = period.days_count || 0;
       const valor = this.calculateVacationAbsenceValue(period.type, salarioBase, dias);
       
-      console.log(`🏖️ Processing vacation/absence: ${period.type} = $${valor} (${dias} days)`);
+      console.log(`🏖️ Processing pending vacation/absence: ${period.type} = $${valor} (${dias} days) - PENDIENTE`);
       
       if (this.isVacationDevengo(period.type)) {
         totalDevengos += valor;

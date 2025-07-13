@@ -31,7 +31,7 @@ export class VacationPayrollIntegrationService {
         };
       }
 
-      // Mark vacation periods as processed in this payroll period
+      // ✅ CAMBIO CRÍTICO: Cambiar status de 'pendiente' a 'liquidado' (masculino)
       const { error: updateError } = await supabase
         .from('employee_vacation_periods')
         .update({

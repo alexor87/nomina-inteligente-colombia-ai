@@ -1,15 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Calendar } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { PayrollEmployee } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
-import { useVacationIntegration } from '@/hooks/useVacationIntegration';
 import { formatCurrency } from '@/lib/utils';
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
-import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +41,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
-  const [vacationsProcessed, setVacationsProcessed] = useState(false);
   const { toast } = useToast();
 
   // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
@@ -62,49 +60,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     lastRefreshTime
   } = usePayrollNovedadesUnified(currentPeriodId || '');
 
-  const { processVacationsForPayroll } = useVacationIntegration();
-
-  // Process vacations when component mounts and we have a period
-  useEffect(() => {
-    if (currentPeriodId && startDate && endDate && !vacationsProcessed) {
-      const processVacations = async () => {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
-
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .single();
-
-          if (!profile?.company_id) return;
-
-          console.log('🔄 Processing vacations for payroll period...');
-          const result = await processVacationsForPayroll({
-            periodId: currentPeriodId,
-            companyId: profile.company_id,
-            startDate,
-            endDate
-          });
-
-          if (result.success && result.processedVacations > 0) {
-            console.log(`✅ Processed ${result.processedVacations} vacation periods`);
-            // Refresh all employee novedades to include processed vacations
-            const employeeIds = employees.map(emp => emp.id);
-            await loadNovedadesTotals(employeeIds);
-          }
-
-          setVacationsProcessed(true);
-        } catch (error) {
-          console.error('Error processing vacations:', error);
-          setVacationsProcessed(true);
-        }
-      };
-
-      processVacations();
-    }
-  }, [currentPeriodId, startDate, endDate, vacationsProcessed, processVacationsForPayroll, employees, loadNovedadesTotals]);
+  // ✅ CAMBIO CRÍTICO: ELIMINAR completamente el procesamiento automático de vacaciones
+  // Las vacaciones ahora aparecen en cálculos pero mantienen estado "pendiente"
 
   // Cargar novedades cuando se monten los empleados o cambie el período
   useEffect(() => {
