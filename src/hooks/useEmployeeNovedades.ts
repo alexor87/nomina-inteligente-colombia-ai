@@ -1,7 +1,60 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollNovedad } from '@/types/novedades';
+
+// Define a proper interface for database response
+interface NovedadFromDB {
+  id: string;
+  company_id: string;
+  empleado_id: string;
+  periodo_id: string;
+  tipo_novedad: string;
+  valor: number;
+  dias?: number;
+  horas?: number;
+  observacion?: string;
+  constitutivo_salario?: boolean;
+  base_calculo?: string;
+  subtipo?: string;
+  adjunto_url?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  creado_por?: string;
+  created_at: string;
+  updated_at: string;
+  employees?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  };
+}
+
+// Define our clean novedad interface
+interface PayrollNovedad {
+  id: string;
+  company_id: string;
+  empleado_id: string;
+  periodo_id: string;
+  tipo_novedad: string;
+  valor: number;
+  dias?: number;
+  horas?: number;
+  observacion?: string;
+  constitutivo_salario?: boolean;
+  base_calculo?: string;
+  subtipo?: string;
+  adjunto_url?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  creado_por?: string;
+  created_at: string;
+  updated_at: string;
+  employee?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  };
+}
 
 export const useEmployeeNovedades = (periodId: string) => {
   const [novedades, setNovedades] = useState<Record<string, PayrollNovedad[]>>({});
@@ -38,22 +91,46 @@ export const useEmployeeNovedades = (periodId: string) => {
 
       console.log('📋 Novedades cargadas:', data?.length || 0);
 
-      // Agrupar novedades por empleado
+      // Agrupar novedades por empleado con transformación de tipos
       const novedadesByEmployee: Record<string, PayrollNovedad[]> = {};
       
-      data?.forEach(novedad => {
-        const employeeId = novedad.empleado_id;
+      data?.forEach((dbNovedad: NovedadFromDB) => {
+        const employeeId = dbNovedad.empleado_id;
         if (!novedadesByEmployee[employeeId]) {
           novedadesByEmployee[employeeId] = [];
         }
-        novedadesByEmployee[employeeId].push(novedad as PayrollNovedad);
+        
+        // Transform the database novedad to our clean interface
+        const cleanNovedad: PayrollNovedad = {
+          id: dbNovedad.id,
+          company_id: dbNovedad.company_id,
+          empleado_id: dbNovedad.empleado_id,
+          periodo_id: dbNovedad.periodo_id,
+          tipo_novedad: dbNovedad.tipo_novedad,
+          valor: dbNovedad.valor,
+          dias: dbNovedad.dias,
+          horas: dbNovedad.horas,
+          observacion: dbNovedad.observacion,
+          constitutivo_salario: dbNovedad.constitutivo_salario,
+          base_calculo: dbNovedad.base_calculo,
+          subtipo: dbNovedad.subtipo,
+          adjunto_url: dbNovedad.adjunto_url,
+          fecha_inicio: dbNovedad.fecha_inicio,
+          fecha_fin: dbNovedad.fecha_fin,
+          creado_por: dbNovedad.creado_por,
+          created_at: dbNovedad.created_at,
+          updated_at: dbNovedad.updated_at,
+          employee: dbNovedad.employees
+        };
+        
+        novedadesByEmployee[employeeId].push(cleanNovedad);
       });
 
       setNovedades(novedadesByEmployee);
 
       // Log de depuración para Alex Ortiz específicamente
       Object.entries(novedadesByEmployee).forEach(([employeeId, empleadoNovedades]) => {
-        const employee = empleadoNovedades[0]?.employees;
+        const employee = empleadoNovedades[0]?.employee;
         if (employee && `${employee.nombre} ${employee.apellido}`.includes('Alex')) {
           console.log(`🏖️ Novedades para ${employee.nombre} ${employee.apellido}:`, empleadoNovedades);
         }
