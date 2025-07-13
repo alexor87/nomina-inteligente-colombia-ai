@@ -16,7 +16,7 @@ interface FormFieldProps {
   placeholder?: string;
   disabled?: boolean;
   onValueChange?: (value: string) => void;
-  className?: string; // ✅ NUEVO: Agregar soporte para className
+  className?: string;
 }
 
 export const FormField = ({
@@ -32,6 +32,13 @@ export const FormField = ({
   onValueChange,
   className
 }: FormFieldProps) => {
+  console.log(`🔍 FormField ${name}:`, { 
+    hasError: !!errors[name], 
+    error: errors[name]?.message,
+    required,
+    currentValue: control._getWatch(name)
+  });
+
   return (
     <div className={`space-y-1.5 ${className || ''}`}>
       <Label className="text-sm font-normal text-gray-600">
@@ -42,12 +49,15 @@ export const FormField = ({
       <Controller
         name={name}
         control={control}
-        rules={{ required: required ? `${label} es requerido` : false }}
+        rules={{ 
+          required: required ? `${label} es requerido` : false 
+        }}
         render={({ field }) => {
           if (type === 'select' && options) {
             return (
               <Select 
                 onValueChange={(value) => {
+                  console.log(`🔄 Select ${name} changed to:`, value);
                   field.onChange(value);
                   onValueChange?.(value);
                 }}
@@ -82,6 +92,7 @@ export const FormField = ({
               disabled={disabled}
               onChange={(e) => {
                 const value = type === 'number' ? Number(e.target.value) || 0 : e.target.value;
+                console.log(`🔄 Input ${name} changed to:`, value);
                 field.onChange(value);
               }}
             />

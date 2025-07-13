@@ -195,11 +195,26 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
           id="employee-form"
           className="employee-form flex flex-col flex-1"
           onSubmit={(e) => {
-            console.log('🔥 FORM onSubmit EVENT TRIGGERED');
+            console.log('🔥 FORM onSubmit EVENT TRIGGERED - ENHANCED');
             console.log('🔥 Event details:', e);
+            console.log('🔥 Form validation before submit:', {
+              isValid,
+              errors: Object.keys(errors),
+              isDraft
+            });
+            
             e.preventDefault();
+            e.stopPropagation();
+            
+            // Si hay errores de validación y no es borrador, no enviar
+            if (!isValid && !isDraft) {
+              console.log('❌ Form has validation errors and is not draft, preventing submission');
+              console.log('❌ Validation errors:', errors);
+              return false;
+            }
             
             // Call react-hook-form's handleSubmit manually
+            console.log('✅ Proceeding with form submission');
             const submitHandler = handleSubmit(onSubmit);
             submitHandler(e);
           }}

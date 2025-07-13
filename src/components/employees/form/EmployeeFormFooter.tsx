@@ -22,99 +22,31 @@ export const EmployeeFormFooter = ({
 }: EmployeeFormFooterProps) => {
   console.log('🔥 FOOTER RENDER - Completion:', completionPercentage, 'IsLoading:', isLoading, 'IsDraft:', isDraft);
 
-  // Handler de prueba simple
-  const handleTestClick = (buttonType: string) => {
-    console.log('🧪 TEST BUTTON CLICKED:', buttonType);
-    console.log('🧪 Current state:', { completionPercentage, isLoading, isDraft });
+  // Handler simplificado para testing
+  const handleTestSave = (buttonType: string) => {
+    console.log('🚀 SIMPLIFIED BUTTON CLICK:', buttonType);
+    console.log('🚀 Current state:', { completionPercentage, isLoading, isDraft });
     
-    // Intentar obtener el formulario
-    const form = document.querySelector('form');
-    console.log('🧪 Form found:', !!form);
-    
-    if (form) {
-      console.log('🧪 Form elements:', form.elements.length);
-      console.log('🧪 Form data test:', new FormData(form));
-    }
-    
-    return true; // Indicar que el evento se manejó
-  };
-
-  const handleDraftSave = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    console.log('🔥 DRAFT BUTTON CLICKED - Starting handler');
-    
-    // Primero, test básico
-    if (!handleTestClick('DRAFT')) return;
-    
-    console.log('💾 Setting draft mode to true...');
-    setIsDraft(true);
-    
-    // Obtener y enviar el formulario
-    const form = e.currentTarget.closest('form');
-    console.log('🔥 Form element found:', !!form);
-    
-    if (form) {
-      console.log('📋 About to submit form programmatically');
-      
-      // Intentar múltiples métodos de envío
-      try {
-        // Método 1: requestSubmit
-        if (form.requestSubmit) {
-          console.log('📋 Using requestSubmit method');
-          form.requestSubmit();
-        } else {
-          // Método 2: submit tradicional
-          console.log('📋 Using traditional submit method');
-          form.submit();
-        }
-      } catch (error) {
-        console.error('❌ Error submitting form:', error);
-      }
+    // Marcar como borrador si es el botón de borrador
+    if (buttonType === 'DRAFT') {
+      console.log('💾 Setting draft mode to true...');
+      setIsDraft(true);
     } else {
-      console.error('❌ No form element found for draft save');
-      
-      // Buscar formulario por ID o clase como fallback
-      const formById = document.getElementById('employee-form');
-      const formByClass = document.querySelector('.employee-form');
-      console.log('🔍 Fallback search - by ID:', !!formById, 'by class:', !!formByClass);
-    }
-  };
-
-  const handleMainSubmit = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    console.log('🔥 MAIN SUBMIT BUTTON CLICKED');
-    console.log('🔥 Current state - isDraft:', isDraft, 'isLoading:', isLoading, 'completion:', completionPercentage);
-    
-    // Test básico
-    if (!handleTestClick('MAIN_SUBMIT')) return;
-    
-    // Asegurar que no está en modo borrador
-    if (isDraft) {
-      console.log('🔄 Switching from draft mode to active mode');
+      console.log('✅ Setting draft mode to false...');
       setIsDraft(false);
     }
     
-    // Enviar el formulario
-    const form = e.currentTarget.closest('form');
-    console.log('🔥 Form element found for main submit:', !!form);
+    // Intentar enviar el formulario de manera directa
+    const formElement = document.getElementById('employee-form') as HTMLFormElement;
+    console.log('📋 Form element found:', !!formElement);
     
-    if (form) {
-      console.log('📋 Submitting form for main action');
-      try {
-        if (form.requestSubmit) {
-          form.requestSubmit();
-        } else {
-          form.submit();
-        }
-      } catch (error) {
-        console.error('❌ Error in main submit:', error);
-      }
+    if (formElement) {
+      console.log('📋 Attempting to submit form programmatically');
+      // Crear y disparar evento de submit
+      const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+      formElement.dispatchEvent(submitEvent);
     } else {
-      console.error('❌ No form found for main submit');
+      console.error('❌ Form element not found');
     }
   };
 
@@ -151,9 +83,14 @@ export const EmployeeFormFooter = ({
         
         <div className="flex gap-3">
           <Button 
-            type="button" 
+            type="button"
             variant="outline" 
-            onClick={handleDraftSave}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔥 DRAFT BUTTON CLICKED - Direct handler');
+              handleTestSave('DRAFT');
+            }}
             disabled={isLoading}
             className="min-w-[140px]"
           >
@@ -162,8 +99,13 @@ export const EmployeeFormFooter = ({
           </Button>
           
           <Button 
-            type="button"
-            onClick={handleMainSubmit}
+            type="submit"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔥 MAIN SUBMIT BUTTON CLICKED - Direct handler');
+              handleTestSave('MAIN_SUBMIT');
+            }}
             disabled={isMainButtonDisabled}
             className="bg-blue-600 hover:bg-blue-700 min-w-[160px]"
           >

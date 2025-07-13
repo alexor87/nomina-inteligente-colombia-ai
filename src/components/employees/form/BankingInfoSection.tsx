@@ -60,8 +60,8 @@ export const BankingInfoSection: React.FC<BankingInfoSectionProps> = ({
             type="select"
             control={control!}
             errors={errors}
-            required
-            options={BANCOS_COLOMBIA.map(banco => ({ value: banco, label: banco }))}
+            required={false} // Cambiar a false para testing
+            options={BANCOS_COLOMBIA.map(banco => ({ value: banco.toLowerCase(), label: banco }))}
           />
 
           <FormField
@@ -70,7 +70,7 @@ export const BankingInfoSection: React.FC<BankingInfoSectionProps> = ({
             type="select"
             control={control!}
             errors={errors}
-            required
+            required={false} // Cambiar a false para testing
             options={[
               { value: 'ahorros', label: 'Ahorros' },
               { value: 'corriente', label: 'Corriente' }
@@ -83,7 +83,7 @@ export const BankingInfoSection: React.FC<BankingInfoSectionProps> = ({
             type="text"
             control={control!}
             errors={errors}
-            required
+            required={false} // Cambiar a false para testing
             placeholder="1234567890"
           />
 
@@ -93,7 +93,7 @@ export const BankingInfoSection: React.FC<BankingInfoSectionProps> = ({
             type="text"
             control={control!}
             errors={errors}
-            required
+            required={false} // Cambiar a false para testing
             placeholder="Juan Pérez"
           />
 

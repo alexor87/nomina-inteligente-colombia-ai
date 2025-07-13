@@ -25,22 +25,31 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
     scrollToSection
   } = useEmployeeFormState();
 
-  // Initialize form with defaults or employee data
+  // Initialize form with defaults or employee data - REMOVED STRICT VALIDATION
   const formMethods = useForm<EmployeeFormData>({
     defaultValues: getEmployeeFormDefaults(),
-    mode: 'onChange' // Enable real-time validation
+    mode: 'onChange',
+    // Remover validación estricta para testing
+    reValidateMode: 'onChange',
+    shouldFocusError: false
   });
 
   const { register, handleSubmit, formState, setValue, watch, trigger, reset, control } = formMethods;
   const { errors, isValid, isDirty, isSubmitting } = formState;
 
-  // Log form state for debugging
-  console.log('📋 Form state:', {
+  // Log form state for debugging - MÁS DETALLADO
+  console.log('📋 Form state DETAILED:', {
     isValid,
     isDirty,
     isSubmitting,
     errorsCount: Object.keys(errors).length,
-    errors: errors
+    specificErrors: Object.keys(errors).map(key => ({
+      field: key,
+      error: errors[key as keyof typeof errors]?.message,
+      value: watch(key as keyof EmployeeFormData)
+    })),
+    bancoValue: watch('banco'),
+    bancoError: errors.banco
   });
 
   const watchedValues = watch();
@@ -57,14 +66,19 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
   // Handle form effects (auto-fill, completion calculation)
   useEmployeeFormEffects(watchedValues, setValue, setCompletionPercentage);
 
-  // Enhanced handleSubmit with debugging
+  // Enhanced handleSubmit with MORE DETAILED debugging
   const enhancedHandleSubmit = (onSubmit: (data: EmployeeFormData) => void | Promise<void>) => {
     console.log('🚀 Creating enhanced handleSubmit wrapper');
     
     return handleSubmit(async (data, event) => {
       console.log('🔥🔥🔥 ENHANCED HANDLE SUBMIT EXECUTED 🔥🔥🔥');
       console.log('📊 Form data received:', data);
-      console.log('📊 Form validation state:', { isValid, isDirty, errorsCount: Object.keys(errors).length });
+      console.log('📊 Form validation state:', { 
+        isValid, 
+        isDirty, 
+        errorsCount: Object.keys(errors).length,
+        errors: errors 
+      });
       console.log('📊 Event details:', event);
       
       try {
@@ -75,9 +89,18 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
         console.error('❌ Error in onSubmit:', error);
         throw error;
       }
-    }, (errors, event) => {
-      console.error('❌ Form validation failed:', errors);
+    }, (validationErrors, event) => {
+      console.error('❌ FORM VALIDATION FAILED:', validationErrors);
       console.error('❌ Validation event:', event);
+      console.error('❌ Current form values:', watchedValues);
+      
+      // Mostrar errores específicos para debugging
+      Object.keys(validationErrors).forEach(fieldName => {
+        console.error(`❌ Field ${fieldName}:`, {
+          error: validationErrors[fieldName as keyof typeof validationErrors],
+          currentValue: watchedValues[fieldName as keyof typeof watchedValues]
+        });
+      });
     });
   };
 
