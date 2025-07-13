@@ -222,7 +222,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                       <div className={`text-sm font-medium flex items-center space-x-1 ${
                         novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {novedades.totalNeto >= 0 && <span>+</span>}
+                        <span>+</span>
                         <span>{formatCurrency(novedades.totalNeto)}</span>
                       </div>
                     )}
