@@ -8,40 +8,30 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calculator, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useNovedadCalculation } from '@/hooks/useNovedadCalculation';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
 
 interface NovedadBonificacionFormProps {
   onBack: () => void;
   onSubmit: (formData: any) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => number | null;
 }
 
 export const NovedadBonificacionForm: React.FC<NovedadBonificacionFormProps> = ({
   onBack,
   onSubmit,
-  employeeSalary,
-  calculateSuggestedValue
+  employeeSalary
 }) => {
   const [formData, setFormData] = useState({
     tipo_novedad: 'bonificacion' as NovedadType,
     subtipo: 'bonificacion_desempeno',
     valor: '',
     observacion: '',
-    constitutivo_salario: false, // ✅ NUEVO: Campo para bonificaciones constitutivas
+    constitutivo_salario: false,
     base_calculo: ''
   });
 
-  const { calculatedValue, calculateValue } = useNovedadCalculation({
-    employeeSalary,
-    calculateSuggestedValue
-  });
+  const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
   const BONIFICACION_SUBTIPOS = [
     { value: 'bonificacion_desempeno', label: 'Bonificación por Desempeño', description: 'Reconocimiento por metas alcanzadas' },
@@ -53,18 +43,6 @@ export const NovedadBonificacionForm: React.FC<NovedadBonificacionFormProps> = (
     { value: 'auxilio_vivienda', label: 'Auxilio de Vivienda', description: 'Subsidio para gastos de vivienda' }
   ];
 
-  // Calcular valor sugerido automáticamente
-  useEffect(() => {
-    if (formData.subtipo && formData.valor && parseFloat(formData.valor) > 0) {
-      calculateValue(
-        formData.tipo_novedad,
-        formData.subtipo,
-        undefined,
-        undefined
-      );
-    }
-  }, [formData.subtipo, formData.valor, calculateValue]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -73,13 +51,12 @@ export const NovedadBonificacionForm: React.FC<NovedadBonificacionFormProps> = (
       return;
     }
 
-    // ✅ ENVIAR DATOS CON CAMPO CONSTITUTIVO_SALARIO
     const submitData = {
       tipo_novedad: formData.tipo_novedad,
       subtipo: formData.subtipo,
       valor: parseFloat(formData.valor),
       observacion: formData.observacion,
-      constitutivo_salario: formData.constitutivo_salario, // ✅ NUEVO: Incluir flag constitutivo
+      constitutivo_salario: formData.constitutivo_salario,
       base_calculo: formData.base_calculo
     };
 
@@ -146,7 +123,7 @@ export const NovedadBonificacionForm: React.FC<NovedadBonificacionFormProps> = (
           )}
         </div>
 
-        {/* ✅ NUEVO: Checkbox constitutivo de salario */}
+        {/* Checkbox constitutivo de salario */}
         <div className="space-y-3 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-400">
           <div className="flex items-start space-x-3">
             <Checkbox

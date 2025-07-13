@@ -7,26 +7,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useNovedadCalculation } from '@/hooks/useNovedadCalculation';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
 
 interface NovedadVacacionesFormProps {
   onBack: () => void;
   onSubmit: (formData: any) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => number | null;
 }
 
 export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
   onBack,
   onSubmit,
-  employeeSalary,
-  calculateSuggestedValue
+  employeeSalary
 }) => {
   const [formData, setFormData] = useState({
     dias: '',
@@ -36,10 +29,7 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
     observacion: ''
   });
 
-  const { calculatedValue, calculateValue } = useNovedadCalculation({
-    employeeSalary,
-    calculateSuggestedValue
-  });
+  const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
   // Calcular valor automáticamente cuando cambien los días
   useEffect(() => {
@@ -48,24 +38,22 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
         dias: parseInt(formData.dias)
       });
       
-      calculateValue(
-        'vacaciones' as NovedadType,
-        undefined,
-        undefined,
-        parseInt(formData.dias)
+      calculateNovedadDebounced(
+        {
+          tipoNovedad: 'vacaciones' as NovedadType,
+          salarioBase: employeeSalary,
+          dias: parseInt(formData.dias),
+          fechaPeriodo: new Date()
+        },
+        (result) => {
+          if (result && result.valor > 0) {
+            console.log('💰 Applying calculated value for vacaciones:', result.valor);
+            setFormData(prev => ({ ...prev, valor: result.valor }));
+          }
+        }
       );
-    } else {
-      calculateValue('vacaciones' as NovedadType, undefined, undefined, 0);
     }
-  }, [formData.dias, calculateValue]);
-
-  // Aplicar valor calculado automáticamente
-  useEffect(() => {
-    if (calculatedValue && calculatedValue > 0) {
-      console.log('💰 Applying calculated value for vacaciones:', calculatedValue);
-      setFormData(prev => ({ ...prev, valor: calculatedValue }));
-    }
-  }, [calculatedValue]);
+  }, [formData.dias, employeeSalary, calculateNovedadDebounced]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -150,36 +138,18 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
           </div>
         </div>
 
-        {/* Valor calculado */}
-        {calculatedValue && calculatedValue > 0 && (
-          <div className="flex items-center justify-between bg-green-50 p-3 rounded">
+        {/* Valor calculado automáticamente */}
+        {isLoading && (
+          <div className="flex items-center justify-between bg-blue-50 p-3 rounded">
             <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">Valor calculado automáticamente:</span>
+              <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
+              <span className="text-sm text-blue-700">Calculando...</span>
             </div>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              {formatCurrency(calculatedValue)}
-            </Badge>
           </div>
         )}
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Valor *</Label>
-            {calculatedValue && calculatedValue !== formData.valor && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleInputChange('valor', calculatedValue)}
-                className="text-xs h-7 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-              >
-                <Calculator className="h-3 w-3 mr-1" />
-                Usar calculado: ${calculatedValue.toLocaleString()}
-              </Button>
-            )}
-          </div>
-
+          <Label>Valor *</Label>
           <Input
             type="number"
             min="0"

@@ -17,9 +17,10 @@ export class PayrollPDFService {
     // Preparar datos para el nuevo servicio
     const voucherData: VoucherData = {
       employee: {
-        ...employee,
-        documento: employee.id?.slice(0, 8) || 'N/A',
-        tipo_documento: 'CC'
+        id: employee.id,
+        nombre: employee.nombre,
+        apellido: employee.apellido,
+        cedula: employee.cedula
       },
       period,
       company: companyInfo || {
@@ -46,14 +47,14 @@ export class PayrollPDFService {
   }
 
   /**
-   * Calcular deducciones detalladas
+   * Calcular deducciones detalladas (usar datos precalculados)
    */
   static calculateDetailedDeductions(baseSalary: number, totalDeductions: number) {
     return PayrollVoucherService.calculateDetailedDeductions(baseSalary, totalDeductions);
   }
 
   /**
-   * Calcular horas extra con valores reales
+   * Calcular horas extra (usar datos precalculados)
    */
   static calculateExtraHours(baseSalary: number, extraHours: number) {
     return PayrollVoucherService.calculateExtraHours(baseSalary, extraHours);

@@ -8,19 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useNovedadCalculation } from '@/hooks/useNovedadCalculation';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
 
 interface NovedadIncapacidadFormProps {
   onBack: () => void;
   onSubmit: (formData: any) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => number | null;
   isSubmitting: boolean;
 }
 
@@ -49,7 +43,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  calculateSuggestedValue,
   isSubmitting
 }) => {
   const [formData, setFormData] = useState({
@@ -61,10 +54,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     observacion: ''
   });
 
-  const { calculatedValue, calculateValue } = useNovedadCalculation({
-    employeeSalary,
-    calculateSuggestedValue
-  });
+  const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
   // Calcular valor automáticamente cuando cambien días o subtipo
   useEffect(() => {
@@ -74,24 +64,23 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         dias: parseInt(formData.dias)
       });
       
-      calculateValue(
-        'incapacidad' as NovedadType,
-        formData.subtipo,
-        undefined,
-        parseInt(formData.dias)
+      calculateNovedadDebounced(
+        {
+          tipoNovedad: 'incapacidad' as NovedadType,
+          subtipo: formData.subtipo,
+          salarioBase: employeeSalary,
+          dias: parseInt(formData.dias),
+          fechaPeriodo: new Date()
+        },
+        (result) => {
+          if (result && result.valor > 0) {
+            console.log('💰 Applying calculated value:', result.valor);
+            setFormData(prev => ({ ...prev, valor: result.valor }));
+          }
+        }
       );
-    } else {
-      calculateValue('incapacidad' as NovedadType, formData.subtipo, undefined, 0);
     }
-  }, [formData.subtipo, formData.dias, calculateValue]);
-
-  // Aplicar valor calculado automáticamente
-  useEffect(() => {
-    if (calculatedValue && calculatedValue > 0) {
-      console.log('💰 Applying calculated value:', calculatedValue);
-      setFormData(prev => ({ ...prev, valor: calculatedValue }));
-    }
-  }, [calculatedValue]);
+  }, [formData.subtipo, formData.dias, employeeSalary, calculateNovedadDebounced]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -212,37 +201,17 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </div>
 
         {/* Valor calculado */}
-        {calculatedValue && calculatedValue > 0 && (
-          <div className="bg-green-50 p-3 rounded border border-green-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calculator className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-green-700">Valor calculado automáticamente:</span>
-              </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                {formatCurrency(calculatedValue)}
-              </Badge>
+        {isLoading && (
+          <div className="bg-blue-50 p-3 rounded border border-blue-200">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
+              <span className="text-sm text-blue-700">Calculando valor...</span>
             </div>
           </div>
         )}
 
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <Label htmlFor="valor" className="text-gray-700">Valor *</Label>
-            {calculatedValue && calculatedValue !== formData.valor && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleInputChange('valor', calculatedValue)}
-                className="text-xs h-7 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-              >
-                <Calculator className="h-3 w-3 mr-1" />
-                Usar calculado: {formatCurrency(calculatedValue)}
-              </Button>
-            )}
-          </div>
-
+          <Label htmlFor="valor" className="text-gray-700">Valor *</Label>
           <Input
             type="number"
             min="0"
