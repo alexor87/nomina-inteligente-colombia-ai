@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -123,13 +124,22 @@ const HORAS_EXTRA_FACTORS = {
 } as const;
 
 function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
-  console.log(`🗓️ BACKEND: Calculando jornada legal para fecha: ${fecha.toISOString().split('T')[0]}`);
+  // ✅ CORRECCIÓN CRÍTICA: Crear fecha sin zona horaria para comparaciones exactas
+  const fechaLocal = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  const fechaString = fechaLocal.toISOString().split('T')[0];
+  
+  console.log(`🗓️ BACKEND: Calculando jornada legal para fecha: ${fechaString}`);
+  console.log(`🗓️ BACKEND: Año: ${fechaLocal.getFullYear()}, Mes: ${fechaLocal.getMonth() + 1}, Día: ${fechaLocal.getDate()}`);
   
   const jornadaVigente = JORNADAS_LEGALES
     .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
     .find(jornada => {
-      const esVigente = fecha >= jornada.fechaInicio;
-      console.log(`   📅 BACKEND: Comparando con ${jornada.fechaInicio.toISOString().split('T')[0]} (${jornada.horasSemanales}h) - Vigente: ${esVigente}`);
+      // ✅ CORRECCIÓN: Comparación exacta de fechas sin problemas de zona horaria
+      const fechaInicioJornada = new Date(jornada.fechaInicio.getFullYear(), jornada.fechaInicio.getMonth(), jornada.fechaInicio.getDate());
+      const esVigente = fechaLocal >= fechaInicioJornada;
+      
+      console.log(`   📅 BACKEND: Comparando ${fechaString} >= ${fechaInicioJornada.toISOString().split('T')[0]} (${jornada.horasSemanales}h) - Vigente: ${esVigente}`);
+      
       return esVigente;
     });
 
@@ -170,14 +180,26 @@ function getHourlyDivisor(fecha: Date = new Date()): number {
 function calculateNovedad(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
-  // ✅ MEJORADO: Parsear fecha correctamente y añadir logs detallados
+  // ✅ CORRECCIÓN CRÍTICA: Parseo de fecha simplificado y consistente
   let fechaCalculo: Date;
   if (fechaPeriodo) {
-    fechaCalculo = new Date(fechaPeriodo + 'T00:00:00.000Z');
-    console.log(`📅 BACKEND: Fecha período recibida: "${fechaPeriodo}" -> Parseada: ${fechaCalculo.toISOString().split('T')[0]}`);
+    // ✅ NUEVO: Parseo simple sin forzar zona horaria UTC
+    fechaCalculo = new Date(fechaPeriodo);
+    console.log(`📅 BACKEND: Fecha período recibida: "${fechaPeriodo}"`);
+    console.log(`📅 BACKEND: Fecha parseada: ${fechaCalculo.toISOString().split('T')[0]}`);
+    console.log(`📅 BACKEND: Año: ${fechaCalculo.getFullYear()}, Mes: ${fechaCalculo.getMonth() + 1}, Día: ${fechaCalculo.getDate()}`);
   } else {
     fechaCalculo = new Date();
     console.log(`📅 BACKEND: No se recibió fecha período, usando fecha actual: ${fechaCalculo.toISOString().split('T')[0]}`);
+  }
+  
+  // ✅ VALIDACIÓN ESPECÍFICA PARA FECHAS DE PRUEBA
+  if (fechaPeriodo === '2025-07-01') {
+    console.log(`🔍 BACKEND: *** FECHA DE PRUEBA 1 JULIO 2025 ***`);
+    console.log(`🔍 BACKEND: Debe usar jornada de 46h semanales = 230h mensuales`);
+  } else if (fechaPeriodo === '2025-07-15') {
+    console.log(`🔍 BACKEND: *** FECHA DE PRUEBA 15 JULIO 2025 ***`);
+    console.log(`🔍 BACKEND: Debe usar jornada de 44h semanales = 220h mensuales`);
   }
   
   const jornadaLegal = getJornadaLegal(fechaCalculo);
@@ -202,6 +224,13 @@ function calculateNovedad(input: NovedadCalculationInput) {
           console.log(`💰 BACKEND: Cálculo horas extra: ${salarioBase} / ${divisorHorario} * ${factor} * ${horas} = ${valor}`);
           console.log(`🔍 BACKEND: Tarifa hora base: $${Math.round(tarifaHora).toLocaleString()} (salario / ${divisorHorario}h mensuales fijas)`);
           
+          // ✅ VALIDACIÓN ESPECÍFICA DE VALORES CALCULADOS
+          if (fechaPeriodo === '2025-07-01' && divisorHorario !== 230) {
+            console.error(`❌ BACKEND: ERROR - 1 julio debería usar 230h, pero usa ${divisorHorario}h`);
+          } else if (fechaPeriodo === '2025-07-15' && divisorHorario !== 220) {
+            console.error(`❌ BACKEND: ERROR - 15 julio debería usar 220h, pero usa ${divisorHorario}h`);
+          }
+          
           let tipoDescripcion = '';
           switch (subtipo) {
             case 'diurnas':
@@ -220,7 +249,7 @@ function calculateNovedad(input: NovedadCalculationInput) {
               tipoDescripcion = 'Horas festivas diurnas (100% recargo)';
               break;
             case 'festivas_nocturnas':
-              tipoDescripción = 'Horas festivas nocturnas (150% recargo)';
+              tipoDescripcion = 'Horas festivas nocturnas (150% recargo)';
               break;
             default:
               tipoDescripcion = `Horas extra ${subtipo}`;
@@ -585,7 +614,7 @@ serve(async (req) => {
         });
     }
   } catch (error) {
-    console.error('Error in payroll-calculations function:', error);
+    console.error('Error in payroll calculations function:', error);
     return new Response(JSON.stringify({ 
       success: false, 
       error: error.message || 'Internal server error'

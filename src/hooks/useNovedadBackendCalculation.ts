@@ -74,11 +74,20 @@ export const useNovedadBackendCalculation = () => {
     try {
       // ✅ MEJORADO: Log detallado de la fecha que se envía
       const fechaParaCalculo = input.fechaPeriodo?.toISOString().split('T')[0];
-      console.log('🔄 Calculating novedad via backend:', {
+      console.log('🔄 FRONTEND: Calculating novedad via backend:', {
         ...input,
         fechaPeriodo: fechaParaCalculo,
         fechaOriginal: input.fechaPeriodo
       });
+
+      // ✅ VALIDACIÓN ESPECÍFICA EN FRONTEND
+      if (fechaParaCalculo === '2025-07-01') {
+        console.log('🔍 FRONTEND: *** ENVIANDO FECHA 1 JULIO 2025 ***');
+        console.log('🔍 FRONTEND: Esperamos jornada de 46h semanales = 230h mensuales');
+      } else if (fechaParaCalculo === '2025-07-15') {
+        console.log('🔍 FRONTEND: *** ENVIANDO FECHA 15 JULIO 2025 ***');
+        console.log('🔍 FRONTEND: Esperamos jornada de 44h semanales = 220h mensuales');
+      }
 
       const requestData = {
         tipoNovedad: input.tipoNovedad,
@@ -89,7 +98,7 @@ export const useNovedadBackendCalculation = () => {
         fechaPeriodo: fechaParaCalculo || undefined
       };
 
-      console.log('📤 Request data being sent to backend:', requestData);
+      console.log('📤 FRONTEND: Request data being sent to backend:', requestData);
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
@@ -108,7 +117,16 @@ export const useNovedadBackendCalculation = () => {
       }
 
       const result = data.data;
-      console.log('✅ Backend calculation result:', result);
+      console.log('✅ FRONTEND: Backend calculation result:', result);
+
+      // ✅ VALIDACIÓN DE RESULTADOS ESPECÍFICOS
+      if (fechaParaCalculo === '2025-07-01' && result.jornadaInfo.divisorHorario !== 230) {
+        console.error(`❌ FRONTEND: ERROR - 1 julio debería usar 230h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
+      } else if (fechaParaCalculo === '2025-07-15' && result.jornadaInfo.divisorHorario !== 220) {
+        console.error(`❌ FRONTEND: ERROR - 15 julio debería usar 220h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
+      } else if (fechaParaCalculo === '2025-07-01' || fechaParaCalculo === '2025-07-15') {
+        console.log(`✅ FRONTEND: Correcto - ${fechaParaCalculo} usa ${result.jornadaInfo.divisorHorario}h mensuales`);
+      }
 
       // Guardar en cache
       setCachedResults(prev => new Map(prev).set(cacheKey, result));
