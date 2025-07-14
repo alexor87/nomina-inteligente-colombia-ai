@@ -40,6 +40,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   const [useManualValue, setUseManualValue] = useState(false);
   const [observacion, setObservacion] = useState<string>('');
   const [isValidationPassing, setIsValidationPassing] = useState<boolean | null>(null);
+  const [debugDate, setDebugDate] = useState<Date>(periodoFecha || new Date());
   
   const { calculateNovedad, calculateNovedadDebounced, isLoading, clearCache } = useNovedadBackendCalculation();
 
@@ -54,7 +55,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   // 🚀 ULTRA-KISS: Efecto de cálculo con validación extrema
   useEffect(() => {
     if (subtipo && horas && parseFloat(horas) > 0) {
-      const fechaCalculo = periodoFecha || new Date();
+      const fechaCalculo = debugDate; // Usar debugDate en lugar de periodoFecha
       
       console.log('🚀 ULTRA-KISS FORM: *** INICIANDO CÁLCULO ***');
       console.log('🚀 ULTRA-KISS FORM: Subtipo:', subtipo);
@@ -128,7 +129,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
       setValorCalculado(0);
       setIsValidationPassing(null);
     }
-  }, [subtipo, horas, employeeSalary, periodoFecha, calculateNovedad]);
+  }, [subtipo, horas, employeeSalary, debugDate, calculateNovedad]);
 
   const handleSubmit = () => {
     const finalValue = useManualValue && valorManual ? parseFloat(valorManual) : valorCalculado;
@@ -333,13 +334,14 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
       </div>
       
       {/* 🚀 ULTRA-KISS: Panel de debugging flotante */}
-      {periodoFecha && horas && parseFloat(horas) > 0 && (
+      {horas && parseFloat(horas) > 0 && (
         <NovedadDebugPanel
-          fecha={periodoFecha}
+          fecha={debugDate}
           horas={horas}
           salario={employeeSalary}
           valorCalculado={valorCalculado}
           validationPassed={isValidationPassing}
+          onDateChange={setDebugDate}
         />
       )}
     </div>
