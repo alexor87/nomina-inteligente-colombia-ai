@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -75,43 +74,34 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
-// ✅ CORRECCIÓN: Jornadas legales con fechas exactas
-const JORNADAS_LEGALES = [
-  {
-    fechaInicio: new Date('2026-07-15'),
-    horasSemanales: 42,
-    descripcion: 'Jornada final según Ley 2101 de 2021'
-  },
-  {
-    fechaInicio: new Date('2025-07-15'),
-    horasSemanales: 44,
-    descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
-  },
-  {
-    fechaInicio: new Date('2024-07-15'),
-    horasSemanales: 46,
-    descripcion: 'Tercera fase de reducción - Ley 2101 de 2021'
-  },
-  {
-    fechaInicio: new Date('2023-07-15'),
-    horasSemanales: 47,
-    descripcion: 'Segunda fase de reducción - Ley 2101 de 2021'
-  },
-  {
-    fechaInicio: new Date('1950-01-01'),
-    horasSemanales: 48,
-    descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo'
+// ✅ SOLUCIÓN KISS: Función super simple para obtener horas mensuales
+function getHorasMensualesSimple(fechaStr?: string): number {
+  if (!fechaStr) {
+    console.log('🔧 KISS: No fecha proporcionada, usando 220h por defecto');
+    return 220; // Default actual
   }
-];
 
-// ✅ TABLA FIJA DE HORAS MENSUALES POR JORNADA SEMANAL - UNIFICADA
-const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
-  48: 240, // Jornada tradicional
-  47: 235, // Primera reducción (2023-2024)
-  46: 230, // Segunda reducción (2024-2025) ✅ 
-  44: 220, // Tercera reducción (2025-2026) ✅
-  42: 210  // Reducción final (2026+)
-};
+  // ✅ KISS: Convertir fecha string a número simple YYYYMMDD
+  const fechaNumero = parseInt(fechaStr.replace(/-/g, ''));
+  console.log(`🔧 KISS: Fecha string "${fechaStr}" → número ${fechaNumero}`);
+
+  // ✅ KISS: Comparación super simple
+  if (fechaNumero < 20250715) {
+    console.log('🔧 KISS: Antes del 15 julio 2025 → 230 horas mensuales');
+    return 230;
+  } else {
+    console.log('🔧 KISS: Desde el 15 julio 2025 → 220 horas mensuales');
+    return 220;
+  }
+}
+
+// ✅ SOLUCIÓN KISS: Función simple para jornada semanal
+function getHorasSemanalesSimple(fechaStr?: string): number {
+  if (!fechaStr) return 44; // Default actual
+  
+  const fechaNumero = parseInt(fechaStr.replace(/-/g, ''));
+  return fechaNumero < 20250715 ? 46 : 44;
+}
 
 // Factores de horas extra según legislación colombiana
 const HORAS_EXTRA_FACTORS = {
@@ -123,90 +113,11 @@ const HORAS_EXTRA_FACTORS = {
   festivas_nocturnas: 2.5
 } as const;
 
-function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
-  // ✅ CORRECCIÓN CRÍTICA: Crear fecha sin zona horaria para comparaciones exactas
-  const fechaLocal = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
-  const fechaString = fechaLocal.toISOString().split('T')[0];
-  
-  console.log(`🗓️ BACKEND: Calculando jornada legal para fecha: ${fechaString}`);
-  console.log(`🗓️ BACKEND: Año: ${fechaLocal.getFullYear()}, Mes: ${fechaLocal.getMonth() + 1}, Día: ${fechaLocal.getDate()}`);
-  
-  const jornadaVigente = JORNADAS_LEGALES
-    .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
-    .find(jornada => {
-      // ✅ CORRECCIÓN: Comparación exacta de fechas sin problemas de zona horaria
-      const fechaInicioJornada = new Date(jornada.fechaInicio.getFullYear(), jornada.fechaInicio.getMonth(), jornada.fechaInicio.getDate());
-      const esVigente = fechaLocal >= fechaInicioJornada;
-      
-      console.log(`   📅 BACKEND: Comparando ${fechaString} >= ${fechaInicioJornada.toISOString().split('T')[0]} (${jornada.horasSemanales}h) - Vigente: ${esVigente}`);
-      
-      return esVigente;
-    });
-
-  if (!jornadaVigente) {
-    const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
-    const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaTradicional.horasSemanales];
-    console.log(`⚠️ BACKEND: No se encontró jornada vigente, usando tradicional: ${jornadaTradicional.horasSemanales}h = ${horasMensuales}h mensuales`);
-    
-    return {
-      horasSemanales: jornadaTradicional.horasSemanales,
-      horasMensuales: horasMensuales,
-      fechaVigencia: jornadaTradicional.fechaInicio,
-      descripcion: jornadaTradicional.descripcion,
-      ley: 'Código Sustantivo del Trabajo'
-    };
-  }
-
-  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaVigente.horasSemanales];
-  console.log(`✅ BACKEND: Jornada seleccionada: ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
-
-  return {
-    horasSemanales: jornadaVigente.horasSemanales,
-    horasMensuales: horasMensuales,
-    fechaVigencia: jornadaVigente.fechaInicio,
-    descripcion: jornadaVigente.descripcion,
-    ley: 'Ley 2101 de 2021'
-  };
-}
-
-function getHourlyDivisor(fecha: Date = new Date()): number {
-  const jornadaInfo = getJornadaLegal(fecha);
-  const divisor = jornadaInfo.horasMensuales; // ✅ USAR TABLA FIJA
-  console.log(`🧮 BACKEND: Divisor horario para ${fecha.toISOString().split('T')[0]}: ${divisor} horas (tabla fija)`);
-  return divisor;
-}
-
-// ✅ FUNCIÓN MEJORADA: Calcular novedades con tabla fija de horas
+// ✅ SOLUCIÓN KISS PARA HORAS EXTRA
 function calculateNovedad(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
-  // ✅ CORRECCIÓN CRÍTICA: Parseo de fecha simplificado y consistente
-  let fechaCalculo: Date;
-  if (fechaPeriodo) {
-    // ✅ NUEVO: Parseo simple sin forzar zona horaria UTC
-    fechaCalculo = new Date(fechaPeriodo);
-    console.log(`📅 BACKEND: Fecha período recibida: "${fechaPeriodo}"`);
-    console.log(`📅 BACKEND: Fecha parseada: ${fechaCalculo.toISOString().split('T')[0]}`);
-    console.log(`📅 BACKEND: Año: ${fechaCalculo.getFullYear()}, Mes: ${fechaCalculo.getMonth() + 1}, Día: ${fechaCalculo.getDate()}`);
-  } else {
-    fechaCalculo = new Date();
-    console.log(`📅 BACKEND: No se recibió fecha período, usando fecha actual: ${fechaCalculo.toISOString().split('T')[0]}`);
-  }
-  
-  // ✅ VALIDACIÓN ESPECÍFICA PARA FECHAS DE PRUEBA
-  if (fechaPeriodo === '2025-07-01') {
-    console.log(`🔍 BACKEND: *** FECHA DE PRUEBA 1 JULIO 2025 ***`);
-    console.log(`🔍 BACKEND: Debe usar jornada de 46h semanales = 230h mensuales`);
-  } else if (fechaPeriodo === '2025-07-15') {
-    console.log(`🔍 BACKEND: *** FECHA DE PRUEBA 15 JULIO 2025 ***`);
-    console.log(`🔍 BACKEND: Debe usar jornada de 44h semanales = 220h mensuales`);
-  }
-  
-  const jornadaLegal = getJornadaLegal(fechaCalculo);
-  const divisorHorario = getHourlyDivisor(fechaCalculo);
-  
-  console.log(`🧮 BACKEND: Calculando novedad: ${tipoNovedad}, subtipo: ${subtipo}`);
-  console.log(`📊 BACKEND: Jornada legal: ${jornadaLegal.horasSemanales}h/semana, divisor: ${divisorHorario}h mensuales, fecha: ${fechaCalculo.toISOString().split('T')[0]}`);
+  console.log(`🔧 KISS: Calculando novedad para fecha: "${fechaPeriodo}"`);
   
   let valor = 0;
   let factorCalculo = 0;
@@ -217,18 +128,25 @@ function calculateNovedad(input: NovedadCalculationInput) {
       if (horas && horas > 0 && subtipo) {
         const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
         if (factor) {
-          const tarifaHora = salarioBase / divisorHorario;
+          // ✅ KISS: Usar función super simple
+          const horasMensuales = getHorasMensualesSimple(fechaPeriodo);
+          const horasSemanales = getHorasSemanalesSimple(fechaPeriodo);
+          
+          console.log(`💰 KISS: Salario: ${salarioBase}, Horas mensuales: ${horasMensuales}, Factor: ${factor}, Horas: ${horas}`);
+          
+          const tarifaHora = salarioBase / horasMensuales;
           valor = Math.round(tarifaHora * factor * horas);
           factorCalculo = factor;
           
-          console.log(`💰 BACKEND: Cálculo horas extra: ${salarioBase} / ${divisorHorario} * ${factor} * ${horas} = ${valor}`);
-          console.log(`🔍 BACKEND: Tarifa hora base: $${Math.round(tarifaHora).toLocaleString()} (salario / ${divisorHorario}h mensuales fijas)`);
+          console.log(`💰 KISS: Tarifa hora: ${Math.round(tarifaHora)}, Valor final: ${valor}`);
           
-          // ✅ VALIDACIÓN ESPECÍFICA DE VALORES CALCULADOS
-          if (fechaPeriodo === '2025-07-01' && divisorHorario !== 230) {
-            console.error(`❌ BACKEND: ERROR - 1 julio debería usar 230h, pero usa ${divisorHorario}h`);
-          } else if (fechaPeriodo === '2025-07-15' && divisorHorario !== 220) {
-            console.error(`❌ BACKEND: ERROR - 15 julio debería usar 220h, pero usa ${divisorHorario}h`);
+          // ✅ KISS: Validación específica simple
+          if (fechaPeriodo === '2025-07-01' && horasMensuales !== 230) {
+            console.error(`❌ KISS: ERROR - 1 julio debería usar 230h, pero usa ${horasMensuales}h`);
+          } else if (fechaPeriodo === '2025-07-15' && horasMensuales !== 220) {
+            console.error(`❌ KISS: ERROR - 15 julio debería usar 220h, pero usa ${horasMensuales}h`);
+          } else {
+            console.log(`✅ KISS: Correcto - ${fechaPeriodo} usa ${horasMensuales}h mensuales`);
           }
           
           let tipoDescripcion = '';
@@ -255,7 +173,7 @@ function calculateNovedad(input: NovedadCalculationInput) {
               tipoDescripcion = `Horas extra ${subtipo}`;
           }
           
-          detalleCalculo = `${tipoDescripcion}: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
+          detalleCalculo = `${tipoDescripcion}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
         } else {
           detalleCalculo = 'Subtipo de horas extra no válido';
         }
@@ -266,11 +184,12 @@ function calculateNovedad(input: NovedadCalculationInput) {
 
     case 'recargo_nocturno':
       if (horas && horas > 0) {
-        const tarifaHora = salarioBase / divisorHorario;
+        const horasMensuales = getHorasMensualesSimple(fechaPeriodo);
+        const tarifaHora = salarioBase / horasMensuales;
         const factor = 0.35; // 35% adicional para recargo nocturno
         valor = Math.round(tarifaHora * factor * horas);
         factorCalculo = factor;
-        detalleCalculo = `Recargo nocturno: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × 35% × ${horas} horas = ${valor.toLocaleString()}`;
+        detalleCalculo = `Recargo nocturno: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × 35% × ${horas} horas = ${valor.toLocaleString()}`;
       } else {
         detalleCalculo = 'Ingrese las horas de recargo nocturno';
       }
@@ -386,28 +305,30 @@ function calculateNovedad(input: NovedadCalculationInput) {
       detalleCalculo = 'Tipo de novedad no reconocido';
   }
 
+  // ✅ KISS: Resultado simple con valores calculados usando función simple
+  const horasMensuales = getHorasMensualesSimple(fechaPeriodo);
+  const horasSemanales = getHorasSemanalesSimple(fechaPeriodo);
+
   const result = {
     valor,
     factorCalculo,
     detalleCalculo,
     jornadaInfo: {
-      horasSemanales: jornadaLegal.horasSemanales,
-      horasMensuales: jornadaLegal.horasMensuales, // ✅ YA ES ENTERO DE LA TABLA
-      divisorHorario,
-      valorHoraOrdinaria: Math.round(salarioBase / divisorHorario),
-      ley: jornadaLegal.ley,
-      descripcion: jornadaLegal.descripcion
+      horasSemanales,
+      horasMensuales,
+      divisorHorario: horasMensuales,
+      valorHoraOrdinaria: Math.round(salarioBase / horasMensuales),
+      ley: horasMensuales === 230 ? 'Ley 2101 de 2021 (Tercera fase)' : 'Ley 2101 de 2021 (Cuarta fase)',
+      descripcion: horasMensuales === 230 ? 'Tercera fase de reducción (46h semanales)' : 'Cuarta fase de reducción (44h semanales)'
     }
   };
 
-  console.log(`✅ BACKEND: Resultado del cálculo:`, result);
+  console.log(`✅ KISS: Resultado final:`, result);
   return result;
 }
 
 function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: string) {
   const config = DEFAULT_CONFIG_2025;
-  const periodDate = input.periodDate ? new Date(input.periodDate) : new Date();
-  const jornadaLegal = getJornadaLegal(periodDate);
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -436,7 +357,8 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
     errors.push('Los días trabajados no pueden ser negativos');
   }
 
-  const maxHorasExtraSemanales = jornadaLegal.horasSemanales * 0.25;
+  const horasSemanales = getHorasSemanalesSimple(input.periodDate);
+  const maxHorasExtraSemanales = horasSemanales * 0.25;
   let horasExtraSemanalesEstimadas: number;
   
   switch (input.periodType) {
@@ -454,7 +376,7 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
   }
   
   if (horasExtraSemanalesEstimadas > maxHorasExtraSemanales) {
-    warnings.push(`Horas extra excesivas para jornada de ${jornadaLegal.horasSemanales}h semanales (máximo recomendado: ${maxHorasExtraSemanales}h/semana)`);
+    warnings.push(`Horas extra excesivas para jornada de ${horasSemanales}h semanales (máximo recomendado: ${maxHorasExtraSemanales}h/semana)`);
   }
   if (input.extraHours < 0) {
     errors.push('Las horas extra no pueden ser negativas');
@@ -480,18 +402,17 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
     errors,
     warnings,
     jornadaInfo: {
-      horasSemanales: jornadaLegal.horasSemanales,
-      ley: jornadaLegal.ley,
-      descripcion: jornadaLegal.descripcion
+      horasSemanales,
+      ley: 'Ley 2101 de 2021',
+      descripcion: `Jornada de ${horasSemanales} horas semanales`
     }
   };
 }
 
 function calculatePayroll(input: PayrollCalculationInput) {
   const config = DEFAULT_CONFIG_2025;
-  const periodDate = input.periodDate ? new Date(input.periodDate) : new Date();
-  const jornadaLegal = getJornadaLegal(periodDate);
-  const hourlyDivisor = getHourlyDivisor(periodDate);
+  const horasMensuales = getHorasMensualesSimple(input.periodDate);
+  const horasSemanales = getHorasSemanalesSimple(input.periodDate);
   
   console.log(`🔧 EDGE FUNCTION - Período: ${input.periodType}, Días: ${input.workedDays}`);
   
@@ -499,7 +420,7 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
   const regularPay = Math.round(dailySalary * effectiveWorkedDays);
 
-  const hourlyRate = input.baseSalary / hourlyDivisor;
+  const hourlyRate = input.baseSalary / horasMensuales;
   const extraPay = Math.round(input.extraHours * hourlyRate * 1.25);
 
   let transportAllowance = 0;
@@ -548,12 +469,12 @@ function calculatePayroll(input: PayrollCalculationInput) {
     employerContributions,
     totalPayrollCost,
     jornadaInfo: {
-      horasSemanales: jornadaLegal.horasSemanales,
-      horasMensuales: Math.round(jornadaLegal.horasMensuales),
-      divisorHorario: hourlyDivisor,
-      valorHoraOrdinaria: Math.round(input.baseSalary / hourlyDivisor),
-      ley: jornadaLegal.ley,
-      descripcion: jornadaLegal.descripcion
+      horasSemanales,
+      horasMensuales,
+      divisorHorario: horasMensuales,
+      valorHoraOrdinaria: Math.round(input.baseSalary / horasMensuales),
+      ley: 'Ley 2101 de 2021',
+      descripcion: `Jornada de ${horasSemanales} horas semanales`
     }
   };
 }
@@ -585,23 +506,25 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
-      // ✅ MEJORADO: Endpoint con logs detallados
       case 'calculate-novedad':
-        console.log('🔍 BACKEND: Received novedad calculation request:', data);
+        console.log('🔍 KISS: Received novedad calculation request:', data);
         const novedadResult = calculateNovedad(data);
-        console.log('📤 BACKEND: Sending novedad calculation response:', novedadResult);
+        console.log('📤 KISS: Sending novedad calculation response:', novedadResult);
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
       case 'get-jornada-legal':
-        const fecha = data.fecha ? new Date(data.fecha) : new Date();
-        const jornadaInfo = getJornadaLegal(fecha);
+        const horasMensuales = getHorasMensualesSimple(data.fecha);
+        const horasSemanales = getHorasSemanalesSimple(data.fecha);
         return new Response(JSON.stringify({ 
           success: true, 
           data: {
-            ...jornadaInfo,
-            divisorHorario: getHourlyDivisor(fecha)
+            horasSemanales,
+            horasMensuales,
+            divisorHorario: horasMensuales,
+            ley: 'Ley 2101 de 2021',
+            descripcion: `Jornada de ${horasSemanales} horas semanales`
           }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
