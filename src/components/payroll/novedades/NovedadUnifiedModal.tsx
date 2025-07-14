@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
@@ -190,7 +189,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[650px] lg:max-w-[750px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {currentNovedadType ? `Novedad: ${currentNovedadType}` : 'Agregar Novedad'}
@@ -200,7 +199,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {renderSelectedForm()}
+        <div className="px-2">
+          {renderSelectedForm()}
+        </div>
 
         <DialogFooter>
           <Button type="button" variant="secondary" onClick={handleClose}>
