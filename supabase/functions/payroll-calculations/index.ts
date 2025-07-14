@@ -74,37 +74,34 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
-// ✅ SOLUCIÓN KISS: Función super simple para obtener horas mensuales
+// ✅ FUNCIÓN ULTRA-SIMPLE PARA HORAS MENSUALES - CORREGIDA
 function getHorasMensualesSimple(fechaStr?: string): number {
   if (!fechaStr) {
-    console.log('🔧 KISS: No fecha proporcionada, usando 220h por defecto');
-    return 220; // Default actual (44h semanales)
+    console.log('🔧 BACKEND: No date provided, using 220h default');
+    return 220;
   }
 
-  // ✅ KISS: Convertir fecha string a número simple YYYYMMDD
   const fechaNumero = parseInt(fechaStr.replace(/-/g, ''));
-  console.log(`🔧 KISS: Fecha string "${fechaStr}" → número ${fechaNumero}`);
+  console.log(`🔧 BACKEND: Date "${fechaStr}" → number ${fechaNumero}`);
 
-  // ✅ KISS: Comparación super simple - CORREGIDA
-  // El 15 julio 2025 (20250715) debe usar 220 horas (44h semanales)
-  if (fechaNumero < 20250715) {
-    console.log('🔧 KISS: Antes del 15 julio 2025 → 230 horas mensuales (46h semanales)');
-    return 230;
-  } else {
-    console.log('🔧 KISS: Desde el 15 julio 2025 (inclusive) → 220 horas mensuales (44h semanales)');
+  // ✅ LÓGICA CORREGIDA: 15 julio 2025 y posteriores usan 220h
+  if (fechaNumero >= 20250715) {
+    console.log('🔧 BACKEND: From July 15, 2025 onwards → 220 monthly hours (44h weekly)');
     return 220;
+  } else {
+    console.log('🔧 BACKEND: Before July 15, 2025 → 230 monthly hours (46h weekly)');
+    return 230;
   }
 }
 
-// ✅ SOLUCIÓN KISS: Función simple para jornada semanal
 function getHorasSemanalesSimple(fechaStr?: string): number {
-  if (!fechaStr) return 44; // Default actual
+  if (!fechaStr) return 44;
   
   const fechaNumero = parseInt(fechaStr.replace(/-/g, ''));
-  if (fechaNumero < 20250715) {
-    return 46; // Antes del 15 julio 2025
+  if (fechaNumero >= 20250715) {
+    return 44; // From July 15, 2025 onwards
   } else {
-    return 44; // Desde el 15 julio 2025 (inclusive)
+    return 46; // Before July 15, 2025
   }
 }
 
@@ -122,7 +119,7 @@ const HORAS_EXTRA_FACTORS = {
 function calculateNovedad(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
-  console.log(`🔧 KISS: Calculando novedad para fecha: "${fechaPeriodo}"`);
+  console.log(`🔧 BACKEND: Calculating novedad for date: "${fechaPeriodo}"`);
   
   let valor = 0;
   let factorCalculo = 0;
@@ -133,29 +130,26 @@ function calculateNovedad(input: NovedadCalculationInput) {
       if (horas && horas > 0 && subtipo) {
         const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
         if (factor) {
-          // ✅ KISS: Usar función super simple
           const horasMensuales = getHorasMensualesSimple(fechaPeriodo);
           const horasSemanales = getHorasSemanalesSimple(fechaPeriodo);
           
-          console.log(`💰 KISS: Salario: ${salarioBase}, Horas mensuales: ${horasMensuales}, Factor: ${factor}, Horas: ${horas}`);
+          console.log(`💰 BACKEND: Salary: ${salarioBase}, Monthly hours: ${horasMensuales}, Factor: ${factor}, Hours: ${horas}`);
           
           const tarifaHora = salarioBase / horasMensuales;
           valor = Math.round(tarifaHora * factor * horas);
           factorCalculo = factor;
           
-          console.log(`💰 KISS: Tarifa hora: ${Math.round(tarifaHora)}, Valor final: ${valor}`);
+          console.log(`💰 BACKEND: Hourly rate: ${Math.round(tarifaHora)}, Final value: ${valor}`);
           
-          // ✅ KISS: Validación específica simple - CORREGIDA
+          // ✅ VALIDACIÓN ESPECÍFICA CORREGIDA
           if (fechaPeriodo === '2025-07-01' && horasMensuales !== 230) {
-            console.error(`❌ KISS: ERROR - 1 julio debería usar 230h, pero usa ${horasMensuales}h`);
+            console.error(`❌ BACKEND: ERROR - July 1 should use 230h, but uses ${horasMensuales}h`);
           } else if (fechaPeriodo === '2025-07-15' && horasMensuales !== 220) {
-            console.error(`❌ KISS: ERROR - 15 julio debería usar 220h, pero usa ${horasMensuales}h`);
+            console.error(`❌ BACKEND: ERROR - July 15 should use 220h, but uses ${horasMensuales}h`);
           } else if (fechaPeriodo === '2025-07-16' && horasMensuales !== 220) {
-            console.error(`❌ KISS: ERROR - 16 julio debería usar 220h, pero usa ${horasMensuales}h`);
-          } else if (fechaPeriodo === '2025-07-17' && horasMensuales !== 220) {
-            console.error(`❌ KISS: ERROR - 17 julio debería usar 220h, pero usa ${horasMensuales}h`);
+            console.error(`❌ BACKEND: ERROR - July 16 should use 220h, but uses ${horasMensuales}h`);
           } else {
-            console.log(`✅ KISS: Correcto - ${fechaPeriodo} usa ${horasMensuales}h mensuales`);
+            console.log(`✅ BACKEND: Correct - ${fechaPeriodo} uses ${horasMensuales}h monthly`);
           }
           
           let tipoDescripcion = '';
@@ -314,7 +308,6 @@ function calculateNovedad(input: NovedadCalculationInput) {
       detalleCalculo = 'Tipo de novedad no reconocido';
   }
 
-  // ✅ KISS: Resultado simple con valores calculados usando función simple
   const horasMensuales = getHorasMensualesSimple(fechaPeriodo);
   const horasSemanales = getHorasSemanalesSimple(fechaPeriodo);
 
@@ -332,7 +325,12 @@ function calculateNovedad(input: NovedadCalculationInput) {
     }
   };
 
-  console.log(`✅ KISS: Resultado final:`, result);
+  console.log(`✅ BACKEND: Final result for ${fechaPeriodo}:`, {
+    valor: result.valor,
+    divisorHorario: result.jornadaInfo.divisorHorario,
+    valorHoraOrdinaria: result.jornadaInfo.valorHoraOrdinaria
+  });
+  
   return result;
 }
 

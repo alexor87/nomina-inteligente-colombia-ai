@@ -32,9 +32,12 @@ export const useNovedadBackendCalculation = () => {
   const [cachedResults, setCachedResults] = useState<Map<string, NovedadCalculationResult>>(new Map());
   const debounceRef = useRef<NodeJS.Timeout>();
 
+  // ✅ CORRECCIÓN CRÍTICA: Cache key debe incluir fecha correctamente
   const generateCacheKey = useCallback((input: NovedadCalculationInput): string => {
-    const dateStr = input.fechaPeriodo?.toISOString().split('T')[0] || 'current';
-    return `${input.tipoNovedad}-${input.subtipo || 'none'}-${input.salarioBase}-${input.horas || 0}-${input.dias || 0}-${dateStr}`;
+    const dateStr = input.fechaPeriodo ? input.fechaPeriodo.toISOString().split('T')[0] : 'no-date';
+    const key = `${input.tipoNovedad}-${input.subtipo || 'none'}-${input.salarioBase}-${input.horas || 0}-${input.dias || 0}-${dateStr}`;
+    console.log(`🔑 CACHE KEY GENERATED: ${key}`);
+    return key;
   }, []);
 
   const calculateNovedad = useCallback(async (
@@ -42,29 +45,30 @@ export const useNovedadBackendCalculation = () => {
   ): Promise<NovedadCalculationResult | null> => {
     const cacheKey = generateCacheKey(input);
     
-    // Verificar cache primero
+    // ✅ VERIFICAR CACHE CON LOGGING
     if (cachedResults.has(cacheKey)) {
-      console.log('🎯 KISS: Using cached result for:', cacheKey);
-      return cachedResults.get(cacheKey)!;
+      const cachedResult = cachedResults.get(cacheKey)!;
+      console.log(`🎯 USING CACHED RESULT for key: ${cacheKey}`);
+      console.log(`   Cached value: ${cachedResult.valor}, divisor: ${cachedResult.jornadaInfo.divisorHorario}`);
+      return cachedResult;
     }
 
     // Validaciones básicas
     if (!input.salarioBase || input.salarioBase <= 0) {
-      console.log('❌ KISS: Invalid salary for calculation');
+      console.log('❌ Invalid salary for calculation');
       return null;
     }
 
-    // Validar inputs requeridos según tipo
     const requiresHours = ['horas_extra', 'recargo_nocturno'].includes(input.tipoNovedad);
     const requiresDays = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'].includes(input.tipoNovedad);
 
     if (requiresHours && (!input.horas || input.horas <= 0)) {
-      console.log('⏳ KISS: Waiting for hours input');
+      console.log('⏳ Waiting for hours input');
       return null;
     }
 
     if (requiresDays && (!input.dias || input.dias <= 0)) {
-      console.log('⏳ KISS: Waiting for days input');
+      console.log('⏳ Waiting for days input');
       return null;
     }
 
@@ -72,22 +76,14 @@ export const useNovedadBackendCalculation = () => {
     setError(null);
 
     try {
-      // ✅ KISS: Fecha simple como string YYYY-MM-DD
       const fechaParaCalculo = input.fechaPeriodo?.toISOString().split('T')[0];
-      console.log('🔄 KISS FRONTEND: Calculating novedad via backend:', {
-        ...input,
-        fechaPeriodo: fechaParaCalculo
-      });
-
-      // ✅ KISS: Validación específica simple - CORREGIDA
+      console.log(`🔄 FRONTEND: Calculating novedad via backend for date: ${fechaParaCalculo}`);
+      
+      // ✅ VALIDACIÓN ESPECÍFICA CON LOGGING DETALLADO
       if (fechaParaCalculo === '2025-07-01') {
-        console.log('🔍 KISS FRONTEND: *** ENVIANDO FECHA 1 JULIO 2025 - ESPERAMOS 230h ***');
+        console.log(`🔍 FRONTEND: *** JULY 1, 2025 - EXPECTING 230h monthly ***`);
       } else if (fechaParaCalculo === '2025-07-15') {
-        console.log('🔍 KISS FRONTEND: *** ENVIANDO FECHA 15 JULIO 2025 - ESPERAMOS 220h ***');
-      } else if (fechaParaCalculo === '2025-07-16') {
-        console.log('🔍 KISS FRONTEND: *** ENVIANDO FECHA 16 JULIO 2025 - ESPERAMOS 220h ***');
-      } else if (fechaParaCalculo === '2025-07-17') {
-        console.log('🔍 KISS FRONTEND: *** ENVIANDO FECHA 17 JULIO 2025 - ESPERAMOS 220h ***');
+        console.log(`🔍 FRONTEND: *** JULY 15, 2025 - EXPECTING 220h monthly ***`);
       }
 
       const requestData = {
@@ -99,7 +95,7 @@ export const useNovedadBackendCalculation = () => {
         fechaPeriodo: fechaParaCalculo || undefined
       };
 
-      console.log('📤 KISS FRONTEND: Request data being sent to backend:', requestData);
+      console.log(`📤 FRONTEND: Request data:`, requestData);
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
@@ -109,7 +105,7 @@ export const useNovedadBackendCalculation = () => {
       });
 
       if (apiError) {
-        console.error('❌ KISS API Error:', apiError);
+        console.error('❌ API Error:', apiError);
         throw new Error('Error en el cálculo de novedad');
       }
 
@@ -118,28 +114,30 @@ export const useNovedadBackendCalculation = () => {
       }
 
       const result = data.data;
-      console.log('✅ KISS FRONTEND: Backend calculation result:', result);
+      console.log(`✅ FRONTEND: Backend result for ${fechaParaCalculo}:`, {
+        valor: result.valor,
+        divisorHorario: result.jornadaInfo.divisorHorario,
+        valorHoraOrdinaria: result.jornadaInfo.valorHoraOrdinaria,
+        factorCalculo: result.factorCalculo
+      });
 
-      // ✅ KISS: Validación de resultados específicos - CORREGIDA
+      // ✅ VALIDACIÓN DE RESULTADOS ESPECÍFICOS
       if (fechaParaCalculo === '2025-07-01' && result.jornadaInfo.divisorHorario !== 230) {
-        console.error(`❌ KISS FRONTEND: ERROR - 1 julio debería usar 230h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
+        console.error(`❌ FRONTEND ERROR: July 1 should use 230h, got ${result.jornadaInfo.divisorHorario}h`);
       } else if (fechaParaCalculo === '2025-07-15' && result.jornadaInfo.divisorHorario !== 220) {
-        console.error(`❌ KISS FRONTEND: ERROR - 15 julio debería usar 220h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
-      } else if (fechaParaCalculo === '2025-07-16' && result.jornadaInfo.divisorHorario !== 220) {
-        console.error(`❌ KISS FRONTEND: ERROR - 16 julio debería usar 220h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
-      } else if (fechaParaCalculo === '2025-07-17' && result.jornadaInfo.divisorHorario !== 220) {
-        console.error(`❌ KISS FRONTEND: ERROR - 17 julio debería usar 220h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
-      } else if (['2025-07-01', '2025-07-15', '2025-07-16', '2025-07-17'].includes(fechaParaCalculo || '')) {
-        console.log(`✅ KISS FRONTEND: Correcto - ${fechaParaCalculo} usa ${result.jornadaInfo.divisorHorario}h mensuales`);
+        console.error(`❌ FRONTEND ERROR: July 15 should use 220h, got ${result.jornadaInfo.divisorHorario}h`);
+      } else if (['2025-07-01', '2025-07-15'].includes(fechaParaCalculo || '')) {
+        console.log(`✅ FRONTEND: Correct - ${fechaParaCalculo} uses ${result.jornadaInfo.divisorHorario}h monthly`);
       }
 
-      // Guardar en cache
+      // ✅ GUARDAR EN CACHE CON LOGGING
+      console.log(`💾 CACHING result for key: ${cacheKey}`);
       setCachedResults(prev => new Map(prev).set(cacheKey, result));
 
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-      console.error('❌ KISS Error in backend calculation:', errorMessage);
+      console.error('❌ Error in backend calculation:', errorMessage);
       setError(errorMessage);
       return null;
     } finally {
@@ -152,12 +150,10 @@ export const useNovedadBackendCalculation = () => {
     callback: (result: NovedadCalculationResult | null) => void,
     delay: number = 500
   ) => {
-    // Limpiar debounce anterior
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    // Configurar nuevo debounce
     debounceRef.current = setTimeout(async () => {
       const result = await calculateNovedad(input);
       callback(result);
@@ -165,7 +161,7 @@ export const useNovedadBackendCalculation = () => {
   }, [calculateNovedad]);
 
   const clearCache = useCallback(() => {
-    console.log('🗑️ KISS: Clearing novedad calculation cache');
+    console.log('🗑️ CLEARING novedad calculation cache');
     setCachedResults(new Map());
   }, []);
 
