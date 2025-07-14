@@ -66,11 +66,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // Calcular fecha del período para jornada legal
+  // Calcular fecha del período para jornada legal - CORREGIDO para evitar shift de timezone
   const getPeriodDate = useCallback(() => {
     if (startDate) {
-      const date = new Date(startDate);
-      console.log('📅 Usando fecha del período para cálculos:', date.toISOString().split('T')[0]);
+      const date = new Date(startDate + 'T00:00:00');
+      console.log('📅 Usando fecha del período para cálculos (UTC corregido):', date.toISOString().split('T')[0]);
       return date;
     }
     console.log('⚠️ No hay startDate, usando fecha actual');
