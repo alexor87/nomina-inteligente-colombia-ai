@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Calculator, Info, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
+import { NovedadDebugPanel } from '@/components/payroll/NovedadDebugPanel';
 
 interface NovedadHorasExtraFormProps {
   onBack: () => void;
@@ -89,21 +90,24 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           console.log('🚀 ULTRA-KISS FORM: Divisor horario:', result.jornadaInfo.divisorHorario);
           console.log('🚀 ULTRA-KISS FORM: Valor hora ordinaria:', result.jornadaInfo.valorHoraOrdinaria);
           
-          // 🎯 VALIDACIÓN FINAL ULTRA-ESPECÍFICA
+          // 🎯 VALIDACIÓN FINAL ULTRA-ESPECÍFICA - Calculando valores exactos esperados
           let validationPassed = null;
+          const expectedValue15July = Math.round((1718661 / 220) * 1.25 * parseFloat(horas)); // ~9765 para 1 hora
+          const expectedValue1July = Math.round((1718661 / 230) * 1.25 * parseFloat(horas)); // ~9341 para 1 hora
+          
           if (fechaString === '2025-07-15') {
-            validationPassed = result.valor >= 9500;
+            validationPassed = Math.abs(result.valor - expectedValue15July) < 50;
             if (validationPassed) {
-              console.log('✅ ULTRA-KISS FORM SUCCESS: 15 julio usa correctamente 220h - Valor:', result.valor);
+              console.log('✅ ULTRA-KISS FORM SUCCESS: 15 julio usa correctamente 220h - Valor:', result.valor, 'Esperado:', expectedValue15July);
             } else {
-              console.error('❌ ULTRA-KISS FORM ERROR: 15 julio valor incorrecto:', result.valor);
+              console.error('❌ ULTRA-KISS FORM ERROR: 15 julio valor incorrecto:', result.valor, 'Esperado:', expectedValue15July);
             }
           } else if (fechaString === '2025-07-01') {
-            validationPassed = Math.abs(result.valor - 9341) < 100;
+            validationPassed = Math.abs(result.valor - expectedValue1July) < 50;
             if (validationPassed) {
-              console.log('✅ ULTRA-KISS FORM SUCCESS: 1 julio usa correctamente 230h - Valor:', result.valor);
+              console.log('✅ ULTRA-KISS FORM SUCCESS: 1 julio usa correctamente 230h - Valor:', result.valor, 'Esperado:', expectedValue1July);
             } else {
-              console.error('❌ ULTRA-KISS FORM ERROR: 1 julio valor incorrecto:', result.valor);
+              console.error('❌ ULTRA-KISS FORM ERROR: 1 julio valor incorrecto:', result.valor, 'Esperado:', expectedValue1July);
             }
           }
           
@@ -258,10 +262,10 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
                 <p className="font-bold">❌ VALIDACIÓN FALLIDA</p>
               )}
               {periodoFecha?.toISOString().split('T')[0] === '2025-07-15' && (
-                <p className="mt-1">Esperado: ≥ $9,500 (220h mensuales)</p>
+                <p className="mt-1">Esperado: ${formatCurrency(Math.round((1718661 / 220) * 1.25 * parseFloat(horas || '1')))} (220h mensuales)</p>
               )}
               {periodoFecha?.toISOString().split('T')[0] === '2025-07-01' && (
-                <p className="mt-1">Esperado: ~$9,341 (230h mensuales)</p>
+                <p className="mt-1">Esperado: ${formatCurrency(Math.round((1718661 / 230) * 1.25 * parseFloat(horas || '1')))} (230h mensuales)</p>
               )}
             </div>
           </div>
@@ -327,6 +331,17 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           {isLoading ? 'Calculando...' : 'Agregar Novedad'}
         </Button>
       </div>
+      
+      {/* 🚀 ULTRA-KISS: Panel de debugging flotante */}
+      {periodoFecha && horas && parseFloat(horas) > 0 && (
+        <NovedadDebugPanel
+          fecha={periodoFecha}
+          horas={horas}
+          salario={employeeSalary}
+          valorCalculado={valorCalculado}
+          validationPassed={isValidationPassing}
+        />
+      )}
     </div>
   );
 };

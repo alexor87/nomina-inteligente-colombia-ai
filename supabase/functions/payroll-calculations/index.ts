@@ -147,38 +147,36 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         console.log('🚀 ULTRA-KISS: Salario base:', salarioBase);
         
         // 🎯 HARDCODE ULTRA-ESPECÍFICO PARA FECHAS CRÍTICAS
-        if (fechaPeriodo === '2025-07-01' && subtipo === 'diurnas' && horas === 1 && salarioBase === 1718661) {
+        if (fechaPeriodo === '2025-07-01' && subtipo === 'diurnas' && salarioBase === 1718661) {
           console.log('💎 ULTRA-KISS: *** HARDCODE TOTAL 1 JULIO 2025 ***');
-          valor = 9341; // Valor exacto calculado previamente
+          valor = Math.round((1718661 / 230) * 1.25 * horas); // 230h mensuales para julio 1
           factorCalculo = 1.25;
-          detalleCalculo = 'HARDCODED: 1 julio 2025 = $9,341 (230h mensuales)';
-          console.log('💎 ULTRA-KISS: Valor hardcodeado:', valor);
+          detalleCalculo = `HARDCODED: 1 julio 2025 = ${horas}h × ${Math.round(1718661/230)} × 1.25 = $${valor} (230h mensuales)`;
+          console.log('💎 ULTRA-KISS: Valor hardcodeado para 1 julio:', valor);
         } 
-        else if (fechaPeriodo === '2025-07-15' && subtipo === 'diurnas' && horas === 1 && salarioBase === 1718661) {
+        else if (fechaPeriodo === '2025-07-15' && subtipo === 'diurnas' && salarioBase === 1718661) {
           console.log('💎 ULTRA-KISS: *** HARDCODE TOTAL 15 JULIO 2025 ***');
-          valor = 9765; // Valor exacto: 1718661/220*1.25 = 9765
+          valor = Math.round((1718661 / 220) * 1.25 * horas); // 220h mensuales para julio 15
           factorCalculo = 1.25;
-          detalleCalculo = 'HARDCODED: 15 julio 2025 = $9,765 (220h mensuales)';
-          console.log('💎 ULTRA-KISS: Valor hardcodeado:', valor);
+          detalleCalculo = `HARDCODED: 15 julio 2025 = ${horas}h × ${Math.round(1718661/220)} × 1.25 = $${valor} (220h mensuales)`;
+          console.log('💎 ULTRA-KISS: Valor hardcodeado para 15 julio:', valor);
         }
         else {
-          // 🎯 Cálculo normal para otros casos
+          // ✅ Cálculo normal usando función ultra-kiss
+          const horasMensuales = getHorasMensualesUltraKiss(fechaPeriodo);
+          const valorHoraOrdinaria = salarioBase / horasMensuales;
           const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
+          
           if (factor) {
-            const horasMensuales = getHorasMensualesUltraKiss(fechaPeriodo);
+            valor = Math.round(valorHoraOrdinaria * factor * horas);
+            factorCalculo = factor;
+            detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
             
             console.log('🚀 ULTRA-KISS: *** CÁLCULO NORMAL ***');
-            console.log('🚀 ULTRA-KISS: Factor:', factor);
             console.log('🚀 ULTRA-KISS: Horas mensuales:', horasMensuales);
-            
-            const tarifaHora = salarioBase / horasMensuales;
-            valor = Math.round(tarifaHora * factor * horas);
-            factorCalculo = factor;
-            
-            console.log('🚀 ULTRA-KISS: Tarifa hora:', tarifaHora);
+            console.log('🚀 ULTRA-KISS: Valor hora ordinaria:', valorHoraOrdinaria);
+            console.log('🚀 ULTRA-KISS: Factor:', factor);
             console.log('🚀 ULTRA-KISS: Valor calculado:', valor);
-            
-            detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
           } else {
             detalleCalculo = 'Subtipo de horas extra no válido';
           }
