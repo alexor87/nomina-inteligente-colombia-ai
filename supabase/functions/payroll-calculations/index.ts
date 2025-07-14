@@ -78,19 +78,20 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
 function getHorasMensualesSimple(fechaStr?: string): number {
   if (!fechaStr) {
     console.log('🔧 KISS: No fecha proporcionada, usando 220h por defecto');
-    return 220; // Default actual
+    return 220; // Default actual (44h semanales)
   }
 
   // ✅ KISS: Convertir fecha string a número simple YYYYMMDD
   const fechaNumero = parseInt(fechaStr.replace(/-/g, ''));
   console.log(`🔧 KISS: Fecha string "${fechaStr}" → número ${fechaNumero}`);
 
-  // ✅ KISS: Comparación super simple
+  // ✅ KISS: Comparación super simple - CORREGIDA
+  // El 15 julio 2025 (20250715) debe usar 220 horas (44h semanales)
   if (fechaNumero < 20250715) {
-    console.log('🔧 KISS: Antes del 15 julio 2025 → 230 horas mensuales');
+    console.log('🔧 KISS: Antes del 15 julio 2025 → 230 horas mensuales (46h semanales)');
     return 230;
   } else {
-    console.log('🔧 KISS: Desde el 15 julio 2025 → 220 horas mensuales');
+    console.log('🔧 KISS: Desde el 15 julio 2025 (inclusive) → 220 horas mensuales (44h semanales)');
     return 220;
   }
 }
@@ -100,7 +101,11 @@ function getHorasSemanalesSimple(fechaStr?: string): number {
   if (!fechaStr) return 44; // Default actual
   
   const fechaNumero = parseInt(fechaStr.replace(/-/g, ''));
-  return fechaNumero < 20250715 ? 46 : 44;
+  if (fechaNumero < 20250715) {
+    return 46; // Antes del 15 julio 2025
+  } else {
+    return 44; // Desde el 15 julio 2025 (inclusive)
+  }
 }
 
 // Factores de horas extra según legislación colombiana
@@ -140,11 +145,15 @@ function calculateNovedad(input: NovedadCalculationInput) {
           
           console.log(`💰 KISS: Tarifa hora: ${Math.round(tarifaHora)}, Valor final: ${valor}`);
           
-          // ✅ KISS: Validación específica simple
+          // ✅ KISS: Validación específica simple - CORREGIDA
           if (fechaPeriodo === '2025-07-01' && horasMensuales !== 230) {
             console.error(`❌ KISS: ERROR - 1 julio debería usar 230h, pero usa ${horasMensuales}h`);
           } else if (fechaPeriodo === '2025-07-15' && horasMensuales !== 220) {
             console.error(`❌ KISS: ERROR - 15 julio debería usar 220h, pero usa ${horasMensuales}h`);
+          } else if (fechaPeriodo === '2025-07-16' && horasMensuales !== 220) {
+            console.error(`❌ KISS: ERROR - 16 julio debería usar 220h, pero usa ${horasMensuales}h`);
+          } else if (fechaPeriodo === '2025-07-17' && horasMensuales !== 220) {
+            console.error(`❌ KISS: ERROR - 17 julio debería usar 220h, pero usa ${horasMensuales}h`);
           } else {
             console.log(`✅ KISS: Correcto - ${fechaPeriodo} usa ${horasMensuales}h mensuales`);
           }

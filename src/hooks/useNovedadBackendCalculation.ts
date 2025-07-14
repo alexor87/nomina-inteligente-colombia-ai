@@ -79,11 +79,15 @@ export const useNovedadBackendCalculation = () => {
         fechaPeriodo: fechaParaCalculo
       });
 
-      // ✅ KISS: Validación específica simple
+      // ✅ KISS: Validación específica simple - CORREGIDA
       if (fechaParaCalculo === '2025-07-01') {
         console.log('🔍 KISS FRONTEND: *** ENVIANDO FECHA 1 JULIO 2025 - ESPERAMOS 230h ***');
       } else if (fechaParaCalculo === '2025-07-15') {
         console.log('🔍 KISS FRONTEND: *** ENVIANDO FECHA 15 JULIO 2025 - ESPERAMOS 220h ***');
+      } else if (fechaParaCalculo === '2025-07-16') {
+        console.log('🔍 KISS FRONTEND: *** ENVIANDO FECHA 16 JULIO 2025 - ESPERAMOS 220h ***');
+      } else if (fechaParaCalculo === '2025-07-17') {
+        console.log('🔍 KISS FRONTEND: *** ENVIANDO FECHA 17 JULIO 2025 - ESPERAMOS 220h ***');
       }
 
       const requestData = {
@@ -116,12 +120,16 @@ export const useNovedadBackendCalculation = () => {
       const result = data.data;
       console.log('✅ KISS FRONTEND: Backend calculation result:', result);
 
-      // ✅ KISS: Validación de resultados específicos
+      // ✅ KISS: Validación de resultados específicos - CORREGIDA
       if (fechaParaCalculo === '2025-07-01' && result.jornadaInfo.divisorHorario !== 230) {
         console.error(`❌ KISS FRONTEND: ERROR - 1 julio debería usar 230h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
       } else if (fechaParaCalculo === '2025-07-15' && result.jornadaInfo.divisorHorario !== 220) {
         console.error(`❌ KISS FRONTEND: ERROR - 15 julio debería usar 220h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
-      } else if (fechaParaCalculo === '2025-07-01' || fechaParaCalculo === '2025-07-15') {
+      } else if (fechaParaCalculo === '2025-07-16' && result.jornadaInfo.divisorHorario !== 220) {
+        console.error(`❌ KISS FRONTEND: ERROR - 16 julio debería usar 220h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
+      } else if (fechaParaCalculo === '2025-07-17' && result.jornadaInfo.divisorHorario !== 220) {
+        console.error(`❌ KISS FRONTEND: ERROR - 17 julio debería usar 220h, pero recibió ${result.jornadaInfo.divisorHorario}h`);
+      } else if (['2025-07-01', '2025-07-15', '2025-07-16', '2025-07-17'].includes(fechaParaCalculo || '')) {
         console.log(`✅ KISS FRONTEND: Correcto - ${fechaParaCalculo} usa ${result.jornadaInfo.divisorHorario}h mensuales`);
       }
 
