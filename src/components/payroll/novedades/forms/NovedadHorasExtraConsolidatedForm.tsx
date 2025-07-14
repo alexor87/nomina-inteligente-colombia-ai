@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,16 +53,19 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
 
   const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
 
-  const calculateHorasExtraValue = async (tipo: string, horas: number) => {
-    if (!tipo || horas <= 0) return 0;
+  const calculateHorasExtraValue = async (tipo: string, horas: number, fecha: string) => {
+    if (!tipo || horas <= 0 || !fecha) return 0;
 
     try {
+      // Convert fecha string to Date object for backend calculation
+      const fechaCalculo = new Date(fecha);
+      
       const result = await calculateNovedad({
         tipoNovedad: 'horas_extra',
         subtipo: tipo,
         salarioBase: employeeSalary,
         horas: horas,
-        fechaPeriodo: periodoFecha || new Date()
+        fechaPeriodo: fechaCalculo // Use specific entry date instead of periodoFecha
       });
 
       return result?.valor || 0;
@@ -79,7 +81,8 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     }
 
     const horas = parseFloat(currentEntry.horas);
-    const valor = await calculateHorasExtraValue(currentEntry.tipo, horas);
+    // Pass the specific date from the entry for calculation
+    const valor = await calculateHorasExtraValue(currentEntry.tipo, horas, currentEntry.fecha);
 
     const newEntry: HorasExtraEntry = {
       id: Date.now().toString(),
