@@ -74,30 +74,30 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
-// Fechas y jornadas según la Ley 2101 de 2021 - UNIFICADO CON FRONTEND
+// ✅ FECHAS CORREGIDAS: Usar comparación por string para evitar problemas de timezone
 const JORNADAS_LEGALES = [
   {
-    fechaInicio: new Date('2026-07-15'),
+    fechaString: '2026-07-15',
     horasSemanales: 42,
     descripcion: 'Jornada final según Ley 2101 de 2021'
   },
   {
-    fechaInicio: new Date('2025-07-15'),
+    fechaString: '2025-07-15', // ← CRÍTICO: Esta fecha debe activar 44h semanales
     horasSemanales: 44,
     descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
   },
   {
-    fechaInicio: new Date('2024-07-15'),
+    fechaString: '2024-07-15',
     horasSemanales: 46,
     descripcion: 'Tercera fase de reducción - Ley 2101 de 2021'
   },
   {
-    fechaInicio: new Date('2023-07-15'),
+    fechaString: '2023-07-15',
     horasSemanales: 47,
     descripcion: 'Segunda fase de reducción - Ley 2101 de 2021'
   },
   {
-    fechaInicio: new Date('1950-01-01'), // Fecha muy anterior para jornada base
+    fechaString: '1950-01-01', // Fecha muy anterior para jornada base
     horasSemanales: 48,
     descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo'
   }
@@ -113,22 +113,27 @@ const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
 };
 
 /**
+ * ✅ FUNCIÓN CORREGIDA: Usa comparación de strings para fechas
  * Obtiene la información de jornada legal vigente para una fecha específica
- * REPLICA EXACTA de la lógica del frontend src/utils/jornadaLegal.ts
  */
 function getJornadaLegal(fechaStr?: string) {
-  const fecha = fechaStr ? new Date(fechaStr) : new Date();
+  // Normalizar fecha a formato YYYY-MM-DD
+  const fechaComparar = fechaStr ? fechaStr.split('T')[0] : new Date().toISOString().split('T')[0];
   
-  console.log(`📅 Backend: Calculando jornada legal para: ${fecha.toISOString().split('T')[0]}`);
+  console.log(`🎯 Backend ULTRA-DEBUG: Calculando jornada para fecha: "${fechaComparar}"`);
   
-  // Ordenar por fecha descendente para encontrar la jornada vigente
-  const jornadaVigente = JORNADAS_LEGALES
-    .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
-    .find(jornada => {
-      const esVigente = fecha >= jornada.fechaInicio;
-      console.log(`   📊 Backend: Comparando con ${jornada.fechaInicio.toISOString().split('T')[0]} (${jornada.horasSemanales}h) - Vigente: ${esVigente}`);
-      return esVigente;
-    });
+  // Buscar la jornada vigente usando comparación de strings
+  let jornadaVigente = null;
+  
+  for (const jornada of JORNADAS_LEGALES) {
+    const esVigente = fechaComparar >= jornada.fechaString;
+    console.log(`   🔍 Comparando "${fechaComparar}" >= "${jornada.fechaString}" (${jornada.horasSemanales}h) = ${esVigente}`);
+    
+    if (esVigente) {
+      jornadaVigente = jornada;
+      break; // La primera que cumpla (están ordenadas descendentemente)
+    }
+  }
 
   if (!jornadaVigente) {
     // Fallback a la jornada tradicional
@@ -139,19 +144,19 @@ function getJornadaLegal(fechaStr?: string) {
     return {
       horasSemanales: jornadaTradicional.horasSemanales,
       horasMensuales: horasMensuales,
-      fechaVigencia: jornadaTradicional.fechaInicio,
+      fechaVigencia: new Date(jornadaTradicional.fechaString),
       descripcion: jornadaTradicional.descripcion,
       ley: 'Código Sustantivo del Trabajo'
     };
   }
 
   const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaVigente.horasSemanales];
-  console.log(`✅ Backend: Jornada seleccionada: ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
+  console.log(`✅ Backend RESULTADO: Fecha "${fechaComparar}" → ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales`);
 
   return {
     horasSemanales: jornadaVigente.horasSemanales,
     horasMensuales: horasMensuales,
-    fechaVigencia: jornadaVigente.fechaInicio,
+    fechaVigencia: new Date(jornadaVigente.fechaString),
     descripcion: jornadaVigente.descripcion,
     ley: 'Ley 2101 de 2021'
   };
@@ -199,7 +204,7 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         console.log('🚀 ULTRA-KISS: Fecha período:', fechaPeriodo);
         console.log('🚀 ULTRA-KISS: Salario base:', salarioBase);
         
-        // ✅ Cálculo usando función centralizadas de jornada legal
+        // ✅ Cálculo usando función corregida de jornada legal
         const horasMensuales = getHorasMensuales(fechaPeriodo);
         const valorHoraOrdinaria = salarioBase / horasMensuales;
         const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
@@ -209,28 +214,37 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           factorCalculo = factor;
           detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
           
-          console.log('🚀 Backend: *** CÁLCULO HORAS EXTRA ***');
-          console.log('🚀 Backend: Horas mensuales:', horasMensuales);
+          console.log('🚀 Backend: *** CÁLCULO HORAS EXTRA DETALLADO ***');
+          console.log('🚀 Backend: Fecha enviada:', fechaPeriodo);
+          console.log('🚀 Backend: Horas mensuales calculadas:', horasMensuales);
           console.log('🚀 Backend: Valor hora ordinaria:', valorHoraOrdinaria);
-          console.log('🚀 Backend: Factor:', factor);
-          console.log('🚀 Backend: Valor calculado:', valor);
+          console.log('🚀 Backend: Factor aplicado:', factor);
+          console.log('🚀 Backend: Valor final calculado:', valor);
         } else {
           detalleCalculo = 'Subtipo de horas extra no válido';
         }
         
         // 🎯 VALIDACIÓN FINAL ULTRA-ESPECÍFICA
-        console.log('🚀 ULTRA-KISS: *** VALIDACIÓN FINAL ***');
-        if (fechaPeriodo === '2025-07-15') {
+        console.log('🚀 ULTRA-KISS: *** VALIDACIÓN DE CASOS CRÍTICOS ***');
+        const fechaNormalizada = fechaPeriodo ? fechaPeriodo.split('T')[0] : '';
+        
+        if (fechaNormalizada === '2025-07-15') {
           if (valor >= 9500) {
-            console.log('✅ ULTRA-KISS SUCCESS: 15 julio valor correcto >= $9,500:', valor);
+            console.log('✅ ULTRA-KISS SUCCESS: 15 julio debe ser >= $9,500 (220h):', valor);
           } else {
-            console.error('❌ ULTRA-KISS ERROR: 15 julio valor incorrecto < $9,500:', valor);
+            console.error('❌ ULTRA-KISS ERROR: 15 julio incorrecto < $9,500 (debería usar 220h):', valor);
           }
-        } else if (fechaPeriodo === '2025-07-01') {
+        } else if (fechaNormalizada === '2025-07-14') {
           if (Math.abs(valor - 9341) < 100) {
-            console.log('✅ ULTRA-KISS SUCCESS: 1 julio valor correcto ~$9,341:', valor);
+            console.log('✅ ULTRA-KISS SUCCESS: 14 julio correcto ~$9,341 (230h):', valor);
           } else {
-            console.error('❌ ULTRA-KISS ERROR: 1 julio valor incorrecto ≠ $9,341:', valor);
+            console.error('❌ ULTRA-KISS ERROR: 14 julio incorrecto ≠ $9,341 (debería usar 230h):', valor);
+          }
+        } else if (fechaNormalizada >= '2025-07-16') {
+          if (valor >= 9500) {
+            console.log('✅ ULTRA-KISS SUCCESS: 16+ julio correcto >= $9,500 (220h):', valor);
+          } else {
+            console.error('❌ ULTRA-KISS ERROR: 16+ julio incorrecto < $9,500 (debería usar 220h):', valor);
           }
         }
       } else {
