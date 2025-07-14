@@ -58,19 +58,16 @@ export const useNovedadBackendCalculation = () => {
     setError(null);
 
     try {
-      // 🚀 ULTRA-KISS: Formateo garantizado y validación extrema
+      // 🚀 ULTRA-KISS: Formateo UTC garantizado para evitar problemas de timezone
       let fechaParaCalculo: string | undefined;
       
       if (input.fechaPeriodo) {
-        // Formateo manual garantizado YYYY-MM-DD
-        const year = input.fechaPeriodo.getFullYear();
-        const month = String(input.fechaPeriodo.getMonth() + 1).padStart(2, '0');
-        const day = String(input.fechaPeriodo.getDate()).padStart(2, '0');
-        fechaParaCalculo = `${year}-${month}-${day}`;
+        // ✅ FIX: Usar UTC para evitar shift de timezone
+        fechaParaCalculo = input.fechaPeriodo.toISOString().split('T')[0];
         
-        console.log('🚀 ULTRA-KISS: *** FRONTEND PREPARANDO REQUEST ***');
+        console.log('🚀 ULTRA-KISS: *** FRONTEND PREPARANDO REQUEST (UTC FIX) ***');
         console.log('🚀 ULTRA-KISS: Fecha original:', input.fechaPeriodo);
-        console.log('🚀 ULTRA-KISS: Fecha formateada FINAL:', fechaParaCalculo);
+        console.log('🚀 ULTRA-KISS: Fecha UTC formateada FINAL:', fechaParaCalculo);
         
         // 🎯 Validación extrema de casos críticos
         if (fechaParaCalculo === '2025-07-15') {
@@ -89,7 +86,7 @@ export const useNovedadBackendCalculation = () => {
         fechaPeriodo: fechaParaCalculo
       };
 
-      console.log('🚀 ULTRA-KISS: *** REQUEST FINAL ENVIADO ***');
+      console.log('🚀 ULTRA-KISS: *** REQUEST FINAL ENVIADO (UTC) ***');
       console.log('🚀 ULTRA-KISS:', JSON.stringify(requestData, null, 2));
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
@@ -111,7 +108,7 @@ export const useNovedadBackendCalculation = () => {
       const result = data.data;
       
       console.log('🚀 ULTRA-KISS: *** RESULTADO RECIBIDO DEL BACKEND ***');
-      console.log('🚀 ULTRA-KISS: Fecha enviada:', fechaParaCalculo);
+      console.log('🚀 ULTRA-KISS: Fecha UTC enviada:', fechaParaCalculo);
       console.log('🚀 ULTRA-KISS: Valor calculado:', result.valor);
       console.log('🚀 ULTRA-KISS: Divisor horario:', result.jornadaInfo.divisorHorario);
       console.log('🚀 ULTRA-KISS: Horas mensuales:', result.jornadaInfo.horasMensuales);
