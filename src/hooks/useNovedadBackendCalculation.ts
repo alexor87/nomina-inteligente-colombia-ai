@@ -58,7 +58,7 @@ export const useNovedadBackendCalculation = () => {
     setError(null);
 
     try {
-      // ✅ SOLUCIÓN DEFINITIVA: Formateo ultra-garantizado de fecha
+      // 🚀 ULTRA-KISS: Formateo garantizado y validación extrema
       let fechaParaCalculo: string | undefined;
       
       if (input.fechaPeriodo) {
@@ -68,14 +68,15 @@ export const useNovedadBackendCalculation = () => {
         const day = String(input.fechaPeriodo.getDate()).padStart(2, '0');
         fechaParaCalculo = `${year}-${month}-${day}`;
         
-        console.log('🎯 DEFINITIVO FRONTEND: Fecha original:', input.fechaPeriodo);
-        console.log('🎯 DEFINITIVO FRONTEND: Fecha formateada FINAL:', fechaParaCalculo);
+        console.log('🚀 ULTRA-KISS: *** FRONTEND PREPARANDO REQUEST ***');
+        console.log('🚀 ULTRA-KISS: Fecha original:', input.fechaPeriodo);
+        console.log('🚀 ULTRA-KISS: Fecha formateada FINAL:', fechaParaCalculo);
         
-        // Validación específica para casos críticos
+        // 🎯 Validación extrema de casos críticos
         if (fechaParaCalculo === '2025-07-15') {
-          console.log('🎯 DEFINITIVO FRONTEND: ✅ 15 julio → debe resultar en > $10,000 (220h mensuales)');
+          console.log('🎯 ULTRA-KISS: ✅ 15 julio → DEBE resultar en $9,765 (220h mensuales)');
         } else if (fechaParaCalculo === '2025-07-01') {
-          console.log('🎯 DEFINITIVO FRONTEND: ✅ 1 julio → debe resultar en $9,341 (230h mensuales)');
+          console.log('🎯 ULTRA-KISS: ✅ 1 julio → DEBE resultar en $9,341 (230h mensuales)');
         }
       }
 
@@ -88,7 +89,8 @@ export const useNovedadBackendCalculation = () => {
         fechaPeriodo: fechaParaCalculo
       };
 
-      console.log('🎯 DEFINITIVO FRONTEND: Request final enviado:', JSON.stringify(requestData, null, 2));
+      console.log('🚀 ULTRA-KISS: *** REQUEST FINAL ENVIADO ***');
+      console.log('🚀 ULTRA-KISS:', JSON.stringify(requestData, null, 2));
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
@@ -108,24 +110,24 @@ export const useNovedadBackendCalculation = () => {
 
       const result = data.data;
       
-      console.log('🎯 DEFINITIVO FRONTEND: *** RESULTADO RECIBIDO ***');
-      console.log('🎯 DEFINITIVO FRONTEND: Fecha enviada:', fechaParaCalculo);
-      console.log('🎯 DEFINITIVO FRONTEND: Valor calculado:', result.valor);
-      console.log('🎯 DEFINITIVO FRONTEND: Divisor horario:', result.jornadaInfo.divisorHorario);
-      console.log('🎯 DEFINITIVO FRONTEND: Horas mensuales:', result.jornadaInfo.horasMensuales);
+      console.log('🚀 ULTRA-KISS: *** RESULTADO RECIBIDO DEL BACKEND ***');
+      console.log('🚀 ULTRA-KISS: Fecha enviada:', fechaParaCalculo);
+      console.log('🚀 ULTRA-KISS: Valor calculado:', result.valor);
+      console.log('🚀 ULTRA-KISS: Divisor horario:', result.jornadaInfo.divisorHorario);
+      console.log('🚀 ULTRA-KISS: Horas mensuales:', result.jornadaInfo.horasMensuales);
 
-      // ✅ Validación final ultra-específica
+      // 🎯 VALIDACIÓN FINAL ULTRA-ESPECÍFICA
       if (fechaParaCalculo === '2025-07-15') {
-        if (result.valor > 9500) {
-          console.log('🎯 DEFINITIVO FRONTEND: ✅ ÉXITO 15 julio: Valor correcto > $9,500:', result.valor);
+        if (result.valor >= 9500) {
+          console.log('✅ ULTRA-KISS SUCCESS: 15 julio valor correcto >= $9,500:', result.valor);
         } else {
-          console.error('🎯 DEFINITIVO FRONTEND: ❌ ERROR 15 julio: Valor incorrecto < $9,500:', result.valor);
+          console.error('❌ ULTRA-KISS ERROR: 15 julio valor incorrecto < $9,500:', result.valor);
         }
       } else if (fechaParaCalculo === '2025-07-01') {
         if (Math.abs(result.valor - 9341) < 100) {
-          console.log('🎯 DEFINITIVO FRONTEND: ✅ ÉXITO 1 julio: Valor correcto ~$9,341:', result.valor);
+          console.log('✅ ULTRA-KISS SUCCESS: 1 julio valor correcto ~$9,341:', result.valor);
         } else {
-          console.error('🎯 DEFINITIVO FRONTEND: ❌ ERROR 1 julio: Valor incorrecto ≠ $9,341:', result.valor);
+          console.error('❌ ULTRA-KISS ERROR: 1 julio valor incorrecto ≠ $9,341:', result.valor);
         }
       }
 
@@ -156,7 +158,7 @@ export const useNovedadBackendCalculation = () => {
   }, [calculateNovedad]);
 
   const clearCache = useCallback(() => {
-    console.log('🎯 DEFINITIVO FRONTEND: Cache permanentemente deshabilitado para debugging');
+    console.log('🚀 ULTRA-KISS: Cache permanentemente deshabilitado para máximo debugging');
   }, []);
 
   return {
