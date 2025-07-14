@@ -1,32 +1,50 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { NovedadTypeSelector } from './NovedadTypeSelector';
-import { NovedadHorasExtraForm } from './forms/NovedadHorasExtraForm';
-import { NovedadRecargoForm as NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoForm';
-import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
-import { NovedadBonificacionesForm as NovedadBonificacionesConsolidatedForm } from './forms/NovedadBonificacionesForm';
-import { NovedadComisionesForm as NovedadComisionConsolidatedForm } from './forms/NovedadComisionesForm';
-import { NovedadPrimaForm as NovedadPrimaConsolidatedForm } from './forms/NovedadPrimaForm';
-import { NovedadOtrosIngresosForm as NovedadOtrosIngresosConsolidatedForm } from './forms/NovedadOtrosIngresosForm';
-import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
-import { NovedadLicenciaForm as NovedadLicenciaConsolidatedForm } from './forms/NovedadLicenciaForm';
-import { NovedadLicenciaNoRemuneradaForm as NovedadLicenciaNoRemuneradaConsolidatedForm } from './forms/NovedadLicenciaNoRemuneradaForm';
-import { NovedadAusenciaForm as NovedadAusenciaConsolidatedForm } from './forms/NovedadAusenciaForm';
-import { NovedadFondoSolidaridadForm as NovedadFondoSolidaridadConsolidatedForm } from './forms/NovedadFondoSolidaridadForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { CreateNovedadData, NovedadType } from '@/types/novedades-enhanced';
-import { usePeriod } from '@/hooks/usePeriod';
+import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
+import { NovedadLicenciasForm } from './forms/NovedadLicenciasForm';
+import { NovedadHorasExtraConsolidatedForm } from './forms/NovedadHorasExtraConsolidatedForm';
+import { NovedadBonificacionesConsolidatedForm } from './forms/NovedadBonificacionesConsolidatedForm';
+import { NovedadIngresosAdicionalesConsolidatedForm } from './forms/NovedadIngresosAdicionalesConsolidatedForm';
+import { NovedadPrestamosConsolidatedForm } from './forms/NovedadPrestamosConsolidatedForm';
+import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesConsolidatedForm';
+import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
+import { NovedadExistingList } from './NovedadExistingList';
+import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
+import { useToast } from '@/hooks/use-toast';
+import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
+import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
+import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
+import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-  employeeId: string;
-  employeeSalary?: number;
-  periodId: string;
+  employeeId: string | undefined;
+  employeeSalary: number | undefined;
+  periodId: string | undefined;
   onSubmit: (data: CreateNovedadData) => Promise<void>;
+  onClose?: () => void;
   selectedNovedadType: NovedadType | null;
-  onClose: () => void;
+  onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
+  startDate?: string;
+  endDate?: string;
 }
+
+// Mapping from categories to specific novedad types
+const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
+  'horas_extra': 'horas_extra',
+  'recargo_nocturno': 'recargo_nocturno',
+  'vacaciones': 'vacaciones',
+  'incapacidades': 'incapacidad',
+  'licencias': 'licencia_remunerada',
+  'bonificaciones': 'bonificacion',
+  'ingresos_adicionales': 'otros_ingresos',
+  'deducciones_especiales': 'descuento_voluntario',
+  'deducciones': 'descuento_voluntario',
+  'prestamos': 'libranza',
+  'retefuente': 'retencion_fuente'
+};
 
 export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   open,
@@ -36,88 +54,190 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   periodId,
   onSubmit,
   selectedNovedadType,
-  onClose
+  onClose,
+  onEmployeeNovedadesChange,
+  startDate,
+  endDate
 }) => {
-  const [currentNovedadType, setCurrentNovedadType] = useState<NovedadType | null>(selectedNovedadType || null);
+  const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form'>('list');
+  const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
+  const [employeeName, setEmployeeName] = useState<string>('');
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { period } = usePeriod(periodId);
+  const { toast } = useToast();
+
+  // Calcular fecha del período para jornada legal
+  const getPeriodDate = useCallback(() => {
+    if (startDate) {
+      const date = new Date(startDate);
+      console.log('📅 Usando fecha del período para cálculos:', date.toISOString().split('T')[0]);
+      return date;
+    }
+    console.log('⚠️ No hay startDate, usando fecha actual');
+    return new Date();
+  }, [startDate]);
+
+  // Initialize step based on whether a specific type was provided
+  useEffect(() => {
+    if (selectedNovedadType) {
+      setSelectedType(selectedNovedadType);
+      setCurrentStep('form');
+    } else {
+      setCurrentStep('list');
+      setSelectedType(null);
+    }
+  }, [selectedNovedadType, open]);
+
+  // Reset states when modal opens
+  useEffect(() => {
+    if (open) {
+      setRefreshTrigger(Date.now());
+      setIsSubmitting(false);
+    }
+  }, [open]);
+
+  // Mock employee name - in real app this would come from props or context
+  useEffect(() => {
+    if (employeeId) {
+      setEmployeeName('Empleado');
+    }
+  }, [employeeId]);
 
   const handleClose = () => {
-    setCurrentNovedadType(null);
-    onClose();
+    setOpen(false);
+    setCurrentStep('list');
+    setSelectedType(null);
+    setRefreshTrigger(0);
+    setIsSubmitting(false);
+    onClose?.();
+  };
+
+  const handleCategorySelect = (category: NovedadCategory) => {
+    const novedadType = categoryToNovedadType[category];
+    setSelectedType(novedadType);
+    setCurrentStep('form');
   };
 
   const handleBackToSelector = () => {
-    setCurrentNovedadType(null);
+    setCurrentStep('selector');
+    setSelectedType(null);
   };
 
-  const handleFormSubmit = async (data: any) => {
+  const handleBackToList = () => {
+    setCurrentStep('list');
+    setSelectedType(null);
+    // Trigger refresh when going back to list after form submission
+    setRefreshTrigger(Date.now());
+  };
+
+  const handleAddNew = () => {
+    setCurrentStep('selector');
+  };
+
+  const handleFormSubmit = async (formData: any) => {
+    if (!employeeId || !periodId) {
+      toast({
+        title: "Error",
+        description: "Faltan datos del empleado o período",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await onSubmit(data);
-      handleClose();
-    } catch (error) {
-      console.error("Error submitting form:", error);
+      console.log('📤 Form data received:', formData);
+      
+      // Check if form data is an array (multiple entries like Horas Extra)
+      const isArrayData = Array.isArray(formData);
+      const dataArray = isArrayData ? formData : [formData];
+      
+      console.log(`🔄 Processing ${dataArray.length} novelty entries`);
+      
+      // Process each entry
+      for (const entry of dataArray) {
+        const submitData: CreateNovedadData = {
+          empleado_id: employeeId,
+          periodo_id: periodId,
+          company_id: '', // Will be completed in the service
+          tipo_novedad: selectedType!,
+          valor: entry.valor || 0,
+          horas: entry.horas || undefined,
+          dias: entry.dias || undefined,
+          observacion: entry.observacion || undefined,
+          fecha_inicio: entry.fecha_inicio || undefined,
+          fecha_fin: entry.fecha_fin || undefined,
+          subtipo: entry.subtipo || undefined,
+          base_calculo: entry.base_calculo || undefined
+        };
+
+        console.log('💾 Saving novelty entry:', submitData);
+        await onSubmit(submitData);
+      }
+      
+      console.log('✅ All novelty entries processed successfully');
+      
+      // Go back to list to show newly created novelties
+      setCurrentStep('list');
+      setSelectedType(null);
+      setRefreshTrigger(Date.now());
+      
+    } catch (error: any) {
+      console.error('❌ Error processing novelties:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudieron guardar las novedades",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const getPeriodDate = (): Date => {
-    if (period?.fecha_inicio) {
-      const periodDate = new Date(period.fecha_inicio);
-      
-      // 🔍 DEBUG: Log period date processing
-      console.log('📅 getPeriodDate processing:', {
-        periodId,
-        periodFechaInicio: period.fecha_inicio,
-        periodDate,
-        periodDateISO: periodDate.toISOString(),
-        periodDateString: periodDate.toISOString().split('T')[0]
-      });
-      
-      return periodDate;
+  const calculateSuggestedValue = useCallback((
+    tipoNovedad: NovedadType,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ): number | null => {
+    if (!employeeSalary) {
+      console.warn('Salario del empleado no definido. No se puede calcular el valor sugerido.');
+      return null;
     }
-    
-    const fallbackDate = new Date();
-    console.log('⚠️ Using fallback date (today):', fallbackDate.toISOString().split('T')[0]);
-    return fallbackDate;
-  };
 
-  const renderSelectedForm = () => {
+    try {
+      // Usar fecha del período para cálculos
+      const fechaPeriodo = getPeriodDate();
+      const { valor } = calcularValorNovedadEnhanced(tipoNovedad, subtipo, employeeSalary, dias, horas, fechaPeriodo);
+      return valor;
+    } catch (error) {
+      console.error('Error al calcular el valor sugerido:', error);
+      return null;
+    }
+  }, [employeeSalary, getPeriodDate]);
+
+  const renderNovedadForm = () => {
+    if (!selectedType || !employeeId) return null;
+
     const baseProps = {
       onBack: handleBackToSelector,
       onSubmit: handleFormSubmit,
       employeeSalary: employeeSalary || 0,
-      periodoFecha: getPeriodDate()  // 🔍 DEBUG: Always pass period date
+      calculateSuggestedValue: calculateSuggestedValue,
+      isSubmitting
     };
 
-    // 🔍 DEBUG: Log form rendering
-    console.log('🎨 Rendering form for:', {
-      currentNovedadType,
-      baseProps: {
-        employeeSalary: baseProps.employeeSalary,
-        periodoFecha: baseProps.periodoFecha?.toISOString()
-      }
-    });
-
-    if (!currentNovedadType) {
-      return <NovedadTypeSelector onSelectType={setCurrentNovedadType} />;
-    }
-
-    switch (currentNovedadType) {
+    switch (selectedType) {
       case 'horas_extra':
+        return <NovedadHorasExtraConsolidatedForm {...baseProps} />;
+      
+      case 'recargo_nocturno':
         return (
-          <NovedadHorasExtraForm
-            onBack={handleBackToSelector}
-            onSubmit={handleFormSubmit}
-            employeeSalary={employeeSalary || 0}
+          <NovedadRecargoConsolidatedForm 
+            {...baseProps} 
             periodoFecha={getPeriodDate()}
           />
         );
-        
-      case 'recargo_nocturno':
-        return <NovedadRecargoConsolidatedForm {...baseProps} />;
         
       case 'vacaciones':
         return (
@@ -132,15 +252,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'bonificacion':
         return <NovedadBonificacionesConsolidatedForm {...baseProps} />;
         
-      case 'comision':
-        return <NovedadComisionConsolidatedForm {...baseProps} />;
-        
-      case 'prima':
-        return <NovedadPrimaConsolidatedForm {...baseProps} />;
-        
       case 'otros_ingresos':
-        return <NovedadOtrosIngresosConsolidatedForm {...baseProps} />;
+        return <NovedadIngresosAdicionalesConsolidatedForm {...baseProps} />;
         
+      case 'libranza':
+        return <NovedadPrestamosConsolidatedForm {...baseProps} />;
+        
+      case 'descuento_voluntario':
+      case 'multa':
+        return <NovedadDeduccionesConsolidatedForm {...baseProps} />;
+
       case 'incapacidad':
         return (
           <NovedadIncapacidadForm
@@ -153,41 +274,93 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         );
         
       case 'licencia_remunerada':
-        return <NovedadLicenciaConsolidatedForm {...baseProps} />;
-        
-      case 'licencia_no_remunerada':
-        return <NovedadLicenciaNoRemuneradaConsolidatedForm {...baseProps} />;
-        
-      case 'ausencia':
-        return <NovedadAusenciaConsolidatedForm {...baseProps} />;
-        
-      case 'fondo_solidaridad':
-        return <NovedadFondoSolidaridadConsolidatedForm {...baseProps} />;
-        
+        return (
+          <NovedadLicenciasForm
+            onBack={handleBackToSelector}
+            onSubmit={handleFormSubmit}
+            employeeSalary={employeeSalary || 0}
+            calculateSuggestedValue={calculateSuggestedValue}
+            isSubmitting={isSubmitting}
+          />
+        );
+
       default:
-        return <NovedadTypeSelector onSelectType={setCurrentNovedadType} />;
+        return (
+          <div className="p-6 text-center">
+            <p className="text-gray-500">Formulario no disponible para este tipo de novedad</p>
+            <Button onClick={handleBackToSelector} className="mt-4">
+              Volver
+            </Button>
+          </div>
+        );
     }
   };
 
+  const renderContent = () => {
+    if (currentStep === 'list' && employeeId && periodId) {
+      return (
+        <NovedadExistingList
+          employeeId={employeeId}
+          periodId={periodId}
+          employeeName={employeeName}
+          onAddNew={handleAddNew}
+          onClose={handleClose}
+          refreshTrigger={refreshTrigger}
+          onEmployeeNovedadesChange={onEmployeeNovedadesChange}
+        />
+      );
+    }
+
+    if (currentStep === 'selector') {
+      return (
+        <NovedadTypeSelector
+          onClose={handleBackToList}
+          onSelectCategory={handleCategorySelect}
+          employeeName={employeeName}
+        />
+      );
+    }
+
+    if (currentStep === 'form') {
+      return renderNovedadForm();
+    }
+
+    // Fallback
+    return (
+      <div className="p-6 text-center">
+        <p className="text-gray-500">Cargando...</p>
+      </div>
+    );
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>
-            {currentNovedadType ? `Novedad: ${currentNovedadType}` : 'Agregar Novedad'}
-          </DialogTitle>
-          <DialogDescription>
-            Selecciona el tipo de novedad que deseas agregar al empleado.
-          </DialogDescription>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+        {currentStep === 'form' && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Agregar Novedad</DialogTitle>
+              <DialogDescription>
+                Completa los campos para agregar una novedad al empleado.
+              </DialogDescription>
+            </DialogHeader>
+          </>
+        )}
 
-        {renderSelectedForm()}
+        {renderContent()}
 
-        <DialogFooter>
-          <Button type="button" variant="secondary" onClick={handleClose}>
-            Cerrar
-          </Button>
-        </DialogFooter>
+        {currentStep === 'form' && (
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="secondary" 
+              onClick={handleBackToSelector}
+              disabled={isSubmitting}
+            >
+              Volver
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

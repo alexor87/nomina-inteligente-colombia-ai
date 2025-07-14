@@ -34,24 +34,7 @@ export const useNovedadBackendCalculation = () => {
 
   const generateCacheKey = useCallback((input: NovedadCalculationInput): string => {
     const dateStr = input.fechaPeriodo?.toISOString().split('T')[0] || 'current';
-    const key = `${input.tipoNovedad}-${input.subtipo || 'none'}-${input.salarioBase}-${input.horas || 0}-${input.dias || 0}-${dateStr}`;
-    
-    // 🔍 DEBUG: Log cache key generation
-    console.log('🔑 Generating cache key:', {
-      input: {
-        tipoNovedad: input.tipoNovedad,
-        subtipo: input.subtipo,
-        salarioBase: input.salarioBase,
-        horas: input.horas,
-        dias: input.dias,
-        fechaPeriodo: input.fechaPeriodo,
-        fechaPeriodoISO: input.fechaPeriodo?.toISOString()
-      },
-      cacheKey: key,
-      dateStr
-    });
-    
-    return key;
+    return `${input.tipoNovedad}-${input.subtipo || 'none'}-${input.salarioBase}-${input.horas || 0}-${input.dias || 0}-${dateStr}`;
   }, []);
 
   const calculateNovedad = useCallback(async (
@@ -59,25 +42,10 @@ export const useNovedadBackendCalculation = () => {
   ): Promise<NovedadCalculationResult | null> => {
     const cacheKey = generateCacheKey(input);
     
-    // 🔍 DEBUG: Log input and cache check
-    console.log('📊 calculateNovedad called with:', {
-      input,
-      fechaPeriodoDetails: {
-        original: input.fechaPeriodo,
-        iso: input.fechaPeriodo?.toISOString(),
-        date: input.fechaPeriodo?.toISOString().split('T')[0],
-        localeDateString: input.fechaPeriodo?.toLocaleDateString(),
-        timestamp: input.fechaPeriodo?.getTime()
-      },
-      cacheKey,
-      hasCachedResult: cachedResults.has(cacheKey)
-    });
-    
     // Verificar cache primero
     if (cachedResults.has(cacheKey)) {
-      const cachedResult = cachedResults.get(cacheKey)!;
-      console.log('🎯 Using cached result for:', cacheKey, cachedResult);
-      return cachedResult;
+      console.log('🎯 Using cached result for:', cacheKey);
+      return cachedResults.get(cacheKey)!;
     }
 
     // Validaciones básicas
@@ -115,13 +83,6 @@ export const useNovedadBackendCalculation = () => {
         fechaPeriodo: input.fechaPeriodo?.toISOString().split('T')[0] || undefined
       };
 
-      // 🔍 DEBUG: Log request data being sent to backend
-      console.log('📤 Sending to backend:', {
-        requestData,
-        originalFechaPeriodo: input.fechaPeriodo,
-        processedFechaPeriodo: requestData.fechaPeriodo
-      });
-
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
           action: 'calculate-novedad',
@@ -139,12 +100,7 @@ export const useNovedadBackendCalculation = () => {
       }
 
       const result = data.data;
-      console.log('✅ Backend calculation result:', {
-        result,
-        jornadaInfo: result.jornadaInfo,
-        requestedDate: requestData.fechaPeriodo,
-        calculatedValue: result.valor
-      });
+      console.log('✅ Backend calculation result:', result);
 
       // Guardar en cache
       setCachedResults(prev => new Map(prev).set(cacheKey, result));
@@ -165,13 +121,6 @@ export const useNovedadBackendCalculation = () => {
     callback: (result: NovedadCalculationResult | null) => void,
     delay: number = 500
   ) => {
-    // 🔍 DEBUG: Log debounced call
-    console.log('⏱️ calculateNovedadDebounced called:', {
-      input,
-      delay,
-      fechaPeriodo: input.fechaPeriodo?.toISOString()
-    });
-    
     // Limpiar debounce anterior
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -179,14 +128,12 @@ export const useNovedadBackendCalculation = () => {
 
     // Configurar nuevo debounce
     debounceRef.current = setTimeout(async () => {
-      console.log('🚀 Debounce timeout executed, calling calculateNovedad');
       const result = await calculateNovedad(input);
       callback(result);
     }, delay);
   }, [calculateNovedad]);
 
   const clearCache = useCallback(() => {
-    console.log('🧹 Clearing novedad calculation cache');
     setCachedResults(new Map());
   }, []);
 
