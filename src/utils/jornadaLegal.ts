@@ -154,6 +154,7 @@ export const calcularValorHoraExtra = (salarioMensual: number, fecha: Date = new
 
 /**
  * Obtiene información sobre próximos cambios en la jornada legal
+ * ✅ CORREGIDO: Ahora usa la tabla fija de horas mensuales
  */
 export const getProximoCambioJornada = (fechaActual: Date = new Date()): JornadaLegalInfo | null => {
   const proximoCambio = JORNADAS_LEGALES
@@ -162,9 +163,14 @@ export const getProximoCambioJornada = (fechaActual: Date = new Date()): Jornada
 
   if (!proximoCambio) return null;
 
+  // ✅ CORRECCIÓN: Usar tabla fija en lugar de fórmula
+  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[proximoCambio.horasSemanales];
+  
+  console.log(`🔮 Próximo cambio de jornada: ${proximoCambio.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
+
   return {
     horasSemanales: proximoCambio.horasSemanales,
-    horasMensuales: (proximoCambio.horasSemanales * 52) / 12,
+    horasMensuales: horasMensuales,
     fechaVigencia: proximoCambio.fechaInicio,
     descripcion: proximoCambio.descripcion,
     ley: 'Ley 2101 de 2021'

@@ -1,12 +1,14 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { MoreHorizontal, ArrowDown, ArrowUp, Copy, UserPlus, FileText, Loader2 } from 'lucide-react';
+import { MoreHorizontal, ArrowDown, ArrowUp, Copy, UserPlus, FileText, Loader2, Bug } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
+import { JornadaLegalTester } from '@/components/payroll/debug/JornadaLegalTester';
 import { useNovedades } from '@/hooks/useNovedades';
 import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
 import { PayrollEmployee } from '@/types/payroll';
@@ -45,6 +47,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
   const [search, setSearch] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
+  const [showDebugMode, setShowDebugMode] = useState(false);
 
   const { createNovedad } = useNovedades(periodoId);
   const { refreshEmployeeNovedades } = usePayrollNovedades(periodoId);
@@ -98,14 +101,32 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
           <h3 className="text-lg font-semibold">
             Lista de empleados para el período actual.
           </h3>
-          <Input
-            type="search"
-            placeholder="Buscar empleado..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-md"
-          />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDebugMode(!showDebugMode)}
+              className="flex items-center gap-2"
+            >
+              <Bug className="h-4 w-4" />
+              {showDebugMode ? 'Ocultar' : 'Debug'} Jornada Legal
+            </Button>
+            <Input
+              type="search"
+              placeholder="Buscar empleado..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-md"
+            />
+          </div>
         </div>
+
+        {/* Debug Mode - Verificador de Jornada Legal */}
+        {showDebugMode && (
+          <div className="mb-6">
+            <JornadaLegalTester />
+          </div>
+        )}
         
         <div className="border rounded-md overflow-hidden">
           <table className="w-full">
