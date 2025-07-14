@@ -74,7 +74,7 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
-// ✅ CORRECCIÓN: Jornadas legales con fechas exactas y cálculo mensual correcto
+// ✅ CORRECCIÓN: Jornadas legales con fechas exactas
 const JORNADAS_LEGALES = [
   {
     fechaInicio: new Date('2026-07-15'),
@@ -103,6 +103,15 @@ const JORNADAS_LEGALES = [
   }
 ];
 
+// ✅ TABLA FIJA DE HORAS MENSUALES POR JORNADA SEMANAL - UNIFICADA
+const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
+  48: 240, // Jornada tradicional
+  47: 235, // Primera reducción (2023-2024)
+  46: 230, // Segunda reducción (2024-2025) ✅ 
+  44: 220, // Tercera reducción (2025-2026) ✅
+  42: 210  // Reducción final (2026+)
+};
+
 // Factores de horas extra según legislación colombiana
 const HORAS_EXTRA_FACTORS = {
   diurnas: 1.25,
@@ -114,31 +123,32 @@ const HORAS_EXTRA_FACTORS = {
 } as const;
 
 function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
-  // ✅ CORRECCIÓN: Log para debug de la fecha que llega
-  console.log(`🗓️ Calculando jornada legal para fecha: ${fecha.toISOString().split('T')[0]}`);
+  console.log(`🗓️ BACKEND: Calculando jornada legal para fecha: ${fecha.toISOString().split('T')[0]}`);
   
   const jornadaVigente = JORNADAS_LEGALES
     .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
     .find(jornada => {
       const esVigente = fecha >= jornada.fechaInicio;
-      console.log(`   📅 Comparando con ${jornada.fechaInicio.toISOString().split('T')[0]} (${jornada.horasSemanales}h) - Vigente: ${esVigente}`);
+      console.log(`   📅 BACKEND: Comparando con ${jornada.fechaInicio.toISOString().split('T')[0]} (${jornada.horasSemanales}h) - Vigente: ${esVigente}`);
       return esVigente;
     });
 
   if (!jornadaVigente) {
     const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
-    console.log(`⚠️ No se encontró jornada vigente, usando tradicional: ${jornadaTradicional.horasSemanales}h`);
+    const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaTradicional.horasSemanales];
+    console.log(`⚠️ BACKEND: No se encontró jornada vigente, usando tradicional: ${jornadaTradicional.horasSemanales}h = ${horasMensuales}h mensuales`);
+    
     return {
       horasSemanales: jornadaTradicional.horasSemanales,
-      horasMensuales: (jornadaTradicional.horasSemanales * 52) / 12, // ✅ FÓRMULA CORRECTA
+      horasMensuales: horasMensuales,
       fechaVigencia: jornadaTradicional.fechaInicio,
       descripcion: jornadaTradicional.descripcion,
       ley: 'Código Sustantivo del Trabajo'
     };
   }
 
-  const horasMensuales = (jornadaVigente.horasSemanales * 52) / 12; // ✅ FÓRMULA CORRECTA
-  console.log(`✅ Jornada seleccionada: ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales.toFixed(2)}h mensuales`);
+  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaVigente.horasSemanales];
+  console.log(`✅ BACKEND: Jornada seleccionada: ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
 
   return {
     horasSemanales: jornadaVigente.horasSemanales,
@@ -151,30 +161,30 @@ function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
 
 function getHourlyDivisor(fecha: Date = new Date()): number {
   const jornadaInfo = getJornadaLegal(fecha);
-  const divisor = Math.round(jornadaInfo.horasMensuales);
-  console.log(`🧮 Divisor horario para ${fecha.toISOString().split('T')[0]}: ${divisor} horas`);
+  const divisor = jornadaInfo.horasMensuales; // ✅ USAR TABLA FIJA
+  console.log(`🧮 BACKEND: Divisor horario para ${fecha.toISOString().split('T')[0]}: ${divisor} horas (tabla fija)`);
   return divisor;
 }
 
-// ✅ FUNCIÓN MEJORADA: Calcular novedades con logs detallados
+// ✅ FUNCIÓN MEJORADA: Calcular novedades con tabla fija de horas
 function calculateNovedad(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
-  // ✅ MEJORADO: Parsear fecha correctamente y añadir logs
+  // ✅ MEJORADO: Parsear fecha correctamente y añadir logs detallados
   let fechaCalculo: Date;
   if (fechaPeriodo) {
     fechaCalculo = new Date(fechaPeriodo + 'T00:00:00.000Z');
-    console.log(`📅 Fecha período recibida: "${fechaPeriodo}" -> Parseada: ${fechaCalculo.toISOString().split('T')[0]}`);
+    console.log(`📅 BACKEND: Fecha período recibida: "${fechaPeriodo}" -> Parseada: ${fechaCalculo.toISOString().split('T')[0]}`);
   } else {
     fechaCalculo = new Date();
-    console.log(`📅 No se recibió fecha período, usando fecha actual: ${fechaCalculo.toISOString().split('T')[0]}`);
+    console.log(`📅 BACKEND: No se recibió fecha período, usando fecha actual: ${fechaCalculo.toISOString().split('T')[0]}`);
   }
   
   const jornadaLegal = getJornadaLegal(fechaCalculo);
   const divisorHorario = getHourlyDivisor(fechaCalculo);
   
-  console.log(`🧮 Calculando novedad: ${tipoNovedad}, subtipo: ${subtipo}`);
-  console.log(`📊 Jornada legal: ${jornadaLegal.horasSemanales}h/semana, divisor: ${divisorHorario}, fecha: ${fechaCalculo.toISOString().split('T')[0]}`);
+  console.log(`🧮 BACKEND: Calculando novedad: ${tipoNovedad}, subtipo: ${subtipo}`);
+  console.log(`📊 BACKEND: Jornada legal: ${jornadaLegal.horasSemanales}h/semana, divisor: ${divisorHorario}h mensuales, fecha: ${fechaCalculo.toISOString().split('T')[0]}`);
   
   let valor = 0;
   let factorCalculo = 0;
@@ -189,7 +199,8 @@ function calculateNovedad(input: NovedadCalculationInput) {
           valor = Math.round(tarifaHora * factor * horas);
           factorCalculo = factor;
           
-          console.log(`💰 Cálculo horas extra: ${salarioBase} / ${divisorHorario} * ${factor} * ${horas} = ${valor}`);
+          console.log(`💰 BACKEND: Cálculo horas extra: ${salarioBase} / ${divisorHorario} * ${factor} * ${horas} = ${valor}`);
+          console.log(`🔍 BACKEND: Tarifa hora base: $${Math.round(tarifaHora).toLocaleString()} (salario / ${divisorHorario}h mensuales fijas)`);
           
           let tipoDescripcion = '';
           switch (subtipo) {
@@ -352,7 +363,7 @@ function calculateNovedad(input: NovedadCalculationInput) {
     detalleCalculo,
     jornadaInfo: {
       horasSemanales: jornadaLegal.horasSemanales,
-      horasMensuales: Math.round(jornadaLegal.horasMensuales),
+      horasMensuales: jornadaLegal.horasMensuales, // ✅ YA ES ENTERO DE LA TABLA
       divisorHorario,
       valorHoraOrdinaria: Math.round(salarioBase / divisorHorario),
       ley: jornadaLegal.ley,
@@ -360,7 +371,7 @@ function calculateNovedad(input: NovedadCalculationInput) {
     }
   };
 
-  console.log(`✅ Resultado del cálculo:`, result);
+  console.log(`✅ BACKEND: Resultado del cálculo:`, result);
   return result;
 }
 

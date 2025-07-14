@@ -2,7 +2,7 @@
 /**
  * Utilidad para manejar la jornada laboral legal según la Ley 2101 de 2021
  * que reduce progresivamente la jornada máxima semanal en Colombia
- * CORREGIDO: Fórmula correcta (horas_semanales / 6) * 30
+ * CORREGIDO: Tabla fija de horas mensuales por jornada legal
  */
 
 export interface JornadaLegalInfo {
@@ -42,30 +42,51 @@ const JORNADAS_LEGALES = [
   }
 ];
 
+// ✅ TABLA FIJA DE HORAS MENSUALES POR JORNADA SEMANAL
+const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
+  48: 240, // Jornada tradicional
+  47: 235, // Primera reducción (2023-2024)
+  46: 230, // Segunda reducción (2024-2025) ✅
+  44: 220, // Tercera reducción (2025-2026) ✅
+  42: 210  // Reducción final (2026+)
+};
+
 /**
  * Obtiene la información de jornada legal vigente para una fecha específica
  */
 export const getJornadaLegal = (fecha: Date = new Date()): JornadaLegalInfo => {
+  console.log(`📅 Calculando jornada legal para: ${fecha.toISOString().split('T')[0]}`);
+  
   // Ordenar por fecha descendente para encontrar la jornada vigente
   const jornadaVigente = JORNADAS_LEGALES
     .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
-    .find(jornada => fecha >= jornada.fechaInicio);
+    .find(jornada => {
+      const esVigente = fecha >= jornada.fechaInicio;
+      console.log(`   📊 Comparando con ${jornada.fechaInicio.toISOString().split('T')[0]} (${jornada.horasSemanales}h) - Vigente: ${esVigente}`);
+      return esVigente;
+    });
 
   if (!jornadaVigente) {
     // Fallback a la jornada tradicional
     const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
+    const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaTradicional.horasSemanales];
+    console.log(`⚠️ No se encontró jornada vigente, usando tradicional: ${jornadaTradicional.horasSemanales}h = ${horasMensuales}h mensuales`);
+    
     return {
       horasSemanales: jornadaTradicional.horasSemanales,
-      horasMensuales: (jornadaTradicional.horasSemanales / 6) * 30, // ✅ FÓRMULA CORREGIDA
+      horasMensuales: horasMensuales,
       fechaVigencia: jornadaTradicional.fechaInicio,
       descripcion: jornadaTradicional.descripcion,
       ley: 'Código Sustantivo del Trabajo'
     };
   }
 
+  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaVigente.horasSemanales];
+  console.log(`✅ Jornada seleccionada: ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
+
   return {
     horasSemanales: jornadaVigente.horasSemanales,
-    horasMensuales: (jornadaVigente.horasSemanales / 6) * 30, // ✅ FÓRMULA CORREGIDA: (horas/día × 30 días)
+    horasMensuales: horasMensuales,
     fechaVigencia: jornadaVigente.fechaInicio,
     descripcion: jornadaVigente.descripcion,
     ley: 'Ley 2101 de 2021'
@@ -74,17 +95,15 @@ export const getJornadaLegal = (fecha: Date = new Date()): JornadaLegalInfo => {
 
 /**
  * Calcula el divisor horario para el cálculo del valor de la hora ordinaria
- * Basado en la jornada legal vigente para la fecha especificada
- * CORREGIDO: Ahora usa la fórmula correcta de legislación colombiana
+ * Basado en la tabla fija de horas mensuales por jornada legal
  */
 export const getHourlyDivisor = (fecha: Date = new Date()): number => {
   const jornadaInfo = getJornadaLegal(fecha);
-  const divisor = Math.round(jornadaInfo.horasMensuales);
+  const divisor = jornadaInfo.horasMensuales;
   
   console.log(`📅 Fecha: ${fecha.toISOString().split('T')[0]}`);
   console.log(`⏰ Jornada legal: ${jornadaInfo.horasSemanales} horas semanales`);
-  console.log(`📊 Horas mensuales: ${jornadaInfo.horasMensuales.toFixed(2)} (${jornadaInfo.horasSemanales}/6 × 30)`);
-  console.log(`🔢 Divisor horario: ${divisor}`);
+  console.log(`🔢 Divisor horario: ${divisor} horas mensuales (tabla fija)`);
   
   return divisor;
 };
