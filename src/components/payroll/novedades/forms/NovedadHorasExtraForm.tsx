@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,24 +40,40 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   
   const { calculateNovedad, isLoading, clearCache } = useNovedadBackendCalculation();
 
-  // ✅ LIMPIAR CACHE AL CAMBIAR FECHA
+  // ✅ KISS: Logging detallado de la fecha desde el componente
   useEffect(() => {
     const fechaStr = periodoFecha?.toISOString().split('T')[0] || 'no-date';
-    console.log(`🗓️ Period date changed: ${fechaStr} - clearing cache`);
+    console.log('🎯 KISS DEBUG: Component received period date:', {
+      original: periodoFecha,
+      formatted: fechaStr,
+      displayDate: periodoFecha?.toLocaleDateString('es-ES')
+    });
     clearCache();
   }, [periodoFecha, clearCache]);
 
-  // ✅ CÁLCULO CON VALIDACIÓN ESTRICTA
+  // ✅ CÁLCULO CON VALIDACIÓN ESTRICTA Y LOGGING DETALLADO
   useEffect(() => {
     if (subtipo && horas && parseFloat(horas) > 0) {
       const fechaCalculo = periodoFecha || new Date();
       const fechaStr = fechaCalculo.toISOString().split('T')[0];
       
-      console.log(`🔄 FORM: Calculating hours extra for date ${fechaStr}:`, { 
+      // ✅ KISS: Logging ultra-detallado del cálculo
+      console.log('🔄 KISS DEBUG: Iniciando cálculo horas extra:', { 
         subtipo, 
         horas: parseFloat(horas),
-        salarioBase: employeeSalary
+        salarioBase: employeeSalary,
+        fechaOriginal: periodoFecha,
+        fechaCalculo: fechaCalculo,
+        fechaStr: fechaStr,
+        fechaDisplay: periodoFecha?.toLocaleDateString('es-ES')
       });
+      
+      // ✅ VALIDACIÓN ESPECÍFICA PARA LAS FECHAS PROBLEMA
+      if (fechaStr === '2025-07-01') {
+        console.log('🎯 KISS DEBUG: *** COMPONENTE - 1 JULIO 2025 - Debe calcular con 230h ***');
+      } else if (fechaStr === '2025-07-15') {
+        console.log('🎯 KISS DEBUG: *** COMPONENTE - 15 JULIO 2025 - Debe calcular con 220h ***');
+      }
       
       calculateNovedad({
         tipoNovedad: 'horas_extra',
@@ -68,19 +83,30 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         fechaPeriodo: fechaCalculo
       }).then(result => {
         if (result && result.valor > 0) {
-          console.log(`✅ FORM: Result for ${fechaStr}:`, {
+          console.log('✅ KISS DEBUG: Resultado final del componente para', fechaStr, ':', {
             valor: result.valor,
             divisorHorario: result.jornadaInfo.divisorHorario,
-            valorHoraOrdinaria: result.jornadaInfo.valorHoraOrdinaria
+            valorHoraOrdinaria: result.jornadaInfo.valorHoraOrdinaria,
+            ley: result.jornadaInfo.ley
           });
+          
+          // ✅ VALIDACIÓN ESPECÍFICA DE RESULTADOS
+          if (fechaStr === '2025-07-01' && result.jornadaInfo.divisorHorario === 230) {
+            console.log('✅ KISS SUCCESS: 1 Julio correctamente usa 230h mensuales');
+          } else if (fechaStr === '2025-07-15' && result.jornadaInfo.divisorHorario === 220) {
+            console.log('✅ KISS SUCCESS: 15 Julio correctamente usa 220h mensuales');
+          } else if (['2025-07-01', '2025-07-15'].includes(fechaStr)) {
+            console.error('❌ KISS ERROR: Fecha', fechaStr, 'usa divisor', result.jornadaInfo.divisorHorario, 'cuando debería usar', fechaStr === '2025-07-01' ? '230' : '220');
+          }
+          
           setValorCalculado(result.valor);
           setUseManualValue(false);
         } else {
-          console.log(`⚠️ FORM: No valid result for ${fechaStr}`);
+          console.log('⚠️ KISS DEBUG: No se obtuvo resultado válido para', fechaStr);
           setValorCalculado(0);
         }
       }).catch(error => {
-        console.error(`❌ FORM: Error calculating for ${fechaStr}:`, error);
+        console.error('❌ KISS DEBUG: Error calculando para', fechaStr, ':', error);
         setValorCalculado(0);
       });
     } else {
@@ -117,7 +143,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
-      {/* Date display */}
+      {/* Date display con información de debugging */}
       {periodoFecha && (
         <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
           <div className="flex items-start gap-2 text-blue-700">
@@ -125,6 +151,12 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
             <div className="text-sm">
               <p className="font-medium">Fecha de cálculo: {periodoFecha.toLocaleDateString('es-ES')}</p>
               <p>Los valores se calculan según la jornada legal vigente para esta fecha.</p>
+              {/* ✅ KISS: Mostrar información de debugging */}
+              <p className="text-xs mt-1 font-mono">
+                Debug: {periodoFecha.toISOString().split('T')[0]} | 
+                {periodoFecha.toISOString().split('T')[0] === '2025-07-01' ? ' Espera 230h' : 
+                 periodoFecha.toISOString().split('T')[0] === '2025-07-15' ? ' Espera 220h' : ' Fecha normal'}
+              </p>
             </div>
           </div>
         </div>
@@ -135,8 +167,8 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <div className="flex items-start gap-2 text-green-700">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div className="text-sm">
-            <p className="font-medium">Cálculo automático con jornada legal dinámica</p>
-            <p>Los valores se calculan automáticamente en el backend usando la legislación vigente para la fecha del período.</p>
+            <p className="font-medium">🎯 KISS Debug: Cálculo automático (sin caché)</p>
+            <p>Los valores se calculan en tiempo real para verificar la transición de jornada legal.</p>
           </div>
         </div>
       </div>
@@ -180,7 +212,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
             <div className="flex items-center gap-2 text-yellow-700">
               <Calculator className="h-4 w-4 animate-spin" />
-              <span className="font-medium">Calculando en backend...</span>
+              <span className="font-medium">🎯 KISS Debug: Calculando en backend (sin caché)...</span>
             </div>
           </div>
         )}
@@ -193,7 +225,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
               <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
             </div>
             <div className="text-xs text-green-600 mt-1">
-              Calculado con jornada legal dinámica para {periodoFecha?.toLocaleDateString('es-ES')}
+              🎯 KISS: Calculado dinámicamente para {periodoFecha?.toLocaleDateString('es-ES')} (sin caché)
             </div>
           </div>
         )}
