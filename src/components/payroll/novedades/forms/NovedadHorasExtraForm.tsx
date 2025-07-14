@@ -35,43 +35,42 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
 }) => {
   const [subtipo, setSubtipo] = useState<string>('');
   const [horas, setHoras] = useState<string>('');
+  const [fechaExtra, setFechaExtra] = useState<Date>(new Date());
   const [valorCalculado, setValorCalculado] = useState<number>(0);
   const [valorManual, setValorManual] = useState<string>('');
   const [useManualValue, setUseManualValue] = useState(false);
   const [observacion, setObservacion] = useState<string>('');
   const [isValidationPassing, setIsValidationPassing] = useState<boolean | null>(null);
-  const [debugDate, setDebugDate] = useState<Date>(periodoFecha || new Date());
   
   const { calculateNovedad, calculateNovedadDebounced, isLoading, clearCache } = useNovedadBackendCalculation();
 
-  // 🚀 ULTRA-KISS: Limpiar cache y mostrar fecha
+  // Initialize component and clear cache
   useEffect(() => {
     console.log('🚀 ULTRA-KISS FORM: *** COMPONENTE INICIALIZADO ***');
-    console.log('🚀 ULTRA-KISS FORM: Fecha recibida:', periodoFecha);
+    console.log('🚀 ULTRA-KISS FORM: Período:', periodoFecha);
     console.log('🚀 ULTRA-KISS FORM: Salario empleado:', employeeSalary);
+    console.log('🚀 ULTRA-KISS FORM: Fecha inicial para horas extra:', fechaExtra);
     clearCache();
   }, [periodoFecha, clearCache]);
 
-  // 🚀 ULTRA-KISS: Efecto de cálculo con validación extrema
+  // Calculation effect using the actual overtime date
   useEffect(() => {
     if (subtipo && horas && parseFloat(horas) > 0) {
-      const fechaCalculo = debugDate; // Usar debugDate en lugar de periodoFecha
-      
       console.log('🚀 ULTRA-KISS FORM: *** INICIANDO CÁLCULO ***');
       console.log('🚀 ULTRA-KISS FORM: Subtipo:', subtipo);
       console.log('🚀 ULTRA-KISS FORM: Horas:', parseFloat(horas));
       console.log('🚀 ULTRA-KISS FORM: Salario base:', employeeSalary);
-      console.log('🚀 ULTRA-KISS FORM: Fecha para cálculo:', fechaCalculo);
+      console.log('🚀 ULTRA-KISS FORM: Fecha para cálculo (fecha extra):', fechaExtra);
       
-      // 🎯 VALIDACIÓN ESPECÍFICA DE FECHAS CRÍTICAS
-      const year = fechaCalculo.getFullYear();
-      const month = String(fechaCalculo.getMonth() + 1).padStart(2, '0');
-      const day = String(fechaCalculo.getDate()).padStart(2, '0');
+      // Format date for calculation
+      const year = fechaExtra.getFullYear();
+      const month = String(fechaExtra.getMonth() + 1).padStart(2, '0');
+      const day = String(fechaExtra.getDate()).padStart(2, '0');
       const fechaString = `${year}-${month}-${day}`;
       
       console.log('🚀 ULTRA-KISS FORM: Fecha como string:', fechaString);
       
-      // 🎯 Predicciones exactas
+      // Specific date validation
       if (fechaString === '2025-07-15') {
         console.log('🎯 ULTRA-KISS FORM: *** 15 JULIO 2025 - ESPERANDO $9,765 ***');
       } else if (fechaString === '2025-07-01') {
@@ -83,7 +82,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         subtipo,
         salarioBase: employeeSalary,
         horas: parseFloat(horas),
-        fechaPeriodo: fechaCalculo
+        fechaPeriodo: fechaExtra
       }).then(result => {
         if (result && result.valor > 0) {
           console.log('🚀 ULTRA-KISS FORM: *** RESULTADO RECIBIDO ***');
@@ -91,10 +90,10 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           console.log('🚀 ULTRA-KISS FORM: Divisor horario:', result.jornadaInfo.divisorHorario);
           console.log('🚀 ULTRA-KISS FORM: Valor hora ordinaria:', result.jornadaInfo.valorHoraOrdinaria);
           
-          // 🎯 VALIDACIÓN FINAL ULTRA-ESPECÍFICA - Calculando valores exactos esperados
+          // Ultra-specific validation
           let validationPassed = null;
-          const expectedValue15July = Math.round((1718661 / 220) * 1.25 * parseFloat(horas)); // ~9765 para 1 hora
-          const expectedValue1July = Math.round((1718661 / 230) * 1.25 * parseFloat(horas)); // ~9341 para 1 hora
+          const expectedValue15July = Math.round((1718661 / 220) * 1.25 * parseFloat(horas)); // ~9765 for 1 hour
+          const expectedValue1July = Math.round((1718661 / 230) * 1.25 * parseFloat(horas)); // ~9341 for 1 hour
           
           if (fechaString === '2025-07-15') {
             validationPassed = Math.abs(result.valor - expectedValue15July) < 50;
@@ -129,7 +128,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
       setValorCalculado(0);
       setIsValidationPassing(null);
     }
-  }, [subtipo, horas, employeeSalary, debugDate, calculateNovedad]);
+  }, [subtipo, horas, employeeSalary, fechaExtra, calculateNovedad]);
 
   const handleSubmit = () => {
     const finalValue = useManualValue && valorManual ? parseFloat(valorManual) : valorCalculado;
@@ -139,7 +138,9 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
       subtipo,
       horas: parseFloat(horas),
       valor: finalValue,
-      observacion
+      observacion,
+      fecha_inicio: fechaExtra.toISOString().split('T')[0],
+      fecha_fin: fechaExtra.toISOString().split('T')[0]
     });
   };
 
@@ -160,22 +161,16 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
-      {/* 🚀 ULTRA-KISS: Información ultra-detallada */}
+      {/* Period info */}
       {periodoFecha && (
         <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
           <div className="flex items-start gap-2 text-blue-700">
             <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
-              <p className="font-medium">🚀 ULTRA-KISS - Fecha: {periodoFecha.toLocaleDateString('es-ES')}</p>
+              <p className="font-medium">🚀 ULTRA-KISS - Período: {periodoFecha.toLocaleDateString('es-ES')}</p>
               <p>Debugging ultra-agresivo habilitado</p>
               <div className="mt-2 font-mono text-xs bg-blue-100 p-2 rounded">
-                <p>📅 Fecha enviada: {periodoFecha.getFullYear()}-{String(periodoFecha.getMonth() + 1).padStart(2, '0')}-{String(periodoFecha.getDate()).padStart(2, '0')}</p>
-                {periodoFecha.toISOString().split('T')[0] === '2025-07-15' && (
-                  <p className="text-green-600 font-bold">🎯 15 julio → DEBE ser $9,765 (220h mensuales)</p>
-                )}
-                {periodoFecha.toISOString().split('T')[0] === '2025-07-01' && (
-                  <p className="text-orange-600 font-bold">🎯 1 julio → DEBE ser $9,341 (230h mensuales)</p>
-                )}
+                <p>📅 Período: {periodoFecha.getFullYear()}-{String(periodoFecha.getMonth() + 1).padStart(2, '0')}-{String(periodoFecha.getDate()).padStart(2, '0')}</p>
               </div>
             </div>
           </div>
@@ -187,8 +182,8 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <div className="flex items-start gap-2 text-green-700">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div className="text-sm">
-            <p className="font-medium">🚀 ULTRA-KISS: Backend con hardcode directo</p>
-            <p>Valores específicos hardcodeados para fechas críticas</p>
+            <p className="font-medium">🚀 ULTRA-KISS: Backend con lógica de jornada legal unificada</p>
+            <p>Cálculo basado en la fecha exacta de la hora extra</p>
           </div>
         </div>
       </div>
@@ -215,6 +210,20 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         </div>
 
         <div>
+          <Label htmlFor="fechaExtra">Fecha de la Hora Extra</Label>
+          <Input
+            id="fechaExtra"
+            type="date"
+            value={fechaExtra.toISOString().split('T')[0]}
+            onChange={(e) => setFechaExtra(new Date(e.target.value))}
+            className="w-full"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Selecciona la fecha exacta cuando se trabajaron las horas extra
+          </p>
+        </div>
+
+        <div>
           <Label htmlFor="horas">Cantidad de Horas</Label>
           <Input
             id="horas"
@@ -232,12 +241,12 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
             <div className="flex items-center gap-2 text-yellow-700">
               <Calculator className="h-4 w-4 animate-spin" />
-              <span className="font-medium">🚀 ULTRA-KISS: Calculando con hardcode...</span>
+              <span className="font-medium">🚀 ULTRA-KISS: Calculando con lógica unificada...</span>
             </div>
           </div>
         )}
 
-        {/* 🚀 ULTRA-KISS: Resultado con validación visual */}
+        {/* Calculation result with validation */}
         {valorCalculado > 0 && !isLoading && (
           <div className={`p-4 rounded-lg border-2 ${
             isValidationPassing === true ? 'bg-green-50 border-green-300' :
@@ -255,17 +264,17 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
               isValidationPassing === false ? 'bg-red-100 text-red-700' :
               'bg-blue-100 text-blue-700'
             }`}>
-              🚀 ULTRA-KISS: Para {periodoFecha?.toLocaleDateString('es-ES')}
+              🚀 ULTRA-KISS: Para {fechaExtra.toLocaleDateString('es-ES')}
               {isValidationPassing === true && (
                 <p className="font-bold">✅ VALIDACIÓN CORRECTA</p>
               )}
               {isValidationPassing === false && (
                 <p className="font-bold">❌ VALIDACIÓN FALLIDA</p>
               )}
-              {periodoFecha?.toISOString().split('T')[0] === '2025-07-15' && (
+              {fechaExtra.toISOString().split('T')[0] === '2025-07-15' && (
                 <p className="mt-1">Esperado: ${formatCurrency(Math.round((1718661 / 220) * 1.25 * parseFloat(horas || '1')))} (220h mensuales)</p>
               )}
-              {periodoFecha?.toISOString().split('T')[0] === '2025-07-01' && (
+              {fechaExtra.toISOString().split('T')[0] === '2025-07-01' && (
                 <p className="mt-1">Esperado: ${formatCurrency(Math.round((1718661 / 230) * 1.25 * parseFloat(horas || '1')))} (230h mensuales)</p>
               )}
             </div>
@@ -333,15 +342,15 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         </Button>
       </div>
       
-      {/* 🚀 ULTRA-KISS: Panel de debugging flotante */}
+      {/* Debug panel using the overtime date */}
       {horas && parseFloat(horas) > 0 && (
         <NovedadDebugPanel
-          fecha={debugDate}
+          fecha={fechaExtra}
           horas={horas}
           salario={employeeSalary}
           valorCalculado={valorCalculado}
           validationPassed={isValidationPassing}
-          onDateChange={setDebugDate}
+          onDateChange={setFechaExtra}
         />
       )}
     </div>

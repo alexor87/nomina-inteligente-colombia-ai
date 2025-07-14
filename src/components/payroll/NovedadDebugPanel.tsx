@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Info, Calendar, Calculator, CheckCircle, XCircle, Settings } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -23,15 +24,15 @@ export const NovedadDebugPanel: React.FC<NovedadDebugPanelProps> = ({
   const fechaString = fecha.toISOString().split('T')[0];
   const horasNum = parseFloat(horas || '1');
   
-  // Cálculos esperados
+  // Expected calculations
   const expectedValue15July = Math.round((salario / 220) * 1.25 * horasNum);
   const expectedValue1July = Math.round((salario / 230) * 1.25 * horasNum);
   
   const getExpectedValue = () => {
     if (fechaString === '2025-07-15') return expectedValue15July;
     if (fechaString === '2025-07-01') return expectedValue1July;
-    if (fechaString >= '2025-07-15') return expectedValue15July; // 220h para fechas >= 15 julio
-    return expectedValue1July; // 230h para fechas < 15 julio
+    if (fechaString >= '2025-07-15') return expectedValue15July; // 220h for dates >= 15 July
+    return expectedValue1July; // 230h for dates < 15 July
   };
   
   const getExpectedHours = () => {
@@ -66,7 +67,7 @@ export const NovedadDebugPanel: React.FC<NovedadDebugPanelProps> = ({
       <div className="space-y-2 text-sm font-mono">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          <span>Fecha: {fechaString}</span>
+          <span>Fecha Extra: {fechaString}</span>
         </div>
         
         <div className="flex items-center gap-2">
@@ -103,7 +104,7 @@ export const NovedadDebugPanel: React.FC<NovedadDebugPanelProps> = ({
           </p>
         </div>
 
-        {/* Botones de prueba */}
+        {/* Test buttons */}
         <div className="space-y-1">
           <p className="font-bold text-blue-800 text-xs">🧪 PROBAR FECHAS:</p>
           <div className="flex gap-1">
