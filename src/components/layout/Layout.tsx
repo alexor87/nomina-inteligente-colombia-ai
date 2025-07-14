@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { Header } from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 
@@ -33,6 +34,7 @@ export const Layout = () => {
           sidebarCollapsed ? 'ml-16' : 'ml-64'
         }`}
       >
+        <Header />
         <div className="min-h-screen">
           <Outlet />
         </div>
