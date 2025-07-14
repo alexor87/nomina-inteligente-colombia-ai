@@ -1,13 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
+import { NovedadTypeSelector } from './NovedadTypeSelector';
 import { NovedadHorasExtraForm } from './forms/NovedadHorasExtraForm';
 import { NovedadRecargoForm as NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 import { NovedadBonificacionesForm as NovedadBonificacionesConsolidatedForm } from './forms/NovedadBonificacionesForm';
+import { NovedadComisionesForm as NovedadComisionConsolidatedForm } from './forms/NovedadComisionesForm';
+import { NovedadPrimaForm as NovedadPrimaConsolidatedForm } from './forms/NovedadPrimaForm';
+import { NovedadOtrosIngresosForm as NovedadOtrosIngresosConsolidatedForm } from './forms/NovedadOtrosIngresosForm';
 import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
+import { NovedadLicenciaForm as NovedadLicenciaConsolidatedForm } from './forms/NovedadLicenciaForm';
+import { NovedadLicenciaNoRemuneradaForm as NovedadLicenciaNoRemuneradaConsolidatedForm } from './forms/NovedadLicenciaNoRemuneradaForm';
+import { NovedadAusenciaForm as NovedadAusenciaConsolidatedForm } from './forms/NovedadAusenciaForm';
+import { NovedadFondoSolidaridadForm as NovedadFondoSolidaridadConsolidatedForm } from './forms/NovedadFondoSolidaridadForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { CreateNovedadData, NovedadType } from '@/types/novedades-enhanced';
+import { usePeriod } from '@/hooks/usePeriod';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -18,8 +26,6 @@ interface NovedadUnifiedModalProps {
   onSubmit: (data: CreateNovedadData) => Promise<void>;
   selectedNovedadType: NovedadType | null;
   onClose: () => void;
-  startDate?: string;
-  endDate?: string;
 }
 
 export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
@@ -30,21 +36,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   periodId,
   onSubmit,
   selectedNovedadType,
-  onClose,
-  startDate,
-  endDate
+  onClose
 }) => {
   const [currentNovedadType, setCurrentNovedadType] = useState<NovedadType | null>(selectedNovedadType || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  console.log('🔍 DEBUG NovedadUnifiedModal - Props received:', {
-    employeeId,
-    employeeSalary,
-    periodId,
-    startDate,
-    endDate,
-    selectedNovedadType
-  });
+  const { period } = usePeriod(periodId);
 
   const handleClose = () => {
     setCurrentNovedadType(null);
@@ -68,12 +64,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const getPeriodDate = (): Date => {
-    if (startDate) {
-      const periodDate = new Date(startDate);
+    if (period?.fecha_inicio) {
+      const periodDate = new Date(period.fecha_inicio);
       
-      console.log('📅 DEBUG NovedadUnifiedModal getPeriodDate processing:', {
+      // 🔍 DEBUG: Log period date processing
+      console.log('📅 getPeriodDate processing:', {
         periodId,
-        startDate,
+        periodFechaInicio: period.fecha_inicio,
         periodDate,
         periodDateISO: periodDate.toISOString(),
         periodDateString: periodDate.toISOString().split('T')[0]
@@ -83,33 +80,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
     
     const fallbackDate = new Date();
-    console.log('⚠️ NovedadUnifiedModal using fallback date (today):', fallbackDate.toISOString().split('T')[0]);
+    console.log('⚠️ Using fallback date (today):', fallbackDate.toISOString().split('T')[0]);
     return fallbackDate;
-  };
-
-  // Map NovedadCategory to NovedadType
-  const mapCategoryToType = (category: NovedadCategory): NovedadType => {
-    switch (category) {
-      case 'horas_extra':
-        return 'horas_extra';
-      case 'recargo_nocturno':
-        return 'recargo_nocturno';
-      case 'vacaciones':
-        return 'vacaciones';
-      case 'incapacidades':
-        return 'incapacidad';
-      case 'bonificaciones':
-        return 'bonificacion';
-      case 'ingresos_adicionales':
-        return 'otros_ingresos';
-      default:
-        return 'horas_extra'; // fallback
-    }
-  };
-
-  const handleCategorySelect = (category: NovedadCategory) => {
-    const novedadType = mapCategoryToType(category);
-    setCurrentNovedadType(novedadType);
   };
 
   const renderSelectedForm = () => {
@@ -117,10 +89,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       onBack: handleBackToSelector,
       onSubmit: handleFormSubmit,
       employeeSalary: employeeSalary || 0,
-      periodoFecha: getPeriodDate()
+      periodoFecha: getPeriodDate()  // 🔍 DEBUG: Always pass period date
     };
 
-    console.log('🎨 DEBUG NovedadUnifiedModal rendering form for:', {
+    // 🔍 DEBUG: Log form rendering
+    console.log('🎨 Rendering form for:', {
       currentNovedadType,
       baseProps: {
         employeeSalary: baseProps.employeeSalary,
@@ -129,13 +102,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     });
 
     if (!currentNovedadType) {
-      return (
-        <NovedadTypeSelector 
-          onClose={handleClose}
-          onSelectCategory={handleCategorySelect}
-          employeeName="Empleado" // We could pass actual employee name if available
-        />
-      );
+      return <NovedadTypeSelector onSelectType={setCurrentNovedadType} />;
     }
 
     switch (currentNovedadType) {
@@ -165,6 +132,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'bonificacion':
         return <NovedadBonificacionesConsolidatedForm {...baseProps} />;
         
+      case 'comision':
+        return <NovedadComisionConsolidatedForm {...baseProps} />;
+        
+      case 'prima':
+        return <NovedadPrimaConsolidatedForm {...baseProps} />;
+        
+      case 'otros_ingresos':
+        return <NovedadOtrosIngresosConsolidatedForm {...baseProps} />;
+        
       case 'incapacidad':
         return (
           <NovedadIncapacidadForm
@@ -176,20 +152,26 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           />
         );
         
+      case 'licencia_remunerada':
+        return <NovedadLicenciaConsolidatedForm {...baseProps} />;
+        
+      case 'licencia_no_remunerada':
+        return <NovedadLicenciaNoRemuneradaConsolidatedForm {...baseProps} />;
+        
+      case 'ausencia':
+        return <NovedadAusenciaConsolidatedForm {...baseProps} />;
+        
+      case 'fondo_solidaridad':
+        return <NovedadFondoSolidaridadConsolidatedForm {...baseProps} />;
+        
       default:
-        return (
-          <NovedadTypeSelector 
-            onClose={handleClose}
-            onSelectCategory={handleCategorySelect}
-            employeeName="Empleado"
-          />
-        );
+        return <NovedadTypeSelector onSelectType={setCurrentNovedadType} />;
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-[95vw] sm:max-w-[650px] lg:max-w-[750px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
             {currentNovedadType ? `Novedad: ${currentNovedadType}` : 'Agregar Novedad'}
@@ -199,9 +181,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-2">
-          {renderSelectedForm()}
-        </div>
+        {renderSelectedForm()}
 
         <DialogFooter>
           <Button type="button" variant="secondary" onClick={handleClose}>

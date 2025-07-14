@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -272,6 +271,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           onSubmit={handleNovedadSubmit}
           selectedNovedadType={null}
           onClose={handleCloseNovedadModal}
+          onEmployeeNovedadesChange={handleNovedadChange}
           startDate={startDate}
           endDate={endDate}
         />
