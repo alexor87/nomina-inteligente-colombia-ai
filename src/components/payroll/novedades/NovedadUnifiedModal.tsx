@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { NovedadTypeSelector } from './NovedadTypeSelector';
+import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadHorasExtraForm } from './forms/NovedadHorasExtraForm';
 import { NovedadRecargoForm as NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
@@ -38,6 +38,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [currentNovedadType, setCurrentNovedadType] = useState<NovedadType | null>(selectedNovedadType || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  console.log('🔍 DEBUG NovedadUnifiedModal - Props received:', {
+    employeeId,
+    employeeSalary,
+    periodId,
+    startDate,
+    endDate,
+    selectedNovedadType
+  });
+
   const handleClose = () => {
     setCurrentNovedadType(null);
     onClose();
@@ -63,8 +72,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     if (startDate) {
       const periodDate = new Date(startDate);
       
-      // 🔍 DEBUG: Log period date processing
-      console.log('📅 NovedadUnifiedModal getPeriodDate processing:', {
+      console.log('📅 DEBUG NovedadUnifiedModal getPeriodDate processing:', {
         periodId,
         startDate,
         periodDate,
@@ -80,16 +88,40 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     return fallbackDate;
   };
 
+  // Map NovedadCategory to NovedadType
+  const mapCategoryToType = (category: NovedadCategory): NovedadType => {
+    switch (category) {
+      case 'horas_extra':
+        return 'horas_extra';
+      case 'recargo_nocturno':
+        return 'recargo_nocturno';
+      case 'vacaciones':
+        return 'vacaciones';
+      case 'incapacidades':
+        return 'incapacidad';
+      case 'bonificaciones':
+        return 'bonificacion';
+      case 'ingresos_adicionales':
+        return 'otros_ingresos';
+      default:
+        return 'horas_extra'; // fallback
+    }
+  };
+
+  const handleCategorySelect = (category: NovedadCategory) => {
+    const novedadType = mapCategoryToType(category);
+    setCurrentNovedadType(novedadType);
+  };
+
   const renderSelectedForm = () => {
     const baseProps = {
       onBack: handleBackToSelector,
       onSubmit: handleFormSubmit,
       employeeSalary: employeeSalary || 0,
-      periodoFecha: getPeriodDate()  // 🔍 DEBUG: Always pass period date
+      periodoFecha: getPeriodDate()
     };
 
-    // 🔍 DEBUG: Log form rendering
-    console.log('🎨 NovedadUnifiedModal rendering form for:', {
+    console.log('🎨 DEBUG NovedadUnifiedModal rendering form for:', {
       currentNovedadType,
       baseProps: {
         employeeSalary: baseProps.employeeSalary,
@@ -98,7 +130,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     });
 
     if (!currentNovedadType) {
-      return <NovedadTypeSelector onSelectType={setCurrentNovedadType} />;
+      return (
+        <NovedadTypeSelector 
+          onClose={handleClose}
+          onSelectCategory={handleCategorySelect}
+          employeeName="Empleado" // We could pass actual employee name if available
+        />
+      );
     }
 
     switch (currentNovedadType) {
@@ -140,7 +178,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         );
         
       default:
-        return <NovedadTypeSelector onSelectType={setCurrentNovedadType} />;
+        return (
+          <NovedadTypeSelector 
+            onClose={handleClose}
+            onSelectCategory={handleCategorySelect}
+            employeeName="Empleado"
+          />
+        );
     }
   };
 
