@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calculator, Info } from 'lucide-react';
+import { ArrowLeft, Calculator, Info, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
@@ -40,25 +40,44 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   const [observacion, setObservacion] = useState<string>('');
   
   // ✅ SOLO BACKEND CALCULATION
-  const { calculateNovedad, isLoading } = useNovedadBackendCalculation();
+  const { calculateNovedad, isLoading, clearCache } = useNovedadBackendCalculation();
 
-  // ✅ BACKEND CALCULATION - eliminar completamente cálculos frontend
+  // ✅ NUEVA FUNCIONALIDAD: Limpiar cache cuando cambie la fecha del período
+  useEffect(() => {
+    console.log('🗓️ Período fecha changed:', periodoFecha?.toISOString().split('T')[0]);
+    clearCache(); // Limpiar cache cuando cambie la fecha
+  }, [periodoFecha, clearCache]);
+
+  // ✅ BACKEND CALCULATION - con fecha exacta del período
   useEffect(() => {
     if (subtipo && horas && parseFloat(horas) > 0) {
-      console.log('🔄 Calculating hours extra via backend:', { subtipo, horas: parseFloat(horas) });
+      const fechaCalculo = periodoFecha || new Date();
+      
+      console.log('🔄 Calculating hours extra via backend:', { 
+        subtipo, 
+        horas: parseFloat(horas),
+        fechaCalculo: fechaCalculo.toISOString().split('T')[0],
+        salarioBase: employeeSalary
+      });
       
       calculateNovedad({
         tipoNovedad: 'horas_extra',
         subtipo,
         salarioBase: employeeSalary,
         horas: parseFloat(horas),
-        fechaPeriodo: periodoFecha || new Date()
+        fechaPeriodo: fechaCalculo
       }).then(result => {
         if (result && result.valor > 0) {
-          console.log('✅ Backend calculation result:', result.valor);
+          console.log('✅ Backend calculation result:', {
+            valor: result.valor,
+            factorCalculo: result.factorCalculo,
+            detalleCalculo: result.detalleCalculo,
+            jornadaInfo: result.jornadaInfo
+          });
           setValorCalculado(result.valor);
           setUseManualValue(false);
         } else {
+          console.log('⚠️ No result from backend calculation');
           setValorCalculado(0);
         }
       }).catch(error => {
@@ -99,9 +118,22 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
+      {/* ✅ NUEVO: Mostrar fecha de cálculo para transparencia */}
+      {periodoFecha && (
+        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-start gap-2 text-blue-700">
+            <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium">Fecha de cálculo: {periodoFecha.toLocaleDateString('es-ES')}</p>
+              <p>Los valores se calculan según la jornada legal vigente para esta fecha.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Backend calculation info */}
-      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex items-start gap-2 text-blue-700">
+      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+        <div className="flex items-start gap-2 text-green-700">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div className="text-sm">
             <p className="font-medium">Cálculo automático con jornada legal dinámica</p>

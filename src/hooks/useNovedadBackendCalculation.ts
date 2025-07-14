@@ -72,7 +72,13 @@ export const useNovedadBackendCalculation = () => {
     setError(null);
 
     try {
-      console.log('🔄 Calculating novedad via backend:', input);
+      // ✅ MEJORADO: Log detallado de la fecha que se envía
+      const fechaParaCalculo = input.fechaPeriodo?.toISOString().split('T')[0];
+      console.log('🔄 Calculating novedad via backend:', {
+        ...input,
+        fechaPeriodo: fechaParaCalculo,
+        fechaOriginal: input.fechaPeriodo
+      });
 
       const requestData = {
         tipoNovedad: input.tipoNovedad,
@@ -80,8 +86,10 @@ export const useNovedadBackendCalculation = () => {
         salarioBase: input.salarioBase,
         horas: input.horas || undefined,
         dias: input.dias || undefined,
-        fechaPeriodo: input.fechaPeriodo?.toISOString().split('T')[0] || undefined
+        fechaPeriodo: fechaParaCalculo || undefined
       };
+
+      console.log('📤 Request data being sent to backend:', requestData);
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
@@ -134,6 +142,7 @@ export const useNovedadBackendCalculation = () => {
   }, [calculateNovedad]);
 
   const clearCache = useCallback(() => {
+    console.log('🗑️ Clearing novedad calculation cache');
     setCachedResults(new Map());
   }, []);
 
