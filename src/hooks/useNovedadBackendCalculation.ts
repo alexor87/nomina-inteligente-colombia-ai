@@ -35,7 +35,7 @@ export const useNovedadBackendCalculation = () => {
     input: NovedadCalculationInput
   ): Promise<NovedadCalculationResult | null> => {
     
-    // ✅ KISS: Validaciones básicas
+    // Validaciones básicas
     if (!input.salarioBase || input.salarioBase <= 0) {
       console.log('❌ Invalid salary for calculation');
       return null;
@@ -58,27 +58,24 @@ export const useNovedadBackendCalculation = () => {
     setError(null);
 
     try {
-      // ✅ KISS: FORZAR FORMATO YYYY-MM-DD CORRECTO
+      // ✅ SOLUCIÓN DIRECTA: Formateo garantizado de fecha
       let fechaParaCalculo: string | undefined;
       
       if (input.fechaPeriodo) {
-        // Crear fecha limpia en UTC para evitar problemas de zona horaria
+        // Garantizar formato YYYY-MM-DD sin importar la zona horaria
         const year = input.fechaPeriodo.getFullYear();
         const month = String(input.fechaPeriodo.getMonth() + 1).padStart(2, '0');
         const day = String(input.fechaPeriodo.getDate()).padStart(2, '0');
         fechaParaCalculo = `${year}-${month}-${day}`;
         
-        console.log('🎯 KISS FRONTEND: Fecha original input:', input.fechaPeriodo);
-        console.log('🎯 KISS FRONTEND: Fecha formateada para backend:', fechaParaCalculo);
-        console.log('🎯 KISS FRONTEND: Año:', year, 'Mes:', month, 'Día:', day);
+        console.log('🔥 FRONTEND DIRECTO: Fecha original:', input.fechaPeriodo);
+        console.log('🔥 FRONTEND DIRECTO: Fecha formateada FINAL:', fechaParaCalculo);
         
-        // ✅ VALIDACIÓN CRÍTICA EN FRONTEND
+        // Validación inmediata en frontend
         if (fechaParaCalculo === '2025-07-15') {
-          console.log('🎯 KISS FRONTEND: *** 15 JULIO 2025 - DEBE USAR 220h MENSUALES ***');
-          console.log('🎯 KISS FRONTEND: Valor esperado: ~$10,150 (superior a $9,341)');
+          console.log('🔥 FRONTEND: 15 julio debe resultar en > $10,000');
         } else if (fechaParaCalculo === '2025-07-01') {
-          console.log('🎯 KISS FRONTEND: *** 1 JULIO 2025 - DEBE USAR 230h MENSUALES ***');
-          console.log('🎯 KISS FRONTEND: Valor esperado: $9,341');
+          console.log('🔥 FRONTEND: 1 julio debe resultar en ~$9,341');
         }
       }
 
@@ -91,7 +88,7 @@ export const useNovedadBackendCalculation = () => {
         fechaPeriodo: fechaParaCalculo
       };
 
-      console.log('📤 KISS FRONTEND: Request data enviado al backend:', JSON.stringify(requestData, null, 2));
+      console.log('🔥 FRONTEND DIRECTO: Request final:', JSON.stringify(requestData, null, 2));
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
@@ -111,34 +108,20 @@ export const useNovedadBackendCalculation = () => {
 
       const result = data.data;
       
-      console.log('✅ KISS FRONTEND: Resultado recibido del backend:', {
+      console.log('🔥 FRONTEND DIRECTO: Resultado recibido:', {
         fechaEnviada: fechaParaCalculo,
         valorCalculado: result.valor,
         divisorHorario: result.jornadaInfo.divisorHorario,
-        horasMensuales: result.jornadaInfo.horasMensuales,
-        valorHoraOrdinaria: result.jornadaInfo.valorHoraOrdinaria,
-        ley: result.jornadaInfo.ley
+        horasMensuales: result.jornadaInfo.horasMensuales
       });
 
-      // ✅ VALIDACIÓN FINAL DE RESULTADOS
-      if (fechaParaCalculo === '2025-07-15') {
-        const valorEsperado = Math.round((input.salarioBase / 220) * 1.25 * (input.horas || 0));
-        console.log('🔍 KISS FRONTEND: 15 julio - Valor esperado:', valorEsperado, 'Valor recibido:', result.valor);
-        
-        if (result.jornadaInfo.divisorHorario !== 220) {
-          console.error('❌ KISS ERROR: 15 julio debe usar 220h, pero recibió', result.jornadaInfo.divisorHorario, 'h');
-        } else {
-          console.log('✅ KISS SUCCESS: 15 julio usa correctamente 220h mensuales');
-        }
-      } else if (fechaParaCalculo === '2025-07-01') {
-        const valorEsperado = Math.round((input.salarioBase / 230) * 1.25 * (input.horas || 0));
-        console.log('🔍 KISS FRONTEND: 1 julio - Valor esperado:', valorEsperado, 'Valor recibido:', result.valor);
-        
-        if (result.jornadaInfo.divisorHorario !== 230) {
-          console.error('❌ KISS ERROR: 1 julio debe usar 230h, pero recibió', result.jornadaInfo.divisorHorario, 'h');
-        } else {
-          console.log('✅ KISS SUCCESS: 1 julio usa correctamente 230h mensuales');
-        }
+      // Validación final
+      if (fechaParaCalculo === '2025-07-15' && result.valor < 10000) {
+        console.error('❌ ERROR: 15 julio debería ser > $10,000 pero es:', result.valor);
+      } else if (fechaParaCalculo === '2025-07-01' && Math.abs(result.valor - 9341) > 100) {
+        console.error('❌ ERROR: 1 julio debería ser ~$9,341 pero es:', result.valor);
+      } else {
+        console.log('✅ Resultado parece correcto para fecha:', fechaParaCalculo);
       }
 
       return result;
@@ -168,7 +151,7 @@ export const useNovedadBackendCalculation = () => {
   }, [calculateNovedad]);
 
   const clearCache = useCallback(() => {
-    console.log('🗑️ KISS: Cache clear called (cache disabled for debugging)');
+    console.log('🗑️ Cache disabled for debugging');
   }, []);
 
   return {
