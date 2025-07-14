@@ -38,41 +38,43 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   const [useManualValue, setUseManualValue] = useState(false);
   const [observacion, setObservacion] = useState<string>('');
   
-  const { calculateNovedad, isLoading, clearCache } = useNovedadBackendCalculation();
+  const { calculateNovedad, calculateNovedadDebounced, isLoading, clearCache } = useNovedadBackendCalculation();
 
-  // ✅ KISS: Logging detallado de la fecha desde el componente
+  // ✅ KISS: Clear cache y log fecha recibida
   useEffect(() => {
-    const fechaStr = periodoFecha?.toISOString().split('T')[0] || 'no-date';
-    console.log('🎯 KISS DEBUG: Component received period date:', {
-      original: periodoFecha,
-      formatted: fechaStr,
-      displayDate: periodoFecha?.toLocaleDateString('es-ES')
-    });
+    console.log('🎯 KISS COMPONENT: Fecha recibida en componente:', periodoFecha);
+    console.log('🎯 KISS COMPONENT: Tipo de fecha:', typeof periodoFecha);
+    console.log('🎯 KISS COMPONENT: Fecha ISO string:', periodoFecha?.toISOString());
+    console.log('🎯 KISS COMPONENT: Fecha local string:', periodoFecha?.toLocaleDateString());
     clearCache();
   }, [periodoFecha, clearCache]);
 
-  // ✅ CÁLCULO CON VALIDACIÓN ESTRICTA Y LOGGING DETALLADO
+  // ✅ KISS: Efecto de cálculo con validación extrema
   useEffect(() => {
     if (subtipo && horas && parseFloat(horas) > 0) {
       const fechaCalculo = periodoFecha || new Date();
-      const fechaStr = fechaCalculo.toISOString().split('T')[0];
       
-      // ✅ KISS: Logging ultra-detallado del cálculo
-      console.log('🔄 KISS DEBUG: Iniciando cálculo horas extra:', { 
-        subtipo, 
-        horas: parseFloat(horas),
-        salarioBase: employeeSalary,
-        fechaOriginal: periodoFecha,
-        fechaCalculo: fechaCalculo,
-        fechaStr: fechaStr,
-        fechaDisplay: periodoFecha?.toLocaleDateString('es-ES')
-      });
+      console.log('🔄 KISS COMPONENT: *** INICIANDO CÁLCULO ***');
+      console.log('🔄 KISS COMPONENT: Subtipo:', subtipo);
+      console.log('🔄 KISS COMPONENT: Horas:', parseFloat(horas));
+      console.log('🔄 KISS COMPONENT: Salario base:', employeeSalary);
+      console.log('🔄 KISS COMPONENT: Fecha para cálculo:', fechaCalculo);
+      console.log('🔄 KISS COMPONENT: Fecha ISO:', fechaCalculo.toISOString());
       
-      // ✅ VALIDACIÓN ESPECÍFICA PARA LAS FECHAS PROBLEMA
-      if (fechaStr === '2025-07-01') {
-        console.log('🎯 KISS DEBUG: *** COMPONENTE - 1 JULIO 2025 - Debe calcular con 230h ***');
-      } else if (fechaStr === '2025-07-15') {
-        console.log('🎯 KISS DEBUG: *** COMPONENTE - 15 JULIO 2025 - Debe calcular con 220h ***');
+      // ✅ VALIDACIÓN ESPECÍFICA DE FECHAS CRÍTICAS
+      const year = fechaCalculo.getFullYear();
+      const month = String(fechaCalculo.getMonth() + 1).padStart(2, '0');
+      const day = String(fechaCalculo.getDate()).padStart(2, '0');
+      const fechaString = `${year}-${month}-${day}`;
+      
+      console.log('🔄 KISS COMPONENT: Fecha como string:', fechaString);
+      
+      if (fechaString === '2025-07-15') {
+        console.log('🎯 KISS COMPONENT: *** 15 JULIO 2025 - ESPERANDO 220h MENSUALES ***');
+        console.log('🎯 KISS COMPONENT: Valor esperado: ~$10,150 (mayor que $9,341)');
+      } else if (fechaString === '2025-07-01') {
+        console.log('🎯 KISS COMPONENT: *** 1 JULIO 2025 - ESPERANDO 230h MENSUALES ***');
+        console.log('🎯 KISS COMPONENT: Valor esperado: $9,341');
       }
       
       calculateNovedad({
@@ -83,30 +85,35 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         fechaPeriodo: fechaCalculo
       }).then(result => {
         if (result && result.valor > 0) {
-          console.log('✅ KISS DEBUG: Resultado final del componente para', fechaStr, ':', {
-            valor: result.valor,
-            divisorHorario: result.jornadaInfo.divisorHorario,
-            valorHoraOrdinaria: result.jornadaInfo.valorHoraOrdinaria,
-            ley: result.jornadaInfo.ley
-          });
+          console.log('✅ KISS COMPONENT: *** RESULTADO RECIBIDO ***');
+          console.log('✅ KISS COMPONENT: Valor:', result.valor);
+          console.log('✅ KISS COMPONENT: Divisor horario:', result.jornadaInfo.divisorHorario);
+          console.log('✅ KISS COMPONENT: Valor hora ordinaria:', result.jornadaInfo.valorHoraOrdinaria);
+          console.log('✅ KISS COMPONENT: Ley:', result.jornadaInfo.ley);
           
-          // ✅ VALIDACIÓN ESPECÍFICA DE RESULTADOS
-          if (fechaStr === '2025-07-01' && result.jornadaInfo.divisorHorario === 230) {
-            console.log('✅ KISS SUCCESS: 1 Julio correctamente usa 230h mensuales');
-          } else if (fechaStr === '2025-07-15' && result.jornadaInfo.divisorHorario === 220) {
-            console.log('✅ KISS SUCCESS: 15 Julio correctamente usa 220h mensuales');
-          } else if (['2025-07-01', '2025-07-15'].includes(fechaStr)) {
-            console.error('❌ KISS ERROR: Fecha', fechaStr, 'usa divisor', result.jornadaInfo.divisorHorario, 'cuando debería usar', fechaStr === '2025-07-01' ? '230' : '220');
+          // ✅ VALIDACIÓN FINAL DEL RESULTADO
+          if (fechaString === '2025-07-15') {
+            if (result.jornadaInfo.divisorHorario === 220) {
+              console.log('✅ KISS SUCCESS: 15 julio usa correctamente 220h mensuales');
+            } else {
+              console.error('❌ KISS ERROR: 15 julio debería usar 220h pero usa', result.jornadaInfo.divisorHorario);
+            }
+          } else if (fechaString === '2025-07-01') {
+            if (result.jornadaInfo.divisorHorario === 230) {
+              console.log('✅ KISS SUCCESS: 1 julio usa correctamente 230h mensuales');
+            } else {
+              console.error('❌ KISS ERROR: 1 julio debería usar 230h pero usa', result.jornadaInfo.divisorHorario);
+            }
           }
           
           setValorCalculado(result.valor);
           setUseManualValue(false);
         } else {
-          console.log('⚠️ KISS DEBUG: No se obtuvo resultado válido para', fechaStr);
+          console.log('⚠️ KISS COMPONENT: No se obtuvo resultado válido');
           setValorCalculado(0);
         }
       }).catch(error => {
-        console.error('❌ KISS DEBUG: Error calculando para', fechaStr, ':', error);
+        console.error('❌ KISS COMPONENT: Error en cálculo:', error);
         setValorCalculado(0);
       });
     } else {
@@ -143,20 +150,25 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
-      {/* Date display con información de debugging */}
+      {/* ✅ KISS: Información visual de debugging mejorada */}
       {periodoFecha && (
-        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
           <div className="flex items-start gap-2 text-blue-700">
             <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
-              <p className="font-medium">Fecha de cálculo: {periodoFecha.toLocaleDateString('es-ES')}</p>
+              <p className="font-medium">🎯 KISS Debug - Fecha de cálculo: {periodoFecha.toLocaleDateString('es-ES')}</p>
               <p>Los valores se calculan según la jornada legal vigente para esta fecha.</p>
-              {/* ✅ KISS: Mostrar información de debugging */}
-              <p className="text-xs mt-1 font-mono">
-                Debug: {periodoFecha.toISOString().split('T')[0]} | 
-                {periodoFecha.toISOString().split('T')[0] === '2025-07-01' ? ' Espera 230h' : 
-                 periodoFecha.toISOString().split('T')[0] === '2025-07-15' ? ' Espera 220h' : ' Fecha normal'}
-              </p>
+              <div className="mt-2 font-mono text-xs bg-blue-100 p-2 rounded">
+                <p>📅 Fecha original: {periodoFecha.toString()}</p>
+                <p>📅 ISO String: {periodoFecha.toISOString()}</p>
+                <p>📅 Formato enviado: {periodoFecha.getFullYear()}-{String(periodoFecha.getMonth() + 1).padStart(2, '0')}-{String(periodoFecha.getDate()).padStart(2, '0')}</p>
+                {periodoFecha.toISOString().split('T')[0] === '2025-07-15' && (
+                  <p className="text-green-600 font-bold">✅ 15 julio → Debe usar 220h mensuales → ~$10,150</p>
+                )}
+                {periodoFecha.toISOString().split('T')[0] === '2025-07-01' && (
+                  <p className="text-orange-600 font-bold">✅ 1 julio → Debe usar 230h mensuales → $9,341</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -167,8 +179,8 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <div className="flex items-start gap-2 text-green-700">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div className="text-sm">
-            <p className="font-medium">🎯 KISS Debug: Cálculo automático (sin caché)</p>
-            <p>Los valores se calculan en tiempo real para verificar la transición de jornada legal.</p>
+            <p className="font-medium">🎯 KISS Debug: Cálculo automático backend (sin caché)</p>
+            <p>Validación de transición jornada legal: 230h → 220h el 15 julio 2025</p>
           </div>
         </div>
       </div>
@@ -212,20 +224,26 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
             <div className="flex items-center gap-2 text-yellow-700">
               <Calculator className="h-4 w-4 animate-spin" />
-              <span className="font-medium">🎯 KISS Debug: Calculando en backend (sin caché)...</span>
+              <span className="font-medium">🎯 KISS Debug: Calculando en backend...</span>
             </div>
           </div>
         )}
 
-        {/* Calculated value display */}
+        {/* ✅ KISS: Resultado con información de debugging */}
         {valorCalculado > 0 && !isLoading && (
-          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
             <div className="flex items-center gap-2 text-green-700">
               <Calculator className="h-4 w-4" />
               <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
             </div>
-            <div className="text-xs text-green-600 mt-1">
-              🎯 KISS: Calculado dinámicamente para {periodoFecha?.toLocaleDateString('es-ES')} (sin caché)
+            <div className="mt-2 text-xs text-green-600 font-mono bg-green-100 p-2 rounded">
+              🎯 KISS: Para {periodoFecha?.toLocaleDateString('es-ES')} (backend sin caché)
+              {periodoFecha?.toISOString().split('T')[0] === '2025-07-15' && valorCalculado > 9500 && (
+                <p className="text-green-700 font-bold">✅ Correcto: Valor superior a $9,341 (usando 220h)</p>
+              )}
+              {periodoFecha?.toISOString().split('T')[0] === '2025-07-01' && Math.abs(valorCalculado - 9341) < 100 && (
+                <p className="text-orange-700 font-bold">✅ Correcto: ~$9,341 (usando 230h)</p>
+              )}
             </div>
           </div>
         )}

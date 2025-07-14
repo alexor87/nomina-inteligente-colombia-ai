@@ -74,34 +74,50 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
-// ✅ KISS: Función ultra-simple y depurada para horas mensuales
+// ✅ KISS: Función ultra-depurada con logging extremo
 function getHorasMensualesKiss(fechaStr?: string): number {
+  console.log('🎯 KISS BACKEND: *** INICIO CÁLCULO HORAS MENSUALES ***');
+  console.log('🎯 KISS BACKEND: fechaStr recibido:', fechaStr);
+  console.log('🎯 KISS BACKEND: tipo de fechaStr:', typeof fechaStr);
+  console.log('🎯 KISS BACKEND: fechaStr length:', fechaStr?.length);
+  
   if (!fechaStr) {
-    console.log('🎯 KISS BACKEND: No date provided, using 220h default');
+    console.log('🎯 KISS BACKEND: Sin fecha, usando 220h default');
     return 220;
   }
 
-  // ✅ KISS: Logging detallado del procesamiento de fecha
-  console.log('🎯 KISS BACKEND: Processing date string:', fechaStr);
+  // ✅ KISS: Logging carácter por carácter
+  console.log('🎯 KISS BACKEND: Analizando fecha carácter por carácter:');
+  for (let i = 0; i < fechaStr.length; i++) {
+    console.log(`  [${i}]: '${fechaStr[i]}' (charCode: ${fechaStr.charCodeAt(i)})`);
+  }
   
-  // ✅ KISS: Comparación de string directa - más simple y confiable
-  if (fechaStr >= '2025-07-15') {
-    console.log('🎯 KISS BACKEND: Date', fechaStr, '>=', '2025-07-15', '→ 220 monthly hours (44h weekly)');
+  // ✅ KISS: Comparación ultra-específica con logging detallado
+  const fechaComparison = '2025-07-15';
+  console.log('🎯 KISS BACKEND: Comparando con:', fechaComparison);
+  console.log('🎯 KISS BACKEND: fechaStr === "2025-07-15":', fechaStr === '2025-07-15');
+  console.log('🎯 KISS BACKEND: fechaStr >= "2025-07-15":', fechaStr >= '2025-07-15');
+  console.log('🎯 KISS BACKEND: fechaStr < "2025-07-15":', fechaStr < '2025-07-15');
+  
+  // ✅ KISS: Casos específicos con logging ultra-detallado
+  if (fechaStr === '2025-07-15') {
+    console.log('🎯 KISS BACKEND: MATCH EXACTO para 2025-07-15 → 220h mensuales');
+    return 220;
+  } else if (fechaStr === '2025-07-01') {
+    console.log('🎯 KISS BACKEND: MATCH EXACTO para 2025-07-01 → 230h mensuales');
+    return 230;
+  } else if (fechaStr >= '2025-07-15') {
+    console.log('🎯 KISS BACKEND: Fecha >= 2025-07-15 → 220h mensuales (44h semanales)');
     return 220;
   } else {
-    console.log('🎯 KISS BACKEND: Date', fechaStr, '<', '2025-07-15', '→ 230 monthly hours (46h weekly)');
+    console.log('🎯 KISS BACKEND: Fecha < 2025-07-15 → 230h mensuales (46h semanales)');
     return 230;
   }
 }
 
 function getHorasSemanalesKiss(fechaStr?: string): number {
-  if (!fechaStr) return 44;
-  
-  if (fechaStr >= '2025-07-15') {
-    return 44; // From July 15, 2025 onwards
-  } else {
-    return 46; // Before July 15, 2025
-  }
+  const horasMensuales = getHorasMensualesKiss(fechaStr);
+  return horasMensuales === 220 ? 44 : 46;
 }
 
 // Factores de horas extra según legislación colombiana
@@ -114,19 +130,12 @@ const HORAS_EXTRA_FACTORS = {
   festivas_nocturnas: 2.5
 } as const;
 
-// ✅ KISS: Función de cálculo ultra-simple y depurada
+// ✅ KISS: Función de cálculo con validación extrema
 function calculateNovedad(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
-  // ✅ KISS: Logging detallado de entrada
-  console.log('🎯 KISS BACKEND: *** STARTING CALCULATION ***');
-  console.log('🎯 KISS BACKEND: Input received:', {
-    tipoNovedad,
-    subtipo,
-    salarioBase,
-    horas,
-    fechaPeriodo
-  });
+  console.log('🎯 KISS BACKEND: *** INICIANDO CÁLCULO DE NOVEDAD ***');
+  console.log('🎯 KISS BACKEND: Input completo:', JSON.stringify(input, null, 2));
   
   let valor = 0;
   let factorCalculo = 0;
@@ -137,65 +146,37 @@ function calculateNovedad(input: NovedadCalculationInput) {
       if (horas && horas > 0 && subtipo) {
         const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
         if (factor) {
-          // ✅ KISS: Usar función simplificada
           const horasMensuales = getHorasMensualesKiss(fechaPeriodo);
           const horasSemanales = getHorasSemanalesKiss(fechaPeriodo);
           
-          // ✅ KISS: Logging ultra-detallado del cálculo
-          console.log('🎯 KISS BACKEND: Calculation details:');
-          console.log('  - Salary:', salarioBase);
-          console.log('  - Monthly hours:', horasMensuales);
-          console.log('  - Factor:', factor);
-          console.log('  - Hours:', horas);
+          console.log('🎯 KISS BACKEND: *** CÁLCULO HORAS EXTRA ***');
+          console.log('🎯 KISS BACKEND: Salario base:', salarioBase);
+          console.log('🎯 KISS BACKEND: Horas mensuales:', horasMensuales);
+          console.log('🎯 KISS BACKEND: Factor multiplicador:', factor);
+          console.log('🎯 KISS BACKEND: Horas a calcular:', horas);
           
           const tarifaHora = salarioBase / horasMensuales;
           valor = Math.round(tarifaHora * factor * horas);
           factorCalculo = factor;
           
-          console.log('🎯 KISS BACKEND: Final calculation:');
-          console.log('  - Hourly rate:', Math.round(tarifaHora));
-          console.log('  - Final value:', valor);
+          console.log('🎯 KISS BACKEND: Tarifa por hora:', tarifaHora);
+          console.log('🎯 KISS BACKEND: Cálculo: ', tarifaHora, '×', factor, '×', horas, '=', valor);
           
-          // ✅ KISS: Validación específica ultra-clara
+          // ✅ VALIDACIÓN ESPECÍFICA CON LOGGING EXTREMO
           if (fechaPeriodo === '2025-07-01') {
-            if (horasMensuales === 230) {
-              console.log('✅ KISS SUCCESS: July 1, 2025 correctly uses 230h monthly');
-            } else {
-              console.error('❌ KISS ERROR: July 1, 2025 should use 230h but uses', horasMensuales, 'h');
-            }
+            console.log('🎯 KISS BACKEND: *** VALIDACIÓN 1 JULIO 2025 ***');
+            console.log('  - Debe usar 230h mensuales:', horasMensuales === 230 ? '✅' : '❌');
+            console.log('  - Tarifa esperada:', salarioBase / 230);
+            console.log('  - Valor esperado:', Math.round((salarioBase / 230) * factor * horas));
           } else if (fechaPeriodo === '2025-07-15') {
-            if (horasMensuales === 220) {
-              console.log('✅ KISS SUCCESS: July 15, 2025 correctly uses 220h monthly');
-            } else {
-              console.error('❌ KISS ERROR: July 15, 2025 should use 220h but uses', horasMensuales, 'h');
-            }
+            console.log('🎯 KISS BACKEND: *** VALIDACIÓN 15 JULIO 2025 ***');
+            console.log('  - Debe usar 220h mensuales:', horasMensuales === 220 ? '✅' : '❌');
+            console.log('  - Tarifa esperada:', salarioBase / 220);
+            console.log('  - Valor esperado:', Math.round((salarioBase / 220) * factor * horas));
+            console.log('  - Diferencia vs 230h:', Math.round((salarioBase / 220) * factor * horas) - Math.round((salarioBase / 230) * factor * horas));
           }
           
-          let tipoDescripcion = '';
-          switch (subtipo) {
-            case 'diurnas':
-              tipoDescripcion = 'Horas extra diurnas (25% recargo)';
-              break;
-            case 'nocturnas':
-              tipoDescripcion = 'Horas extra nocturnas (75% recargo)';
-              break;
-            case 'dominicales_diurnas':
-              tipoDescripcion = 'Horas dominicales diurnas (100% recargo)';
-              break;
-            case 'dominicales_nocturnas':
-              tipoDescripcion = 'Horas dominicales nocturnas (150% recargo)';
-              break;
-            case 'festivas_diurnas':
-              tipoDescripcion = 'Horas festivas diurnas (100% recargo)';
-              break;
-            case 'festivas_nocturnas':
-              tipoDescripcion = 'Horas festivas nocturnas (150% recargo)';
-              break;
-            default:
-              tipoDescripcion = `Horas extra ${subtipo}`;
-          }
-          
-          detalleCalculo = `${tipoDescripcion}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
+          detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
         } else {
           detalleCalculo = 'Subtipo de horas extra no válido';
         }
@@ -327,7 +308,6 @@ function calculateNovedad(input: NovedadCalculationInput) {
       detalleCalculo = 'Tipo de novedad no reconocido';
   }
 
-  // ✅ KISS: Usar funciones simplificadas para el resultado final
   const horasMensuales = getHorasMensualesKiss(fechaPeriodo);
   const horasSemanales = getHorasSemanalesKiss(fechaPeriodo);
 
@@ -345,14 +325,8 @@ function calculateNovedad(input: NovedadCalculationInput) {
     }
   };
 
-  // ✅ KISS: Logging final ultra-detallado
-  console.log('🎯 KISS BACKEND: *** FINAL RESULT ***');
-  console.log('🎯 KISS BACKEND: Final result for', fechaPeriodo, ':', {
-    valor: result.valor,
-    divisorHorario: result.jornadaInfo.divisorHorario,
-    valorHoraOrdinaria: result.jornadaInfo.valorHoraOrdinaria,
-    ley: result.jornadaInfo.ley
-  });
+  console.log('🎯 KISS BACKEND: *** RESULTADO FINAL ***');
+  console.log('🎯 KISS BACKEND: Resultado para fecha', fechaPeriodo, ':', JSON.stringify(result, null, 2));
   
   return result;
 }
@@ -537,11 +511,12 @@ serve(async (req) => {
         });
 
       case 'calculate-novedad':
-        console.log('🎯 KISS BACKEND: *** RECEIVED NOVEDAD CALCULATION REQUEST ***');
-        console.log('🎯 KISS BACKEND: Request data:', data);
+        console.log('🎯 KISS BACKEND: *** RECIBIDA SOLICITUD DE CÁLCULO DE NOVEDAD ***');
+        console.log('🎯 KISS BACKEND: Action:', action);
+        console.log('🎯 KISS BACKEND: Data recibida:', JSON.stringify(data, null, 2));
         const novedadResult = calculateNovedad(data);
-        console.log('🎯 KISS BACKEND: *** SENDING RESPONSE ***');
-        console.log('🎯 KISS BACKEND: Response data:', novedadResult);
+        console.log('🎯 KISS BACKEND: *** ENVIANDO RESPUESTA ***');
+        console.log('🎯 KISS BACKEND: Respuesta:', JSON.stringify(novedadResult, null, 2));
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
