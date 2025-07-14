@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -33,6 +32,26 @@ interface JornadaLegalInfo {
   fechaVigencia: Date;
   descripcion: string;
   ley: string;
+}
+
+interface PayrollConfiguration {
+  salarioMinimo: number;
+  auxilioTransporte: number;
+  uvt: number;
+  porcentajes: {
+    saludEmpleado: number;
+    pensionEmpleado: number;
+    saludEmpleador: number;
+    pensionEmpleador: number;
+    arl: number;
+    cajaCompensacion: number;
+    icbf: number;
+    sena: number;
+    cesantias: number;
+    interesesCesantias: number;
+    prima: number;
+    vacaciones: number;
+  };
 }
 
 const DEFAULT_CONFIG_2025: PayrollConfiguration = {
@@ -95,12 +114,25 @@ const HORAS_EXTRA_FACTORS = {
 } as const;
 
 function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
+  // 🔍 DEBUG: Log fecha input and processing
+  console.log('🕐 getJornadaLegal called with:', {
+    fechaInput: fecha,
+    fechaISO: fecha.toISOString(),
+    fechaDate: fecha.toISOString().split('T')[0],
+    timestamp: fecha.getTime()
+  });
+
   const jornadaVigente = JORNADAS_LEGALES
     .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
-    .find(jornada => fecha >= jornada.fechaInicio);
+    .find(jornada => {
+      const isValid = fecha >= jornada.fechaInicio;
+      console.log(`  📅 Checking jornada ${jornada.horasSemanales}h desde ${jornada.fechaInicio.toISOString().split('T')[0]}: ${isValid}`);
+      return isValid;
+    });
 
   if (!jornadaVigente) {
     const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
+    console.log('⚠️ No jornada found, using traditional:', jornadaTradicional);
     return {
       horasSemanales: jornadaTradicional.horasSemanales,
       horasMensuales: (jornadaTradicional.horasSemanales / 6) * 30,
@@ -110,24 +142,69 @@ function getJornadaLegal(fecha: Date = new Date()): JornadaLegalInfo {
     };
   }
 
-  return {
+  const result = {
     horasSemanales: jornadaVigente.horasSemanales,
     horasMensuales: (jornadaVigente.horasSemanales / 6) * 30,
     fechaVigencia: jornadaVigente.fechaInicio,
     descripcion: jornadaVigente.descripcion,
     ley: 'Ley 2101 de 2021'
   };
+
+  // 🔍 DEBUG: Log selected jornada
+  console.log('✅ Selected jornada legal:', {
+    fecha: fecha.toISOString().split('T')[0],
+    jornadaSeleccionada: {
+      horasSemanales: result.horasSemanales,
+      horasMensuales: result.horasMensuales,
+      fechaVigencia: result.fechaVigencia.toISOString().split('T')[0],
+      descripcion: result.descripcion
+    }
+  });
+
+  return result;
 }
 
 function getHourlyDivisor(fecha: Date = new Date()): number {
   const jornadaInfo = getJornadaLegal(fecha);
-  return Math.round(jornadaInfo.horasMensuales);
+  const divisor = Math.round(jornadaInfo.horasMensuales);
+  
+  // 🔍 DEBUG: Log divisor calculation
+  console.log('🔢 Hourly divisor calculation:', {
+    fecha: fecha.toISOString().split('T')[0],
+    horasSemanales: jornadaInfo.horasSemanales,
+    horasMensuales: jornadaInfo.horasMensuales,
+    divisor
+  });
+  
+  return divisor;
 }
 
 // ✅ NUEVA FUNCIÓN: Calcular novedades con jornada legal dinámica
 function calculateNovedad(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
+  
+  // 🔍 DEBUG: Log input processing
+  console.log('🧮 calculateNovedad called with:', {
+    tipoNovedad,
+    subtipo,
+    salarioBase,
+    horas,
+    dias,
+    fechaPeriodoString: fechaPeriodo,
+    fechaPeriodoType: typeof fechaPeriodo
+  });
+
   const fechaCalculo = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+  
+  // 🔍 DEBUG: Log date processing
+  console.log('📅 Date processing:', {
+    fechaPeriodoInput: fechaPeriodo,
+    fechaCalculoCreated: fechaCalculo,
+    fechaCalculoISO: fechaCalculo.toISOString(),
+    fechaCalculoDate: fechaCalculo.toISOString().split('T')[0],
+    isValidDate: !isNaN(fechaCalculo.getTime())
+  });
+
   const jornadaLegal = getJornadaLegal(fechaCalculo);
   const divisorHorario = getHourlyDivisor(fechaCalculo);
   
@@ -146,6 +223,18 @@ function calculateNovedad(input: NovedadCalculationInput) {
           const tarifaHora = salarioBase / divisorHorario;
           valor = Math.round(tarifaHora * factor * horas);
           factorCalculo = factor;
+          
+          // 🔍 DEBUG: Log horas extra calculation
+          console.log('💰 Horas extra calculation:', {
+            salarioBase,
+            divisorHorario,
+            tarifaHora,
+            factor,
+            horas,
+            valor,
+            fecha: fechaCalculo.toISOString().split('T')[0],
+            jornadaUsada: jornadaLegal.horasSemanales
+          });
           
           let tipoDescripcion = '';
           switch (subtipo) {
@@ -302,7 +391,7 @@ function calculateNovedad(input: NovedadCalculationInput) {
       detalleCalculo = 'Tipo de novedad no reconocido';
   }
 
-  return {
+  const result = {
     valor,
     factorCalculo,
     detalleCalculo,
@@ -315,6 +404,18 @@ function calculateNovedad(input: NovedadCalculationInput) {
       descripcion: jornadaLegal.descripcion
     }
   };
+
+  // 🔍 DEBUG: Log final result
+  console.log('✅ calculateNovedad result:', {
+    tipoNovedad,
+    fechaUsada: fechaCalculo.toISOString().split('T')[0],
+    jornadaAplicada: jornadaLegal.horasSemanales,
+    divisorHorario,
+    valorCalculado: valor,
+    result
+  });
+
+  return result;
 }
 
 function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: string) {
@@ -479,6 +580,13 @@ serve(async (req) => {
   try {
     const { action, data } = await req.json();
 
+    // 🔍 DEBUG: Log incoming request
+    console.log('📨 Edge function called:', {
+      action,
+      data,
+      timestamp: new Date().toISOString()
+    });
+
     switch (action) {
       case 'calculate':
         const calculation = calculatePayroll(data);
@@ -500,6 +608,7 @@ serve(async (req) => {
 
       // ✅ NUEVO ENDPOINT: Calcular novedades
       case 'calculate-novedad':
+        console.log('🔥 calculate-novedad endpoint called with:', data);
         const novedadResult = calculateNovedad(data);
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -40,12 +40,32 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   const [observacion, setObservacion] = useState<string>('');
   
   // ✅ SOLO BACKEND CALCULATION
-  const { calculateNovedad, isLoading } = useNovedadBackendCalculation();
+  const { calculateNovedad, isLoading, clearCache } = useNovedadBackendCalculation();
+
+  // 🔍 DEBUG: Log component render and props
+  useEffect(() => {
+    console.log('🎯 NovedadHorasExtraForm rendered with props:', {
+      employeeSalary,
+      periodoFecha: periodoFecha?.toISOString(),
+      periodoFechaDate: periodoFecha?.toISOString().split('T')[0]
+    });
+  }, [employeeSalary, periodoFecha]);
+
+  // Clear cache when period date changes to force recalculation
+  useEffect(() => {
+    clearCache();
+    console.log('🧹 Cache cleared due to period date change:', periodoFecha?.toISOString().split('T')[0]);
+  }, [periodoFecha, clearCache]);
 
   // ✅ BACKEND CALCULATION - eliminar completamente cálculos frontend
   useEffect(() => {
     if (subtipo && horas && parseFloat(horas) > 0) {
-      console.log('🔄 Calculating hours extra via backend:', { subtipo, horas: parseFloat(horas) });
+      console.log('🔄 Calculating hours extra via backend:', { 
+        subtipo, 
+        horas: parseFloat(horas),
+        employeeSalary,
+        periodoFecha: periodoFecha?.toISOString()
+      });
       
       calculateNovedad({
         tipoNovedad: 'horas_extra',
@@ -55,10 +75,15 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         fechaPeriodo: periodoFecha || new Date()
       }).then(result => {
         if (result && result.valor > 0) {
-          console.log('✅ Backend calculation result:', result.valor);
+          console.log('✅ Backend calculation result:', {
+            result: result.valor,
+            jornadaInfo: result.jornadaInfo,
+            detalleCalculo: result.detalleCalculo
+          });
           setValorCalculado(result.valor);
           setUseManualValue(false);
         } else {
+          console.log('⚠️ No result from backend calculation');
           setValorCalculado(0);
         }
       }).catch(error => {
@@ -72,6 +97,17 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
 
   const handleSubmit = () => {
     const finalValue = useManualValue && valorManual ? parseFloat(valorManual) : valorCalculado;
+
+    // 🔍 DEBUG: Log form submission
+    console.log('📤 Submitting horas extra form:', {
+      subtipo,
+      horas: parseFloat(horas),
+      finalValue,
+      useManualValue,
+      valorCalculado,
+      valorManual,
+      periodoFecha: periodoFecha?.toISOString()
+    });
 
     onSubmit({
       tipo_novedad: 'horas_extra',
@@ -99,13 +135,14 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
-      {/* Backend calculation info */}
+      {/* 🔍 DEBUG: Period date info */}
       <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
         <div className="flex items-start gap-2 text-blue-700">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div className="text-sm">
             <p className="font-medium">Cálculo automático con jornada legal dinámica</p>
-            <p>Los valores se calculan automáticamente en el backend usando la legislación vigente para la fecha del período.</p>
+            <p>Fecha del período: {periodoFecha?.toLocaleDateString() || 'Hoy'}</p>
+            <p>Los valores se calculan automáticamente en el backend usando la legislación vigente.</p>
           </div>
         </div>
       </div>
@@ -160,7 +197,9 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
               <Calculator className="h-4 w-4" />
               <span className="font-medium">Valor Calculado: {formatCurrency(valorCalculado)}</span>
             </div>
-            <div className="text-xs text-green-600 mt-1">Calculado con jornada legal dinámica</div>
+            <div className="text-xs text-green-600 mt-1">
+              Calculado para {periodoFecha?.toLocaleDateString() || 'hoy'} con jornada legal vigente
+            </div>
           </div>
         )}
 
