@@ -1,17 +1,18 @@
 
 /**
- * Servicio unificado para cálculo de recargos con factores progresivos
- * KISS: Una función principal que determina factores dinámicamente por fecha
- * CORREGIDO: Implementa Ley 2466/2024 con factores progresivos desde 1 julio 2025
+ * Servicio unificado para cálculo de recargos
+ * KISS: Una sola función, una sola fórmula, factores estandarizados
+ * CORREGIDO: Usa jornada legal dinámica con fórmula correcta
+ * Resultado debe coincidir exactamente con Aleluya
  */
 
-import { getHourlyDivisor, getDominicalFactor, getJornadaInfo } from '@/utils/jornadaLegal';
+import { getHourlyDivisor } from '@/utils/jornadaLegal';
 
 export interface RecargoCalculationInput {
   salarioBase: number;
   tipoRecargo: 'nocturno' | 'dominical' | 'festivo' | 'nocturno_dominical' | 'nocturno_festivo';
   horas: number;
-  fechaPeriodo?: Date; // ✅ CRÍTICO: Para cálculo dinámico de factores progresivos
+  fechaPeriodo?: Date; // ✅ NUEVO: Para cálculo dinámico de jornada legal
 }
 
 export interface RecargoCalculationResult {
@@ -29,82 +30,49 @@ export interface RecargoCalculationResult {
 
 export class RecargosCalculationService {
   /**
-   * ✅ KISS: Factores base estandarizados
+   * Factores de recargo estandarizados según normativa colombiana
    */
-  private static readonly FACTORES_BASE = {
-    nocturno: 0.35,    // 35% recargo nocturno (fijo)
-    // dominical y festivo son dinámicos por fecha (getDominicalFactor)
-    // nocturno_dominical y nocturno_festivo son multiplicativos
+  private static readonly FACTORES_RECARGO = {
+    nocturno: 0.35,           // 35% recargo nocturno
+    dominical: 0.80,          // 80% recargo dominical
+    festivo: 0.75,            // 75% recargo festivo
+    nocturno_dominical: 1.15, // 115% recargo nocturno dominical
+    nocturno_festivo: 1.10    // 110% recargo nocturno festivo
   };
 
   /**
-   * ✅ KISS: Función principal de cálculo con factores dinámicos unificados
-   * Corrige la lógica multiplicativa para recargos combinados
+   * Calcula el valor del recargo usando jornada legal dinámica
+   * CORREGIDO: Usa getHourlyDivisor(fecha) para cálculo exacto según período
+   * Fórmula: (salario ÷ divisor_horario_legal) × factor × horas
    */
   static calcularRecargo(input: RecargoCalculationInput): RecargoCalculationResult {
     const { salarioBase, tipoRecargo, horas, fechaPeriodo = new Date() } = input;
     
-    console.log('🧮 KISS: Calculando recargo con factores progresivos unificados:', { 
+    console.log('🧮 Calculando recargo con jornada legal dinámica:', { 
       salarioBase, 
       tipoRecargo, 
       horas, 
       fechaPeriodo: fechaPeriodo.toISOString().split('T')[0] 
     });
     
-    // ✅ KISS: Usar divisor horario dinámico unificado
+    // ✅ CORRECCIÓN PRINCIPAL: Usar divisor horario dinámico según jornada legal
     const divisorHorario = getHourlyDivisor(fechaPeriodo);
     const valorHora = salarioBase / divisorHorario;
     
-    let factorRecargo: number;
-    let detalleCalculo: string;
+    // Factor de recargo según tipo
+    const factorRecargo = this.FACTORES_RECARGO[tipoRecargo];
     
-    // ✅ KISS: Lógica principal simplificada con casos específicos
-    switch (tipoRecargo) {
-      case 'nocturno':
-        factorRecargo = this.FACTORES_BASE.nocturno;
-        detalleCalculo = `Recargo nocturno: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × 35% × ${horas} horas = ${Math.round(valorHora * factorRecargo * horas).toLocaleString()}`;
-        break;
-        
-      case 'dominical':
-        // ✅ KISS: Factor dinámico unificado
-        factorRecargo = getDominicalFactor(fechaPeriodo);
-        const porcentajeDominical = (factorRecargo * 100).toFixed(0);
-        detalleCalculo = `Recargo dominical: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × ${porcentajeDominical}% × ${horas} horas = ${Math.round(valorHora * factorRecargo * horas).toLocaleString()}`;
-        break;
-        
-      case 'festivo':
-        // ✅ KISS: Festivo usa la misma lógica progresiva que dominical
-        factorRecargo = getDominicalFactor(fechaPeriodo);
-        const porcentajeFestivo = (factorRecargo * 100).toFixed(0);
-        detalleCalculo = `Recargo festivo: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × ${porcentajeFestivo}% × ${horas} horas = ${Math.round(valorHora * factorRecargo * horas).toLocaleString()}`;
-        break;
-        
-      case 'nocturno_dominical':
-        // ✅ CORRECCIÓN MULTIPLICATIVA: 1.35 × factor_dominical_fecha
-        const factorDominicalNocturno = getDominicalFactor(fechaPeriodo);
-        factorRecargo = 1.35 * factorDominicalNocturno; // Multiplicativo, no suma
-        const porcentajeND = (factorRecargo * 100).toFixed(0);
-        detalleCalculo = `Recargo nocturno dominical: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × ${porcentajeND}% × ${horas} horas = ${Math.round(valorHora * factorRecargo * horas).toLocaleString()}`;
-        console.log(`🎯 RECARGO: Nocturno Dominical = 1.35 × ${(factorDominicalNocturno * 100).toFixed(0)}% = ${porcentajeND}%`);
-        break;
-        
-      case 'nocturno_festivo':
-        // ✅ CORRECCIÓN MULTIPLICATIVA: 1.35 × factor_festivo_fecha
-        const factorFestivoNocturno = getDominicalFactor(fechaPeriodo);
-        factorRecargo = 1.35 * factorFestivoNocturno; // Multiplicativo, no suma
-        const porcentajeNF = (factorRecargo * 100).toFixed(0);
-        detalleCalculo = `Recargo nocturno festivo: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}) × ${porcentajeNF}% × ${horas} horas = ${Math.round(valorHora * factorRecargo * horas).toLocaleString()}`;
-        console.log(`🎯 RECARGO: Nocturno Festivo = 1.35 × ${(factorFestivoNocturno * 100).toFixed(0)}% = ${porcentajeNF}%`);
-        break;
-        
-      default:
-        throw new Error(`Tipo de recargo no válido: ${tipoRecargo}`);
+    if (!factorRecargo) {
+      throw new Error(`Tipo de recargo no válido: ${tipoRecargo}`);
     }
     
     // Valor del recargo = valor hora × factor × horas
     const valorRecargo = Math.round(valorHora * factorRecargo * horas);
     
-    console.log('✅ KISS: Recargo calculado con factores dinámicos unificados:', {
+    // Detalle del cálculo para auditoría con información de jornada
+    const detalleCalculo = `(${salarioBase.toLocaleString()} ÷ ${divisorHorario}h) × ${(factorRecargo * 100).toFixed(0)}% × ${horas}h = ${valorRecargo.toLocaleString()}`;
+    
+    console.log('✅ Recargo calculado con jornada dinámica:', {
       fechaPeriodo: fechaPeriodo.toISOString().split('T')[0],
       divisorHorario,
       valorHora: Math.round(valorHora),
@@ -119,73 +87,60 @@ export class RecargosCalculationService {
       valorRecargo,
       detalleCalculo,
       jornadaInfo: {
-        ...getJornadaInfo(fechaPeriodo),
+        horasSemanales: divisorHorario === 230 ? 46 : (divisorHorario === 220 ? 44 : 42),
+        horasMensuales: divisorHorario,
+        divisorHorario,
         fechaVigencia: fechaPeriodo
       }
     };
   }
 
   /**
-   * ✅ KISS: Obtiene el factor de recargo para un tipo y fecha específicos (unificado)
+   * Obtiene el factor de recargo para un tipo específico
    */
-  static getFactorRecargo(tipoRecargo: string, fecha: Date = new Date()): number {
-    switch (tipoRecargo) {
-      case 'nocturno':
-        return this.FACTORES_BASE.nocturno;
-      case 'dominical':
-      case 'festivo':
-        return getDominicalFactor(fecha);
-      case 'nocturno_dominical':
-      case 'nocturno_festivo':
-        return 1.35 * getDominicalFactor(fecha);
-      default:
-        return 0;
-    }
+  static getFactorRecargo(tipoRecargo: string): number {
+    return this.FACTORES_RECARGO[tipoRecargo as keyof typeof this.FACTORES_RECARGO] || 0;
   }
 
   /**
-   * ✅ KISS: Información de tipos de recargo con factores dinámicos unificados
+   * Obtiene todos los tipos de recargo disponibles con sus factores
    */
-  static getTiposRecargo(fecha: Date = new Date()): Array<{
+  static getTiposRecargo(): Array<{
     tipo: string;
     factor: number;
     porcentaje: string;
     descripcion: string;
   }> {
-    const factorDominical = getDominicalFactor(fecha);
-    const factorNocturnoDominical = 1.35 * factorDominical;
-    const factorNocturnoFestivo = 1.35 * factorDominical;
-    
     return [
       {
         tipo: 'nocturno',
-        factor: this.FACTORES_BASE.nocturno,
+        factor: this.FACTORES_RECARGO.nocturno,
         porcentaje: '35%',
         descripcion: 'Recargo nocturno (10:00 PM - 6:00 AM)'
       },
       {
         tipo: 'dominical',
-        factor: factorDominical,
-        porcentaje: `${(factorDominical * 100).toFixed(0)}%`,
-        descripcion: 'Recargo dominical (progresivo por Ley 2466/2024)'
+        factor: this.FACTORES_RECARGO.dominical,
+        porcentaje: '80%',
+        descripcion: 'Recargo dominical'
       },
       {
         tipo: 'festivo',
-        factor: factorDominical,
-        porcentaje: `${(factorDominical * 100).toFixed(0)}%`,
-        descripcion: 'Recargo festivo (progresivo por Ley 2466/2024)'
+        factor: this.FACTORES_RECARGO.festivo,
+        porcentaje: '75%',
+        descripcion: 'Recargo festivo'
       },
       {
         tipo: 'nocturno_dominical',
-        factor: factorNocturnoDominical,
-        porcentaje: `${(factorNocturnoDominical * 100).toFixed(0)}%`,
-        descripcion: 'Recargo nocturno dominical (multiplicativo)'
+        factor: this.FACTORES_RECARGO.nocturno_dominical,
+        porcentaje: '115%',
+        descripcion: 'Recargo nocturno dominical'
       },
       {
         tipo: 'nocturno_festivo',
-        factor: factorNocturnoFestivo,
-        porcentaje: `${(factorNocturnoFestivo * 100).toFixed(0)}%`,
-        descripcion: 'Recargo nocturno festivo (multiplicativo)'
+        factor: this.FACTORES_RECARGO.nocturno_festivo,
+        porcentaje: '110%',
+        descripcion: 'Recargo nocturno festivo'
       }
     ];
   }
