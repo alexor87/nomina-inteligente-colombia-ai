@@ -30,15 +30,15 @@ export interface RecargoCalculationResult {
 
 export class RecargosCalculationService {
   /**
-   * Factores de recargo estandarizados según normativa colombiana
-   * ✅ CORREGIDO: Recargo dominical 75% (vigente hasta 1 julio 2025)
-   * TODO: Cambiar manualmente a 80% el 1 de julio 2025
+   * Factores de recargo según configuración actual de Aleluya
+   * MANTENIDO: Usando los mismos factores que Aleluya para consistencia
+   * TODO: Revisar factores cuando se decida hacer corrección oficial
    */
   private static readonly FACTORES_RECARGO = {
     nocturno: 0.35,           // 35% recargo nocturno
-    dominical: 0.75,          // ✅ CORREGIDO: 75% recargo dominical (hasta 1 julio 2025)
+    dominical: 0.80,          // 80% recargo dominical (según Aleluya)
     festivo: 0.75,            // 75% recargo festivo
-    nocturno_dominical: 1.10, // ✅ CORREGIDO: 110% recargo nocturno dominical (75% + 35%)
+    nocturno_dominical: 1.15, // 115% recargo nocturno dominical (según Aleluya)
     nocturno_festivo: 1.10    // 110% recargo nocturno festivo (75% + 35%)
   };
 
@@ -123,8 +123,8 @@ export class RecargosCalculationService {
       {
         tipo: 'dominical',
         factor: this.FACTORES_RECARGO.dominical,
-        porcentaje: '75%', // ✅ CORREGIDO: Mostrar 75% actual
-        descripcion: 'Recargo dominical (vigente hasta 1 julio 2025)'
+        porcentaje: '80%', // Mantenido según Aleluya
+        descripcion: 'Recargo dominical (según configuración actual)'
       },
       {
         tipo: 'festivo',
@@ -135,8 +135,8 @@ export class RecargosCalculationService {
       {
         tipo: 'nocturno_dominical',
         factor: this.FACTORES_RECARGO.nocturno_dominical,
-        porcentaje: '110%', // ✅ CORREGIDO: 110% (75% + 35%)
-        descripcion: 'Recargo nocturno dominical'
+        porcentaje: '115%', // Mantenido según Aleluya
+        descripcion: 'Recargo nocturno dominical (según configuración actual)'
       },
       {
         tipo: 'nocturno_festivo',
