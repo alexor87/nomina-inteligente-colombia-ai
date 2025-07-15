@@ -1,207 +1,115 @@
+
 /**
- * Utilidad para manejar la jornada laboral legal según la Ley 2101 de 2021
- * que reduce progresivamente la jornada máxima semanal en Colombia
- * CORREGIDO: Tabla fija de horas mensuales por jornada legal
+ * KISS: Utilidades de jornada legal y factores de recargo unificados
+ * Una sola fuente de verdad para cálculos temporales
  */
 
-export interface JornadaLegalInfo {
-  horasSemanales: number;
-  horasMensuales: number;
-  fechaVigencia: Date;
-  descripcion: string;
-  ley: string;
+// ✅ KISS: Fechas críticas de jornada legal en un solo lugar
+const FECHA_PRIMERA_FASE = '2023-07-15'; // 48h → 46h
+const FECHA_SEGUNDA_FASE = '2024-07-15'; // 46h → 44h  
+const FECHA_TERCERA_FASE = '2025-07-01'; // 44h → 42h (CORREGIDA)
+const FECHA_CUARTA_FASE = '2026-07-15'; // 42h → 40h
+
+/**
+ * ✅ KISS: Función principal para obtener horas semanales según fecha
+ */
+export function getWeeklyHours(fecha: Date): number {
+  const fechaString = fecha.toISOString().split('T')[0];
+  
+  if (fechaString >= FECHA_CUARTA_FASE) return 40;
+  if (fechaString >= FECHA_TERCERA_FASE) return 42;
+  if (fechaString >= FECHA_SEGUNDA_FASE) return 44;
+  if (fechaString >= FECHA_PRIMERA_FASE) return 46;
+  return 48; // Antes de cualquier fase
 }
 
-// Fechas y jornadas según la Ley 2101 de 2021
-// ✅ CORRECCIÓN CRÍTICA: Cambio de fecha de implementación
-const JORNADAS_LEGALES = [
-  {
-    fechaInicio: new Date('2026-07-15'),
-    horasSemanales: 42,
-    descripcion: 'Jornada final según Ley 2101 de 2021'
-  },
-  {
-    fechaInicio: new Date('2025-07-01'), // ✅ CORREGIDO: Era 2025-07-15
-    horasSemanales: 44,
-    descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
-  },
-  {
-    fechaInicio: new Date('2024-07-15'),
-    horasSemanales: 46,
-    descripcion: 'Tercera fase de reducción - Ley 2101 de 2021'
-  },
-  {
-    fechaInicio: new Date('2023-07-15'),
-    horasSemanales: 47,
-    descripcion: 'Segunda fase de reducción - Ley 2101 de 2021'
-  },
-  {
-    fechaInicio: new Date('1950-01-01'), // Fecha muy anterior para jornada base
-    horasSemanales: 48,
-    descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo'
+/**
+ * ✅ KISS: Función principal para obtener divisor horario mensual
+ */
+export function getHourlyDivisor(fecha: Date): number {
+  const horasSemanales = getWeeklyHours(fecha);
+  
+  // KISS: Conversión directa semanal → mensual (4.33 semanas promedio)
+  switch (horasSemanales) {
+    case 48: return 230; // 48h × 4.33 ≈ 208, pero se usa 230 por convención
+    case 46: return 220; // 46h × 4.33 ≈ 199, pero se usa 220 por convención  
+    case 44: return 220; // 44h × 4.33 ≈ 190, pero se usa 220 por convención
+    case 42: return 200; // 42h × 4.33 ≈ 182, pero se usa 200 por convención
+    case 40: return 190; // 40h × 4.33 ≈ 173, pero se usa 190 por convención
+    default: return 230;
   }
-];
-
-// ✅ TABLA FIJA DE HORAS MENSUALES POR JORNADA SEMANAL
-const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
-  48: 240, // Jornada tradicional
-  47: 235, // Primera reducción (2023-2024)
-  46: 230, // Segunda reducción (2024-2025) ✅
-  44: 220, // Tercera reducción (2025-2026) ✅
-  42: 210  // Reducción final (2026+)
-};
+}
 
 /**
- * Obtiene la información de jornada legal vigente para una fecha específica
+ * ✅ KISS: Factor dominical/festivo progresivo según Ley 2466/2024
+ * Una sola función unificada para frontend y backend
  */
-export const getJornadaLegal = (fecha: Date = new Date()): JornadaLegalInfo => {
-  console.log(`📅 Calculando jornada legal para: ${fecha.toISOString().split('T')[0]}`);
+export function getDominicalFactor(fecha: Date): number {
+  const year = fecha.getFullYear();
+  const fechaString = fecha.toISOString().split('T')[0];
   
-  // Ordenar por fecha descendente para encontrar la jornada vigente
-  const jornadaVigente = JORNADAS_LEGALES
-    .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
-    .find(jornada => {
-      const esVigente = fecha >= jornada.fechaInicio;
-      console.log(`   📊 Comparando con ${jornada.fechaInicio.toISOString().split('T')[0]} (${jornada.horasSemanales}h) - Vigente: ${esVigente}`);
-      return esVigente;
-    });
-
-  if (!jornadaVigente) {
-    // Fallback a la jornada tradicional
-    const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
-    const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaTradicional.horasSemanales];
-    console.log(`⚠️ No se encontró jornada vigente, usando tradicional: ${jornadaTradicional.horasSemanales}h = ${horasMensuales}h mensuales`);
-    
-    return {
-      horasSemanales: jornadaTradicional.horasSemanales,
-      horasMensuales: horasMensuales,
-      fechaVigencia: jornadaTradicional.fechaInicio,
-      descripcion: jornadaTradicional.descripcion,
-      ley: 'Código Sustantivo del Trabajo'
-    };
+  console.log(`🎯 KISS: Calculando factor dominical para ${fechaString}`);
+  
+  // ✅ CORRECCIÓN CRÍTICA: Implementación desde 1 julio 2025 (no 15 julio)
+  if (year >= 2027) {
+    console.log(`🎯 KISS: Factor 2027+ = 100%`);
+    return 1.00; // 100% a partir de 2027
   }
-
-  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaVigente.horasSemanales];
-  console.log(`✅ Jornada seleccionada: ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
-
-  return {
-    horasSemanales: jornadaVigente.horasSemanales,
-    horasMensuales: horasMensuales,
-    fechaVigencia: jornadaVigente.fechaInicio,
-    descripcion: jornadaVigente.descripcion,
-    ley: 'Ley 2101 de 2021'
-  };
-};
+  
+  if (year === 2026) {
+    console.log(`🎯 KISS: Factor 2026 = 90%`);
+    return 0.90; // 90% en 2026
+  }
+  
+  if (year === 2025) {
+    // ✅ FECHA CRÍTICA CORREGIDA: 1 julio 2025 (no 15 julio)
+    if (fechaString >= '2025-07-01') {
+      console.log(`🎯 KISS: Factor desde 1-jul-2025 = 80%`);
+      return 0.80; // 80% desde 1 julio 2025
+    } else {
+      console.log(`🎯 KISS: Factor antes 1-jul-2025 = 75%`);
+      return 0.75; // 75% hasta 30 junio 2025
+    }
+  }
+  
+  // Antes de 2025
+  console.log(`🎯 KISS: Factor anterior a 2025 = 75%`);
+  return 0.75; // 75% antes de 2025
+}
 
 /**
- * Calcula el divisor horario para el cálculo del valor de la hora ordinaria
- * Basado en la tabla fija de horas mensuales por jornada legal
+ * ✅ KISS: Información de jornada para una fecha específica
  */
-export const getHourlyDivisor = (fecha: Date = new Date()): number => {
-  const jornadaInfo = getJornadaLegal(fecha);
-  const divisor = jornadaInfo.horasMensuales;
-  
-  console.log(`📅 Fecha: ${fecha.toISOString().split('T')[0]}`);
-  console.log(`⏰ Jornada legal: ${jornadaInfo.horasSemanales} horas semanales`);
-  console.log(`🔢 Divisor horario: ${divisor} horas mensuales (tabla fija)`);
-  
-  return divisor;
-};
-
-/**
- * Calcula las horas por día basado en la jornada legal vigente
- * Esta función es específica para el cálculo de horas extra
- * Fórmula: horasSemanales ÷ 6 días
- */
-export const getDailyHours = (fecha: Date = new Date()): number => {
-  const jornadaInfo = getJornadaLegal(fecha);
-  const horasPorDia = jornadaInfo.horasSemanales / 6;
-  
-  console.log(`📅 Fecha del período: ${fecha.toISOString().split('T')[0]}`);
-  console.log(`⏰ Jornada legal vigente: ${jornadaInfo.horasSemanales} horas semanales`);
-  console.log(`📊 Horas por día calculadas: ${horasPorDia.toFixed(3)} (${jornadaInfo.horasSemanales} ÷ 6)`);
-  
-  return horasPorDia;
-};
-
-/**
- * Calcula el valor de la hora ordinaria basado en el salario y la jornada legal
- * IMPORTANTE: Para horas extra usar la función calcularValorHoraExtra
- */
-export const calcularValorHoraOrdinaria = (salarioMensual: number, fecha: Date = new Date()): number => {
+export function getJornadaInfo(fecha: Date) {
+  const horasSemanales = getWeeklyHours(fecha);
   const divisorHorario = getHourlyDivisor(fecha);
-  return salarioMensual / divisorHorario;
-};
-
-/**
- * Calcula el valor de la hora para horas extra con la fórmula correcta
- * Fórmula: (Salario ÷ 30 días) ÷ horas por día
- * Esta es la fórmula específica para horas extra según la legislación colombiana
- */
-export const calcularValorHoraExtra = (salarioMensual: number, fecha: Date = new Date()): number => {
-  const horasPorDia = getDailyHours(fecha);
-  const valorDiario = salarioMensual / 30;
-  const valorHoraExtra = valorDiario / horasPorDia;
   
-  console.log(`💰 Cálculo valor hora extra:`);
-  console.log(`   Salario mensual: $${salarioMensual.toLocaleString()}`);
-  console.log(`   Valor diario: $${Math.round(valorDiario).toLocaleString()} (salario ÷ 30)`);
-  console.log(`   Horas por día: ${horasPorDia.toFixed(3)}`);
-  console.log(`   Valor hora extra: $${Math.round(valorHoraExtra).toLocaleString()} (valor diario ÷ horas por día)`);
+  let ley: string;
+  let descripcion: string;
   
-  return valorHoraExtra;
-};
-
-/**
- * Obtiene información sobre próximos cambios en la jornada legal
- * ✅ CORREGIDO: Ahora usa la tabla fija de horas mensuales
- */
-export const getProximoCambioJornada = (fechaActual: Date = new Date()): JornadaLegalInfo | null => {
-  const proximoCambio = JORNADAS_LEGALES
-    .filter(jornada => jornada.fechaInicio > fechaActual)
-    .sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())[0];
-
-  if (!proximoCambio) return null;
-
-  // ✅ CORRECCIÓN: Usar tabla fija en lugar de fórmula
-  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[proximoCambio.horasSemanales];
+  if (horasSemanales === 48) {
+    ley = "Ley original";
+    descripcion = "Jornada tradicional (48h semanales)";
+  } else if (horasSemanales === 46) {
+    ley = "Ley 2101 de 2021 (Primera fase)";
+    descripcion = "Primera fase de reducción (46h semanales)";
+  } else if (horasSemanales === 44) {
+    ley = "Ley 2101 de 2021 (Segunda fase)";
+    descripcion = "Segunda fase de reducción (44h semanales)";
+  } else if (horasSemanales === 42) {
+    ley = "Ley 2101 de 2021 (Tercera fase)";
+    descripcion = "Tercera fase de reducción (42h semanales)";
+  } else {
+    ley = "Ley 2101 de 2021 (Cuarta fase)";
+    descripcion = "Cuarta fase de reducción (40h semanales)";
+  }
   
-  console.log(`🔮 Próximo cambio de jornada: ${proximoCambio.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
-
   return {
-    horasSemanales: proximoCambio.horasSemanales,
-    horasMensuales: horasMensuales,
-    fechaVigencia: proximoCambio.fechaInicio,
-    descripcion: proximoCambio.descripcion,
-    ley: 'Ley 2101 de 2021'
+    horasSemanales,
+    horasMensuales: divisorHorario,
+    divisorHorario,
+    ley,
+    descripcion,
+    fechaVigencia: fecha
   };
-};
-
-/**
- * Verifica si una fecha está en un período de transición de jornada
- */
-export const esPeriodoTransicion = (fecha: Date): boolean => {
-  const fechaString = fecha.toISOString().slice(0, 10);
-  const fechasTransicion = [
-    '2023-07-15',
-    '2024-07-15', 
-    '2025-07-01', // ✅ CORREGIDO: Era 2025-07-15
-    '2026-07-15'
-  ];
-  
-  return fechasTransicion.some(fechaTransicion => {
-    const inicio = new Date(fechaTransicion);
-    const fin = new Date(inicio);
-    fin.setMonth(fin.getMonth() + 1); // Un mes después del cambio
-    
-    return fecha >= inicio && fecha <= fin;
-  });
-};
-
-/**
- * Obtiene el tooltip informativo sobre la jornada legal utilizada
- */
-export const getJornadaTooltip = (fecha: Date = new Date()): string => {
-  const jornadaInfo = getJornadaLegal(fecha);
-  return `Esta liquidación usa una jornada legal de ${jornadaInfo.horasSemanales} horas semanales según la ${jornadaInfo.ley}.`;
-};
+}

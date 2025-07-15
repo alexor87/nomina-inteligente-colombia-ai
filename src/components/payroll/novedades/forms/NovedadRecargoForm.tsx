@@ -15,7 +15,7 @@ interface NovedadRecargoFormProps {
   onBack: () => void;
   onSubmit: (formData: any) => void;
   employeeSalary: number;
-  periodoFecha?: Date; // ✅ NUEVO: Fecha del período para jornada legal correcta
+  periodoFecha?: Date;
   calculateSuggestedValue?: (
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
@@ -24,12 +24,13 @@ interface NovedadRecargoFormProps {
   ) => number | null;
 }
 
+// ✅ KISS: Mapeo correcto de tipos de recargo (CORREGIDO)
 const RECARGO_SUBTIPOS = [
   { value: 'nocturno', label: 'Nocturno (35%)', description: '10:00 PM - 6:00 AM' },
-  { value: 'dominical', label: 'Dominical (80%)', description: 'Trabajo en domingo' },
-  { value: 'nocturno_dominical', label: 'Nocturno Dominical (115%)', description: 'Domingo 10:00 PM - 6:00 AM' },
-  { value: 'festivo', label: 'Festivo (75%)', description: 'Trabajo en día festivo' },
-  { value: 'nocturno_festivo', label: 'Nocturno Festivo (110%)', description: 'Festivo 10:00 PM - 6:00 AM' }
+  { value: 'dominical', label: 'Dominical (80%)', description: 'Trabajo en domingo' }, // ✅ CORREGIDO
+  { value: 'festivo', label: 'Festivo (80%)', description: 'Trabajo en día festivo' }, // ✅ CORREGIDO
+  { value: 'nocturno_dominical', label: 'Nocturno Dominical (108%)', description: 'Domingo 10:00 PM - 6:00 AM' },
+  { value: 'nocturno_festivo', label: 'Nocturno Festivo (108%)', description: 'Festivo 10:00 PM - 6:00 AM' }
 ];
 
 export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
@@ -38,8 +39,9 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   employeeSalary,
   periodoFecha
 }) => {
+  // ✅ KISS: Estado inicial con mapeo correcto
   const [formData, setFormData] = useState({
-    subtipo: 'nocturno',
+    subtipo: 'dominical', // ✅ CORREGIDO: Usar 'dominical' por defecto
     horas: '',
     valor: 0,
     observacion: ''
@@ -48,23 +50,37 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
   const [jornadaInfo, setJornadaInfo] = useState<any>(null);
 
-  // ✅ CORRECCIÓN: Usar fecha del período para jornada legal correcta
+  // ✅ KISS: Función de cálculo simplificada con mapeo correcto
   const calculateRecargoValue = (subtipo: string, horas: number) => {
     if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
       return null;
     }
 
     try {
-      console.log('💰 Calculando recargo con fecha del período:', periodoFecha?.toISOString().split('T')[0]);
-      
-      const result = RecargosCalculationService.calcularRecargo({
-        salarioBase: employeeSalary,
-        tipoRecargo: subtipo as any,
-        horas: horas,
-        fechaPeriodo: periodoFecha || new Date() // ✅ Usar fecha del período
+      console.log('💰 KISS: Calculando recargo con mapeo correcto:', {
+        subtipo,
+        tipoRecargo: subtipo, // ✅ MAPEO DIRECTO: subtipo = tipoRecargo
+        horas,
+        empleeeSalario: employeeSalary,
+        periodoFecha: periodoFecha?.toISOString().split('T')[0]
       });
       
-      console.log('💰 Recargo calculado:', result);
+      // ✅ KISS: Mapeo directo sin confusión
+      const result = RecargosCalculationService.calcularRecargo({
+        salarioBase: employeeSalary,
+        tipoRecargo: subtipo as any, // ✅ MAPEO DIRECTO
+        horas: horas,
+        fechaPeriodo: periodoFecha || new Date()
+      });
+      
+      console.log('💰 KISS: Resultado calculado:', {
+        subtipo,
+        tipoRecargo: subtipo,
+        valorCalculado: result.valorRecargo,
+        factorAplicado: result.factorRecargo,
+        detalleCalculo: result.detalleCalculo
+      });
+      
       setJornadaInfo(result.jornadaInfo);
       return result.valorRecargo;
     } catch (error) {
@@ -76,7 +92,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   // Calcular valor automáticamente cuando cambien horas o subtipo
   useEffect(() => {
     if (formData.horas && parseFloat(formData.horas) > 0) {
-      console.log('🔄 Calculating value for recargo:', {
+      console.log('🔄 KISS: Calculating value for recargo:', {
         subtipo: formData.subtipo,
         horas: parseFloat(formData.horas)
       });
@@ -91,7 +107,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   // Aplicar valor calculado automáticamente
   useEffect(() => {
     if (calculatedValue && calculatedValue > 0) {
-      console.log('💰 Applying calculated value for recargo:', calculatedValue);
+      console.log('💰 KISS: Applying calculated value for recargo:', calculatedValue);
       setFormData(prev => ({ ...prev, valor: calculatedValue }));
     }
   }, [calculatedValue]);
@@ -111,15 +127,16 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
       return;
     }
 
+    // ✅ KISS: Envío con mapeo correcto
     const submitData = {
-      tipo_novedad: 'recargo_nocturno',
-      subtipo: formData.subtipo,
+      tipo_novedad: 'recargo_nocturno', // ✅ Tipo general para backend
+      subtipo: formData.subtipo, // ✅ CORREGIDO: subtipo específico (dominical, festivo, etc.)
       horas: parseFloat(formData.horas),
       valor: formData.valor,
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 Submitting recargo:', submitData);
+    console.log('📤 KISS: Submitting recargo with correct mapping:', submitData);
     onSubmit(submitData);
   };
 
@@ -138,7 +155,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         <h3 className="text-lg font-semibold">Recargo</h3>
       </div>
 
-      {/* ✅ NUEVO: Información de jornada legal usada */}
+      {/* ✅ KISS: Información de jornada legal usada */}
       {jornadaInfo && (
         <div className="flex items-center gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
           <Info className="h-4 w-4" />
