@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,16 +50,31 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
 
   const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
 
-  const calculateRecargoValue = async (tipo: string, horas: number) => {
-    if (!tipo || horas <= 0) return 0;
+  const calculateRecargoValue = async (tipo: string, horas: number, fechaEspecifica: string) => {
+    if (!tipo || horas <= 0 || !fechaEspecifica) return 0;
 
     try {
+      const fechaParaCalculo = new Date(fechaEspecifica + 'T00:00:00');
+      
+      console.log('🎯 RECARGO: Calculando con fecha específica:', {
+        fechaEspecifica,
+        fechaParaCalculo: fechaParaCalculo.toISOString().split('T')[0],
+        tipo,
+        horas,
+        salario: employeeSalary
+      });
+
       const result = await calculateNovedad({
         tipoNovedad: 'recargo_nocturno',
         subtipo: tipo,
         salarioBase: employeeSalary,
         horas: horas,
-        fechaPeriodo: periodoFecha || new Date()
+        fechaPeriodo: fechaParaCalculo
+      });
+
+      console.log('✅ RECARGO: Resultado calculado:', {
+        fecha: fechaEspecifica,
+        valor: result?.valor || 0
       });
 
       return result?.valor || 0;
@@ -76,7 +90,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     }
 
     const horas = parseFloat(currentEntry.horas);
-    const valor = await calculateRecargoValue(currentEntry.tipo, horas);
+    const valor = await calculateRecargoValue(currentEntry.tipo, horas, currentEntry.fecha);
 
     const newEntry: RecargoEntry = {
       id: Date.now().toString(),
