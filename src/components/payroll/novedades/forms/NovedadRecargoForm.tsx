@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calculator, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { NovedadType } from '@/types/novedades-enhanced';
-import { RecargosCalculationService } from '@/services/RecargosCalculationService';
 
 interface NovedadRecargoFormProps {
   onBack: () => void;
@@ -24,7 +23,7 @@ interface NovedadRecargoFormProps {
   ) => number | null;
 }
 
-// ✅ KISS: Mapeo correcto de tipos de recargo (CORREGIDO)
+// ✅ KISS: Mapeo simple de tipos de recargo
 const RECARGO_SUBTIPOS = [
   { value: 'nocturno', label: 'Nocturno (35%)', description: '10:00 PM - 6:00 AM' },
   { value: 'dominical', label: 'Dominical (80%)', description: 'Trabajo en domingo' },
@@ -37,9 +36,10 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  periodoFecha
+  periodoFecha,
+  calculateSuggestedValue
 }) => {
-  // ✅ FIX: Estado inicial con valor correcto
+  // ✅ KISS: Estado simple del formulario
   const [formData, setFormData] = useState({
     subtipo: 'nocturno',
     horas: '',
@@ -48,112 +48,49 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   });
 
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
-  const [jornadaInfo, setJornadaInfo] = useState<any>(null);
 
-  // ✅ FIX: Función de cálculo mejorada con validaciones
-  const calculateRecargoValue = (subtipo: string, horas: number) => {
-    console.log('🔧 FIX: Iniciando cálculo con parámetros:', {
-      subtipo,
-      horas,
-      employeeSalary,
-      periodoFecha: periodoFecha?.toISOString().split('T')[0]
-    });
-
-    // ✅ FIX: Validaciones estrictas
-    if (!employeeSalary || employeeSalary <= 0) {
-      console.error('❌ FIX: Salario inválido:', employeeSalary);
-      return null;
-    }
-
-    if (!horas || horas <= 0) {
-      console.error('❌ FIX: Horas inválidas:', horas);
-      return null;
-    }
-
-    if (!periodoFecha) {
-      console.error('❌ FIX: Fecha de período no válida:', periodoFecha);
-      return null;
-    }
-
-    try {
-      console.log('💰 FIX: Calculando recargo con datos válidos:', {
-        subtipo,
-        tipoRecargo: subtipo,
-        horas,
-        salarioBase: employeeSalary,
-        fechaPeriodo: periodoFecha
-      });
-      
-      const result = RecargosCalculationService.calcularRecargo({
-        salarioBase: employeeSalary,
-        tipoRecargo: subtipo as any,
-        horas: horas,
-        fechaPeriodo: periodoFecha
-      });
-      
-      console.log('✅ FIX: Resultado del cálculo:', {
-        valorCalculado: result.valorRecargo,
-        factorAplicado: result.factorRecargo,
-        detalleCalculo: result.detalleCalculo,
-        jornadaInfo: result.jornadaInfo
-      });
-      
-      setJornadaInfo(result.jornadaInfo);
-      return result.valorRecargo;
-    } catch (error) {
-      console.error('❌ FIX: Error en cálculo:', error);
-      return null;
-    }
-  };
-
-  // ✅ FIX: Effect mejorado para calcular valor automáticamente
+  // ✅ KISS: Effect simple para calcular valor usando la prop
   useEffect(() => {
-    console.log('🔄 FIX: useEffect disparado con:', {
-      horas: formData.horas,
-      subtipo: formData.subtipo,
-      employeeSalary,
-      periodoFecha
-    });
-
-    if (formData.horas && parseFloat(formData.horas) > 0 && employeeSalary > 0) {
+    console.log('🔧 KISS: Calculando valor con prop calculateSuggestedValue');
+    
+    if (formData.horas && parseFloat(formData.horas) > 0 && calculateSuggestedValue) {
       const horasNum = parseFloat(formData.horas);
-      console.log('🧮 FIX: Ejecutando cálculo automático...');
+      console.log('🧮 KISS: Ejecutando cálculo...', {
+        tipoNovedad: 'recargo_nocturno',
+        subtipo: formData.subtipo,
+        horas: horasNum,
+        employeeSalary,
+        periodoFecha
+      });
       
-      const calculated = calculateRecargoValue(formData.subtipo, horasNum);
-      console.log('📊 FIX: Valor calculado:', calculated);
+      const calculated = calculateSuggestedValue('recargo_nocturno', formData.subtipo, horasNum);
+      console.log('📊 KISS: Valor calculado:', calculated);
       
       setCalculatedValue(calculated);
     } else {
-      console.log('⏳ FIX: No se puede calcular - datos incompletos');
+      console.log('⏳ KISS: No se puede calcular - datos incompletos');
       setCalculatedValue(null);
     }
-  }, [formData.subtipo, formData.horas, employeeSalary, periodoFecha]);
+  }, [formData.subtipo, formData.horas, employeeSalary, periodoFecha, calculateSuggestedValue]);
 
-  // ✅ FIX: Effect mejorado para aplicar valor calculado
+  // ✅ KISS: Effect simple para aplicar valor calculado
   useEffect(() => {
-    console.log('💫 FIX: Aplicando valor calculado:', {
-      calculatedValue,
-      currentFormValue: formData.valor
-    });
-
     if (calculatedValue !== null && calculatedValue > 0) {
-      console.log('✅ FIX: Aplicando valor calculado al formulario:', calculatedValue);
+      console.log('✅ KISS: Aplicando valor calculado:', calculatedValue);
       setFormData(prev => ({ 
         ...prev, 
         valor: calculatedValue 
       }));
-    } else if (calculatedValue === 0) {
-      console.warn('⚠️ FIX: Valor calculado es 0 - verificar datos');
     }
   }, [calculatedValue]);
 
   const handleInputChange = (field: string, value: any) => {
-    console.log('📝 FIX: Cambiando campo:', field, 'a valor:', value);
+    console.log('📝 KISS: Cambiando campo:', field, 'a valor:', value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = () => {
-    console.log('🚀 FIX: Intentando enviar formulario:', formData);
+    console.log('🚀 KISS: Enviando formulario:', formData);
 
     if (!formData.horas || parseFloat(formData.horas) <= 0) {
       alert('Por favor ingrese las horas de recargo');
@@ -173,7 +110,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 FIX: Enviando datos corregidos:', submitData);
+    console.log('📤 KISS: Enviando datos:', submitData);
     onSubmit(submitData);
   };
 
@@ -183,13 +120,13 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
 
   const currentSubtipoInfo = getSubtipoInfo(formData.subtipo);
 
-  // ✅ FIX: Debug de datos de entrada
-  console.log('🔍 FIX: Estado actual del componente:', {
+  // ✅ KISS: Debug simple
+  console.log('🔍 KISS: Estado actual:', {
     employeeSalary,
     periodoFecha,
     formData,
     calculatedValue,
-    jornadaInfo
+    hasCalculateFunction: !!calculateSuggestedValue
   });
 
   return (
@@ -201,22 +138,12 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         <h3 className="text-lg font-semibold">Recargo</h3>
       </div>
 
-      {/* ✅ FIX: Debug info visible */}
+      {/* ✅ KISS: Debug info visible en desarrollo */}
       {process.env.NODE_ENV === 'development' && (
         <div className="bg-yellow-50 p-3 rounded text-xs">
           <strong>DEBUG:</strong> Salario: {employeeSalary}, Fecha: {periodoFecha?.toISOString().split('T')[0]}, 
-          Valor calculado: {calculatedValue}, Valor formulario: {formData.valor}
-        </div>
-      )}
-
-      {/* Información de jornada legal usada */}
-      {jornadaInfo && (
-        <div className="flex items-center gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
-          <Info className="h-4 w-4" />
-          <span>
-            Jornada legal: {jornadaInfo.horasSemanales}h semanales = {jornadaInfo.divisorHorario}h mensuales
-            {periodoFecha && ` (vigente desde ${periodoFecha.toLocaleDateString()})`}
-          </span>
+          Valor calculado: {calculatedValue}, Valor formulario: {formData.valor}, 
+          Función cálculo: {calculateSuggestedValue ? 'Disponible' : 'No disponible'}
         </div>
       )}
 
@@ -265,7 +192,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
           </div>
         </div>
 
-        {/* ✅ FIX: Mostrar valor calculado con más información */}
+        {/* ✅ KISS: Mostrar valor calculado */}
         {calculatedValue !== null && calculatedValue > 0 && (
           <div className="flex items-center justify-between bg-green-50 p-3 rounded">
             <div className="flex items-center gap-2">
@@ -278,11 +205,11 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
           </div>
         )}
 
-        {/* ✅ FIX: Mostrar advertencia si valor es 0 */}
-        {calculatedValue === 0 && formData.horas && parseFloat(formData.horas) > 0 && (
+        {/* ✅ KISS: Advertencia si no hay función de cálculo */}
+        {!calculateSuggestedValue && (
           <div className="flex items-center gap-2 bg-yellow-50 p-3 rounded text-sm text-yellow-700">
             <Info className="h-4 w-4" />
-            <span>Advertencia: El cálculo resultó en $0. Verifica los datos.</span>
+            <span>Función de cálculo no disponible. Configure el valor manualmente.</span>
           </div>
         )}
 
