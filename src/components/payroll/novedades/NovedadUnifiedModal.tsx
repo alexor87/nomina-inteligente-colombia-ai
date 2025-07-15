@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -12,10 +13,10 @@ import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadExistingList } from './NovedadExistingList';
 import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
-import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -65,6 +66,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  // ✅ KISS: Usar hook de backend para cálculos
+  const { calculateNovedad } = useNovedadBackendCalculation();
 
   // Calcular fecha del período para jornada legal - CORREGIDO para evitar shift de timezone
   const getPeriodDate = useCallback(() => {
@@ -194,27 +198,42 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   };
 
-  const calculateSuggestedValue = useCallback((
+  // ✅ KISS: Función de cálculo simplificada usando hook de backend
+  const calculateSuggestedValue = useCallback(async (
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
     horas?: number,
     dias?: number
-  ): number | null => {
+  ): Promise<number | null> => {
     if (!employeeSalary) {
-      console.warn('Salario del empleado no definido. No se puede calcular el valor sugerido.');
+      console.warn('✅ KISS: Salario del empleado no definido.');
       return null;
     }
 
     try {
-      // Usar fecha del período para cálculos
+      console.log('✅ KISS: Calculando con backend hook...');
       const fechaPeriodo = getPeriodDate();
-      const { valor } = calcularValorNovedadEnhanced(tipoNovedad, subtipo, employeeSalary, dias, horas, fechaPeriodo);
-      return valor;
+      
+      const result = await calculateNovedad({
+        tipoNovedad,
+        subtipo,
+        salarioBase: employeeSalary,
+        dias,
+        horas,
+        fechaPeriodo
+      });
+
+      if (result) {
+        console.log('✅ KISS: Valor calculado:', result.valor);
+        return result.valor;
+      }
+      
+      return null;
     } catch (error) {
-      console.error('Error al calcular el valor sugerido:', error);
+      console.error('✅ KISS: Error al calcular:', error);
       return null;
     }
-  }, [employeeSalary, getPeriodDate]);
+  }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
   const renderNovedadForm = () => {
     if (!selectedType || !employeeId) return null;
