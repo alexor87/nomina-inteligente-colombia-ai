@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Clock, Plus, Trash2, Calculator } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { NovedadType } from '@/types/novedades-enhanced';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface HorasExtraEntry {
   id: string;
@@ -35,12 +34,6 @@ interface NovedadHorasExtraConsolidatedFormProps {
   employeeSalary: number;
   isSubmitting?: boolean;
   periodoFecha?: Date;
-  calculateSuggestedValue?: (
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => Promise<number | null>;
 }
 
 export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsolidatedFormProps> = ({
@@ -48,8 +41,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
   onSubmit,
   employeeSalary,
   isSubmitting = false,
-  periodoFecha,
-  calculateSuggestedValue
+  periodoFecha
 }) => {
   const [entries, setEntries] = useState<HorasExtraEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState({
@@ -59,25 +51,26 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     observacion: ''
   });
 
-  const [isCalculating, setIsCalculating] = useState(false);
+  const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
 
-  // ✅ KISS: Función async de cálculo usando la prop
-  const calculateHorasExtraValue = async (tipo: string, horas: number, fecha: string): Promise<number> => {
-    if (!tipo || horas <= 0 || !fecha || !calculateSuggestedValue) {
-      console.log('🔧 KISS: No se puede calcular - datos incompletos');
-      return 0;
-    }
+  const calculateHorasExtraValue = async (tipo: string, horas: number, fecha: string) => {
+    if (!tipo || horas <= 0 || !fecha) return 0;
 
     try {
-      console.log('🧮 KISS: Calculando horas extra:', { tipo, horas, fecha });
+      // Convert fecha string to Date object for backend calculation
+      const fechaCalculo = new Date(fecha);
       
-      const result = await calculateSuggestedValue('horas_extra', tipo, horas);
-      const valor = result || 0;
-      
-      console.log('✅ KISS: Resultado calculado:', valor);
-      return valor;
+      const result = await calculateNovedad({
+        tipoNovedad: 'horas_extra',
+        subtipo: tipo,
+        salarioBase: employeeSalary,
+        horas: horas,
+        fechaPeriodo: fechaCalculo // Use specific entry date instead of periodoFecha
+      });
+
+      return result?.valor || 0;
     } catch (error) {
-      console.error('❌ KISS: Error en cálculo:', error);
+      console.error('Error calculating hours extra:', error);
       return 0;
     }
   };
@@ -87,8 +80,8 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
       return;
     }
 
-    setIsCalculating(true);
     const horas = parseFloat(currentEntry.horas);
+    // Pass the specific date from the entry for calculation
     const valor = await calculateHorasExtraValue(currentEntry.tipo, horas, currentEntry.fecha);
 
     const newEntry: HorasExtraEntry = {
@@ -107,7 +100,6 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
       horas: '',
       observacion: ''
     });
-    setIsCalculating(false);
   };
 
   const handleRemoveEntry = (id: string) => {
@@ -126,14 +118,6 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     return tiposHorasExtra.find(t => t.value === tipo)?.label || tipo;
   };
 
-  // ✅ KISS: Debug simple
-  console.log('🔍 KISS: Estado actual horas extra:', {
-    employeeSalary,
-    periodoFecha,
-    hasCalculateFunction: !!calculateSuggestedValue,
-    entriesCount: entries.length
-  });
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 pb-4 border-b">
@@ -143,25 +127,10 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
-      {/* ✅ KISS: Debug info visible en desarrollo */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-yellow-50 p-3 rounded text-xs">
-          <strong>DEBUG:</strong> Salario: {employeeSalary}, Fecha: {periodoFecha?.toISOString().split('T')[0]}, 
-          Función cálculo: {calculateSuggestedValue ? 'Disponible' : 'No disponible'}
-        </div>
-      )}
-
       {/* Current Entry Form */}
       <Card>
         <CardContent className="p-4 space-y-4">
           <h4 className="font-medium text-blue-800">Agregar Horas Extra</h4>
-          
-          {!calculateSuggestedValue && (
-            <div className="bg-yellow-50 p-3 rounded text-sm text-yellow-700">
-              <Calculator className="h-4 w-4 inline mr-2" />
-              Función de cálculo no disponible. Los valores deberán ingresarse manualmente.
-            </div>
-          )}
           
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
