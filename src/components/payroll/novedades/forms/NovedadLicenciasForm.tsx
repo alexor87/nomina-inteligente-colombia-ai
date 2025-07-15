@@ -6,47 +6,31 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calculator, Info, AlertTriangle, Scale } from 'lucide-react';
+import { ArrowLeft, Calculator, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { NovedadType } from '@/types/novedades-enhanced';
 
 interface NovedadLicenciasFormProps {
   onBack: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (formData: any) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, dias?: number) => number | null;
-  isSubmitting: boolean;
+  calculateSuggestedValue?: (
+    tipoNovedad: NovedadType,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ) => Promise<number | null>;
+  isSubmitting?: boolean;
 }
 
-// ✅ NUEVA ESTRUCTURA: Diferenciación legal clara
-const licenciaTypes = [
-  { 
-    value: 'remunerada', 
-    label: 'Licencia Remunerada', 
-    description: 'Se paga el 100% del salario durante la ausencia',
-    legalBasis: 'Arts. 57, 230 CST',
-    color: 'green',
-    subtipos: [
-      { value: 'paternidad', label: 'Paternidad', dias: 8, obligatoria: true },
-      { value: 'matrimonio', label: 'Matrimonio', dias: 5, obligatoria: true },
-      { value: 'luto', label: 'Luto', dias: 5, obligatoria: true },
-      { value: 'estudio', label: 'Estudios', dias: null, obligatoria: false }
-    ]
-  },
-  { 
-    value: 'no_remunerada', 
-    label: 'Licencia No Remunerada', 
-    description: 'Permiso autorizado sin pago que mantiene el vínculo laboral',
-    legalBasis: 'Art. 51 CST',
-    color: 'yellow',
-    subtipos: [
-      { value: 'personal', label: 'Personal', dias: null, obligatoria: false },
-      { value: 'estudios', label: 'Estudios', dias: null, obligatoria: false },
-      { value: 'familiar', label: 'Emergencia Familiar', dias: null, obligatoria: false },
-      { value: 'salud_no_eps', label: 'Salud (No EPS)', dias: null, obligatoria: false },
-      { value: 'maternidad_extendida', label: 'Maternidad Extendida', dias: null, obligatoria: false },
-      { value: 'cuidado_hijo_menor', label: 'Cuidado Hijo Menor', dias: null, obligatoria: false }
-    ]
-  }
+// ✅ KISS: Tipos de licencia disponibles
+const LICENCIA_SUBTIPOS = [
+  { value: 'maternidad', label: 'Licencia de Maternidad', dias: 126 },
+  { value: 'paternidad', label: 'Licencia de Paternidad', dias: 8 },
+  { value: 'luto', label: 'Licencia por Luto', dias: 5 },
+  { value: 'calamidad', label: 'Licencia por Calamidad', dias: 3 },
+  { value: 'estudio', label: 'Licencia de Estudio', dias: 0 },
+  { value: 'compensatorio', label: 'Licencia Compensatoria', dias: 0 }
 ];
 
 export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
@@ -54,237 +38,276 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
   onSubmit,
   employeeSalary,
   calculateSuggestedValue,
-  isSubmitting
+  isSubmitting = false
 }) => {
-  const [tipoLicencia, setTipoLicencia] = useState<string>('');
-  const [subtipo, setSubtipo] = useState<string>('');
-  const [dias, setDias] = useState<string>('');
-  const [valorCalculado, setValorCalculado] = useState<number>(0);
-  const [observacion, setObservacion] = useState<string>('');
+  // ✅ KISS: Estado simple del formulario
+  const [formData, setFormData] = useState({
+    subtipo: '',
+    dias: '',
+    fechaInicio: '',
+    fechaFin: '',
+    valor: 0,
+    observacion: ''
+  });
 
+  const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  // ✅ KISS: Effect async para calcular valor
   useEffect(() => {
-    if (tipoLicencia && dias && parseFloat(dias) > 0 && calculateSuggestedValue) {
-      if (tipoLicencia === 'remunerada') {
-        const calculatedValue = calculateSuggestedValue('licencia_remunerada', subtipo, parseFloat(dias));
-        if (calculatedValue) {
-          setValorCalculado(calculatedValue);
+    const calculateAsync = async () => {
+      if (formData.dias && parseFloat(formData.dias) > 0 && formData.subtipo && calculateSuggestedValue) {
+        setIsCalculating(true);
+        try {
+          const diasNum = parseFloat(formData.dias);
+          console.log('🧮 KISS Licencias: Calculando...', {
+            tipoNovedad: 'licencia_remunerada',
+            subtipo: formData.subtipo,
+            dias: diasNum,
+            employeeSalary
+          });
+          
+          const calculated = await calculateSuggestedValue('licencia_remunerada', formData.subtipo, undefined, diasNum);
+          console.log('📊 KISS Licencias: Valor calculado:', calculated);
+          
+          setCalculatedValue(calculated);
+        } catch (error) {
+          console.error('❌ KISS Licencias: Error en cálculo:', error);
+          setCalculatedValue(null);
+        } finally {
+          setIsCalculating(false);
         }
       } else {
-        // Licencia no remunerada siempre es $0
-        setValorCalculado(0);
+        setCalculatedValue(null);
+      }
+    };
+
+    calculateAsync();
+  }, [formData.subtipo, formData.dias, employeeSalary, calculateSuggestedValue]);
+
+  // ✅ KISS: Effect para aplicar valor calculado
+  useEffect(() => {
+    if (calculatedValue !== null && calculatedValue > 0) {
+      console.log('✅ KISS Licencias: Aplicando valor calculado:', calculatedValue);
+      setFormData(prev => ({ 
+        ...prev, 
+        valor: calculatedValue 
+      }));
+    }
+  }, [calculatedValue]);
+
+  const handleInputChange = (field: string, value: any) => {
+    console.log('📝 KISS Licencias: Cambiando campo:', field, 'a valor:', value);
+    setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Auto-completar días según el tipo de licencia
+    if (field === 'subtipo') {
+      const tipoLicencia = LICENCIA_SUBTIPOS.find(l => l.value === value);
+      if (tipoLicencia && tipoLicencia.dias > 0) {
+        setFormData(prev => ({ ...prev, dias: tipoLicencia.dias.toString() }));
       }
     }
-  }, [tipoLicencia, subtipo, dias, calculateSuggestedValue]);
-
-  const handleSubmit = () => {
-    if (!tipoLicencia || !dias || parseFloat(dias) <= 0) return;
-
-    // ✅ NUEVA LÓGICA: Mapeo correcto según diferenciación legal
-    const novedadType = tipoLicencia === 'remunerada' ? 'licencia_remunerada' : 'licencia_no_remunerada';
-
-    onSubmit({
-      tipo_novedad: novedadType,
-      subtipo: subtipo || tipoLicencia,
-      dias: parseFloat(dias),
-      valor: tipoLicencia === 'remunerada' ? Math.abs(valorCalculado) : 0, // No remunerada siempre $0
-      observacion: `${observacion} (${tipoLicencia === 'remunerada' ? 'Licencia Remunerada' : 'Licencia No Remunerada'})`.trim()
-    });
   };
 
-  const selectedType = licenciaTypes.find(t => t.value === tipoLicencia);
-  const selectedSubtipo = selectedType?.subtipos.find(s => s.value === subtipo);
-  const isValid = tipoLicencia && dias && parseFloat(dias) > 0;
+  const handleSubmit = () => {
+    console.log('🚀 KISS Licencias: Enviando formulario:', formData);
+
+    if (!formData.subtipo || !formData.dias || parseFloat(formData.dias) <= 0) {
+      alert('Por favor complete todos los campos obligatorios');
+      return;
+    }
+
+    if (!formData.fechaInicio) {
+      alert('Por favor ingrese la fecha de inicio');
+      return;
+    }
+
+    if (formData.valor <= 0) {
+      alert('El valor debe ser mayor a 0. Valor actual: ' + formData.valor);
+      return;
+    }
+
+    const submitData = {
+      tipo_novedad: 'licencia_remunerada',
+      subtipo: formData.subtipo,
+      dias: parseFloat(formData.dias),
+      fecha_inicio: formData.fechaInicio,
+      fecha_fin: formData.fechaFin || formData.fechaInicio,
+      valor: formData.valor,
+      observacion: formData.observacion || undefined
+    };
+
+    console.log('📤 KISS Licencias: Enviando datos:', submitData);
+    onSubmit(submitData);
+  };
+
+  const getTipoInfo = (subtipo: string) => {
+    return LICENCIA_SUBTIPOS.find(l => l.value === subtipo);
+  };
+
+  const currentTipoInfo = getTipoInfo(formData.subtipo);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b bg-white">
+      <div className="flex items-center gap-3 pb-4 border-b">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold text-gray-900">Licencias</h3>
-        <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-700 border-blue-200">
-          Diferenciación Legal
-        </Badge>
+        <h3 className="text-lg font-semibold">Licencias Remuneradas</h3>
       </div>
 
-      {/* Información Legal */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <Scale className="h-5 w-5 text-blue-600 mt-0.5" />
-          <div>
-            <h4 className="font-medium text-blue-800 mb-2">Marco Legal Colombiano</h4>
-            <div className="text-sm text-blue-700 space-y-1">
-              <p><strong>Licencia Remunerada:</strong> Derecho del trabajador con pago del 100% del salario (Arts. 57, 230 CST)</p>
-              <p><strong>Licencia No Remunerada:</strong> Permiso autorizado sin pago que suspende temporalmente prestaciones (Art. 51 CST)</p>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Tipo de Licencia *</Label>
+          <Select
+            value={formData.subtipo}
+            onValueChange={(value) => handleInputChange('subtipo', value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar tipo de licencia" />
+            </SelectTrigger>
+            <SelectContent>
+              {LICENCIA_SUBTIPOS.map((licencia) => (
+                <SelectItem key={licencia.value} value={licencia.value}>
+                  <div>
+                    <div className="font-medium">{licencia.label}</div>
+                    {licencia.dias > 0 && (
+                      <div className="text-xs text-gray-500">{licencia.dias} días</div>
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {currentTipoInfo && currentTipoInfo.dias > 0 && (
+            <div className="text-sm text-blue-600">
+              <strong>Días legales:</strong> {currentTipoInfo.dias} días
             </div>
-          </div>
+          )}
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-        <h4 className="text-gray-800 font-medium">Información de la Licencia</h4>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="tipo" className="text-gray-700">Tipo de Licencia</Label>
-            <Select value={tipoLicencia} onValueChange={setTipoLicencia}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona el tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {licenciaTypes.map((tipo) => (
-                  <SelectItem key={tipo.value} value={tipo.value}>
-                    <div>
-                      <div className="font-medium flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                          tipo.color === 'green' ? 'bg-green-500' : 'bg-yellow-500'
-                        }`}></div>
-                        {tipo.label}
-                      </div>
-                      <div className="text-xs text-gray-500">{tipo.description}</div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Fecha de Inicio *</Label>
+            <Input
+              type="date"
+              value={formData.fechaInicio}
+              onChange={(e) => handleInputChange('fechaInicio', e.target.value)}
+            />
           </div>
 
-          <div>
-            <Label htmlFor="dias" className="text-gray-700">Días</Label>
+          <div className="space-y-2">
+            <Label>Fecha de Fin</Label>
             <Input
-              id="dias"
-              type="number"
-              placeholder="0"
-              value={dias}
-              onChange={(e) => setDias(e.target.value)}
-              min="0"
-              step="1"
+              type="date"
+              value={formData.fechaFin}
+              onChange={(e) => handleInputChange('fechaFin', e.target.value)}
             />
           </div>
         </div>
 
-        {selectedType && (
-          <>
-            <div>
-              <Label htmlFor="subtipo" className="text-gray-700">Subtipo</Label>
-              <Select value={subtipo} onValueChange={setSubtipo}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona el subtipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedType.subtipos.map((sub) => (
-                    <SelectItem key={sub.value} value={sub.value}>
-                      <div className="flex items-center justify-between w-full">
-                        <span className="capitalize">{sub.label}</span>
-                        {sub.obligatoria && (
-                          <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-800">
-                            Obligatoria
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-2">
+          <Label>Cantidad de Días *</Label>
+          <Input
+            type="number"
+            min="0"
+            step="1"
+            value={formData.dias}
+            onChange={(e) => handleInputChange('dias', e.target.value)}
+            placeholder="0"
+          />
+        </div>
 
-            {/* Información Legal Específica */}
-            <div className={`p-3 rounded border ${
-              selectedType.color === 'green' 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-yellow-50 border-yellow-200'
-            }`}>
-              <div className={`flex items-center gap-2 mb-1 ${
-                selectedType.color === 'green' ? 'text-green-700' : 'text-yellow-700'
-              }`}>
-                <Info className="h-4 w-4" />
-                <span className="font-medium">Marco Legal</span>
-              </div>
-              <div className={`text-sm ${
-                selectedType.color === 'green' ? 'text-green-600' : 'text-yellow-600'
-              }`}>
-                <p><strong>Base Legal:</strong> {selectedType.legalBasis}</p>
-                <p>{selectedType.description}</p>
-                {selectedType.value === 'no_remunerada' && (
-                  <p className="mt-1"><strong>Efecto:</strong> Suspende acumulación de prestaciones sociales durante el período</p>
-                )}
-              </div>
+        {/* ✅ KISS: Mostrar estado de cálculo */}
+        {isCalculating && (
+          <div className="flex items-center justify-between bg-blue-50 p-3 rounded">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
+              <span className="text-sm text-blue-700">Calculando valor...</span>
             </div>
-
-            {/* Días sugeridos para licencias obligatorias */}
-            {selectedSubtipo?.obligatoria && selectedSubtipo.dias && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="flex items-center gap-2 text-blue-700 mb-1">
-                  <Info className="h-4 w-4" />
-                  <span className="font-medium">Días Legales</span>
-                </div>
-                <p className="text-sm text-blue-600">
-                  Esta licencia tiene derecho legal a <strong>{selectedSubtipo.dias} días</strong> según la normativa vigente.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Cálculo del Valor */}
-        {tipoLicencia && dias && parseFloat(dias) > 0 && (
-          <div className={`p-3 rounded border ${
-            tipoLicencia === 'remunerada' 
-              ? 'bg-green-50 border-green-200' 
-              : 'bg-yellow-50 border-yellow-200'
-          }`}>
-            <div className={`flex items-center gap-2 ${
-              tipoLicencia === 'remunerada' ? 'text-green-700' : 'text-yellow-700'
-            }`}>
-              <Calculator className="h-4 w-4" />
-              <span className="font-medium">
-                {tipoLicencia === 'remunerada' ? 'Valor a Pagar' : 'Sin Remuneración'}
-              </span>
-            </div>
-            <Badge variant="secondary" className={`mt-1 ${
-              tipoLicencia === 'remunerada' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {tipoLicencia === 'remunerada' 
-                ? `+${formatCurrency(valorCalculado)}`
-                : '$0 (Sin pago por definición legal)'
-              }
-            </Badge>
-            {tipoLicencia === 'no_remunerada' && (
-              <p className="text-xs text-yellow-600 mt-1">
-                Las licencias no remuneradas no generan pago pero mantienen el vínculo laboral
-              </p>
-            )}
           </div>
         )}
 
-        <div>
-          <Label htmlFor="observacion" className="text-gray-700">Observaciones (Opcional)</Label>
-          <Textarea
-            id="observacion"
-            placeholder="Detalles adicionales sobre la licencia..."
-            value={observacion}
-            onChange={(e) => setObservacion(e.target.value)}
-            rows={3}
-            className="resize-none"
+        {calculatedValue !== null && calculatedValue > 0 && !isCalculating && (
+          <div className="flex items-center justify-between bg-green-50 p-3 rounded">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-700">Valor calculado automáticamente:</span>
+            </div>
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              {formatCurrency(calculatedValue)}
+            </Badge>
+          </div>
+        )}
+
+        {!calculateSuggestedValue && (
+          <div className="flex items-center gap-2 bg-yellow-50 p-3 rounded text-sm text-yellow-700">
+            <Info className="h-4 w-4" />
+            <span>Función de cálculo no disponible. Configure el valor manualmente.</span>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Valor *</Label>
+            {calculatedValue && calculatedValue !== formData.valor && calculatedValue > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleInputChange('valor', calculatedValue)}
+                className="text-xs h-7 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+              >
+                <Calculator className="h-3 w-3 mr-1" />
+                Usar calculado: {formatCurrency(calculatedValue)}
+              </Button>
+            )}
+          </div>
+
+          <Input
+            type="number"
+            min="0"
+            step="1000"
+            value={formData.valor}
+            onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
+            placeholder="0"
+            className="text-lg font-medium"
           />
         </div>
+
+        <div className="space-y-2">
+          <Label>Observaciones</Label>
+          <Textarea
+            value={formData.observacion}
+            onChange={(e) => handleInputChange('observacion', e.target.value)}
+            placeholder="Detalles adicionales sobre la licencia..."
+            rows={3}
+          />
+        </div>
+
+        {/* Preview */}
+        {formData.valor > 0 && (
+          <div className="p-3 bg-gray-50 rounded text-center">
+            <Badge variant="default" className="text-sm px-3 py-1">
+              +{formatCurrency(formData.valor)}
+            </Badge>
+            <div className="text-xs text-gray-500 mt-1">
+              {formData.dias} días de {currentTipoInfo?.label || 'licencia'}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
-        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
+        <Button variant="outline" onClick={onBack}>
           Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid || isSubmitting}
-          className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+          disabled={!formData.subtipo || !formData.dias || formData.valor <= 0 || isSubmitting || isCalculating}
         >
-          {isSubmitting ? 'Guardando...' : 'Guardar Licencia'}
+          {isSubmitting ? 'Guardando...' : isCalculating ? 'Calculando...' : 'Guardar Licencia'}
         </Button>
       </div>
     </div>
