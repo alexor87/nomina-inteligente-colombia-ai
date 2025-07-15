@@ -74,7 +74,7 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
-// ✅ FECHAS CORREGIDAS: Usar comparación por string para evitar problemas de timezone
+// ✅ CORRECCIÓN CRÍTICA: Fecha corregida de implementación
 const JORNADAS_LEGALES = [
   {
     fechaString: '2026-07-15',
@@ -82,7 +82,7 @@ const JORNADAS_LEGALES = [
     descripcion: 'Jornada final según Ley 2101 de 2021'
   },
   {
-    fechaString: '2025-07-15', // ← CRÍTICO: Esta fecha debe activar 44h semanales
+    fechaString: '2025-07-01', // ✅ CRÍTICO: Cambio de 2025-07-15 a 2025-07-01
     horasSemanales: 44,
     descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
   },
@@ -111,6 +111,41 @@ const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
   44: 220, // Tercera reducción (2025-2026) ✅
   42: 210  // Reducción final (2026+)
 };
+
+// ✅ KISS: Factores progresivos para recargos dominicales/festivos según Ley 2466/2024
+function getDominicalFactor(fechaStr?: string): number {
+  if (!fechaStr) return 0.75;
+  
+  const year = parseInt(fechaStr.split('-')[0]);
+  
+  console.log(`🎯 Backend RECARGO: Calculando factor dominical para ${fechaStr}`);
+  
+  // ✅ Implementación progresiva desde 1 julio 2025
+  if (year >= 2027) {
+    console.log(`🎯 Backend RECARGO: Factor 2027+ = 100%`);
+    return 1.00; // 100% a partir de 2027
+  }
+  
+  if (year === 2026) {
+    console.log(`🎯 Backend RECARGO: Factor 2026 = 90%`);
+    return 0.90; // 90% en 2026
+  }
+  
+  if (year === 2025) {
+    // ✅ FECHA CRÍTICA CORREGIDA: 1 julio 2025 (no 15 julio)
+    if (fechaStr >= '2025-07-01') {
+      console.log(`🎯 Backend RECARGO: Factor desde 1-jul-2025 = 80%`);
+      return 0.80; // 80% desde 1 julio 2025
+    } else {
+      console.log(`🎯 Backend RECARGO: Factor antes 1-jul-2025 = 75%`);
+      return 0.75; // 75% hasta 30 junio 2025
+    }
+  }
+  
+  // Antes de 2025
+  console.log(`🎯 Backend RECARGO: Factor anterior a 2025 = 75%`);
+  return 0.75; // 75% antes de 2025
+}
 
 /**
  * ✅ FUNCIÓN CORREGIDA: Usa comparación de strings para fechas
@@ -184,12 +219,12 @@ const HORAS_EXTRA_FACTORS = {
   festivas_nocturnas: 2.5
 } as const;
 
-// 🎯 FUNCIÓN DE CÁLCULO ULTRA-KISS
+// 🎯 FUNCIÓN DE CÁLCULO KISS CON RECARGOS CORREGIDOS
 function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
-  console.log('🚀 ULTRA-KISS: *** INICIANDO CÁLCULO NOVEDAD ***');
-  console.log('🚀 ULTRA-KISS: Input completo:', JSON.stringify(input, null, 2));
+  console.log('🚀 KISS Backend: *** INICIANDO CÁLCULO NOVEDAD ***');
+  console.log('🚀 KISS Backend: Input completo:', JSON.stringify(input, null, 2));
   
   let valor = 0;
   let factorCalculo = 0;
@@ -198,13 +233,8 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   switch (tipoNovedad) {
     case 'horas_extra':
       if (horas && horas > 0 && subtipo) {
-        console.log('🚀 ULTRA-KISS: *** PROCESANDO HORAS EXTRA ***');
-        console.log('🚀 ULTRA-KISS: Horas:', horas);
-        console.log('🚀 ULTRA-KISS: Subtipo:', subtipo);
-        console.log('🚀 ULTRA-KISS: Fecha período:', fechaPeriodo);
-        console.log('🚀 ULTRA-KISS: Salario base:', salarioBase);
+        console.log('🚀 KISS Backend: *** PROCESANDO HORAS EXTRA ***');
         
-        // ✅ Cálculo usando función corregida de jornada legal
         const horasMensuales = getHorasMensuales(fechaPeriodo);
         const valorHoraOrdinaria = salarioBase / horasMensuales;
         const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
@@ -213,56 +243,64 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           valor = Math.round(valorHoraOrdinaria * factor * horas);
           factorCalculo = factor;
           detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
-          
-          console.log('🚀 Backend: *** CÁLCULO HORAS EXTRA DETALLADO ***');
-          console.log('🚀 Backend: Fecha enviada:', fechaPeriodo);
-          console.log('🚀 Backend: Horas mensuales calculadas:', horasMensuales);
-          console.log('🚀 Backend: Valor hora ordinaria:', valorHoraOrdinaria);
-          console.log('🚀 Backend: Factor aplicado:', factor);
-          console.log('🚀 Backend: Valor final calculado:', valor);
         } else {
           detalleCalculo = 'Subtipo de horas extra no válido';
-        }
-        
-        // 🎯 VALIDACIÓN FINAL ULTRA-ESPECÍFICA
-        console.log('🚀 ULTRA-KISS: *** VALIDACIÓN DE CASOS CRÍTICOS ***');
-        const fechaNormalizada = fechaPeriodo ? fechaPeriodo.split('T')[0] : '';
-        
-        if (fechaNormalizada === '2025-07-15') {
-          if (valor >= 9500) {
-            console.log('✅ ULTRA-KISS SUCCESS: 15 julio debe ser >= $9,500 (220h):', valor);
-          } else {
-            console.error('❌ ULTRA-KISS ERROR: 15 julio incorrecto < $9,500 (debería usar 220h):', valor);
-          }
-        } else if (fechaNormalizada === '2025-07-14') {
-          if (Math.abs(valor - 9341) < 100) {
-            console.log('✅ ULTRA-KISS SUCCESS: 14 julio correcto ~$9,341 (230h):', valor);
-          } else {
-            console.error('❌ ULTRA-KISS ERROR: 14 julio incorrecto ≠ $9,341 (debería usar 230h):', valor);
-          }
-        } else if (fechaNormalizada >= '2025-07-16') {
-          if (valor >= 9500) {
-            console.log('✅ ULTRA-KISS SUCCESS: 16+ julio correcto >= $9,500 (220h):', valor);
-          } else {
-            console.error('❌ ULTRA-KISS ERROR: 16+ julio incorrecto < $9,500 (debería usar 220h):', valor);
-          }
         }
       } else {
         detalleCalculo = 'Ingrese horas y seleccione subtipo';
       }
       break;
 
-    // ... keep existing code (other novedad types like recargo_nocturno, vacaciones, etc)
     case 'recargo_nocturno':
       if (horas && horas > 0) {
+        console.log('🚀 KISS Backend: *** PROCESANDO RECARGO NOCTURNO ***');
+        
         const horasMensuales = getHorasMensuales(fechaPeriodo);
-        const tarifaHora = salarioBase / horasMensuales;
-        const factor = 0.35; // 35% adicional para recargo nocturno
-        valor = Math.round(tarifaHora * factor * horas);
-        factorCalculo = factor;
-        detalleCalculo = `Recargo nocturno: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × 35% × ${horas} horas = ${valor.toLocaleString()}`;
+        const valorHoraOrdinaria = salarioBase / horasMensuales;
+        
+        // ✅ KISS: Lógica de recargos corregida con factores dinámicos
+        if (subtipo === 'nocturno') {
+          factorCalculo = 0.35; // 35% nocturno fijo
+          valor = Math.round(valorHoraOrdinaria * factorCalculo * horas);
+          detalleCalculo = `Recargo nocturno: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × 35% × ${horas} horas = ${valor.toLocaleString()}`;
+        } else if (subtipo === 'dominical') {
+          factorCalculo = getDominicalFactor(fechaPeriodo); // ✅ Factor dinámico
+          valor = Math.round(valorHoraOrdinaria * factorCalculo * horas);
+          const porcentaje = (factorCalculo * 100).toFixed(0);
+          detalleCalculo = `Recargo dominical: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${porcentaje}% × ${horas} horas = ${valor.toLocaleString()}`;
+        } else if (subtipo === 'festivo') {
+          factorCalculo = getDominicalFactor(fechaPeriodo); // ✅ Factor dinámico igual que dominical
+          valor = Math.round(valorHoraOrdinaria * factorCalculo * horas);
+          const porcentaje = (factorCalculo * 100).toFixed(0);
+          detalleCalculo = `Recargo festivo: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${porcentaje}% × ${horas} horas = ${valor.toLocaleString()}`;
+        } else if (subtipo === 'nocturno_dominical') {
+          // ✅ CORRECCIÓN MULTIPLICATIVA: 1.35 × factor_dominical_fecha
+          const factorDominical = getDominicalFactor(fechaPeriodo);
+          factorCalculo = 1.35 * factorDominical;
+          valor = Math.round(valorHoraOrdinaria * factorCalculo * horas);
+          const porcentaje = (factorCalculo * 100).toFixed(0);
+          detalleCalculo = `Recargo nocturno dominical: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${porcentaje}% × ${horas} horas = ${valor.toLocaleString()}`;
+          console.log(`🎯 Backend RECARGO: Nocturno Dominical = 1.35 × ${(factorDominical * 100).toFixed(0)}% = ${porcentaje}%`);
+        } else if (subtipo === 'nocturno_festivo') {
+          // ✅ CORRECCIÓN MULTIPLICATIVA: 1.35 × factor_festivo_fecha
+          const factorFestivo = getDominicalFactor(fechaPeriodo);
+          factorCalculo = 1.35 * factorFestivo;
+          valor = Math.round(valorHoraOrdinaria * factorCalculo * horas);
+          const porcentaje = (factorCalculo * 100).toFixed(0);
+          detalleCalculo = `Recargo nocturno festivo: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${porcentaje}% × ${horas} horas = ${valor.toLocaleString()}`;
+          console.log(`🎯 Backend RECARGO: Nocturno Festivo = 1.35 × ${(factorFestivo * 100).toFixed(0)}% = ${porcentaje}%`);
+        } else {
+          detalleCalculo = 'Subtipo de recargo no válido';
+        }
+        
+        // ✅ Validación de fecha crítica corregida
+        const fechaNormalizada = fechaPeriodo ? fechaPeriodo.split('T')[0] : '';
+        console.log('🚀 KISS Backend: *** VALIDACIÓN FECHA CRÍTICA ***');
+        console.log(`🚀 KISS Backend: Fecha normalizada: ${fechaNormalizada}`);
+        console.log(`🚀 KISS Backend: Factor calculado: ${factorCalculo}`);
+        console.log(`🚀 KISS Backend: Valor final: ${valor}`);
       } else {
-        detalleCalculo = 'Ingrese las horas de recargo nocturno';
+        detalleCalculo = 'Ingrese las horas de recargo';
       }
       break;
 
@@ -393,8 +431,8 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
     }
   };
 
-  console.log('🚀 ULTRA-KISS: *** RESULTADO FINAL ***');
-  console.log('🚀 ULTRA-KISS:', JSON.stringify(result, null, 2));
+  console.log('🚀 KISS Backend: *** RESULTADO FINAL ***');
+  console.log('🚀 KISS Backend:', JSON.stringify(result, null, 2));
   
   return result;
 }
@@ -579,12 +617,12 @@ serve(async (req) => {
         });
 
       case 'calculate-novedad':
-        console.log('🚀 ULTRA-KISS: *** RECIBIDA SOLICITUD NOVEDAD ***');
-        console.log('🚀 ULTRA-KISS: Action:', action);
-        console.log('🚀 ULTRA-KISS: Data recibida:', JSON.stringify(data, null, 2));
+        console.log('🚀 KISS Backend: *** RECIBIDA SOLICITUD NOVEDAD ***');
+        console.log('🚀 KISS Backend: Action:', action);
+        console.log('🚀 KISS Backend: Data recibida:', JSON.stringify(data, null, 2));
         const novedadResult = calculateNovedadUltraKiss(data);
-        console.log('🚀 ULTRA-KISS: *** ENVIANDO RESPUESTA ***');
-        console.log('🚀 ULTRA-KISS: Respuesta:', JSON.stringify(novedadResult, null, 2));
+        console.log('🚀 KISS Backend: *** ENVIANDO RESPUESTA ***');
+        console.log('🚀 KISS Backend: Respuesta:', JSON.stringify(novedadResult, null, 2));
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

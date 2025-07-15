@@ -1,4 +1,3 @@
-
 /**
  * Utilidad para manejar la jornada laboral legal según la Ley 2101 de 2021
  * que reduce progresivamente la jornada máxima semanal en Colombia
@@ -14,6 +13,7 @@ export interface JornadaLegalInfo {
 }
 
 // Fechas y jornadas según la Ley 2101 de 2021
+// ✅ CORRECCIÓN CRÍTICA: Cambio de fecha de implementación
 const JORNADAS_LEGALES = [
   {
     fechaInicio: new Date('2026-07-15'),
@@ -21,7 +21,7 @@ const JORNADAS_LEGALES = [
     descripcion: 'Jornada final según Ley 2101 de 2021'
   },
   {
-    fechaInicio: new Date('2025-07-15'),
+    fechaInicio: new Date('2025-07-01'), // ✅ CORREGIDO: Era 2025-07-15
     horasSemanales: 44,
     descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
   },
@@ -185,7 +185,7 @@ export const esPeriodoTransicion = (fecha: Date): boolean => {
   const fechasTransicion = [
     '2023-07-15',
     '2024-07-15', 
-    '2025-07-15',
+    '2025-07-01', // ✅ CORREGIDO: Era 2025-07-15
     '2026-07-15'
   ];
   
