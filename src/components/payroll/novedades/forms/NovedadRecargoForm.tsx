@@ -20,7 +20,7 @@ interface NovedadRecargoFormProps {
     subtipo: string | undefined,
     horas?: number,
     dias?: number
-  ) => number | null;
+  ) => Promise<number | null>;
 }
 
 // ✅ KISS: Mapeo simple de tipos de recargo
@@ -48,29 +48,40 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   });
 
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
 
-  // ✅ KISS: Effect simple para calcular valor usando la prop
+  // ✅ KISS: Effect async para calcular valor usando la prop
   useEffect(() => {
-    console.log('🔧 KISS: Calculando valor con prop calculateSuggestedValue');
-    
-    if (formData.horas && parseFloat(formData.horas) > 0 && calculateSuggestedValue) {
-      const horasNum = parseFloat(formData.horas);
-      console.log('🧮 KISS: Ejecutando cálculo...', {
-        tipoNovedad: 'recargo_nocturno',
-        subtipo: formData.subtipo,
-        horas: horasNum,
-        employeeSalary,
-        periodoFecha
-      });
-      
-      const calculated = calculateSuggestedValue('recargo_nocturno', formData.subtipo, horasNum);
-      console.log('📊 KISS: Valor calculado:', calculated);
-      
-      setCalculatedValue(calculated);
-    } else {
-      console.log('⏳ KISS: No se puede calcular - datos incompletos');
-      setCalculatedValue(null);
-    }
+    const calculateAsync = async () => {
+      if (formData.horas && parseFloat(formData.horas) > 0 && calculateSuggestedValue) {
+        setIsCalculating(true);
+        try {
+          const horasNum = parseFloat(formData.horas);
+          console.log('🧮 KISS: Ejecutando cálculo async...', {
+            tipoNovedad: 'recargo_nocturno',
+            subtipo: formData.subtipo,
+            horas: horasNum,
+            employeeSalary,
+            periodoFecha
+          });
+          
+          const calculated = await calculateSuggestedValue('recargo_nocturno', formData.subtipo, horasNum);
+          console.log('📊 KISS: Valor calculado:', calculated);
+          
+          setCalculatedValue(calculated);
+        } catch (error) {
+          console.error('❌ KISS: Error en cálculo async:', error);
+          setCalculatedValue(null);
+        } finally {
+          setIsCalculating(false);
+        }
+      } else {
+        console.log('⏳ KISS: No se puede calcular - datos incompletos');
+        setCalculatedValue(null);
+      }
+    };
+
+    calculateAsync();
   }, [formData.subtipo, formData.horas, employeeSalary, periodoFecha, calculateSuggestedValue]);
 
   // ✅ KISS: Effect simple para aplicar valor calculado
@@ -126,6 +137,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
     periodoFecha,
     formData,
     calculatedValue,
+    isCalculating,
     hasCalculateFunction: !!calculateSuggestedValue
   });
 
@@ -143,6 +155,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         <div className="bg-yellow-50 p-3 rounded text-xs">
           <strong>DEBUG:</strong> Salario: {employeeSalary}, Fecha: {periodoFecha?.toISOString().split('T')[0]}, 
           Valor calculado: {calculatedValue}, Valor formulario: {formData.valor}, 
+          Calculando: {isCalculating ? 'Sí' : 'No'},
           Función cálculo: {calculateSuggestedValue ? 'Disponible' : 'No disponible'}
         </div>
       )}
@@ -193,7 +206,16 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         </div>
 
         {/* ✅ KISS: Mostrar valor calculado */}
-        {calculatedValue !== null && calculatedValue > 0 && (
+        {isCalculating && (
+          <div className="flex items-center justify-between bg-blue-50 p-3 rounded">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
+              <span className="text-sm text-blue-700">Calculando valor...</span>
+            </div>
+          </div>
+        )}
+
+        {calculatedValue !== null && calculatedValue > 0 && !isCalculating && (
           <div className="flex items-center justify-between bg-green-50 p-3 rounded">
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-green-600" />
@@ -270,9 +292,9 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.horas || formData.valor <= 0}
+          disabled={!formData.horas || formData.valor <= 0 || isCalculating}
         >
-          Guardar Recargo
+          {isCalculating ? 'Calculando...' : 'Guardar Recargo'}
         </Button>
       </div>
     </div>

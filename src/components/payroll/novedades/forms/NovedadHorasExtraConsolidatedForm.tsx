@@ -40,7 +40,7 @@ interface NovedadHorasExtraConsolidatedFormProps {
     subtipo: string | undefined,
     horas?: number,
     dias?: number
-  ) => number | null;
+  ) => Promise<number | null>;
 }
 
 export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsolidatedFormProps> = ({
@@ -61,8 +61,8 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
 
   const [isCalculating, setIsCalculating] = useState(false);
 
-  // ✅ KISS: Función simple de cálculo usando la prop
-  const calculateHorasExtraValue = (tipo: string, horas: number, fecha: string): number => {
+  // ✅ KISS: Función async de cálculo usando la prop
+  const calculateHorasExtraValue = async (tipo: string, horas: number, fecha: string): Promise<number> => {
     if (!tipo || horas <= 0 || !fecha || !calculateSuggestedValue) {
       console.log('🔧 KISS: No se puede calcular - datos incompletos');
       return 0;
@@ -71,7 +71,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     try {
       console.log('🧮 KISS: Calculando horas extra:', { tipo, horas, fecha });
       
-      const result = calculateSuggestedValue('horas_extra', tipo, horas);
+      const result = await calculateSuggestedValue('horas_extra', tipo, horas);
       const valor = result || 0;
       
       console.log('✅ KISS: Resultado calculado:', valor);
@@ -89,7 +89,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
 
     setIsCalculating(true);
     const horas = parseFloat(currentEntry.horas);
-    const valor = calculateHorasExtraValue(currentEntry.tipo, horas, currentEntry.fecha);
+    const valor = await calculateHorasExtraValue(currentEntry.tipo, horas, currentEntry.fecha);
 
     const newEntry: HorasExtraEntry = {
       id: Date.now().toString(),
