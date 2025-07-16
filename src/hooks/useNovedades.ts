@@ -131,6 +131,7 @@ export const useNovedades = (periodId: string) => {
           empleado_id: novedad.empleado_id,
           periodo_id: novedad.periodo_id,
           tipo_novedad: novedad.tipo_novedad,
+          subtipo: novedad.subtipo,
           valor: novedad.valor || 0,
           dias: novedad.dias,
           horas: novedad.horas,
