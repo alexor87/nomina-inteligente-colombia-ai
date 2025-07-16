@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -119,17 +120,13 @@ const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
 function getHorasParaRecargos(fechaStr?: string): number {
   const fechaComparar = fechaStr ? fechaStr.split('T')[0] : new Date().toISOString().split('T')[0];
   
-  console.log(`🎯 Backend RECARGOS: Calculando horas para recargos en fecha: "${fechaComparar}"`);
-  
   // ✅ CORRECCIÓN: Usar 220h desde 1 julio 2025 para recargos
   if (fechaComparar >= '2025-07-01') {
-    console.log(`🎯 Backend RECARGOS: Desde 1 julio 2025 → 220h mensuales`);
     return 220;
   }
   
   // Para fechas anteriores, usar jornada legal normal
   const jornadaInfo = getJornadaLegal(fechaStr);
-  console.log(`🎯 Backend RECARGOS: Jornada normal anterior → ${jornadaInfo.horasMensuales}h mensuales`);
   return jornadaInfo.horasMensuales;
 }
 
@@ -139,13 +136,10 @@ function getHorasParaRecargos(fechaStr?: string): number {
 function getJornadaLegal(fechaStr?: string) {
   const fechaComparar = fechaStr ? fechaStr.split('T')[0] : new Date().toISOString().split('T')[0];
   
-  console.log(`🎯 Backend JORNADA: Calculando jornada laboral para fecha: "${fechaComparar}"`);
-  
   let jornadaVigente = null;
   
   for (const jornada of JORNADAS_LEGALES) {
     const esVigente = fechaComparar >= jornada.fechaString;
-    console.log(`   🔍 Comparando "${fechaComparar}" >= "${jornada.fechaString}" (${jornada.horasSemanales}h) = ${esVigente}`);
     
     if (esVigente) {
       jornadaVigente = jornada;
@@ -156,7 +150,6 @@ function getJornadaLegal(fechaStr?: string) {
   if (!jornadaVigente) {
     const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
     const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaTradicional.horasSemanales];
-    console.log(`⚠️ Backend: No se encontró jornada vigente, usando tradicional: ${jornadaTradicional.horasSemanales}h = ${horasMensuales}h mensuales`);
     
     return {
       horasSemanales: jornadaTradicional.horasSemanales,
@@ -168,7 +161,6 @@ function getJornadaLegal(fechaStr?: string) {
   }
 
   const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaVigente.horasSemanales];
-  console.log(`✅ Backend JORNADA: Fecha "${fechaComparar}" → ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales`);
 
   return {
     horasSemanales: jornadaVigente.horasSemanales,
@@ -181,13 +173,11 @@ function getJornadaLegal(fechaStr?: string) {
 
 function getHorasMensuales(fechaStr?: string): number {
   const jornadaInfo = getJornadaLegal(fechaStr);
-  console.log(`🎯 Backend: Horas mensuales para ${fechaStr || 'fecha actual'}: ${jornadaInfo.horasMensuales}h`);
   return jornadaInfo.horasMensuales;
 }
 
 function getHorasSemanales(fechaStr?: string): number {
   const jornadaInfo = getJornadaLegal(fechaStr);
-  console.log(`🎯 Backend: Horas semanales para ${fechaStr || 'fecha actual'}: ${jornadaInfo.horasSemanales}h`);
   return jornadaInfo.horasSemanales;
 }
 
@@ -198,8 +188,6 @@ function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
   normativa: string;
 } {
   const fecha = fechaPeriodo || new Date();
-  
-  console.log(`📅 FACTORES TOTALES ALELUYA: Calculando para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
   
   switch (tipoRecargo) {
     case 'nocturno':
@@ -268,9 +256,6 @@ const HORAS_EXTRA_FACTORS = {
 function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
-  console.log('🚀 FACTORES TOTALES ALELUYA: *** INICIANDO CÁLCULO CORREGIDO ***');
-  console.log('🚀 FACTORES TOTALES ALELUYA: Input completo:', JSON.stringify(input, null, 2));
-  
   let valor = 0;
   let factorCalculo = 0;
   let detalleCalculo = '';
@@ -278,8 +263,6 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   switch (tipoNovedad) {
     case 'horas_extra':
       if (horas && horas > 0 && subtipo) {
-        console.log('🚀 FACTORES TOTALES ALELUYA: *** PROCESANDO HORAS EXTRA ***');
-        
         // ✅ Usar horas mensuales normales para horas extra
         const horasMensuales = getHorasMensuales(fechaPeriodo);
         const valorHoraOrdinaria = salarioBase / horasMensuales;
@@ -289,10 +272,6 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           valor = Math.round(valorHoraOrdinaria * factor * horas);
           factorCalculo = factor;
           detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
-          
-          console.log('🚀 FACTORES TOTALES ALELUYA: *** CÁLCULO HORAS EXTRA DETALLADO ***');
-          console.log('🚀 FACTORES TOTALES ALELUYA: Horas mensuales (jornada laboral):', horasMensuales);
-          console.log('🚀 FACTORES TOTALES ALELUYA: Valor final calculado:', valor);
         } else {
           detalleCalculo = 'Subtipo de horas extra no válido';
         }
@@ -303,23 +282,26 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
 
     case 'recargo_nocturno':
       if (horas && horas > 0) {
-        console.log('🚀 FACTORES TOTALES ALELUYA: *** PROCESANDO RECARGO CON FÓRMULA UNIFICADA ***');
-        console.log('🚀 FACTORES TOTALES ALELUYA: Tipo novedad:', tipoNovedad);
-        console.log('🚀 FACTORES TOTALES ALELUYA: Subtipo recibido:', subtipo);
-        console.log('🚀 FACTORES TOTALES ALELUYA: Fecha período:', fechaPeriodo);
+        // ✅ CORRECCIÓN CRÍTICA: Mapear correctamente los subtipos
+        let tipoRecargoAleluya = 'nocturno'; // Valor por defecto
         
-        let tipoRecargoAleluya = 'nocturno';
         if (subtipo === 'dominical') {
           tipoRecargoAleluya = 'dominical';
         } else if (subtipo === 'nocturno_dominical') {
           tipoRecargoAleluya = 'nocturno_dominical';
         }
-        
-        console.log('🚀 FACTORES TOTALES ALELUYA: Tipo recargo mapeado:', tipoRecargoAleluya);
+        // Si subtipo es 'nocturno' o undefined, mantener 'nocturno'
         
         // ✅ FACTORES TOTALES CON TRANSICIÓN 1 JULIO 2025
         const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
         const factorInfo = getFactorRecargoTotal(tipoRecargoAleluya, fechaObj);
+        
+        // ✅ VERIFICACIÓN CRÍTICA: Validar que tenemos un factor válido
+        if (factorInfo.factorTotal <= 0) {
+          console.error(`❌ Factor inválido para ${tipoRecargoAleluya}:`, factorInfo);
+          detalleCalculo = `Error: Factor inválido para ${tipoRecargoAleluya}`;
+          break;
+        }
         
         // ✅ FÓRMULA UNIFICADA ALELUYA: Salario × Factor × Horas ÷ (30 × 7.333) para TODOS
         const divisorAleluya = 30 * 7.333; // 219.99
@@ -327,23 +309,17 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         factorCalculo = factorInfo.factorTotal;
         detalleCalculo = `${tipoRecargoAleluya} (fórmula Aleluya): (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ (30 × 7.333) = ${valor.toLocaleString()}`;
         
-        console.log('🚀 FACTORES TOTALES ALELUYA: *** FÓRMULA UNIFICADA APLICADA ***');
-        console.log('🚀 FACTORES TOTALES ALELUYA: Divisor Aleluya (30 × 7.333):', divisorAleluya);
-        console.log('🚀 FACTORES TOTALES ALELUYA: Factor total aplicado:', factorInfo.factorTotal);
-        console.log('🚀 FACTORES TOTALES ALELUYA: Valor final calculado:', valor);
-        console.log('🚀 FACTORES TOTALES ALELUYA: Normativa:', factorInfo.normativa);
-        
         // ✅ VALIDACIÓN ESPECÍFICA ALELUYA CON FACTORES TOTALES
         if (salarioBase === 1718661 && horas === 1) {
           const fechaNormalizada = fechaPeriodo ? fechaPeriodo.split('T')[0] : '';
           
           if (fechaNormalizada >= '2025-07-01') {
             if (tipoRecargoAleluya === 'dominical' && Math.abs(valor - 6250) < 100) {
-              console.log('✅ FACTORES TOTALES SUCCESS: Dominical exacto $6,250:', valor);
+              console.log('✅ DOMINICAL SUCCESS: Exacto $6,250:', valor);
             } else if (tipoRecargoAleluya === 'nocturno_dominical' && Math.abs(valor - 8984) < 100) {
-              console.log('✅ FACTORES TOTALES SUCCESS: Nocturno Dominical exacto $8,984:', valor);
+              console.log('✅ NOCTURNO DOMINICAL SUCCESS: Exacto $8,984:', valor);
             } else if (tipoRecargoAleluya === 'nocturno' && Math.abs(valor - 2734) < 100) {
-              console.log('✅ FACTORES TOTALES SUCCESS: Nocturno exacto $2,734:', valor);
+              console.log('✅ NOCTURNO SUCCESS: Exacto $2,734:', valor);
             }
           }
         }
@@ -480,9 +456,6 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
       descripcion: horasMensualesJornada === 230 ? 'Tercera fase de reducción (46h semanales)' : 'Cuarta fase de reducción (44h semanales)'
     }
   };
-
-  console.log('🚀 FACTORES TOTALES ALELUYA: *** RESULTADO FINAL CON FACTORES TOTALES ***');
-  console.log('🚀 FACTORES TOTALES ALELUYA:', JSON.stringify(result, null, 2));
   
   return result;
 }
@@ -573,8 +546,6 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const config = DEFAULT_CONFIG_2025;
   const horasMensuales = getHorasMensuales(input.periodDate);
   const horasSemanales = getHorasSemanales(input.periodDate);
-  
-  console.log(`🔧 EDGE FUNCTION - Período: ${input.periodType}, Días: ${input.workedDays}`);
   
   const dailySalary = input.baseSalary / 30;
   const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
@@ -667,12 +638,7 @@ serve(async (req) => {
         });
 
       case 'calculate-novedad':
-        console.log('🚀 FACTORES TOTALES ALELUYA: *** RECIBIDA SOLICITUD NOVEDAD CON FACTORES TOTALES ***');
-        console.log('🚀 FACTORES TOTALES ALELUYA: Action:', action);
-        console.log('🚀 FACTORES TOTALES ALELUYA: Data recibida:', JSON.stringify(data, null, 2));
         const novedadResult = calculateNovedadUltraKiss(data);
-        console.log('🚀 FACTORES TOTALES ALELUYA: *** ENVIANDO RESPUESTA CON FACTORES TOTALES ***');
-        console.log('🚀 FACTORES TOTALES ALELUYA: Respuesta:', JSON.stringify(novedadResult, null, 2));
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

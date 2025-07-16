@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Info, Calendar, Calculator, CheckCircle, XCircle, Settings } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Info, Calendar, Calculator, CheckCircle, XCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -24,23 +24,39 @@ export const NovedadDebugPanel: React.FC<NovedadDebugPanelProps> = ({
   const fechaString = fecha.toISOString().split('T')[0];
   const horasNum = parseFloat(horas || '1');
   
-  // Expected calculations
-  const expectedValue15July = Math.round((salario / 220) * 1.25 * horasNum);
-  const expectedValue1July = Math.round((salario / 230) * 1.25 * horasNum);
-  
-  const getExpectedValue = () => {
-    if (fechaString === '2025-07-15') return expectedValue15July;
-    if (fechaString === '2025-07-01') return expectedValue1July;
-    if (fechaString >= '2025-07-15') return expectedValue15July; // 220h for dates >= 15 July
-    return expectedValue1July; // 230h for dates < 15 July
-  };
-  
-  const getExpectedHours = () => {
-    if (fechaString === '2025-07-15') return 220;
-    if (fechaString === '2025-07-01') return 230;
-    if (fechaString >= '2025-07-15') return 220;
-    return 230;
-  };
+  // ✅ Optimización: Usar useMemo para cálculos pesados
+  const calculationData = useMemo(() => {
+    // Expected calculations usando fórmula Aleluya
+    const divisorAleluya = 30 * 7.333; // 219.99
+    
+    const expectedValue15July = Math.round((salario * 0.80 * horasNum) / divisorAleluya); // Factor dominical 0.80
+    const expectedValue1July = Math.round((salario * 0.75 * horasNum) / divisorAleluya); // Factor dominical 0.75
+    
+    const getExpectedValue = () => {
+      if (fechaString === '2025-07-15') return expectedValue15July;
+      if (fechaString === '2025-07-01') return expectedValue1July;
+      if (fechaString >= '2025-07-01') return expectedValue15July; // 0.80 factor desde julio 1
+      return expectedValue1July; // 0.75 factor antes de julio 1
+    };
+    
+    const getExpectedFactor = () => {
+      if (fechaString >= '2025-07-01') return 0.80; // Factor total dominical desde julio 1
+      return 0.75; // Factor total dominical antes de julio 1
+    };
+
+    const currentExpected = getExpectedValue();
+    const currentFactor = getExpectedFactor();
+    const isCorrect = Math.abs(valorCalculado - currentExpected) < 50;
+
+    return {
+      expectedValue15July,
+      expectedValue1July,
+      currentExpected,
+      currentFactor,
+      isCorrect,
+      divisorAleluya
+    };
+  }, [salario, horasNum, fechaString, valorCalculado]);
 
   const testDate1July = () => {
     if (onDateChange) {
@@ -54,20 +70,17 @@ export const NovedadDebugPanel: React.FC<NovedadDebugPanelProps> = ({
     }
   };
 
-  const currentExpected = getExpectedValue();
-  const isCorrect = Math.abs(valorCalculado - currentExpected) < 50;
-
   return (
     <div className="fixed bottom-4 right-4 max-w-md bg-white border-2 border-blue-300 rounded-lg shadow-lg p-4 z-50">
       <div className="flex items-center gap-2 mb-3">
         <Info className="h-5 w-5 text-blue-600" />
-        <span className="font-bold text-blue-800">🚀 ULTRA-KISS DEBUG</span>
+        <span className="font-bold text-blue-800">🚀 DEBUG ALELUYA</span>
       </div>
       
       <div className="space-y-2 text-sm font-mono">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          <span>Fecha Extra: {fechaString}</span>
+          <span>Fecha: {fechaString}</span>
         </div>
         
         <div className="flex items-center gap-2">
@@ -77,34 +90,34 @@ export const NovedadDebugPanel: React.FC<NovedadDebugPanelProps> = ({
         
         <div className="bg-gray-100 p-2 rounded">
           <p>💰 Salario: {formatCurrency(salario)}</p>
-          <p>⏰ Horas esperadas: {getExpectedHours()}h/mes</p>
-          <p>🎯 Valor esperado: {formatCurrency(getExpectedValue())}</p>
+          <p>📊 Factor esperado: {calculationData.currentFactor}</p>
+          <p>🎯 Valor esperado: {formatCurrency(calculationData.currentExpected)}</p>
         </div>
         
         <div className={`p-2 rounded flex items-center gap-2 ${
-          isCorrect ? 'bg-green-100 text-green-800' :
+          calculationData.isCorrect ? 'bg-green-100 text-green-800' :
           'bg-red-100 text-red-800'
         }`}>
-          {isCorrect ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+          {calculationData.isCorrect ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
           <div>
             <p className="font-bold">Resultado: {formatCurrency(valorCalculado)}</p>
             <p className="text-xs">
-              {isCorrect ? '✅ CORRECTO' : '❌ INCORRECTO'}
+              {calculationData.isCorrect ? '✅ CORRECTO' : '❌ INCORRECTO'}
             </p>
           </div>
         </div>
         
         <div className="bg-yellow-100 p-2 rounded text-yellow-800">
-          <p className="font-bold">🎯 FÓRMULA ACTUAL</p>
+          <p className="font-bold">🎯 FÓRMULA ALELUYA</p>
           <p className="text-xs">
-            {formatCurrency(salario)} ÷ {getExpectedHours()}h × 1.25 × {horasNum}h
+            ({formatCurrency(salario)} × {calculationData.currentFactor} × {horasNum}h) ÷ (30 × 7.333)
           </p>
           <p className="text-xs">
-            = {formatCurrency(getExpectedValue())}
+            = {formatCurrency(calculationData.currentExpected)}
           </p>
         </div>
 
-        {/* Test buttons */}
+        {/* Test buttons optimizados */}
         <div className="space-y-1">
           <p className="font-bold text-blue-800 text-xs">🧪 PROBAR FECHAS:</p>
           <div className="flex gap-1">
@@ -114,7 +127,7 @@ export const NovedadDebugPanel: React.FC<NovedadDebugPanelProps> = ({
               onClick={testDate1July}
               className="text-xs px-2 py-1 h-auto"
             >
-              1 Jul (230h)
+              1 Jul (0.75)
             </Button>
             <Button 
               size="sm" 
@@ -122,7 +135,7 @@ export const NovedadDebugPanel: React.FC<NovedadDebugPanelProps> = ({
               onClick={testDate15July}
               className="text-xs px-2 py-1 h-auto"
             >
-              15 Jul (220h)
+              15 Jul (0.80)
             </Button>
           </div>
         </div>
