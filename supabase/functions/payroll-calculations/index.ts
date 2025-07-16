@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -189,6 +188,9 @@ function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
 } {
   const fecha = fechaPeriodo || new Date();
   
+  // ✅ DEBUG ESPECÍFICO NOCTURNO DOMINICAL
+  console.log(`🔍 DEBUG NOCTURNO DOMINICAL: tipoRecargo="${tipoRecargo}", fecha=${fecha.toISOString().split('T')[0]}`);
+  
   switch (tipoRecargo) {
     case 'nocturno':
       return {
@@ -226,6 +228,8 @@ function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
       }
       
     case 'nocturno_dominical':
+      // ✅ DEBUG: Log específico para nocturno dominical
+      console.log(`✅ NOCTURNO DOMINICAL DETECTADO: Aplicando factor 1.15`);
       return {
         factorTotal: 1.15, // Factor total específico para Aleluya
         porcentaje: '115%',
@@ -282,19 +286,30 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
 
     case 'recargo_nocturno':
       if (horas && horas > 0) {
+        // ✅ DEBUG: Log del subtipo recibido
+        console.log(`🔍 SUBTIPO RECIBIDO: "${subtipo}"`);
+        
         // ✅ CORRECCIÓN CRÍTICA: Mapear correctamente los subtipos
         let tipoRecargoAleluya = 'nocturno'; // Valor por defecto
         
         if (subtipo === 'dominical') {
           tipoRecargoAleluya = 'dominical';
+          console.log(`🔄 MAPEO: subtipo "dominical" → tipoRecargoAleluya "dominical"`);
         } else if (subtipo === 'nocturno_dominical') {
           tipoRecargoAleluya = 'nocturno_dominical';
+          console.log(`🔄 MAPEO CRÍTICO: subtipo "nocturno_dominical" → tipoRecargoAleluya "nocturno_dominical"`);
+        } else if (subtipo === 'nocturno' || subtipo === undefined) {
+          tipoRecargoAleluya = 'nocturno';
+          console.log(`🔄 MAPEO: subtipo "${subtipo}" → tipoRecargoAleluya "nocturno"`);
         }
-        // Si subtipo es 'nocturno' o undefined, mantener 'nocturno'
+        
+        console.log(`🎯 TIPO RECARGO FINAL: "${tipoRecargoAleluya}"`);
         
         // ✅ FACTORES TOTALES CON TRANSICIÓN 1 JULIO 2025
         const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
         const factorInfo = getFactorRecargoTotal(tipoRecargoAleluya, fechaObj);
+        
+        console.log(`📊 FACTOR INFO: factorTotal=${factorInfo.factorTotal}, porcentaje=${factorInfo.porcentaje}`);
         
         // ✅ VERIFICACIÓN CRÍTICA: Validar que tenemos un factor válido
         if (factorInfo.factorTotal <= 0) {
@@ -305,8 +320,12 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         
         // ✅ FÓRMULA UNIFICADA ALELUYA: Salario × Factor × Horas ÷ (30 × 7.333) para TODOS
         const divisorAleluya = 30 * 7.333; // 219.99
-        valor = Math.round((salarioBase * factorInfo.factorTotal * horas) / divisorAleluya);
+        const calculoDetallado = (salarioBase * factorInfo.factorTotal * horas) / divisorAleluya;
+        valor = Math.round(calculoDetallado);
         factorCalculo = factorInfo.factorTotal;
+        
+        console.log(`🧮 CÁLCULO DETALLADO: (${salarioBase} × ${factorInfo.factorTotal} × ${horas}) ÷ ${divisorAleluya} = ${calculoDetallado} → ${valor}`);
+        
         detalleCalculo = `${tipoRecargoAleluya} (fórmula Aleluya): (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ (30 × 7.333) = ${valor.toLocaleString()}`;
         
         // ✅ VALIDACIÓN ESPECÍFICA ALELUYA CON FACTORES TOTALES
@@ -320,6 +339,8 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
               console.log('✅ NOCTURNO DOMINICAL SUCCESS: Exacto $8,984:', valor);
             } else if (tipoRecargoAleluya === 'nocturno' && Math.abs(valor - 2734) < 100) {
               console.log('✅ NOCTURNO SUCCESS: Exacto $2,734:', valor);
+            } else {
+              console.log(`⚠️ VALIDACIÓN: ${tipoRecargoAleluya} = $${valor} (esperado diferente)`);
             }
           }
         }
@@ -457,6 +478,11 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
     }
   };
   
+  // ✅ DEBUG FINAL: Log del resultado para nocturno dominical
+  if (tipoNovedad === 'recargo_nocturno' && subtipo === 'nocturno_dominical') {
+    console.log(`🏁 RESULTADO FINAL NOCTURNO DOMINICAL: valor=${result.valor}, factorCalculo=${result.factorCalculo}`);
+  }
+  
   return result;
 }
 
@@ -512,7 +538,7 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
     warnings.push(`Horas extra excesivas para jornada de ${horasSemanales}h semanales (máximo recomendado: ${maxHorasExtraSemanales}h/semana)`);
   }
   if (input.extraHours < 0) {
-    errors.push('Las horas extra no pueden ser negativas');
+    errors.push('Las horas extra no pueden ser negativos');
   }
 
   if (input.disabilities > input.workedDays) {
