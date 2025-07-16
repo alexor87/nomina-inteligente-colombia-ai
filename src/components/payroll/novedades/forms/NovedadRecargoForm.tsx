@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calculator, Info } from 'lucide-react';
+import { ArrowLeft, Calculator, Info, Clock } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { RecargosCalculationService } from '@/services/RecargosCalculationService';
@@ -15,7 +14,7 @@ interface NovedadRecargoFormProps {
   onBack: () => void;
   onSubmit: (formData: any) => void;
   employeeSalary: number;
-  periodoFecha?: Date; // ✅ NUEVO: Fecha del período para jornada legal correcta
+  periodoFecha?: Date; // ✅ REQUERIDO: Fecha del período para factores dinámicos
   calculateSuggestedValue?: (
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
@@ -23,14 +22,6 @@ interface NovedadRecargoFormProps {
     dias?: number
   ) => number | null;
 }
-
-const RECARGO_SUBTIPOS = [
-  { value: 'nocturno', label: 'Nocturno (35%)', description: '10:00 PM - 6:00 AM' },
-  { value: 'dominical', label: 'Dominical (80%)', description: 'Trabajo en domingo' },
-  { value: 'nocturno_dominical', label: 'Nocturno Dominical (115%)', description: 'Domingo 10:00 PM - 6:00 AM' },
-  { value: 'festivo', label: 'Festivo (75%)', description: 'Trabajo en día festivo' },
-  { value: 'nocturno_festivo', label: 'Nocturno Festivo (110%)', description: 'Festivo 10:00 PM - 6:00 AM' }
-];
 
 export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   onBack,
@@ -47,15 +38,46 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
 
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
   const [jornadaInfo, setJornadaInfo] = useState<any>(null);
+  const [factorInfo, setFactorInfo] = useState<any>(null);
+  
+  // ✅ FASE 3: Obtener subtipos dinámicos según fecha del período
+  const [recargoSubtipos, setRecargoSubtipos] = useState<any[]>([]);
 
-  // ✅ CORRECCIÓN: Usar fecha del período para jornada legal correcta
+  useEffect(() => {
+    // ✅ NUEVO: Cargar subtipos con factores dinámicos según fecha del período
+    const fechaCalculo = periodoFecha || new Date();
+    const tiposRecargo = RecargosCalculationService.getTiposRecargo(fechaCalculo);
+    
+    const subtiposFormateados = tiposRecargo.map(tipo => ({
+      value: tipo.tipo,
+      label: `${tipo.tipo === 'nocturno' ? 'Nocturno' : 
+               tipo.tipo === 'dominical' ? 'Dominical' :
+               tipo.tipo === 'festivo' ? 'Festivo' :
+               tipo.tipo === 'nocturno_dominical' ? 'Nocturno Dominical' :
+               'Nocturno Festivo'} (${tipo.porcentaje})`,
+      description: tipo.descripcion,
+      normativa: tipo.normativa,
+      factor: tipo.factor,
+      porcentaje: tipo.porcentaje
+    }));
+    
+    setRecargoSubtipos(subtiposFormateados);
+    
+    console.log('🔄 Subtipos de recargo cargados para fecha:', {
+      fechaCalculo: fechaCalculo.toISOString().split('T')[0],
+      subtipos: subtiposFormateados.length,
+      factores: subtiposFormateados.map(s => ({ tipo: s.value, factor: s.factor }))
+    });
+  }, [periodoFecha]);
+
+  // ✅ CORRECCIÓN: Usar fecha del período para cálculo correcto
   const calculateRecargoValue = (subtipo: string, horas: number) => {
     if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
       return null;
     }
 
     try {
-      console.log('💰 Calculando recargo con fecha del período:', periodoFecha?.toISOString().split('T')[0]);
+      console.log('💰 Calculando recargo con factores dinámicos para fecha:', periodoFecha?.toISOString().split('T')[0]);
       
       const result = RecargosCalculationService.calcularRecargo({
         salarioBase: employeeSalary,
@@ -64,8 +86,9 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         fechaPeriodo: periodoFecha || new Date() // ✅ Usar fecha del período
       });
       
-      console.log('💰 Recargo calculado:', result);
+      console.log('💰 Recargo calculado con factores dinámicos:', result);
       setJornadaInfo(result.jornadaInfo);
+      setFactorInfo(result.factorInfo); // ✅ NUEVO: Información del factor aplicado
       return result.valorRecargo;
     } catch (error) {
       console.error('❌ Error calculando recargo:', error);
@@ -119,15 +142,15 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 Submitting recargo:', submitData);
+    console.log('📤 Submitting recargo con factores dinámicos:', submitData);
     onSubmit(submitData);
   };
 
-  const getSubtipoInfo = (subtipo: string) => {
-    return RECARGO_SUBTIPOS.find(s => s.value === subtipo);
+  const getCurrentSubtipoInfo = () => {
+    return recargoSubtipos.find(s => s.value === formData.subtipo);
   };
 
-  const currentSubtipoInfo = getSubtipoInfo(formData.subtipo);
+  const currentSubtipoInfo = getCurrentSubtipoInfo();
 
   return (
     <div className="space-y-6">
@@ -138,9 +161,25 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         <h3 className="text-lg font-semibold">Recargo</h3>
       </div>
 
-      {/* ✅ NUEVO: Información de jornada legal usada */}
+      {/* ✅ NUEVO: Información de normativa aplicada */}
+      {factorInfo && (
+        <div className="flex items-start gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
+          <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <div className="font-medium">Normativa aplicada: {factorInfo.porcentajeDisplay}</div>
+            <div className="text-xs">{factorInfo.normativaAplicable}</div>
+            {periodoFecha && (
+              <div className="text-xs mt-1">
+                Período: {periodoFecha.toLocaleDateString('es-CO')}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MANTENER: Información de jornada legal usada */}
       {jornadaInfo && (
-        <div className="flex items-center gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
+        <div className="flex items-center gap-2 bg-green-50 p-3 rounded text-sm text-green-700">
           <Info className="h-4 w-4" />
           <span>
             Jornada legal: {jornadaInfo.horasSemanales}h semanales = {jornadaInfo.divisorHorario}h mensuales
@@ -160,11 +199,14 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {RECARGO_SUBTIPOS.map((subtipo) => (
+              {recargoSubtipos.map((subtipo) => (
                 <SelectItem key={subtipo.value} value={subtipo.value}>
                   <div>
                     <div className="font-medium">{subtipo.label}</div>
                     <div className="text-xs text-gray-500">{subtipo.description}</div>
+                    {subtipo.normativa && (
+                      <div className="text-xs text-blue-600 mt-1">{subtipo.normativa}</div>
+                    )}
                   </div>
                 </SelectItem>
               ))}
@@ -174,6 +216,11 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
           {currentSubtipoInfo && (
             <div className="text-sm text-blue-600">
               <strong>Horario:</strong> {currentSubtipoInfo.description}
+              {currentSubtipoInfo.normativa && (
+                <div className="text-xs text-gray-600 mt-1">
+                  {currentSubtipoInfo.normativa}
+                </div>
+              )}
             </div>
           )}
         </div>

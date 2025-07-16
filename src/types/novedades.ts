@@ -1,4 +1,3 @@
-
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -235,9 +234,17 @@ export const calcularValorNovedad = (
   subtipo: string | undefined,
   salarioBase: number,
   dias?: number,
-  horas?: number
+  horas?: number,
+  fechaPeriodo?: Date // ✅ NUEVO: Fecha del período para factores dinámicos
 ): { valor: number; baseCalculo: BaseCalculoData } => {
-  console.log('🧮 Calculando novedad:', { tipoNovedad, subtipo, salarioBase, dias, horas });
+  console.log('🧮 Calculando novedad con fecha del período:', { 
+    tipoNovedad, 
+    subtipo, 
+    salarioBase, 
+    dias, 
+    horas, 
+    fechaPeriodo: fechaPeriodo?.toISOString().split('T')[0] 
+  });
   
   const category = Object.values(NOVEDAD_CATEGORIES).find(cat => 
     cat.types[tipoNovedad as keyof typeof cat.types]
@@ -302,20 +309,26 @@ export const calcularValorNovedad = (
       break;
 
     case 'recargo_nocturno':
-      // ✅ USAR SERVICIO UNIFICADO PARA RECARGOS
+      // ✅ USAR SERVICIO UNIFICADO CON FACTORES DINÁMICOS
       if (horas && horas > 0 && subtipo) {
         try {
           const resultado = RecargosCalculationService.calcularRecargo({
             salarioBase,
             tipoRecargo: subtipo as any,
-            horas
+            horas,
+            fechaPeriodo: fechaPeriodo || new Date() // ✅ Usar fecha del período
           });
           
           valor = resultado.valorRecargo;
           factorCalculo = resultado.factorRecargo;
-          detalleCalculo = resultado.detalleCalculo;
           
-          console.log('✅ Recargo calculado con servicio unificado:', resultado);
+          // ✅ MEJORAR: Detalle con información normativa
+          detalleCalculo = `${resultado.detalleCalculo}`;
+          if (resultado.factorInfo) {
+            detalleCalculo += ` (${resultado.factorInfo.normativaAplicable})`;
+          }
+          
+          console.log('✅ Recargo calculado con factores dinámicos:', resultado);
         } catch (error) {
           console.error('❌ Error calculando recargo:', error);
           detalleCalculo = 'Error en cálculo de recargo';
