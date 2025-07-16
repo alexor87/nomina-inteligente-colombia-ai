@@ -8,6 +8,7 @@ export interface DisplayNovedad {
   empleado_id?: string;
   periodo_id?: string;
   tipo_novedad: NovedadType | VacationAbsenceType;
+  subtipo?: string;
   valor: number;
   dias?: number;
   horas?: number;
@@ -151,6 +152,7 @@ export const convertNovedadToDisplay = (novedad: any): DisplayNovedad => {
     empleado_id: novedad.empleado_id,
     periodo_id: novedad.periodo_id,
     tipo_novedad: novedad.tipo_novedad,
+    subtipo: novedad.subtipo,
     valor: novedad.valor || 0,
     dias: novedad.dias,
     horas: novedad.horas,
