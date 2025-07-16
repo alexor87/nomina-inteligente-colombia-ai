@@ -40,6 +40,38 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // ✅ NUEVO: Formatear tipo de novedad para mostrar correctamente
+  const formatTipoNovedad = (tipo: string, subtipo?: string) => {
+    // ✅ MANEJO ESPECÍFICO PARA RECARGOS NOCTURNOS
+    if (tipo === 'recargo_nocturno') {
+      switch (subtipo) {
+        case 'nocturno':
+          return 'Recargo nocturno';
+        case 'dominical':
+          return 'Recargo dominical';
+        case 'nocturno_dominical':
+          return 'Recargo nocturno dominical';
+        default:
+          return 'Recargo nocturno';
+      }
+    }
+
+    // ✅ MANTENER FORMATO EXISTENTE PARA OTROS TIPOS
+    const tipos: Record<string, string> = {
+      'horas_extra': 'Horas Extra',
+      'bonificacion': 'Bonificación',
+      'incapacidad': 'Incapacidad',
+      'vacaciones': 'Vacaciones',
+      'licencia_remunerada': 'Licencia',
+      'otros_ingresos': 'Otros Ingresos',
+      'descuento_voluntario': 'Descuento',
+      'libranza': 'Libranza'
+    };
+
+    const base = tipos[tipo] || tipo;
+    return subtipo && tipo !== 'recargo_nocturno' ? `${base} (${subtipo})` : base;
+  };
+
   const fetchIntegratedData = async () => {
     try {
       setLoading(true);
@@ -75,7 +107,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   }, [refreshTrigger]);
 
   const handleEditNovedad = (item: DisplayNovedad) => {
-    // TODO: Implementar modal de edición para novedades
     console.log('✏️ Editando novedad:', item);
     toast({
       title: "Funcionalidad en desarrollo",
@@ -87,7 +118,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     try {
       console.log('👁️ Viendo detalles de vacación:', item);
       
-      // Cargar datos completos de la vacación
       const { data: vacation, error } = await supabase
         .from('employee_vacation_periods')
         .select(`
@@ -116,7 +146,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const handleGoToVacationModule = (employeeId: string) => {
     console.log('🔗 Navegando al módulo de vacaciones para empleado:', employeeId);
     
-    // Navegar al módulo de vacaciones con filtro por empleado
     navigate('/app/vacations-absences', {
       state: { 
         filterByEmployee: employeeId,
@@ -124,13 +153,11 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       }
     });
     
-    // Cerrar el modal actual
     onClose();
   };
 
   const handleDeleteByOrigin = async (item: DisplayNovedad) => {
     if (item.origen === 'vacaciones') {
-      // Para vacaciones, solo permitir eliminar si está pendiente
       if (item.status !== 'pendiente') {
         toast({
           title: "Acción no disponible",
@@ -142,7 +169,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
 
       if (window.confirm('¿Estás seguro de que deseas eliminar esta ausencia?')) {
         try {
-          // Eliminar de employee_vacation_periods
           const { error } = await supabase
             .from('employee_vacation_periods')
             .delete()
@@ -152,7 +178,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
 
           setIntegratedData(prev => prev.filter(n => n.id !== item.id));
           
-          // Notificar cambio a la tabla principal
           if (onEmployeeNovedadesChange) {
             console.log('🔄 Notificando cambio después de eliminar ausencia para:', employeeId);
             await onEmployeeNovedadesChange(employeeId);
@@ -172,13 +197,11 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         }
       }
     } else {
-      // Para novedades, usar la función existente
       if (window.confirm('¿Estás seguro de que deseas eliminar esta novedad?')) {
         try {
           await deleteNovedad(item.id);
           setIntegratedData(prev => prev.filter(n => n.id !== item.id));
           
-          // Notificar cambio a la tabla principal
           if (onEmployeeNovedadesChange) {
             console.log('🔄 Notificando cambio después de eliminar novedad para:', employeeId);
             await onEmployeeNovedadesChange(employeeId);
@@ -200,7 +223,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   };
 
   const handleEditVacation = (vacation: any) => {
-    // Navegar al módulo de vacaciones con la ausencia para editar
     navigate('/app/vacations-absences', {
       state: { 
         editVacation: vacation,
@@ -208,7 +230,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       }
     });
     
-    // Cerrar modales
     setVacationDetailModal({ isOpen: false, vacation: null });
     onClose();
   };
@@ -222,10 +243,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
 
       if (error) throw error;
 
-      // Actualizar lista local
       setIntegratedData(prev => prev.filter(n => n.id !== vacationId));
       
-      // Notificar cambio
       if (onEmployeeNovedadesChange) {
         await onEmployeeNovedadesChange(employeeId);
       }
@@ -235,7 +254,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         description: "La ausencia se ha eliminado correctamente",
       });
       
-      // Cerrar modal de detalles
       setVacationDetailModal({ isOpen: false, vacation: null });
     } catch (error) {
       console.error('Error eliminando ausencia:', error);
@@ -255,7 +273,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     }).format(value);
   };
 
-  // ✅ NUEVO: Calcular totales separados por confirmación
   const getSeparatedTotals = (): SeparatedTotals => {
     const confirmed = integratedData.filter(n => n.isConfirmed);
     const estimated = integratedData.filter(n => !n.isConfirmed);
@@ -477,7 +494,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                             )}
                           </div>
                           <div className="text-sm font-medium text-gray-900">
-                            {item.tipo_novedad.replace('_', ' ')}
+                            {formatTipoNovedad(item.tipo_novedad, item.subtipo)}
                           </div>
                         </div>
                       </div>
