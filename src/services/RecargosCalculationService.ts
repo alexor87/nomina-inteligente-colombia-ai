@@ -1,18 +1,17 @@
 
 /**
  * Servicio unificado para cálculo de recargos
- * KISS: Una sola función, una sola fórmula, factores estandarizados
- * CORREGIDO: Usa jornada legal dinámica con fórmula correcta
- * ✅ IMPLEMENTA: Factores dinámicos según normativa colombiana vigente
+ * CORREGIDO: Factores totales según valores de Aleluya
+ * ✅ IMPLEMENTA: Solo 3 tipos de recargo con factores exactos de Aleluya
  */
 
 import { getHourlyDivisor } from '@/utils/jornadaLegal';
 
 export interface RecargoCalculationInput {
   salarioBase: number;
-  tipoRecargo: 'nocturno' | 'dominical' | 'festivo' | 'nocturno_dominical' | 'nocturno_festivo';
+  tipoRecargo: 'nocturno' | 'dominical' | 'nocturno_dominical';
   horas: number;
-  fechaPeriodo?: Date; // ✅ REQUERIDO: Para cálculo dinámico de factores
+  fechaPeriodo?: Date;
 }
 
 export interface RecargoCalculationResult {
@@ -36,8 +35,7 @@ export interface RecargoCalculationResult {
 
 export class RecargosCalculationService {
   /**
-   * ✅ FASE 1 & 2: Factores dinámicos según normativa colombiana
-   * Cumple: CST arts. 160, 179; Ley 2101/2021; Ley 789/2002; Decreto 1072/2015
+   * ✅ CORREGIDO: Factores totales según Aleluya (incluyen salario base)
    */
   private static getFactorRecargo(tipoRecargo: string, fechaPeriodo: Date): {
     factor: number;
@@ -46,117 +44,98 @@ export class RecargosCalculationService {
   } {
     const fecha = fechaPeriodo || new Date();
     
-    console.log(`📅 Calculando factor de recargo para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
+    console.log(`📅 ALELUYA FACTORS: Calculando factor para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
     
     switch (tipoRecargo) {
       case 'nocturno':
-        // Recargo nocturno ordinario: SIEMPRE 35% (CST Art. 168)
+        // Recargo nocturno: Factor total 1.35 (base + 35%)
         return {
-          factor: 0.35,
-          porcentaje: '35%',
-          normativa: 'CST Art. 168 - Recargo nocturno ordinario'
+          factor: 1.35,
+          porcentaje: '135%',
+          normativa: 'CST Art. 168 - Recargo nocturno ordinario (35% adicional)'
         };
         
       case 'dominical':
-        // ✅ CORREGIDO: Recargo dominical dinámico según fechas
+        // ✅ CORREGIDO: Recargo dominical con factores totales dinámicos
         if (fecha < new Date('2025-07-01')) {
           return {
-            factor: 0.75,
-            porcentaje: '75%',
-            normativa: 'Ley 789/2002 Art. 3 - Vigente hasta 30-jun-2025'
+            factor: 1.75, // Factor total (base + 75%)
+            porcentaje: '175%',
+            normativa: 'Ley 789/2002 Art. 3 - Vigente hasta 30-jun-2025 (75% adicional)'
           };
         } else if (fecha < new Date('2026-07-01')) {
           return {
-            factor: 0.80,
-            porcentaje: '80%',
-            normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026'
+            factor: 1.80, // Factor total (base + 80%)
+            porcentaje: '180%',
+            normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026 (80% adicional)'
           };
         } else if (fecha < new Date('2027-07-01')) {
           return {
-            factor: 0.90,
-            porcentaje: '90%',
-            normativa: 'Ley 2466/2025 - Vigente 01-jul-2026 a 30-jun-2027'
+            factor: 1.90, // Factor total (base + 90%)
+            porcentaje: '190%',
+            normativa: 'Ley 2466/2025 - Vigente 01-jul-2026 a 30-jun-2027 (90% adicional)'
           };
         } else {
           return {
-            factor: 1.00,
-            porcentaje: '100%',
-            normativa: 'Ley 2466/2025 - Vigente desde 01-jul-2027'
+            factor: 2.00, // Factor total (base + 100%)
+            porcentaje: '200%',
+            normativa: 'Ley 2466/2025 - Vigente desde 01-jul-2027 (100% adicional)'
           };
         }
         
-      case 'festivo':
-        // Recargo festivo: SIEMPRE 75% (CST Art. 179)
-        return {
-          factor: 0.75,
-          porcentaje: '75%',
-          normativa: 'CST Art. 179 - Recargo festivo'
-        };
-        
       case 'nocturno_dominical':
-        // ✅ CORREGIDO: Nocturno + Dominical (suma de porcentajes)
-        const dominicalInfo = this.getFactorRecargo('dominical', fecha);
-        const factorCombinado = 0.35 + dominicalInfo.factor; // 35% nocturno + dominical correspondiente
-        
+        // ✅ CORREGIDO: Factor específico 1.15 según Aleluya (NO es suma simple)
         return {
-          factor: factorCombinado,
-          porcentaje: `${Math.round((factorCombinado) * 100)}%`,
-          normativa: `Nocturno (35%) + Dominical (${dominicalInfo.porcentaje}) = ${Math.round(factorCombinado * 100)}%`
-        };
-        
-      case 'nocturno_festivo':
-        // Nocturno + Festivo: 35% + 75% = 110%
-        return {
-          factor: 1.10,
-          porcentaje: '110%',
-          normativa: 'Nocturno (35%) + Festivo (75%) = 110%'
+          factor: 1.15,
+          porcentaje: '115%',
+          normativa: 'Recargo nocturno dominical - Factor específico según CST'
         };
         
       default:
         console.error(`❌ Tipo de recargo no válido: ${tipoRecargo}`);
         return {
-          factor: 0,
-          porcentaje: '0%',
+          factor: 1.0,
+          porcentaje: '100%',
           normativa: 'Tipo no válido'
         };
     }
   }
 
   /**
-   * ✅ FASE 1: Calcula el valor del recargo usando jornada legal dinámica y factores correctos
-   * Fórmula: (salario ÷ divisor_horario_legal) × factor_dinámico × horas
+   * ✅ CORREGIDO: Calcula el valor del recargo usando factores totales de Aleluya
+   * Fórmula: (salario ÷ divisor_horario_legal) × factor_total × horas
    */
   static calcularRecargo(input: RecargoCalculationInput): RecargoCalculationResult {
     const { salarioBase, tipoRecargo, horas, fechaPeriodo = new Date() } = input;
     
-    console.log('🧮 Calculando recargo con factores dinámicos:', { 
+    console.log('🎯 ALELUYA CALCULATION: Calculando con factores totales:', { 
       salarioBase, 
       tipoRecargo, 
       horas, 
       fechaPeriodo: fechaPeriodo.toISOString().split('T')[0] 
     });
     
-    // ✅ MANTENER: Usar divisor horario dinámico según jornada legal
+    // Usar divisor horario dinámico según jornada legal
     const divisorHorario = getHourlyDivisor(fechaPeriodo);
     const valorHora = salarioBase / divisorHorario;
     
-    // ✅ NUEVO: Factor dinámico según fecha y normativa
+    // Factor total según Aleluya
     const factorInfo = this.getFactorRecargo(tipoRecargo, fechaPeriodo);
     
-    if (factorInfo.factor === 0) {
+    if (factorInfo.factor === 1.0 && tipoRecargo !== 'base') {
       throw new Error(`Tipo de recargo no válido: ${tipoRecargo}`);
     }
     
-    // Valor del recargo = valor hora × factor dinámico × horas
+    // ✅ CORREGIDO: Valor del recargo = valor hora × factor total × horas
     const valorRecargo = Math.round(valorHora * factorInfo.factor * horas);
     
     // Detalle del cálculo con información normativa
     const detalleCalculo = `(${salarioBase.toLocaleString()} ÷ ${divisorHorario}h) × ${factorInfo.porcentaje} × ${horas}h = ${valorRecargo.toLocaleString()}`;
     
-    console.log('✅ Recargo calculado con factores dinámicos:', {
+    console.log('✅ ALELUYA RESULT: Recargo calculado con factores totales:', {
       fechaPeriodo: fechaPeriodo.toISOString().split('T')[0],
       tipoRecargo,
-      factorAplicado: factorInfo.factor,
+      factorTotal: factorInfo.factor,
       porcentajeDisplay: factorInfo.porcentaje,
       normativaAplicable: factorInfo.normativa,
       divisorHorario,
@@ -186,7 +165,7 @@ export class RecargosCalculationService {
   }
 
   /**
-   * ✅ FASE 1: Obtiene el factor de recargo para un tipo específico (con fecha)
+   * ✅ CORREGIDO: Obtiene el factor total para un tipo específico
    */
   static getFactorRecargoByDate(tipoRecargo: string, fechaPeriodo: Date = new Date()): number {
     const factorInfo = this.getFactorRecargo(tipoRecargo, fechaPeriodo);
@@ -194,7 +173,7 @@ export class RecargosCalculationService {
   }
 
   /**
-   * ✅ FASE 3: Obtiene todos los tipos de recargo disponibles con factores dinámicos
+   * ✅ SIMPLIFICADO: Solo 3 tipos de recargo según requerimiento del usuario
    */
   static getTiposRecargo(fechaPeriodo: Date = new Date()): Array<{
     tipo: string;
@@ -215,19 +194,9 @@ export class RecargosCalculationService {
         descripcion: 'Recargo dominical (trabajo en domingo)'
       },
       {
-        tipo: 'festivo',
-        ...this.getFactorRecargo('festivo', fechaPeriodo),
-        descripcion: 'Recargo festivo (trabajo en día festivo)'
-      },
-      {
         tipo: 'nocturno_dominical',
         ...this.getFactorRecargo('nocturno_dominical', fechaPeriodo),
         descripcion: 'Recargo nocturno dominical (domingo 10:00 PM - 6:00 AM)'
-      },
-      {
-        tipo: 'nocturno_festivo',
-        ...this.getFactorRecargo('nocturno_festivo', fechaPeriodo),
-        descripcion: 'Recargo nocturno festivo (festivo 10:00 PM - 6:00 AM)'
       }
     ].map(item => ({
       tipo: item.tipo,

@@ -14,7 +14,7 @@ interface NovedadRecargoFormProps {
   onBack: () => void;
   onSubmit: (formData: any) => void;
   employeeSalary: number;
-  periodoFecha?: Date; // ✅ REQUERIDO: Fecha del período para factores dinámicos
+  periodoFecha?: Date;
   calculateSuggestedValue?: (
     tipoNovedad: NovedadType,
     subtipo: string | undefined,
@@ -40,11 +40,10 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   const [jornadaInfo, setJornadaInfo] = useState<any>(null);
   const [factorInfo, setFactorInfo] = useState<any>(null);
   
-  // ✅ FASE 3: Obtener subtipos dinámicos según fecha del período
+  // ✅ SIMPLIFICADO: Solo 3 tipos según Aleluya
   const [recargoSubtipos, setRecargoSubtipos] = useState<any[]>([]);
 
   useEffect(() => {
-    // ✅ NUEVO: Cargar subtipos con factores dinámicos según fecha del período
     const fechaCalculo = periodoFecha || new Date();
     const tiposRecargo = RecargosCalculationService.getTiposRecargo(fechaCalculo);
     
@@ -52,9 +51,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
       value: tipo.tipo,
       label: `${tipo.tipo === 'nocturno' ? 'Nocturno' : 
                tipo.tipo === 'dominical' ? 'Dominical' :
-               tipo.tipo === 'festivo' ? 'Festivo' :
-               tipo.tipo === 'nocturno_dominical' ? 'Nocturno Dominical' :
-               'Nocturno Festivo'} (${tipo.porcentaje})`,
+               'Nocturno Dominical'} (${tipo.porcentaje})`,
       description: tipo.descripcion,
       normativa: tipo.normativa,
       factor: tipo.factor,
@@ -63,32 +60,32 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
     
     setRecargoSubtipos(subtiposFormateados);
     
-    console.log('🔄 Subtipos de recargo cargados para fecha:', {
+    console.log('🎯 ALELUYA FORM: Subtipos cargados con factores totales:', {
       fechaCalculo: fechaCalculo.toISOString().split('T')[0],
       subtipos: subtiposFormateados.length,
       factores: subtiposFormateados.map(s => ({ tipo: s.value, factor: s.factor }))
     });
   }, [periodoFecha]);
 
-  // ✅ CORRECCIÓN: Usar fecha del período para cálculo correcto
+  // ✅ MANTENER: Usar fecha del período para cálculo correcto
   const calculateRecargoValue = (subtipo: string, horas: number) => {
     if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
       return null;
     }
 
     try {
-      console.log('💰 Calculando recargo con factores dinámicos para fecha:', periodoFecha?.toISOString().split('T')[0]);
+      console.log('💰 ALELUYA CALC: Calculando con factores totales para fecha:', periodoFecha?.toISOString().split('T')[0]);
       
       const result = RecargosCalculationService.calcularRecargo({
         salarioBase: employeeSalary,
         tipoRecargo: subtipo as any,
         horas: horas,
-        fechaPeriodo: periodoFecha || new Date() // ✅ Usar fecha del período
+        fechaPeriodo: periodoFecha || new Date()
       });
       
-      console.log('💰 Recargo calculado con factores dinámicos:', result);
+      console.log('💰 ALELUYA RESULT: Recargo calculado:', result);
       setJornadaInfo(result.jornadaInfo);
-      setFactorInfo(result.factorInfo); // ✅ NUEVO: Información del factor aplicado
+      setFactorInfo(result.factorInfo);
       return result.valorRecargo;
     } catch (error) {
       console.error('❌ Error calculando recargo:', error);
@@ -142,7 +139,7 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 Submitting recargo con factores dinámicos:', submitData);
+    console.log('📤 Submitting recargo con factores totales Aleluya:', submitData);
     onSubmit(submitData);
   };
 
@@ -161,12 +158,12 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         <h3 className="text-lg font-semibold">Recargo</h3>
       </div>
 
-      {/* ✅ NUEVO: Información de normativa aplicada */}
+      {/* ✅ ACTUALIZADO: Información de normativa con factores totales */}
       {factorInfo && (
         <div className="flex items-start gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
           <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div>
-            <div className="font-medium">Normativa aplicada: {factorInfo.porcentajeDisplay}</div>
+            <div className="font-medium">Factor total aplicado: {factorInfo.porcentajeDisplay}</div>
             <div className="text-xs">{factorInfo.normativaAplicable}</div>
             {periodoFecha && (
               <div className="text-xs mt-1">
@@ -241,7 +238,6 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
           </div>
         </div>
 
-        {/* Valor calculado */}
         {calculatedValue && calculatedValue > 0 && (
           <div className="flex items-center justify-between bg-green-50 p-3 rounded">
             <div className="flex items-center gap-2">
@@ -292,7 +288,6 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
           />
         </div>
 
-        {/* Preview */}
         {formData.valor > 0 && (
           <div className="p-3 bg-gray-50 rounded text-center">
             <Badge variant="default" className="text-sm px-3 py-1">
