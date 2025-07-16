@@ -122,8 +122,9 @@ export class RecargosCalculationService {
     // Factor total según Aleluya
     const factorInfo = this.getFactorRecargo(tipoRecargo, fechaPeriodo);
     
-    if (factorInfo.factor === 1.0 && tipoRecargo !== 'base') {
-      throw new Error(`Tipo de recargo no válido: ${tipoRecargo}`);
+    // ✅ CORREGIDO: Remover validación innecesaria con 'base'
+    if (!factorInfo || factorInfo.factor <= 0) {
+      throw new Error(`Error calculando factor para tipo de recargo: ${tipoRecargo}`);
     }
     
     // ✅ CORREGIDO: Valor del recargo = valor hora × factor total × horas
