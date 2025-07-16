@@ -180,7 +180,7 @@ function getHorasSemanales(fechaStr?: string): number {
   return jornadaInfo.horasSemanales;
 }
 
-// ✅ CORREGIDO: Factores TOTALES (no adicionales) según Aleluya
+// ✅ CORREGIDO: Factores TOTALES (no adicionales) según Aleluya - VERSIÓN ACTUALIZADA 2025
 function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
   factorTotal: number;
   porcentaje: string;
@@ -188,8 +188,8 @@ function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
 } {
   const fecha = fechaPeriodo || new Date();
   
-  // ✅ DEBUG ESPECÍFICO NOCTURNO DOMINICAL
-  console.log(`🔍 DEBUG NOCTURNO DOMINICAL: tipoRecargo="${tipoRecargo}", fecha=${fecha.toISOString().split('T')[0]}`);
+  // ✅ DEBUG ESPECÍFICO - VERSIÓN ACTUALIZADA
+  console.log(`🔍 [EDGE v2.0] DEBUG NOCTURNO DOMINICAL: tipoRecargo="${tipoRecargo}", fecha=${fecha.toISOString().split('T')[0]}`);
   
   switch (tipoRecargo) {
     case 'nocturno':
@@ -228,16 +228,16 @@ function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
       }
       
     case 'nocturno_dominical':
-      // ✅ DEBUG: Log específico para nocturno dominical
-      console.log(`✅ NOCTURNO DOMINICAL DETECTADO: Aplicando factor 1.15`);
+      // ✅ DEBUG Y APLICACIÓN: Factor total específico para Aleluya - ACTUALIZADO
+      console.log(`✅ [EDGE v2.0] NOCTURNO DOMINICAL DETECTADO: Aplicando factor 1.15`);
       return {
         factorTotal: 1.15, // Factor total específico para Aleluya
         porcentaje: '115%',
-        normativa: 'Recargo nocturno dominical - Factor total según CST'
+        normativa: 'Recargo nocturno dominical - Factor total según CST (Actualizado 2025)'
       };
       
     default:
-      console.error(`❌ Backend: Tipo de recargo no válido: ${tipoRecargo}`);
+      console.error(`❌ [EDGE v2.0] Backend: Tipo de recargo no válido: ${tipoRecargo}`);
       return {
         factorTotal: 0.0,
         porcentaje: '0%',
@@ -256,7 +256,7 @@ const HORAS_EXTRA_FACTORS = {
   festivas_nocturnas: 2.5
 } as const;
 
-// ✅ FUNCIÓN CORREGIDA: Cálculo con factores totales + fórmula unificada Aleluya
+// ✅ FUNCIÓN CORREGIDA: Cálculo con factores totales + fórmula unificada Aleluya - VERSIÓN ACTUALIZADA
 function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
@@ -286,61 +286,61 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
 
     case 'recargo_nocturno':
       if (horas && horas > 0) {
-        // ✅ DEBUG: Log del subtipo recibido
-        console.log(`🔍 SUBTIPO RECIBIDO: "${subtipo}"`);
+        // ✅ DEBUG: Log del subtipo recibido - VERSIÓN ACTUALIZADA
+        console.log(`🔍 [EDGE v2.0] SUBTIPO RECIBIDO: "${subtipo}"`);
         
-        // ✅ CORRECCIÓN CRÍTICA: Mapear correctamente los subtipos
+        // ✅ CORRECCIÓN CRÍTICA: Mapear correctamente los subtipos - ACTUALIZADO
         let tipoRecargoAleluya = 'nocturno'; // Valor por defecto
         
         if (subtipo === 'dominical') {
           tipoRecargoAleluya = 'dominical';
-          console.log(`🔄 MAPEO: subtipo "dominical" → tipoRecargoAleluya "dominical"`);
+          console.log(`🔄 [EDGE v2.0] MAPEO: subtipo "dominical" → tipoRecargoAleluya "dominical"`);
         } else if (subtipo === 'nocturno_dominical') {
           tipoRecargoAleluya = 'nocturno_dominical';
-          console.log(`🔄 MAPEO CRÍTICO: subtipo "nocturno_dominical" → tipoRecargoAleluya "nocturno_dominical"`);
+          console.log(`🔄 [EDGE v2.0] MAPEO CRÍTICO: subtipo "nocturno_dominical" → tipoRecargoAleluya "nocturno_dominical"`);
         } else if (subtipo === 'nocturno' || subtipo === undefined) {
           tipoRecargoAleluya = 'nocturno';
-          console.log(`🔄 MAPEO: subtipo "${subtipo}" → tipoRecargoAleluya "nocturno"`);
+          console.log(`🔄 [EDGE v2.0] MAPEO: subtipo "${subtipo}" → tipoRecargoAleluya "nocturno"`);
         }
         
-        console.log(`🎯 TIPO RECARGO FINAL: "${tipoRecargoAleluya}"`);
+        console.log(`🎯 [EDGE v2.0] TIPO RECARGO FINAL: "${tipoRecargoAleluya}"`);
         
-        // ✅ FACTORES TOTALES CON TRANSICIÓN 1 JULIO 2025
+        // ✅ FACTORES TOTALES CON TRANSICIÓN 1 JULIO 2025 - ACTUALIZADO
         const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
         const factorInfo = getFactorRecargoTotal(tipoRecargoAleluya, fechaObj);
         
-        console.log(`📊 FACTOR INFO: factorTotal=${factorInfo.factorTotal}, porcentaje=${factorInfo.porcentaje}`);
+        console.log(`📊 [EDGE v2.0] FACTOR INFO: factorTotal=${factorInfo.factorTotal}, porcentaje=${factorInfo.porcentaje}`);
         
-        // ✅ VERIFICACIÓN CRÍTICA: Validar que tenemos un factor válido
+        // ✅ VERIFICACIÓN CRÍTICA: Validar que tenemos un factor válido - ACTUALIZADO
         if (factorInfo.factorTotal <= 0) {
-          console.error(`❌ Factor inválido para ${tipoRecargoAleluya}:`, factorInfo);
+          console.error(`❌ [EDGE v2.0] Factor inválido para ${tipoRecargoAleluya}:`, factorInfo);
           detalleCalculo = `Error: Factor inválido para ${tipoRecargoAleluya}`;
           break;
         }
         
-        // ✅ FÓRMULA UNIFICADA ALELUYA: Salario × Factor × Horas ÷ (30 × 7.333) para TODOS
+        // ✅ FÓRMULA UNIFICADA ALELUYA: Salario × Factor × Horas ÷ (30 × 7.333) para TODOS - ACTUALIZADO
         const divisorAleluya = 30 * 7.333; // 219.99
         const calculoDetallado = (salarioBase * factorInfo.factorTotal * horas) / divisorAleluya;
         valor = Math.round(calculoDetallado);
         factorCalculo = factorInfo.factorTotal;
         
-        console.log(`🧮 CÁLCULO DETALLADO: (${salarioBase} × ${factorInfo.factorTotal} × ${horas}) ÷ ${divisorAleluya} = ${calculoDetallado} → ${valor}`);
+        console.log(`🧮 [EDGE v2.0] CÁLCULO DETALLADO: (${salarioBase} × ${factorInfo.factorTotal} × ${horas}) ÷ ${divisorAleluya} = ${calculoDetallado} → ${valor}`);
         
-        detalleCalculo = `${tipoRecargoAleluya} (fórmula Aleluya): (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ (30 × 7.333) = ${valor.toLocaleString()}`;
+        detalleCalculo = `${tipoRecargoAleluya} (fórmula Aleluya v2.0): (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ (30 × 7.333) = ${valor.toLocaleString()}`;
         
-        // ✅ VALIDACIÓN ESPECÍFICA ALELUYA CON FACTORES TOTALES
+        // ✅ VALIDACIÓN ESPECÍFICA ALELUYA CON FACTORES TOTALES - ACTUALIZADO
         if (salarioBase === 1718661 && horas === 1) {
           const fechaNormalizada = fechaPeriodo ? fechaPeriodo.split('T')[0] : '';
           
           if (fechaNormalizada >= '2025-07-01') {
             if (tipoRecargoAleluya === 'dominical' && Math.abs(valor - 6250) < 100) {
-              console.log('✅ DOMINICAL SUCCESS: Exacto $6,250:', valor);
+              console.log('✅ [EDGE v2.0] DOMINICAL SUCCESS: Exacto $6,250:', valor);
             } else if (tipoRecargoAleluya === 'nocturno_dominical' && Math.abs(valor - 8984) < 100) {
-              console.log('✅ NOCTURNO DOMINICAL SUCCESS: Exacto $8,984:', valor);
+              console.log('✅ [EDGE v2.0] NOCTURNO DOMINICAL SUCCESS: Exacto $8,984:', valor);
             } else if (tipoRecargoAleluya === 'nocturno' && Math.abs(valor - 2734) < 100) {
-              console.log('✅ NOCTURNO SUCCESS: Exacto $2,734:', valor);
+              console.log('✅ [EDGE v2.0] NOCTURNO SUCCESS: Exacto $2,734:', valor);
             } else {
-              console.log(`⚠️ VALIDACIÓN: ${tipoRecargoAleluya} = $${valor} (esperado diferente)`);
+              console.log(`⚠️ [EDGE v2.0] VALIDACIÓN: ${tipoRecargoAleluya} = $${valor} (esperado diferente)`);
             }
           }
         }
@@ -478,9 +478,9 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
     }
   };
   
-  // ✅ DEBUG FINAL: Log del resultado para nocturno dominical
+  // ✅ DEBUG FINAL: Log del resultado para nocturno dominical - ACTUALIZADO
   if (tipoNovedad === 'recargo_nocturno' && subtipo === 'nocturno_dominical') {
-    console.log(`🏁 RESULTADO FINAL NOCTURNO DOMINICAL: valor=${result.valor}, factorCalculo=${result.factorCalculo}`);
+    console.log(`🏁 [EDGE v2.0] RESULTADO FINAL NOCTURNO DOMINICAL: valor=${result.valor}, factorCalculo=${result.factorCalculo}`);
   }
   
   return result;
@@ -644,6 +644,8 @@ serve(async (req) => {
   try {
     const { action, data } = await req.json();
 
+    console.log(`🚀 [EDGE v2.0] Request received: action="${action}", tipoNovedad="${data?.tipoNovedad}", subtipo="${data?.subtipo}"`);
+
     switch (action) {
       case 'calculate':
         const calculation = calculatePayroll(data);
@@ -664,7 +666,9 @@ serve(async (req) => {
         });
 
       case 'calculate-novedad':
+        console.log(`🎯 [EDGE v2.0] Calculating novedad: ${data.tipoNovedad} - ${data.subtipo}`);
         const novedadResult = calculateNovedadUltraKiss(data);
+        console.log(`🎯 [EDGE v2.0] Novedad result: valor=${novedadResult.valor}`);
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
