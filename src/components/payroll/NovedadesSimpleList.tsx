@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -97,9 +96,23 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
 
   // Formatear tipo de novedad para mostrar
   const formatTipoNovedad = (tipo: string, subtipo?: string) => {
+    // ✅ MANEJO ESPECÍFICO PARA RECARGOS NOCTURNOS
+    if (tipo === 'recargo_nocturno') {
+      switch (subtipo) {
+        case 'nocturno':
+          return 'Recargo nocturno';
+        case 'dominical':
+          return 'Recargo dominical';
+        case 'nocturno_dominical':
+          return 'Recargo nocturno dominical';
+        default:
+          return 'Recargo nocturno';
+      }
+    }
+
+    // ✅ MANTENER FORMATO EXISTENTE PARA OTROS TIPOS
     const tipos: Record<string, string> = {
       'horas_extra': 'Horas Extra',
-      'recargo_nocturno': 'Recargo Nocturno',
       'bonificacion': 'Bonificación',
       'incapacidad': 'Incapacidad',
       'vacaciones': 'Vacaciones',
@@ -110,7 +123,7 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
     };
 
     const base = tipos[tipo] || tipo;
-    return subtipo ? `${base} (${subtipo})` : base;
+    return subtipo && tipo !== 'recargo_nocturno' ? `${base} (${subtipo})` : base;
   };
 
   // Formatear valor
