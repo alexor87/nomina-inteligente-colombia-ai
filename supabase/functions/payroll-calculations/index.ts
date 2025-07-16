@@ -113,23 +113,23 @@ const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
 };
 
 /**
- * ✅ NUEVA FUNCIÓN: Horas específicas para cálculo de RECARGOS
- * Implementa lógica dual de transiciones
+ * ✅ FUNCIÓN CORREGIDA: Horas específicas para cálculo de RECARGOS
+ * Usa transición del 1 de julio de 2025 (220h desde esa fecha)
  */
 function getHorasParaRecargos(fechaStr?: string): number {
   const fechaComparar = fechaStr ? fechaStr.split('T')[0] : new Date().toISOString().split('T')[0];
   
   console.log(`🎯 Backend RECARGOS: Calculando horas para recargos en fecha: "${fechaComparar}"`);
   
-  // ✅ LÓGICA DUAL: Para recargos en julio 1-15, usar 230h (jornada anterior)
-  if (fechaComparar >= '2025-07-01' && fechaComparar < '2025-07-15') {
-    console.log(`🎯 Backend RECARGOS: Período especial 1-15 julio 2025 → 230h mensuales`);
-    return 230;
+  // ✅ CORRECCIÓN: Usar 220h desde 1 julio 2025 para recargos
+  if (fechaComparar >= '2025-07-01') {
+    console.log(`🎯 Backend RECARGOS: Desde 1 julio 2025 → 220h mensuales`);
+    return 220;
   }
   
-  // Para otras fechas, usar jornada legal normal
+  // Para fechas anteriores, usar jornada legal normal
   const jornadaInfo = getJornadaLegal(fechaStr);
-  console.log(`🎯 Backend RECARGOS: Jornada normal → ${jornadaInfo.horasMensuales}h mensuales`);
+  console.log(`🎯 Backend RECARGOS: Jornada normal anterior → ${jornadaInfo.horasMensuales}h mensuales`);
   return jornadaInfo.horasMensuales;
 }
 
@@ -191,21 +191,21 @@ function getHorasSemanales(fechaStr?: string): number {
   return jornadaInfo.horasSemanales;
 }
 
-// ✅ CORREGIDO: Factores de recargo con TRANSICIÓN 1 JULIO 2025
-function getFactorRecargoAleluya(tipoRecargo: string, fechaPeriodo: Date): {
-  factor: number;
+// ✅ CORREGIDO: Factores ADICIONALES (no totales) con TRANSICIÓN 1 JULIO 2025
+function getFactorRecargoAdicional(tipoRecargo: string, fechaPeriodo: Date): {
+  factorAdicional: number;
   porcentaje: string;
   normativa: string;
 } {
   const fecha = fechaPeriodo || new Date();
   
-  console.log(`📅 DUAL FACTORS: Calculando factor para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
+  console.log(`📅 FACTORES ADICIONALES: Calculando para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
   
   switch (tipoRecargo) {
     case 'nocturno':
       return {
-        factor: 1.35,
-        porcentaje: '135%',
+        factorAdicional: 0.35, // 35% adicional
+        porcentaje: '35%',
         normativa: 'CST Art. 168 - Recargo nocturno ordinario (35% adicional)'
       };
       
@@ -213,33 +213,33 @@ function getFactorRecargoAleluya(tipoRecargo: string, fechaPeriodo: Date): {
       // ✅ TRANSICIÓN DE RECARGOS: 1 JULIO 2025
       if (fecha < new Date('2025-07-01')) {
         return {
-          factor: 1.75,
-          porcentaje: '175%',
+          factorAdicional: 0.75, // 75% adicional
+          porcentaje: '75%',
           normativa: 'Ley 789/2002 Art. 3 - Vigente hasta 30-jun-2025 (75% adicional)'
         };
       } else if (fecha < new Date('2026-07-01')) {
         return {
-          factor: 1.80, // ✅ NUEVO: 80% desde 1 julio 2025
-          porcentaje: '180%',
+          factorAdicional: 0.80, // ✅ NUEVO: 80% adicional desde 1 julio 2025
+          porcentaje: '80%',
           normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026 (80% adicional)'
         };
       } else if (fecha < new Date('2027-07-01')) {
         return {
-          factor: 1.90,
-          porcentaje: '190%',
+          factorAdicional: 0.90, // 90% adicional
+          porcentaje: '90%',
           normativa: 'Ley 2466/2025 - Vigente 01-jul-2026 a 30-jun-2027 (90% adicional)'
         };
       } else {
         return {
-          factor: 2.00,
-          porcentaje: '200%',
+          factorAdicional: 1.00, // 100% adicional
+          porcentaje: '100%',
           normativa: 'Ley 2466/2025 - Vigente desde 01-jul-2027 (100% adicional)'
         };
       }
       
     case 'nocturno_dominical':
       return {
-        factor: 1.15,
+        factorAdicional: 1.15, // Factor específico para fórmula especial
         porcentaje: '115%',
         normativa: 'Recargo nocturno dominical - Factor específico según CST'
       };
@@ -247,8 +247,8 @@ function getFactorRecargoAleluya(tipoRecargo: string, fechaPeriodo: Date): {
     default:
       console.error(`❌ Backend: Tipo de recargo no válido: ${tipoRecargo}`);
       return {
-        factor: 1.0,
-        porcentaje: '100%',
+        factorAdicional: 0.0,
+        porcentaje: '0%',
         normativa: 'Tipo no válido'
       };
   }
@@ -264,12 +264,12 @@ const HORAS_EXTRA_FACTORS = {
   festivas_nocturnas: 2.5
 } as const;
 
-// ✅ FUNCIÓN CORREGIDA: Cálculo con lógica dual de transiciones
+// ✅ FUNCIÓN CORREGIDA: Cálculo con factores adicionales + fórmula especial
 function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
   
-  console.log('🚀 DUAL BACKEND: *** INICIANDO CÁLCULO CON LÓGICA DUAL ***');
-  console.log('🚀 DUAL BACKEND: Input completo:', JSON.stringify(input, null, 2));
+  console.log('🚀 FACTORES ADICIONALES: *** INICIANDO CÁLCULO CORREGIDO ***');
+  console.log('🚀 FACTORES ADICIONALES: Input completo:', JSON.stringify(input, null, 2));
   
   let valor = 0;
   let factorCalculo = 0;
@@ -278,7 +278,7 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   switch (tipoNovedad) {
     case 'horas_extra':
       if (horas && horas > 0 && subtipo) {
-        console.log('🚀 DUAL BACKEND: *** PROCESANDO HORAS EXTRA ***');
+        console.log('🚀 FACTORES ADICIONALES: *** PROCESANDO HORAS EXTRA ***');
         
         // ✅ Usar horas mensuales normales para horas extra
         const horasMensuales = getHorasMensuales(fechaPeriodo);
@@ -290,9 +290,9 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           factorCalculo = factor;
           detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
           
-          console.log('🚀 DUAL BACKEND: *** CÁLCULO HORAS EXTRA DETALLADO ***');
-          console.log('🚀 DUAL BACKEND: Horas mensuales (jornada laboral):', horasMensuales);
-          console.log('🚀 DUAL BACKEND: Valor final calculado:', valor);
+          console.log('🚀 FACTORES ADICIONALES: *** CÁLCULO HORAS EXTRA DETALLADO ***');
+          console.log('🚀 FACTORES ADICIONALES: Horas mensuales (jornada laboral):', horasMensuales);
+          console.log('🚀 FACTORES ADICIONALES: Valor final calculado:', valor);
         } else {
           detalleCalculo = 'Subtipo de horas extra no válido';
         }
@@ -303,12 +303,12 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
 
     case 'recargo_nocturno':
       if (horas && horas > 0) {
-        console.log('🚀 DUAL BACKEND: *** PROCESANDO RECARGO CON LÓGICA DUAL ***');
-        console.log('🚀 DUAL BACKEND: Tipo novedad:', tipoNovedad);
-        console.log('🚀 DUAL BACKEND: Subtipo recibido:', subtipo);
-        console.log('🚀 DUAL BACKEND: Fecha período:', fechaPeriodo);
+        console.log('🚀 FACTORES ADICIONALES: *** PROCESANDO RECARGO CON FACTORES ADICIONALES ***');
+        console.log('🚀 FACTORES ADICIONALES: Tipo novedad:', tipoNovedad);
+        console.log('🚀 FACTORES ADICIONALES: Subtipo recibido:', subtipo);
+        console.log('🚀 FACTORES ADICIONALES: Fecha período:', fechaPeriodo);
         
-        // ✅ USAR HORAS ESPECÍFICAS PARA RECARGOS
+        // ✅ USAR HORAS ESPECÍFICAS PARA RECARGOS (220h desde 1 julio)
         const horasRecargos = getHorasParaRecargos(fechaPeriodo);
         const valorHoraOrdinaria = salarioBase / horasRecargos;
         
@@ -319,35 +319,52 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           tipoRecargoAleluya = 'nocturno_dominical';
         }
         
-        console.log('🚀 DUAL BACKEND: Tipo recargo mapeado:', tipoRecargoAleluya);
+        console.log('🚀 FACTORES ADICIONALES: Tipo recargo mapeado:', tipoRecargoAleluya);
         
-        // ✅ FACTORES CON TRANSICIÓN 1 JULIO 2025
+        // ✅ FACTORES ADICIONALES CON TRANSICIÓN 1 JULIO 2025
         const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
-        const factorInfo = getFactorRecargoAleluya(tipoRecargoAleluya, fechaObj);
+        const factorInfo = getFactorRecargoAdicional(tipoRecargoAleluya, fechaObj);
         
-        valor = Math.round(valorHoraOrdinaria * factorInfo.factor * horas);
-        factorCalculo = factorInfo.factor;
-        detalleCalculo = `Recargo ${tipoRecargoAleluya}: (${salarioBase.toLocaleString()} ÷ ${horasRecargos}) × ${factorInfo.porcentaje} × ${horas} horas = ${valor.toLocaleString()}`;
+        if (tipoRecargoAleluya === 'nocturno_dominical') {
+          // ✅ FÓRMULA ESPECIAL ALELUYA: Salario × Factor × Horas ÷ (30 × 7.333)
+          const divisorEspecial = 30 * 7.333; // 220
+          valor = Math.round((salarioBase * factorInfo.factorAdicional * horas) / divisorEspecial);
+          factorCalculo = factorInfo.factorAdicional;
+          detalleCalculo = `Nocturno Dominical (fórmula especial): (${salarioBase.toLocaleString()} × ${factorInfo.factorAdicional} × ${horas}h) ÷ (30 × 7.333) = ${valor.toLocaleString()}`;
+          
+          console.log('🚀 FACTORES ADICIONALES: *** FÓRMULA ESPECIAL NOCTURNO DOMINICAL ***');
+          console.log('🚀 FACTORES ADICIONALES: Divisor especial (30 × 7.333):', divisorEspecial);
+          console.log('🚀 FACTORES ADICIONALES: Factor específico:', factorInfo.factorAdicional);
+          console.log('🚀 FACTORES ADICIONALES: Valor final fórmula especial:', valor);
+        } else {
+          // ✅ FÓRMULA NORMAL: valorHora × (1 + factor_adicional) × horas
+          const factorTotal = 1 + factorInfo.factorAdicional;
+          valor = Math.round(valorHoraOrdinaria * factorTotal * horas);
+          factorCalculo = factorInfo.factorAdicional;
+          detalleCalculo = `Recargo ${tipoRecargoAleluya}: (${salarioBase.toLocaleString()} ÷ ${horasRecargos}) × (1 + ${factorInfo.porcentaje}) × ${horas} horas = ${valor.toLocaleString()}`;
+          
+          console.log('🚀 FACTORES ADICIONALES: *** RESULTADO RECARGO FACTORES ADICIONALES ***');
+          console.log('🚀 FACTORES ADICIONALES: Horas para recargos:', horasRecargos);
+          console.log('🚀 FACTORES ADICIONALES: Valor hora ordinaria:', Math.round(valorHoraOrdinaria));
+          console.log('🚀 FACTORES ADICIONALES: Factor adicional aplicado:', factorInfo.factorAdicional);
+          console.log('🚀 FACTORES ADICIONALES: Factor total (1 + adicional):', factorTotal);
+          console.log('🚀 FACTORES ADICIONALES: Valor final calculado:', valor);
+        }
         
-        console.log('🚀 DUAL BACKEND: *** RESULTADO RECARGO CON LÓGICA DUAL ***');
-        console.log('🚀 DUAL BACKEND: Horas para recargos:', horasRecargos);
-        console.log('🚀 DUAL BACKEND: Valor hora ordinaria:', Math.round(valorHoraOrdinaria));
-        console.log('🚀 DUAL BACKEND: Factor aplicado:', factorInfo.factor);
-        console.log('🚀 DUAL BACKEND: Valor final calculado:', valor);
-        console.log('🚀 DUAL BACKEND: Normativa:', factorInfo.normativa);
+        console.log('🚀 FACTORES ADICIONALES: Normativa:', factorInfo.normativa);
         
-        // ✅ VALIDACIÓN ESPECÍFICA ALELUYA
+        // ✅ VALIDACIÓN ESPECÍFICA ALELUYA CON FACTORES ADICIONALES
         if (salarioBase === 1718661 && horas === 1) {
           const fechaNormalizada = fechaPeriodo ? fechaPeriodo.split('T')[0] : '';
           
-          if (fechaNormalizada >= '2025-07-01' && fechaNormalizada < '2025-07-15') {
-            // Período especial: 1-15 julio 2025, usar 230h para recargos
+          if (fechaNormalizada >= '2025-07-01') {
+            // Desde 1 julio 2025: usar 220h para recargos
             if (tipoRecargoAleluya === 'dominical' && Math.abs(valor - 6250) < 100) {
-              console.log('✅ DUAL BACKEND SUCCESS: Dominical 1-15 julio correcto ~$6,250:', valor);
+              console.log('✅ FACTORES ADICIONALES SUCCESS: Dominical desde 1 julio correcto ~$6,250:', valor);
             } else if (tipoRecargoAleluya === 'nocturno_dominical' && Math.abs(valor - 8984) < 100) {
-              console.log('✅ DUAL BACKEND SUCCESS: Nocturno Dominical 1-15 julio correcto ~$8,984:', valor);
+              console.log('✅ FACTORES ADICIONALES SUCCESS: Nocturno Dominical correcto ~$8,984:', valor);
             } else if (tipoRecargoAleluya === 'nocturno' && Math.abs(valor - 2734) < 100) {
-              console.log('✅ DUAL BACKEND SUCCESS: Nocturno 1-15 julio correcto ~$2,734:', valor);
+              console.log('✅ FACTORES ADICIONALES SUCCESS: Nocturno correcto ~$2,734:', valor);
             }
           }
         }
@@ -486,8 +503,8 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
     }
   };
 
-  console.log('🚀 DUAL BACKEND: *** RESULTADO FINAL CON LÓGICA DUAL ***');
-  console.log('🚀 DUAL BACKEND:', JSON.stringify(result, null, 2));
+  console.log('🚀 FACTORES ADICIONALES: *** RESULTADO FINAL CON FACTORES ADICIONALES ***');
+  console.log('🚀 FACTORES ADICIONALES:', JSON.stringify(result, null, 2));
   
   return result;
 }
@@ -672,12 +689,12 @@ serve(async (req) => {
         });
 
       case 'calculate-novedad':
-        console.log('🚀 DUAL BACKEND: *** RECIBIDA SOLICITUD NOVEDAD CON LÓGICA DUAL ***');
-        console.log('🚀 DUAL BACKEND: Action:', action);
-        console.log('🚀 DUAL BACKEND: Data recibida:', JSON.stringify(data, null, 2));
+        console.log('🚀 FACTORES ADICIONALES: *** RECIBIDA SOLICITUD NOVEDAD CON FACTORES ADICIONALES ***');
+        console.log('🚀 FACTORES ADICIONALES: Action:', action);
+        console.log('🚀 FACTORES ADICIONALES: Data recibida:', JSON.stringify(data, null, 2));
         const novedadResult = calculateNovedadUltraKiss(data);
-        console.log('🚀 DUAL BACKEND: *** ENVIANDO RESPUESTA CON LÓGICA DUAL ***');
-        console.log('🚀 DUAL BACKEND: Respuesta:', JSON.stringify(novedadResult, null, 2));
+        console.log('🚀 FACTORES ADICIONALES: *** ENVIANDO RESPUESTA CON FACTORES ADICIONALES ***');
+        console.log('🚀 FACTORES ADICIONALES: Respuesta:', JSON.stringify(novedadResult, null, 2));
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

@@ -1,4 +1,3 @@
-
 /**
  * Utilidad para manejar la jornada laboral legal según la Ley 2101 de 2021
  * CORREGIDO: Separación de lógica para jornada laboral vs recargos
@@ -53,24 +52,21 @@ const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
 };
 
 /**
- * ✅ NUEVA FUNCIÓN: Obtiene horas para cálculo de RECARGOS
- * Los recargos pueden usar un divisor diferente al de la jornada laboral
- * Para julio 1-15 de 2025: usar 230h (jornada anterior) para recargos
- * Para julio 15+ de 2025: usar 220h (nueva jornada) para recargos
+ * ✅ FUNCIÓN CORREGIDA: Obtiene horas para cálculo de RECARGOS
+ * Usa transición del 1 de julio de 2025 (no 15 julio)
  */
 export const getHorasParaRecargos = (fecha: Date = new Date()): number => {
   console.log(`📅 Calculando horas para RECARGOS en fecha: ${fecha.toISOString().split('T')[0]}`);
   
-  // Para recargos, la transición efectiva es el 15 de julio (mismo que jornada)
-  // pero temporalmente mantener 230h para julio 1-15 según comportamiento Aleluya
-  if (fecha >= new Date('2025-07-01') && fecha < new Date('2025-07-15')) {
-    console.log(`🎯 RECARGOS: Período especial 1-15 julio 2025 → usando 230h mensuales`);
-    return 230; // Mantener jornada anterior para recargos en este período
+  // ✅ CORRECCIÓN: Usar 220h desde 1 julio 2025 para recargos
+  if (fecha >= new Date('2025-07-01')) {
+    console.log(`🎯 RECARGOS: Desde 1 julio 2025 → usando 220h mensuales`);
+    return 220; // Nueva jornada para recargos desde 1 julio
   }
   
-  // Para fechas posteriores o anteriores, usar la jornada legal normal
+  // Para fechas anteriores, usar jornada legal normal
   const jornadaInfo = getJornadaLegal(fecha);
-  console.log(`🎯 RECARGOS: Jornada normal → ${jornadaInfo.horasMensuales}h mensuales`);
+  console.log(`🎯 RECARGOS: Jornada normal anterior → ${jornadaInfo.horasMensuales}h mensuales`);
   return jornadaInfo.horasMensuales;
 };
 
@@ -133,7 +129,7 @@ export const getHourlyDivisor = (fecha: Date = new Date()): number => {
 };
 
 /**
- * ✅ NUEVA FUNCIÓN: Divisor horario específico para RECARGOS
+ * ✅ FUNCIÓN CORREGIDA: Divisor horario específico para RECARGOS
  */
 export const getHourlyDivisorForRecargos = (fecha: Date = new Date()): number => {
   const horasRecargos = getHorasParaRecargos(fecha);
@@ -170,7 +166,7 @@ export const calcularValorHoraOrdinaria = (salarioMensual: number, fecha: Date =
 };
 
 /**
- * ✅ NUEVA FUNCIÓN: Valor de hora específico para RECARGOS
+ * ✅ FUNCIÓN CORREGIDA: Valor de hora específico para RECARGOS
  */
 export const calcularValorHoraParaRecargos = (salarioMensual: number, fecha: Date = new Date()): number => {
   const divisorHorario = getHourlyDivisorForRecargos(fecha);
@@ -203,10 +199,6 @@ export const calcularValorHoraExtra = (salarioMensual: number, fecha: Date = new
   return valorHoraExtra;
 };
 
-/**
- * Obtiene información sobre próximos cambios en la jornada legal
- * ✅ CORREGIDO: Ahora usa la tabla fija de horas mensuales
- */
 export const getProximoCambioJornada = (fechaActual: Date = new Date()): JornadaLegalInfo | null => {
   const proximoCambio = JORNADAS_LEGALES
     .filter(jornada => jornada.fechaInicio > fechaActual)
