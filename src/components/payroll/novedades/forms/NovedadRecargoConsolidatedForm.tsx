@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { ArrowLeft, Clock, Calculator, Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
+import { RecargosCalculationService } from '@/services/RecargosCalculationService';
 
 interface RecargoEntry {
   id: string;
@@ -18,12 +20,6 @@ interface RecargoEntry {
   valor: number;
   observacion?: string;
 }
-
-const tiposRecargo = [
-  { value: 'nocturno', label: 'Recargo Nocturno (35%)', factor: 0.35 },
-  { value: 'nocturno_dominical', label: 'Nocturno Dominical', factor: 0.35 },
-  { value: 'nocturno_festivo', label: 'Nocturno Festivo', factor: 0.35 }
-];
 
 interface NovedadRecargoConsolidatedFormProps {
   onBack: () => void;
@@ -48,7 +44,43 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     observacion: ''
   });
 
+  // ✅ NUEVO: Estados para tipos dinámicos
+  const [tiposRecargo, setTiposRecargo] = useState<any[]>([]);
+
   const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
+
+  // ✅ FASE 1: Cargar tipos de recargo dinámicos según fecha del período
+  useEffect(() => {
+    const fechaCalculo = periodoFecha || new Date();
+    
+    console.log('🔄 CONSOLIDADO: Cargando tipos de recargo dinámicos para fecha:', fechaCalculo.toISOString().split('T')[0]);
+    
+    const tiposDinamicos = RecargosCalculationService.getTiposRecargo(fechaCalculo);
+    
+    const tiposFormateados = tiposDinamicos.map(tipo => ({
+      value: tipo.tipo,
+      label: `${tipo.tipo === 'nocturno' ? 'Recargo Nocturno' : 
+               tipo.tipo === 'dominical' ? 'Recargo Dominical' :
+               tipo.tipo === 'festivo' ? 'Recargo Festivo' :
+               tipo.tipo === 'nocturno_dominical' ? 'Nocturno Dominical' :
+               'Nocturno Festivo'} (${tipo.porcentaje})`,
+      factor: tipo.factor,
+      porcentaje: tipo.porcentaje,
+      descripcion: tipo.descripcion,
+      normativa: tipo.normativa
+    }));
+    
+    setTiposRecargo(tiposFormateados);
+    
+    console.log('✅ CONSOLIDADO: Tipos cargados con factores dinámicos:', {
+      fechaCalculo: fechaCalculo.toISOString().split('T')[0],
+      tipos: tiposFormateados.map(t => ({ 
+        tipo: t.value, 
+        factor: t.factor, 
+        porcentaje: t.porcentaje 
+      }))
+    });
+  }, [periodoFecha]);
 
   const calculateRecargoValue = async (tipo: string, horas: number, fechaEspecifica: string) => {
     if (!tipo || horas <= 0 || !fechaEspecifica) return 0;
@@ -56,7 +88,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     try {
       const fechaParaCalculo = new Date(fechaEspecifica + 'T00:00:00');
       
-      console.log('🎯 RECARGO: Calculando con fecha específica:', {
+      console.log('🎯 CONSOLIDADO RECARGO: Calculando con servicio unificado:', {
         fechaEspecifica,
         fechaParaCalculo: fechaParaCalculo.toISOString().split('T')[0],
         tipo,
@@ -72,14 +104,16 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         fechaPeriodo: fechaParaCalculo
       });
 
-      console.log('✅ RECARGO: Resultado calculado:', {
+      console.log('✅ CONSOLIDADO RECARGO: Resultado calculado:', {
         fecha: fechaEspecifica,
-        valor: result?.valor || 0
+        tipo,
+        valor: result?.valor || 0,
+        factorUsado: result?.factorCalculo
       });
 
       return result?.valor || 0;
     } catch (error) {
-      console.error('Error calculating recargo:', error);
+      console.error('❌ CONSOLIDADO: Error calculating recargo:', error);
       return 0;
     }
   };
@@ -101,6 +135,8 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
       observacion: currentEntry.observacion
     };
 
+    console.log('➕ CONSOLIDADO: Agregando entrada:', newEntry);
+    
     setEntries(prev => [...prev, newEntry]);
     setCurrentEntry({
       fecha: '',
@@ -123,7 +159,8 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
   const totalValor = entries.reduce((sum, entry) => sum + entry.valor, 0);
 
   const getTipoLabel = (tipo: string) => {
-    return tiposRecargo.find(t => t.value === tipo)?.label || tipo;
+    const tipoEncontrado = tiposRecargo.find(t => t.value === tipo);
+    return tipoEncontrado?.label || tipo;
   };
 
   return (
@@ -134,6 +171,20 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         </Button>
         <h3 className="text-lg font-semibold">Recargo Nocturno</h3>
       </div>
+
+      {/* ✅ NUEVO: Información de normativa aplicada */}
+      {periodoFecha && (
+        <div className="flex items-start gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
+          <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <div className="font-medium">Normativa aplicada para período:</div>
+            <div className="text-xs">{periodoFecha.toLocaleDateString('es-CO')}</div>
+            <div className="text-xs mt-1">
+              Factores dinámicos según legislación colombiana vigente
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Current Entry Form */}
       <Card>
@@ -159,7 +210,13 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
                 <SelectContent>
                   {tiposRecargo.map((tipo) => (
                     <SelectItem key={tipo.value} value={tipo.value}>
-                      {tipo.label}
+                      <div>
+                        <div className="font-medium">{tipo.label}</div>
+                        <div className="text-xs text-gray-500">{tipo.descripcion}</div>
+                        {tipo.normativa && (
+                          <div className="text-xs text-blue-600 mt-1">{tipo.normativa}</div>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
