@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { ArrowLeft, Calculator, Info, Clock } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { RecargosCalculationService } from '@/services/RecargosCalculationService';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface NovedadRecargoFormProps {
   onBack: () => void;
@@ -36,12 +38,12 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
     observacion: ''
   });
 
-  const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
   const [jornadaInfo, setJornadaInfo] = useState<any>(null);
   const [factorInfo, setFactorInfo] = useState<any>(null);
-  
-  // ✅ SIMPLIFICADO: Solo 3 tipos según Aleluya
   const [recargoSubtipos, setRecargoSubtipos] = useState<any[]>([]);
+
+  // ✅ INTEGRAR: Hook de backend para cálculo automático
+  const { calculateNovedadDebounced, isLoading, error } = useNovedadBackendCalculation();
 
   useEffect(() => {
     const fechaCalculo = periodoFecha || new Date();
@@ -67,54 +69,73 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
     });
   }, [periodoFecha]);
 
-  // ✅ MANTENER: Usar fecha del período para cálculo correcto
-  const calculateRecargoValue = (subtipo: string, horas: number) => {
-    if (!employeeSalary || employeeSalary <= 0 || !horas || horas <= 0) {
-      return null;
-    }
-
-    try {
-      console.log('💰 ALELUYA CALC: Calculando con factores totales para fecha:', periodoFecha?.toISOString().split('T')[0]);
-      
-      const result = RecargosCalculationService.calcularRecargo({
-        salarioBase: employeeSalary,
-        tipoRecargo: subtipo as any,
-        horas: horas,
-        fechaPeriodo: periodoFecha || new Date()
-      });
-      
-      console.log('💰 ALELUYA RESULT: Recargo calculado:', result);
-      setJornadaInfo(result.jornadaInfo);
-      setFactorInfo(result.factorInfo);
-      return result.valorRecargo;
-    } catch (error) {
-      console.error('❌ Error calculando recargo:', error);
-      return null;
-    }
-  };
-
-  // Calcular valor automáticamente cuando cambien horas o subtipo
+  // ✅ NUEVO: Cálculo automático usando backend con fallback local
   useEffect(() => {
-    if (formData.horas && parseFloat(formData.horas) > 0) {
-      console.log('🔄 Calculating value for recargo:', {
+    if (formData.horas && parseFloat(formData.horas) > 0 && employeeSalary > 0) {
+      const horas = parseFloat(formData.horas);
+      
+      console.log('🔄 ALELUYA AUTO-CALC: Iniciando cálculo automático:', {
         subtipo: formData.subtipo,
-        horas: parseFloat(formData.horas)
+        horas,
+        salario: employeeSalary,
+        fecha: periodoFecha?.toISOString().split('T')[0]
       });
-      
-      const calculated = calculateRecargoValue(formData.subtipo, parseFloat(formData.horas));
-      setCalculatedValue(calculated);
-    } else {
-      setCalculatedValue(null);
-    }
-  }, [formData.subtipo, formData.horas, employeeSalary]);
 
-  // Aplicar valor calculado automáticamente
-  useEffect(() => {
-    if (calculatedValue && calculatedValue > 0) {
-      console.log('💰 Applying calculated value for recargo:', calculatedValue);
-      setFormData(prev => ({ ...prev, valor: calculatedValue }));
+      // ✅ PRIORIDAD 1: Usar backend calculation
+      calculateNovedadDebounced(
+        {
+          tipoNovedad: 'recargo_nocturno',
+          subtipo: formData.subtipo,
+          salarioBase: employeeSalary,
+          horas,
+          fechaPeriodo: periodoFecha || new Date()
+        },
+        (result) => {
+          if (result && result.valor > 0) {
+            console.log('✅ ALELUYA BACKEND SUCCESS:', {
+              valor: result.valor,
+              factor: result.factorCalculo,
+              detalle: result.detalleCalculo
+            });
+            
+            setFormData(prev => ({ ...prev, valor: result.valor }));
+            setJornadaInfo(result.jornadaInfo);
+            setFactorInfo({
+              fechaVigencia: periodoFecha || new Date(),
+              normativaAplicable: result.detalleCalculo,
+              factorOriginal: result.factorCalculo,
+              porcentajeDisplay: `${(result.factorCalculo * 100).toFixed(0)}%`
+            });
+          } else {
+            console.log('⚠️ ALELUYA FALLBACK: Backend falló, usando cálculo local');
+            
+            // ✅ FALLBACK: Cálculo local si backend falla
+            try {
+              const localResult = RecargosCalculationService.calcularRecargo({
+                salarioBase: employeeSalary,
+                tipoRecargo: formData.subtipo as any,
+                horas,
+                fechaPeriodo: periodoFecha || new Date()
+              });
+              
+              console.log('✅ ALELUYA LOCAL FALLBACK:', localResult);
+              setFormData(prev => ({ ...prev, valor: localResult.valorRecargo }));
+              setJornadaInfo(localResult.jornadaInfo);
+              setFactorInfo(localResult.factorInfo);
+            } catch (localError) {
+              console.error('❌ ALELUYA LOCAL ERROR:', localError);
+            }
+          }
+        },
+        300 // Debounce más rápido para UX mejor
+      );
+    } else if (!formData.horas || parseFloat(formData.horas) <= 0) {
+      // Limpiar valores cuando no hay horas
+      setFormData(prev => ({ ...prev, valor: 0 }));
+      setJornadaInfo(null);
+      setFactorInfo(null);
     }
-  }, [calculatedValue]);
+  }, [formData.subtipo, formData.horas, employeeSalary, periodoFecha, calculateNovedadDebounced]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -157,6 +178,20 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         </Button>
         <h3 className="text-lg font-semibold">Recargo</h3>
       </div>
+
+      {/* ✅ MEJORADO: Estado de cálculo más claro */}
+      {isLoading && (
+        <div className="flex items-center gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <span>Calculando con valores Aleluya...</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-center gap-2 bg-red-50 p-3 rounded text-sm text-red-700">
+          <span>⚠️ Error en cálculo: {error} (usando fallback local)</span>
+        </div>
+      )}
 
       {/* ✅ ACTUALIZADO: Información de normativa con factores totales */}
       {factorInfo && (
@@ -238,14 +273,16 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
           </div>
         </div>
 
-        {calculatedValue && calculatedValue > 0 && (
+        {formData.valor > 0 && !isLoading && (
           <div className="flex items-center justify-between bg-green-50 p-3 rounded">
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">Valor calculado automáticamente:</span>
+              <span className="text-sm text-green-700">
+                Valor calculado automáticamente con Aleluya:
+              </span>
             </div>
             <Badge variant="secondary" className="bg-green-100 text-green-800">
-              {formatCurrency(calculatedValue)}
+              {formatCurrency(formData.valor)}
             </Badge>
           </div>
         )}
@@ -253,18 +290,6 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Valor *</Label>
-            {calculatedValue && calculatedValue !== formData.valor && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleInputChange('valor', calculatedValue)}
-                className="text-xs h-7 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-              >
-                <Calculator className="h-3 w-3 mr-1" />
-                Usar calculado: ${calculatedValue.toLocaleString()}
-              </Button>
-            )}
           </div>
 
           <Input
@@ -306,9 +331,9 @@ export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.horas || formData.valor <= 0}
+          disabled={!formData.horas || formData.valor <= 0 || isLoading}
         >
-          Guardar Recargo
+          {isLoading ? 'Calculando...' : 'Guardar Recargo'}
         </Button>
       </div>
     </div>
