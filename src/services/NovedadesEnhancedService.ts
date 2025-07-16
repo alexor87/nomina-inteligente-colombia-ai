@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
+import { PayrollNovedad, BaseCalculoData } from '@/types/novedades-enhanced';
 
 // ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS PARA EVITAR CONFLICTOS
 type DatabaseNovedadType = Database['public']['Enums']['novedad_type'];
@@ -21,22 +22,7 @@ export interface CreateNovedadData {
   constitutivo_salario?: boolean;
 }
 
-export interface PayrollNovedad {
-  id: string;
-  company_id: string;
-  empleado_id: string;
-  periodo_id: string;
-  tipo_novedad: DatabaseNovedadType;
-  valor: number;
-  horas?: number;
-  dias?: number;
-  observacion?: string;
-  fecha_inicio?: string;
-  fecha_fin?: string;
-  base_calculo?: any;
-  created_at: string;
-  updated_at: string;
-}
+// ✅ REMOVIDO: Usar solo el tipo de novedades-enhanced.ts
 
 /**
  * ✅ SERVICIO DE NOVEDADES REPARADO - FASE 3 CRÍTICA
@@ -61,7 +47,27 @@ export class NovedadesEnhancedService {
       }
 
       console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
-      return (novedades || []) as PayrollNovedad[];
+      
+      // Transformar datos de Supabase a PayrollNovedad
+      return (novedades || []).map(novedad => ({
+        id: novedad.id,
+        company_id: novedad.company_id,
+        empleado_id: novedad.empleado_id,
+        periodo_id: novedad.periodo_id,
+        tipo_novedad: novedad.tipo_novedad,
+        subtipo: novedad.subtipo,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        dias: novedad.dias,
+        horas: novedad.horas,
+        valor: novedad.valor || 0,
+        base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
+        observacion: novedad.observacion,
+        adjunto_url: novedad.adjunto_url,
+        creado_por: novedad.creado_por,
+        created_at: novedad.created_at,
+        updated_at: novedad.updated_at
+      } as PayrollNovedad));
       
     } catch (error) {
       console.error('💥 Error crítico en getNovedades:', error);
@@ -85,7 +91,27 @@ export class NovedadesEnhancedService {
       }
 
       console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
-      return (novedades || []) as PayrollNovedad[];
+      
+      // Transformar datos de Supabase a PayrollNovedad
+      return (novedades || []).map(novedad => ({
+        id: novedad.id,
+        company_id: novedad.company_id,
+        empleado_id: novedad.empleado_id,
+        periodo_id: novedad.periodo_id,
+        tipo_novedad: novedad.tipo_novedad,
+        subtipo: novedad.subtipo,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        dias: novedad.dias,
+        horas: novedad.horas,
+        valor: novedad.valor || 0,
+        base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
+        observacion: novedad.observacion,
+        adjunto_url: novedad.adjunto_url,
+        creado_por: novedad.creado_por,
+        created_at: novedad.created_at,
+        updated_at: novedad.updated_at
+      } as PayrollNovedad));
       
     } catch (error) {
       console.error('💥 Error crítico en getNovedadesByEmployee:', error);
@@ -144,7 +170,27 @@ export class NovedadesEnhancedService {
       }
 
       console.log('✅ Novedad creada exitosamente');
-      return novedad as PayrollNovedad;
+      
+      // Transformar datos de Supabase a PayrollNovedad
+      return {
+        id: novedad.id,
+        company_id: novedad.company_id,
+        empleado_id: novedad.empleado_id,
+        periodo_id: novedad.periodo_id,
+        tipo_novedad: novedad.tipo_novedad,
+        subtipo: novedad.subtipo,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        dias: novedad.dias,
+        horas: novedad.horas,
+        valor: novedad.valor || 0,
+        base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
+        observacion: novedad.observacion,
+        adjunto_url: novedad.adjunto_url,
+        creado_por: novedad.creado_por,
+        created_at: novedad.created_at,
+        updated_at: novedad.updated_at
+      } as PayrollNovedad;
       
     } catch (error) {
       console.error('💥 Error crítico creando novedad:', error);
@@ -169,7 +215,27 @@ export class NovedadesEnhancedService {
       }
 
       console.log('✅ Novedad actualizada exitosamente');
-      return novedad as PayrollNovedad;
+      
+      // Transformar datos de Supabase a PayrollNovedad
+      return {
+        id: novedad.id,
+        company_id: novedad.company_id,
+        empleado_id: novedad.empleado_id,
+        periodo_id: novedad.periodo_id,
+        tipo_novedad: novedad.tipo_novedad,
+        subtipo: novedad.subtipo,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        dias: novedad.dias,
+        horas: novedad.horas,
+        valor: novedad.valor || 0,
+        base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
+        observacion: novedad.observacion,
+        adjunto_url: novedad.adjunto_url,
+        creado_por: novedad.creado_por,
+        created_at: novedad.created_at,
+        updated_at: novedad.updated_at
+      } as PayrollNovedad;
       
     } catch (error) {
       console.error('💥 Error crítico actualizando novedad:', error);
