@@ -42,16 +42,15 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   const [observacion, setObservacion] = useState<string>('');
   const [isValidationPassing, setIsValidationPassing] = useState<boolean | null>(null);
   
-  const { calculateNovedad, calculateNovedadDebounced, isLoading, clearCache } = useNovedadBackendCalculation();
+  const { calculateNovedad, calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
-  // Initialize component and clear cache
+  // Initialize component
   useEffect(() => {
     console.log('🚀 ULTRA-KISS FORM: *** COMPONENTE INICIALIZADO ***');
     console.log('🚀 ULTRA-KISS FORM: Período:', periodoFecha);
     console.log('🚀 ULTRA-KISS FORM: Salario empleado:', employeeSalary);
     console.log('🚀 ULTRA-KISS FORM: Fecha inicial para horas extra:', fechaExtra);
-    clearCache();
-  }, [periodoFecha, clearCache]);
+  }, [periodoFecha]);
 
   // Calculation effect using the actual overtime date
   useEffect(() => {
