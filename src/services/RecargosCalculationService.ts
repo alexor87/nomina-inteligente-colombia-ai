@@ -1,9 +1,10 @@
 
 /**
  * Servicio unificado para cálculo de recargos
- * ✅ CORREGIDO: Factores como adicionales + fórmula especial nocturno dominical
+ * ✅ CORREGIDO: Factores TOTALES + fórmula unificada Aleluya
  * - Jornada laboral: 15 julio 2025
  * - Recargos factores: 1 julio 2025
+ * - Fórmula unificada: Salario × Factor × Horas ÷ (30 × 7.333)
  */
 
 import { getHourlyDivisorForRecargos, calcularValorHoraParaRecargos } from '@/utils/jornadaLegal';
@@ -36,66 +37,66 @@ export interface RecargoCalculationResult {
 
 export class RecargosCalculationService {
   /**
-   * ✅ CORREGIDO: Factores ADICIONALES (no totales) con transición 1 julio 2025
+   * ✅ CORREGIDO: Factores TOTALES (no adicionales) según Aleluya
    */
-  private static getFactorRecargoAdicional(tipoRecargo: string, fechaPeriodo: Date): {
-    factorAdicional: number;
+  private static getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
+    factorTotal: number;
     porcentaje: string;
     normativa: string;
   } {
     const fecha = fechaPeriodo || new Date();
     
-    console.log(`📅 FACTORES ADICIONALES: Calculando para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
+    console.log(`📅 FACTORES TOTALES: Calculando para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
     
     switch (tipoRecargo) {
       case 'nocturno':
-        // Recargo nocturno: 35% adicional
+        // Recargo nocturno: 35% total
         return {
-          factorAdicional: 0.35,
+          factorTotal: 0.35,
           porcentaje: '35%',
-          normativa: 'CST Art. 168 - Recargo nocturno ordinario (35% adicional)'
+          normativa: 'CST Art. 168 - Recargo nocturno ordinario (35% total)'
         };
         
       case 'dominical':
-        // ✅ TRANSICIÓN 1 JULIO 2025: Factores ADICIONALES de recargo dominical
+        // ✅ TRANSICIÓN 1 JULIO 2025: Factores TOTALES de recargo dominical
         if (fecha < new Date('2025-07-01')) {
           return {
-            factorAdicional: 0.75, // 75% adicional
+            factorTotal: 0.75, // 75% total
             porcentaje: '75%',
-            normativa: 'Ley 789/2002 Art. 3 - Vigente hasta 30-jun-2025 (75% adicional)'
+            normativa: 'Ley 789/2002 Art. 3 - Vigente hasta 30-jun-2025 (75% total)'
           };
         } else if (fecha < new Date('2026-07-01')) {
           return {
-            factorAdicional: 0.80, // ✅ NUEVO: 80% adicional desde 1 julio 2025
+            factorTotal: 0.80, // ✅ ALELUYA: 80% total desde 1 julio 2025
             porcentaje: '80%',
-            normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026 (80% adicional)'
+            normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026 (80% total)'
           };
         } else if (fecha < new Date('2027-07-01')) {
           return {
-            factorAdicional: 0.90, // 90% adicional
+            factorTotal: 0.90, // 90% total
             porcentaje: '90%',
-            normativa: 'Ley 2466/2025 - Vigente 01-jul-2026 a 30-jun-2027 (90% adicional)'
+            normativa: 'Ley 2466/2025 - Vigente 01-jul-2026 a 30-jun-2027 (90% total)'
           };
         } else {
           return {
-            factorAdicional: 1.00, // 100% adicional
+            factorTotal: 1.00, // 100% total
             porcentaje: '100%',
-            normativa: 'Ley 2466/2025 - Vigente desde 01-jul-2027 (100% adicional)'
+            normativa: 'Ley 2466/2025 - Vigente desde 01-jul-2027 (100% total)'
           };
         }
         
       case 'nocturno_dominical':
-        // ✅ Factor específico 1.15 para fórmula especial Aleluya
+        // ✅ Factor total específico 1.15 para Aleluya
         return {
-          factorAdicional: 1.15, // Factor específico para fórmula especial
+          factorTotal: 1.15, // Factor total específico
           porcentaje: '115%',
-          normativa: 'Recargo nocturno dominical - Factor específico según CST'
+          normativa: 'Recargo nocturno dominical - Factor total según CST'
         };
         
       default:
         console.error(`❌ Tipo de recargo no válido: ${tipoRecargo}`);
         return {
-          factorAdicional: 0.0,
+          factorTotal: 0.0,
           porcentaje: '0%',
           normativa: 'Tipo no válido'
         };
@@ -103,67 +104,43 @@ export class RecargosCalculationService {
   }
 
   /**
-   * ✅ CORREGIDO: Calcula recargo usando factores adicionales + fórmula especial
+   * ✅ CORREGIDO: Calcula recargo usando factores totales + fórmula unificada Aleluya
    */
   static calcularRecargo(input: RecargoCalculationInput): RecargoCalculationResult {
     const { salarioBase, tipoRecargo, horas, fechaPeriodo = new Date() } = input;
     
-    console.log('🎯 FACTORES ADICIONALES: Calculando recargo con factores corregidos:', { 
+    console.log('🎯 FACTORES TOTALES: Calculando recargo con fórmula Aleluya:', { 
       salarioBase, 
       tipoRecargo, 
       horas, 
       fechaPeriodo: fechaPeriodo.toISOString().split('T')[0] 
     });
     
-    const factorInfo = this.getFactorRecargoAdicional(tipoRecargo, fechaPeriodo);
+    const factorInfo = this.getFactorRecargoTotal(tipoRecargo, fechaPeriodo);
     
-    if (!factorInfo || factorInfo.factorAdicional < 0) {
+    if (!factorInfo || factorInfo.factorTotal < 0) {
       throw new Error(`Error calculando factor para tipo de recargo: ${tipoRecargo}`);
     }
     
-    let valorRecargo: number;
-    let detalleCalculo: string;
-    let valorHora: number;
+    // ✅ FÓRMULA UNIFICADA ALELUYA: Salario × Factor × Horas ÷ (30 × 7.333) para TODOS
+    const divisorAleluya = 30 * 7.333; // 219.99
+    const valorRecargo = Math.round((salarioBase * factorInfo.factorTotal * horas) / divisorAleluya);
+    const valorHora = salarioBase / divisorAleluya;
+    const detalleCalculo = `${tipoRecargo} (fórmula Aleluya): (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ (30 × 7.333) = ${valorRecargo.toLocaleString()}`;
     
-    if (tipoRecargo === 'nocturno_dominical') {
-      // ✅ FÓRMULA ESPECIAL ALELUYA: Salario × Factor × Horas ÷ (30 × 7.333)
-      const divisorEspecial = 30 * 7.333; // 220
-      valorRecargo = Math.round((salarioBase * factorInfo.factorAdicional * horas) / divisorEspecial);
-      valorHora = salarioBase / divisorEspecial;
-      detalleCalculo = `Nocturno Dominical (fórmula especial): (${salarioBase.toLocaleString()} × ${factorInfo.factorAdicional} × ${horas}h) ÷ (30 × 7.333) = ${valorRecargo.toLocaleString()}`;
-      
-      console.log('✅ FÓRMULA ESPECIAL: Nocturno Dominical calculado:', {
-        salarioBase,
-        factor: factorInfo.factorAdicional,
-        horas,
-        divisorEspecial,
-        valorRecargo,
-        detalleCalculo
-      });
-    } else {
-      // ✅ FÓRMULA NORMAL: valorHora × (1 + factor_adicional) × horas
-      const divisorHorario = getHourlyDivisorForRecargos(fechaPeriodo);
-      valorHora = calcularValorHoraParaRecargos(salarioBase, fechaPeriodo);
-      const factorTotal = 1 + factorInfo.factorAdicional;
-      
-      valorRecargo = Math.round(valorHora * factorTotal * horas);
-      detalleCalculo = `${tipoRecargo}: (${salarioBase.toLocaleString()} ÷ ${divisorHorario}h) × (1 + ${factorInfo.porcentaje}) × ${horas}h = ${valorRecargo.toLocaleString()}`;
-      
-      console.log('✅ FÓRMULA NORMAL: Recargo calculado:', {
-        fechaPeriodo: fechaPeriodo.toISOString().split('T')[0],
-        tipoRecargo,
-        divisorHorario,
-        valorHora: Math.round(valorHora),
-        factorAdicional: factorInfo.factorAdicional,
-        factorTotal,
-        valorRecargo,
-        detalleCalculo
-      });
-    }
+    console.log('✅ FÓRMULA ALELUYA: Recargo calculado:', {
+      fechaPeriodo: fechaPeriodo.toISOString().split('T')[0],
+      tipoRecargo,
+      divisorAleluya,
+      valorHora: Math.round(valorHora),
+      factorTotal: factorInfo.factorTotal,
+      valorRecargo,
+      detalleCalculo
+    });
     
     return {
       valorHora: Math.round(valorHora),
-      factorRecargo: factorInfo.factorAdicional,
+      factorRecargo: factorInfo.factorTotal,
       valorRecargo,
       detalleCalculo,
       jornadaInfo: {
@@ -175,22 +152,22 @@ export class RecargosCalculationService {
       factorInfo: {
         fechaVigencia: fechaPeriodo,
         normativaAplicable: factorInfo.normativa,
-        factorOriginal: factorInfo.factorAdicional,
+        factorOriginal: factorInfo.factorTotal,
         porcentajeDisplay: factorInfo.porcentaje
       }
     };
   }
 
   /**
-   * ✅ Obtiene el factor adicional para un tipo específico
+   * ✅ Obtiene el factor total para un tipo específico
    */
   static getFactorRecargoByDate(tipoRecargo: string, fechaPeriodo: Date = new Date()): number {
-    const factorInfo = this.getFactorRecargoAdicional(tipoRecargo, fechaPeriodo);
-    return factorInfo.factorAdicional;
+    const factorInfo = this.getFactorRecargoTotal(tipoRecargo, fechaPeriodo);
+    return factorInfo.factorTotal;
   }
 
   /**
-   * ✅ Solo 3 tipos de recargo con factores adicionales actualizados
+   * ✅ Solo 3 tipos de recargo con factores totales actualizados
    */
   static getTiposRecargo(fechaPeriodo: Date = new Date()): Array<{
     tipo: string;
@@ -202,22 +179,22 @@ export class RecargosCalculationService {
     return [
       {
         tipo: 'nocturno',
-        ...this.getFactorRecargoAdicional('nocturno', fechaPeriodo),
+        ...this.getFactorRecargoTotal('nocturno', fechaPeriodo),
         descripcion: 'Recargo nocturno (10:00 PM - 6:00 AM)'
       },
       {
         tipo: 'dominical',
-        ...this.getFactorRecargoAdicional('dominical', fechaPeriodo),
+        ...this.getFactorRecargoTotal('dominical', fechaPeriodo),
         descripcion: 'Recargo dominical (trabajo en domingo)'
       },
       {
         tipo: 'nocturno_dominical',
-        ...this.getFactorRecargoAdicional('nocturno_dominical', fechaPeriodo),
+        ...this.getFactorRecargoTotal('nocturno_dominical', fechaPeriodo),
         descripcion: 'Recargo nocturno dominical (domingo 10:00 PM - 6:00 AM)'
       }
     ].map(item => ({
       tipo: item.tipo,
-      factor: item.factorAdicional,
+      factor: item.factorTotal,
       porcentaje: item.porcentaje,
       descripcion: item.descripcion,
       normativa: item.normativa
