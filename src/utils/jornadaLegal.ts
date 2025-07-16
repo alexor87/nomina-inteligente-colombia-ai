@@ -1,8 +1,9 @@
 
 /**
  * Utilidad para manejar la jornada laboral legal según la Ley 2101 de 2021
- * que reduce progresivamente la jornada máxima semanal en Colombia
- * CORREGIDO: Tabla fija de horas mensuales por jornada legal
+ * CORREGIDO: Separación de lógica para jornada laboral vs recargos
+ * - Jornada laboral: transición el 15 de julio de 2025
+ * - Recargos: usan fechas de transición diferentes (1 de julio)
  */
 
 export interface JornadaLegalInfo {
@@ -13,7 +14,7 @@ export interface JornadaLegalInfo {
   ley: string;
 }
 
-// Fechas y jornadas según la Ley 2101 de 2021
+// ✅ FECHAS DE JORNADA LABORAL - Transición 15 julio 2025
 const JORNADAS_LEGALES = [
   {
     fechaInicio: new Date('2026-07-15'),
@@ -21,7 +22,7 @@ const JORNADAS_LEGALES = [
     descripcion: 'Jornada final según Ley 2101 de 2021'
   },
   {
-    fechaInicio: new Date('2025-07-15'),
+    fechaInicio: new Date('2025-07-15'), // ✅ CORRECTO: 15 julio para jornada laboral
     horasSemanales: 44,
     descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
   },
@@ -36,7 +37,7 @@ const JORNADAS_LEGALES = [
     descripcion: 'Segunda fase de reducción - Ley 2101 de 2021'
   },
   {
-    fechaInicio: new Date('1950-01-01'), // Fecha muy anterior para jornada base
+    fechaInicio: new Date('1950-01-01'),
     horasSemanales: 48,
     descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo'
   }
@@ -52,10 +53,33 @@ const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
 };
 
 /**
+ * ✅ NUEVA FUNCIÓN: Obtiene horas para cálculo de RECARGOS
+ * Los recargos pueden usar un divisor diferente al de la jornada laboral
+ * Para julio 1-15 de 2025: usar 230h (jornada anterior) para recargos
+ * Para julio 15+ de 2025: usar 220h (nueva jornada) para recargos
+ */
+export const getHorasParaRecargos = (fecha: Date = new Date()): number => {
+  console.log(`📅 Calculando horas para RECARGOS en fecha: ${fecha.toISOString().split('T')[0]}`);
+  
+  // Para recargos, la transición efectiva es el 15 de julio (mismo que jornada)
+  // pero temporalmente mantener 230h para julio 1-15 según comportamiento Aleluya
+  if (fecha >= new Date('2025-07-01') && fecha < new Date('2025-07-15')) {
+    console.log(`🎯 RECARGOS: Período especial 1-15 julio 2025 → usando 230h mensuales`);
+    return 230; // Mantener jornada anterior para recargos en este período
+  }
+  
+  // Para fechas posteriores o anteriores, usar la jornada legal normal
+  const jornadaInfo = getJornadaLegal(fecha);
+  console.log(`🎯 RECARGOS: Jornada normal → ${jornadaInfo.horasMensuales}h mensuales`);
+  return jornadaInfo.horasMensuales;
+};
+
+/**
  * Obtiene la información de jornada legal vigente para una fecha específica
+ * SOLO para cálculos de salario base y jornada laboral normal
  */
 export const getJornadaLegal = (fecha: Date = new Date()): JornadaLegalInfo => {
-  console.log(`📅 Calculando jornada legal para: ${fecha.toISOString().split('T')[0]}`);
+  console.log(`📅 Calculando jornada LABORAL para: ${fecha.toISOString().split('T')[0]}`);
   
   // Ordenar por fecha descendente para encontrar la jornada vigente
   const jornadaVigente = JORNADAS_LEGALES
@@ -82,7 +106,7 @@ export const getJornadaLegal = (fecha: Date = new Date()): JornadaLegalInfo => {
   }
 
   const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaVigente.horasSemanales];
-  console.log(`✅ Jornada seleccionada: ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
+  console.log(`✅ Jornada LABORAL seleccionada: ${jornadaVigente.horasSemanales}h semanales = ${horasMensuales}h mensuales`);
 
   return {
     horasSemanales: jornadaVigente.horasSemanales,
@@ -109,6 +133,18 @@ export const getHourlyDivisor = (fecha: Date = new Date()): number => {
 };
 
 /**
+ * ✅ NUEVA FUNCIÓN: Divisor horario específico para RECARGOS
+ */
+export const getHourlyDivisorForRecargos = (fecha: Date = new Date()): number => {
+  const horasRecargos = getHorasParaRecargos(fecha);
+  
+  console.log(`📅 Fecha para recargos: ${fecha.toISOString().split('T')[0]}`);
+  console.log(`🔢 Divisor horario RECARGOS: ${horasRecargos} horas mensuales`);
+  
+  return horasRecargos;
+};
+
+/**
  * Calcula las horas por día basado en la jornada legal vigente
  * Esta función es específica para el cálculo de horas extra
  * Fórmula: horasSemanales ÷ 6 días
@@ -131,6 +167,21 @@ export const getDailyHours = (fecha: Date = new Date()): number => {
 export const calcularValorHoraOrdinaria = (salarioMensual: number, fecha: Date = new Date()): number => {
   const divisorHorario = getHourlyDivisor(fecha);
   return salarioMensual / divisorHorario;
+};
+
+/**
+ * ✅ NUEVA FUNCIÓN: Valor de hora específico para RECARGOS
+ */
+export const calcularValorHoraParaRecargos = (salarioMensual: number, fecha: Date = new Date()): number => {
+  const divisorHorario = getHourlyDivisorForRecargos(fecha);
+  const valorHora = salarioMensual / divisorHorario;
+  
+  console.log(`💰 Cálculo valor hora para RECARGOS:`);
+  console.log(`   Salario mensual: $${salarioMensual.toLocaleString()}`);
+  console.log(`   Divisor recargos: ${divisorHorario}h`);
+  console.log(`   Valor hora recargos: $${Math.round(valorHora).toLocaleString()}`);
+  
+  return valorHora;
 };
 
 /**
@@ -163,7 +214,6 @@ export const getProximoCambioJornada = (fechaActual: Date = new Date()): Jornada
 
   if (!proximoCambio) return null;
 
-  // ✅ CORRECCIÓN: Usar tabla fija en lugar de fórmula
   const horasMensuales = HORAS_MENSUALES_POR_JORNADA[proximoCambio.horasSemanales];
   
   console.log(`🔮 Próximo cambio de jornada: ${proximoCambio.horasSemanales}h semanales = ${horasMensuales}h mensuales (tabla fija)`);
@@ -177,9 +227,6 @@ export const getProximoCambioJornada = (fechaActual: Date = new Date()): Jornada
   };
 };
 
-/**
- * Verifica si una fecha está en un período de transición de jornada
- */
 export const esPeriodoTransicion = (fecha: Date): boolean => {
   const fechaString = fecha.toISOString().slice(0, 10);
   const fechasTransicion = [
@@ -192,15 +239,12 @@ export const esPeriodoTransicion = (fecha: Date): boolean => {
   return fechasTransicion.some(fechaTransicion => {
     const inicio = new Date(fechaTransicion);
     const fin = new Date(inicio);
-    fin.setMonth(fin.getMonth() + 1); // Un mes después del cambio
+    fin.setMonth(fin.getMonth() + 1);
     
     return fecha >= inicio && fecha <= fin;
   });
 };
 
-/**
- * Obtiene el tooltip informativo sobre la jornada legal utilizada
- */
 export const getJornadaTooltip = (fecha: Date = new Date()): string => {
   const jornadaInfo = getJornadaLegal(fecha);
   return `Esta liquidación usa una jornada legal de ${jornadaInfo.horasSemanales} horas semanales según la ${jornadaInfo.ley}.`;

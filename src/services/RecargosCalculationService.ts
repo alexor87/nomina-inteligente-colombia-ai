@@ -1,11 +1,12 @@
 
 /**
  * Servicio unificado para cálculo de recargos
- * CORREGIDO: Factores totales según valores de Aleluya
- * ✅ IMPLEMENTA: Solo 3 tipos de recargo con factores exactos de Aleluya
+ * ✅ CORREGIDO: Lógica dual de transiciones implementada
+ * - Jornada laboral: 15 julio 2025
+ * - Recargos factores: 1 julio 2025
  */
 
-import { getHourlyDivisor } from '@/utils/jornadaLegal';
+import { getHourlyDivisorForRecargos, calcularValorHoraParaRecargos } from '@/utils/jornadaLegal';
 
 export interface RecargoCalculationInput {
   salarioBase: number;
@@ -35,7 +36,7 @@ export interface RecargoCalculationResult {
 
 export class RecargosCalculationService {
   /**
-   * ✅ CORREGIDO: Factores totales según Aleluya (incluyen salario base)
+   * ✅ CORREGIDO: Factores de recargos con transición 1 julio 2025
    */
   private static getFactorRecargo(tipoRecargo: string, fechaPeriodo: Date): {
     factor: number;
@@ -44,7 +45,7 @@ export class RecargosCalculationService {
   } {
     const fecha = fechaPeriodo || new Date();
     
-    console.log(`📅 ALELUYA FACTORS: Calculando factor para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
+    console.log(`📅 RECARGO FACTORS: Calculando factor para ${tipoRecargo} en fecha: ${fecha.toISOString().split('T')[0]}`);
     
     switch (tipoRecargo) {
       case 'nocturno':
@@ -56,7 +57,7 @@ export class RecargosCalculationService {
         };
         
       case 'dominical':
-        // ✅ CORREGIDO: Recargo dominical con factores totales dinámicos
+        // ✅ TRANSICIÓN 1 JULIO 2025: Factores de recargo dominical
         if (fecha < new Date('2025-07-01')) {
           return {
             factor: 1.75, // Factor total (base + 75%)
@@ -65,7 +66,7 @@ export class RecargosCalculationService {
           };
         } else if (fecha < new Date('2026-07-01')) {
           return {
-            factor: 1.80, // Factor total (base + 80%)
+            factor: 1.80, // ✅ NUEVO: Factor total (base + 80%) desde 1 julio 2025
             porcentaje: '180%',
             normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026 (80% adicional)'
           };
@@ -84,7 +85,7 @@ export class RecargosCalculationService {
         }
         
       case 'nocturno_dominical':
-        // ✅ CORREGIDO: Factor específico 1.15 según Aleluya (NO es suma simple)
+        // ✅ Factor específico 1.15 según Aleluya
         return {
           factor: 1.15,
           porcentaje: '115%',
@@ -102,44 +103,42 @@ export class RecargosCalculationService {
   }
 
   /**
-   * ✅ CORREGIDO: Calcula el valor del recargo usando factores totales de Aleluya
-   * Fórmula: (salario ÷ divisor_horario_legal) × factor_total × horas
+   * ✅ CORREGIDO: Calcula recargo usando divisor específico para recargos
    */
   static calcularRecargo(input: RecargoCalculationInput): RecargoCalculationResult {
     const { salarioBase, tipoRecargo, horas, fechaPeriodo = new Date() } = input;
     
-    console.log('🎯 ALELUYA CALCULATION: Calculando con factores totales:', { 
+    console.log('🎯 DUAL LOGIC CALCULATION: Calculando recargo con lógica dual:', { 
       salarioBase, 
       tipoRecargo, 
       horas, 
       fechaPeriodo: fechaPeriodo.toISOString().split('T')[0] 
     });
     
-    // Usar divisor horario dinámico según jornada legal
-    const divisorHorario = getHourlyDivisor(fechaPeriodo);
-    const valorHora = salarioBase / divisorHorario;
+    // ✅ USAR DIVISOR ESPECÍFICO PARA RECARGOS
+    const divisorHorario = getHourlyDivisorForRecargos(fechaPeriodo);
+    const valorHora = calcularValorHoraParaRecargos(salarioBase, fechaPeriodo);
     
-    // Factor total según Aleluya
+    // ✅ FACTOR CON TRANSICIÓN 1 JULIO 2025
     const factorInfo = this.getFactorRecargo(tipoRecargo, fechaPeriodo);
     
-    // ✅ CORREGIDO: Remover validación innecesaria con 'base'
     if (!factorInfo || factorInfo.factor <= 0) {
       throw new Error(`Error calculando factor para tipo de recargo: ${tipoRecargo}`);
     }
     
-    // ✅ CORREGIDO: Valor del recargo = valor hora × factor total × horas
+    // ✅ Valor del recargo = valor hora × factor total × horas
     const valorRecargo = Math.round(valorHora * factorInfo.factor * horas);
     
     // Detalle del cálculo con información normativa
     const detalleCalculo = `(${salarioBase.toLocaleString()} ÷ ${divisorHorario}h) × ${factorInfo.porcentaje} × ${horas}h = ${valorRecargo.toLocaleString()}`;
     
-    console.log('✅ ALELUYA RESULT: Recargo calculado con factores totales:', {
+    console.log('✅ DUAL LOGIC RESULT: Recargo calculado con lógica dual:', {
       fechaPeriodo: fechaPeriodo.toISOString().split('T')[0],
       tipoRecargo,
+      divisorHorarioRecargos: divisorHorario,
       factorTotal: factorInfo.factor,
       porcentajeDisplay: factorInfo.porcentaje,
       normativaAplicable: factorInfo.normativa,
-      divisorHorario,
       valorHora: Math.round(valorHora),
       valorRecargo,
       detalleCalculo
@@ -166,7 +165,7 @@ export class RecargosCalculationService {
   }
 
   /**
-   * ✅ CORREGIDO: Obtiene el factor total para un tipo específico
+   * ✅ Obtiene el factor total para un tipo específico
    */
   static getFactorRecargoByDate(tipoRecargo: string, fechaPeriodo: Date = new Date()): number {
     const factorInfo = this.getFactorRecargo(tipoRecargo, fechaPeriodo);
@@ -174,7 +173,7 @@ export class RecargosCalculationService {
   }
 
   /**
-   * ✅ SIMPLIFICADO: Solo 3 tipos de recargo según requerimiento del usuario
+   * ✅ Solo 3 tipos de recargo con factores actualizados
    */
   static getTiposRecargo(fechaPeriodo: Date = new Date()): Array<{
     tipo: string;
