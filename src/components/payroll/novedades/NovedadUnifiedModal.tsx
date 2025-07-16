@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -31,7 +32,6 @@ interface NovedadUnifiedModalProps {
   endDate?: string;
 }
 
-// Mapping from categories to specific novedad types
 const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
   'horas_extra': 'horas_extra',
   'recargo_nocturno': 'recargo_nocturno',
@@ -66,18 +66,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // Calcular fecha del período para jornada legal - CORREGIDO para evitar shift de timezone
+  // ✅ KISS: Fecha del período sin complejidad
   const getPeriodDate = useCallback(() => {
     if (startDate) {
       const date = new Date(startDate + 'T00:00:00');
-      console.log('📅 Usando fecha del período para cálculos (UTC corregido):', date.toISOString().split('T')[0]);
+      console.log('📅 Fecha período:', date.toISOString().split('T')[0]);
       return date;
     }
-    console.log('⚠️ No hay startDate, usando fecha actual');
     return new Date();
   }, [startDate]);
 
-  // Initialize step based on whether a specific type was provided
   useEffect(() => {
     if (selectedNovedadType) {
       setSelectedType(selectedNovedadType);
@@ -88,7 +86,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   }, [selectedNovedadType, open]);
 
-  // Reset states when modal opens
   useEffect(() => {
     if (open) {
       setRefreshTrigger(Date.now());
@@ -96,7 +93,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   }, [open]);
 
-  // Mock employee name - in real app this would come from props or context
   useEffect(() => {
     if (employeeId) {
       setEmployeeName('Empleado');
@@ -126,7 +122,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const handleBackToList = () => {
     setCurrentStep('list');
     setSelectedType(null);
-    // Trigger refresh when going back to list after form submission
     setRefreshTrigger(Date.now());
   };
 
@@ -148,18 +143,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     try {
       console.log('📤 Form data received:', formData);
       
-      // Check if form data is an array (multiple entries like Horas Extra)
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
       
       console.log(`🔄 Processing ${dataArray.length} novelty entries`);
       
-      // Process each entry
       for (const entry of dataArray) {
         const submitData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
-          company_id: '', // Will be completed in the service
+          company_id: '',
           tipo_novedad: selectedType!,
           valor: entry.valor || 0,
           horas: entry.horas || undefined,
@@ -177,7 +170,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       
       console.log('✅ All novelty entries processed successfully');
       
-      // Go back to list to show newly created novelties
       setCurrentStep('list');
       setSelectedType(null);
       setRefreshTrigger(Date.now());
@@ -201,12 +193,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     dias?: number
   ): number | null => {
     if (!employeeSalary) {
-      console.warn('Salario del empleado no definido. No se puede calcular el valor sugerido.');
+      console.warn('Salario del empleado no definido.');
       return null;
     }
 
     try {
-      // Usar fecha del período para cálculos
       const fechaPeriodo = getPeriodDate();
       const { valor } = calcularValorNovedadEnhanced(tipoNovedad, subtipo, employeeSalary, dias, horas, fechaPeriodo);
       return valor;
@@ -325,7 +316,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return renderNovedadForm();
     }
 
-    // Fallback
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">Cargando...</p>

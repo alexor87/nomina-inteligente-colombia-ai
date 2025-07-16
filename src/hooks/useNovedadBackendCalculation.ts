@@ -31,11 +31,11 @@ export const useNovedadBackendCalculation = () => {
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
 
+  // ✅ KISS: Cálculo directo sin cache compartido
   const calculateNovedad = useCallback(async (
     input: NovedadCalculationInput
   ): Promise<NovedadCalculationResult | null> => {
     
-    // Validaciones básicas
     if (!input.salarioBase || input.salarioBase <= 0) {
       console.log('❌ Invalid salary for calculation');
       return null;
@@ -58,23 +58,19 @@ export const useNovedadBackendCalculation = () => {
     setError(null);
 
     try {
-      // 🚀 ULTRA-KISS: Formateo UTC garantizado para evitar problemas de timezone
+      // ✅ KISS: Formateo UTC simple
       let fechaParaCalculo: string | undefined;
       
       if (input.fechaPeriodo) {
-        // ✅ FIX: Usar UTC para evitar shift de timezone
         fechaParaCalculo = input.fechaPeriodo.toISOString().split('T')[0];
         
-        console.log('🚀 ULTRA-KISS: *** FRONTEND PREPARANDO REQUEST (UTC FIX) ***');
-        console.log('🚀 ULTRA-KISS: Fecha original:', input.fechaPeriodo);
-        console.log('🚀 ULTRA-KISS: Fecha UTC formateada FINAL:', fechaParaCalculo);
-        
-        // 🎯 Validación extrema de casos críticos
-        if (fechaParaCalculo === '2025-07-15') {
-          console.log('🎯 ULTRA-KISS: ✅ 15 julio → DEBE resultar en $9,765 (220h mensuales)');
-        } else if (fechaParaCalculo === '2025-07-01') {
-          console.log('🎯 ULTRA-KISS: ✅ 1 julio → DEBE resultar en $9,341 (230h mensuales)');
-        }
+        console.log('🎯 HOOK: Calculando novedad:', {
+          tipo: input.tipoNovedad,
+          subtipo: input.subtipo,
+          fecha: fechaParaCalculo,
+          salario: input.salarioBase,
+          horas: input.horas
+        });
       }
 
       const requestData = {
@@ -85,9 +81,6 @@ export const useNovedadBackendCalculation = () => {
         dias: input.dias || undefined,
         fechaPeriodo: fechaParaCalculo
       };
-
-      console.log('🚀 ULTRA-KISS: *** REQUEST FINAL ENVIADO (UTC) ***');
-      console.log('🚀 ULTRA-KISS:', JSON.stringify(requestData, null, 2));
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
@@ -107,26 +100,11 @@ export const useNovedadBackendCalculation = () => {
 
       const result = data.data;
       
-      console.log('🚀 ULTRA-KISS: *** RESULTADO RECIBIDO DEL BACKEND ***');
-      console.log('🚀 ULTRA-KISS: Fecha UTC enviada:', fechaParaCalculo);
-      console.log('🚀 ULTRA-KISS: Valor calculado:', result.valor);
-      console.log('🚀 ULTRA-KISS: Divisor horario:', result.jornadaInfo.divisorHorario);
-      console.log('🚀 ULTRA-KISS: Horas mensuales:', result.jornadaInfo.horasMensuales);
-
-      // 🎯 VALIDACIÓN FINAL ULTRA-ESPECÍFICA
-      if (fechaParaCalculo === '2025-07-15') {
-        if (result.valor >= 9500) {
-          console.log('✅ ULTRA-KISS SUCCESS: 15 julio valor correcto >= $9,500:', result.valor);
-        } else {
-          console.error('❌ ULTRA-KISS ERROR: 15 julio valor incorrecto < $9,500:', result.valor);
-        }
-      } else if (fechaParaCalculo === '2025-07-01') {
-        if (Math.abs(result.valor - 9341) < 100) {
-          console.log('✅ ULTRA-KISS SUCCESS: 1 julio valor correcto ~$9,341:', result.valor);
-        } else {
-          console.error('❌ ULTRA-KISS ERROR: 1 julio valor incorrecto ≠ $9,341:', result.valor);
-        }
-      }
+      console.log('✅ HOOK SUCCESS:', {
+        tipo: input.subtipo || input.tipoNovedad,
+        valor: result.valor,
+        factor: result.factorCalculo
+      });
 
       return result;
     } catch (err) {
@@ -139,6 +117,7 @@ export const useNovedadBackendCalculation = () => {
     }
   }, []);
 
+  // ✅ KISS: Debounce simple sin cache compartido
   const calculateNovedadDebounced = useCallback((
     input: NovedadCalculationInput,
     callback: (result: NovedadCalculationResult | null) => void,
@@ -154,15 +133,10 @@ export const useNovedadBackendCalculation = () => {
     }, delay);
   }, [calculateNovedad]);
 
-  const clearCache = useCallback(() => {
-    console.log('🚀 ULTRA-KISS: Cache permanentemente deshabilitado para máximo debugging');
-  }, []);
-
   return {
     calculateNovedad,
     calculateNovedadDebounced,
     isLoading,
-    error,
-    clearCache
+    error
   };
 };

@@ -9,8 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Clock, Calculator, Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
-import { RecargosCalculationService } from '@/services/RecargosCalculationService';
 
 interface RecargoEntry {
   id: string;
@@ -29,6 +27,42 @@ interface NovedadRecargoConsolidatedFormProps {
   periodoFecha?: Date;
 }
 
+// ✅ KISS: Tipos de recargo isolados por componente (sin cache compartido)
+const getTiposRecargoLocal = (fechaPeriodo: Date = new Date()) => {
+  const fecha = fechaPeriodo;
+  
+  // ✅ KISS: Factores totales directos sin cache
+  const getFactorTotal = (tipo: string) => {
+    switch (tipo) {
+      case 'nocturno':
+        return { factor: 0.35, porcentaje: '35%', descripcion: 'Recargo nocturno (10:00 PM - 6:00 AM)' };
+        
+      case 'dominical':
+        if (fecha < new Date('2025-07-01')) {
+          return { factor: 0.75, porcentaje: '75%', descripcion: 'Recargo dominical (trabajo en domingo)' };
+        } else if (fecha < new Date('2026-07-01')) {
+          return { factor: 0.80, porcentaje: '80%', descripcion: 'Recargo dominical (trabajo en domingo)' };
+        } else if (fecha < new Date('2027-07-01')) {
+          return { factor: 0.90, porcentaje: '90%', descripcion: 'Recargo dominical (trabajo en domingo)' };
+        } else {
+          return { factor: 1.00, porcentaje: '100%', descripcion: 'Recargo dominical (trabajo en domingo)' };
+        }
+        
+      case 'nocturno_dominical':
+        return { factor: 1.15, porcentaje: '115%', descripcion: 'Recargo nocturno dominical (domingo 10:00 PM - 6:00 AM)' };
+        
+      default:
+        return { factor: 0.0, porcentaje: '0%', descripcion: 'Tipo no válido' };
+    }
+  };
+
+  return [
+    { value: 'nocturno', ...getFactorTotal('nocturno') },
+    { value: 'dominical', ...getFactorTotal('dominical') },
+    { value: 'nocturno_dominical', ...getFactorTotal('nocturno_dominical') }
+  ];
+};
+
 export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidatedFormProps> = ({
   onBack,
   onSubmit,
@@ -44,77 +78,62 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     observacion: ''
   });
 
-  // ✅ NUEVO: Estados para tipos dinámicos
-  const [tiposRecargo, setTiposRecargo] = useState<any[]>([]);
+  // ✅ KISS: Tipos locales sin dependencias externas
+  const [tiposRecargo] = useState(() => getTiposRecargoLocal(periodoFecha));
+  const [isCalculating, setIsCalculating] = useState(false);
 
-  const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
-
-  // ✅ FASE 1: Cargar tipos de recargo dinámicos según fecha del período
-  useEffect(() => {
-    const fechaCalculo = periodoFecha || new Date();
-    
-    console.log('🔄 CONSOLIDADO: Cargando tipos de recargo dinámicos para fecha:', fechaCalculo.toISOString().split('T')[0]);
-    
-    const tiposDinamicos = RecargosCalculationService.getTiposRecargo(fechaCalculo);
-    
-    const tiposFormateados = tiposDinamicos.map(tipo => ({
-      value: tipo.tipo,
-      label: `${tipo.tipo === 'nocturno' ? 'Recargo Nocturno' : 
-               tipo.tipo === 'dominical' ? 'Recargo Dominical' :
-               tipo.tipo === 'festivo' ? 'Recargo Festivo' :
-               tipo.tipo === 'nocturno_dominical' ? 'Nocturno Dominical' :
-               'Nocturno Festivo'} (${tipo.porcentaje})`,
-      factor: tipo.factor,
-      porcentaje: tipo.porcentaje,
-      descripcion: tipo.descripcion,
-      normativa: tipo.normativa
-    }));
-    
-    setTiposRecargo(tiposFormateados);
-    
-    console.log('✅ CONSOLIDADO: Tipos cargados con factores dinámicos:', {
-      fechaCalculo: fechaCalculo.toISOString().split('T')[0],
-      tipos: tiposFormateados.map(t => ({ 
-        tipo: t.value, 
-        factor: t.factor, 
-        porcentaje: t.porcentaje 
-      }))
-    });
-  }, [periodoFecha]);
-
+  // ✅ KISS: Cálculo directo sin hooks complejos
   const calculateRecargoValue = async (tipo: string, horas: number, fechaEspecifica: string) => {
-    if (!tipo || horas <= 0 || !fechaEspecifica) return 0;
+    if (!tipo || horas <= 0 || !fechaEspecifica || !employeeSalary) return 0;
 
+    setIsCalculating(true);
+    
     try {
       const fechaParaCalculo = new Date(fechaEspecifica + 'T00:00:00');
       
-      console.log('🎯 CONSOLIDADO RECARGO: Calculando con servicio unificado:', {
-        fechaEspecifica,
-        fechaParaCalculo: fechaParaCalculo.toISOString().split('T')[0],
+      console.log('🎯 RECARGO CONSOLIDADO: Calculando:', {
         tipo,
         horas,
-        salario: employeeSalary
+        salario: employeeSalary,
+        fecha: fechaEspecifica
       });
 
-      const result = await calculateNovedad({
-        tipoNovedad: 'recargo_nocturno',
-        subtipo: tipo,
-        salarioBase: employeeSalary,
-        horas: horas,
-        fechaPeriodo: fechaParaCalculo
+      // ✅ KISS: Llamada directa al backend sin cache ni debounce
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { data, error } = await supabase.functions.invoke('payroll-calculations', {
+        body: {
+          action: 'calculate-novedad',
+          data: {
+            tipoNovedad: 'recargo_nocturno',
+            subtipo: tipo,
+            salarioBase: employeeSalary,
+            horas: horas,
+            fechaPeriodo: fechaParaCalculo.toISOString().split('T')[0]
+          }
+        }
       });
 
-      console.log('✅ CONSOLIDADO RECARGO: Resultado calculado:', {
-        fecha: fechaEspecifica,
-        tipo,
-        valor: result?.valor || 0,
-        factorUsado: result?.factorCalculo
-      });
+      if (error || !data?.success) {
+        console.error('❌ Error backend:', error);
+        // ✅ FALLBACK: Cálculo local simple
+        const tipoInfo = tiposRecargo.find(t => t.value === tipo);
+        const factor = tipoInfo?.factor || 0;
+        const valorLocal = Math.round((employeeSalary * factor * horas) / (30 * 7.333));
+        
+        console.log('✅ FALLBACK local:', { tipo, factor, valor: valorLocal });
+        return valorLocal;
+      }
 
-      return result?.valor || 0;
+      const valor = data.data?.valor || 0;
+      console.log('✅ BACKEND success:', { tipo, valor });
+      return valor;
+
     } catch (error) {
-      console.error('❌ CONSOLIDADO: Error calculating recargo:', error);
+      console.error('❌ Error calculando recargo:', error);
       return 0;
+    } finally {
+      setIsCalculating(false);
     }
   };
 
@@ -160,7 +179,15 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
 
   const getTipoLabel = (tipo: string) => {
     const tipoEncontrado = tiposRecargo.find(t => t.value === tipo);
-    return tipoEncontrado?.label || tipo;
+    if (!tipoEncontrado) return tipo;
+    
+    const labels = {
+      'nocturno': 'Recargo Nocturno',
+      'dominical': 'Recargo Dominical', 
+      'nocturno_dominical': 'Nocturno Dominical'
+    };
+    
+    return `${labels[tipo as keyof typeof labels] || tipo} (${tipoEncontrado.porcentaje})`;
   };
 
   return (
@@ -172,7 +199,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         <h3 className="text-lg font-semibold">Recargo Nocturno</h3>
       </div>
 
-      {/* ✅ NUEVO: Información de normativa aplicada */}
+      {/* Información de normativa aplicada */}
       {periodoFecha && (
         <div className="flex items-start gap-2 bg-blue-50 p-3 rounded text-sm text-blue-700">
           <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
@@ -180,7 +207,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
             <div className="font-medium">Normativa aplicada para período:</div>
             <div className="text-xs">{periodoFecha.toLocaleDateString('es-CO')}</div>
             <div className="text-xs mt-1">
-              Factores dinámicos según legislación colombiana vigente
+              Factores según legislación colombiana vigente
             </div>
           </div>
         </div>
@@ -211,11 +238,12 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
                   {tiposRecargo.map((tipo) => (
                     <SelectItem key={tipo.value} value={tipo.value}>
                       <div>
-                        <div className="font-medium">{tipo.label}</div>
+                        <div className="font-medium">
+                          {tipo.value === 'nocturno' ? 'Recargo Nocturno' : 
+                           tipo.value === 'dominical' ? 'Recargo Dominical' :
+                           'Nocturno Dominical'} ({tipo.porcentaje})
+                        </div>
                         <div className="text-xs text-gray-500">{tipo.descripcion}</div>
-                        {tipo.normativa && (
-                          <div className="text-xs text-blue-600 mt-1">{tipo.normativa}</div>
-                        )}
                       </div>
                     </SelectItem>
                   ))}
