@@ -246,15 +246,34 @@ function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
   }
 }
 
-// Factores de horas extra según legislación colombiana
-const HORAS_EXTRA_FACTORS = {
-  diurnas: 1.25,
-  nocturnas: 1.75,
-  dominicales_diurnas: 2.0,
-  dominicales_nocturnas: 2.5,
-  festivas_diurnas: 2.0,
-  festivas_nocturnas: 2.5
-} as const;
+// ✅ FUNCIÓN DINÁMICA NORMATIVA COLOMBIANA: Calcula factores combinando porcentajes según fecha
+function getFactorHoraExtra(subtipo: string, fechaPeriodo?: string): number {
+  const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+  
+  switch (subtipo) {
+    case 'diurnas':
+      return 1.25; // 1 + 0.25 (25% extra)
+      
+    case 'nocturnas':
+      return 1.75; // 1 + 0.75 (75% extra)
+      
+    case 'dominicales_diurnas':
+    case 'festivas_diurnas':
+      // ✅ NORMATIVA: 1 + 25% extra + factor dominical dinámico
+      const factorDominicalDiurno = getFactorRecargoTotal('dominical', fechaObj);
+      return 1 + 0.25 + factorDominicalDiurno.factorTotal;
+      
+    case 'dominicales_nocturnas':
+    case 'festivas_nocturnas':
+      // ✅ NORMATIVA: 1 + 75% extra + factor dominical dinámico
+      const factorDominicalNocturno = getFactorRecargoTotal('dominical', fechaObj);
+      return 1 + 0.75 + factorDominicalNocturno.factorTotal;
+      
+    default:
+      console.error(`❌ Subtipo de horas extra no válido: ${subtipo}`);
+      return 1.0;
+  }
+}
 
 // ✅ FUNCIÓN CORREGIDA: Cálculo con factores totales + fórmula unificada Aleluya - VERSIÓN ACTUALIZADA
 function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
@@ -270,14 +289,27 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         // ✅ Usar horas mensuales normales para horas extra
         const horasMensuales = getHorasMensuales(fechaPeriodo);
         const valorHoraOrdinaria = salarioBase / horasMensuales;
-        const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
+        const factor = getFactorHoraExtra(subtipo, fechaPeriodo);
         
-        if (factor) {
+        if (factor && factor > 0) {
           valor = Math.round(valorHoraOrdinaria * factor * horas);
           factorCalculo = factor;
-          detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
+          
+          // ✅ DETALLE NORMATIVO: Mostrar descomposición del factor según la ley
+          let detalleNormativo = '';
+          if (subtipo === 'dominicales_diurnas' || subtipo === 'festivas_diurnas') {
+            const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+            const factorDominical = getFactorRecargoTotal('dominical', fechaObj);
+            detalleNormativo = ` (1.00 + 0.25 + ${factorDominical.factorTotal} dominical = ${factor})`;
+          } else if (subtipo === 'dominicales_nocturnas' || subtipo === 'festivas_nocturnas') {
+            const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+            const factorDominical = getFactorRecargoTotal('dominical', fechaObj);
+            detalleNormativo = ` (1.00 + 0.75 + ${factorDominical.factorTotal} dominical = ${factor})`;
+          }
+          
+          detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor}${detalleNormativo} × ${horas} horas = ${valor.toLocaleString()}`;
         } else {
-          detalleCalculo = 'Subtipo de horas extra no válido';
+          detalleCalculo = 'Error: Factor de horas extra inválido para el subtipo especificado';
         }
       } else {
         detalleCalculo = 'Ingrese horas y seleccione subtipo';
