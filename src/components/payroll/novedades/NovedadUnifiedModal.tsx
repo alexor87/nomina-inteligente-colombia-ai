@@ -160,7 +160,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           observacion: entry.observacion || undefined,
           fecha_inicio: entry.fecha_inicio || undefined,
           fecha_fin: entry.fecha_fin || undefined,
-          subtipo: entry.subtipo || undefined,
+          subtipo: entry.subtipo || entry.tipo || undefined,
           base_calculo: entry.base_calculo || undefined
         };
 
