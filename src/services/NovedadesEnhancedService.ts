@@ -1,9 +1,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
+import { Database, Tables } from '@/integrations/supabase/types';
 
-// ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS PARA EVITAR CONFLICTOS
+// ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS
 type DatabaseNovedadType = Database['public']['Enums']['novedad_type'];
+type PayrollNovedad = Tables<'payroll_novedades'>;
 
 export interface CreateNovedadData {
   empleado_id: string;
@@ -14,28 +15,11 @@ export interface CreateNovedadData {
   dias?: number;
   observacion?: string;
   fecha_inicio?: string;
-  fecha_fin?: string;
+  fecha_fin?: string; 
   base_calculo?: any;
   subtipo?: string;
   company_id: string; // ✅ Required field
   constitutivo_salario?: boolean;
-}
-
-export interface PayrollNovedad {
-  id: string;
-  company_id: string;
-  empleado_id: string;
-  periodo_id: string;
-  tipo_novedad: DatabaseNovedadType;
-  valor: number;
-  horas?: number;
-  dias?: number;
-  observacion?: string;
-  fecha_inicio?: string;
-  fecha_fin?: string;
-  base_calculo?: any;
-  created_at: string;
-  updated_at: string;
 }
 
 /**
@@ -61,7 +45,7 @@ export class NovedadesEnhancedService {
       }
 
       console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
-      return (novedades || []) as PayrollNovedad[];
+      return (novedades || []);
       
     } catch (error) {
       console.error('💥 Error crítico en getNovedades:', error);

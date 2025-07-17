@@ -11,7 +11,6 @@ import { useToast } from './use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useNovedades = (periodId: string) => {
-  const [novedades, setNovedades] = useState<PayrollNovedad[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -34,7 +33,6 @@ export const useNovedades = (periodId: string) => {
         if (!profile?.company_id) return [];
 
         const novedades = await NovedadesEnhancedService.getNovedades(profile.company_id, periodId);
-        setNovedades(novedades);
         return novedades;
       } catch (error) {
         console.error("Error fetching novedades:", error);
@@ -134,7 +132,7 @@ export const useNovedades = (periodId: string) => {
           empleado_id: novedad.empleado_id,
           periodo_id: novedad.periodo_id,
           tipo_novedad: novedad.tipo_novedad,
-          subtipo: novedad.subtipo,
+          subtipo: (novedad as any).subtipo,
           valor: novedad.valor || 0,
           dias: novedad.dias,
           horas: novedad.horas,
@@ -162,7 +160,7 @@ export const useNovedades = (periodId: string) => {
   }, [periodId]);
 
   return {
-    novedades,
+    novedades: data || [],
     isLoading,
     error,
     createNovedad,
