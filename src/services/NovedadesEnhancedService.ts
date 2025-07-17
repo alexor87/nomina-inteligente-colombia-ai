@@ -129,6 +129,7 @@ export class NovedadesEnhancedService {
         fecha_inicio: novedadData.fecha_inicio,
         fecha_fin: novedadData.fecha_fin,
         base_calculo: novedadData.base_calculo,
+        subtipo: novedadData.subtipo,
         constitutivo_salario: novedadData.constitutivo_salario || false
       };
 

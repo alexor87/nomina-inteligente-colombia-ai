@@ -1,7 +1,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
-import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
+import type { Tables } from '@/integrations/supabase/types';
+
+type PayrollNovedad = Tables<'payroll_novedades'>;
 import { DisplayNovedad } from '@/types/vacation-integration';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './use-toast';
