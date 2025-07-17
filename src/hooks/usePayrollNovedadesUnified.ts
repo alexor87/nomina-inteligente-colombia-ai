@@ -3,7 +3,10 @@ import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
-import { CreateNovedadData, PayrollNovedad } from '@/types/novedades-enhanced';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
+import type { Tables } from '@/integrations/supabase/types';
+
+type PayrollNovedad = Tables<'payroll_novedades'>;
 import { supabase } from '@/integrations/supabase/client';
 
 export const usePayrollNovedadesUnified = (periodId: string) => {
