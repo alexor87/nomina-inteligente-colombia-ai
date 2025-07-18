@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calculator, Info } from 'lucide-react';
+import { ArrowLeft, Calculator, Info, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
+import { calculateDaysBetween, isValidDateRange } from '@/utils/dateUtils';
 
 interface NovedadIncapacidadFormProps {
   onBack: () => void;
@@ -52,7 +53,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     subtipo: 'general',
-    dias: '',
     fecha_inicio: '',
     fecha_fin: '',
     valor: 0,
@@ -61,15 +61,19 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
-  // ✅ CORRECCIÓN SINCRONIZACIÓN: useEffect optimizado sin race conditions
+  // ✅ Calcular días automáticamente basado en las fechas
+  const calculatedDays = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
+  const isValidRange = isValidDateRange(formData.fecha_inicio, formData.fecha_fin);
+
+  // ✅ CORRECCIÓN: Cálculo automático cuando cambien fechas o subtipo
   useEffect(() => {
-    const diasNum = parseInt(formData.dias);
-    
-    if (diasNum > 0 && formData.subtipo && employeeSalary > 0) {
+    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0) {
       console.log('🔄 Triggering calculation for incapacidad:', {
         subtipo: formData.subtipo,
-        dias: diasNum,
+        dias: calculatedDays,
         salario: employeeSalary,
+        fechaInicio: formData.fecha_inicio,
+        fechaFin: formData.fecha_fin,
         periodo: periodoFecha
       });
       
@@ -79,12 +83,12 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           tipoNovedad: 'incapacidad' as NovedadType,
           subtipo: formData.subtipo,
           salarioBase: employeeSalary,
-          dias: diasNum,
+          dias: calculatedDays,
           fechaPeriodo: periodoFecha || new Date()
         },
         (result) => {
           if (result && result.valor > 0) {
-            console.log('💰 Updating calculated value:', result.valor);
+            console.log('💰 Updating calculated value for', calculatedDays, 'days:', result.valor);
             
             // ✅ CORRECCIÓN CRÍTICA: Actualizar inmediatamente sin condiciones
             setFormData(prev => ({ 
@@ -100,50 +104,20 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           }
         }
       );
-    } else if (diasNum === 0 || !formData.dias) {
-      // ✅ Limpiar valor cuando no hay días
+    } else if (calculatedDays === 0 || !isValidRange) {
+      // ✅ Limpiar valor cuando no hay días válidos
       setFormData(prev => ({ 
         ...prev, 
         valor: 0 
       }));
     }
-  }, [formData.subtipo, formData.dias, employeeSalary, calculateNovedadDebounced, periodoFecha]);
-
-  // ✅ MEJORA UX: Calcular fechas automáticamente
-  const calculateEndDate = useCallback((startDate: string, days: number) => {
-    if (!startDate || days <= 0) return '';
-    
-    const start = new Date(startDate);
-    const end = new Date(start);
-    end.setDate(start.getDate() + days - 1); // -1 porque incluye el día inicial
-    
-    return end.toISOString().split('T')[0];
-  }, []);
+  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha]);
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => {
-      const newData = { ...prev, [field]: value };
-      
-      // ✅ Auto-calcular fecha fin cuando cambie inicio o días
-      if (field === 'fecha_inicio' || field === 'dias') {
-        const dias = field === 'dias' ? parseInt(value) || 0 : parseInt(prev.dias) || 0;
-        const fechaInicio = field === 'fecha_inicio' ? value : prev.fecha_inicio;
-        
-        if (fechaInicio && dias > 0) {
-          newData.fecha_fin = calculateEndDate(fechaInicio, dias);
-        }
-      }
-      
-      return newData;
-    });
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = () => {
-    if (!formData.dias || parseInt(formData.dias) <= 0) {
-      alert('Por favor ingrese los días de incapacidad');
-      return;
-    }
-
     if (!formData.fecha_inicio) {
       alert('Por favor seleccione la fecha de inicio');
       return;
@@ -151,6 +125,16 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
     if (!formData.fecha_fin) {
       alert('Por favor seleccione la fecha de fin');
+      return;
+    }
+
+    if (!isValidRange) {
+      alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
+      return;
+    }
+
+    if (calculatedDays <= 0) {
+      alert('El rango de fechas debe ser válido');
       return;
     }
 
@@ -162,7 +146,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     const submitData = {
       tipo_novedad: 'incapacidad',
       subtipo: formData.subtipo,
-      dias: parseInt(formData.dias),
+      dias: calculatedDays, // ✅ Usar días calculados automáticamente
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
       valor: formData.valor,
@@ -232,17 +216,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           )}
         </div>
 
-        <div>
-          <Label htmlFor="dias" className="text-gray-700">Días de Incapacidad *</Label>
-          <Input
-            type="number"
-            min="1"
-            value={formData.dias}
-            onChange={(e) => handleInputChange('dias', e.target.value)}
-            placeholder="0"
-          />
-        </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="fecha_inicio" className="text-gray-700">Fecha Inicio *</Label>
@@ -254,26 +227,48 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
 
           <div>
-            <Label htmlFor="fecha_fin" className="text-gray-700">
-              Fecha Fin * 
-              {formData.fecha_inicio && formData.dias && (
-                <span className="text-xs text-gray-500 ml-1">(calculada automáticamente)</span>
-              )}
-            </Label>
+            <Label htmlFor="fecha_fin" className="text-gray-700">Fecha Fin *</Label>
             <Input
               type="date"
               value={formData.fecha_fin}
               onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
             />
+            {!isValidRange && formData.fecha_inicio && formData.fecha_fin && (
+              <div className="text-xs text-red-600 mt-1">
+                La fecha de fin debe ser igual o posterior a la fecha de inicio
+              </div>
+            )}
           </div>
         </div>
 
+        {/* ✅ NUEVO: Mostrar días calculados automáticamente */}
+        {formData.fecha_inicio && formData.fecha_fin && (
+          <div className="bg-white p-3 rounded border border-blue-200">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-gray-700">
+                Días calculados: 
+              </span>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                {isValidRange ? `${calculatedDays} días` : 'Rango inválido'}
+              </Badge>
+            </div>
+            {isValidRange && (
+              <div className="text-xs text-gray-600 mt-1">
+                Del {formData.fecha_inicio} al {formData.fecha_fin} (ambos días incluidos)
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ✅ MEJORA UX: Feedback de cálculo más claro */}
-        {isLoading && (
+        {isLoading && calculatedDays > 0 && (
           <div className="bg-blue-50 p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
-              <span className="text-sm text-blue-700">Calculando valor según normativa colombiana...</span>
+              <span className="text-sm text-blue-700">
+                Calculando valor para {calculatedDays} días según normativa colombiana...
+              </span>
             </div>
           </div>
         )}
@@ -310,13 +305,13 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </div>
 
         {/* ✅ Preview mejorado */}
-        {formData.valor > 0 && (
+        {formData.valor > 0 && calculatedDays > 0 && (
           <div className="bg-green-50 p-3 rounded text-center border border-green-200">
             <Badge variant="secondary" className="bg-green-100 text-green-800 text-base px-4 py-2">
               +{formatCurrency(formData.valor)}
             </Badge>
             <div className="text-sm text-gray-700 mt-2">
-              {formData.dias} días de incapacidad {currentSubtipoInfo?.label.toLowerCase()}
+              {calculatedDays} días de incapacidad {currentSubtipoInfo?.label.toLowerCase()}
             </div>
             {currentSubtipoInfo && (
               <div className="text-xs text-gray-600 mt-1">
@@ -334,7 +329,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.dias || !formData.fecha_inicio || !formData.fecha_fin || formData.valor <= 0 || isSubmitting}
+          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays <= 0 || formData.valor <= 0 || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700"
         >
           {isSubmitting ? 'Guardando...' : 'Guardar Incapacidad'}
