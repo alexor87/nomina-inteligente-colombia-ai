@@ -54,8 +54,9 @@ interface PayrollConfiguration {
   };
 }
 
+// ✅ CORREGIDO: Salario mínimo 2025 según normativa colombiana
 const DEFAULT_CONFIG_2025: PayrollConfiguration = {
-  salarioMinimo: 1300000,
+  salarioMinimo: 1423500, // ✅ ACTUALIZADO: Salario mínimo 2025
   auxilioTransporte: 200000,
   uvt: 47065,
   porcentajes: {
@@ -397,19 +398,47 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         const salarioDiario = salarioBase / 30;
         
         if (subtipo === 'general') {
-          const diasPagados = Math.max(0, dias - 3);
-          if (diasPagados > 0) {
-            valor = Math.round(salarioDiario * 0.667 * diasPagados);
-            factorCalculo = 0.667;
-            detalleCalculo = `Incapacidad general: (${salarioBase.toLocaleString()} / 30) × 66.7% × ${diasPagados} días (desde día 4) = ${valor.toLocaleString()}`;
-          } else {
-            detalleCalculo = 'Incapacidad general: EPS paga desde el día 4';
+          // ✅ NUEVA LÓGICA: Cálculo desde día 1 según normativa colombiana
+          console.log(`🏥 [INCAPACIDAD v3.0] Calculando incapacidad general: ${dias} días, salario base: ${salarioBase}`);
+          
+          // Calcular valor diario al 66.67%
+          const valorDiarioCalculado = salarioDiario * 0.6667;
+          
+          // ✅ TOPE MÍNIMO: SMLDV 2025 = $1.423.500 / 30 = $47.450
+          const smldv = DEFAULT_CONFIG_2025.salarioMinimo / 30;
+          
+          // Aplicar el mayor entre el cálculo y el SMLDV
+          const valorDiarioFinal = Math.max(valorDiarioCalculado, smldv);
+          
+          // Aplicar a TODOS los días (desde día 1)
+          valor = Math.round(valorDiarioFinal * dias);
+          factorCalculo = valorDiarioFinal / salarioDiario; // Factor efectivo aplicado
+          
+          console.log(`🧮 [INCAPACIDAD v3.0] CÁLCULO DETALLADO:`);
+          console.log(`  - Salario diario: $${salarioDiario.toFixed(2)}`);
+          console.log(`  - Valor al 66.67%: $${valorDiarioCalculado.toFixed(2)}`);
+          console.log(`  - SMLDV 2025: $${smldv.toFixed(2)}`);
+          console.log(`  - Valor diario final: $${valorDiarioFinal.toFixed(2)}`);
+          console.log(`  - Total ${dias} días: $${valor}`);
+          
+          // ✅ DETALLE NORMATIVO COMPLETO
+          const tipoTope = valorDiarioFinal === smldv ? '(aplicando SMLDV como tope mínimo)' : '(66.67% del salario)';
+          detalleCalculo = `Incapacidad general: ${dias} días × $${Math.round(valorDiarioFinal).toLocaleString()} ${tipoTope} = $${valor.toLocaleString()}`;
+          
+          // ✅ VALIDACIÓN CON CASOS DE PRUEBA
+          if (salarioBase === 1200000 && dias === 3 && Math.abs(valor - 142350) < 100) {
+            console.log('✅ [INCAPACIDAD v3.0] CASO 1 SUCCESS: $1.200.000 × 3 días = $142.350');
+          } else if (salarioBase === 2000000 && dias === 5 && Math.abs(valor - 237250) < 100) {
+            console.log('✅ [INCAPACIDAD v3.0] CASO 2 SUCCESS: $2.000.000 × 5 días = $237.250');
           }
+          
         } else if (subtipo === 'laboral') {
+          // Incapacidades laborales: 100% desde día 1
           valor = Math.round(salarioDiario * dias);
           factorCalculo = 1;
           detalleCalculo = `Incapacidad laboral: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
         } else if (subtipo === 'maternidad') {
+          // Incapacidades de maternidad: 100% desde día 1
           valor = Math.round(salarioDiario * dias);
           factorCalculo = 1;
           detalleCalculo = `Incapacidad maternidad: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
@@ -510,9 +539,9 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
     }
   };
   
-  // ✅ DEBUG FINAL: Log del resultado para nocturno dominical - ACTUALIZADO
-  if (tipoNovedad === 'recargo_nocturno' && subtipo === 'nocturno_dominical') {
-    console.log(`🏁 [EDGE v2.0] RESULTADO FINAL NOCTURNO DOMINICAL: valor=${result.valor}, factorCalculo=${result.factorCalculo}`);
+  // ✅ DEBUG FINAL: Log del resultado para casos específicos
+  if (tipoNovedad === 'incapacidad' && subtipo === 'general') {
+    console.log(`🏁 [INCAPACIDAD v3.0] RESULTADO FINAL: valor=$${result.valor}, días=${dias}, base=$${salarioBase}`);
   }
   
   return result;
@@ -676,7 +705,7 @@ serve(async (req) => {
   try {
     const { action, data } = await req.json();
 
-    console.log(`🚀 [EDGE v2.0] Request received: action="${action}", tipoNovedad="${data?.tipoNovedad}", subtipo="${data?.subtipo}"`);
+    console.log(`🚀 [EDGE v3.0] Request received: action="${action}", tipoNovedad="${data?.tipoNovedad}", subtipo="${data?.subtipo}"`);
 
     switch (action) {
       case 'calculate':
@@ -698,9 +727,9 @@ serve(async (req) => {
         });
 
       case 'calculate-novedad':
-        console.log(`🎯 [EDGE v2.0] Calculating novedad: ${data.tipoNovedad} - ${data.subtipo}`);
+        console.log(`🎯 [EDGE v3.0] Calculating novedad: ${data.tipoNovedad} - ${data.subtipo}`);
         const novedadResult = calculateNovedadUltraKiss(data);
-        console.log(`🎯 [EDGE v2.0] Novedad result: valor=${novedadResult.valor}`);
+        console.log(`🎯 [EDGE v3.0] Novedad result: valor=${novedadResult.valor}`);
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
