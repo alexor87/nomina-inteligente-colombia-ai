@@ -31,7 +31,7 @@ export const useNovedadBackendCalculation = () => {
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
 
-  // ✅ KISS: Cálculo directo sin cache compartido
+  // ✅ KISS: Cálculo directo optimizado
   const calculateNovedad = useCallback(async (
     input: NovedadCalculationInput
   ): Promise<NovedadCalculationResult | null> => {
@@ -69,7 +69,8 @@ export const useNovedadBackendCalculation = () => {
           subtipo: input.subtipo,
           fecha: fechaParaCalculo,
           salario: input.salarioBase,
-          horas: input.horas
+          horas: input.horas,
+          dias: input.dias
         });
       }
 
@@ -103,7 +104,8 @@ export const useNovedadBackendCalculation = () => {
       console.log('✅ HOOK SUCCESS:', {
         tipo: input.subtipo || input.tipoNovedad,
         valor: result.valor,
-        factor: result.factorCalculo
+        factor: result.factorCalculo,
+        detalle: result.detalleCalculo
       });
 
       return result;
@@ -117,20 +119,34 @@ export const useNovedadBackendCalculation = () => {
     }
   }, []);
 
-  // ✅ KISS: Debounce simple sin cache compartido
+  // ✅ CORRECCIÓN SINCRONIZACIÓN: Debounce mejorado con callback inmediato
   const calculateNovedadDebounced = useCallback((
     input: NovedadCalculationInput,
     callback: (result: NovedadCalculationResult | null) => void,
-    delay: number = 500
+    delay: number = 300
   ) => {
+    // Limpiar timeout previo
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    debounceRef.current = setTimeout(async () => {
-      const result = await calculateNovedad(input);
-      callback(result);
-    }, delay);
+    // ✅ KISS: Ejecutar inmediatamente si tenemos todos los datos necesarios
+    const hasRequiredData = input.salarioBase > 0 && (
+      (['horas_extra', 'recargo_nocturno'].includes(input.tipoNovedad) && input.horas && input.horas > 0) ||
+      (['incapacidad', 'vacaciones', 'licencia_remunerada'].includes(input.tipoNovedad) && input.dias && input.dias > 0) ||
+      (!['horas_extra', 'recargo_nocturno', 'incapacidad', 'vacaciones', 'licencia_remunerada'].includes(input.tipoNovedad))
+    );
+
+    if (hasRequiredData) {
+      // ✅ Ejecutar inmediatamente para mejor UX
+      calculateNovedad(input).then(callback);
+    } else {
+      // ✅ Usar debounce solo cuando faltan datos
+      debounceRef.current = setTimeout(async () => {
+        const result = await calculateNovedad(input);
+        callback(result);
+      }, delay);
+    }
   }, [calculateNovedad]);
 
   return {
