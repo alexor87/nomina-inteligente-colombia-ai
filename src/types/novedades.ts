@@ -59,7 +59,7 @@ export type NovedadType =
   | 'recargo_nocturno'
   | 'vacaciones'
   | 'licencia_remunerada'
-  | 'licencia_no_remunerada' // ✅ AGREGADO
+  | 'licencia_no_remunerada'
   | 'incapacidad'
   | 'bonificacion'
   | 'comision'
@@ -124,25 +124,28 @@ export const NOVEDAD_CATEGORIES = {
       },
       incapacidad: {
         label: 'Incapacidad',
+        description: 'Incapacidades médicas por enfermedad o accidente',
         requiere_horas: false,
         requiere_dias: true,
         auto_calculo: true,
-        subtipos: ['general', 'laboral', 'maternidad']
+        legal_note: 'Pago según normativa de seguridad social',
+        subtipos: ['general', 'laboral']
       },
       licencia_remunerada: {
         label: 'Licencia Remunerada',
+        description: 'Licencias laborales con pago del 100% del salario',
         requiere_horas: false,
         requiere_dias: true,
         auto_calculo: true,
-        subtipos: ['paternidad', 'matrimonio', 'luto', 'estudio']
+        legal_note: 'Derecho del trabajador según Arts. 57, 230 CST y normas especiales',
+        subtipos: ['paternidad', 'maternidad', 'matrimonio', 'luto', 'estudio']
       },
-      // ✅ AGREGADO: Licencia no remunerada
       licencia_no_remunerada: {
         label: 'Licencia No Remunerada',
         description: 'Permiso autorizado sin pago que mantiene el vínculo laboral',
         requiere_horas: false,
         requiere_dias: true,
-        auto_calculo: false, // Siempre valor $0
+        auto_calculo: false,
         legal_note: 'Suspende temporalmente prestaciones sociales según Art. 51 CST',
         affects_benefits: true,
         subtipos: [
@@ -235,7 +238,7 @@ export const calcularValorNovedad = (
   salarioBase: number,
   dias?: number,
   horas?: number,
-  fechaPeriodo?: Date // ✅ NUEVO: Fecha del período para factores dinámicos
+  fechaPeriodo?: Date
 ): { valor: number; baseCalculo: BaseCalculoData } => {
   console.log('🧮 Calculando novedad con fecha del período:', { 
     tipoNovedad, 
@@ -344,27 +347,31 @@ export const calcularValorNovedad = (
         const salarioDiario = salarioBase / 30;
         
         if (subtipo === 'general') {
-          // EPS paga 66.7% desde el día 4
-          const diasPagados = Math.max(0, dias - 3);
-          if (diasPagados > 0) {
-            valor = Math.round(salarioDiario * 0.667 * diasPagados);
-            factorCalculo = 0.667;
-            detalleCalculo = `Incapacidad general: (${salarioBase.toLocaleString()} / 30) × 66.7% × ${diasPagados} días (desde día 4) = ${valor.toLocaleString()}`;
-          } else {
-            detalleCalculo = 'Incapacidad general: EPS paga desde el día 4';
-          }
+          // ✅ NUEVA LÓGICA: Cálculo desde día 1 según normativa colombiana
+          console.log(`🏥 [INCAPACIDAD v3.0] Calculando incapacidad general: ${dias} días, salario base: ${salarioBase}`);
+          
+          // Calcular valor diario al 66.67%
+          const valorDiarioCalculado = salarioDiario * 0.6667;
+          
+          // ✅ TOPE MÍNIMO: SMLDV 2025 = $1.423.500 / 30 = $47.450
+          const smldv = 1423500 / 30;
+          
+          // Aplicar el mayor entre el cálculo y el SMLDV
+          const valorDiarioFinal = Math.max(valorDiarioCalculado, smldv);
+          
+          // Aplicar a TODOS los días (desde día 1)
+          valor = Math.round(valorDiarioFinal * dias);
+          factorCalculo = valorDiarioFinal / salarioDiario;
+          
+          const tipoTope = valorDiarioFinal === smldv ? '(aplicando SMLDV como tope mínimo)' : '(66.67% del salario)';
+          detalleCalculo = `Incapacidad general: ${dias} días × $${Math.round(valorDiarioFinal).toLocaleString()} ${tipoTope} = $${valor.toLocaleString()}`;
+          
         } else if (subtipo === 'laboral') {
-          // ARL paga 100% desde el día 1
+          // Incapacidades laborales: 100% desde día 1
           valor = Math.round(salarioDiario * dias);
           factorCalculo = 1;
           detalleCalculo = `Incapacidad laboral: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
-        } else if (subtipo === 'maternidad') {
-          // 100% del salario
-          valor = Math.round(salarioDiario * dias);
-          factorCalculo = 1;
-          detalleCalculo = `Incapacidad maternidad: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
         }
-        console.log('Resultado incapacidad:', { subtipo, dias, valor });
       } else {
         detalleCalculo = 'Ingrese días y seleccione tipo de incapacidad';
       }
@@ -387,8 +394,15 @@ export const calcularValorNovedad = (
         const salarioDiario = salarioBase / 30;
         valor = Math.round(salarioDiario * dias);
         factorCalculo = 1;
-        detalleCalculo = `Licencia remunerada: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
-        console.log('Resultado licencia remunerada:', { dias, valor });
+        
+        // ✅ NUEVA LÓGICA: Manejo específico para maternidad
+        if (subtipo === 'maternidad') {
+          detalleCalculo = `Licencia de maternidad: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()} (Ley 1822/2017 - Pago EPS)`;
+        } else {
+          detalleCalculo = `Licencia remunerada: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+        }
+        
+        console.log('Resultado licencia remunerada:', { subtipo, dias, valor });
       } else {
         detalleCalculo = 'Ingrese los días de licencia';
       }

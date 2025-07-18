@@ -80,7 +80,7 @@ const deduccionesCategorias = [
   {
     id: 'incapacidades' as NovedadCategory,
     title: 'Incapacidades',
-    description: 'Común, laboral y maternidad',
+    description: 'Común y laboral', // ✅ ACTUALIZADO: Removida "maternidad"
     icon: AlertTriangle,
     color: 'bg-red-500',
     textColor: 'text-red-600',
@@ -90,7 +90,7 @@ const deduccionesCategorias = [
   {
     id: 'licencias' as NovedadCategory,
     title: 'Licencias',
-    description: 'Remuneradas y no remuneradas',
+    description: 'Paternidad, maternidad, matrimonio, luto', // ✅ ACTUALIZADO: Agregada "maternidad"
     icon: FileText,
     color: 'bg-indigo-500',
     textColor: 'text-indigo-600',

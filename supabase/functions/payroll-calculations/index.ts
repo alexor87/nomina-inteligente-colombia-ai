@@ -437,12 +437,8 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           valor = Math.round(salarioDiario * dias);
           factorCalculo = 1;
           detalleCalculo = `Incapacidad laboral: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
-        } else if (subtipo === 'maternidad') {
-          // Incapacidades de maternidad: 100% desde día 1
-          valor = Math.round(salarioDiario * dias);
-          factorCalculo = 1;
-          detalleCalculo = `Incapacidad maternidad: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
         }
+        // ✅ REMOVIDO: case 'maternidad' (ahora está en licencia_remunerada)
       } else {
         detalleCalculo = 'Ingrese días y seleccione tipo de incapacidad';
       }
@@ -453,7 +449,14 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         const salarioDiario = salarioBase / 30;
         valor = Math.round(salarioDiario * dias);
         factorCalculo = 1;
-        detalleCalculo = `Licencia remunerada: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+        
+        // ✅ NUEVA LÓGICA: Manejo específico para maternidad
+        if (subtipo === 'maternidad') {
+          detalleCalculo = `Licencia de maternidad: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()} (Ley 1822/2017 - Pago EPS)`;
+          console.log('✅ [MATERNIDAD] Calculada como licencia remunerada:', { dias, valor });
+        } else {
+          detalleCalculo = `Licencia remunerada: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+        }
       } else {
         detalleCalculo = 'Ingrese los días de licencia';
       }

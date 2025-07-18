@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,16 +16,17 @@ interface NovedadLicenciasFormProps {
   isSubmitting: boolean;
 }
 
-// ✅ NUEVA ESTRUCTURA: Diferenciación legal clara
+// ✅ NUEVA ESTRUCTURA: Diferenciación legal clara con maternidad incluida
 const licenciaTypes = [
   { 
     value: 'remunerada', 
     label: 'Licencia Remunerada', 
     description: 'Se paga el 100% del salario durante la ausencia',
-    legalBasis: 'Arts. 57, 230 CST',
+    legalBasis: 'Arts. 57, 230 CST y normas especiales',
     color: 'green',
     subtipos: [
       { value: 'paternidad', label: 'Paternidad', dias: 8, obligatoria: true },
+      { value: 'maternidad', label: 'Maternidad', dias: 126, obligatoria: true, normativa: 'Ley 1822/2017' },
       { value: 'matrimonio', label: 'Matrimonio', dias: 5, obligatoria: true },
       { value: 'luto', label: 'Luto', dias: 5, obligatoria: true },
       { value: 'estudio', label: 'Estudios', dias: null, obligatoria: false }
@@ -86,7 +86,7 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
       tipo_novedad: novedadType,
       subtipo: subtipo || tipoLicencia,
       dias: parseFloat(dias),
-      valor: tipoLicencia === 'remunerada' ? Math.abs(valorCalculado) : 0, // No remunerada siempre $0
+      valor: tipoLicencia === 'remunerada' ? Math.abs(valorCalculado) : 0,
       observacion: `${observacion} (${tipoLicencia === 'remunerada' ? 'Licencia Remunerada' : 'Licencia No Remunerada'})`.trim()
     });
   };
@@ -116,6 +116,7 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
             <h4 className="font-medium text-blue-800 mb-2">Marco Legal Colombiano</h4>
             <div className="text-sm text-blue-700 space-y-1">
               <p><strong>Licencia Remunerada:</strong> Derecho del trabajador con pago del 100% del salario (Arts. 57, 230 CST)</p>
+              <p><strong>Licencia de Maternidad:</strong> 18 semanas pagadas por la EPS (Ley 1822/2017)</p>
               <p><strong>Licencia No Remunerada:</strong> Permiso autorizado sin pago que suspende temporalmente prestaciones (Art. 51 CST)</p>
             </div>
           </div>
@@ -213,6 +214,21 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
               </div>
             </div>
 
+            {/* ✅ NUEVA SECCIÓN: Información específica para maternidad */}
+            {subtipo === 'maternidad' && (
+              <div className="p-3 bg-pink-50 border border-pink-200 rounded">
+                <div className="flex items-center gap-2 text-pink-700 mb-1">
+                  <Info className="h-4 w-4" />
+                  <span className="font-medium">Licencia de Maternidad</span>
+                </div>
+                <div className="text-sm text-pink-600 space-y-1">
+                  <p><strong>Duración legal:</strong> 18 semanas (126 días) - Ley 1822/2017</p>
+                  <p><strong>Pago:</strong> 100% del salario a cargo de la EPS</p>
+                  <p><strong>Puede extenderse:</strong> 2 semanas adicionales en casos especiales</p>
+                </div>
+              </div>
+            )}
+
             {/* Días sugeridos para licencias obligatorias */}
             {selectedSubtipo?.obligatoria && selectedSubtipo.dias && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded">
@@ -222,6 +238,11 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
                 </div>
                 <p className="text-sm text-blue-600">
                   Esta licencia tiene derecho legal a <strong>{selectedSubtipo.dias} días</strong> según la normativa vigente.
+                  {selectedSubtipo.normativa && (
+                    <span className="block text-xs mt-1 text-blue-500">
+                      Normativa: {selectedSubtipo.normativa}
+                    </span>
+                  )}
                 </p>
               </div>
             )}
@@ -256,6 +277,11 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
             {tipoLicencia === 'no_remunerada' && (
               <p className="text-xs text-yellow-600 mt-1">
                 Las licencias no remuneradas no generan pago pero mantienen el vínculo laboral
+              </p>
+            )}
+            {subtipo === 'maternidad' && tipoLicencia === 'remunerada' && (
+              <p className="text-xs text-green-600 mt-1">
+                ✅ Licencia de maternidad: Pago a cargo de la EPS según Ley 1822/2017
               </p>
             )}
           </div>
