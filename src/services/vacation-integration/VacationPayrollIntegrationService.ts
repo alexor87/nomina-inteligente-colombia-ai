@@ -8,14 +8,17 @@ export class VacationPayrollIntegrationService {
     try {
       console.log('🔄 Processing vacations for payroll period:', options);
 
-      // Get pending vacation periods that fall within the payroll period
+      // ✅ CORREGIDA: Obtener ausencias pendientes que se solapen con el período (no solo las contenidas)
       const { data: pendingVacations, error: vacationError } = await supabase
         .from('employee_vacation_periods')
-        .select('*')
+        .select(`
+          *,
+          employees!inner(id, nombre, apellido, salario_base)
+        `)
         .eq('company_id', options.companyId)
         .eq('status', 'pendiente')
-        .gte('start_date', options.startDate)
-        .lte('end_date', options.endDate);
+        .lte('start_date', options.endDate)   // La ausencia empieza antes o durante el período
+        .gte('end_date', options.startDate);  // La ausencia termina después o durante el período
 
       if (vacationError) {
         throw new Error(`Error fetching vacation periods: ${vacationError.message}`);
@@ -32,6 +35,46 @@ export class VacationPayrollIntegrationService {
       }
 
       console.log(`📋 Encontradas ${pendingVacations.length} licencias/ausencias pendientes`);
+
+      let createdNovedades = 0;
+
+      // ✅ NUEVA: Crear novedades en payroll_novedades para cada ausencia
+      for (const vacation of pendingVacations) {
+        try {
+          // Calcular el valor de la novedad
+          const valor = this.calculateVacationValue(
+            vacation.type,
+            vacation.employees.salario_base,
+            vacation.days_count
+          );
+
+          // Crear novedad correspondiente
+          const { error: novedadError } = await supabase
+            .from('payroll_novedades')
+            .insert({
+              company_id: options.companyId,
+              empleado_id: vacation.employee_id,
+              periodo_id: options.periodId,
+              tipo_novedad: vacation.type, // Mapeo directo del tipo
+              subtipo: vacation.subtipo,
+              valor: Math.round(valor),
+              dias: vacation.days_count,
+              fecha_inicio: vacation.start_date,
+              fecha_fin: vacation.end_date,
+              observacion: vacation.observations || `Ausencia procesada automáticamente desde el período ${vacation.start_date} - ${vacation.end_date}`,
+              creado_por: null // Sistema automático
+            });
+
+          if (novedadError) {
+            console.error(`Error creando novedad para ausencia ${vacation.id}:`, novedadError);
+          } else {
+            createdNovedades++;
+            console.log(`✅ Novedad creada para ${vacation.employees.nombre} ${vacation.employees.apellido} - Tipo: ${vacation.type}`);
+          }
+        } catch (error) {
+          console.error(`Error procesando ausencia ${vacation.id}:`, error);
+        }
+      }
 
       // Cambiar status de 'pendiente' a 'liquidada' 
       const { error: updateError } = await supabase
@@ -59,7 +102,7 @@ export class VacationPayrollIntegrationService {
         NovedadesCalculationService.invalidateCache(employeeId, options.periodId);
       });
 
-      console.log(`✅ Processed ${pendingVacations.length} vacation periods for ${affectedEmployees.length} employees`);
+      console.log(`✅ Processed ${pendingVacations.length} vacation periods and created ${createdNovedades} novelties for ${affectedEmployees.length} employees`);
 
       // Create detailed message about what was processed
       const vacationTypes = pendingVacations.reduce((acc, v) => {
@@ -80,10 +123,10 @@ export class VacationPayrollIntegrationService {
 
       return {
         processedVacations: pendingVacations.length,
-        createdNovedades: 0,
+        createdNovedades: createdNovedades,
         conflicts: [],
         success: true,
-        message: `Se procesaron exitosamente: ${typeMessages}`
+        message: `Se procesaron exitosamente: ${typeMessages}. Se crearon ${createdNovedades} novedades.`
       };
 
     } catch (error) {
