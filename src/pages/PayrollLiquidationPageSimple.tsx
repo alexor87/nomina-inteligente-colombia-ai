@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,13 +22,14 @@ const PayrollLiquidationPageSimple = () => {
     isLoading,
     isLiquidating,
     loadEmployees,
+    loadEmployeesWithVacations,
     addEmployees,
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
     currentPeriodId,
     
-    // Nuevas propiedades para conflictos
+    // Propiedades para conflictos
     conflictDetectionStep,
     conflictReport,
     hasConflicts,
@@ -46,8 +46,8 @@ const PayrollLiquidationPageSimple = () => {
     console.log('🎯 Período seleccionado:', period.label);
     setSelectedPeriod(period);
     
-    // Cargar empleados con detección de conflictos
-    await loadEmployees(period.startDate, period.endDate);
+    // ✅ USAR EL MÉTODO CON INTEGRACIÓN AUTOMÁTICA DE VACACIONES
+    await loadEmployeesWithVacations(period.startDate, period.endDate);
   };
 
   const handleLiquidate = async () => {

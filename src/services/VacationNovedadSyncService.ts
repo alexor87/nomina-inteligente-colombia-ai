@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
 import { calculateDaysBetween } from '@/utils/dateUtils';
@@ -71,10 +72,100 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * Obtener datos unificados de vacaciones y novedades
+   * ✅ CORREGIDO: Obtener datos unificados de vacaciones y novedades
    */
   static async getUnifiedVacationData(filters: any = {}) {
-    // Combinar datos de ambas tablas manualmente hasta que se actualice el schema
+    console.log('🔄 Fetching unified vacation data with filters:', filters);
+    
+    try {
+      // ✅ USAR LA VISTA UNIFICADA CREADA EN LA MIGRACIÓN
+      let query = supabase
+        .from('unified_vacation_novedad_view')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // Aplicar filtros
+      if (filters.type) {
+        query = query.eq('tipo_novedad', filters.type);
+      }
+      if (filters.status) {
+        query = query.eq('status', filters.status);
+      }
+      if (filters.employee_search) {
+        const search = filters.employee_search.toLowerCase();
+        query = query.or(`employee_nombre.ilike.%${search}%,employee_apellido.ilike.%${search}%,employee_cedula.ilike.%${search}%`);
+      }
+      if (filters.date_from) {
+        query = query.gte('fecha_inicio', filters.date_from);
+      }
+      if (filters.date_to) {
+        query = query.lte('fecha_fin', filters.date_to);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('❌ Error fetching unified data:', error);
+        throw error;
+      }
+
+      console.log('✅ Unified data fetched successfully:', data?.length || 0, 'records');
+      
+      // Transformar datos para compatibilidad con interfaz existente
+      const transformedData = (data || []).map(item => ({
+        source_type: item.source_type,
+        id: item.id,
+        empleado_id: item.empleado_id,
+        company_id: item.company_id,
+        periodo_id: item.periodo_id,
+        tipo_novedad: item.tipo_novedad,
+        subtipo: item.subtipo,
+        fecha_inicio: item.fecha_inicio,
+        fecha_fin: item.fecha_fin,
+        dias: item.dias,
+        valor: item.valor,
+        observacion: item.observacion,
+        status: item.status,
+        creado_por: item.creado_por,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        employee_nombre: item.employee_nombre,
+        employee_apellido: item.employee_apellido,
+        employee_cedula: item.employee_cedula,
+        employee: {
+          id: item.empleado_id,
+          nombre: item.employee_nombre || '',
+          apellido: item.employee_apellido || '',
+          cedula: item.employee_cedula || ''
+        },
+        
+        // ✅ MAPEO PARA COMPATIBILIDAD CON VacationAbsence
+        employee_id: item.empleado_id,
+        type: item.tipo_novedad as any,
+        start_date: item.fecha_inicio,
+        end_date: item.fecha_fin,
+        days_count: item.dias || 0,
+        observations: item.observacion,
+        created_by: item.creado_por,
+        processed_in_period_id: item.periodo_id
+      }));
+
+      return transformedData;
+
+    } catch (error) {
+      console.error('❌ Error en getUnifiedVacationData:', error);
+      
+      // ✅ FALLBACK: Si la vista no existe, usar queries separadas
+      return await VacationNovedadSyncService.getFallbackUnifiedData(filters);
+    }
+  }
+
+  /**
+   * ✅ NUEVO: Método fallback para cuando la vista DB no esté disponible
+   */
+  static async getFallbackUnifiedData(filters: any = {}) {
+    console.log('⚠️ Using fallback method for unified data');
+    
     const [vacationsResult, novedadesResult] = await Promise.all([
       supabase
         .from('employee_vacation_periods')
@@ -110,7 +201,7 @@ export class VacationNovedadSyncService {
         fecha_inicio: item.start_date,
         fecha_fin: item.end_date,
         dias: item.days_count,
-        valor: 0, // Se calculará en el backend
+        valor: 0, // Se calculará en el backend o vista
         observacion: item.observations,
         status: item.status as 'pendiente' | 'liquidada' | 'cancelada',
         creado_por: item.created_by,
@@ -165,7 +256,7 @@ export class VacationNovedadSyncService {
       }))
     ];
 
-    // Aplicar filtros
+    // Aplicar filtros manualmente
     let filteredData = unifiedData;
     
     if (filters.type) {
@@ -189,7 +280,6 @@ export class VacationNovedadSyncService {
       filteredData = filteredData.filter(item => item.fecha_fin <= filters.date_to);
     }
 
-    // Ordenar por fecha de creación descendente
     return filteredData.sort((a, b) => 
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
