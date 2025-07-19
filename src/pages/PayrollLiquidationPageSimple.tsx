@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,18 +18,18 @@ const PayrollLiquidationPageSimple = () => {
   const { companyId } = useCurrentCompany();
   
   const {
+    currentPeriod,
     employees,
     isLoading,
     isLiquidating,
     loadEmployees,
-    loadEmployeesWithVacations,
     addEmployees,
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
     currentPeriodId,
     
-    // Propiedades para conflictos
+    // Nuevas propiedades para conflictos
     conflictDetectionStep,
     conflictReport,
     hasConflicts,
@@ -45,8 +46,8 @@ const PayrollLiquidationPageSimple = () => {
     console.log('🎯 Período seleccionado:', period.label);
     setSelectedPeriod(period);
     
-    // ✅ USAR EL MÉTODO CON INTEGRACIÓN AUTOMÁTICA DE VACACIONES
-    await loadEmployeesWithVacations(period.startDate, period.endDate);
+    // Cargar empleados con detección de conflictos
+    await loadEmployees(period.startDate, period.endDate);
   };
 
   const handleLiquidate = async () => {
@@ -137,14 +138,14 @@ const PayrollLiquidationPageSimple = () => {
       )}
 
       {/* Información del Período Seleccionado */}
-      {selectedPeriod && currentPeriodId && !needsConflictResolution && (
+      {selectedPeriod && currentPeriod && !needsConflictResolution && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium text-green-800">Período Activo</h3>
                 <p className="text-green-700">{selectedPeriod.label}</p>
-                <p className="text-sm text-green-600">ID: {currentPeriodId}</p>
+                <p className="text-sm text-green-600">ID: {currentPeriod.id}</p>
                 {conflictDetectionStep === 'completed' && (
                   <p className="text-xs text-green-500 mt-1">
                     ✅ Sin conflictos detectados entre ausencias y novedades
@@ -179,7 +180,7 @@ const PayrollLiquidationPageSimple = () => {
       )}
 
       {/* Tabla de Empleados */}
-      {employees.length > 0 && selectedPeriod && currentPeriodId && canProceedWithLiquidation && (
+      {employees.length > 0 && selectedPeriod && currentPeriod && canProceedWithLiquidation && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">

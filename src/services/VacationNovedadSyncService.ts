@@ -1,7 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
-import { calculateDaysBetween } from '@/utils/dateUtils';
 
 export class VacationNovedadSyncService {
   
@@ -16,11 +14,11 @@ export class VacationNovedadSyncService {
         type: formData.type,
         start_date: formData.start_date,
         end_date: formData.end_date,
-        days_count: calculateDaysBetween(formData.start_date, formData.end_date),
+        days_count: this.calculateDays(formData.start_date, formData.end_date),
         observations: formData.observations || '',
         status: 'pendiente',
         created_by: (await supabase.auth.getUser()).data.user?.id,
-        company_id: await VacationNovedadSyncService.getCurrentCompanyId()
+        company_id: await this.getCurrentCompanyId()
       })
       .select(`
         *,
@@ -42,7 +40,7 @@ export class VacationNovedadSyncService {
     };
 
     if (formData.start_date && formData.end_date) {
-      updateData.days_count = calculateDaysBetween(formData.start_date, formData.end_date);
+      updateData.days_count = this.calculateDays(formData.start_date, formData.end_date);
     }
 
     const { data, error } = await supabase
@@ -72,31 +70,10 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * ✅ CORREGIDO: Obtener datos unificados de vacaciones y novedades
+   * Obtener datos unificados de vacaciones y novedades
    */
   static async getUnifiedVacationData(filters: any = {}) {
-    console.log('🔄 Fetching unified vacation data with filters:', filters);
-    
-    try {
-      // ✅ Fallback directo sin usar vista (ya que no existe en los tipos)
-      return await VacationNovedadSyncService.getFallbackUnifiedData(filters);
-
-      // This section is removed since we're using fallback directly
-
-    } catch (error) {
-      console.error('❌ Error en getUnifiedVacationData:', error);
-      
-      // ✅ FALLBACK: Si la vista no existe, usar queries separadas
-      return await VacationNovedadSyncService.getFallbackUnifiedData(filters);
-    }
-  }
-
-  /**
-   * ✅ NUEVO: Método fallback para cuando la vista DB no esté disponible
-   */
-  static async getFallbackUnifiedData(filters: any = {}) {
-    console.log('⚠️ Using fallback method for unified data');
-    
+    // Combinar datos de ambas tablas manualmente hasta que se actualice el schema
     const [vacationsResult, novedadesResult] = await Promise.all([
       supabase
         .from('employee_vacation_periods')
@@ -132,7 +109,7 @@ export class VacationNovedadSyncService {
         fecha_inicio: item.start_date,
         fecha_fin: item.end_date,
         dias: item.days_count,
-        valor: 0, // Se calculará en el backend o vista
+        valor: 0, // Se calculará en el backend
         observacion: item.observations,
         status: item.status as 'pendiente' | 'liquidada' | 'cancelada',
         creado_por: item.created_by,
@@ -187,7 +164,7 @@ export class VacationNovedadSyncService {
       }))
     ];
 
-    // Aplicar filtros manualmente
+    // Aplicar filtros
     let filteredData = unifiedData;
     
     if (filters.type) {
@@ -211,6 +188,7 @@ export class VacationNovedadSyncService {
       filteredData = filteredData.filter(item => item.fecha_fin <= filters.date_to);
     }
 
+    // Ordenar por fecha de creación descendente
     return filteredData.sort((a, b) => 
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
@@ -244,6 +222,16 @@ export class VacationNovedadSyncService {
       .subscribe();
 
     return channel;
+  }
+
+  /**
+   * Calcular días entre fechas
+   */
+  private static calculateDays(startDate: string, endDate: string): number {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   }
 
   /**

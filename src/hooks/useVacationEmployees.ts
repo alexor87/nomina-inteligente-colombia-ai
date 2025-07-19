@@ -1,30 +1,28 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-
-interface Employee {
-  id: string;
-  nombre: string;
-  apellido: string;
-  cedula: string;
-  cargo: string;
-}
+import { useAuth } from '@/contexts/AuthContext';
 
 export const useVacationEmployees = (enabled: boolean = true) => {
-  return useQuery<Employee[]>({
+  const { user } = useAuth();
+
+  return useQuery({
     queryKey: ['vacation-employees'],
     queryFn: async () => {
+      if (!user) throw new Error('Usuario no autenticado');
+
       const { data, error } = await supabase
         .from('employees')
-        .select('id, nombre, apellido, cedula, cargo')
+        .select('id, nombre, apellido, cedula')
         .eq('estado', 'activo')
         .order('nombre');
 
       if (error) throw error;
       return data || [];
     },
-    enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    gcTime: 10 * 60 * 1000, // 10 minutos
+    enabled: enabled && !!user,
+    // Forzar refresco de datos para mostrar la lista limpia
+    staleTime: 0,
+    gcTime: 0,
   });
 };
