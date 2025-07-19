@@ -46,7 +46,7 @@ export const NovedadVacacionesForm: React.FC<NovedadVacacionesFormProps> = ({
           tipoNovedad: 'vacaciones' as NovedadType,
           salarioBase: employeeSalary,
           dias: parseInt(formData.dias),
-          fechaPeriodo: periodoFecha || new Date()
+          fechaPeriodo: (periodoFecha || new Date()).toISOString()
         },
         (result) => {
           if (result && result.valor > 0) {

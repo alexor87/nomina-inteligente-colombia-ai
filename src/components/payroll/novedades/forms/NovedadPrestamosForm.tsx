@@ -68,7 +68,7 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
         fechaPeriodo: new Date().toISOString()
       }).then((result) => {
         if (result) {
-          setValidationResult(result.validationResult);
+          setValidationResult(result);
         }
       });
     }
@@ -94,7 +94,7 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
   const porcentajeSalario = employeeSalary > 0 ? (valorCuotaNumerico / employeeSalary) * 100 : 0;
   
   // Usar validación del backend si está disponible
-  const excedeLimite = validationResult ? !validationResult.isValid : 
+  const excedeLimite = validationResult ? validationResult.valor === 0 : 
     (selectedType && porcentajeSalario > selectedType.maxPercent);
 
   return (

@@ -81,7 +81,7 @@ export const NovedadDeduccionEspecialForm: React.FC<NovedadDeduccionEspecialForm
   const isValid = tipoDeduccion && valorDeduccion && parseFloat(valorDeduccion) > 0;
   
   const valorDeduccionNumerico = parseFloat(valorDeduccion) || 0;
-  const porcentajeSalario = employeeSalary > 0 ? (valorDeduccionNumerico / employeeSalario) * 100 : 0;
+  const porcentajeSalario = employeeSalary > 0 ? (valorDeduccionNumerico / employeeSalary) * 100 : 0;
   const excedeLimite = selectedType && porcentajeSalario > selectedType.maxPercent;
 
   return (

@@ -81,7 +81,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         subtipo,
         salarioBase: employeeSalary,
         horas: parseFloat(horas),
-        fechaPeriodo: fechaExtra
+        fechaPeriodo: typeof fechaExtra === 'string' ? fechaExtra : fechaExtra.toISOString()
       }).then(result => {
         if (result && result.valor > 0) {
           console.log('🚀 ULTRA-KISS FORM: *** RESULTADO RECIBIDO ***');

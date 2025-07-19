@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Database, Tables } from '@/integrations/supabase/types';
 
 // ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS
-type DatabaseNovedadType = Database['public']['Enums']['novedad_type'];
+type DatabaseNovedadType = Database['public']['Enums']['novedad_type'] | 'deduccion_especial';
 type PayrollNovedad = Tables<'payroll_novedades'>;
 
 export interface CreateNovedadData {
@@ -119,7 +119,7 @@ export class NovedadesEnhancedService {
 
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
-        .insert(insertData)
+        .insert(insertData as any)
         .select()
         .single();
 

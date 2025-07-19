@@ -9,7 +9,9 @@ interface NovedadCalculationInput {
   salarioBase: number;
   horas?: number;
   dias?: number;
-  fechaPeriodo?: Date;
+  valorManual?: number;
+  cuotas?: number;
+  fechaPeriodo?: string;
 }
 
 interface NovedadCalculationResult {
@@ -62,7 +64,7 @@ export const useNovedadBackendCalculation = () => {
       let fechaParaCalculo: string | undefined;
       
       if (input.fechaPeriodo) {
-        fechaParaCalculo = input.fechaPeriodo.toISOString().split('T')[0];
+        fechaParaCalculo = input.fechaPeriodo.split('T')[0];
         
         console.log('🎯 HOOK: Calculando novedad:', {
           tipo: input.tipoNovedad,

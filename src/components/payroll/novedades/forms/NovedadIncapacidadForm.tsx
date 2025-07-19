@@ -76,7 +76,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           subtipo: formData.subtipo,
           salarioBase: employeeSalary,
           dias: calculatedDays,
-          fechaPeriodo: periodoFecha || new Date()
+          fechaPeriodo: (periodoFecha || new Date()).toISOString()
         },
         (result) => {
           if (result && result.valor > 0) {

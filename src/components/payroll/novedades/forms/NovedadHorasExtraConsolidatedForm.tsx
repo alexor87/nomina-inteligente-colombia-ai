@@ -65,7 +65,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         subtipo: tipo,
         salarioBase: employeeSalary,
         horas: horas,
-        fechaPeriodo: fechaCalculo // Use specific entry date instead of periodoFecha
+        fechaPeriodo: typeof fechaCalculo === 'string' ? fechaCalculo : fechaCalculo.toISOString() // Use specific entry date instead of periodoFecha
       });
 
       return result?.valor || 0;

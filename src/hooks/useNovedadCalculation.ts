@@ -45,7 +45,7 @@ export const useNovedadCalculation = ({
         salarioBase: employeeSalary,
         horas: horas || undefined,
         dias: dias || undefined,
-        fechaPeriodo: periodoFecha || new Date()
+        fechaPeriodo: (periodoFecha || new Date()).toISOString()
       },
       (result) => {
         if (result) {
