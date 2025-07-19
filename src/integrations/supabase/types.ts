@@ -1887,6 +1887,10 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: boolean
       }
+      sync_existing_vacation_data: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       sync_historical_payroll_data: {
         Args: { p_period_id: string; p_company_id?: string }
         Returns: Json
