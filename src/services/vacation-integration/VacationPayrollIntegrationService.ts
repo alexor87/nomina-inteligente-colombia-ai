@@ -4,6 +4,97 @@ import { VacationIntegrationResult, VacationProcessingOptions } from '@/types/va
 import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
 
 export class VacationPayrollIntegrationService {
+  // ✅ NUEVO: Método para procesar licencias pendientes de un empleado específico
+  static async processEmployeePendingVacations(
+    employeeId: string, 
+    periodId: string, 
+    companyId: string
+  ): Promise<VacationIntegrationResult> {
+    try {
+      console.log('🔄 Procesando licencias pendientes para empleado:', { employeeId, periodId });
+
+      // Obtener información del período
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (periodError || !period) {
+        throw new Error(`Error obteniendo período: ${periodError?.message}`);
+      }
+
+      // Buscar licencias pendientes del empleado que caen en el período
+      const { data: pendingVacations, error: vacationError } = await supabase
+        .from('employee_vacation_periods')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('company_id', companyId)
+        .eq('status', 'pendiente')
+        .gte('start_date', period.fecha_inicio)
+        .lte('end_date', period.fecha_fin);
+
+      if (vacationError) {
+        throw new Error(`Error obteniendo licencias: ${vacationError.message}`);
+      }
+
+      if (!pendingVacations || pendingVacations.length === 0) {
+        console.log('📝 No hay licencias pendientes para procesar');
+        return {
+          processedVacations: 0,
+          createdNovedades: 0,
+          conflicts: [],
+          success: true,
+          message: 'No hay licencias pendientes para este empleado en el período'
+        };
+      }
+
+      // Procesar las licencias encontradas
+      const { error: updateError } = await supabase
+        .from('employee_vacation_periods')
+        .update({
+          status: 'liquidada',
+          processed_in_period_id: periodId,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', pendingVacations.map(v => v.id));
+
+      if (updateError) {
+        throw new Error(`Error actualizando licencias: ${updateError.message}`);
+      }
+
+      // Actualizar actividad del período para futuros auto-procesamientos
+      await supabase
+        .from('payroll_periods_real')
+        .update({ last_activity_at: new Date().toISOString() })
+        .eq('id', periodId);
+
+      // Invalidar cache de novedades
+      NovedadesCalculationService.invalidateCache(employeeId, periodId);
+
+      console.log(`✅ Procesadas ${pendingVacations.length} licencias para empleado ${employeeId}`);
+
+      return {
+        processedVacations: pendingVacations.length,
+        createdNovedades: 0,
+        conflicts: [],
+        success: true,
+        message: `Se procesaron ${pendingVacations.length} licencia(s) pendiente(s)`
+      };
+
+    } catch (error) {
+      console.error('❌ Error procesando licencias del empleado:', error);
+      return {
+        processedVacations: 0,
+        createdNovedades: 0,
+        conflicts: [],
+        success: false,
+        message: error instanceof Error ? error.message : 'Error desconocido'
+      };
+    }
+  }
+
   static async processVacationsForPayroll(options: VacationProcessingOptions): Promise<VacationIntegrationResult> {
     try {
       console.log('🔄 Processing vacations for payroll period:', options);

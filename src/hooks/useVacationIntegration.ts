@@ -24,6 +24,69 @@ export const useVacationIntegration = () => {
   const [lastResult, setLastResult] = useState<VacationIntegrationResult | null>(null);
   const { toast } = useToast();
 
+  // ✅ NUEVO: Procesar licencias pendientes para un empleado específico
+  const processEmployeePendingVacations = useCallback(async (
+    employeeId: string,
+    periodId: string,
+    companyId: string
+  ): Promise<VacationIntegrationResult> => {
+    setIsProcessing(true);
+    try {
+      console.log('🔄 Procesando licencias pendientes del empleado...');
+      
+      const result = await VacationPayrollIntegrationService.processEmployeePendingVacations(
+        employeeId, 
+        periodId, 
+        companyId
+      );
+      
+      setLastResult(result);
+
+      if (result.success && result.processedVacations > 0) {
+        toast({
+          title: "✅ Licencias procesadas",
+          description: result.message,
+          className: "border-green-200 bg-green-50"
+        });
+      } else if (result.success) {
+        toast({
+          title: "ℹ️ Sin licencias",
+          description: result.message,
+          className: "border-blue-200 bg-blue-50"
+        });
+      } else {
+        toast({
+          title: "❌ Error procesando licencias",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      const failureResult: VacationIntegrationResult = {
+        processedVacations: 0,
+        createdNovedades: 0,
+        conflicts: [],
+        success: false,
+        message: errorMessage
+      };
+      
+      setLastResult(failureResult);
+      
+      toast({
+        title: "❌ Error crítico",
+        description: errorMessage,
+        variant: "destructive"
+      });
+
+      return failureResult;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [toast]);
+
   const processVacationsForPayroll = useCallback(async (
     options: VacationProcessingOptions
   ): Promise<VacationIntegrationResult> => {
@@ -73,7 +136,7 @@ export const useVacationIntegration = () => {
     }
   }, [toast]);
 
-  // ✅ NUEVA: Función para auto-procesar vacaciones en período activo
+  // ✅ NUEVA: Función para auto-procesar vacaciones en período activo (con menos restricción de tiempo)
   const autoProcessVacationForActivePeriod = useCallback(async (
     companyId: string,
     vacationStartDate: string,
@@ -82,26 +145,22 @@ export const useVacationIntegration = () => {
     try {
       console.log('🔄 Verificando período activo para auto-procesamiento...');
       
-      // Obtener período activo
-      const { data: rawData } = await supabase.rpc('get_active_period_for_company', {
-        p_company_id: companyId
-      });
-
-      // ✅ Type assertion corregida con unknown
-      const activePeriodData = rawData as unknown as ActivePeriodResponse | null;
+      // Obtener período activo con menor restricción de tiempo (7 días en lugar de 24 horas)
+      const { data: activePeriods } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .in('estado', ['en_proceso', 'borrador'])
+        .gte('last_activity_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // 7 días
+        .order('last_activity_at', { ascending: false })
+        .limit(1);
       
-      if (!activePeriodData || !activePeriodData.has_active_period) {
-        console.log('📝 No hay período activo, skip auto-procesamiento');
+      if (!activePeriods || activePeriods.length === 0) {
+        console.log('📝 No hay período activo reciente, skip auto-procesamiento');
         return;
       }
 
-      const activePeriod = activePeriodData.period;
-      
-      // ✅ Verificación defensiva de que existe el período
-      if (!activePeriod) {
-        console.log('📝 Período activo sin datos, skip auto-procesamiento');
-        return;
-      }
+      const activePeriod = activePeriods[0];
       
       // Verificar si la vacación cae dentro del período activo
       const vacationStart = new Date(vacationStartDate);
@@ -173,7 +232,8 @@ export const useVacationIntegration = () => {
     isProcessing,
     lastResult,
     processVacationsForPayroll,
-    autoProcessVacationForActivePeriod, // ✅ NUEVA función exportada
+    processEmployeePendingVacations, // ✅ NUEVA función exportada
+    autoProcessVacationForActivePeriod,
     detectConflicts,
     calculateValue
   };
