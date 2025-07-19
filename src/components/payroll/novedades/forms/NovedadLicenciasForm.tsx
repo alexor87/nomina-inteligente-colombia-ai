@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calculator, Info, AlertTriangle, Scale } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { isValidDateRange } from '@/utils/dateUtils';
 
 interface NovedadLicenciasFormProps {
   onBack: () => void;
@@ -58,14 +59,22 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
 }) => {
   const [tipoLicencia, setTipoLicencia] = useState<string>('');
   const [subtipo, setSubtipo] = useState<string>('');
-  const [dias, setDias] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [dias, setDias] = useState<number>(0);
   const [valorCalculado, setValorCalculado] = useState<number>(0);
   const [observacion, setObservacion] = useState<string>('');
 
+  const handleDateRangeChange = (start: string, end: string, calculatedDays: number) => {
+    setStartDate(start);
+    setEndDate(end);
+    setDias(calculatedDays);
+  };
+
   useEffect(() => {
-    if (tipoLicencia && dias && parseFloat(dias) > 0 && calculateSuggestedValue) {
+    if (tipoLicencia && dias > 0 && calculateSuggestedValue) {
       if (tipoLicencia === 'remunerada') {
-        const calculatedValue = calculateSuggestedValue('licencia_remunerada', subtipo, parseFloat(dias));
+        const calculatedValue = calculateSuggestedValue('licencia_remunerada', subtipo, dias);
         if (calculatedValue) {
           setValorCalculado(calculatedValue);
         }
@@ -77,15 +86,21 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
   }, [tipoLicencia, subtipo, dias, calculateSuggestedValue]);
 
   const handleSubmit = () => {
-    if (!tipoLicencia || !dias || parseFloat(dias) <= 0) return;
+    if (!tipoLicencia || !startDate || !endDate || dias <= 0) return;
 
-    // ✅ NUEVA LÓGICA: Mapeo correcto según diferenciación legal
+    if (!isValidDateRange(startDate, endDate)) {
+      alert('El rango de fechas seleccionado no es válido');
+      return;
+    }
+
     const novedadType = tipoLicencia === 'remunerada' ? 'licencia_remunerada' : 'licencia_no_remunerada';
 
     onSubmit({
       tipo_novedad: novedadType,
       subtipo: subtipo || tipoLicencia,
-      dias: parseFloat(dias),
+      fecha_inicio: startDate,
+      fecha_fin: endDate,
+      dias: dias,
       valor: tipoLicencia === 'remunerada' ? Math.abs(valorCalculado) : 0,
       observacion: `${observacion} (${tipoLicencia === 'remunerada' ? 'Licencia Remunerada' : 'Licencia No Remunerada'})`.trim()
     });
@@ -93,7 +108,7 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
 
   const selectedType = licenciaTypes.find(t => t.value === tipoLicencia);
   const selectedSubtipo = selectedType?.subtipos.find(s => s.value === subtipo);
-  const isValid = tipoLicencia && dias && parseFloat(dias) > 0;
+  const isValid = tipoLicencia && startDate && endDate && dias > 0;
 
   return (
     <div className="space-y-6">
@@ -153,104 +168,99 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
           </div>
 
           <div>
-            <Label htmlFor="dias" className="text-gray-700">Días</Label>
-            <Input
-              id="dias"
-              type="number"
-              placeholder="0"
-              value={dias}
-              onChange={(e) => setDias(e.target.value)}
-              min="0"
-              step="1"
-            />
+            <Label htmlFor="subtipo" className="text-gray-700">Subtipo</Label>
+            <Select value={subtipo} onValueChange={setSubtipo} disabled={!selectedType}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona el subtipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {selectedType?.subtipos.map((sub) => (
+                  <SelectItem key={sub.value} value={sub.value}>
+                    <div className="flex items-center justify-between w-full">
+                      <span className="capitalize">{sub.label}</span>
+                      {sub.obligatoria && (
+                        <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-800">
+                          Obligatoria
+                        </Badge>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {selectedType && (
-          <>
-            <div>
-              <Label htmlFor="subtipo" className="text-gray-700">Subtipo</Label>
-              <Select value={subtipo} onValueChange={setSubtipo}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona el subtipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedType.subtipos.map((sub) => (
-                    <SelectItem key={sub.value} value={sub.value}>
-                      <div className="flex items-center justify-between w-full">
-                        <span className="capitalize">{sub.label}</span>
-                        {sub.obligatoria && (
-                          <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-800">
-                            Obligatoria
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Selector de Rango de Fechas */}
+        <div>
+          <Label className="text-gray-700 mb-2 block">Período de la Licencia</Label>
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onDateRangeChange={handleDateRangeChange}
+            disabled={isSubmitting}
+            placeholder="Seleccionar fechas de inicio y fin"
+          />
+        </div>
 
-            {/* Información Legal Específica */}
-            <div className={`p-3 rounded border ${
-              selectedType.color === 'green' 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-yellow-50 border-yellow-200'
-            }`}>
-              <div className={`flex items-center gap-2 mb-1 ${
-                selectedType.color === 'green' ? 'text-green-700' : 'text-yellow-700'
-              }`}>
-                <Info className="h-4 w-4" />
-                <span className="font-medium">Marco Legal</span>
-              </div>
-              <div className={`text-sm ${
-                selectedType.color === 'green' ? 'text-green-600' : 'text-yellow-600'
-              }`}>
-                <p><strong>Base Legal:</strong> {selectedType.legalBasis}</p>
-                <p>{selectedType.description}</p>
-                {selectedType.value === 'no_remunerada' && (
-                  <p className="mt-1"><strong>Efecto:</strong> Suspende acumulación de prestaciones sociales durante el período</p>
-                )}
-              </div>
-            </div>
-
-            {/* ✅ NUEVA SECCIÓN: Información específica para maternidad */}
-            {subtipo === 'maternidad' && (
-              <div className="p-3 bg-pink-50 border border-pink-200 rounded">
-                <div className="flex items-center gap-2 text-pink-700 mb-1">
-                  <Info className="h-4 w-4" />
-                  <span className="font-medium">Licencia de Maternidad</span>
-                </div>
-                <div className="text-sm text-pink-600 space-y-1">
-                  <p><strong>Duración legal:</strong> 18 semanas (126 días) - Ley 1822/2017</p>
-                  <p><strong>Pago:</strong> 100% del salario a cargo de la EPS</p>
-                  <p><strong>Puede extenderse:</strong> 2 semanas adicionales en casos especiales</p>
-                </div>
-              </div>
+        {/* Información Legal Específica */}
+        <div className={`p-3 rounded border ${
+          selectedType.color === 'green' 
+            ? 'bg-green-50 border-green-200' 
+            : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className={`flex items-center gap-2 mb-1 ${
+            selectedType.color === 'green' ? 'text-green-700' : 'text-yellow-700'
+          }`}>
+            <Info className="h-4 w-4" />
+            <span className="font-medium">Marco Legal</span>
+          </div>
+          <div className={`text-sm ${
+            selectedType.color === 'green' ? 'text-green-600' : 'text-yellow-600'
+          }`}>
+            <p><strong>Base Legal:</strong> {selectedType.legalBasis}</p>
+            <p>{selectedType.description}</p>
+            {selectedType.value === 'no_remunerada' && (
+              <p className="mt-1"><strong>Efecto:</strong> Suspende acumulación de prestaciones sociales durante el período</p>
             )}
+          </div>
+        </div>
 
-            {/* Días sugeridos para licencias obligatorias */}
-            {selectedSubtipo?.obligatoria && selectedSubtipo.dias && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="flex items-center gap-2 text-blue-700 mb-1">
-                  <Info className="h-4 w-4" />
-                  <span className="font-medium">Días Legales</span>
-                </div>
-                <p className="text-sm text-blue-600">
-                  Esta licencia tiene derecho legal a <strong>{selectedSubtipo.dias} días</strong> según la normativa vigente.
-                  {selectedSubtipo.normativa && (
-                    <span className="block text-xs mt-1 text-blue-500">
-                      Normativa: {selectedSubtipo.normativa}
-                    </span>
-                  )}
-                </p>
-              </div>
-            )}
-          </>
+        {/* Información específica para maternidad */}
+        {subtipo === 'maternidad' && (
+          <div className="p-3 bg-pink-50 border border-pink-200 rounded">
+            <div className="flex items-center gap-2 text-pink-700 mb-1">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Licencia de Maternidad</span>
+            </div>
+            <div className="text-sm text-pink-600 space-y-1">
+              <p><strong>Duración legal:</strong> 18 semanas (126 días) - Ley 1822/2017</p>
+              <p><strong>Pago:</strong> 100% del salario a cargo de la EPS</p>
+              <p><strong>Puede extenderse:</strong> 2 semanas adicionales en casos especiales</p>
+            </div>
+          </div>
+        )}
+
+        {/* Días sugeridos para licencias obligatorias */}
+        {selectedSubtipo?.obligatoria && selectedSubtipo.dias && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+            <div className="flex items-center gap-2 text-blue-700 mb-1">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Días Legales</span>
+            </div>
+            <p className="text-sm text-blue-600">
+              Esta licencia tiene derecho legal a <strong>{selectedSubtipo.dias} días</strong> según la normativa vigente.
+              {selectedSubtipo.normativa && (
+                <span className="block text-xs mt-1 text-blue-500">
+                  Normativa: {selectedSubtipo.normativa}
+                </span>
+              )}
+            </p>
+          </div>
         )}
 
         {/* Cálculo del Valor */}
-        {tipoLicencia && dias && parseFloat(dias) > 0 && (
+        {tipoLicencia && dias > 0 && (
           <div className={`p-3 rounded border ${
             tipoLicencia === 'remunerada' 
               ? 'bg-green-50 border-green-200' 
