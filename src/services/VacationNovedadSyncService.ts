@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
 
@@ -14,11 +15,11 @@ export class VacationNovedadSyncService {
         type: formData.type,
         start_date: formData.start_date,
         end_date: formData.end_date,
-        days_count: this.calculateDays(formData.start_date, formData.end_date),
+        days_count: VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date),
         observations: formData.observations || '',
         status: 'pendiente',
         created_by: (await supabase.auth.getUser()).data.user?.id,
-        company_id: await this.getCurrentCompanyId()
+        company_id: await VacationNovedadSyncService.getCurrentCompanyId()
       })
       .select(`
         *,
@@ -40,7 +41,7 @@ export class VacationNovedadSyncService {
     };
 
     if (formData.start_date && formData.end_date) {
-      updateData.days_count = this.calculateDays(formData.start_date, formData.end_date);
+      updateData.days_count = VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date);
     }
 
     const { data, error } = await supabase
@@ -73,32 +74,46 @@ export class VacationNovedadSyncService {
    * Obtener datos unificados de vacaciones y novedades
    */
   static async getUnifiedVacationData(filters: any = {}) {
-    // Combinar datos de ambas tablas manualmente hasta que se actualice el schema
-    const [vacationsResult, novedadesResult] = await Promise.all([
-      supabase
-        .from('employee_vacation_periods')
-        .select(`
-          *,
-          employee:employees(id, nombre, apellido, cedula)
-        `)
-        .order('created_at', { ascending: false }),
-      
-      supabase
-        .from('payroll_novedades')
-        .select(`
-          *,
-          empleado:employees(id, nombre, apellido, cedula)
-        `)
-        .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'])
-        .order('created_at', { ascending: false })
-    ]);
+    console.log('🔍 Loading unified vacation data with filters:', filters);
+    
+    // Obtener company_id del usuario actual
+    const companyId = await VacationNovedadSyncService.getCurrentCompanyId();
+    
+    // Obtener vacaciones/ausencias
+    const { data: vacationsData, error: vacationsError } = await supabase
+      .from('employee_vacation_periods')
+      .select(`
+        *,
+        employee:employees(id, nombre, apellido, cedula)
+      `)
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
 
-    if (vacationsResult.error) throw vacationsResult.error;
-    if (novedadesResult.error) throw novedadesResult.error;
+    if (vacationsError) {
+      console.error('Error loading vacations:', vacationsError);
+      throw vacationsError;
+    }
+
+    // Obtener novedades relacionadas con vacaciones/ausencias
+    const { data: novedadesData, error: novedadesError } = await supabase
+      .from('payroll_novedades')
+      .select(`
+        *,
+        empleado:employees(id, nombre, apellido, cedula)
+      `)
+      .eq('company_id', companyId)
+      .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'])
+      .order('created_at', { ascending: false });
+
+    if (novedadesError) {
+      console.error('Error loading novedades:', novedadesError);
+      throw novedadesError;
+    }
 
     // Combinar y transformar datos
     const unifiedData = [
-      ...(vacationsResult.data || []).map(item => ({
+      // Transformar vacaciones
+      ...(vacationsData || []).map(item => ({
         source_type: 'vacation' as const,
         id: item.id,
         empleado_id: item.employee_id,
@@ -130,7 +145,9 @@ export class VacationNovedadSyncService {
         created_by: item.created_by,
         processed_in_period_id: item.processed_in_period_id
       })),
-      ...(novedadesResult.data || []).map(item => ({
+      
+      // Transformar novedades
+      ...(novedadesData || []).map(item => ({
         source_type: 'novedad' as const,
         id: item.id,
         empleado_id: item.empleado_id,
@@ -227,7 +244,7 @@ export class VacationNovedadSyncService {
   /**
    * Calcular días entre fechas
    */
-  private static calculateDays(startDate: string, endDate: string): number {
+  private static calculateDaysBetween(startDate: string, endDate: string): number {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());

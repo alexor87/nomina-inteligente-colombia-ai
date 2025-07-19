@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { VacationNovedadSyncService } from '@/services/VacationNovedadSyncService';
@@ -19,7 +20,9 @@ export function useUnifiedVacationsAbsences(filters: VacationAbsenceFilters) {
   } = useQuery<UnifiedVacationData[]>({
     queryKey: ['unified-vacations-absences', filters],
     queryFn: () => VacationNovedadSyncService.getUnifiedVacationData(filters),
-    staleTime: 30000, // 30 segundos
+    staleTime: 10000, // 10 segundos - más frecuente para ver cambios rápido
+    refetchOnWindowFocus: true,
+    refetchOnMount: true
   });
 
   // Mutation para crear
@@ -28,13 +31,14 @@ export function useUnifiedVacationsAbsences(filters: VacationAbsenceFilters) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['unified-vacations-absences'] });
       toast({
-        title: "Éxito",
-        description: "Vacación/ausencia creada correctamente y sincronizada automáticamente",
+        title: "✅ Éxito",
+        description: "Vacación/ausencia creada y sincronizada automáticamente con el módulo de novedades",
+        className: "border-green-200 bg-green-50"
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "❌ Error",
         description: error.message,
         variant: "destructive",
       });
@@ -48,13 +52,14 @@ export function useUnifiedVacationsAbsences(filters: VacationAbsenceFilters) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['unified-vacations-absences'] });
       toast({
-        title: "Éxito",
+        title: "✅ Éxito",
         description: "Vacación/ausencia actualizada y sincronizada automáticamente",
+        className: "border-blue-200 bg-blue-50"
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "❌ Error",
         description: error.message,
         variant: "destructive",
       });
@@ -67,32 +72,43 @@ export function useUnifiedVacationsAbsences(filters: VacationAbsenceFilters) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['unified-vacations-absences'] });
       toast({
-        title: "Éxito",
+        title: "✅ Éxito",
         description: "Vacación/ausencia eliminada y sincronizada automáticamente",
+        className: "border-orange-200 bg-orange-50"
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "❌ Error",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  // Configurar realtime
+  // Configurar realtime con notificaciones mejoradass
   useEffect(() => {
+    console.log('🔔 Configurando realtime para sincronización bidireccional...');
+    
     const channel = VacationNovedadSyncService.subscribeToVacationChanges((payload) => {
       console.log('🔄 Cambio detectado en sincronización:', payload);
+      
       // Invalidar queries para refrescar datos
       queryClient.invalidateQueries({ queryKey: ['unified-vacations-absences'] });
       
-      // Mostrar notificación de sincronización
+      // Mostrar notificación específica según el tipo de cambio
       if (payload.eventType !== 'SELECT') {
+        const eventMessages = {
+          INSERT: 'Nuevo registro sincronizado entre módulos',
+          UPDATE: 'Registro actualizado y sincronizado',
+          DELETE: 'Registro eliminado y sincronizado'
+        };
+        
         toast({
-          title: "Sincronización automática",
-          description: "Los datos han sido sincronizados entre módulos",
+          title: "🔄 Sincronización automática",
+          description: eventMessages[payload.eventType as keyof typeof eventMessages] || "Datos sincronizados entre módulos",
           duration: 3000,
+          className: "border-purple-200 bg-purple-50"
         });
       }
     });
@@ -101,17 +117,47 @@ export function useUnifiedVacationsAbsences(filters: VacationAbsenceFilters) {
 
     return () => {
       if (channel) {
+        console.log('🔌 Desconectando realtime...');
         channel.unsubscribe();
       }
     };
   }, [queryClient, toast]);
 
+  // Función helper para determinar el origen visual de un registro
+  const getRecordOrigin = (record: UnifiedVacationData) => {
+    return {
+      isFromVacationModule: record.source_type === 'vacation',
+      isFromNovedadModule: record.source_type === 'novedad',
+      originLabel: record.source_type === 'vacation' ? 'Módulo Vacaciones' : 'Módulo Novedades',
+      canEditInCurrentModule: record.source_type === 'vacation', // Solo editable si viene del módulo vacaciones
+      statusLabel: record.status === 'pendiente' ? 'Pendiente de liquidar' : 
+                  record.status === 'liquidada' ? 'Liquidada en nómina' : 'Cancelada'
+    };
+  };
+
+  // Función helper para obtener estadísticas
+  const getUnifiedStats = () => {
+    const stats = {
+      total: unifiedData.length,
+      pendientes: unifiedData.filter(r => r.status === 'pendiente').length,
+      liquidadas: unifiedData.filter(r => r.status === 'liquidada').length,
+      fromVacations: unifiedData.filter(r => r.source_type === 'vacation').length,
+      fromNovedades: unifiedData.filter(r => r.source_type === 'novedad').length,
+      totalDays: unifiedData.reduce((sum, r) => sum + (r.dias || 0), 0),
+      totalValue: unifiedData.reduce((sum, r) => sum + (r.valor || 0), 0)
+    };
+    
+    return stats;
+  };
+
   return {
-    // Datos unificados
+    // Datos unificados con funciones helper
     vacationsAbsences: unifiedData,
     isLoading,
     error,
     refetch,
+    getRecordOrigin,
+    getUnifiedStats,
 
     // Funciones CRUD
     createVacationAbsence: createMutation.mutateAsync,

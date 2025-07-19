@@ -1,9 +1,9 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
-import { PayrollAutomationService } from '@/services/PayrollAutomationService';
 import { useToast } from '@/hooks/use-toast';
-import { useVacationIntegration } from '@/hooks/useVacationIntegration';
+import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
 
 interface PayrollPeriod {
   id: string;
@@ -19,7 +19,6 @@ export const usePayrollUnified = (companyId: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLiquidating, setIsLiquidating] = useState(false);
   const { toast } = useToast();
-  const { processVacationsForPayroll } = useVacationIntegration();
 
   // Función simple para limpiar duplicados
   const cleanDuplicates = useCallback(async () => {
@@ -59,7 +58,7 @@ export const usePayrollUnified = (companyId: string) => {
       if (existingPeriods && existingPeriods.length > 0) {
         const period = existingPeriods[0];
         
-        // SOLUCIÓN KISS: Si el período está cancelado, reactivarlo Y limpiar payrolls antiguos
+        // Si el período está cancelado, reactivarlo Y limpiar payrolls antiguos
         if (period.estado === 'cancelado') {
           console.log('🔄 Reactivando período cancelado y limpiando payrolls:', period.id);
           
@@ -134,7 +133,7 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [companyId, cleanDuplicates]);
 
-  // SOLUCIÓN KISS: Un solo flujo simplificado para cargar empleados
+  // Cargar empleados con integración automática de vacaciones
   const loadEmployees = useCallback(async (startDate: string, endDate: string) => {
     setIsLoading(true);
     try {
@@ -146,6 +145,28 @@ export const usePayrollUnified = (companyId: string) => {
       }
 
       setCurrentPeriod(period);
+
+      // Procesar vacaciones/ausencias automáticamente al cargar empleados
+      console.log('🏖️ Procesando vacaciones/ausencias automáticamente...');
+      try {
+        const integrationResult = await VacationPayrollIntegrationService.processVacationsForPayroll({
+          periodId: period.id,
+          companyId: companyId,
+          startDate: startDate,
+          endDate: endDate
+        });
+
+        if (integrationResult.success && integrationResult.processedVacations > 0) {
+          toast({
+            title: "✅ Vacaciones integradas",
+            description: `Se procesaron ${integrationResult.processedVacations} ausencias automáticamente`,
+            className: "border-green-200 bg-green-50"
+          });
+        }
+      } catch (integrationError) {
+        console.warn('⚠️ Error en integración de vacaciones:', integrationError);
+        // Continuar sin bloquear la carga de empleados
+      }
 
       // Verificar si ya hay empleados en payrolls para este período
       const { data: periodEmployees, error: periodError } = await supabase
@@ -278,47 +299,6 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [companyId, findOrCreatePeriod, toast]);
 
-  // ✅ NUEVA FUNCIÓN: Cargar empleados con integración automática de vacaciones
-  const loadEmployeesWithVacations = useCallback(async (startDate: string, endDate: string) => {
-    setIsLoading(true);
-    try {
-      console.log('🏖️ Cargando empleados con integración de vacaciones...');
-
-      // 1. Cargar empleados normalmente
-      await loadEmployees(startDate, endDate);
-
-      // 2. Si hay período activo, procesar vacaciones automáticamente
-      if (currentPeriod) {
-        console.log('🔄 Procesando vacaciones para período:', currentPeriod.id);
-        
-        const integrationResult = await processVacationsForPayroll({
-          periodId: currentPeriod.id,
-          companyId: companyId,
-          startDate: startDate,
-          endDate: endDate
-        });
-
-        if (integrationResult.success && integrationResult.processedVacations > 0) {
-          toast({
-            title: "✅ Vacaciones integradas",
-            description: `Se procesaron ${integrationResult.processedVacations} ausencias automáticamente`,
-            className: "border-green-200 bg-green-50"
-          });
-        }
-      }
-
-    } catch (error) {
-      console.error('Error en loadEmployeesWithVacations:', error);
-      toast({
-        title: "Error",
-        description: "Error en la integración con vacaciones",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadEmployees, currentPeriod, processVacationsForPayroll, companyId, toast]);
-
   const addEmployees = useCallback(async (employeeIds: string[]) => {
     if (!currentPeriod) return;
 
@@ -387,7 +367,7 @@ export const usePayrollUnified = (companyId: string) => {
     if (!currentPeriod) return;
 
     try {
-      // Remover de payrolls (esto ya mantenía la persistencia)
+      // Remover de payrolls
       await supabase
         .from('payrolls')
         .delete()
@@ -406,16 +386,23 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, toast]);
 
-  // ✅ FIXED: Liquidación de nómina simplificada sin métodos inexistentes
+  // Liquidación de nómina con integración completa de vacaciones
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
     if (!currentPeriod || employees.length === 0) return;
 
     setIsLiquidating(true);
     try {
-      console.log('🏖️ Iniciando liquidación simplificada...');
+      console.log('🏖️ Iniciando liquidación con integración completa de vacaciones...');
 
-      // ✅ SIMPLIFICADO: Las ausencias ya están en payroll_novedades, no necesitamos procesamiento adicional
-      console.log('✅ Los registros de tiempo libre ya están integrados en payroll_novedades');
+      // INTEGRACIÓN CRÍTICA: Procesar todas las vacaciones/ausencias pendientes
+      const integrationResult = await VacationPayrollIntegrationService.processVacationsForPayroll({
+        periodId: currentPeriod.id,
+        companyId: companyId,
+        startDate: startDate,
+        endDate: endDate
+      });
+
+      console.log('✅ Resultado de integración de vacaciones:', integrationResult);
 
       // Actualizar estado del período a cerrado
       await supabase
@@ -425,7 +412,7 @@ export const usePayrollUnified = (companyId: string) => {
 
       toast({
         title: "Nómina liquidada exitosamente ✅",
-        description: "Se incluyeron automáticamente todas las novedades registradas",
+        description: `Se incluyeron ${integrationResult.processedVacations} ausencias/vacaciones automáticamente`,
         variant: "default",
       });
 
@@ -455,7 +442,6 @@ export const usePayrollUnified = (companyId: string) => {
     isLoading,
     isLiquidating,
     loadEmployees,
-    loadEmployeesWithVacations,
     addEmployees,
     removeEmployee,
     liquidatePayroll,
