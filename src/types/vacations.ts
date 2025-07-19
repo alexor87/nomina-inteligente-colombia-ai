@@ -17,7 +17,6 @@ export interface VacationAbsence {
   employee_id: string;
   company_id: string;
   type: VacationAbsenceType; // ✅ USANDO TIPO FILTRADO DE NOVEDADES
-  subtipo?: string; // ✅ NUEVO: Campo subtipo agregado
   start_date: string;
   end_date: string;
   days_count: number;
@@ -48,7 +47,6 @@ export interface VacationAbsenceFilters {
 export interface VacationAbsenceFormData {
   employee_id: string;
   type: VacationAbsenceType; // ✅ USANDO TIPO FILTRADO DE NOVEDADES
-  subtipo?: string; // ✅ NUEVO: Campo subtipo agregado
   start_date: string;
   end_date: string;
   observations?: string;
@@ -72,52 +70,6 @@ export const ABSENCE_TYPE_COLORS: Record<VacationAbsenceType, string> = {
   licencia_no_remunerada: 'bg-yellow-100 text-yellow-800',
   incapacidad: 'bg-purple-100 text-purple-800',
   ausencia: 'bg-red-100 text-red-800'
-};
-
-// ✅ CORREGIDO: Cambiar return type a readonly string[] para compatibilidad
-export const getSubtiposForType = (type: VacationAbsenceType): readonly string[] => {
-  switch (type) {
-    case 'licencia_remunerada':
-      return NOVEDAD_CATEGORIES.devengados.types.licencia_remunerada.subtipos || [];
-    case 'licencia_no_remunerada':
-      return NOVEDAD_CATEGORIES.devengados.types.licencia_no_remunerada.subtipos || [];
-    case 'incapacidad':
-      return NOVEDAD_CATEGORIES.devengados.types.incapacidad.subtipos || [];
-    case 'ausencia':
-      return NOVEDAD_CATEGORIES.deducciones.types.ausencia.subtipos || [];
-    case 'vacaciones':
-    default:
-      return [];
-  }
-};
-
-// ✅ NUEVO: Labels para subtipos
-export const SUBTIPO_LABELS: Record<string, string> = {
-  // Licencia remunerada
-  'paternidad': 'Paternidad',
-  'matrimonio': 'Matrimonio',
-  'luto': 'Luto',
-  'estudio': 'Estudio',
-  
-  // Licencia no remunerada
-  'personal': 'Personal',
-  'estudios': 'Estudios',
-  'familiar': 'Familiar',
-  'salud_no_eps': 'Salud (no EPS)',
-  'maternidad_extendida': 'Maternidad Extendida',
-  'cuidado_hijo_menor': 'Cuidado Hijo Menor',
-  'emergencia_familiar': 'Emergencia Familiar',
-  
-  // Incapacidad
-  'general': 'General',
-  'laboral': 'Laboral',
-  'maternidad': 'Maternidad',
-  
-  // Ausencia
-  'injustificada': 'Injustificada',
-  'abandono_puesto': 'Abandono de Puesto',
-  'suspension_disciplinaria': 'Suspensión Disciplinaria',
-  'tardanza_excesiva': 'Tardanza Excesiva'
 };
 
 // ✅ FUNCIÓN HELPER PARA FILTRAR TIPOS APLICABLES A VACACIONES/AUSENCIAS

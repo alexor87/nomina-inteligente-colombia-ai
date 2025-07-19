@@ -12,10 +12,13 @@ import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { PayrollCleanupService } from '@/services/PayrollCleanupService';
+import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 
 const PayrollLiquidationPage = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [periodSelected, setPeriodSelected] = useState(false);
   
   const { companyId } = useCurrentCompany();
@@ -42,12 +45,17 @@ const PayrollLiquidationPage = () => {
     markCurrentPeriodAsLiquidated
   } = useSimplePeriodSelection(companyId || '');
 
+  // Limpiar períodos abandonados al montar
+  useEffect(() => {
+    PayrollCleanupService.cleanupAbandonedPeriods();
+  }, []);
+
   const handlePeriodSelection = async (period: SelectablePeriod) => {
     console.log('🎯 Período seleccionado desde UI:', period.label);
     handlePeriodSelect(period);
     setPeriodSelected(true);
     
-    // KISS: Solo cargar empleados - toda la información viene de novedades
+    // Cargar empleados automáticamente
     await loadEmployees(period.startDate, period.endDate);
   };
 
@@ -99,6 +107,16 @@ const PayrollLiquidationPage = () => {
               lastSaveTime={lastAutoSaveTime}
             />
           )}
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCleanupDialog(true)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Limpiar Períodos
+          </Button>
         </div>
       </div>
 
@@ -132,9 +150,6 @@ const PayrollLiquidationPage = () => {
                   <div>
                     <h3 className="font-medium text-green-800">Período Activo</h3>
                     <p className="text-green-700">{selectedPeriod.label}</p>
-                    <p className="text-xs text-green-600 mt-1">
-                      ✅ Datos obtenidos desde módulo de novedades
-                    </p>
                   </div>
                   <Button
                     variant="outline"
@@ -198,6 +213,15 @@ const PayrollLiquidationPage = () => {
           <PayrollDiagnosticPanel />
         </TabsContent>
       </Tabs>
+
+      {/* Period Cleanup Dialog */}
+      <PeriodCleanupDialog
+        isOpen={showCleanupDialog}
+        onClose={() => setShowCleanupDialog(false)}
+        onCleanupComplete={() => {
+          // Opcional: recargar períodos si es necesario
+        }}
+      />
 
       {/* Add Employee Modal */}
       <EmployeeAddModal

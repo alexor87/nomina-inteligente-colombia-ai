@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PayrollEmployee } from '@/types/payroll';
@@ -34,7 +33,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
   period,
   canEdit,
   onUpdateEmployee,
-  periodId = period.startDate
+  periodId = period.startDate // fallback to startDate if periodId not provided
 }) => {
   const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [showVoucherPreview, setShowVoucherPreview] = useState(false);
@@ -152,9 +151,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         periodId={periodId}
         onSubmit={handleCreateNovedad}
         selectedNovedadType={null}
-        onClose={() => {
-          setShowNovedadesModal(false);
-        }}
+        onClose={() => setShowNovedadesModal(false)}
       />
 
       {/* Modal de Edición de Liquidación */}

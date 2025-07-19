@@ -4,13 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarDays } from 'lucide-react';
-import { 
-  VacationAbsenceFormData, 
-  ABSENCE_TYPE_LABELS, 
-  VacationAbsenceType, 
-  getSubtiposForType,
-  SUBTIPO_LABELS 
-} from '@/types/vacations';
+import { VacationAbsenceFormData, ABSENCE_TYPE_LABELS, VacationAbsenceType } from '@/types/vacations';
 
 interface Employee {
   id: string;
@@ -34,18 +28,6 @@ export const VacationFormFields = ({
   calculatedDays,
   isSubmitting
 }: VacationFormFieldsProps) => {
-  // ✅ NUEVO: Obtener subtipos disponibles para el tipo seleccionado
-  const availableSubtipos = getSubtiposForType(formData.type);
-  
-  // ✅ NUEVO: Limpiar subtipo cuando cambia el tipo
-  const handleTypeChange = (value: VacationAbsenceType) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      type: value,
-      subtipo: undefined // Limpiar subtipo al cambiar tipo
-    }));
-  };
-
   return (
     <>
       {/* Employee Selection */}
@@ -74,12 +56,12 @@ export const VacationFormFields = ({
         )}
       </div>
 
-      {/* ✅ Tipo de Ausencia */}
+      {/* ✅ NUEVO: Tipo de Ausencia */}
       <div className="space-y-2">
         <Label htmlFor="type">Tipo de Ausencia *</Label>
         <Select
           value={formData.type}
-          onValueChange={handleTypeChange}
+          onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as VacationAbsenceType }))}
           disabled={isSubmitting}
         >
           <SelectTrigger>
@@ -94,37 +76,6 @@ export const VacationFormFields = ({
           </SelectContent>
         </Select>
       </div>
-
-      {/* ✅ NUEVO: Campo Subtipo (condicional) */}
-      {availableSubtipos.length > 0 && (
-        <div className="space-y-2">
-          <Label htmlFor="subtipo">
-            Subtipo de {ABSENCE_TYPE_LABELS[formData.type]}
-            {formData.type === 'licencia_remunerada' || formData.type === 'incapacidad' ? ' *' : ''}
-          </Label>
-          <Select
-            value={formData.subtipo || ''}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, subtipo: value || undefined }))}
-            disabled={isSubmitting}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar subtipo..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableSubtipos.map((subtipo) => (
-                <SelectItem key={subtipo} value={subtipo}>
-                  {SUBTIPO_LABELS[subtipo] || subtipo}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {(formData.type === 'licencia_remunerada' || formData.type === 'incapacidad') && !formData.subtipo && (
-            <p className="text-sm text-red-600">
-              El subtipo es requerido para {ABSENCE_TYPE_LABELS[formData.type].toLowerCase()}
-            </p>
-          )}
-        </div>
-      )}
 
       {/* Date Fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -705,7 +705,6 @@ export type Database = {
           processed_in_period_id: string | null
           start_date: string
           status: string
-          subtipo: string | null
           type: Database["public"]["Enums"]["novedad_type"]
           updated_at: string
         }
@@ -721,7 +720,6 @@ export type Database = {
           processed_in_period_id?: string | null
           start_date: string
           status?: string
-          subtipo?: string | null
           type?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
         }
@@ -737,7 +735,6 @@ export type Database = {
           processed_in_period_id?: string | null
           start_date?: string
           status?: string
-          subtipo?: string | null
           type?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
         }

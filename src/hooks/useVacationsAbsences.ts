@@ -5,12 +5,10 @@ import { VacationAbsence, VacationAbsenceFilters, VacationAbsenceFormData, Vacat
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { calculateDaysBetween } from '@/utils/dateUtils';
-import { useVacationIntegration } from './useVacationIntegration';
 
 export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { autoProcessVacationForActivePeriod } = useVacationIntegration();
 
   console.log('🪝 useVacationsAbsences initialized', { filters, userId: user?.id });
 
@@ -144,28 +142,10 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     return profile.company_id;
   };
 
-  // ✅ NUEVO: Validación de subtipo requerido
-  const validateSubtipo = (formData: VacationAbsenceFormData): string | null => {
-    // Subtipos requeridos para ciertos tipos
-    const requiresSubtipo = ['licencia_remunerada', 'incapacidad'];
-    
-    if (requiresSubtipo.includes(formData.type) && !formData.subtipo) {
-      return `El subtipo es requerido para ${formData.type.replace('_', ' ')}`;
-    }
-    
-    return null;
-  };
-
   // Mutación para crear vacación/ausencia
   const createMutation = useMutation({
     mutationFn: async (formData: VacationAbsenceFormData) => {
       if (!user) throw new Error('Usuario no autenticado');
-
-      // ✅ NUEVO: Validar subtipo
-      const subtipoError = validateSubtipo(formData);
-      if (subtipoError) {
-        throw new Error(subtipoError);
-      }
 
       const companyId = await getCompanyId();
 
@@ -189,7 +169,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
           company_id: companyId,
           employee_id: formData.employee_id,
           type: formData.type,
-          subtipo: formData.subtipo, // ✅ NUEVO: Incluir subtipo
           start_date: formData.start_date,
           end_date: formData.end_date,
           days_count: days,
@@ -201,22 +180,11 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .single();
 
       if (error) throw error;
-      return { data, companyId, formData };
+      return data;
     },
-    onSuccess: async ({ data, companyId, formData }) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vacations-absences'] });
       toast.success('Ausencia registrada exitosamente');
-
-      // ✅ NUEVA: Auto-procesamiento automático
-      try {
-        await autoProcessVacationForActivePeriod(
-          companyId,
-          formData.start_date,
-          formData.end_date
-        );
-      } catch (error) {
-        console.warn('Auto-procesamiento falló (no crítico):', error);
-      }
     },
     onError: (error: any) => {
       console.error('Error creating vacation/absence:', error);
@@ -228,14 +196,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
   const updateMutation = useMutation({
     mutationFn: async ({ id, formData }: { id: string; formData: VacationAbsenceFormData }) => {
       if (!user) throw new Error('Usuario no autenticado');
-
-      // ✅ NUEVO: Validar subtipo
-      const subtipoError = validateSubtipo(formData);
-      if (subtipoError) {
-        throw new Error(subtipoError);
-      }
-
-      const companyId = await getCompanyId();
 
       // Use the centralized date calculation utility
       const days = calculateDaysBetween(formData.start_date, formData.end_date);
@@ -257,7 +217,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .update({
           employee_id: formData.employee_id,
           type: formData.type,
-          subtipo: formData.subtipo, // ✅ NUEVO: Incluir subtipo
           start_date: formData.start_date,
           end_date: formData.end_date,
           days_count: days,
@@ -269,22 +228,11 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .single();
 
       if (error) throw error;
-      return { data, companyId, formData };
+      return data;
     },
-    onSuccess: async ({ data, companyId, formData }) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vacations-absences'] });
       toast.success('Ausencia actualizada exitosamente');
-
-      // ✅ NUEVA: Auto-procesamiento automático también en updates
-      try {
-        await autoProcessVacationForActivePeriod(
-          companyId,
-          formData.start_date,
-          formData.end_date
-        );
-      } catch (error) {
-        console.warn('Auto-procesamiento falló (no crítico):', error);
-      }
     },
     onError: (error: any) => {
       console.error('Error updating vacation/absence:', error);

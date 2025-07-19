@@ -119,7 +119,6 @@ export const convertVacationToDisplay = (
     empleado_id: vacation.employee_id,
     periodo_id: vacation.processed_in_period_id,
     tipo_novedad: vacation.type,
-    subtipo: vacation.subtipo, // ✅ NUEVO: Incluir subtipo
     valor: Math.round(valor),
     dias: vacation.days_count,
     observacion: vacation.observations,
