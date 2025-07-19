@@ -50,6 +50,11 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     
     // Estado calculado
     canProceedWithLiquidation: payrollHook.employees.length > 0,
-    isLoadingEmployees: payrollHook.isLoading
+    isLoadingEmployees: payrollHook.isLoading,
+    
+    // Propiedades faltantes con valores por defecto
+    isAutoSaving: false,
+    lastAutoSaveTime: undefined,
+    isRemovingEmployee: false
   };
 };
