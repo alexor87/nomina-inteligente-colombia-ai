@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
+import { calculateDaysBetween } from '@/utils/dateUtils';
 
 export class VacationNovedadSyncService {
   
@@ -14,11 +15,11 @@ export class VacationNovedadSyncService {
         type: formData.type,
         start_date: formData.start_date,
         end_date: formData.end_date,
-        days_count: this.calculateDays(formData.start_date, formData.end_date),
+        days_count: calculateDaysBetween(formData.start_date, formData.end_date),
         observations: formData.observations || '',
         status: 'pendiente',
         created_by: (await supabase.auth.getUser()).data.user?.id,
-        company_id: await this.getCurrentCompanyId()
+        company_id: await VacationNovedadSyncService.getCurrentCompanyId()
       })
       .select(`
         *,
@@ -40,7 +41,7 @@ export class VacationNovedadSyncService {
     };
 
     if (formData.start_date && formData.end_date) {
-      updateData.days_count = this.calculateDays(formData.start_date, formData.end_date);
+      updateData.days_count = calculateDaysBetween(formData.start_date, formData.end_date);
     }
 
     const { data, error } = await supabase
@@ -222,16 +223,6 @@ export class VacationNovedadSyncService {
       .subscribe();
 
     return channel;
-  }
-
-  /**
-   * Calcular días entre fechas
-   */
-  private static calculateDays(startDate: string, endDate: string): number {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   }
 
   /**
