@@ -8,6 +8,7 @@ import { NovedadBonificacionesConsolidatedForm } from './forms/NovedadBonificaci
 import { NovedadIngresosAdicionalesConsolidatedForm } from './forms/NovedadIngresosAdicionalesConsolidatedForm';
 import { NovedadPrestamosConsolidatedForm } from './forms/NovedadPrestamosConsolidatedForm';
 import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesConsolidatedForm';
+import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadExistingList } from './NovedadExistingList';
 import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
@@ -300,6 +301,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             employeeSalary={employeeSalary || 0}
             calculateSuggestedValue={calculateSuggestedValue}
             isSubmitting={isSubmitting}
+          />
+        );
+
+      case 'retencion_fuente':
+        return (
+          <NovedadRetefuenteForm
+            onBack={handleBackToSelector}
+            onSubmit={handleFormSubmit}
+            employeeSalary={employeeSalary || 0}
           />
         );
 
