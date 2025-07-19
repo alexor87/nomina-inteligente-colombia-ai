@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bug, Database, Sync, CheckCircle } from 'lucide-react';
+import { Bug, Database, RefreshCw, CheckCircle } from 'lucide-react';
 import { PayrollCleanArchitecture } from '@/components/payroll/PayrollCleanArchitecture';
 
 export const PayrollDiagnosticPanel = () => {
@@ -20,7 +20,7 @@ export const PayrollDiagnosticPanel = () => {
             Arquitectura
           </TabsTrigger>
           <TabsTrigger value="sync" className="flex items-center gap-2">
-            <Sync className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4" />
             Sincronización
           </TabsTrigger>
           <TabsTrigger value="data" className="flex items-center gap-2">

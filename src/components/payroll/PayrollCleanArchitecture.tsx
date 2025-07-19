@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, ArrowRight, Database, Sync } from 'lucide-react';
+import { CheckCircle, ArrowRight, Database, RefreshCw } from 'lucide-react';
 import { useVacationNovedadSync } from '@/hooks/useVacationNovedadSync';
 
 /**
@@ -32,7 +32,7 @@ export const PayrollCleanArchitecture = () => {
           <div className="flex items-center justify-center">
             <div className="flex items-center gap-2 text-green-600">
               <ArrowRight className="h-4 w-4" />
-              <Sync className="h-4 w-4 animate-spin" />
+              <RefreshCw className="h-4 w-4 animate-spin" />
               <ArrowRight className="h-4 w-4 rotate-180" />
             </div>
           </div>
