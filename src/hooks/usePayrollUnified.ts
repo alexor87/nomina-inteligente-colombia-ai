@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollService } from '@/services/PayrollService';
 import { EmployeeService } from '@/services/EmployeeService';
-import { PayrollPeriodService } from '@/services/payroll/PayrollPeriodService';
+import { PayrollPeriodService } from '@/services/PayrollPeriodService';
+import { supabase } from '@/integrations/supabase/client';
 import { BaseEmployeeData, PayrollEmployee } from '@/types/payroll';
 import { usePayrollNovedadesUnified } from './usePayrollNovedadesUnified';
 import { useVacationIntegration } from './useVacationIntegration';
@@ -31,7 +32,22 @@ export const usePayrollUnified = (companyId?: string) => {
     setIsAutoSaving(true);
     try {
       console.log('💾 Auto-saving payroll data...');
-      await PayrollService.savePayrollData(currentPeriodId, employees);
+      const companyId = await PayrollPeriodService.getCurrentUserCompanyId();
+      const { error } = await supabase
+        .from('payrolls')
+        .upsert(employees.map(emp => ({
+          employee_id: emp.id,
+          period_id: currentPeriodId,
+          company_id: companyId,
+          periodo: currentPeriodId, // Required field
+          salario_base: emp.baseSalary,
+          total_devengado: emp.grossPay,
+          total_deducciones: emp.deductions,
+          neto_pagado: emp.netPay,
+          estado: 'borrador'
+        })));
+      
+      if (error) throw error;
       setLastAutoSaveTime(new Date());
       toast({
         title: "💾 Auto Guardado",
@@ -64,11 +80,10 @@ export const usePayrollUnified = (companyId?: string) => {
 
     try {
       console.log('🗓️ Creating or resuming payroll period...', { startDate, endDate });
-      const period = await PayrollPeriodService.createOrResumePeriod({
-        companyId,
-        startDate,
-        endDate
-      });
+      const period = await PayrollPeriodService.createPayrollPeriod(startDate, endDate, 'mensual');
+      if (!period) {
+        throw new Error('Failed to create payroll period');
+      }
 
       setCurrentPeriodId(period.id);
       return { success: true, message: 'Payroll period created/resumed', periodId: period.id };
@@ -98,37 +113,48 @@ export const usePayrollUnified = (companyId?: string) => {
       }
 
       // 2. Obtener empleados de la empresa
-      const baseEmployees: BaseEmployeeData[] = await EmployeeService.getEmployeesForPayroll(companyId);
+      const employeesResult = await EmployeeService.getEmployees();
+      if (!employeesResult.success) {
+        throw new Error(employeesResult.error || 'Error loading employees');
+      }
+      const baseEmployees = employeesResult.data || [];
       console.log(`✅ Found ${baseEmployees.length} employees`);
 
       // 3. Cargar datos de nómina existentes (si existen)
-      const existingPayrollData = await PayrollService.getPayrollData(periodResult.periodId);
-      console.log(`✅ Found existing payroll data for ${existingPayrollData.length} employees`);
+      const { data: existingPayrollData, error: payrollError } = await supabase
+        .from('payrolls')
+        .select('*')
+        .eq('period_id', periodResult.periodId);
+      
+      if (payrollError) {
+        console.error('Error loading payroll data:', payrollError);
+      }
+      console.log(`✅ Found existing payroll data for ${existingPayrollData?.length || 0} employees`);
 
       // 4. Combinar datos base con datos de nómina existentes
       const payrollEmployees = baseEmployees.map(baseEmp => {
-        const existingData = existingPayrollData.find(data => data.employeeId === baseEmp.id);
+        const existingData = existingPayrollData?.find(data => data.employee_id === baseEmp.id);
         return {
           id: baseEmp.id,
-          name: baseEmp.name,
-          position: baseEmp.position,
-          baseSalary: baseEmp.baseSalary,
-          workedDays: baseEmp.workedDays,
-          extraHours: baseEmp.extraHours,
-          disabilities: baseEmp.disabilities,
-          bonuses: baseEmp.bonuses,
-          absences: baseEmp.absences,
-          grossPay: existingData?.grossPay || 0,
-          deductions: existingData?.deductions || 0,
-          netPay: existingData?.netPay || 0,
+          name: `${baseEmp.nombre} ${baseEmp.apellido}`,
+          position: baseEmp.cargo || 'Sin cargo',
+          baseSalary: baseEmp.salarioBase || 0,
+          workedDays: baseEmp.diasTrabajo || 30,
+          extraHours: 0,
+          disabilities: 0,
+          bonuses: 0,
+          absences: 0,
+          grossPay: existingData?.total_devengado || 0,
+          deductions: existingData?.total_deducciones || 0,
+          netPay: existingData?.neto_pagado || 0,
           status: 'valid' as 'valid' | 'error' | 'incomplete',
           errors: [],
-          eps: baseEmp.eps,
-          afp: baseEmp.afp,
-          transportAllowance: existingData?.transportAllowance || 0,
-          employerContributions: existingData?.employerContributions || 0,
-          ibc: existingData?.ibc || baseEmp.baseSalary,
-          novedades: baseEmp.novedades || []
+          eps: baseEmp.eps || '',
+          afp: baseEmp.afp || '',
+          transportAllowance: 0,
+          employerContributions: 0,
+          ibc: baseEmp.salarioBase || 0,
+          novedades: []
         };
       });
 
@@ -166,30 +192,32 @@ export const usePayrollUnified = (companyId?: string) => {
       console.log('➕ Adding employees to payroll:', employeeIds);
 
       // 1. Obtener datos base de los empleados
-      const newEmployees: BaseEmployeeData[] = await EmployeeService.getEmployeesByIds(employeeIds);
+      const employeePromises = employeeIds.map(id => EmployeeService.getEmployeeById(id));
+      const employeeResults = await Promise.all(employeePromises);
+      const newEmployees = employeeResults.filter(Boolean);
 
       // 2. Mapear a tipo PayrollEmployee
       const payrollEmployees: PayrollEmployee[] = newEmployees.map(emp => ({
         id: emp.id,
-        name: emp.name,
-        position: emp.position,
-        baseSalary: emp.baseSalary,
-        workedDays: emp.workedDays,
-        extraHours: emp.extraHours,
-        disabilities: emp.disabilities,
-        bonuses: emp.bonuses,
-        absences: emp.absences,
+        name: `${emp.nombre} ${emp.apellido}`,
+        position: emp.cargo || 'Sin cargo',
+        baseSalary: emp.salarioBase || 0,
+        workedDays: emp.diasTrabajo || 30,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
         grossPay: 0,
         deductions: 0,
         netPay: 0,
         status: 'valid',
         errors: [],
-        eps: emp.eps,
-        afp: emp.afp,
+        eps: emp.eps || '',
+        afp: emp.afp || '',
         transportAllowance: 0,
         employerContributions: 0,
-        ibc: emp.baseSalary,
-        novedades: emp.novedades || []
+        ibc: emp.salarioBase || 0,
+        novedades: []
       }));
 
       // 3. Combinar con empleados existentes
@@ -259,7 +287,52 @@ export const usePayrollUnified = (companyId?: string) => {
     setIsLiquidating(true);
     try {
       console.log('💰 Liquidating payroll for period:', { startDate, endDate });
-      await PayrollService.liquidatePayroll(currentPeriodId, employees);
+      
+      // Process payroll liquidation using available methods
+      const companyId = await PayrollPeriodService.getCurrentUserCompanyId();
+      const payrollCalculations = employees.map(employee => {
+        // Create a complete PayrollCalculation object
+        const baseCalculation = {
+          salarioBase: employee.baseSalary || 0,
+          diasTrabajados: employee.workedDays || 30,
+          horasExtra: employee.extraHours || 0,
+          recargoNocturno: 0,
+          recargoDominical: 0,
+          bonificaciones: employee.bonuses || 0,
+          auxilioTransporte: 0,
+          totalDevengado: 0,
+          saludEmpleado: 0,
+          pensionEmpleado: 0,
+          retencionFuente: 0,
+          otrasDeducciones: 0,
+          totalDeducciones: 0,
+          netoPagado: 0,
+          cesantias: 0,
+          interesesCesantias: 0,
+          prima: 0,
+          vacaciones: 0
+        };
+        
+        return PayrollService.calculatePayroll(baseCalculation);
+      });
+
+      // Save calculated payrolls
+      const { error: saveError } = await supabase
+        .from('payrolls')
+        .upsert(employees.map((employee, index) => ({
+          employee_id: employee.id,
+          period_id: currentPeriodId,
+          company_id: companyId,
+          periodo: currentPeriodId, // Required field
+          salario_base: employee.baseSalary,
+          dias_trabajados: employee.workedDays,
+          total_devengado: payrollCalculations[index].totalDevengado,
+          total_deducciones: payrollCalculations[index].totalDeducciones,
+          neto_pagado: payrollCalculations[index].netoPagado,
+          estado: 'liquidada'
+        })));
+
+      if (saveError) throw saveError;
 
       toast({
         title: "✅ Nómina liquidada",

@@ -17,7 +17,6 @@ const PayrollLiquidationPageSimple = () => {
   const { companyId } = useCurrentCompany();
   
   const {
-    currentPeriod,
     employees,
     isLoading,
     isLiquidating,
@@ -138,14 +137,14 @@ const PayrollLiquidationPageSimple = () => {
       )}
 
       {/* Información del Período Seleccionado */}
-      {selectedPeriod && currentPeriod && !needsConflictResolution && (
+      {selectedPeriod && currentPeriodId && !needsConflictResolution && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium text-green-800">Período Activo</h3>
                 <p className="text-green-700">{selectedPeriod.label}</p>
-                <p className="text-sm text-green-600">ID: {currentPeriod.id}</p>
+                <p className="text-sm text-green-600">ID: {currentPeriodId}</p>
                 {conflictDetectionStep === 'completed' && (
                   <p className="text-xs text-green-500 mt-1">
                     ✅ Sin conflictos detectados entre ausencias y novedades
@@ -180,7 +179,7 @@ const PayrollLiquidationPageSimple = () => {
       )}
 
       {/* Tabla de Empleados */}
-      {employees.length > 0 && selectedPeriod && currentPeriod && canProceedWithLiquidation && (
+      {employees.length > 0 && selectedPeriod && currentPeriodId && canProceedWithLiquidation && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
