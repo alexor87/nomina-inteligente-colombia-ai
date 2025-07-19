@@ -45,6 +45,8 @@ export interface PayrollEmployee {
   employerContributions: number;
   // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades
   ibc?: number;
+  // ✅ NUEVO CAMPO: novedades para cálculo de IBC
+  novedades?: NovedadForIBC[];
 }
 
 export interface PayrollSummary {
