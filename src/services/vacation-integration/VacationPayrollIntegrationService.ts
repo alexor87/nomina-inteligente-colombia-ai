@@ -76,11 +76,11 @@ export class VacationPayrollIntegrationService {
         }
       }
 
-      // Cambiar status de 'pendiente' a 'liquidada' 
+      // ✅ CORREGIDO: Cambiar status de 'pendiente' a 'liquidado' (no 'liquidada')
       const { error: updateError } = await supabase
         .from('employee_vacation_periods')
         .update({
-          status: 'liquidada',
+          status: 'liquidado',
           processed_in_period_id: options.periodId,
           updated_at: new Date().toISOString()
         })
