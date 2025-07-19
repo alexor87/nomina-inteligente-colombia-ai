@@ -40,3 +40,19 @@ export const calculateDaysBetween = (startDate: string, endDate: string): number
   const diffTime = Math.abs(end.getTime() - start.getTime());
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 };
+
+/**
+ * Formatea una fecha y hora para mostrar al usuario
+ * @param dateString - Fecha en formato ISO
+ * @returns Fecha y hora formateada para display
+ */
+export const formatDateTimeForDisplay = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('es-CO', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
