@@ -204,27 +204,29 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
         </div>
 
         {/* Información Legal Específica */}
-        <div className={`p-3 rounded border ${
-          selectedType.color === 'green' 
-            ? 'bg-green-50 border-green-200' 
-            : 'bg-yellow-50 border-yellow-200'
-        }`}>
-          <div className={`flex items-center gap-2 mb-1 ${
-            selectedType.color === 'green' ? 'text-green-700' : 'text-yellow-700'
+        {selectedType && (
+          <div className={`p-3 rounded border ${
+            selectedType.color === 'green' 
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-yellow-50 border-yellow-200'
           }`}>
-            <Info className="h-4 w-4" />
-            <span className="font-medium">Marco Legal</span>
+            <div className={`flex items-center gap-2 mb-1 ${
+              selectedType.color === 'green' ? 'text-green-700' : 'text-yellow-700'
+            }`}>
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Marco Legal</span>
+            </div>
+            <div className={`text-sm ${
+              selectedType.color === 'green' ? 'text-green-600' : 'text-yellow-600'
+            }`}>
+              <p><strong>Base Legal:</strong> {selectedType.legalBasis}</p>
+              <p>{selectedType.description}</p>
+              {selectedType.value === 'no_remunerada' && (
+                <p className="mt-1"><strong>Efecto:</strong> Suspende acumulación de prestaciones sociales durante el período</p>
+              )}
+            </div>
           </div>
-          <div className={`text-sm ${
-            selectedType.color === 'green' ? 'text-green-600' : 'text-yellow-600'
-          }`}>
-            <p><strong>Base Legal:</strong> {selectedType.legalBasis}</p>
-            <p>{selectedType.description}</p>
-            {selectedType.value === 'no_remunerada' && (
-              <p className="mt-1"><strong>Efecto:</strong> Suspende acumulación de prestaciones sociales durante el período</p>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Información específica para maternidad */}
         {subtipo === 'maternidad' && (
