@@ -74,8 +74,8 @@ export const ABSENCE_TYPE_COLORS: Record<VacationAbsenceType, string> = {
   ausencia: 'bg-red-100 text-red-800'
 };
 
-// ✅ NUEVO: Función para obtener subtipos disponibles por tipo
-export const getSubtiposForType = (type: VacationAbsenceType): string[] => {
+// ✅ CORREGIDO: Cambiar return type a readonly string[] para compatibilidad
+export const getSubtiposForType = (type: VacationAbsenceType): readonly string[] => {
   switch (type) {
     case 'licencia_remunerada':
       return NOVEDAD_CATEGORIES.devengados.types.licencia_remunerada.subtipos || [];
