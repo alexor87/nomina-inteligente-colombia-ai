@@ -214,14 +214,13 @@ const VacationsAbsencesPage = () => {
               Cargando datos unificados...
             </div>
           ) : (
-            <VacationAbsenceTable
-              vacationsAbsences={vacationsAbsences}
-              onView={handleViewVacation}
-              onEdit={handleEditVacation}
-              onDelete={handleDeleteVacation}
-              isLoading={isLoading}
-              getRecordOrigin={getRecordOrigin}
-            />
+              <VacationAbsenceTable
+                vacationsAbsences={vacationsAbsences}
+                onView={handleViewVacation}
+                onEdit={handleEditVacation}
+                onDelete={handleDeleteVacation}
+                isLoading={isLoading}
+              />
           )}
         </CardContent>
       </Card>
