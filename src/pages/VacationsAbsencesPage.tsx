@@ -6,7 +6,7 @@ import { VacationAbsenceFiltersComponent } from '@/components/vacations/Vacation
 import { VacationAbsenceTable } from '@/components/vacations/VacationAbsenceTable';
 import { VacationAbsenceForm } from '@/components/vacations/VacationAbsenceForm';
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
-import { useVacationsAbsences } from '@/hooks/useVacationsAbsences';
+import { useUnifiedVacationsAbsences } from '@/hooks/useUnifiedVacationsAbsences';
 import { VacationAbsence, VacationAbsenceFilters } from '@/types/vacations';
 import { Plus, Calendar, Users, Clock, CheckCircle } from 'lucide-react';
 
@@ -28,7 +28,7 @@ const VacationsAbsencesPage = () => {
     isCreating,
     isUpdating,
     isDeleting
-  } = useVacationsAbsences(filters);
+  } = useUnifiedVacationsAbsences(filters);
 
   console.log('📊 Vacations data:', {
     count: vacationsAbsences.length,
