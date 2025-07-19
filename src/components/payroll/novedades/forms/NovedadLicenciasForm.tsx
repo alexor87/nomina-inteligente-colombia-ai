@@ -13,7 +13,7 @@ interface NovedadLicenciasFormProps {
   onBack: () => void;
   onSubmit: (data: any) => void;
   employeeSalary: number;
-  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, dias?: number) => number | null;
+  calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number, dias?: number) => Promise<number | null>;
   isSubmitting: boolean;
 }
 
@@ -64,6 +64,7 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
   const [dias, setDias] = useState<number>(0);
   const [valorCalculado, setValorCalculado] = useState<number>(0);
   const [observacion, setObservacion] = useState<string>('');
+  const [isCalculating, setIsCalculating] = useState(false);
 
   const handleDateRangeChange = (start: string, end: string, calculatedDays: number) => {
     setStartDate(start);
@@ -72,18 +73,42 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
   };
 
   useEffect(() => {
-    if (tipoLicencia && dias > 0 && calculateSuggestedValue) {
-      if (tipoLicencia === 'remunerada') {
-        const calculatedValue = calculateSuggestedValue('licencia_remunerada', subtipo, dias);
-        if (calculatedValue) {
-          setValorCalculado(calculatedValue);
+    const calculateValue = async () => {
+      if (tipoLicencia && dias > 0 && calculateSuggestedValue) {
+        setIsCalculating(true);
+        
+        try {
+          if (tipoLicencia === 'remunerada') {
+            console.log('🔄 FORM: Calculando licencia remunerada:', {
+              subtipo,
+              dias,
+              salario: employeeSalary
+            });
+            
+            const calculatedValue = await calculateSuggestedValue('licencia_remunerada', subtipo, undefined, dias);
+            
+            if (calculatedValue && calculatedValue > 0) {
+              console.log('✅ FORM: Valor calculado:', calculatedValue);
+              setValorCalculado(calculatedValue);
+            } else {
+              console.warn('⚠️ FORM: Valor calculado es 0 o null');
+              setValorCalculado(0);
+            }
+          } else {
+            // Licencia no remunerada siempre es $0
+            setValorCalculado(0);
+          }
+        } catch (error) {
+          console.error('❌ FORM: Error en cálculo:', error);
+          setValorCalculado(0);
+        } finally {
+          setIsCalculating(false);
         }
-      } else {
-        // Licencia no remunerada siempre es $0
-        setValorCalculado(0);
       }
-    }
-  }, [tipoLicencia, subtipo, dias, calculateSuggestedValue]);
+    };
+
+    calculateValue();
+  }, [tipoLicencia, subtipo, dias, calculateSuggestedValue, employeeSalary]);
 
   const handleSubmit = () => {
     if (!tipoLicencia || !startDate || !endDate || dias <= 0) return;
@@ -94,6 +119,13 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
     }
 
     const novedadType = tipoLicencia === 'remunerada' ? 'licencia_remunerada' : 'licencia_no_remunerada';
+
+    console.log('📤 FORM: Enviando datos:', {
+      tipo_novedad: novedadType,
+      subtipo: subtipo || tipoLicencia,
+      dias,
+      valor: tipoLicencia === 'remunerada' ? Math.abs(valorCalculado) : 0
+    });
 
     onSubmit({
       tipo_novedad: novedadType,
@@ -275,6 +307,9 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
               <span className="font-medium">
                 {tipoLicencia === 'remunerada' ? 'Valor a Pagar' : 'Sin Remuneración'}
               </span>
+              {isCalculating && (
+                <span className="text-xs text-gray-500">(Calculando...)</span>
+              )}
             </div>
             <Badge variant="secondary" className={`mt-1 ${
               tipoLicencia === 'remunerada' 
@@ -291,9 +326,9 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
                 Las licencias no remuneradas no generan pago pero mantienen el vínculo laboral
               </p>
             )}
-            {subtipo === 'maternidad' && tipoLicencia === 'remunerada' && (
+            {subtipo === 'maternidad' && tipoLicencia === 'remunerada' && valorCalculado > 0 && (
               <p className="text-xs text-green-600 mt-1">
-                ✅ Licencia de maternidad: Pago a cargo de la EPS según Ley 1822/2017
+                ✅ Licencia de maternidad: Cálculo correcto según normativa legal
               </p>
             )}
           </div>
@@ -319,7 +354,7 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid || isSubmitting}
+          disabled={!isValid || isSubmitting || isCalculating}
           className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
         >
           {isSubmitting ? 'Guardando...' : 'Guardar Licencia'}

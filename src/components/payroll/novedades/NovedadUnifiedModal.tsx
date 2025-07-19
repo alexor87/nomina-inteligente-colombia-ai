@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -13,10 +12,10 @@ import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadExistingList } from './NovedadExistingList';
 import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
-import { calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -65,6 +64,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  
+  const { calculateNovedad } = useNovedadBackendCalculation();
 
   // ✅ KISS: Fecha del período sin complejidad
   const getPeriodDate = useCallback(() => {
@@ -129,6 +130,54 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     setCurrentStep('selector');
   };
 
+  const calculateSuggestedValue = useCallback(async (
+    tipoNovedad: NovedadType,
+    subtipo: string | undefined,
+    horas?: number,
+    dias?: number
+  ): Promise<number | null> => {
+    if (!employeeSalary) {
+      console.warn('❌ Salario del empleado no definido');
+      return null;
+    }
+
+    try {
+      const fechaPeriodo = getPeriodDate().toISOString().split('T')[0];
+      
+      console.log('🎯 MODAL: Calculando novedad:', {
+        tipo: tipoNovedad,
+        subtipo,
+        salario: employeeSalary,
+        horas,
+        dias,
+        fecha: fechaPeriodo
+      });
+
+      const result = await calculateNovedad({
+        tipoNovedad,
+        subtipo,
+        salarioBase: employeeSalary,
+        horas,
+        dias,
+        fechaPeriodo
+      });
+
+      if (result) {
+        console.log('✅ MODAL: Cálculo exitoso:', {
+          tipo: subtipo || tipoNovedad,
+          valor: result.valor,
+          detalle: result.detalleCalculo
+        });
+        return result.valor;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Error en cálculo:', error);
+      return null;
+    }
+  }, [employeeSalary, getPeriodDate, calculateNovedad]);
+
   const handleFormSubmit = async (formData: any) => {
     if (!employeeId || !periodId) {
       toast({
@@ -185,27 +234,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       setIsSubmitting(false);
     }
   };
-
-  const calculateSuggestedValue = useCallback((
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ): number | null => {
-    if (!employeeSalary) {
-      console.warn('Salario del empleado no definido.');
-      return null;
-    }
-
-    try {
-      const fechaPeriodo = getPeriodDate();
-      const { valor } = calcularValorNovedadEnhanced(tipoNovedad, subtipo, employeeSalary, dias, horas, fechaPeriodo);
-      return valor;
-    } catch (error) {
-      console.error('Error al calcular el valor sugerido:', error);
-      return null;
-    }
-  }, [employeeSalary, getPeriodDate]);
 
   const renderNovedadForm = () => {
     if (!selectedType || !employeeId) return null;
