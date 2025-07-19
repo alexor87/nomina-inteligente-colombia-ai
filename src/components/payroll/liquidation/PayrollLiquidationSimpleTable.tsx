@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
-import { PayrollEmployee } from '@/types/payroll';
+import { PayrollEmployee, NovedadForIBC } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { formatCurrency } from '@/lib/utils';
@@ -19,6 +20,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { PayrollCalculationBackendService } from '@/services/PayrollCalculationBackendService';
+import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -40,6 +43,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
+  const [employeeCalculations, setEmployeeCalculations] = useState<Record<string, { totalToPay: number; ibc: number }>>({});
   const { toast } = useToast();
 
   // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
@@ -56,7 +60,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     getEmployeeNovedades,
     refreshEmployeeNovedades,
     isCreating,
-    lastRefreshTime
+    lastRefreshTime,
+    getEmployeeNovedadesList
   } = usePayrollNovedadesUnified(currentPeriodId || '');
 
   // Cargar novedades cuando se monten los empleados o cambie el período
@@ -67,6 +72,62 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       loadNovedadesTotals(employeeIds);
     }
   }, [employees, currentPeriodId, loadNovedadesTotals]);
+
+  // ✅ NUEVO: Recalcular totales cuando cambien las novedades
+  useEffect(() => {
+    const recalculateAllEmployees = async () => {
+      if (!currentPeriodId || employees.length === 0) return;
+
+      console.log('🔄 Recalculando empleados con IBC correcto...');
+      const newCalculations: Record<string, { totalToPay: number; ibc: number }> = {};
+
+      for (const employee of employees) {
+        try {
+          // Obtener novedades del empleado
+          const novedadesList = await getEmployeeNovedadesList(employee.id);
+          const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(novedadesList);
+
+          console.log('📝 Novedades para empleado:', employee.name, {
+            count: novedadesForIBC.length,
+            constitutivas: novedadesForIBC.filter(n => n.constitutivo_salario).length
+          });
+
+          // Calcular usando el backend con novedades
+          const calculation = await PayrollCalculationBackendService.calculatePayroll({
+            baseSalary: employee.baseSalary,
+            workedDays: calculateWorkedDays(),
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            periodType: 'mensual',
+            novedades: novedadesForIBC
+          });
+
+          newCalculations[employee.id] = {
+            totalToPay: calculation.netPay,
+            ibc: calculation.ibc
+          };
+
+          console.log('✅ Empleado calculado:', employee.name, {
+            ibc: calculation.ibc,
+            netPay: calculation.netPay
+          });
+
+        } catch (error) {
+          console.error('❌ Error calculando empleado:', employee.name, error);
+          newCalculations[employee.id] = {
+            totalToPay: 0,
+            ibc: employee.baseSalary
+          };
+        }
+      }
+
+      setEmployeeCalculations(newCalculations);
+    };
+
+    recalculateAllEmployees();
+  }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList]);
 
   const calculateWorkedDays = () => {
     if (!startDate || !endDate) return 30;
@@ -156,30 +217,15 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     setEmployeeToDelete(null);
   };
 
-  const calculateTotalToPay = (employee: PayrollEmployee) => {
-    const config = getCurrentYearConfig();
-    const novedades = getEmployeeNovedades(employee.id);
-    
-    // Salario proporcional según días trabajados
-    const salarioProporcional = (employee.baseSalary / 30) * workedDays;
-    
-    // Base gravable: salario proporcional + novedades netas
-    const baseGravable = salarioProporcional + novedades.totalNeto;
-    
-    // Deducciones de ley sobre base gravable
-    const saludEmpleado = baseGravable * config.porcentajes.saludEmpleado;
-    const pensionEmpleado = baseGravable * config.porcentajes.pensionEmpleado;
-    const totalDeducciones = saludEmpleado + pensionEmpleado;
-    
-    // Auxilio de transporte proporcional (solo si salario ≤ 2 SMMLV)
-    const auxilioTransporte = employee.baseSalary <= (config.salarioMinimo * 2) 
-      ? (config.auxilioTransporte / 30) * workedDays 
-      : 0;
-    
-    // Total a pagar = base gravable - deducciones + auxilio de transporte
-    const totalNeto = baseGravable - totalDeducciones + auxilioTransporte;
-    
-    return Math.max(0, totalNeto);
+  // ✅ MEJORADO: Usar cálculos con IBC correcto
+  const getTotalToPay = (employee: PayrollEmployee) => {
+    const calculation = employeeCalculations[employee.id];
+    return calculation ? calculation.totalToPay : 0;
+  };
+
+  const getEmployeeIBC = (employee: PayrollEmployee) => {
+    const calculation = employeeCalculations[employee.id];
+    return calculation ? calculation.ibc : employee.baseSalary;
   };
 
   return (
@@ -189,6 +235,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           <TableRow>
             <TableHead>Nombre Empleado</TableHead>
             <TableHead className="text-right">Salario Base</TableHead>
+            <TableHead className="text-right">IBC</TableHead>
             <TableHead className="text-center">Días Trabajados</TableHead>
             <TableHead className="text-center">Novedades</TableHead>
             <TableHead className="text-right">Total a Pagar Período</TableHead>
@@ -198,7 +245,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         <TableBody>
           {employees.map((employee) => {
             const novedades = getEmployeeNovedades(employee.id);
-            const totalToPay = calculateTotalToPay(employee);
+            const totalToPay = getTotalToPay(employee);
+            const ibc = getEmployeeIBC(employee);
             const hasNovedades = novedades.hasNovedades;
 
             return (
@@ -210,6 +258,17 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                 
                 <TableCell className="text-right font-medium">
                   {formatCurrency(employee.baseSalary)}
+                </TableCell>
+
+                <TableCell className="text-right">
+                  <div className={`font-medium ${ibc !== employee.baseSalary ? 'text-blue-600' : 'text-gray-600'}`}>
+                    {formatCurrency(ibc)}
+                  </div>
+                  {ibc !== employee.baseSalary && (
+                    <div className="text-xs text-blue-500">
+                      +{formatCurrency(ibc - employee.baseSalary)} constitutivo
+                    </div>
+                  )}
                 </TableCell>
                 
                 <TableCell className="text-center font-medium">

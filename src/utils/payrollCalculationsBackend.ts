@@ -1,11 +1,18 @@
 
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
-import { PayrollEmployee, BaseEmployeeData, PayrollSummary } from '@/types/payroll';
+import { PayrollEmployee, BaseEmployeeData, PayrollSummary, NovedadForIBC } from '@/types/payroll';
 
 export const calculateEmployeeBackend = async (
   baseEmployee: BaseEmployeeData, 
   periodType: 'quincenal' | 'mensual'
 ): Promise<PayrollEmployee> => {
+  console.log('🔍 calculateEmployeeBackend: Procesando empleado con novedades:', {
+    employeeId: baseEmployee.id,
+    name: baseEmployee.name,
+    novedadesCount: baseEmployee.novedades?.length || 0,
+    novedades: baseEmployee.novedades
+  });
+
   const input: PayrollCalculationInput = {
     baseSalary: baseEmployee.baseSalary,
     workedDays: baseEmployee.workedDays,
@@ -13,7 +20,9 @@ export const calculateEmployeeBackend = async (
     disabilities: baseEmployee.disabilities,
     bonuses: baseEmployee.bonuses, // Now includes all positive novedades
     absences: baseEmployee.absences,
-    periodType
+    periodType,
+    // ✅ NUEVO: Incluir novedades para cálculo correcto de IBC
+    novedades: baseEmployee.novedades || []
   };
 
   try {
@@ -22,6 +31,13 @@ export const calculateEmployeeBackend = async (
       PayrollCalculationBackendService.validateEmployee(input, baseEmployee.eps, baseEmployee.afp)
     ]);
 
+    console.log('✅ calculateEmployeeBackend: Cálculo completado:', {
+      employeeId: baseEmployee.id,
+      ibc: calculation.ibc,
+      healthDeduction: calculation.healthDeduction,
+      pensionDeduction: calculation.pensionDeduction
+    });
+
     return {
       ...baseEmployee,
       grossPay: calculation.grossPay,
@@ -29,6 +45,8 @@ export const calculateEmployeeBackend = async (
       netPay: calculation.netPay,
       transportAllowance: calculation.transportAllowance,
       employerContributions: calculation.employerContributions,
+      // ✅ NUEVO: Incluir IBC calculado
+      ibc: calculation.ibc,
       status: validation.isValid ? 'valid' : 'error',
       errors: [...validation.errors, ...validation.warnings]
     };
@@ -41,6 +59,7 @@ export const calculateEmployeeBackend = async (
       netPay: 0,
       transportAllowance: 0,
       employerContributions: 0,
+      ibc: 0,
       status: 'error',
       errors: ['Error en el cálculo de nómina: ' + (error instanceof Error ? error.message : 'Error desconocido')]
     };
@@ -79,6 +98,17 @@ export const convertToBaseEmployeeData = (employee: PayrollEmployee): BaseEmploy
     bonuses: employee.bonuses,
     absences: employee.absences,
     eps: employee.eps,
-    afp: employee.afp
+    afp: employee.afp,
+    // ✅ CONSERVAR: novedades si existen
+    novedades: employee.novedades || []
   };
+};
+
+// ✅ NUEVA FUNCIÓN: Convertir novedades de base de datos a formato para IBC
+export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
+  return novedades.map(novedad => ({
+    valor: Number(novedad.valor || 0),
+    constitutivo_salario: Boolean(novedad.constitutivo_salario),
+    tipo_novedad: novedad.tipo_novedad || 'otros'
+  }));
 };

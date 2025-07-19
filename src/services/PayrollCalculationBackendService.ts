@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { NovedadForIBC } from '@/types/payroll';
 
 export interface PayrollCalculationInput {
   baseSalary: number;
@@ -9,6 +10,8 @@ export interface PayrollCalculationInput {
   bonuses: number;
   absences: number;
   periodType: 'quincenal' | 'mensual';
+  // ✅ NUEVO CAMPO: novedades para cálculo correcto de IBC
+  novedades?: NovedadForIBC[];
 }
 
 export interface PayrollCalculationResult {
@@ -28,6 +31,8 @@ export interface PayrollCalculationResult {
   employerSena: number;
   employerContributions: number;
   totalPayrollCost: number;
+  // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades constitutivas
+  ibc: number;
 }
 
 export interface ValidationResult {
@@ -39,6 +44,12 @@ export interface ValidationResult {
 export class PayrollCalculationBackendService {
   static async calculatePayroll(input: PayrollCalculationInput): Promise<PayrollCalculationResult> {
     try {
+      console.log('🔍 PayrollCalculationBackendService: Calculando nómina con novedades:', {
+        baseSalary: input.baseSalary,
+        novedadesCount: input.novedades?.length || 0,
+        novedades: input.novedades
+      });
+
       const { data, error } = await supabase.functions.invoke('payroll-calculations', {
         body: {
           action: 'calculate',
@@ -54,6 +65,12 @@ export class PayrollCalculationBackendService {
       if (!data.success) {
         throw new Error(data.error || 'Error desconocido en el cálculo');
       }
+
+      console.log('✅ PayrollCalculationBackendService: Resultado del cálculo:', {
+        ibc: data.data.ibc,
+        healthDeduction: data.data.healthDeduction,
+        pensionDeduction: data.data.pensionDeduction
+      });
 
       return data.data;
     } catch (error) {
@@ -123,9 +140,9 @@ export class PayrollCalculationBackendService {
     year: string;
   } {
     return {
-      salarioMinimo: 1300000,
+      salarioMinimo: 1423500, // ✅ SMMLV 2025 actualizado
       auxilioTransporte: 200000,
-      uvt: 47065,
+      uvt: 47065, // ✅ UVT 2025 actualizado  
       year: '2025'
     };
   }

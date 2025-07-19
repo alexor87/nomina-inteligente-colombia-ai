@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface NovedadForIBC {
+  valor: number;
+  constitutivo_salario: boolean;
+  tipo_novedad: string;
+}
+
 interface PayrollCalculationInput {
   baseSalary: number;
   workedDays: number;
@@ -15,6 +21,7 @@ interface PayrollCalculationInput {
   absences: number;
   periodType: 'quincenal' | 'mensual' | 'semanal';
   periodDate?: string;
+  novedades?: NovedadForIBC[];
 }
 
 interface NovedadCalculationInput {
@@ -357,6 +364,62 @@ function validatePrestamoLimits(valorCuota: number, salarioBase: number, tipoPre
     maxAllowed,
     percentage,
     warning: !isValid ? `Excede el límite legal del ${limit.maxPercent}% (${limit.description})` : undefined
+  };
+}
+
+// ✅ NUEVA FUNCIÓN: Calcular IBC incluyendo novedades constitutivas
+function calculateIBC(baseSalary: number, novedades: NovedadForIBC[] = [], config: PayrollConfiguration): {
+  ibcSalud: number;
+  ibcPension: number;
+  detalleCalculo: string;
+} {
+  console.log('🔍 [IBC v2.0] Calculando IBC:', {
+    baseSalary,
+    novedadesCount: novedades.length,
+    novedades: novedades.map(n => ({ tipo: n.tipo_novedad, valor: n.valor, constitutivo: n.constitutivo_salario }))
+  });
+
+  // 1. Calcular ingresos constitutivos de salario
+  const novedadesConstitutivas = novedades
+    .filter(n => n.constitutivo_salario === true)
+    .reduce((sum, n) => sum + Number(n.valor || 0), 0);
+
+  const ingresosConstitutivos = baseSalary + novedadesConstitutivas;
+  
+  console.log('📊 [IBC v2.0] Ingresos constitutivos:', {
+    salarioBase: baseSalary,
+    novedadesConstitutivas,
+    totalConstitutivo: ingresosConstitutivos
+  });
+
+  // 2. Aplicar límites legales
+  const topeIbcPension = config.salarioMinimo * 25; // 25 SMMLV para pensión
+  const minimoIbc = config.salarioMinimo; // Mínimo 1 SMMLV
+  
+  // Para salud: sin límite superior
+  const ibcSalud = Math.max(ingresosConstitutivos, minimoIbc);
+  
+  // Para pensión: tope de 25 SMMLV
+  const ibcPension = Math.min(Math.max(ingresosConstitutivos, minimoIbc), topeIbcPension);
+  
+  console.log('✅ [IBC v2.0] IBC calculados:', {
+    ibcSalud,
+    ibcPension,
+    topeAplicado: ibcPension < ingresosConstitutivos,
+    diferencia: ingresosConstitutivos - ibcPension
+  });
+
+  const detalleCalculo = `IBC Salud: $${ibcSalud.toLocaleString()} - IBC Pensión: $${ibcPension.toLocaleString()}${
+    novedadesConstitutivas > 0 ? ` (incluye $${novedadesConstitutivas.toLocaleString()} en novedades constitutivas)` : ''
+  }${
+    ibcPension === topeIbcPension && ingresosConstitutivos > topeIbcPension ? 
+    ` - Tope pensión aplicado (máx. 25 SMMLV)` : ''
+  }`;
+
+  return {
+    ibcSalud,
+    ibcPension,
+    detalleCalculo
   };
 }
 
@@ -764,16 +827,22 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
     jornadaInfo: {
       horasSemanales,
       ley: 'Ley 2101 de 2021',
-      descripcion: `Jornada de ${horasSemanales} horas semanales`
+      descripcion: `Jornada de ${getHorasSemanales(input.periodDate)} horas semanales`
     }
   };
 }
 
+// ✅ FUNCIÓN PRINCIPAL ACTUALIZADA: Ahora calcula IBC correctamente
 function calculatePayroll(input: PayrollCalculationInput) {
   const config = DEFAULT_CONFIG_2025;
   const horasMensuales = getHorasMensuales(input.periodDate);
   const horasSemanales = getHorasSemanales(input.periodDate);
   
+  console.log('🚀 [PAYROLL v3.0] Iniciando cálculo con IBC correcto:', {
+    baseSalary: input.baseSalary,
+    novedadesCount: input.novedades?.length || 0
+  });
+
   const dailySalary = input.baseSalary / 30;
   const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
   const regularPay = Math.round(dailySalary * effectiveWorkedDays);
@@ -790,26 +859,30 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const grossSalary = regularPay + extraPay + input.bonuses;
   const grossPay = grossSalary + transportAllowance;
   
-  const payrollBase = regularPay + extraPay + input.bonuses;
-  const healthDeduction = Math.round(payrollBase * config.porcentajes.saludEmpleado);
-  const pensionDeduction = Math.round(payrollBase * config.porcentajes.pensionEmpleado);
+  // ✅ NUEVO: Calcular IBC incluyendo novedades constitutivas
+  const ibcCalculation = calculateIBC(input.baseSalary, input.novedades || [], config);
+  
+  // ✅ CORREGIDO: Usar IBC para calcular deducciones
+  const healthDeduction = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleado);
+  const pensionDeduction = Math.round(ibcCalculation.ibcPension * config.porcentajes.pensionEmpleado);
   const totalDeductions = healthDeduction + pensionDeduction;
 
   const netPay = grossPay - totalDeductions;
 
-  const employerHealth = Math.round(payrollBase * config.porcentajes.saludEmpleador);
-  const employerPension = Math.round(payrollBase * config.porcentajes.pensionEmpleador);
-  const employerArl = Math.round(payrollBase * config.porcentajes.arl);
-  const employerCaja = Math.round(payrollBase * config.porcentajes.cajaCompensacion);
-  const employerIcbf = Math.round(payrollBase * config.porcentajes.icbf);
-  const employerSena = Math.round(payrollBase * config.porcentajes.sena);
+  // ✅ CORREGIDO: Aportes patronales también se calculan sobre IBC
+  const employerHealth = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleador);
+  const employerPension = Math.round(ibcCalculation.ibcPension * config.porcentajes.pensionEmpleador);
+  const employerArl = Math.round(ibcCalculation.ibcSalud * config.porcentajes.arl);
+  const employerCaja = Math.round(ibcCalculation.ibcSalud * config.porcentajes.cajaCompensacion);
+  const employerIcbf = Math.round(ibcCalculation.ibcSalud * config.porcentajes.icbf);
+  const employerSena = Math.round(ibcCalculation.ibcSalud * config.porcentajes.sena);
 
   const employerContributions = employerHealth + employerPension + employerArl + 
                                 employerCaja + employerIcbf + employerSena;
 
   const totalPayrollCost = netPay + employerContributions;
 
-  return {
+  const result = {
     regularPay,
     extraPay,
     transportAllowance,
@@ -826,6 +899,8 @@ function calculatePayroll(input: PayrollCalculationInput) {
     employerSena,
     employerContributions,
     totalPayrollCost,
+    // ✅ NUEVO: Incluir IBC en el resultado
+    ibc: ibcCalculation.ibcSalud,
     jornadaInfo: {
       horasSemanales,
       horasMensuales,
@@ -835,6 +910,15 @@ function calculatePayroll(input: PayrollCalculationInput) {
       descripcion: `Jornada de ${horasSemanales} horas semanales`
     }
   };
+
+  console.log('✅ [PAYROLL v3.0] Cálculo completado con IBC:', {
+    ibc: result.ibc,
+    healthDeduction: result.healthDeduction,
+    pensionDeduction: result.pensionDeduction,
+    detalleIBC: ibcCalculation.detalleCalculo
+  });
+
+  return result;
 }
 
 serve(async (req) => {
@@ -845,7 +929,10 @@ serve(async (req) => {
   try {
     const { action, data } = await req.json();
 
-    console.log(`🚀 [EDGE v4.0] Request received: action="${action}", tipoNovedad="${data?.tipoNovedad}", subtipo="${data?.subtipo}"`);
+    console.log(`🚀 [EDGE v5.0] Request received: action="${action}"`);
+    if (action === 'calculate' && data.novedades) {
+      console.log(`📊 [EDGE v5.0] Novedades incluidas: ${data.novedades.length} items`);
+    }
 
     switch (action) {
       case 'calculate':

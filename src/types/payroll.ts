@@ -17,6 +17,13 @@ export interface PayrollPeriod {
   numero_periodo_anual?: number;
 }
 
+// ✅ NUEVA INTERFACE: Para novedades en cálculo de IBC
+export interface NovedadForIBC {
+  valor: number;
+  constitutivo_salario: boolean;
+  tipo_novedad: string;
+}
+
 export interface PayrollEmployee {
   id: string;
   name: string;
@@ -36,6 +43,8 @@ export interface PayrollEmployee {
   afp?: string;
   transportAllowance: number;
   employerContributions: number;
+  // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades
+  ibc?: number;
 }
 
 export interface PayrollSummary {
@@ -61,6 +70,8 @@ export interface BaseEmployeeData {
   eps?: string;
   afp?: string;
   additionalDeductions?: number;
+  // ✅ NUEVO CAMPO: novedades para cálculo de IBC
+  novedades?: NovedadForIBC[];
 }
 
 // ✅ UNIFICACIÓN: Interfaces consolidadas para detección de períodos
