@@ -1,12 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { VacationAbsence, VacationAbsenceFormData } from '@/types/vacations';
-import { calculateDaysBetween } from '@/utils/dateUtils';
 
-export const useVacationAbsenceForm = (
-  editingVacation?: VacationAbsence | null,
-  isOpen?: boolean
-) => {
+export const useVacationAbsenceForm = (editingVacation: VacationAbsence | null, isOpen: boolean) => {
   const [formData, setFormData] = useState<VacationAbsenceFormData>({
     employee_id: '',
     type: 'vacaciones',
@@ -14,43 +10,39 @@ export const useVacationAbsenceForm = (
     end_date: '',
     observations: ''
   });
-  const [calculatedDays, setCalculatedDays] = useState<number>(0);
 
-  // Load editing data
+  // Reset form when modal opens/closes or editing vacation changes
   useEffect(() => {
-    if (editingVacation) {
-      setFormData({
-        employee_id: editingVacation.employee_id,
-        type: editingVacation.type || 'vacaciones',
-        start_date: editingVacation.start_date,
-        end_date: editingVacation.end_date,
-        observations: editingVacation.observations || ''
-      });
-    } else {
-      setFormData({
-        employee_id: '',
-        type: 'vacaciones',
-        start_date: '',
-        end_date: '',
-        observations: ''
-      });
+    if (isOpen) {
+      if (editingVacation) {
+        setFormData({
+          employee_id: editingVacation.employee_id,
+          type: editingVacation.type,
+          start_date: editingVacation.start_date,
+          end_date: editingVacation.end_date,
+          observations: editingVacation.observations || ''
+        });
+      } else {
+        setFormData({
+          employee_id: '',
+          type: 'vacaciones',
+          start_date: '',
+          end_date: '',
+          observations: ''
+        });
+      }
     }
   }, [editingVacation, isOpen]);
 
-  // Calculate days automatically using the centralized utility
-  useEffect(() => {
-    if (formData.start_date && formData.end_date) {
-      const days = calculateDaysBetween(formData.start_date, formData.end_date);
-      setCalculatedDays(days);
-      console.log('📅 Hook - Calculated days:', { 
-        start: formData.start_date, 
-        end: formData.end_date, 
-        days 
-      });
-    } else {
-      setCalculatedDays(0);
-    }
-  }, [formData.start_date, formData.end_date]);
+  // Calculate days between dates
+  const calculatedDays = formData.start_date && formData.end_date 
+    ? (() => {
+        const start = new Date(formData.start_date);
+        const end = new Date(formData.end_date);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      })()
+    : 0;
 
   return {
     formData,

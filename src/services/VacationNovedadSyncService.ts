@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
 
@@ -14,11 +15,11 @@ export class VacationNovedadSyncService {
         type: formData.type,
         start_date: formData.start_date,
         end_date: formData.end_date,
-        days_count: this.calculateDays(formData.start_date, formData.end_date),
+        days_count: VacationNovedadSyncService.calculateDays(formData.start_date, formData.end_date),
         observations: formData.observations || '',
         status: 'pendiente',
         created_by: (await supabase.auth.getUser()).data.user?.id,
-        company_id: await this.getCurrentCompanyId()
+        company_id: await VacationNovedadSyncService.getCurrentCompanyId()
       })
       .select(`
         *,
@@ -40,7 +41,7 @@ export class VacationNovedadSyncService {
     };
 
     if (formData.start_date && formData.end_date) {
-      updateData.days_count = this.calculateDays(formData.start_date, formData.end_date);
+      updateData.days_count = VacationNovedadSyncService.calculateDays(formData.start_date, formData.end_date);
     }
 
     const { data, error } = await supabase
@@ -88,8 +89,8 @@ export class VacationNovedadSyncService {
       .from('payroll_novedades')
       .select(`
         *,
-        empleado:employees(id, nombre, apellido, cedula),
-        periodo:payroll_periods_real!periodo_id(id, estado, periodo)
+        employee:employees!empleado_id(id, nombre, apellido, cedula),
+        period:payroll_periods_real!periodo_id(id, estado, periodo)
       `)
       .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'])
       .order('created_at', { ascending: false });
@@ -148,7 +149,7 @@ export class VacationNovedadSyncService {
         // Determinar estado correcto para novedades
         let correctStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
         
-        if (item.periodo_id && item.periodo?.estado === 'cerrado') {
+        if (item.periodo_id && item.period?.estado === 'cerrado') {
           correctStatus = 'liquidada';
         } else {
           correctStatus = 'pendiente';
@@ -171,10 +172,10 @@ export class VacationNovedadSyncService {
           creado_por: item.creado_por,
           created_at: item.created_at,
           updated_at: item.updated_at,
-          employee_nombre: item.empleado?.nombre || '',
-          employee_apellido: item.empleado?.apellido || '',
-          employee_cedula: item.empleado?.cedula || '',
-          employee: item.empleado || { id: '', nombre: '', apellido: '', cedula: '' },
+          employee_nombre: item.employee?.nombre || '',
+          employee_apellido: item.employee?.apellido || '',
+          employee_cedula: item.employee?.cedula || '',
+          employee: item.employee || { id: '', nombre: '', apellido: '', cedula: '' },
           
           // Mapped properties for compatibility
           employee_id: item.empleado_id,
