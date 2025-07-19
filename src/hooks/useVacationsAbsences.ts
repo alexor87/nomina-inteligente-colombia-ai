@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -142,10 +143,28 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     return profile.company_id;
   };
 
+  // ✅ NUEVO: Validación de subtipo requerido
+  const validateSubtipo = (formData: VacationAbsenceFormData): string | null => {
+    // Subtipos requeridos para ciertos tipos
+    const requiresSubtipo = ['licencia_remunerada', 'incapacidad'];
+    
+    if (requiresSubtipo.includes(formData.type) && !formData.subtipo) {
+      return `El subtipo es requerido para ${formData.type.replace('_', ' ')}`;
+    }
+    
+    return null;
+  };
+
   // Mutación para crear vacación/ausencia
   const createMutation = useMutation({
     mutationFn: async (formData: VacationAbsenceFormData) => {
       if (!user) throw new Error('Usuario no autenticado');
+
+      // ✅ NUEVO: Validar subtipo
+      const subtipoError = validateSubtipo(formData);
+      if (subtipoError) {
+        throw new Error(subtipoError);
+      }
 
       const companyId = await getCompanyId();
 
@@ -169,6 +188,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
           company_id: companyId,
           employee_id: formData.employee_id,
           type: formData.type,
+          subtipo: formData.subtipo, // ✅ NUEVO: Incluir subtipo
           start_date: formData.start_date,
           end_date: formData.end_date,
           days_count: days,
@@ -197,6 +217,12 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     mutationFn: async ({ id, formData }: { id: string; formData: VacationAbsenceFormData }) => {
       if (!user) throw new Error('Usuario no autenticado');
 
+      // ✅ NUEVO: Validar subtipo
+      const subtipoError = validateSubtipo(formData);
+      if (subtipoError) {
+        throw new Error(subtipoError);
+      }
+
       // Use the centralized date calculation utility
       const days = calculateDaysBetween(formData.start_date, formData.end_date);
 
@@ -217,6 +243,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .update({
           employee_id: formData.employee_id,
           type: formData.type,
+          subtipo: formData.subtipo, // ✅ NUEVO: Incluir subtipo
           start_date: formData.start_date,
           end_date: formData.end_date,
           days_count: days,

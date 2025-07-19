@@ -10,6 +10,7 @@ export const useVacationAbsenceForm = (
   const [formData, setFormData] = useState<VacationAbsenceFormData>({
     employee_id: '',
     type: 'vacaciones',
+    subtipo: undefined, // ✅ NUEVO: Campo subtipo
     start_date: '',
     end_date: '',
     observations: ''
@@ -22,6 +23,7 @@ export const useVacationAbsenceForm = (
       setFormData({
         employee_id: editingVacation.employee_id,
         type: editingVacation.type || 'vacaciones',
+        subtipo: editingVacation.subtipo, // ✅ NUEVO: Cargar subtipo existente
         start_date: editingVacation.start_date,
         end_date: editingVacation.end_date,
         observations: editingVacation.observations || ''
@@ -30,6 +32,7 @@ export const useVacationAbsenceForm = (
       setFormData({
         employee_id: '',
         type: 'vacaciones',
+        subtipo: undefined, // ✅ NUEVO: Limpiar subtipo
         start_date: '',
         end_date: '',
         observations: ''
