@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,13 +33,6 @@ const INCAPACIDAD_SUBTIPOS = [
     description: 'ARL paga desde el día 1 al 100%',
     porcentaje: 100,
     normativa: 'Decreto 1295/1994 - ARL asume desde el primer día'
-  },
-  { 
-    value: 'maternidad', 
-    label: 'Maternidad - EPS (100%)', 
-    description: 'EPS paga al 100%',
-    porcentaje: 100,
-    normativa: 'Ley 1822/2017 - 18 semanas de licencia remunerada'
   }
 ];
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -132,8 +131,7 @@ export const NovedadForm = ({
         config.isAutoCalculated = true;
         config.subtipoOptions = [
           { value: 'comun', label: 'Común - EPS (66.7%)' },
-          { value: 'laboral', label: 'Laboral - ARL (100%)' },
-          { value: 'maternidad', label: 'Maternidad - EPS (100%)' }
+          { value: 'laboral', label: 'Laboral - ARL (100%)' }
         ];
         break;
 
