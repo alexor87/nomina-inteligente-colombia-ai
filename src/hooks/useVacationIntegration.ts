@@ -5,6 +5,20 @@ import { VacationIntegrationResult, VacationProcessingOptions } from '@/types/va
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// ✅ Interface para tipar la respuesta del RPC
+interface ActivePeriodResponse {
+  has_active_period: boolean;
+  period?: {
+    id: string;
+    periodo: string;
+    fecha_inicio: string;
+    fecha_fin: string;
+    estado: string;
+    last_activity_at: string;
+    employees_count: number;
+  };
+}
+
 export const useVacationIntegration = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<VacationIntegrationResult | null>(null);
@@ -69,16 +83,25 @@ export const useVacationIntegration = () => {
       console.log('🔄 Verificando período activo para auto-procesamiento...');
       
       // Obtener período activo
-      const { data: activePeriodData } = await supabase.rpc('get_active_period_for_company', {
+      const { data: rawData } = await supabase.rpc('get_active_period_for_company', {
         p_company_id: companyId
       });
 
-      if (!activePeriodData?.has_active_period) {
+      // ✅ Type assertion con verificación defensiva
+      const activePeriodData = rawData as ActivePeriodResponse | null;
+      
+      if (!activePeriodData || !activePeriodData.has_active_period) {
         console.log('📝 No hay período activo, skip auto-procesamiento');
         return;
       }
 
       const activePeriod = activePeriodData.period;
+      
+      // ✅ Verificación defensiva de que existe el período
+      if (!activePeriod) {
+        console.log('📝 Período activo sin datos, skip auto-procesamiento');
+        return;
+      }
       
       // Verificar si la vacación cae dentro del período activo
       const vacationStart = new Date(vacationStartDate);
