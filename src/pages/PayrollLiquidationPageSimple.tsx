@@ -2,20 +2,25 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Loader2, AlertTriangle } from 'lucide-react';
+import { Calculator, Users, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { ConflictResolutionPanel } from '@/components/vacation-integration/ConflictResolutionPanel';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { usePayrollLiquidationWithVacations } from '@/hooks/usePayrollLiquidationWithVacations';
+import { useVacationIntegration } from '@/hooks/useVacationIntegration';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
+import { useToast } from '@/hooks/use-toast';
 
 const PayrollLiquidationPageSimple = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<SelectablePeriod | null>(null);
+  const [isUpdatingData, setIsUpdatingData] = useState(false);
   
   const { companyId } = useCurrentCompany();
+  const { toast } = useToast();
+  const { processVacationsForPayroll } = useVacationIntegration();
   
   const {
     currentPeriod,
@@ -85,6 +90,57 @@ const PayrollLiquidationPageSimple = () => {
     );
   };
 
+  // ✅ NUEVA: Función para actualizar/sincronizar datos de vacaciones y ausencias
+  const handleUpdateData = async () => {
+    if (!selectedPeriod || !currentPeriodId || !companyId) {
+      toast({
+        title: "Error",
+        description: "No hay período seleccionado para actualizar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsUpdatingData(true);
+    try {
+      console.log('🔄 Actualizando datos de vacaciones y ausencias...');
+      
+      // Procesar vacaciones para el período actual
+      const result = await processVacationsForPayroll({
+        companyId,
+        periodId: currentPeriodId,
+        startDate: selectedPeriod.startDate,
+        endDate: selectedPeriod.endDate
+      });
+
+      if (result.success) {
+        // Recargar empleados para mostrar los datos actualizados
+        await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
+        
+        toast({
+          title: "✅ Datos Actualizados",
+          description: `Se procesaron ${result.processedVacations} licencia(s) y ausencia(s)`,
+          className: "border-green-200 bg-green-50"
+        });
+      } else {
+        toast({
+          title: "⚠️ Sin cambios",
+          description: result.message,
+          className: "border-blue-200 bg-blue-50"
+        });
+      }
+    } catch (error) {
+      console.error('Error actualizando datos:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudieron actualizar los datos",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdatingData(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -148,18 +204,31 @@ const PayrollLiquidationPageSimple = () => {
                 <p className="text-sm text-green-600">ID: {currentPeriod.id}</p>
                 {conflictDetectionStep === 'completed' && (
                   <p className="text-xs text-green-500 mt-1">
-                    ✅ Sin conflictos detectados entre ausencias y novedades
+                    ✅ Integración automática con vacaciones y ausencias completada
                   </p>
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReset}
-                className="text-green-700 border-green-200 hover:bg-green-100"
-              >
-                Cambiar Período
-              </Button>
+              <div className="flex space-x-2">
+                {/* ✅ NUEVO: Botón para actualizar datos */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUpdateData}
+                  disabled={isUpdatingData}
+                  className="text-blue-700 border-blue-200 hover:bg-blue-50"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingData ? 'animate-spin' : ''}`} />
+                  {isUpdatingData ? 'Actualizando...' : 'Actualizar Datos'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  className="text-green-700 border-green-200 hover:bg-green-100"
+                >
+                  Cambiar Período
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -172,7 +241,7 @@ const PayrollLiquidationPageSimple = () => {
             <div className="flex items-center justify-center space-x-2">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>
-                {isDetectingConflicts ? 'Detectando conflictos entre ausencias y novedades...' : 'Cargando empleados...'}
+                {isDetectingConflicts ? 'Detectando conflictos y sincronizando vacaciones...' : 'Cargando empleados...'}
               </span>
             </div>
           </CardContent>

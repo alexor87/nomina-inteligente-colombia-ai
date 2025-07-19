@@ -8,8 +8,7 @@ import {
   Send, 
   Edit,
   StickyNote,
-  FileText,
-  Calendar
+  FileText
 } from 'lucide-react';
 import { EmployeeCalculationModal } from '../modals/EmployeeCalculationModal';
 import { VoucherPreviewModal } from '../modals/VoucherPreviewModal';
@@ -17,9 +16,6 @@ import { VoucherSendDialog } from '../modals/VoucherSendDialog';
 import { EmployeeLiquidationModal } from '../modals/EmployeeLiquidationModal';
 import { EmployeeNotesModal } from '../notes/EmployeeNotesModal';
 import { NovedadUnifiedModal } from '../novedades/NovedadUnifiedModal';
-import { useVacationIntegration } from '@/hooks/useVacationIntegration';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 interface PayrollTableActionsProps {
   employee: PayrollEmployee;
@@ -38,7 +34,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
   period,
   canEdit,
   onUpdateEmployee,
-  periodId = period.startDate // fallback to startDate if periodId not provided
+  periodId = period.startDate
 }) => {
   const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [showVoucherPreview, setShowVoucherPreview] = useState(false);
@@ -47,64 +43,9 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showNovedadesModal, setShowNovedadesModal] = useState(false);
 
-  const { processEmployeePendingVacations, isProcessing } = useVacationIntegration();
-  const { toast } = useToast();
-
   const handleCreateNovedad = async (novedadData: any) => {
     console.log('Creando novedad:', novedadData);
     // TODO: Implementar lógica para crear la novedad
-  };
-
-  // ✅ NUEVA: Función para procesar licencias pendientes del empleado
-  const handleProcessPendingVacations = async () => {
-    try {
-      // Obtener company_id del usuario
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "Usuario no autenticado",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.company_id) {
-        toast({
-          title: "Error",
-          description: "No se pudo determinar la empresa",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      console.log('🔄 Procesando licencias pendientes para:', employee.name);
-      
-      await processEmployeePendingVacations(
-        employee.id,
-        periodId,
-        profile.company_id
-      );
-
-      // Refrescar datos del empleado si hay callback
-      if (onUpdateEmployee) {
-        onUpdateEmployee(employee.id, {});
-      }
-
-    } catch (error) {
-      console.error('Error procesando licencias:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron procesar las licencias",
-        variant: "destructive"
-      });
-    }
   };
 
   return (
@@ -155,18 +96,6 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
           className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
         >
           <FileText className="h-4 w-4" />
-        </Button>
-
-        {/* ✅ NUEVO: Botón para procesar licencias pendientes */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleProcessPendingVacations}
-          disabled={isProcessing}
-          title="Procesar licencias pendientes"
-          className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-        >
-          <Calendar className="h-4 w-4" />
         </Button>
 
         {canEdit && onUpdateEmployee && (

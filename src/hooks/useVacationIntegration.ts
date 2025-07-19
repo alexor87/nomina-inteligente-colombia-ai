@@ -5,87 +5,10 @@ import { VacationIntegrationResult, VacationProcessingOptions } from '@/types/va
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-// ✅ Interface para tipar la respuesta del RPC
-interface ActivePeriodResponse {
-  has_active_period: boolean;
-  period?: {
-    id: string;
-    periodo: string;
-    fecha_inicio: string;
-    fecha_fin: string;
-    estado: string;
-    last_activity_at: string;
-    employees_count: number;
-  };
-}
-
 export const useVacationIntegration = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<VacationIntegrationResult | null>(null);
   const { toast } = useToast();
-
-  // ✅ NUEVO: Procesar licencias pendientes para un empleado específico
-  const processEmployeePendingVacations = useCallback(async (
-    employeeId: string,
-    periodId: string,
-    companyId: string
-  ): Promise<VacationIntegrationResult> => {
-    setIsProcessing(true);
-    try {
-      console.log('🔄 Procesando licencias pendientes del empleado...');
-      
-      const result = await VacationPayrollIntegrationService.processEmployeePendingVacations(
-        employeeId, 
-        periodId, 
-        companyId
-      );
-      
-      setLastResult(result);
-
-      if (result.success && result.processedVacations > 0) {
-        toast({
-          title: "✅ Licencias procesadas",
-          description: result.message,
-          className: "border-green-200 bg-green-50"
-        });
-      } else if (result.success) {
-        toast({
-          title: "ℹ️ Sin licencias",
-          description: result.message,
-          className: "border-blue-200 bg-blue-50"
-        });
-      } else {
-        toast({
-          title: "❌ Error procesando licencias",
-          description: result.message,
-          variant: "destructive"
-        });
-      }
-
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      const failureResult: VacationIntegrationResult = {
-        processedVacations: 0,
-        createdNovedades: 0,
-        conflicts: [],
-        success: false,
-        message: errorMessage
-      };
-      
-      setLastResult(failureResult);
-      
-      toast({
-        title: "❌ Error crítico",
-        description: errorMessage,
-        variant: "destructive"
-      });
-
-      return failureResult;
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [toast]);
 
   const processVacationsForPayroll = useCallback(async (
     options: VacationProcessingOptions
@@ -98,11 +21,19 @@ export const useVacationIntegration = () => {
       setLastResult(result);
 
       if (result.success) {
-        toast({
-          title: "✅ Integración completada",
-          description: result.message,
-          className: "border-green-200 bg-green-50"
-        });
+        if (result.processedVacations > 0) {
+          toast({
+            title: "✅ Integración completada",
+            description: result.message,
+            className: "border-green-200 bg-green-50"
+          });
+        } else {
+          toast({
+            title: "ℹ️ Sin datos para procesar",
+            description: result.message,
+            className: "border-blue-200 bg-blue-50"
+          });
+        }
       } else {
         toast({
           title: "❌ Error en integración",
@@ -232,7 +163,6 @@ export const useVacationIntegration = () => {
     isProcessing,
     lastResult,
     processVacationsForPayroll,
-    processEmployeePendingVacations, // ✅ NUEVA función exportada
     autoProcessVacationForActivePeriod,
     detectConflicts,
     calculateValue
