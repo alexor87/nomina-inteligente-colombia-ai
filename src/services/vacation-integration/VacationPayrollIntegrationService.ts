@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { VacationIntegrationResult, VacationProcessingOptions } from '@/types/vacation-integration';
 import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
@@ -41,6 +40,23 @@ export class VacationPayrollIntegrationService {
       // ✅ NUEVA: Crear novedades en payroll_novedades para cada ausencia
       for (const vacation of pendingVacations) {
         try {
+          // Verificar si ya existe una novedad para esta ausencia en este período
+          const { data: existingNovedad } = await supabase
+            .from('payroll_novedades')
+            .select('id')
+            .eq('company_id', options.companyId)
+            .eq('empleado_id', vacation.employee_id)
+            .eq('periodo_id', options.periodId)
+            .eq('tipo_novedad', vacation.type)
+            .eq('fecha_inicio', vacation.start_date)
+            .eq('fecha_fin', vacation.end_date)
+            .maybeSingle();
+
+          if (existingNovedad) {
+            console.log(`⏭️ Novedad ya existe para ausencia ${vacation.id}, saltando...`);
+            continue;
+          }
+
           // Calcular el valor de la novedad
           const valor = this.calculateVacationValue(
             vacation.type,
@@ -76,11 +92,10 @@ export class VacationPayrollIntegrationService {
         }
       }
 
-      // ✅ CORREGIDO: Cambiar status de 'pendiente' a 'liquidado' (no 'liquidada')
+      // ✅ KISS: NO cambiar status aquí - solo marcar como vinculadas al período
       const { error: updateError } = await supabase
         .from('employee_vacation_periods')
         .update({
-          status: 'liquidado',
           processed_in_period_id: options.periodId,
           updated_at: new Date().toISOString()
         })
@@ -126,7 +141,7 @@ export class VacationPayrollIntegrationService {
         createdNovedades: createdNovedades,
         conflicts: [],
         success: true,
-        message: `Se procesaron exitosamente: ${typeMessages}. Se crearon ${createdNovedades} novedades.`
+        message: `Se integraron como novedades: ${typeMessages}. Las ausencias cambiarán a "liquidado" al cerrar la nómina.`
       };
 
     } catch (error) {
@@ -183,6 +198,33 @@ export class VacationPayrollIntegrationService {
       
       default:
         return 0;
+    }
+  }
+
+  static async liquidateVacationsForPeriod(companyId: string, periodId: string): Promise<void> {
+    try {
+      console.log('🔄 Liquidando ausencias para período:', periodId);
+
+      // Cambiar status de ausencias vinculadas a este período
+      const { error } = await supabase
+        .from('employee_vacation_periods')
+        .update({
+          status: 'liquidado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('company_id', companyId)
+        .eq('processed_in_period_id', periodId)
+        .eq('status', 'pendiente');
+
+      if (error) {
+        console.error('Error liquidating vacations:', error);
+        throw error;
+      }
+
+      console.log('✅ Ausencias liquidadas exitosamente');
+    } catch (error) {
+      console.error('❌ Error in liquidateVacationsForPeriod:', error);
+      throw error;
     }
   }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
 import { PayrollAutomationService } from '@/services/PayrollAutomationService';
+import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
 import { useToast } from '@/hooks/use-toast';
 import { useVacationIntegration } from '@/hooks/useVacationIntegration';
 
@@ -406,16 +407,19 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, toast]);
 
-  // ✅ FIXED: Liquidación de nómina simplificada sin métodos inexistentes
+  // ✅ CORRECCIÓN PRINCIPAL: Liquidación con cambio de status de ausencias
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
     if (!currentPeriod || employees.length === 0) return;
 
     setIsLiquidating(true);
     try {
-      console.log('🏖️ Iniciando liquidación simplificada...');
+      console.log('🏖️ Iniciando liquidación con liquidación de ausencias...');
 
-      // ✅ SIMPLIFICADO: Las ausencias ya están en payroll_novedades, no necesitamos procesamiento adicional
-      console.log('✅ Los registros de tiempo libre ya están integrados en payroll_novedades');
+      // ✅ KISS: Liquidar ausencias vinculadas a este período
+      await VacationPayrollIntegrationService.liquidateVacationsForPeriod(
+        companyId, 
+        currentPeriod.id
+      );
 
       // Actualizar estado del período a cerrado
       await supabase
@@ -425,7 +429,7 @@ export const usePayrollUnified = (companyId: string) => {
 
       toast({
         title: "Nómina liquidada exitosamente ✅",
-        description: "Se incluyeron automáticamente todas las novedades registradas",
+        description: "Las ausencias han sido liquidadas y marcadas como procesadas",
         variant: "default",
       });
 
