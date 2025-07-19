@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,10 +5,12 @@ import { VacationAbsence, VacationAbsenceFilters, VacationAbsenceFormData, Vacat
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { calculateDaysBetween } from '@/utils/dateUtils';
+import { useVacationIntegration } from './useVacationIntegration';
 
 export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { autoProcessVacationForActivePeriod } = useVacationIntegration();
 
   console.log('🪝 useVacationsAbsences initialized', { filters, userId: user?.id });
 
@@ -200,11 +201,22 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .single();
 
       if (error) throw error;
-      return data;
+      return { data, companyId, formData };
     },
-    onSuccess: () => {
+    onSuccess: async ({ data, companyId, formData }) => {
       queryClient.invalidateQueries({ queryKey: ['vacations-absences'] });
       toast.success('Ausencia registrada exitosamente');
+
+      // ✅ NUEVA: Auto-procesamiento automático
+      try {
+        await autoProcessVacationForActivePeriod(
+          companyId,
+          formData.start_date,
+          formData.end_date
+        );
+      } catch (error) {
+        console.warn('Auto-procesamiento falló (no crítico):', error);
+      }
     },
     onError: (error: any) => {
       console.error('Error creating vacation/absence:', error);
@@ -222,6 +234,8 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
       if (subtipoError) {
         throw new Error(subtipoError);
       }
+
+      const companyId = await getCompanyId();
 
       // Use the centralized date calculation utility
       const days = calculateDaysBetween(formData.start_date, formData.end_date);
@@ -255,11 +269,22 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .single();
 
       if (error) throw error;
-      return data;
+      return { data, companyId, formData };
     },
-    onSuccess: () => {
+    onSuccess: async ({ data, companyId, formData }) => {
       queryClient.invalidateQueries({ queryKey: ['vacations-absences'] });
       toast.success('Ausencia actualizada exitosamente');
+
+      // ✅ NUEVA: Auto-procesamiento automático también en updates
+      try {
+        await autoProcessVacationForActivePeriod(
+          companyId,
+          formData.start_date,
+          formData.end_date
+        );
+      } catch (error) {
+        console.warn('Auto-procesamiento falló (no crítico):', error);
+      }
     },
     onError: (error: any) => {
       console.error('Error updating vacation/absence:', error);

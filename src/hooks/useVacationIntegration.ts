@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
 import { VacationIntegrationResult, VacationProcessingOptions } from '@/types/vacation-integration';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useVacationIntegration = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -58,6 +59,68 @@ export const useVacationIntegration = () => {
     }
   }, [toast]);
 
+  // ✅ NUEVA: Función para auto-procesar vacaciones en período activo
+  const autoProcessVacationForActivePeriod = useCallback(async (
+    companyId: string,
+    vacationStartDate: string,
+    vacationEndDate: string
+  ) => {
+    try {
+      console.log('🔄 Verificando período activo para auto-procesamiento...');
+      
+      // Obtener período activo
+      const { data: activePeriodData } = await supabase.rpc('get_active_period_for_company', {
+        p_company_id: companyId
+      });
+
+      if (!activePeriodData?.has_active_period) {
+        console.log('📝 No hay período activo, skip auto-procesamiento');
+        return;
+      }
+
+      const activePeriod = activePeriodData.period;
+      
+      // Verificar si la vacación cae dentro del período activo
+      const vacationStart = new Date(vacationStartDate);
+      const vacationEnd = new Date(vacationEndDate);
+      const periodStart = new Date(activePeriod.fecha_inicio);
+      const periodEnd = new Date(activePeriod.fecha_fin);
+
+      const vacationInPeriod = vacationStart <= periodEnd && vacationEnd >= periodStart;
+      
+      if (!vacationInPeriod) {
+        console.log('📝 Vacación fuera del período activo, skip auto-procesamiento');
+        return;
+      }
+
+      console.log('🎯 Auto-procesando vacación en período activo:', activePeriod.periodo);
+
+      // Procesar automáticamente
+      await processVacationsForPayroll({
+        companyId,
+        periodId: activePeriod.id,
+        startDate: activePeriod.fecha_inicio,
+        endDate: activePeriod.fecha_fin
+      });
+
+      // Toast silencioso para informar
+      toast({
+        title: "🔄 Procesamiento automático",
+        description: `Vacación integrada automáticamente al período ${activePeriod.periodo}`,
+        className: "border-blue-200 bg-blue-50"
+      });
+
+    } catch (error) {
+      // Error silencioso, no bloquea la operación principal
+      console.warn('⚠️ Error en auto-procesamiento (no crítico):', error);
+      toast({
+        title: "⚠️ Procesamiento pendiente",
+        description: "La vacación se registró correctamente. Integración manual requerida.",
+        className: "border-yellow-200 bg-yellow-50"
+      });
+    }
+  }, [processVacationsForPayroll, toast]);
+
   const detectConflicts = useCallback(async (
     companyId: string,
     startDate: string,
@@ -87,6 +150,7 @@ export const useVacationIntegration = () => {
     isProcessing,
     lastResult,
     processVacationsForPayroll,
+    autoProcessVacationForActivePeriod, // ✅ NUEVA función exportada
     detectConflicts,
     calculateValue
   };
