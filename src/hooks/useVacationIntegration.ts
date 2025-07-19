@@ -87,8 +87,8 @@ export const useVacationIntegration = () => {
         p_company_id: companyId
       });
 
-      // ✅ Type assertion con verificación defensiva
-      const activePeriodData = rawData as ActivePeriodResponse | null;
+      // ✅ Type assertion corregida con unknown
+      const activePeriodData = rawData as unknown as ActivePeriodResponse | null;
       
       if (!activePeriodData || !activePeriodData.has_active_period) {
         console.log('📝 No hay período activo, skip auto-procesamiento');
