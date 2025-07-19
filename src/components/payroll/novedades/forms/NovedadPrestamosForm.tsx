@@ -1,13 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CreditCard, Info, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CreditCard, Info, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface NovedadPrestamosFormProps {
   onBack: () => void;
@@ -51,6 +52,27 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
   const [valorCuota, setValorCuota] = useState<string>('');
   const [numeroCuotas, setNumeroCuotas] = useState<string>('');
   const [observacion, setObservacion] = useState<string>('');
+  const [validationResult, setValidationResult] = useState<any>(null);
+
+  const { calculateNovedad, isLoading } = useNovedadBackendCalculation();
+
+  // ✅ Validar con backend cuando cambian los valores
+  useEffect(() => {
+    if (tipoPrestamo && valorCuota && parseFloat(valorCuota) > 0) {
+      calculateNovedad({
+        tipoNovedad: 'libranza',
+        subtipo: tipoPrestamo,
+        salarioBase: employeeSalary,
+        valorManual: parseFloat(valorCuota),
+        cuotas: numeroCuotas ? parseInt(numeroCuotas) : undefined,
+        fechaPeriodo: new Date().toISOString()
+      }).then((result) => {
+        if (result) {
+          setValidationResult(result.validationResult);
+        }
+      });
+    }
+  }, [tipoPrestamo, valorCuota, numeroCuotas, employeeSalary, calculateNovedad]);
 
   const handleSubmit = () => {
     if (!tipoPrestamo || !valorCuota || parseFloat(valorCuota) <= 0) return;
@@ -69,8 +91,11 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
   const isValid = tipoPrestamo && valorCuota && parseFloat(valorCuota) > 0;
   
   const valorCuotaNumerico = parseFloat(valorCuota) || 0;
-  const porcentajeSalario = (valorCuotaNumerico / employeeSalary) * 100;
-  const excedeLimite = selectedType && porcentajeSalario > selectedType.maxPercent;
+  const porcentajeSalario = employeeSalary > 0 ? (valorCuotaNumerico / employeeSalary) * 100 : 0;
+  
+  // Usar validación del backend si está disponible
+  const excedeLimite = validationResult ? !validationResult.isValid : 
+    (selectedType && porcentajeSalario > selectedType.maxPercent);
 
   return (
     <div className="space-y-6">
@@ -126,9 +151,11 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
           <div className="p-3 bg-white rounded border border-blue-200">
             <div className="flex items-center gap-2 text-blue-700 mb-1">
               <Info className="h-4 w-4" />
-              <span className="font-medium">Información</span>
+              <span className="font-medium">Límites Legales</span>
             </div>
-            <p className="text-sm text-blue-600">{selectedType.description}</p>
+            <p className="text-sm text-blue-600">
+              {selectedType.description} - Máximo permitido: {formatCurrency(employeeSalary * (selectedType.maxPercent / 100))} ({selectedType.maxPercent}%)
+            </p>
           </div>
         )}
 
@@ -148,12 +175,23 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
             />
           </div>
           {valorCuota && parseFloat(valorCuota) > 0 && (
-            <div className="mt-2 space-y-1">
-              <Badge variant="secondary" className="bg-red-100 text-red-800">
-                -{formatCurrency(parseFloat(valorCuota))}
-              </Badge>
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="bg-red-100 text-red-800">
+                  -{formatCurrency(parseFloat(valorCuota))}
+                </Badge>
+                {isLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                {!isLoading && validationResult?.isValid && (
+                  <CheckCircle className="h-3 w-3 text-green-600" />
+                )}
+              </div>
               <p className="text-sm text-gray-600">
                 Porcentaje del salario: {porcentajeSalario.toFixed(1)}%
+                {validationResult && (
+                  <span className="ml-2 text-xs">
+                    (Máx. permitido: {validationResult.maxAllowed?.toLocaleString()})
+                  </span>
+                )}
               </p>
             </div>
           )}
@@ -163,10 +201,11 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
           <div className="p-3 bg-red-50 rounded border border-red-200">
             <div className="flex items-center gap-2 text-red-700 mb-1">
               <AlertTriangle className="h-4 w-4" />
-              <span className="font-medium">Advertencia</span>
+              <span className="font-medium">Advertencia Legal</span>
             </div>
             <p className="text-sm text-red-600">
-              Esta cuota excede el límite legal del {selectedType.maxPercent}% del salario.
+              {validationResult?.warning || 
+               `Esta cuota excede el límite legal del ${selectedType?.maxPercent}% del salario.`}
             </p>
           </div>
         )}
@@ -174,10 +213,11 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
         <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
           <div className="flex items-center gap-2 text-yellow-700 mb-1">
             <Info className="h-4 w-4" />
-            <span className="font-medium">Recordatorio</span>
+            <span className="font-medium">Validación Automática</span>
           </div>
           <p className="text-sm text-yellow-700">
-            Los descuentos por préstamos requieren autorización expresa del empleado y están limitados por ley.
+            Los límites se validan automáticamente según la normativa colombiana. 
+            Los descuentos requieren autorización expresa del empleado.
           </p>
         </div>
 
@@ -201,10 +241,10 @@ export const NovedadPrestamosForm: React.FC<NovedadPrestamosFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid}
+          disabled={!isValid || isLoading}
           className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
         >
-          Guardar Préstamo
+          {isLoading ? 'Validando...' : 'Guardar Préstamo'}
         </Button>
       </div>
     </div>

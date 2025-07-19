@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Receipt, Calculator, Info } from 'lucide-react';
+import { ArrowLeft, Receipt, Calculator, Info, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
 interface NovedadRetefuenteFormProps {
   onBack: () => void;
@@ -15,16 +16,8 @@ interface NovedadRetefuenteFormProps {
   employeeSalary: number;
 }
 
-const retencionRanges = [
-  { min: 0, max: 1340000, rate: 0, description: 'Sin retención' },
-  { min: 1340001, max: 1770000, rate: 19, base: 1340000, description: '19% sobre exceso de $1,340,000' },
-  { min: 1770001, max: 4113000, rate: 28, base: 1770000, description: '28% sobre exceso de $1,770,000' },
-  { min: 4113001, max: 8548000, rate: 33, base: 4113000, description: '33% sobre exceso de $4,113,000' },
-  { min: 8548001, max: Infinity, rate: 39, base: 8548000, description: '39% sobre exceso de $8,548,000' }
-];
-
 const tiposRetencion = [
-  { value: 'automatica', label: 'Cálculo Automático', description: 'Basado en tabla de retención vigente' },
+  { value: 'automatica', label: 'Cálculo Automático', description: 'Basado en tabla de retención vigente 2025' },
   { value: 'manual', label: 'Valor Manual', description: 'Ingreso manual del valor a retener' },
   { value: 'ajuste', label: 'Ajuste', description: 'Ajuste a retención calculada automáticamente' }
 ];
@@ -38,35 +31,41 @@ export const NovedadRetefuenteForm: React.FC<NovedadRetefuenteFormProps> = ({
   const [valorManual, setValorManual] = useState<string>('');
   const [valorCalculado, setValorCalculado] = useState<number>(0);
   const [observacion, setObservacion] = useState<string>('');
+  const [calculationDetails, setCalculationDetails] = useState<string>('');
 
-  const calcularRetencion = (salarioMensual: number): { valor: number; detalle: string } => {
-    const salarioAnual = salarioMensual * 12;
-    
-    const rango = retencionRanges.find(r => salarioAnual >= r.min && salarioAnual <= r.max);
-    
-    if (!rango || rango.rate === 0) {
-      return { valor: 0, detalle: 'Salario no sujeto a retención en la fuente' };
-    }
+  const { calculateNovedad, isLoading } = useNovedadBackendCalculation();
 
-    const baseGravable = salarioAnual - rango.base;
-    const retencionAnual = baseGravable * (rango.rate / 100);
-    const retencionMensual = Math.round(retencionAnual / 12);
-
-    return {
-      valor: retencionMensual,
-      detalle: `${rango.description}. Base gravable anual: ${formatCurrency(baseGravable)}. Retención mensual: ${formatCurrency(retencionMensual)}`
-    };
-  };
-
+  // ✅ Calcular automáticamente cuando se selecciona tipo automático
   useEffect(() => {
     if (tipoCalculo === 'automatica') {
-      const calculo = calcularRetencion(employeeSalary);
-      setValorCalculado(calculo.valor);
-      setObservacion(calculo.detalle);
+      calculateNovedad({
+        tipoNovedad: 'retencion_fuente',
+        salarioBase: employeeSalary,
+        fechaPeriodo: new Date().toISOString()
+      }).then((result) => {
+        if (result) {
+          setValorCalculado(result.valor);
+          setCalculationDetails(result.detalleCalculo);
+          setObservacion(`Cálculo automático 2025: ${result.detalleCalculo}`);
+        }
+      });
     } else if (tipoCalculo === 'manual' && valorManual) {
-      setValorCalculado(parseFloat(valorManual));
+      const valorNumerico = parseFloat(valorManual);
+      if (!isNaN(valorNumerico) && valorNumerico > 0) {
+        calculateNovedad({
+          tipoNovedad: 'retencion_fuente',
+          salarioBase: employeeSalary,
+          valorManual: valorNumerico,
+          fechaPeriodo: new Date().toISOString()
+        }).then((result) => {
+          if (result) {
+            setValorCalculado(result.valor);
+            setCalculationDetails(result.detalleCalculo);
+          }
+        });
+      }
     }
-  }, [tipoCalculo, valorManual, employeeSalary]);
+  }, [tipoCalculo, valorManual, employeeSalary, calculateNovedad]);
 
   const handleSubmit = () => {
     if (!tipoCalculo || valorCalculado <= 0) return;
@@ -74,14 +73,12 @@ export const NovedadRetefuenteForm: React.FC<NovedadRetefuenteFormProps> = ({
     onSubmit({
       tipo_novedad: 'retencion_fuente',
       valor: valorCalculado,
-      observacion: `${observacion} (${tipoCalculo})`.trim()
+      observacion: observacion || calculationDetails
     });
   };
 
   const isValid = tipoCalculo && valorCalculado > 0;
-  const rangoActual = retencionRanges.find(r => 
-    employeeSalary * 12 >= r.min && employeeSalary * 12 <= r.max
-  );
+  const porcentajeSalario = employeeSalary > 0 ? (valorCalculado / employeeSalary) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -105,9 +102,7 @@ export const NovedadRetefuenteForm: React.FC<NovedadRetefuenteFormProps> = ({
           <div className="text-sm text-blue-600 space-y-1">
             <p>Salario mensual: {formatCurrency(employeeSalary)}</p>
             <p>Salario anual: {formatCurrency(employeeSalary * 12)}</p>
-            {rangoActual && (
-              <p>Rango de retención: {rangoActual.description}</p>
-            )}
+            <p className="text-xs text-blue-500">UVT 2025: $47.065 - Tabla actualizada según DIAN</p>
           </div>
         </div>
 
@@ -150,31 +145,45 @@ export const NovedadRetefuenteForm: React.FC<NovedadRetefuenteFormProps> = ({
             </div>
           )}
 
-          {valorCalculado > 0 && (
+          {(isLoading || valorCalculado > 0) && (
             <div className="p-3 bg-green-50 rounded border border-green-200">
               <div className="flex items-center gap-2 text-green-700 mb-2">
-                <Calculator className="h-4 w-4" />
-                <span className="font-medium">Retención Calculada</span>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Calculator className="h-4 w-4" />
+                )}
+                <span className="font-medium">
+                  {isLoading ? 'Calculando...' : 'Retención Calculada'}
+                </span>
               </div>
-              <div className="space-y-2">
-                <Badge variant="secondary" className="bg-red-100 text-red-800">
-                  -{formatCurrency(valorCalculado)}
-                </Badge>
-                <p className="text-sm text-green-600">
-                  Porcentaje del salario: {((valorCalculado / employeeSalary) * 100).toFixed(2)}%
-                </p>
-              </div>
+              
+              {!isLoading && (
+                <div className="space-y-2">
+                  <Badge variant="secondary" className="bg-red-100 text-red-800">
+                    -{formatCurrency(valorCalculado)}
+                  </Badge>
+                  <p className="text-sm text-green-600">
+                    Porcentaje del salario: {porcentajeSalario.toFixed(2)}%
+                  </p>
+                  {calculationDetails && (
+                    <p className="text-xs text-green-500 mt-1">
+                      {calculationDetails}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
             <div className="flex items-center gap-2 text-yellow-700 mb-1">
               <Info className="h-4 w-4" />
-              <span className="font-medium">Nota</span>
+              <span className="font-medium">Actualización 2025</span>
             </div>
             <p className="text-sm text-yellow-700">
-              Los valores se basan en la tabla de retención vigente para 2025. 
-              Consulta con el área contable para casos especiales.
+              Los valores se calculan automáticamente con la tabla de retención DIAN 2025. 
+              UVT actualizado: $47.065. Consulta con el área contable para casos especiales.
             </p>
           </div>
 
@@ -199,10 +208,10 @@ export const NovedadRetefuenteForm: React.FC<NovedadRetefuenteFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid}
+          disabled={!isValid || isLoading}
           className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
         >
-          Guardar Retención
+          {isLoading ? 'Calculando...' : 'Guardar Retención'}
         </Button>
       </div>
     </div>

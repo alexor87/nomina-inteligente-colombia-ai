@@ -24,6 +24,8 @@ interface NovedadCalculationInput {
   horas?: number;
   dias?: number;
   fechaPeriodo?: string;
+  valorManual?: number;
+  cuotas?: number;
 }
 
 interface JornadaLegalInfo {
@@ -58,7 +60,7 @@ interface PayrollConfiguration {
 const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   salarioMinimo: 1423500, // ✅ ACTUALIZADO: Salario mínimo 2025
   auxilioTransporte: 200000,
-  uvt: 47065,
+  uvt: 47065, // ✅ UVT 2025 actualizado
   porcentajes: {
     saludEmpleado: 0.04,
     pensionEmpleado: 0.04,
@@ -75,7 +77,25 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
   }
 };
 
-// ✅ LÓGICA DUAL: Fechas separadas para jornada laboral y recargos
+// ✅ NUEVA TABLA DE RETENCIÓN EN LA FUENTE 2025 (actualizada)
+const RETENCION_FUENTE_2025 = [
+  { min: 0, max: 95, rate: 0, base: 0, description: 'Exento' },
+  { min: 96, max: 150, rate: 19, base: 95, description: '19% sobre exceso de 95 UVT' },
+  { min: 151, max: 360, rate: 28, base: 150, description: '28% sobre exceso de 150 UVT' },
+  { min: 361, max: 640, rate: 33, base: 360, description: '33% sobre exceso de 360 UVT' },
+  { min: 641, max: 945, rate: 35, base: 640, description: '35% sobre exceso de 640 UVT' },
+  { min: 946, max: 2300, rate: 37, base: 945, description: '37% sobre exceso de 945 UVT' },
+  { min: 2301, max: Infinity, rate: 39, base: 2300, description: '39% sobre exceso de 2300 UVT' }
+];
+
+// ✅ LÍMITES LEGALES PARA PRÉSTAMOS Y LIBRANZAS
+const PRESTAMO_LIMITS = {
+  libranza: { maxPercent: 30, description: 'Libranza - Máximo 30% del salario' },
+  cooperativa: { maxPercent: 30, description: 'Cooperativa - Máximo 30% del salario' },
+  empresa: { maxPercent: 50, description: 'Empresa - Máximo 50% del salario' },
+  banco: { maxPercent: 30, description: 'Banco - Máximo 30% del salario' }
+};
+
 const JORNADAS_LEGALES = [
   {
     fechaString: '2026-07-15',
@@ -83,7 +103,7 @@ const JORNADAS_LEGALES = [
     descripcion: 'Jornada final según Ley 2101 de 2021'
   },
   {
-    fechaString: '2025-07-15', // ✅ JORNADA LABORAL: 15 julio 2025
+    fechaString: '2025-07-15',
     horasSemanales: 44,
     descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
   },
@@ -104,7 +124,6 @@ const JORNADAS_LEGALES = [
   }
 ];
 
-// Tabla fija de horas mensuales por jornada semanal
 const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
   48: 240,
   47: 235,
@@ -113,26 +132,17 @@ const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
   42: 210
 };
 
-/**
- * ✅ FUNCIÓN CORREGIDA: Horas específicas para cálculo de RECARGOS
- * Usa transición del 1 de julio de 2025 (220h desde esa fecha)
- */
 function getHorasParaRecargos(fechaStr?: string): number {
   const fechaComparar = fechaStr ? fechaStr.split('T')[0] : new Date().toISOString().split('T')[0];
   
-  // ✅ CORRECCIÓN: Usar 220h desde 1 julio 2025 para recargos
   if (fechaComparar >= '2025-07-01') {
     return 220;
   }
   
-  // Para fechas anteriores, usar jornada legal normal
   const jornadaInfo = getJornadaLegal(fechaStr);
   return jornadaInfo.horasMensuales;
 }
 
-/**
- * ✅ Función de jornada legal para salario base (sin cambios)
- */
 function getJornadaLegal(fechaStr?: string) {
   const fechaComparar = fechaStr ? fechaStr.split('T')[0] : new Date().toISOString().split('T')[0];
   
@@ -181,7 +191,6 @@ function getHorasSemanales(fechaStr?: string): number {
   return jornadaInfo.horasSemanales;
 }
 
-// ✅ CORREGIDO: Factores TOTALES (no adicionales) según Aleluya - VERSIÓN ACTUALIZADA 2025
 function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
   factorTotal: number;
   porcentaje: string;
@@ -189,50 +198,47 @@ function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
 } {
   const fecha = fechaPeriodo || new Date();
   
-  // ✅ DEBUG ESPECÍFICO - VERSIÓN ACTUALIZADA
   console.log(`🔍 [EDGE v2.0] DEBUG NOCTURNO DOMINICAL: tipoRecargo="${tipoRecargo}", fecha=${fecha.toISOString().split('T')[0]}`);
   
   switch (tipoRecargo) {
     case 'nocturno':
       return {
-        factorTotal: 0.35, // Factor total 35%
+        factorTotal: 0.35,
         porcentaje: '35%',
         normativa: 'CST Art. 168 - Recargo nocturno ordinario (35% total)'
       };
       
     case 'dominical':
-      // ✅ TRANSICIÓN DE RECARGOS: 1 JULIO 2025 - FACTORES TOTALES
       if (fecha < new Date('2025-07-01')) {
         return {
-          factorTotal: 0.75, // Factor total 75%
+          factorTotal: 0.75,
           porcentaje: '75%',
           normativa: 'Ley 789/2002 Art. 3 - Vigente hasta 30-jun-2025 (75% total)'
         };
       } else if (fecha < new Date('2026-07-01')) {
         return {
-          factorTotal: 0.80, // ✅ ALELUYA: Factor total 80% desde 1 julio 2025
+          factorTotal: 0.80,
           porcentaje: '80%',
           normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026 (80% total)'
         };
       } else if (fecha < new Date('2027-07-01')) {
         return {
-          factorTotal: 0.90, // Factor total 90%
+          factorTotal: 0.90,
           porcentaje: '90%',
           normativa: 'Ley 2466/2025 - Vigente 01-jul-2026 a 30-jun-2027 (90% total)'
         };
       } else {
         return {
-          factorTotal: 1.00, // Factor total 100%
+          factorTotal: 1.00,
           porcentaje: '100%',
           normativa: 'Ley 2466/2025 - Vigente desde 01-jul-2027 (100% total)'
         };
       }
       
     case 'nocturno_dominical':
-      // ✅ DEBUG Y APLICACIÓN: Factor total específico para Aleluya - ACTUALIZADO
       console.log(`✅ [EDGE v2.0] NOCTURNO DOMINICAL DETECTADO: Aplicando factor 1.15`);
       return {
-        factorTotal: 1.15, // Factor total específico para Aleluya
+        factorTotal: 1.15,
         porcentaje: '115%',
         normativa: 'Recargo nocturno dominical - Factor total según CST (Actualizado 2025)'
       };
@@ -247,26 +253,23 @@ function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
   }
 }
 
-// ✅ FUNCIÓN DINÁMICA NORMATIVA COLOMBIANA: Calcula factores combinando porcentajes según fecha
 function getFactorHoraExtra(subtipo: string, fechaPeriodo?: string): number {
   const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
   
   switch (subtipo) {
     case 'diurnas':
-      return 1.25; // 1 + 0.25 (25% extra)
+      return 1.25;
       
     case 'nocturnas':
-      return 1.75; // 1 + 0.75 (75% extra)
+      return 1.75;
       
     case 'dominicales_diurnas':
     case 'festivas_diurnas':
-      // ✅ NORMATIVA: 1 + 25% extra + factor dominical dinámico
       const factorDominicalDiurno = getFactorRecargoTotal('dominical', fechaObj);
       return 1 + 0.25 + factorDominicalDiurno.factorTotal;
       
     case 'dominicales_nocturnas':
     case 'festivas_nocturnas':
-      // ✅ NORMATIVA: 1 + 75% extra + factor dominical dinámico
       const factorDominicalNocturno = getFactorRecargoTotal('dominical', fechaObj);
       return 1 + 0.75 + factorDominicalNocturno.factorTotal;
       
@@ -276,18 +279,99 @@ function getFactorHoraExtra(subtipo: string, fechaPeriodo?: string): number {
   }
 }
 
-// ✅ FUNCIÓN CORREGIDA: Cálculo con factores totales + fórmula unificada Aleluya - VERSIÓN ACTUALIZADA
+// ✅ NUEVA FUNCIÓN: Calcular retención en la fuente 2025
+function calculateRetencionFuente2025(salarioMensual: number): { 
+  valor: number; 
+  detalle: string; 
+  baseEnUvt: number;
+  rangoAplicado: any;
+} {
+  const config = DEFAULT_CONFIG_2025;
+  const baseEnUvt = salarioMensual / config.uvt;
+  
+  console.log('🏦 Calculando Retención en la Fuente 2025:', {
+    salarioMensual,
+    uvt: config.uvt,
+    baseEnUvt: baseEnUvt.toFixed(2)
+  });
+  
+  // Encontrar el rango correspondiente
+  const rango = RETENCION_FUENTE_2025.find(r => 
+    baseEnUvt >= r.min && baseEnUvt <= r.max
+  );
+  
+  if (!rango || rango.rate === 0) {
+    return {
+      valor: 0,
+      detalle: 'Salario no sujeto a retención en la fuente (menor a 95 UVT)',
+      baseEnUvt,
+      rangoAplicado: rango
+    };
+  }
+  
+  // Calcular retención
+  const baseGravable = baseEnUvt - rango.base;
+  const retencionEnUvt = baseGravable * (rango.rate / 100);
+  const retencionEnPesos = Math.round(retencionEnUvt * config.uvt);
+  
+  console.log('💰 Retención calculada:', {
+    rango: `${rango.min}-${rango.max} UVT`,
+    porcentaje: `${rango.rate}%`,
+    baseGravable: baseGravable.toFixed(2),
+    retencionEnUvt: retencionEnUvt.toFixed(2),
+    retencionEnPesos
+  });
+  
+  return {
+    valor: retencionEnPesos,
+    detalle: `${rango.description}. Base: ${baseGravable.toFixed(2)} UVT × ${rango.rate}% = ${retencionEnPesos.toLocaleString()}`,
+    baseEnUvt,
+    rangoAplicado: rango
+  };
+}
+
+// ✅ NUEVA FUNCIÓN: Validar límites de préstamos
+function validatePrestamoLimits(valorCuota: number, salarioBase: number, tipoPrestamo: string): {
+  isValid: boolean;
+  maxAllowed: number;
+  percentage: number;
+  warning?: string;
+} {
+  const limit = PRESTAMO_LIMITS[tipoPrestamo as keyof typeof PRESTAMO_LIMITS];
+  
+  if (!limit) {
+    return {
+      isValid: false,
+      maxAllowed: 0,
+      percentage: 0,
+      warning: 'Tipo de préstamo no válido'
+    };
+  }
+  
+  const maxAllowed = Math.round(salarioBase * (limit.maxPercent / 100));
+  const percentage = (valorCuota / salarioBase) * 100;
+  const isValid = valorCuota <= maxAllowed;
+  
+  return {
+    isValid,
+    maxAllowed,
+    percentage,
+    warning: !isValid ? `Excede el límite legal del ${limit.maxPercent}% (${limit.description})` : undefined
+  };
+}
+
+// ✅ FUNCIÓN MEJORADA: Cálculo de novedades con nuevos tipos
 function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
-  const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
+  const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, valorManual, cuotas } = input;
   
   let valor = 0;
   let factorCalculo = 0;
   let detalleCalculo = '';
+  let validationResult: any = null;
 
   switch (tipoNovedad) {
     case 'horas_extra':
       if (horas && horas > 0 && subtipo) {
-        // ✅ Usar horas mensuales normales para horas extra
         const horasMensuales = getHorasMensuales(fechaPeriodo);
         const valorHoraOrdinaria = salarioBase / horasMensuales;
         const factor = getFactorHoraExtra(subtipo, fechaPeriodo);
@@ -296,7 +380,6 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           valor = Math.round(valorHoraOrdinaria * factor * horas);
           factorCalculo = factor;
           
-          // ✅ DETALLE NORMATIVO: Mostrar descomposición del factor según la ley
           let detalleNormativo = '';
           if (subtipo === 'dominicales_diurnas' || subtipo === 'festivas_diurnas') {
             const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
@@ -319,11 +402,9 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
 
     case 'recargo_nocturno':
       if (horas && horas > 0) {
-        // ✅ DEBUG: Log del subtipo recibido - VERSIÓN ACTUALIZADA
         console.log(`🔍 [EDGE v2.0] SUBTIPO RECIBIDO: "${subtipo}"`);
         
-        // ✅ CORRECCIÓN CRÍTICA: Mapear correctamente los subtipos - ACTUALIZADO
-        let tipoRecargoAleluya = 'nocturno'; // Valor por defecto
+        let tipoRecargoAleluya = 'nocturno';
         
         if (subtipo === 'dominical') {
           tipoRecargoAleluya = 'dominical';
@@ -338,21 +419,18 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         
         console.log(`🎯 [EDGE v2.0] TIPO RECARGO FINAL: "${tipoRecargoAleluya}"`);
         
-        // ✅ FACTORES TOTALES CON TRANSICIÓN 1 JULIO 2025 - ACTUALIZADO
         const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
         const factorInfo = getFactorRecargoTotal(tipoRecargoAleluya, fechaObj);
         
         console.log(`📊 [EDGE v2.0] FACTOR INFO: factorTotal=${factorInfo.factorTotal}, porcentaje=${factorInfo.porcentaje}`);
         
-        // ✅ VERIFICACIÓN CRÍTICA: Validar que tenemos un factor válido - ACTUALIZADO
         if (factorInfo.factorTotal <= 0) {
           console.error(`❌ [EDGE v2.0] Factor inválido para ${tipoRecargoAleluya}:`, factorInfo);
           detalleCalculo = `Error: Factor inválido para ${tipoRecargoAleluya}`;
           break;
         }
         
-        // ✅ FÓRMULA UNIFICADA ALELUYA: Salario × Factor × Horas ÷ (30 × 7.333) para TODOS - ACTUALIZADO
-        const divisorAleluya = 30 * 7.333; // 219.99
+        const divisorAleluya = 30 * 7.333;
         const calculoDetallado = (salarioBase * factorInfo.factorTotal * horas) / divisorAleluya;
         valor = Math.round(calculoDetallado);
         factorCalculo = factorInfo.factorTotal;
@@ -360,23 +438,6 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         console.log(`🧮 [EDGE v2.0] CÁLCULO DETALLADO: (${salarioBase} × ${factorInfo.factorTotal} × ${horas}) ÷ ${divisorAleluya} = ${calculoDetallado} → ${valor}`);
         
         detalleCalculo = `${tipoRecargoAleluya} (fórmula Aleluya v2.0): (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ (30 × 7.333) = ${valor.toLocaleString()}`;
-        
-        // ✅ VALIDACIÓN ESPECÍFICA ALELUYA CON FACTORES TOTALES - ACTUALIZADO
-        if (salarioBase === 1718661 && horas === 1) {
-          const fechaNormalizada = fechaPeriodo ? fechaPeriodo.split('T')[0] : '';
-          
-          if (fechaNormalizada >= '2025-07-01') {
-            if (tipoRecargoAleluya === 'dominical' && Math.abs(valor - 6250) < 100) {
-              console.log('✅ [EDGE v2.0] DOMINICAL SUCCESS: Exacto $6,250:', valor);
-            } else if (tipoRecargoAleluya === 'nocturno_dominical' && Math.abs(valor - 8984) < 100) {
-              console.log('✅ [EDGE v2.0] NOCTURNO DOMINICAL SUCCESS: Exacto $8,984:', valor);
-            } else if (tipoRecargoAleluya === 'nocturno' && Math.abs(valor - 2734) < 100) {
-              console.log('✅ [EDGE v2.0] NOCTURNO SUCCESS: Exacto $2,734:', valor);
-            } else {
-              console.log(`⚠️ [EDGE v2.0] VALIDACIÓN: ${tipoRecargoAleluya} = $${valor} (esperado diferente)`);
-            }
-          }
-        }
       } else {
         detalleCalculo = 'Ingrese las horas de recargo';
       }
@@ -397,22 +458,15 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
       if (dias && dias > 0 && subtipo) {
         const salarioDiario = salarioBase / 30;
         
-        if (subtipo === 'general') {
-          // ✅ NUEVA LÓGICA: Cálculo desde día 1 según normativa colombiana
+        if (subtipo === 'general' || subtipo === 'comun') {
           console.log(`🏥 [INCAPACIDAD v3.0] Calculando incapacidad general: ${dias} días, salario base: ${salarioBase}`);
           
-          // Calcular valor diario al 66.67%
           const valorDiarioCalculado = salarioDiario * 0.6667;
-          
-          // ✅ TOPE MÍNIMO: SMLDV 2025 = $1.423.500 / 30 = $47.450
           const smldv = DEFAULT_CONFIG_2025.salarioMinimo / 30;
-          
-          // Aplicar el mayor entre el cálculo y el SMLDV
           const valorDiarioFinal = Math.max(valorDiarioCalculado, smldv);
           
-          // Aplicar a TODOS los días (desde día 1)
           valor = Math.round(valorDiarioFinal * dias);
-          factorCalculo = valorDiarioFinal / salarioDiario; // Factor efectivo aplicado
+          factorCalculo = valorDiarioFinal / salarioDiario;
           
           console.log(`🧮 [INCAPACIDAD v3.0] CÁLCULO DETALLADO:`);
           console.log(`  - Salario diario: $${salarioDiario.toFixed(2)}`);
@@ -421,24 +475,14 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           console.log(`  - Valor diario final: $${valorDiarioFinal.toFixed(2)}`);
           console.log(`  - Total ${dias} días: $${valor}`);
           
-          // ✅ DETALLE NORMATIVO COMPLETO
           const tipoTope = valorDiarioFinal === smldv ? '(aplicando SMLDV como tope mínimo)' : '(66.67% del salario)';
           detalleCalculo = `Incapacidad general: ${dias} días × $${Math.round(valorDiarioFinal).toLocaleString()} ${tipoTope} = $${valor.toLocaleString()}`;
           
-          // ✅ VALIDACIÓN CON CASOS DE PRUEBA
-          if (salarioBase === 1200000 && dias === 3 && Math.abs(valor - 142350) < 100) {
-            console.log('✅ [INCAPACIDAD v3.0] CASO 1 SUCCESS: $1.200.000 × 3 días = $142.350');
-          } else if (salarioBase === 2000000 && dias === 5 && Math.abs(valor - 237250) < 100) {
-            console.log('✅ [INCAPACIDAD v3.0] CASO 2 SUCCESS: $2.000.000 × 5 días = $237.250');
-          }
-          
         } else if (subtipo === 'laboral') {
-          // Incapacidades laborales: 100% desde día 1
           valor = Math.round(salarioDiario * dias);
           factorCalculo = 1;
           detalleCalculo = `Incapacidad laboral: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
         }
-        // ✅ REMOVIDO: case 'maternidad' (ahora está en licencia_remunerada)
       } else {
         detalleCalculo = 'Ingrese días y seleccione tipo de incapacidad';
       }
@@ -450,7 +494,6 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         valor = Math.round(salarioDiario * dias);
         factorCalculo = 1;
         
-        // ✅ NUEVA LÓGICA: Manejo específico para maternidad
         if (subtipo === 'maternidad') {
           detalleCalculo = `Licencia de maternidad: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()} (Ley 1822/2017 - Pago EPS)`;
           console.log('✅ [MATERNIDAD] Calculada como licencia remunerada:', { dias, valor });
@@ -502,11 +545,106 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
       }
       break;
 
+    // ✅ NUEVOS CASOS: Préstamos y deducciones
+    case 'libranza':
+      if (valorManual && valorManual > 0) {
+        valor = valorManual;
+        factorCalculo = valor / salarioBase;
+        
+        // Validar límites legales
+        const validation = validatePrestamoLimits(valor, salarioBase, subtipo || 'libranza');
+        validationResult = validation;
+        
+        let descripcionTipo = '';
+        switch (subtipo) {
+          case 'cooperativa':
+            descripcionTipo = 'Cooperativa (máx. 30%)';
+            break;
+          case 'empresa':
+            descripcionTipo = 'Empresa (máx. 50%)';
+            break;
+          case 'banco':
+            descripcionTipo = 'Banco (máx. 30%)';
+            break;
+          default:
+            descripcionTipo = 'Libranza (máx. 30%)';
+        }
+        
+        const porcentaje = validation.percentage.toFixed(1);
+        const estado = validation.isValid ? '✅' : '⚠️';
+        
+        detalleCalculo = `${estado} ${descripcionTipo}: $${valor.toLocaleString()} (${porcentaje}% del salario)`;
+        
+        if (cuotas && cuotas > 0) {
+          detalleCalculo += ` - ${cuotas} cuotas restantes`;
+        }
+        
+        if (!validation.isValid) {
+          detalleCalculo += ` - ${validation.warning}`;
+        }
+      } else {
+        detalleCalculo = 'Ingrese el valor de la cuota del préstamo';
+      }
+      break;
+
+    case 'retencion_fuente':
+      if (valorManual && valorManual > 0) {
+        // Valor manual ingresado
+        valor = valorManual;
+        factorCalculo = valor / salarioBase;
+        detalleCalculo = `Retención manual: $${valor.toLocaleString()} (${(factorCalculo * 100).toFixed(2)}% del salario)`;
+      } else {
+        // Cálculo automático usando tabla 2025
+        const retencionResult = calculateRetencionFuente2025(salarioBase);
+        valor = retencionResult.valor;
+        factorCalculo = valor > 0 ? valor / salarioBase : 0;
+        
+        detalleCalculo = `Retención automática 2025: ${retencionResult.detalle}`;
+        
+        // Información adicional para debug
+        validationResult = {
+          baseEnUvt: retencionResult.baseEnUvt,
+          rangoAplicado: retencionResult.rangoAplicado,
+          uvt2025: DEFAULT_CONFIG_2025.uvt
+        };
+      }
+      break;
+
+    case 'deduccion_especial':
+      if (valorManual && valorManual > 0) {
+        valor = valorManual;
+        factorCalculo = valor / salarioBase;
+        
+        let tipoDeduccion = 'Deducción especial';
+        switch (subtipo) {
+          case 'multa':
+            tipoDeduccion = 'Multa disciplinaria';
+            break;
+          case 'descuento_nomina':
+            tipoDeduccion = 'Descuento de nómina';
+            break;
+          case 'otros':
+            tipoDeduccion = 'Otra deducción';
+            break;
+        }
+        
+        detalleCalculo = `${tipoDeduccion}: $${valor.toLocaleString()} (${(factorCalculo * 100).toFixed(2)}% del salario)`;
+      } else {
+        detalleCalculo = 'Ingrese el valor de la deducción especial';
+      }
+      break;
+
     case 'bonificacion':
     case 'comision':
     case 'prima':
     case 'otros_ingresos':
-      detalleCalculo = 'Ingrese el valor manualmente para este tipo de novedad';
+      if (valorManual && valorManual > 0) {
+        valor = valorManual;
+        factorCalculo = valor / salarioBase;
+        detalleCalculo = `${tipoNovedad}: $${valor.toLocaleString()} (${(factorCalculo * 100).toFixed(2)}% del salario)`;
+      } else {
+        detalleCalculo = 'Ingrese el valor manualmente para este tipo de novedad';
+      }
       break;
 
     case 'fondo_solidaridad':
@@ -523,7 +661,6 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
       detalleCalculo = 'Tipo de novedad no reconocido';
   }
 
-  // ✅ INFORMACIÓN FINAL: Distinguir entre horas jornada laboral y recargos
   const horasMensualesJornada = getHorasMensuales(fechaPeriodo);
   const horasSemanalesJornada = getHorasSemanales(fechaPeriodo);
   const horasRecargos = getHorasParaRecargos(fechaPeriodo);
@@ -532,6 +669,7 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
     valor,
     factorCalculo,
     detalleCalculo,
+    validationResult,
     jornadaInfo: {
       horasSemanales: horasSemanalesJornada,
       horasMensuales: horasMensualesJornada,
@@ -542,7 +680,6 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
     }
   };
   
-  // ✅ DEBUG FINAL: Log del resultado para casos específicos
   if (tipoNovedad === 'incapacidad' && subtipo === 'general') {
     console.log(`🏁 [INCAPACIDAD v3.0] RESULTADO FINAL: valor=$${result.valor}, días=${dias}, base=$${salarioBase}`);
   }
@@ -708,7 +845,7 @@ serve(async (req) => {
   try {
     const { action, data } = await req.json();
 
-    console.log(`🚀 [EDGE v3.0] Request received: action="${action}", tipoNovedad="${data?.tipoNovedad}", subtipo="${data?.subtipo}"`);
+    console.log(`🚀 [EDGE v4.0] Request received: action="${action}", tipoNovedad="${data?.tipoNovedad}", subtipo="${data?.subtipo}"`);
 
     switch (action) {
       case 'calculate':
@@ -730,9 +867,9 @@ serve(async (req) => {
         });
 
       case 'calculate-novedad':
-        console.log(`🎯 [EDGE v3.0] Calculating novedad: ${data.tipoNovedad} - ${data.subtipo}`);
+        console.log(`🎯 [EDGE v4.0] Calculating novedad: ${data.tipoNovedad} - ${data.subtipo}`);
         const novedadResult = calculateNovedadUltraKiss(data);
-        console.log(`🎯 [EDGE v3.0] Novedad result: valor=${novedadResult.valor}`);
+        console.log(`🎯 [EDGE v4.0] Novedad result: valor=${novedadResult.valor}, validation=${JSON.stringify(novedadResult.validationResult)}`);
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -749,6 +886,22 @@ serve(async (req) => {
             descripcion: jornadaInfo.descripcion
           }
         }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      // ✅ NUEVA ACCIÓN: Calcular solo retención en la fuente
+      case 'calculate-retencion-fuente':
+        console.log(`🏦 [EDGE v4.0] Calculating retención fuente for salary: ${data.salarioBase}`);
+        const retencionResult = calculateRetencionFuente2025(data.salarioBase);
+        return new Response(JSON.stringify({ success: true, data: retencionResult }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      // ✅ NUEVA ACCIÓN: Validar límites de préstamos
+      case 'validate-prestamo':
+        console.log(`💳 [EDGE v4.0] Validating prestamo: ${data.valorCuota} for salary: ${data.salarioBase}`);
+        const validationPrestamo = validatePrestamoLimits(data.valorCuota, data.salarioBase, data.tipoPrestamo);
+        return new Response(JSON.stringify({ success: true, data: validationPrestamo }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
