@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +44,7 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
   const [pendingVacations, setPendingVacations] = useState<PendingVacation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { processEmployeePendingVacations, isProcessing } = useVacationIntegration();
+  const { processVacationsForPayroll, isProcessing } = useVacationIntegration();
 
   // Cargar novedades
   const loadNovedades = async () => {
@@ -141,7 +140,7 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
     }
   };
 
-  // ✅ NUEVA: Procesar licencia pendiente específica
+  // ✅ CORREGIDA: Procesar licencia pendiente específica
   const processVacation = async (vacationId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -155,7 +154,22 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
 
       if (!profile?.company_id) return;
 
-      await processEmployeePendingVacations(employeeId, periodId, profile.company_id);
+      // Obtener información del período
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('fecha_inicio, fecha_fin')
+        .eq('id', periodId)
+        .single();
+
+      if (!period) return;
+
+      // Usar la función disponible del hook
+      await processVacationsForPayroll({
+        companyId: profile.company_id,
+        periodId: periodId,
+        startDate: period.fecha_inicio,
+        endDate: period.fecha_fin
+      });
       
       // Recargar datos después del procesamiento
       await loadNovedades();
@@ -163,6 +177,11 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
 
     } catch (error) {
       console.error('Error procesando licencia:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo procesar la licencia",
+        variant: "destructive",
+      });
     }
   };
 
