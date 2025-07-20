@@ -1,7 +1,7 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { MultiPeriodAbsenceService } from '@/services/MultiPeriodAbsenceService';
 
 interface PeriodDetectionResult {
   periodId: string | null;
@@ -9,6 +9,8 @@ interface PeriodDetectionResult {
   isExact: boolean;
   isAutoCreated: boolean;
   message: string;
+  crossesMultiplePeriods?: boolean;
+  periodSegments?: any[];
 }
 
 export const usePeriodDetection = () => {
@@ -41,6 +43,31 @@ export const usePeriodDetection = () => {
 
       if (!profile?.company_id) {
         throw new Error('Usuario no tiene empresa asignada');
+      }
+
+      // 🎯 NUEVA FUNCIONALIDAD: Analizar si cruza múltiples períodos
+      const multiPeriodAnalysis = await MultiPeriodAbsenceService.analyzeAbsenceAcrossPeriods(
+        startDate, 
+        endDate, 
+        profile.company_id
+      );
+
+      console.log('🔍 Análisis multi-período:', multiPeriodAnalysis);
+
+      // Si cruza múltiples períodos, informar al usuario
+      if (multiPeriodAnalysis.crossesMultiplePeriods) {
+        // Para ausencias multi-período, usar el primer período como referencia principal
+        const primarySegment = multiPeriodAnalysis.segments[0];
+        
+        return {
+          periodId: primarySegment.periodId,
+          periodName: primarySegment.periodName,
+          isExact: false,
+          isAutoCreated: false,
+          crossesMultiplePeriods: true,
+          periodSegments: multiPeriodAnalysis.segments,
+          message: `⚡ Ausencia multi-período detectada: ${multiPeriodAnalysis.segments.length} períodos afectados (${multiPeriodAnalysis.totalDays} días total)`
+        };
       }
 
       // Buscar período que contenga exactamente las fechas

@@ -1,16 +1,13 @@
 
-import { Label } from '@/components/ui/label';
+import { VacationAbsenceFormData } from '@/types/vacations';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarDays, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { 
-  VacationAbsenceFormData, 
-  ABSENCE_TYPE_LABELS, 
-  VacationAbsenceType,
-  requiresSubtype,
-  getSubtypesForType
-} from '@/types/vacations';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, Clock, AlertTriangle, CheckCircle, Loader2, Zap } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -25,16 +22,18 @@ interface PeriodInfo {
   isExact: boolean;
   isAutoCreated: boolean;
   message: string;
+  crossesMultiplePeriods?: boolean;
+  periodSegments?: any[];
 }
 
 interface VacationFormFieldsProps {
   formData: VacationAbsenceFormData;
-  setFormData: React.Dispatch<React.SetStateAction<VacationAbsenceFormData>>;
+  setFormData: (data: VacationAbsenceFormData) => void;
   employees: Employee[];
   calculatedDays: number;
   isSubmitting: boolean;
-  periodInfo?: PeriodInfo | null;
-  isDetectingPeriod?: boolean;
+  periodInfo: PeriodInfo | null;
+  isDetectingPeriod: boolean;
 }
 
 export const VacationFormFields = ({
@@ -44,181 +43,170 @@ export const VacationFormFields = ({
   calculatedDays,
   isSubmitting,
   periodInfo,
-  isDetectingPeriod = false
+  isDetectingPeriod
 }: VacationFormFieldsProps) => {
-  const handleTypeChange = (newType: VacationAbsenceType) => {
-    setFormData(prev => ({
-      ...prev,
-      type: newType,
-      subtipo: undefined
-    }));
+  const selectedEmployee = employees.find(emp => emp.id === formData.employee_id);
+
+  const getPeriodStatusIcon = () => {
+    if (isDetectingPeriod) return <Loader2 className="h-4 w-4 animate-spin" />;
+    if (!periodInfo) return <Clock className="h-4 w-4 text-gray-400" />;
+    if (periodInfo.crossesMultiplePeriods) return <Zap className="h-4 w-4 text-purple-500" />;
+    if (periodInfo.isExact) return <CheckCircle className="h-4 w-4 text-green-500" />;
+    if (periodInfo.isAutoCreated) return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+    return <CheckCircle className="h-4 w-4 text-blue-500" />;
   };
 
-  const subtypesForCurrentType = getSubtypesForType(formData.type);
-  const isSubtypeRequired = requiresSubtype(formData.type);
+  const getPeriodStatusColor = () => {
+    if (periodInfo?.crossesMultiplePeriods) return 'border-purple-200 bg-purple-50';
+    if (periodInfo?.isExact) return 'border-green-200 bg-green-50';
+    if (periodInfo?.isAutoCreated) return 'border-orange-200 bg-orange-50';
+    if (periodInfo) return 'border-blue-200 bg-blue-50';
+    return 'border-gray-200 bg-gray-50';
+  };
 
   return (
-    <>
+    <div className="space-y-6">
       {/* Employee Selection */}
       <div className="space-y-2">
-        <Label htmlFor="employee_id">Empleado *</Label>
-        <Select
-          value={formData.employee_id}
-          onValueChange={(value) => setFormData(prev => ({ ...prev, employee_id: value }))}
+        <Label htmlFor="employee">Empleado *</Label>
+        <Select 
+          value={formData.employee_id} 
+          onValueChange={(value) => setFormData({ ...formData, employee_id: value })}
           disabled={isSubmitting}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Seleccionar empleado..." />
+            <SelectValue placeholder="Seleccionar empleado" />
           </SelectTrigger>
           <SelectContent>
             {employees.map((employee) => (
-              <SelectItem key={`employee-${employee.id}`} value={employee.id}>
+              <SelectItem key={employee.id} value={employee.id}>
                 {employee.nombre} {employee.apellido} - {employee.cedula}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {employees.length === 0 && (
+        {selectedEmployee && (
           <p className="text-sm text-muted-foreground">
-            No hay empleados activos disponibles
+            {selectedEmployee.nombre} {selectedEmployee.apellido}
           </p>
         )}
       </div>
 
-      {/* Tipo de Ausencia */}
+      {/* Absence Type */}
       <div className="space-y-2">
         <Label htmlFor="type">Tipo de Ausencia *</Label>
-        <Select
-          value={formData.type}
-          onValueChange={handleTypeChange}
+        <Select 
+          value={formData.type} 
+          onValueChange={(value) => setFormData({ ...formData, type: value as any })}
           disabled={isSubmitting}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Seleccionar tipo de ausencia..." />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Object.entries(ABSENCE_TYPE_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
+            <SelectItem value="vacaciones">Vacaciones</SelectItem>
+            <SelectItem value="licencia_remunerada">Licencia Remunerada</SelectItem>
+            <SelectItem value="licencia_no_remunerada">Licencia No Remunerada</SelectItem>
+            <SelectItem value="incapacidad">Incapacidad</SelectItem>
+            <SelectItem value="ausencia">Ausencia</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Subtipo dinámico basado en el tipo seleccionado */}
-      {subtypesForCurrentType.length > 0 && (
-        <div className="space-y-2">
-          <Label htmlFor="subtipo">
-            Subtipo {isSubtypeRequired ? '*' : ''}
-          </Label>
-          <Select
-            value={formData.subtipo || ''}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, subtipo: value || undefined }))}
-            disabled={isSubmitting}
-          >
-            <SelectTrigger>
-              <SelectValue 
-                placeholder={`Seleccionar subtipo de ${ABSENCE_TYPE_LABELS[formData.type].toLowerCase()}...`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {subtypesForCurrentType.map((subtype) => (
-                <SelectItem key={subtype.value} value={subtype.value}>
-                  {subtype.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {isSubtypeRequired && !formData.subtipo && (
-            <p className="text-sm text-red-600">
-              El subtipo es requerido para {ABSENCE_TYPE_LABELS[formData.type].toLowerCase()}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Date Fields */}
+      {/* Date Range */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="start_date">Fecha de Inicio *</Label>
+          <Label htmlFor="start_date">Fecha Inicio *</Label>
           <Input
             id="start_date"
             type="date"
             value={formData.start_date}
-            onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
             disabled={isSubmitting}
-            required
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="end_date">Fecha de Fin *</Label>
+          <Label htmlFor="end_date">Fecha Fin *</Label>
           <Input
             id="end_date"
             type="date"
             value={formData.end_date}
-            onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+            onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
             disabled={isSubmitting}
-            required
           />
         </div>
       </div>
 
-      {/* 🎯 NUEVA FUNCIONALIDAD: Información del período detectado */}
-      {(isDetectingPeriod || periodInfo) && (
-        <div className="space-y-3">
-          {isDetectingPeriod && (
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Clock className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Detectando período...</span>
-              </div>
-            </div>
-          )}
-          
-          {periodInfo && (
-            <div className={`p-3 border rounded-lg ${
-              periodInfo.periodId 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-amber-50 border-amber-200'
-            }`}>
-              <div className="flex items-start gap-2">
-                {periodInfo.periodId ? (
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-medium ${
-                    periodInfo.periodId ? 'text-green-700' : 'text-amber-700'
-                  }`}>
-                    {periodInfo.periodId ? 'Período asignado' : 'Período no encontrado'}
-                  </div>
-                  <div className={`text-sm ${
-                    periodInfo.periodId ? 'text-green-600' : 'text-amber-600'
-                  }`}>
-                    {periodInfo.message}
-                  </div>
-                  {periodInfo.isAutoCreated && (
-                    <div className="text-xs text-green-500 mt-1">
-                      ✨ Período creado automáticamente
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+      {/* Days Calculation */}
+      {calculatedDays > 0 && (
+        <div className="flex items-center space-x-2">
+          <CalendarDays className="h-4 w-4 text-blue-500" />
+          <span className="text-sm font-medium">
+            Total días: <Badge variant="outline">{calculatedDays}</Badge>
+          </span>
         </div>
       )}
 
-      {/* Calculated Days Display */}
-      {calculatedDays > 0 && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2 text-blue-700">
-            <CalendarDays className="h-4 w-4" />
-            <span className="font-medium">Días calculados: {calculatedDays}</span>
-          </div>
-        </div>
+      {/* 🎯 NUEVA FUNCIONALIDAD: Información de período(s) detectado(s) */}
+      {(formData.start_date && formData.end_date) && (
+        <Card className={`${getPeriodStatusColor()}`}>
+          <CardContent className="pt-4">
+            <div className="flex items-start space-x-3">
+              {getPeriodStatusIcon()}
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {isDetectingPeriod ? 'Detectando período...' : 'Análisis de Período(s)'}
+                  </span>
+                </div>
+                
+                {periodInfo && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-700">
+                      {periodInfo.message}
+                    </p>
+                    
+                    {/* 🎯 MULTI-PERÍODO: Mostrar información detallada */}
+                    {periodInfo.crossesMultiplePeriods && periodInfo.periodSegments && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-purple-700">
+                          📋 División por períodos:
+                        </p>
+                        <div className="space-y-1">
+                          {periodInfo.periodSegments.map((segment, index) => (
+                            <div key={segment.periodId} className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1">
+                              <span className="font-medium">{segment.periodName}</span>
+                              <div className="flex items-center space-x-2">
+                                <span>{segment.startDate} - {segment.endDate}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {segment.days} días
+                                </Badge>
+                                {segment.isPartial && (
+                                  <Badge variant="outline" className="text-xs bg-orange-50 border-orange-200 text-orange-700">
+                                    Parcial
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-xs text-purple-600 bg-purple-100/50 rounded px-2 py-1">
+                          💡 <strong>Al liquidar cada período</strong>, se generarán automáticamente las novedades correspondientes a los días que aplican para ese período específico.
+                        </div>
+                      </div>
+                    )}
+                    
+                    {periodInfo.isAutoCreated && (
+                      <p className="text-xs text-orange-600">
+                        🔧 Se creó automáticamente un nuevo período para estas fechas.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Observations */}
@@ -226,13 +214,13 @@ export const VacationFormFields = ({
         <Label htmlFor="observations">Observaciones</Label>
         <Textarea
           id="observations"
-          placeholder="Observaciones adicionales..."
+          placeholder="Observaciones adicionales (opcional)"
           value={formData.observations}
-          onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))}
+          onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
           disabled={isSubmitting}
           rows={3}
         />
       </div>
-    </>
+    </div>
   );
 };

@@ -10,6 +10,8 @@ interface PeriodInfo {
   isExact: boolean;
   isAutoCreated: boolean;
   message: string;
+  crossesMultiplePeriods?: boolean;
+  periodSegments?: any[];
 }
 
 export const useVacationAbsenceForm = (
@@ -53,11 +55,11 @@ export const useVacationAbsenceForm = (
     }
   }, [editingVacation, isOpen]);
 
-  // 🎯 NUEVA FUNCIONALIDAD: Detección automática de período al cambiar fechas
+  // 🎯 FUNCIONALIDAD MEJORADA: Detección automática con análisis multi-período
   useEffect(() => {
     const detectPeriod = async () => {
       if (formData.start_date && formData.end_date) {
-        console.log('🔍 Detectando período para fechas:', { 
+        console.log('🔍 Detectando período(s) para fechas:', { 
           start: formData.start_date, 
           end: formData.end_date 
         });
@@ -65,7 +67,14 @@ export const useVacationAbsenceForm = (
         const detection = await detectPeriodForDates(formData.start_date, formData.end_date);
         setPeriodInfo(detection);
         
-        console.log('✅ Período detectado:', detection);
+        if (detection.crossesMultiplePeriods) {
+          console.log('⚡ MULTI-PERÍODO detectado:', {
+            segments: detection.periodSegments?.length,
+            primaryPeriod: detection.periodName
+          });
+        } else {
+          console.log('✅ Período único detectado:', detection);
+        }
       } else {
         setPeriodInfo(null);
       }
