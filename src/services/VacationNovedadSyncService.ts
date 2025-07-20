@@ -1,10 +1,11 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
 
 export class VacationNovedadSyncService {
   
   /**
-   * 🎯 CORRECCIÓN KISS: Crear una vacación/ausencia con periodo_id explícito
+   * 🎯 CORRECCIÓN KISS: Crear una vacación/ausencia con periodo_id explícito y campos boolean corregidos
    */
   static async createVacationAbsence(formData: VacationAbsenceFormData & { periodo_id?: string }) {
     console.log('🏖️ Creating vacation with form data:', formData);
@@ -14,21 +15,26 @@ export class VacationNovedadSyncService {
     
     console.log('📋 Using processed_in_period_id:', processed_in_period_id);
     
+    // 🎯 CORRECCIÓN BOOLEAN: Asegurar que todos los campos boolean tienen valores válidos
+    const insertData = {
+      employee_id: formData.employee_id,
+      type: formData.type,
+      subtipo: formData.subtipo || null, // Null en lugar de undefined
+      start_date: formData.start_date,
+      end_date: formData.end_date,
+      days_count: VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date),
+      observations: formData.observations || '', // String vacío en lugar de null
+      status: 'pendiente',
+      created_by: (await supabase.auth.getUser()).data.user?.id,
+      company_id: await VacationNovedadSyncService.getCurrentCompanyId(),
+      processed_in_period_id: processed_in_period_id
+    };
+    
+    console.log('📝 Insert data prepared:', insertData);
+    
     const { data, error } = await supabase
       .from('employee_vacation_periods')
-      .insert({
-        employee_id: formData.employee_id,
-        type: formData.type,
-        subtipo: formData.subtipo,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        days_count: VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date),
-        observations: formData.observations || '',
-        status: 'pendiente',
-        created_by: (await supabase.auth.getUser()).data.user?.id,
-        company_id: await VacationNovedadSyncService.getCurrentCompanyId(),
-        processed_in_period_id: processed_in_period_id // 🎯 CORRECCIÓN: Usar el período explícito
-      })
+      .insert(insertData)
       .select(`
         *,
         employee:employees(id, nombre, apellido, cedula)
@@ -45,22 +51,29 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * Actualizar una vacación/ausencia - sincronización automática
+   * 🎯 CORRECCIÓN BOOLEAN: Actualizar con campos boolean seguros
    */
   static async updateVacationAbsence(id: string, formData: Partial<VacationAbsenceFormData & { periodo_id?: string }>) {
+    // 🎯 PREPARAR DATOS CON VALORES SEGUROS
     const updateData: any = {
-      ...formData,
       updated_at: new Date().toISOString()
     };
 
+    // Solo agregar campos que realmente han cambiado y con valores seguros
+    if (formData.employee_id !== undefined) updateData.employee_id = formData.employee_id;
+    if (formData.type !== undefined) updateData.type = formData.type;
+    if (formData.subtipo !== undefined) updateData.subtipo = formData.subtipo || null;
+    if (formData.start_date !== undefined) updateData.start_date = formData.start_date;
+    if (formData.end_date !== undefined) updateData.end_date = formData.end_date;
+    if (formData.observations !== undefined) updateData.observations = formData.observations || '';
+    if (formData.periodo_id !== undefined) updateData.processed_in_period_id = formData.periodo_id;
+
+    // Calcular días solo si tenemos ambas fechas
     if (formData.start_date && formData.end_date) {
       updateData.days_count = VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date);
     }
 
-    // 🎯 CORRECCIÓN: Incluir periodo_id si está disponible
-    if (formData.periodo_id !== undefined) {
-      updateData.processed_in_period_id = formData.periodo_id;
-    }
+    console.log('📝 Update data prepared:', updateData);
 
     const { data, error } = await supabase
       .from('employee_vacation_periods')
@@ -72,7 +85,12 @@ export class VacationNovedadSyncService {
       `)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error updating vacation:', error);
+      throw error;
+    }
+    
+    console.log('✅ Vacation updated successfully:', data);
     return data;
   }
 
@@ -146,7 +164,7 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * Obtener datos unificados de vacaciones y novedades - CON DEDUPLICACIÓN KISS
+   * 🎯 CORRECCIÓN BOOLEAN: Obtener datos unificados con manejo seguro de campos
    */
   static async getUnifiedVacationData(filters: any = {}) {
     console.log('🔍 Loading unified vacation data with filters:', filters);
@@ -210,7 +228,7 @@ export class VacationNovedadSyncService {
 
     console.log('🔍 Period status map:', periodStatusMap);
 
-    // Combinar y transformar datos con lógica SIMPLE
+    // 🎯 TRANSFORMACIÓN SEGURA: Combinar datos con valores por defecto seguros
     const unifiedData = [
       ...(vacationsData || []).map(item => {
         let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
@@ -231,12 +249,12 @@ export class VacationNovedadSyncService {
           company_id: item.company_id,
           periodo_id: item.processed_in_period_id,
           tipo_novedad: item.type,
-          subtipo: item.subtipo,
+          subtipo: item.subtipo || '', // 🎯 String vacío en lugar de null
           fecha_inicio: item.start_date,
           fecha_fin: item.end_date,
-          dias: item.days_count,
+          dias: item.days_count || 0, // 🎯 Número en lugar de null
           valor: 0,
-          observacion: item.observations,
+          observacion: item.observations || '', // 🎯 String vacío en lugar de null
           status: calculatedStatus,
           creado_por: item.created_by,
           created_at: item.created_at,
@@ -251,8 +269,8 @@ export class VacationNovedadSyncService {
           type: item.type as any,
           start_date: item.start_date,
           end_date: item.end_date,
-          days_count: item.days_count,
-          observations: item.observations,
+          days_count: item.days_count || 0,
+          observations: item.observations || '',
           created_by: item.created_by,
           processed_in_period_id: item.processed_in_period_id
         };
@@ -277,12 +295,12 @@ export class VacationNovedadSyncService {
           company_id: item.company_id,
           periodo_id: item.periodo_id,
           tipo_novedad: item.tipo_novedad,
-          subtipo: item.subtipo,
+          subtipo: item.subtipo || '', // 🎯 String vacío en lugar de null
           fecha_inicio: item.fecha_inicio,
           fecha_fin: item.fecha_fin,
-          dias: item.dias || 0,
-          valor: item.valor || 0,
-          observacion: item.observacion,
+          dias: item.dias || 0, // 🎯 Número en lugar de null
+          valor: item.valor || 0, // 🎯 Número en lugar de null
+          observacion: item.observacion || '', // 🎯 String vacío en lugar de null
           status: calculatedStatus,
           creado_por: item.creado_por,
           created_at: item.created_at,
@@ -298,7 +316,7 @@ export class VacationNovedadSyncService {
           start_date: item.fecha_inicio,
           end_date: item.fecha_fin,
           days_count: item.dias || 0,
-          observations: item.observacion,
+          observations: item.observacion || '',
           created_by: item.creado_por,
           processed_in_period_id: item.periodo_id
         };
