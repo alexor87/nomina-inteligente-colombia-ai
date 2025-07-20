@@ -13,6 +13,7 @@ export class VacationNovedadSyncService {
       .insert({
         employee_id: formData.employee_id,
         type: formData.type,
+        subtipo: formData.subtipo, // ✅ AGREGADO: Incluir subtipo
         start_date: formData.start_date,
         end_date: formData.end_date,
         days_count: VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date),

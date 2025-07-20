@@ -1,6 +1,6 @@
 
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
-import { VacationAbsence, VacationAbsenceFormData } from '@/types/vacations';
+import { VacationAbsence, VacationAbsenceFormData, requiresSubtype } from '@/types/vacations';
 import { CalendarDays } from 'lucide-react';
 import { useVacationAbsenceForm } from '@/hooks/useVacationAbsenceForm';
 import { useVacationEmployees } from '@/hooks/useVacationEmployees';
@@ -30,6 +30,12 @@ export const VacationAbsenceForm = ({
     e.preventDefault();
     
     if (!formData.employee_id || !formData.type || !formData.start_date || !formData.end_date) {
+      return;
+    }
+
+    // ✅ VALIDACIÓN KISS: Verificar subtipo si es requerido
+    if (requiresSubtype(formData.type) && !formData.subtipo) {
+      alert('El subtipo es requerido para este tipo de ausencia');
       return;
     }
 
