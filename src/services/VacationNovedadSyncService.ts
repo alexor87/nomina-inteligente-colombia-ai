@@ -79,12 +79,13 @@ export class VacationNovedadSyncService {
     // Obtener company_id del usuario actual
     const companyId = await VacationNovedadSyncService.getCurrentCompanyId();
     
-    // Obtener vacaciones/ausencias
+    // ✅ CORRECCIÓN CRÍTICA: Obtener vacaciones/ausencias con estado real del período
     const { data: vacationsData, error: vacationsError } = await supabase
       .from('employee_vacation_periods')
       .select(`
         *,
-        employee:employees(id, nombre, apellido, cedula)
+        employee:employees(id, nombre, apellido, cedula),
+        period:payroll_periods_real(id, estado)
       `)
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
@@ -94,12 +95,13 @@ export class VacationNovedadSyncService {
       throw vacationsError;
     }
 
-    // Obtener novedades relacionadas con vacaciones/ausencias
+    // ✅ CORRECCIÓN CRÍTICA: Obtener novedades con estado real del período
     const { data: novedadesData, error: novedadesError } = await supabase
       .from('payroll_novedades')
       .select(`
         *,
-        empleado:employees(id, nombre, apellido, cedula)
+        empleado:employees(id, nombre, apellido, cedula),
+        period:payroll_periods_real(id, estado)
       `)
       .eq('company_id', companyId)
       .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'])
@@ -112,73 +114,95 @@ export class VacationNovedadSyncService {
 
     // Combinar y transformar datos
     const unifiedData = [
-      // Transformar vacaciones
-      ...(vacationsData || []).map(item => ({
-        source_type: 'vacation' as const,
-        id: item.id,
-        empleado_id: item.employee_id,
-        company_id: item.company_id,
-        periodo_id: item.processed_in_period_id,
-        tipo_novedad: item.type,
-        subtipo: item.subtipo,
-        fecha_inicio: item.start_date,
-        fecha_fin: item.end_date,
-        dias: item.days_count,
-        valor: 0, // Se calculará en el backend
-        observacion: item.observations,
-        status: item.status as 'pendiente' | 'liquidada' | 'cancelada',
-        creado_por: item.created_by,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        employee_nombre: item.employee?.nombre || '',
-        employee_apellido: item.employee?.apellido || '',
-        employee_cedula: item.employee?.cedula || '',
-        employee: item.employee || { id: '', nombre: '', apellido: '', cedula: '' },
+      // ✅ CORRECCIÓN: Transformar vacaciones con estado correcto
+      ...(vacationsData || []).map(item => {
+        // Determinar estado real basado en el estado del período
+        let calculatedStatus = item.status; // Usar el status original por defecto
         
-        // Mapped properties for compatibility
-        employee_id: item.employee_id,
-        type: item.type as any,
-        start_date: item.start_date,
-        end_date: item.end_date,
-        days_count: item.days_count,
-        observations: item.observations,
-        created_by: item.created_by,
-        processed_in_period_id: item.processed_in_period_id
-      })),
+        // Solo cambiar a 'liquidada' si el período está realmente cerrado
+        if (item.processed_in_period_id && item.period && item.period.estado === 'cerrado') {
+          calculatedStatus = 'liquidada';
+        } else if (item.processed_in_period_id && item.period && item.period.estado !== 'cerrado') {
+          calculatedStatus = 'pendiente'; // Forzar a pendiente si el período no está cerrado
+        }
+
+        return {
+          source_type: 'vacation' as const,
+          id: item.id,
+          empleado_id: item.employee_id,
+          company_id: item.company_id,
+          periodo_id: item.processed_in_period_id,
+          tipo_novedad: item.type,
+          subtipo: item.subtipo,
+          fecha_inicio: item.start_date,
+          fecha_fin: item.end_date,
+          dias: item.days_count,
+          valor: 0, // Se calculará en el backend
+          observacion: item.observations,
+          status: calculatedStatus, // ✅ USAR ESTADO CALCULADO CORRECTO
+          creado_por: item.created_by,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          employee_nombre: item.employee?.nombre || '',
+          employee_apellido: item.employee?.apellido || '',
+          employee_cedula: item.employee?.cedula || '',
+          employee: item.employee || { id: '', nombre: '', apellido: '', cedula: '' },
+          
+          // Mapped properties for compatibility
+          employee_id: item.employee_id,
+          type: item.type as any,
+          start_date: item.start_date,
+          end_date: item.end_date,
+          days_count: item.days_count,
+          observations: item.observations,
+          created_by: item.created_by,
+          processed_in_period_id: item.processed_in_period_id
+        };
+      }),
       
-      // Transformar novedades
-      ...(novedadesData || []).map(item => ({
-        source_type: 'novedad' as const,
-        id: item.id,
-        empleado_id: item.empleado_id,
-        company_id: item.company_id,
-        periodo_id: item.periodo_id,
-        tipo_novedad: item.tipo_novedad,
-        subtipo: item.subtipo,
-        fecha_inicio: item.fecha_inicio,
-        fecha_fin: item.fecha_fin,
-        dias: item.dias || 0,
-        valor: item.valor || 0,
-        observacion: item.observacion,
-        status: (item.periodo_id ? 'liquidada' : 'pendiente') as 'pendiente' | 'liquidada' | 'cancelada',
-        creado_por: item.creado_por,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        employee_nombre: item.empleado?.nombre || '',
-        employee_apellido: item.empleado?.apellido || '',
-        employee_cedula: item.empleado?.cedula || '',
-        employee: item.empleado || { id: '', nombre: '', apellido: '', cedula: '' },
+      // ✅ CORRECCIÓN: Transformar novedades con estado correcto
+      ...(novedadesData || []).map(item => {
+        // Determinar estado real basado en el estado del período
+        let calculatedStatus = 'pendiente'; // Por defecto pendiente
         
-        // Mapped properties for compatibility
-        employee_id: item.empleado_id,
-        type: item.tipo_novedad as any,
-        start_date: item.fecha_inicio,
-        end_date: item.fecha_fin,
-        days_count: item.dias || 0,
-        observations: item.observacion,
-        created_by: item.creado_por,
-        processed_in_period_id: item.periodo_id
-      }))
+        // Solo marcar como liquidada si el período está realmente cerrado
+        if (item.periodo_id && item.period && item.period.estado === 'cerrado') {
+          calculatedStatus = 'liquidada';
+        }
+
+        return {
+          source_type: 'novedad' as const,
+          id: item.id,
+          empleado_id: item.empleado_id,
+          company_id: item.company_id,
+          periodo_id: item.periodo_id,
+          tipo_novedad: item.tipo_novedad,
+          subtipo: item.subtipo,
+          fecha_inicio: item.fecha_inicio,
+          fecha_fin: item.fecha_fin,
+          dias: item.dias || 0,
+          valor: item.valor || 0,
+          observacion: item.observacion,
+          status: calculatedStatus, // ✅ USAR ESTADO CALCULADO CORRECTO
+          creado_por: item.creado_por,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          employee_nombre: item.empleado?.nombre || '',
+          employee_apellido: item.empleado?.apellido || '',
+          employee_cedula: item.empleado?.cedula || '',
+          employee: item.empleado || { id: '', nombre: '', apellido: '', cedula: '' },
+          
+          // Mapped properties for compatibility
+          employee_id: item.empleado_id,
+          type: item.tipo_novedad as any,
+          start_date: item.fecha_inicio,
+          end_date: item.fecha_fin,
+          days_count: item.dias || 0,
+          observations: item.observacion,
+          created_by: item.creado_por,
+          processed_in_period_id: item.periodo_id
+        };
+      })
     ];
 
     // Aplicar filtros
@@ -204,6 +228,12 @@ export class VacationNovedadSyncService {
     if (filters.date_to) {
       filteredData = filteredData.filter(item => item.fecha_fin <= filters.date_to);
     }
+
+    console.log('✅ Datos unificados con estados corregidos:', {
+      total: filteredData.length,
+      pendientes: filteredData.filter(item => item.status === 'pendiente').length,
+      liquidadas: filteredData.filter(item => item.status === 'liquidada').length
+    });
 
     // Ordenar por fecha de creación descendente
     return filteredData.sort((a, b) => 
