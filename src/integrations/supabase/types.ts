@@ -1827,6 +1827,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      force_sync_existing_novedades: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_payroll_records_for_period: {
         Args: { p_period_id: string }
         Returns: Json
