@@ -58,15 +58,43 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * Eliminar vacación/ausencia - sincronización automática
+   * SOLUCIÓN DEFINITIVA: Eliminar vacación/ausencia desde cualquier origen
    */
   static async deleteVacationAbsence(id: string) {
-    const { error } = await supabase
+    console.log('🗑️ Intentando eliminar registro:', id);
+    
+    // PASO 1: Intentar eliminar de employee_vacation_periods
+    const { error: vacationError, count: vacationCount } = await supabase
       .from('employee_vacation_periods')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', id);
 
-    if (error) throw error;
+    // Si se eliminó exitosamente de vacaciones, terminar
+    if (!vacationError && vacationCount && vacationCount > 0) {
+      console.log('✅ Eliminado de employee_vacation_periods:', id);
+      return;
+    }
+
+    console.log('⚠️ No se encontró en employee_vacation_periods, intentando payroll_novedades:', vacationError?.message);
+
+    // PASO 2: Si no se eliminó de vacaciones, intentar eliminar de novedades
+    const { error: novedadError, count: novedadCount } = await supabase
+      .from('payroll_novedades')
+      .delete({ count: 'exact' })
+      .eq('id', id);
+
+    // Verificar resultado final
+    if (novedadError) {
+      console.error('❌ Error eliminando de payroll_novedades:', novedadError);
+      throw new Error(`No se pudo eliminar el registro: ${novedadError.message}`);
+    }
+
+    if (!novedadCount || novedadCount === 0) {
+      console.error('❌ Registro no encontrado en ninguna tabla:', id);
+      throw new Error('Registro no encontrado para eliminar');
+    }
+
+    console.log('✅ Eliminado de payroll_novedades:', id);
   }
 
   /**
