@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
 
@@ -98,7 +99,41 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * Obtener datos unificados de vacaciones y novedades - SIMPLIFICADO
+   * ✅ SOLUCIÓN KISS: Deduplicar registros unificados por ID
+   */
+  private static deduplicateUnifiedData(unifiedData: any[]): any[] {
+    const deduplicatedMap = new Map();
+    let duplicatesDetected = 0;
+
+    // Procesar cada registro y deduplicar por ID
+    unifiedData.forEach(item => {
+      const existingItem = deduplicatedMap.get(item.id);
+      
+      if (existingItem) {
+        duplicatesDetected++;
+        console.log(`🔄 Duplicado detectado ID: ${item.id}, priorizando fuente: ${existingItem.source_type}`);
+        
+        // REGLA KISS: Priorizar 'vacation' sobre 'novedad' para consistencia
+        if (item.source_type === 'vacation' && existingItem.source_type === 'novedad') {
+          deduplicatedMap.set(item.id, item);
+          console.log(`✅ Reemplazado por fuente vacation: ${item.id}`);
+        }
+        // Si ambos son del mismo tipo o novedad tiene prioridad, mantener el existente
+      } else {
+        // Nuevo registro, agregarlo al mapa
+        deduplicatedMap.set(item.id, item);
+      }
+    });
+
+    if (duplicatesDetected > 0) {
+      console.log(`🎯 DEDUPLICACIÓN KISS: ${duplicatesDetected} duplicados eliminados de vista`);
+    }
+
+    return Array.from(deduplicatedMap.values());
+  }
+
+  /**
+   * Obtener datos unificados de vacaciones y novedades - CON DEDUPLICACIÓN KISS
    */
   static async getUnifiedVacationData(filters: any = {}) {
     console.log('🔍 Loading unified vacation data with filters:', filters);
@@ -267,8 +302,11 @@ export class VacationNovedadSyncService {
       })
     ];
 
+    // ✅ SOLUCIÓN KISS: Deduplicar por ID antes de aplicar filtros
+    const deduplicatedData = VacationNovedadSyncService.deduplicateUnifiedData(unifiedData);
+
     // Aplicar filtros
-    let filteredData = unifiedData;
+    let filteredData = deduplicatedData;
     
     if (filters.type) {
       filteredData = filteredData.filter(item => item.tipo_novedad === filters.type);
@@ -291,7 +329,7 @@ export class VacationNovedadSyncService {
       filteredData = filteredData.filter(item => item.fecha_fin && item.fecha_fin <= filters.date_to);
     }
 
-    console.log('✅ DATOS SIMPLIFICADOS:', {
+    console.log('✅ DATOS DEDUPLICADOS Y FILTRADOS:', {
       total: filteredData.length,
       pendientes: filteredData.filter(item => item.status === 'pendiente').length,
       liquidadas: filteredData.filter(item => item.status === 'liquidada').length,
