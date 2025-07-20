@@ -137,6 +137,18 @@ export function useUnifiedVacationsAbsences(filters: VacationAbsenceFilters) {
 
   // Función helper para obtener estadísticas
   const getUnifiedStats = () => {
+    if (!unifiedData || !Array.isArray(unifiedData)) {
+      return {
+        total: 0,
+        pendientes: 0,
+        liquidadas: 0,
+        fromVacations: 0,
+        fromNovedades: 0,
+        totalDays: 0,
+        totalValue: 0
+      };
+    }
+    
     const stats = {
       total: unifiedData.length,
       pendientes: unifiedData.filter(r => r.status === 'pendiente').length,

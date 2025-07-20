@@ -85,7 +85,7 @@ export class VacationNovedadSyncService {
       .select(`
         *,
         employee:employees(id, nombre, apellido, cedula),
-        period:payroll_periods_real(id, estado)
+        period:payroll_periods_real!processed_in_period_id(id, estado)
       `)
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
@@ -101,7 +101,7 @@ export class VacationNovedadSyncService {
       .select(`
         *,
         empleado:employees(id, nombre, apellido, cedula),
-        period:payroll_periods_real(id, estado)
+        period:payroll_periods_real!periodo_id(id, estado)
       `)
       .eq('company_id', companyId)
       .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'])
@@ -117,7 +117,7 @@ export class VacationNovedadSyncService {
       // ✅ CORRECCIÓN: Transformar vacaciones con estado correcto
       ...(vacationsData || []).map(item => {
         // Determinar estado real basado en el estado del período
-        let calculatedStatus = item.status; // Usar el status original por defecto
+        let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = item.status as 'pendiente' | 'liquidada' | 'cancelada';
         
         // Solo cambiar a 'liquidada' si el período está realmente cerrado
         if (item.processed_in_period_id && item.period && item.period.estado === 'cerrado') {
@@ -163,7 +163,7 @@ export class VacationNovedadSyncService {
       // ✅ CORRECCIÓN: Transformar novedades con estado correcto
       ...(novedadesData || []).map(item => {
         // Determinar estado real basado en el estado del período
-        let calculatedStatus = 'pendiente'; // Por defecto pendiente
+        let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente'; // Por defecto pendiente
         
         // Solo marcar como liquidada si el período está realmente cerrado
         if (item.periodo_id && item.period && item.period.estado === 'cerrado') {
