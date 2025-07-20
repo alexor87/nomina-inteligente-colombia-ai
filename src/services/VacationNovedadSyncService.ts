@@ -5,22 +5,30 @@ import { VacationAbsenceFormData } from '@/types/vacations';
 export class VacationNovedadSyncService {
   
   /**
-   * Crear una vacación/ausencia - automáticamente sincronizada via triggers DB
+   * 🎯 CORRECCIÓN KISS: Crear una vacación/ausencia con periodo_id explícito
    */
-  static async createVacationAbsence(formData: VacationAbsenceFormData) {
+  static async createVacationAbsence(formData: VacationAbsenceFormData & { periodo_id?: string }) {
+    console.log('🏖️ Creating vacation with form data:', formData);
+    
+    // 🎯 SOLUCIÓN DIRECTA: Usar periodo_id si está disponible
+    const processed_in_period_id = formData.periodo_id || null;
+    
+    console.log('📋 Using processed_in_period_id:', processed_in_period_id);
+    
     const { data, error } = await supabase
       .from('employee_vacation_periods')
       .insert({
         employee_id: formData.employee_id,
         type: formData.type,
-        subtipo: formData.subtipo, // ✅ AGREGADO: Incluir subtipo
+        subtipo: formData.subtipo,
         start_date: formData.start_date,
         end_date: formData.end_date,
         days_count: VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date),
         observations: formData.observations || '',
         status: 'pendiente',
         created_by: (await supabase.auth.getUser()).data.user?.id,
-        company_id: await VacationNovedadSyncService.getCurrentCompanyId()
+        company_id: await VacationNovedadSyncService.getCurrentCompanyId(),
+        processed_in_period_id: processed_in_period_id // 🎯 CORRECCIÓN: Usar el período explícito
       })
       .select(`
         *,
@@ -28,14 +36,19 @@ export class VacationNovedadSyncService {
       `)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error creating vacation:', error);
+      throw error;
+    }
+    
+    console.log('✅ Vacation created successfully:', data);
     return data;
   }
 
   /**
    * Actualizar una vacación/ausencia - sincronización automática
    */
-  static async updateVacationAbsence(id: string, formData: Partial<VacationAbsenceFormData>) {
+  static async updateVacationAbsence(id: string, formData: Partial<VacationAbsenceFormData & { periodo_id?: string }>) {
     const updateData: any = {
       ...formData,
       updated_at: new Date().toISOString()
@@ -43,6 +56,11 @@ export class VacationNovedadSyncService {
 
     if (formData.start_date && formData.end_date) {
       updateData.days_count = VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date);
+    }
+
+    // 🎯 CORRECCIÓN: Incluir periodo_id si está disponible
+    if (formData.periodo_id !== undefined) {
+      updateData.processed_in_period_id = formData.periodo_id;
     }
 
     const { data, error } = await supabase
@@ -200,12 +218,7 @@ export class VacationNovedadSyncService {
 
     // Combinar y transformar datos con lógica SIMPLE
     const unifiedData = [
-      // ✅ SIMPLIFICACIÓN: Transformar vacaciones con lógica directa
       ...(vacationsData || []).map(item => {
-        // LÓGICA SIMPLE: 
-        // - Sin periodo_id → pendiente
-        // - Con periodo_id y período cerrado → liquidada  
-        // - Cualquier otro caso → pendiente
         let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
         
         if (item.processed_in_period_id) {
@@ -228,9 +241,9 @@ export class VacationNovedadSyncService {
           fecha_inicio: item.start_date,
           fecha_fin: item.end_date,
           dias: item.days_count,
-          valor: 0, // Se calculará en el backend
+          valor: 0,
           observacion: item.observations,
-          status: calculatedStatus, // ✅ USAR ESTADO CALCULADO SIMPLE
+          status: calculatedStatus,
           creado_por: item.created_by,
           created_at: item.created_at,
           updated_at: item.updated_at,
@@ -251,12 +264,7 @@ export class VacationNovedadSyncService {
         };
       }),
       
-      // ✅ SIMPLIFICACIÓN: Transformar novedades con lógica directa
       ...(novedadesData || []).map(item => {
-        // LÓGICA SIMPLE: 
-        // - Sin periodo_id → pendiente
-        // - Con periodo_id y período cerrado → liquidada
-        // - Cualquier otro caso → pendiente
         let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
         
         if (item.periodo_id) {
@@ -281,7 +289,7 @@ export class VacationNovedadSyncService {
           dias: item.dias || 0,
           valor: item.valor || 0,
           observacion: item.observacion,
-          status: calculatedStatus, // ✅ USAR ESTADO CALCULADO SIMPLE
+          status: calculatedStatus,
           creado_por: item.creado_por,
           created_at: item.created_at,
           updated_at: item.updated_at,

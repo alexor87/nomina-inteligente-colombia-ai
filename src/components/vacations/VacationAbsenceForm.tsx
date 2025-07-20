@@ -11,7 +11,7 @@ import { isValidDateRange } from '@/utils/dateUtils';
 interface VacationAbsenceFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: VacationAbsenceFormData) => Promise<void>;
+  onSubmit: (data: VacationAbsenceFormData, periodInfo?: any) => Promise<void>;
   editingVacation?: VacationAbsence | null;
   isSubmitting?: boolean;
 }
@@ -59,7 +59,8 @@ export const VacationAbsenceForm = ({
     }
 
     try {
-      await onSubmit(formData);
+      // 🎯 CORRECCIÓN KISS: Pasar periodInfo como segundo parámetro
+      await onSubmit(formData, periodInfo);
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);

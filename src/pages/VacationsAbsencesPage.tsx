@@ -60,16 +60,25 @@ const VacationsAbsencesPage = () => {
     setIsDetailOpen(true);
   };
 
-  const handleFormSubmit = async (formData: any) => {
-    console.log('💾 Submitting form:', formData);
+  const handleFormSubmit = async (formData: any, periodInfo?: any) => {
+    console.log('💾 Submitting form:', { formData, periodInfo });
+    
     try {
+      // 🎯 CORRECCIÓN KISS: Incluir periodo_id del periodInfo detectado
+      const submissionData = {
+        ...formData,
+        periodo_id: periodInfo?.periodId || null // Incluir el período detectado
+      };
+      
+      console.log('📋 Submission data with period:', submissionData);
+      
       if (editingVacation) {
         await updateVacationAbsence({
           id: editingVacation.id,
-          formData
+          formData: submissionData
         });
       } else {
-        await createVacationAbsence(formData);
+        await createVacationAbsence(submissionData);
       }
       setIsFormOpen(false);
       setEditingVacation(null);
@@ -192,14 +201,12 @@ const VacationsAbsencesPage = () => {
         </CardContent>
       </Card>
 
-      {/* Filtros */}
       <VacationAbsenceFiltersComponent
         filters={filters}
         onFiltersChange={setFilters}
         onClearFilters={clearFilters}
       />
 
-      {/* Tabla */}
       <Card>
         <CardHeader>
           <CardTitle>Registros de Vacaciones y Ausencias</CardTitle>
