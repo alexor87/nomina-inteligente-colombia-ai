@@ -3,7 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { 
   VacationAbsenceFormData, 
   ABSENCE_TYPE_LABELS, 
@@ -19,12 +19,22 @@ interface Employee {
   cedula: string;
 }
 
+interface PeriodInfo {
+  periodId: string | null;
+  periodName: string | null;
+  isExact: boolean;
+  isAutoCreated: boolean;
+  message: string;
+}
+
 interface VacationFormFieldsProps {
   formData: VacationAbsenceFormData;
   setFormData: React.Dispatch<React.SetStateAction<VacationAbsenceFormData>>;
   employees: Employee[];
   calculatedDays: number;
   isSubmitting: boolean;
+  periodInfo?: PeriodInfo | null;
+  isDetectingPeriod?: boolean;
 }
 
 export const VacationFormFields = ({
@@ -32,13 +42,15 @@ export const VacationFormFields = ({
   setFormData,
   employees,
   calculatedDays,
-  isSubmitting
+  isSubmitting,
+  periodInfo,
+  isDetectingPeriod = false
 }: VacationFormFieldsProps) => {
   const handleTypeChange = (newType: VacationAbsenceType) => {
     setFormData(prev => ({
       ...prev,
       type: newType,
-      subtipo: undefined // ✅ LIMPIAR SUBTIPO AL CAMBIAR TIPO
+      subtipo: undefined
     }));
   };
 
@@ -73,7 +85,7 @@ export const VacationFormFields = ({
         )}
       </div>
 
-      {/* ✅ Tipo de Ausencia */}
+      {/* Tipo de Ausencia */}
       <div className="space-y-2">
         <Label htmlFor="type">Tipo de Ausencia *</Label>
         <Select
@@ -94,7 +106,7 @@ export const VacationFormFields = ({
         </Select>
       </div>
 
-      {/* ✅ NUEVO: Subtipo dinámico basado en el tipo seleccionado */}
+      {/* Subtipo dinámico basado en el tipo seleccionado */}
       {subtypesForCurrentType.length > 0 && (
         <div className="space-y-2">
           <Label htmlFor="subtipo">
@@ -151,6 +163,53 @@ export const VacationFormFields = ({
           />
         </div>
       </div>
+
+      {/* 🎯 NUEVA FUNCIONALIDAD: Información del período detectado */}
+      {(isDetectingPeriod || periodInfo) && (
+        <div className="space-y-3">
+          {isDetectingPeriod && (
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-2 text-gray-600">
+                <Clock className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Detectando período...</span>
+              </div>
+            </div>
+          )}
+          
+          {periodInfo && (
+            <div className={`p-3 border rounded-lg ${
+              periodInfo.periodId 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-amber-50 border-amber-200'
+            }`}>
+              <div className="flex items-start gap-2">
+                {periodInfo.periodId ? (
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium ${
+                    periodInfo.periodId ? 'text-green-700' : 'text-amber-700'
+                  }`}>
+                    {periodInfo.periodId ? 'Período asignado' : 'Período no encontrado'}
+                  </div>
+                  <div className={`text-sm ${
+                    periodInfo.periodId ? 'text-green-600' : 'text-amber-600'
+                  }`}>
+                    {periodInfo.message}
+                  </div>
+                  {periodInfo.isAutoCreated && (
+                    <div className="text-xs text-green-500 mt-1">
+                      ✨ Período creado automáticamente
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Calculated Days Display */}
       {calculatedDays > 0 && (

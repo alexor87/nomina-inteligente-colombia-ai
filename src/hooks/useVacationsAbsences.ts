@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -129,7 +130,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     return (data && data.length > 0) || false;
   };
 
-  // Obtener company_id del usuario
   const getCompanyId = async (): Promise<string> => {
     const { data: profile } = await supabase
       .from('profiles')
@@ -144,7 +144,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     return profile.company_id;
   };
 
-  // Mutación para crear vacación/ausencia
+  // 🎯 MUTACIÓN MEJORADA: Usar detección automática de período
   const createMutation = useMutation({
     mutationFn: async (formData: VacationAbsenceFormData) => {
       if (!user) throw new Error('Usuario no autenticado');
@@ -165,10 +165,14 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         throw new Error('El empleado ya tiene una ausencia registrada en este período');
       }
 
-      // 🎯 SOLUCIÓN KISS: Detectar período automáticamente
+      // 🎯 DETECCIÓN AUTOMÁTICA: El período ya fue detectado/creado automáticamente
       const periodDetection = await detectPeriodForDates(formData.start_date, formData.end_date);
       
-      console.log('🎯 Detección de período:', periodDetection);
+      if (!periodDetection.periodId) {
+        throw new Error('No se pudo determinar un período válido para las fechas seleccionadas');
+      }
+
+      console.log('🎯 Usando período detectado:', periodDetection);
 
       const { data, error } = await supabase
         .from('employee_vacation_periods')
@@ -183,7 +187,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
           observations: formData.observations,
           status: 'pendiente',
           created_by: user.id,
-          processed_in_period_id: periodDetection.periodId, // 🎯 Período detectado automáticamente
+          processed_in_period_id: periodDetection.periodId, // 🎯 Período garantizado
         })
         .select()
         .single();
@@ -221,7 +225,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         throw new Error('El empleado ya tiene una ausencia registrada en este período');
       }
 
-      // 🎯 SOLUCIÓN KISS: Detectar período automáticamente
+      // Para actualizaciones, detectar período también
       const periodDetection = await detectPeriodForDates(formData.start_date, formData.end_date);
       
       console.log('🎯 Detección de período para actualización:', periodDetection);
@@ -236,7 +240,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
           end_date: formData.end_date,
           days_count: days,
           observations: formData.observations,
-          processed_in_period_id: periodDetection.periodId, // 🎯 Período detectado automáticamente
+          processed_in_period_id: periodDetection.periodId, // 🎯 Período actualizado
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -256,7 +260,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     },
   });
 
-  // Mutación para eliminar
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -276,7 +279,6 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
     },
   });
 
-  // Mutación para cambiar estado
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: VacationAbsenceStatus }) => {
       const { data, error } = await supabase

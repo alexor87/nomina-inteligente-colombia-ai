@@ -23,7 +23,14 @@ export const VacationAbsenceForm = ({
   editingVacation,
   isSubmitting = false
 }: VacationAbsenceFormProps) => {
-  const { formData, setFormData, calculatedDays } = useVacationAbsenceForm(editingVacation, isOpen);
+  const { 
+    formData, 
+    setFormData, 
+    calculatedDays, 
+    periodInfo, 
+    isDetectingPeriod 
+  } = useVacationAbsenceForm(editingVacation, isOpen);
+  
   const { data: employees = [] } = useVacationEmployees(isOpen);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +40,7 @@ export const VacationAbsenceForm = ({
       return;
     }
 
-    // ✅ VALIDACIÓN KISS: Verificar subtipo si es requerido
+    // Verificar subtipo si es requerido
     if (requiresSubtype(formData.type) && !formData.subtipo) {
       alert('El subtipo es requerido para este tipo de ausencia');
       return;
@@ -42,6 +49,12 @@ export const VacationAbsenceForm = ({
     // Use the centralized date validation utility
     if (!isValidDateRange(formData.start_date, formData.end_date)) {
       alert('La fecha de fin debe ser posterior a la fecha de inicio');
+      return;
+    }
+
+    // 🎯 VALIDACIÓN: Verificar que tengamos un período válido para nuevas ausencias
+    if (!editingVacation && (!periodInfo || !periodInfo.periodId)) {
+      alert('No se pudo determinar un período válido para las fechas seleccionadas. Por favor, seleccione fechas diferentes.');
       return;
     }
 
@@ -69,6 +82,8 @@ export const VacationAbsenceForm = ({
           employees={employees}
           calculatedDays={calculatedDays}
           isSubmitting={isSubmitting}
+          periodInfo={periodInfo}
+          isDetectingPeriod={isDetectingPeriod}
         />
 
         <VacationFormActions
