@@ -5,10 +5,12 @@ import { VacationAbsence, VacationAbsenceFilters, VacationAbsenceFormData, Vacat
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { calculateDaysBetween } from '@/utils/dateUtils';
+import { usePeriodDetection } from './usePeriodDetection';
 
 export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { detectPeriodForDates } = usePeriodDetection();
 
   console.log('🪝 useVacationsAbsences initialized', { filters, userId: user?.id });
 
@@ -163,6 +165,11 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         throw new Error('El empleado ya tiene una ausencia registrada en este período');
       }
 
+      // 🎯 SOLUCIÓN KISS: Detectar período automáticamente
+      const periodDetection = await detectPeriodForDates(formData.start_date, formData.end_date);
+      
+      console.log('🎯 Detección de período:', periodDetection);
+
       const { data, error } = await supabase
         .from('employee_vacation_periods')
         .insert({
@@ -176,6 +183,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
           observations: formData.observations,
           status: 'pendiente',
           created_by: user.id,
+          processed_in_period_id: periodDetection.periodId, // 🎯 Período detectado automáticamente
         })
         .select()
         .single();
@@ -213,6 +221,11 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         throw new Error('El empleado ya tiene una ausencia registrada en este período');
       }
 
+      // 🎯 SOLUCIÓN KISS: Detectar período automáticamente
+      const periodDetection = await detectPeriodForDates(formData.start_date, formData.end_date);
+      
+      console.log('🎯 Detección de período para actualización:', periodDetection);
+
       const { data, error } = await supabase
         .from('employee_vacation_periods')
         .update({
@@ -223,6 +236,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
           end_date: formData.end_date,
           days_count: days,
           observations: formData.observations,
+          processed_in_period_id: periodDetection.periodId, // 🎯 Período detectado automáticamente
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
