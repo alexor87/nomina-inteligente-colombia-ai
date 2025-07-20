@@ -84,9 +84,10 @@ export const usePeriodDetection = () => {
       // Si no se encuentra ningún período, usar detección inteligente
       const { data: smartPeriod } = await supabase.rpc('detect_current_smart_period');
       
-      if (smartPeriod?.suggested_period) {
-        const suggestedStart = smartPeriod.suggested_period.start_date;
-        const suggestedEnd = smartPeriod.suggested_period.end_date;
+      if (smartPeriod && typeof smartPeriod === 'object' && 'suggested_period' in smartPeriod) {
+        const suggestedPeriod = (smartPeriod as any).suggested_period;
+        const suggestedStart = suggestedPeriod.start_date;
+        const suggestedEnd = suggestedPeriod.end_date;
         
         // Verificar si las fechas están dentro del período sugerido
         if (startDate >= suggestedStart && endDate <= suggestedEnd) {
