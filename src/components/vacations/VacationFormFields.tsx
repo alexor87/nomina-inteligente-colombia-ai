@@ -1,5 +1,5 @@
 
-import { VacationAbsenceFormData } from '@/types/vacations';
+import { VacationAbsenceFormData, requiresSubtype, getSubtypesForType } from '@/types/vacations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,6 +46,8 @@ export const VacationFormFields = ({
   isDetectingPeriod
 }: VacationFormFieldsProps) => {
   const selectedEmployee = employees.find(emp => emp.id === formData.employee_id);
+  const showSubtypeField = requiresSubtype(formData.type);
+  const availableSubtypes = getSubtypesForType(formData.type);
 
   const getPeriodStatusIcon = () => {
     if (isDetectingPeriod) return <Loader2 className="h-4 w-4 animate-spin" />;
@@ -97,7 +99,14 @@ export const VacationFormFields = ({
         <Label htmlFor="type">Tipo de Ausencia *</Label>
         <Select 
           value={formData.type} 
-          onValueChange={(value) => setFormData({ ...formData, type: value as any })}
+          onValueChange={(value) => {
+            // Limpiar subtipo al cambiar tipo
+            setFormData({ 
+              ...formData, 
+              type: value as any, 
+              subtipo: undefined 
+            });
+          }}
           disabled={isSubmitting}
         >
           <SelectTrigger>
@@ -112,6 +121,29 @@ export const VacationFormFields = ({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Subtipo Field - Solo mostrar si es requerido */}
+      {showSubtypeField && (
+        <div className="space-y-2">
+          <Label htmlFor="subtipo">Subtipo *</Label>
+          <Select 
+            value={formData.subtipo || ''} 
+            onValueChange={(value) => setFormData({ ...formData, subtipo: value })}
+            disabled={isSubmitting}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar subtipo" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableSubtypes.map((subtipo) => (
+                <SelectItem key={subtipo.value} value={subtipo.value}>
+                  {subtipo.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Date Range */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -147,7 +179,7 @@ export const VacationFormFields = ({
         </div>
       )}
 
-      {/* 🎯 NUEVA FUNCIONALIDAD: Información de período(s) detectado(s) */}
+      {/* Información de período(s) detectado(s) */}
       {(formData.start_date && formData.end_date) && (
         <Card className={`${getPeriodStatusColor()}`}>
           <CardContent className="pt-4">
@@ -166,7 +198,7 @@ export const VacationFormFields = ({
                       {periodInfo.message}
                     </p>
                     
-                    {/* 🎯 MULTI-PERÍODO: Mostrar información detallada */}
+                    {/* Multi-período: Mostrar información detallada */}
                     {periodInfo.crossesMultiplePeriods && periodInfo.periodSegments && (
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-purple-700">

@@ -55,7 +55,7 @@ export const useVacationAbsenceForm = (
     }
   }, [editingVacation, isOpen]);
 
-  // 🎯 FUNCIONALIDAD MEJORADA: Detección automática con análisis multi-período
+  // Detección automática con análisis multi-período
   useEffect(() => {
     const detectPeriod = async () => {
       if (formData.start_date && formData.end_date) {

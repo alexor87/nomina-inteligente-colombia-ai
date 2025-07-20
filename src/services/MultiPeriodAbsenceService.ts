@@ -28,9 +28,9 @@ export class MultiPeriodAbsenceService {
     console.log('🔍 Analizando ausencia multi-período:', { startDate, endDate, companyId });
 
     // Obtener todos los períodos que intersectan con el rango de fechas
-    const { data: periods, error } = await supabase
+    const { data: periodsRaw, error } = await supabase
       .from('payroll_periods_real')
-      .select('id, periodo, fecha_inicio, fecha_fin, tipo_periodo')
+      .select('id, periodo, fecha_inicio, fecha_fin, tipo_periodo, created_at')
       .eq('company_id', companyId)
       .or(`and(fecha_inicio.lte.${endDate},fecha_fin.gte.${startDate})`)
       .order('fecha_inicio', { ascending: true });
@@ -40,10 +40,25 @@ export class MultiPeriodAbsenceService {
       throw error;
     }
 
+    // CORRECCIÓN: Filtrar períodos duplicados por fechas exactas
+    const periodsMap = new Map();
+    for (const period of periodsRaw || []) {
+      const key = `${period.fecha_inicio}-${period.fecha_fin}`;
+      const existing = periodsMap.get(key);
+      
+      // Si existe duplicado, mantener el más reciente
+      if (!existing || new Date(period.created_at) > new Date(existing.created_at)) {
+        periodsMap.set(key, period);
+      }
+    }
+    
+    const periods = Array.from(periodsMap.values());
+    console.log(`🔧 Períodos filtrados: ${periodsRaw?.length || 0} → ${periods.length} (eliminados ${(periodsRaw?.length || 0) - periods.length} duplicados)`);
+
     const segments: PeriodSegment[] = [];
     let totalDays = 0;
 
-    for (const period of periods || []) {
+    for (const period of periods) {
       // Calcular intersección entre la ausencia y el período
       const segmentStart = startDate > period.fecha_inicio ? startDate : period.fecha_inicio;
       const segmentEnd = endDate < period.fecha_fin ? endDate : period.fecha_fin;

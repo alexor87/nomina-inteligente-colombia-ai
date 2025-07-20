@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,7 +46,7 @@ export const usePeriodDetection = () => {
         throw new Error('Usuario no tiene empresa asignada');
       }
 
-      // 🎯 NUEVA FUNCIONALIDAD: Analizar si cruza múltiples períodos
+      // NUEVA FUNCIONALIDAD: Analizar si cruza múltiples períodos
       const multiPeriodAnalysis = await MultiPeriodAbsenceService.analyzeAbsenceAcrossPeriods(
         startDate, 
         endDate, 
@@ -70,18 +71,23 @@ export const usePeriodDetection = () => {
         };
       }
 
-      // Buscar período que contenga exactamente las fechas
-      const { data: exactPeriod } = await supabase
+      // CORRECCIÓN: Buscar período único con filtro de duplicados mejorado
+      const { data: allExactPeriods } = await supabase
         .from('payroll_periods_real')
-        .select('id, periodo, fecha_inicio, fecha_fin')
+        .select('id, periodo, fecha_inicio, fecha_fin, created_at')
         .eq('company_id', profile.company_id)
         .eq('fecha_inicio', startDate)
         .eq('fecha_fin', endDate)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
+
+      // Si hay múltiples períodos con las mismas fechas, usar el más reciente
+      const exactPeriod = allExactPeriods?.[0];
 
       if (exactPeriod) {
+        if (allExactPeriods && allExactPeriods.length > 1) {
+          console.warn(`⚠️ ${allExactPeriods.length} períodos duplicados encontrados para fechas ${startDate} - ${endDate}, usando el más reciente`);
+        }
+        
         return {
           periodId: exactPeriod.id,
           periodName: exactPeriod.periodo,
@@ -91,18 +97,23 @@ export const usePeriodDetection = () => {
         };
       }
 
-      // Buscar período que contenga las fechas de la ausencia
-      const { data: containingPeriod } = await supabase
+      // Buscar período que contenga las fechas de la ausencia (con filtro de duplicados)
+      const { data: allContainingPeriods } = await supabase
         .from('payroll_periods_real')
-        .select('id, periodo, fecha_inicio, fecha_fin')
+        .select('id, periodo, fecha_inicio, fecha_fin, created_at')
         .eq('company_id', profile.company_id)
         .lte('fecha_inicio', startDate)
         .gte('fecha_fin', endDate)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
+
+      // Filtrar duplicados y usar el más reciente
+      const containingPeriod = allContainingPeriods?.[0];
 
       if (containingPeriod) {
+        if (allContainingPeriods && allContainingPeriods.length > 1) {
+          console.warn(`⚠️ ${allContainingPeriods.length} períodos contenedores encontrados, usando el más reciente`);
+        }
+        
         return {
           periodId: containingPeriod.id,
           periodName: containingPeriod.periodo,
@@ -112,7 +123,7 @@ export const usePeriodDetection = () => {
         };
       }
 
-      // 🎯 NUEVA FUNCIONALIDAD: Crear período automáticamente usando detección inteligente
+      // Crear período automáticamente usando detección inteligente
       const { data: smartPeriod } = await supabase.rpc('detect_current_smart_period');
       
       if (smartPeriod && typeof smartPeriod === 'object' && 'suggested_period' in smartPeriod) {
