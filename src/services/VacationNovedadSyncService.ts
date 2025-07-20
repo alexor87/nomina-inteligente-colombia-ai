@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
 
@@ -78,29 +77,29 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * SOLUCIÓN DEFINITIVA: Eliminar vacación/ausencia desde cualquier origen
+   * 🎯 SOLUCIÓN KISS: Eliminación simplificada sin count problemático
    */
   static async deleteVacationAbsence(id: string) {
-    console.log('🗑️ Intentando eliminar registro:', id);
+    console.log('🗑️ Eliminando registro:', id);
     
-    // PASO 1: Intentar eliminar de employee_vacation_periods
-    const { error: vacationError, count: vacationCount } = await supabase
+    // PASO 1: Intentar eliminar de employee_vacation_periods (tabla principal)
+    const { error: vacationError } = await supabase
       .from('employee_vacation_periods')
-      .delete({ count: 'exact' })
+      .delete()
       .eq('id', id);
 
     // Si se eliminó exitosamente de vacaciones, terminar
-    if (!vacationError && vacationCount && vacationCount > 0) {
-      console.log('✅ Eliminado de employee_vacation_periods:', id);
+    if (!vacationError) {
+      console.log('✅ Eliminado exitosamente de employee_vacation_periods:', id);
       return;
     }
 
     console.log('⚠️ No se encontró en employee_vacation_periods, intentando payroll_novedades:', vacationError?.message);
 
     // PASO 2: Si no se eliminó de vacaciones, intentar eliminar de novedades
-    const { error: novedadError, count: novedadCount } = await supabase
+    const { error: novedadError } = await supabase
       .from('payroll_novedades')
-      .delete({ count: 'exact' })
+      .delete()
       .eq('id', id);
 
     // Verificar resultado final
@@ -109,12 +108,7 @@ export class VacationNovedadSyncService {
       throw new Error(`No se pudo eliminar el registro: ${novedadError.message}`);
     }
 
-    if (!novedadCount || novedadCount === 0) {
-      console.error('❌ Registro no encontrado en ninguna tabla:', id);
-      throw new Error('Registro no encontrado para eliminar');
-    }
-
-    console.log('✅ Eliminado de payroll_novedades:', id);
+    console.log('✅ Eliminado exitosamente de payroll_novedades:', id);
   }
 
   /**
