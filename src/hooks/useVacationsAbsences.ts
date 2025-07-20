@@ -169,6 +169,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
           company_id: companyId,
           employee_id: formData.employee_id,
           type: formData.type,
+          subtipo: formData.subtipo,
           start_date: formData.start_date,
           end_date: formData.end_date,
           days_count: days,
@@ -217,6 +218,7 @@ export const useVacationsAbsences = (filters: VacationAbsenceFilters = {}) => {
         .update({
           employee_id: formData.employee_id,
           type: formData.type,
+          subtipo: formData.subtipo,
           start_date: formData.start_date,
           end_date: formData.end_date,
           days_count: days,
