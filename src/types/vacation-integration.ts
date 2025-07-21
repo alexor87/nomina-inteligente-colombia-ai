@@ -106,7 +106,7 @@ export const NOVEDAD_VISUAL_CONFIG = {
   badge: { icon: '📋', label: 'Novedad', color: 'bg-blue-100 text-blue-800' }
 };
 
-// ✅ ACTUALIZADO: Helpers para conversión con soporte de fragmentación
+// ✅ ACTUALIZADO: Convertir ausencias con fragmentación inteligente
 export const convertVacationToDisplay = (
   vacation: any, 
   employeeSalary: number,
@@ -115,7 +115,7 @@ export const convertVacationToDisplay = (
 ): DisplayNovedad => {
   const config = VACATION_VISUAL_CONFIG[vacation.type as VacationAbsenceType];
   
-  // ✅ NUEVA LÓGICA: Calcular días para el período específico si se proporciona
+  // ✅ LÓGICA MEJORADA: Calcular días proporcionales al período
   let displayDays = vacation.days_count;
   let isFragmented = false;
   
@@ -127,6 +127,14 @@ export const convertVacationToDisplay = (
       periodEndDate
     );
     isFragmented = displayDays < vacation.days_count;
+    
+    console.log('🔄 Fragmentación aplicada:', {
+      originalDays: vacation.days_count,
+      periodDays: displayDays,
+      isFragmented,
+      vacationPeriod: `${vacation.start_date} - ${vacation.end_date}`,
+      payrollPeriod: `${periodStartDate} - ${periodEndDate}`
+    });
   }
   
   const valor = config.calculation(employeeSalary, displayDays);
@@ -172,7 +180,7 @@ export const convertVacationToDisplay = (
   };
 };
 
-// ✅ NUEVA FUNCIÓN: Calcular intersección de días
+// ✅ NUEVA FUNCIÓN: Calcular intersección de días (centralizada)
 function calculatePeriodIntersectionDays(
   vacationStart: string,
   vacationEnd: string,

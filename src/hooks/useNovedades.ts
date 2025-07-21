@@ -1,6 +1,6 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
+import { PayrollIntegratedDataService } from '@/services/PayrollIntegratedDataService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -118,43 +118,31 @@ export const useNovedades = (periodId: string) => {
     }
   }, [refetch]);
 
-  // ✅ FIXED: Properly type the returned objects to match DisplayNovedad interface
+  // ✅ NUEVA IMPLEMENTACIÓN: Usar servicio integrado para fragmentación inteligente
   const loadIntegratedNovedades = useCallback(async (employeeId: string): Promise<DisplayNovedad[]> => {
     try {
       if (!periodId) return [];
       
-      const novedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
-      
-      // Transform to expected format with all required properties properly typed
-      return novedades.map(novedad => {
-        const displayNovedad: DisplayNovedad = {
-          id: novedad.id,
-          empleado_id: novedad.empleado_id,
-          periodo_id: novedad.periodo_id,
-          tipo_novedad: novedad.tipo_novedad,
-          subtipo: (novedad as any).subtipo,
-          valor: novedad.valor || 0,
-          dias: novedad.dias,
-          horas: novedad.horas,
-          fecha_inicio: novedad.fecha_inicio,
-          fecha_fin: novedad.fecha_fin,
-          observacion: novedad.observacion,
-          origen: 'novedades' as const,
-          isConfirmed: true,
-          badgeLabel: 'Novedad',
-          badgeIcon: '📋',
-          badgeColor: 'bg-blue-100 text-blue-800',
-          status: 'registrada' as const, // ✅ FIXED: Explicitly type as const to ensure proper literal type
-          statusColor: 'text-blue-600',
-          canEdit: true,
-          canDelete: true,
-          created_at: novedad.created_at,
-          updated_at: novedad.updated_at
-        };
-        return displayNovedad;
+      console.log('🔄 useNovedades - Cargando datos integrados con fragmentación:', {
+        employeeId,
+        periodId
       });
+
+      // Usar el nuevo servicio integrado que maneja fragmentación
+      const integratedData = await PayrollIntegratedDataService.getEmployeePeriodData(
+        employeeId,
+        periodId
+      );
+
+      console.log('✅ useNovedades - Datos integrados cargados:', {
+        totalElementos: integratedData.length,
+        novedades: integratedData.filter(item => item.origen === 'novedades').length,
+        ausencias: integratedData.filter(item => item.origen === 'vacaciones').length
+      });
+
+      return integratedData;
     } catch (error) {
-      console.error('Error loading integrated novedades:', error);
+      console.error('❌ useNovedades - Error loading integrated data:', error);
       return [];
     }
   }, [periodId]);
