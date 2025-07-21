@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
@@ -181,13 +180,10 @@ export const usePayrollUnified = (companyId: string) => {
         return;
       }
 
-      // Verificar si ya hay empleados en payrolls para este período
+      // Query mejorado y más simple para evitar fallos
       const { data: periodEmployees, error: periodError } = await supabase
         .from('payrolls')
-        .select(`
-          *,
-          employees!inner(*)
-        `)
+        .select('*, employees(*)')
         .eq('company_id', companyId)
         .eq('period_id', period.id);
 
@@ -196,6 +192,13 @@ export const usePayrollUnified = (companyId: string) => {
         setEmployees([]);
         return;
       }
+
+      // Logging detallado para debugging
+      console.log('📊 Resultado del query de empleados:', {
+        periodEmployees: periodEmployees?.length || 0,
+        employees_loaded: periodData.employees_loaded,
+        period_id: period.id
+      });
 
       // Detectar estado inconsistente: marcado como inicializado pero sin empleados
       const isInconsistentState = periodData.employees_loaded && 
@@ -255,10 +258,13 @@ export const usePayrollUnified = (companyId: string) => {
 
           console.log('✅ Registros de payroll creados exitosamente');
 
-          // Marcar el período como inicializado
+          // Marcar el período como inicializado y actualizar contador
           await supabase
             .from('payroll_periods_real')
-            .update({ employees_loaded: true })
+            .update({ 
+              employees_loaded: true,
+              empleados_count: activeEmployees.length
+            })
             .eq('id', period.id);
 
           console.log('✅ Período marcado como inicializado');
@@ -365,6 +371,15 @@ export const usePayrollUnified = (companyId: string) => {
 
       if (insertError) throw insertError;
 
+      // Actualizar contador de empleados en el período
+      const newEmployeeCount = employees.length + employeeIds.length;
+      await supabase
+        .from('payroll_periods_real')
+        .update({ empleados_count: newEmployeeCount })
+        .eq('id', currentPeriod.id);
+
+      console.log(`✅ Empleados agregados. Nuevo contador: ${newEmployeeCount}`);
+
       const newEmployeesList: PayrollEmployee[] = (newEmployees || []).map(emp => ({
         id: emp.id,
         name: `${emp.nombre} ${emp.apellido}`,
@@ -396,19 +411,41 @@ export const usePayrollUnified = (companyId: string) => {
         variant: "destructive",
       });
     }
-  }, [currentPeriod, companyId, toast]);
+  }, [currentPeriod, companyId, employees.length, toast]);
 
   const removeEmployee = useCallback(async (employeeId: string) => {
     if (!currentPeriod) return;
 
     try {
-      // Remover de payrolls
-      await supabase
+      console.log('🗑️ Eliminando empleado del período:', { employeeId, periodId: currentPeriod.id, companyId });
+
+      // CORRECCIÓN: Incluir company_id para eliminación segura y correcta
+      const { error: deleteError } = await supabase
         .from('payrolls')
         .delete()
+        .eq('company_id', companyId)
         .eq('employee_id', employeeId)
         .eq('period_id', currentPeriod.id);
 
+      if (deleteError) {
+        console.error('Error eliminando empleado de payrolls:', deleteError);
+        throw deleteError;
+      }
+
+      // Actualizar contador de empleados en el período
+      const newEmployeeCount = employees.length - 1;
+      const { error: updateError } = await supabase
+        .from('payroll_periods_real')
+        .update({ empleados_count: newEmployeeCount })
+        .eq('id', currentPeriod.id);
+
+      if (updateError) {
+        console.warn('Error actualizando contador de empleados:', updateError);
+      }
+
+      console.log(`✅ Empleado eliminado correctamente. Nuevo contador: ${newEmployeeCount}`);
+
+      // Actualizar estado local
       setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
 
     } catch (error) {
@@ -419,9 +456,8 @@ export const usePayrollUnified = (companyId: string) => {
         variant: "destructive",
       });
     }
-  }, [currentPeriod, toast]);
+  }, [currentPeriod, companyId, employees.length, toast]);
 
-  // Liquidación de nómina con integración completa de vacaciones
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
     if (!currentPeriod || employees.length === 0) return;
 
