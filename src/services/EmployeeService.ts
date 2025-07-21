@@ -226,7 +226,7 @@ export class EmployeeService {
   /**
    * Bulk update employee status
    */
-  static async bulkUpdateStatus(employeeIds: string[], newStatus: string): Promise<{ success: boolean; results: { successful: number; failed: number; errors: string[] }; error?: string }> {
+  static async bulkUpdateStatus(employeeIds: string[], newStatus: 'activo' | 'inactivo' | 'eliminado'): Promise<{ success: boolean; results: { successful: number; failed: number; errors: string[] }; error?: string }> {
     try {
       console.log('🔄 EmployeeService: Bulk updating employee status:', employeeIds.length, 'to', newStatus);
       

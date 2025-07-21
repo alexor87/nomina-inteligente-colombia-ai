@@ -195,7 +195,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     }
   };
 
-  const handleBulkUpdateStatus = async (newStatus: string) => {
+  const handleBulkUpdateStatus = async (newStatus: 'activo' | 'inactivo') => {
     if (selectedEmployees.length === 0) return;
 
     try {
