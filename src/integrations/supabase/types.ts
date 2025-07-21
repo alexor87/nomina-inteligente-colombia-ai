@@ -1776,6 +1776,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_period_intersection_days: {
+        Args: {
+          absence_start: string
+          absence_end: string
+          period_start: string
+          period_end: string
+        }
+        Returns: number
+      }
       can_manage_company_users: {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
@@ -1826,6 +1835,10 @@ export type Database = {
       ensure_admin_role_for_company_users: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      fix_malformed_fragmented_absences: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       force_sync_existing_novedades: {
         Args: Record<PropertyKey, never>
