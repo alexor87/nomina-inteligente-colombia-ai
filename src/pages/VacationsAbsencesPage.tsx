@@ -49,9 +49,25 @@ const VacationsAbsencesPage = () => {
   };
 
   const handleEditVacation = (vacation: VacationAbsence) => {
-    console.log('✏️ Editing vacation:', vacation.id);
+    console.log('✏️ Editing vacation from table:', vacation.id);
     setEditingVacation(vacation);
     setIsFormOpen(true);
+  };
+
+  // 🎯 CORRECCIÓN: Handler específico para edición desde modal de detalles
+  const handleEditFromDetail = (vacation: VacationAbsence) => {
+    console.log('✏️ Editing from detail modal:', vacation.id);
+    
+    // 1. Cerrar modal de detalles primero
+    setIsDetailOpen(false);
+    setSelectedVacation(null);
+    
+    // 2. Pequeño delay para evitar conflictos de estado
+    setTimeout(() => {
+      // 3. Abrir formulario de edición
+      setEditingVacation(vacation);
+      setIsFormOpen(true);
+    }, 100);
   };
 
   const handleViewVacation = (vacation: VacationAbsence) => {
@@ -251,7 +267,7 @@ const VacationsAbsencesPage = () => {
           setSelectedVacation(null);
         }}
         vacation={selectedVacation}
-        onEdit={handleEditVacation}
+        onEdit={handleEditFromDetail}
         onDelete={handleDeleteVacation}
       />
     </div>
