@@ -1,19 +1,20 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { DisplayNovedad, convertVacationToDisplay, convertNovedadToDisplay } from '@/types/vacation-integration';
+import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
 
 export class PayrollIntegratedDataService {
   /**
-   * Obtiene datos integrados de novedades y ausencias para un empleado en un período específico
-   * Aplica fragmentación inteligente para ausencias multi-período
+   * Obtiene datos integrados de novedades para un empleado en un período específico
+   * SOLUCIÓN KISS: Solo usar payroll_novedades como fuente única de verdad
+   * Los triggers ya manejan la fragmentación correcta de ausencias multi-período
    */
   static async getEmployeePeriodData(
     employeeId: string,
     periodId: string
   ): Promise<DisplayNovedad[]> {
     try {
-      console.log('🔍 PayrollIntegratedDataService - Obteniendo datos integrados:', {
+      console.log('🔍 PayrollIntegratedDataService - Obteniendo datos unificados (solo novedades):', {
         employeeId,
         periodId
       });
@@ -39,57 +40,41 @@ export class PayrollIntegratedDataService {
 
       const employeeSalary = employee?.salario_base || 0;
 
-      // 1. Obtener novedades directas del período
-      const novedadesDirectas = await NovedadesEnhancedService.getNovedadesByEmployee(
+      // SOLUCIÓN KISS: Solo obtener datos de payroll_novedades
+      // Los triggers ya fragmentan correctamente las ausencias multi-período
+      const novedadesData = await NovedadesEnhancedService.getNovedadesByEmployee(
         employeeId,
         periodId
       );
 
-      // 2. Obtener ausencias que intersectan con el período
-      const { data: intersectingVacations } = await supabase
-        .from('employee_vacation_periods')
-        .select('*')
-        .eq('employee_id', employeeId)
-        .eq('company_id', period.company_id)
-        .lte('start_date', period.fecha_fin)    // Comienza antes o durante el período
-        .gte('end_date', period.fecha_inicio);   // Termina después o durante el período
-
-      // 3. Convertir novedades directas
-      const displayNovedades: DisplayNovedad[] = novedadesDirectas.map(novedad => 
-        convertNovedadToDisplay(novedad)
-      );
-
-      // 4. Convertir ausencias intersectantes con fragmentación
-      const displayVacations: DisplayNovedad[] = (intersectingVacations || []).map(vacation => 
-        convertVacationToDisplay(
-          vacation,
-          employeeSalary,
-          period.fecha_inicio,
-          period.fecha_fin
-        )
-      );
-
-      // 5. Combinar y ordenar por fecha de creación
-      const allData = [...displayNovedades, ...displayVacations]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      console.log('✅ PayrollIntegratedDataService - Datos integrados obtenidos:', {
-        novedadesDirectas: displayNovedades.length,
-        ausenciasFragmentadas: displayVacations.length,
-        totalElementos: allData.length
+      // Convertir todas las novedades a formato display
+      const displayData: DisplayNovedad[] = novedadesData.map(novedad => {
+        // Para ausencias sincronizadas, usar la fragmentación ya aplicada por los triggers
+        return convertNovedadToDisplay(novedad);
       });
 
-      return allData;
+      // Ordenar por fecha de creación (más recientes primero)
+      const sortedData = displayData.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      console.log('✅ PayrollIntegratedDataService - Datos unificados obtenidos:', {
+        totalElementos: sortedData.length,
+        novedades: sortedData.filter(item => item.origen === 'novedades').length,
+        ausenciasFragmentadas: sortedData.filter(item => item.origen === 'vacaciones').length
+      });
+
+      return sortedData;
 
     } catch (error) {
-      console.error('❌ PayrollIntegratedDataService - Error obteniendo datos integrados:', error);
+      console.error('❌ PayrollIntegratedDataService - Error obteniendo datos unificados:', error);
       return [];
     }
   }
 
   /**
    * Calcular días de intersección entre una ausencia y un período
-   * Reutiliza la lógica del VacationPayrollIntegrationService
+   * Mantener método para compatibilidad (aunque ya no se usa para fragmentación)
    */
   static calculatePeriodIntersectionDays(
     vacationStart: string,
