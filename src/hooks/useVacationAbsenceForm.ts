@@ -55,13 +55,14 @@ export const useVacationAbsenceForm = (
     }
   }, [editingVacation, isOpen]);
 
-  // Detección automática con análisis multi-período
+  // 🎯 CORRECCIÓN: Detección automática TANTO para crear como para editar
   useEffect(() => {
     const detectPeriod = async () => {
       if (formData.start_date && formData.end_date) {
         console.log('🔍 Detectando período(s) para fechas:', { 
           start: formData.start_date, 
-          end: formData.end_date 
+          end: formData.end_date,
+          isEditing: !!editingVacation
         });
         
         const detection = await detectPeriodForDates(formData.start_date, formData.end_date);
@@ -73,18 +74,18 @@ export const useVacationAbsenceForm = (
             primaryPeriod: detection.periodName
           });
         } else {
-          console.log('✅ Período único detectado:', detection);
+          console.log('✅ Período detectado:', detection);
         }
       } else {
         setPeriodInfo(null);
       }
     };
 
-    // Solo detectar si no estamos editando (para nuevas ausencias)
-    if (!editingVacation && formData.start_date && formData.end_date) {
+    // 🎯 CORRECCIÓN: Eliminar condición !editingVacation - detectar período SIEMPRE
+    if (formData.start_date && formData.end_date) {
       detectPeriod();
     }
-  }, [formData.start_date, formData.end_date, editingVacation, detectPeriodForDates]);
+  }, [formData.start_date, formData.end_date, detectPeriodForDates]);
 
   // Calculate days automatically using the centralized utility
   useEffect(() => {
