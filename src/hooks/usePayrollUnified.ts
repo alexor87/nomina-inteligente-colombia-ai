@@ -197,8 +197,22 @@ export const usePayrollUnified = (companyId: string) => {
         return;
       }
 
-      // LÓGICA CORREGIDA: Solo crear empleados si el período NO fue inicializado
-      if (!periodData.employees_loaded && (!periodEmployees || periodEmployees.length === 0)) {
+      // Detectar estado inconsistente: marcado como inicializado pero sin empleados
+      const isInconsistentState = periodData.employees_loaded && 
+                                 (!periodEmployees || periodEmployees.length === 0);
+
+      if (isInconsistentState) {
+        console.warn('⚠️ Estado inconsistente detectado: período marcado como inicializado pero sin empleados. Corrigiendo...');
+        
+        // Resetear el flag de inicialización
+        await supabase
+          .from('payroll_periods_real')
+          .update({ employees_loaded: false })
+          .eq('id', period.id);
+      }
+
+      // Crear empleados si NO está inicializado O si hay inconsistencia
+      if (!periodData.employees_loaded || isInconsistentState) {
         console.log('🔧 No hay empleados en payrolls, creando desde empleados activos...');
         
         const { data: activeEmployees, error: empError } = await supabase
