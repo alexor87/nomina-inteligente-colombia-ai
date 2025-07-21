@@ -1,17 +1,19 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCheck, UserX, Loader2 } from 'lucide-react';
+import { UserCheck, UserX, Trash2, Loader2 } from 'lucide-react';
 
 interface EmployeeBulkActionsProps {
   selectedCount: number;
   onBulkUpdateStatus: (status: string) => void;
+  onBulkDelete: () => void;
   isUpdating?: boolean;
 }
 
 export const EmployeeBulkActions = ({ 
   selectedCount, 
   onBulkUpdateStatus, 
+  onBulkDelete,
   isUpdating = false 
 }: EmployeeBulkActionsProps) => {
   if (selectedCount === 0) return null;
@@ -49,6 +51,19 @@ export const EmployeeBulkActions = ({
                 <UserX className="h-4 w-4 mr-1" />
               )}
               Desactivar
+            </Button>
+            <Button 
+              size="sm" 
+              variant="destructive" 
+              onClick={onBulkDelete}
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1" />
+              )}
+              Eliminar
             </Button>
           </div>
         </div>
