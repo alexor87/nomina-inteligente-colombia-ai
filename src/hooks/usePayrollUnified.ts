@@ -168,6 +168,19 @@ export const usePayrollUnified = (companyId: string) => {
         // Continuar sin bloquear la carga de empleados
       }
 
+      // Verificar si el período ya fue inicializado con empleados
+      const { data: periodData, error: periodDataError } = await supabase
+        .from('payroll_periods_real')
+        .select('employees_loaded')
+        .eq('id', period.id)
+        .single();
+
+      if (periodDataError) {
+        console.error('Error verificando estado del período:', periodDataError);
+        setEmployees([]);
+        return;
+      }
+
       // Verificar si ya hay empleados en payrolls para este período
       const { data: periodEmployees, error: periodError } = await supabase
         .from('payrolls')
@@ -184,8 +197,8 @@ export const usePayrollUnified = (companyId: string) => {
         return;
       }
 
-      // Si NO hay empleados en payrolls, crear registros desde empleados activos
-      if (!periodEmployees || periodEmployees.length === 0) {
+      // LÓGICA CORREGIDA: Solo crear empleados si el período NO fue inicializado
+      if (!periodData.employees_loaded && (!periodEmployees || periodEmployees.length === 0)) {
         console.log('🔧 No hay empleados en payrolls, creando desde empleados activos...');
         
         const { data: activeEmployees, error: empError } = await supabase
@@ -228,6 +241,14 @@ export const usePayrollUnified = (companyId: string) => {
 
           console.log('✅ Registros de payroll creados exitosamente');
 
+          // Marcar el período como inicializado
+          await supabase
+            .from('payroll_periods_real')
+            .update({ employees_loaded: true })
+            .eq('id', period.id);
+
+          console.log('✅ Período marcado como inicializado');
+
           // Convertir a formato PayrollEmployee
           const employeesList: PayrollEmployee[] = activeEmployees.map(emp => ({
             id: emp.id,
@@ -256,10 +277,10 @@ export const usePayrollUnified = (companyId: string) => {
           setEmployees([]);
         }
       } else {
-        // Si YA hay empleados en payrolls, convertir y mostrar
-        console.log(`✅ Empleados existentes en payrolls: ${periodEmployees.length}`);
+        // Si el período YA fue inicializado, solo cargar empleados existentes (respetando eliminaciones)
+        console.log(`✅ Período ya inicializado. Empleados en payrolls: ${periodEmployees?.length || 0}`);
         
-        const employeesList: PayrollEmployee[] = periodEmployees.map(payroll => {
+        const employeesList: PayrollEmployee[] = (periodEmployees || []).map(payroll => {
           const emp = payroll.employees as any;
           return {
             id: emp.id,

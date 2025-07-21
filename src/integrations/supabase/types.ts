@@ -1131,6 +1131,7 @@ export type Database = {
           company_id: string
           created_at: string
           empleados_count: number | null
+          employees_loaded: boolean | null
           estado: string
           fecha_fin: string
           fecha_inicio: string
@@ -1148,6 +1149,7 @@ export type Database = {
           company_id: string
           created_at?: string
           empleados_count?: number | null
+          employees_loaded?: boolean | null
           estado?: string
           fecha_fin: string
           fecha_inicio: string
@@ -1165,6 +1167,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           empleados_count?: number | null
+          employees_loaded?: boolean | null
           estado?: string
           fecha_fin?: string
           fecha_inicio?: string
