@@ -46,19 +46,19 @@ export const usePeriodDetection = () => {
         throw new Error('Usuario no tiene empresa asignada');
       }
 
-      // NUEVA FUNCIONALIDAD: Analizar si cruza múltiples períodos
+      // 🎯 CORRECCIÓN KISS: Analizar multi-período PRIMERO (antes de buscar período único)
       const multiPeriodAnalysis = await MultiPeriodAbsenceService.analyzeAbsenceAcrossPeriods(
         startDate, 
         endDate, 
         profile.company_id
       );
 
-      console.log('🔍 Análisis multi-período:', multiPeriodAnalysis);
+      console.log('🔍 Análisis multi-período prioritario:', multiPeriodAnalysis);
 
-      // Si cruza múltiples períodos, informar al usuario
+      // 🎯 CORRECCIÓN: Si cruza múltiples períodos, manejar inmediatamente
       if (multiPeriodAnalysis.crossesMultiplePeriods) {
-        // Para ausencias multi-período, usar el primer período como referencia principal
         const primarySegment = multiPeriodAnalysis.segments[0];
+        const totalPeriods = multiPeriodAnalysis.segments.length;
         
         return {
           periodId: primarySegment.periodId,
@@ -67,11 +67,11 @@ export const usePeriodDetection = () => {
           isAutoCreated: false,
           crossesMultiplePeriods: true,
           periodSegments: multiPeriodAnalysis.segments,
-          message: `⚡ Ausencia multi-período detectada: ${multiPeriodAnalysis.segments.length} períodos afectados (${multiPeriodAnalysis.totalDays} días total)`
+          message: `⚡ Ausencia multi-período: ${totalPeriods} períodos afectados (${multiPeriodAnalysis.totalDays} días total)`
         };
       }
 
-      // CORRECCIÓN: Buscar período único con filtro de duplicados mejorado
+      // Solo si NO es multi-período, buscar período único exacto
       const { data: allExactPeriods } = await supabase
         .from('payroll_periods_real')
         .select('id, periodo, fecha_inicio, fecha_fin, created_at')
@@ -80,12 +80,11 @@ export const usePeriodDetection = () => {
         .eq('fecha_fin', endDate)
         .order('created_at', { ascending: false });
 
-      // Si hay múltiples períodos con las mismas fechas, usar el más reciente
       const exactPeriod = allExactPeriods?.[0];
 
       if (exactPeriod) {
         if (allExactPeriods && allExactPeriods.length > 1) {
-          console.warn(`⚠️ ${allExactPeriods.length} períodos duplicados encontrados para fechas ${startDate} - ${endDate}, usando el más reciente`);
+          console.warn(`⚠️ ${allExactPeriods.length} períodos duplicados encontrados, usando el más reciente`);
         }
         
         return {
@@ -97,7 +96,7 @@ export const usePeriodDetection = () => {
         };
       }
 
-      // Buscar período que contenga las fechas de la ausencia (con filtro de duplicados)
+      // Buscar período que contenga las fechas (solo para períodos únicos)
       const { data: allContainingPeriods } = await supabase
         .from('payroll_periods_real')
         .select('id, periodo, fecha_inicio, fecha_fin, created_at')
@@ -106,7 +105,6 @@ export const usePeriodDetection = () => {
         .gte('fecha_fin', endDate)
         .order('created_at', { ascending: false });
 
-      // Filtrar duplicados y usar el más reciente
       const containingPeriod = allContainingPeriods?.[0];
 
       if (containingPeriod) {
@@ -131,7 +129,6 @@ export const usePeriodDetection = () => {
         const suggestedStart = suggestedPeriod.start_date;
         const suggestedEnd = suggestedPeriod.end_date;
         
-        // Verificar si las fechas están dentro del período sugerido O crear un período personalizado
         let periodToCreate;
         let shouldCreateCustom = false;
         
@@ -143,7 +140,6 @@ export const usePeriodDetection = () => {
             type: suggestedPeriod.type
           };
         } else {
-          // Crear período personalizado que cubra las fechas seleccionadas
           shouldCreateCustom = true;
           const startMonth = new Date(startDate).getMonth() + 1;
           const startYear = new Date(startDate).getFullYear();
@@ -169,7 +165,7 @@ export const usePeriodDetection = () => {
             fecha_inicio: periodToCreate.start_date,
             fecha_fin: periodToCreate.end_date,
             tipo_periodo: periodToCreate.type,
-            estado: 'borrador', // Estado inicial
+            estado: 'borrador',
             empleados_count: 0,
             total_devengado: 0,
             total_deducciones: 0,

@@ -1,29 +1,27 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
 
 export class VacationNovedadSyncService {
   
   /**
-   * 🎯 CORRECCIÓN KISS: Crear una vacación/ausencia con periodo_id explícito y campos boolean corregidos
+   * 🎯 CORRECCIÓN BOOLEAN: Crear vacación con campos boolean seguros
    */
   static async createVacationAbsence(formData: VacationAbsenceFormData & { periodo_id?: string }) {
     console.log('🏖️ Creating vacation with form data:', formData);
     
-    // 🎯 SOLUCIÓN DIRECTA: Usar periodo_id si está disponible
     const processed_in_period_id = formData.periodo_id || null;
     
     console.log('📋 Using processed_in_period_id:', processed_in_period_id);
     
-    // 🎯 CORRECCIÓN BOOLEAN: Asegurar que todos los campos boolean tienen valores válidos
+    // 🎯 CORRECCIÓN BOOLEAN: Valores seguros para todos los campos
     const insertData = {
       employee_id: formData.employee_id,
       type: formData.type,
-      subtipo: formData.subtipo || null, // Null en lugar de undefined
+      subtipo: formData.subtipo || null,
       start_date: formData.start_date,
       end_date: formData.end_date,
       days_count: VacationNovedadSyncService.calculateDaysBetween(formData.start_date, formData.end_date),
-      observations: formData.observations || '', // String vacío en lugar de null
+      observations: formData.observations || '',
       status: 'pendiente',
       created_by: (await supabase.auth.getUser()).data.user?.id,
       company_id: await VacationNovedadSyncService.getCurrentCompanyId(),
@@ -51,22 +49,22 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * 🎯 CORRECCIÓN BOOLEAN: Actualizar con campos boolean seguros
+   * 🎯 CORRECCIÓN BOOLEAN: Actualizar con valores seguros
    */
   static async updateVacationAbsence(id: string, formData: Partial<VacationAbsenceFormData & { periodo_id?: string }>) {
-    // 🎯 PREPARAR DATOS CON VALORES SEGUROS
+    // 🎯 CORRECCIÓN: Preparar datos con valores seguros (sin strings vacíos)
     const updateData: any = {
       updated_at: new Date().toISOString()
     };
 
-    // Solo agregar campos que realmente han cambiado y con valores seguros
+    // Solo agregar campos que realmente han cambiado con valores seguros
     if (formData.employee_id !== undefined) updateData.employee_id = formData.employee_id;
     if (formData.type !== undefined) updateData.type = formData.type;
     if (formData.subtipo !== undefined) updateData.subtipo = formData.subtipo || null;
     if (formData.start_date !== undefined) updateData.start_date = formData.start_date;
     if (formData.end_date !== undefined) updateData.end_date = formData.end_date;
     if (formData.observations !== undefined) updateData.observations = formData.observations || '';
-    if (formData.periodo_id !== undefined) updateData.processed_in_period_id = formData.periodo_id;
+    if (formData.periodo_id !== undefined) updateData.processed_in_period_id = formData.periodo_id || null;
 
     // Calcular días solo si tenemos ambas fechas
     if (formData.start_date && formData.end_date) {
@@ -95,18 +93,16 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * 🎯 SOLUCIÓN KISS: Eliminación simplificada sin count problemático
+   * 🎯 SOLUCIÓN KISS: Eliminación simplificada
    */
   static async deleteVacationAbsence(id: string) {
     console.log('🗑️ Eliminando registro:', id);
     
-    // PASO 1: Intentar eliminar de employee_vacation_periods (tabla principal)
     const { error: vacationError } = await supabase
       .from('employee_vacation_periods')
       .delete()
       .eq('id', id);
 
-    // Si se eliminó exitosamente de vacaciones, terminar
     if (!vacationError) {
       console.log('✅ Eliminado exitosamente de employee_vacation_periods:', id);
       return;
@@ -114,13 +110,11 @@ export class VacationNovedadSyncService {
 
     console.log('⚠️ No se encontró en employee_vacation_periods, intentando payroll_novedades:', vacationError?.message);
 
-    // PASO 2: Si no se eliminó de vacaciones, intentar eliminar de novedades
     const { error: novedadError } = await supabase
       .from('payroll_novedades')
       .delete()
       .eq('id', id);
 
-    // Verificar resultado final
     if (novedadError) {
       console.error('❌ Error eliminando de payroll_novedades:', novedadError);
       throw new Error(`No se pudo eliminar el registro: ${novedadError.message}`);
@@ -136,7 +130,6 @@ export class VacationNovedadSyncService {
     const deduplicatedMap = new Map();
     let duplicatesDetected = 0;
 
-    // Procesar cada registro y deduplicar por ID
     unifiedData.forEach(item => {
       const existingItem = deduplicatedMap.get(item.id);
       
@@ -144,14 +137,11 @@ export class VacationNovedadSyncService {
         duplicatesDetected++;
         console.log(`🔄 Duplicado detectado ID: ${item.id}, priorizando fuente: ${existingItem.source_type}`);
         
-        // REGLA KISS: Priorizar 'vacation' sobre 'novedad' para consistencia
         if (item.source_type === 'vacation' && existingItem.source_type === 'novedad') {
           deduplicatedMap.set(item.id, item);
           console.log(`✅ Reemplazado por fuente vacation: ${item.id}`);
         }
-        // Si ambos son del mismo tipo o novedad tiene prioridad, mantener el existente
       } else {
-        // Nuevo registro, agregarlo al mapa
         deduplicatedMap.set(item.id, item);
       }
     });
@@ -169,10 +159,8 @@ export class VacationNovedadSyncService {
   static async getUnifiedVacationData(filters: any = {}) {
     console.log('🔍 Loading unified vacation data with filters:', filters);
     
-    // Obtener company_id del usuario actual
     const companyId = await VacationNovedadSyncService.getCurrentCompanyId();
     
-    // ✅ SIMPLIFICACIÓN: Obtener vacaciones SIN JOIN problemático
     const { data: vacationsData, error: vacationsError } = await supabase
       .from('employee_vacation_periods')
       .select(`
@@ -187,7 +175,6 @@ export class VacationNovedadSyncService {
       throw vacationsError;
     }
 
-    // ✅ SIMPLIFICACIÓN: Obtener novedades SIN JOIN problemático
     const { data: novedadesData, error: novedadesError } = await supabase
       .from('payroll_novedades')
       .select(`
@@ -203,7 +190,6 @@ export class VacationNovedadSyncService {
       throw novedadesError;
     }
 
-    // ✅ SIMPLIFICACIÓN: Obtener estados de períodos solo cuando hay IDs únicos
     const allPeriodIds = [
       ...(vacationsData || []).map(v => v.processed_in_period_id).filter(Boolean),
       ...(novedadesData || []).map(n => n.periodo_id).filter(Boolean)
@@ -228,7 +214,7 @@ export class VacationNovedadSyncService {
 
     console.log('🔍 Period status map:', periodStatusMap);
 
-    // 🎯 TRANSFORMACIÓN SEGURA: Combinar datos con valores por defecto seguros
+    // 🎯 CORRECCIÓN BOOLEAN: Transformación segura con valores por defecto
     const unifiedData = [
       ...(vacationsData || []).map(item => {
         let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
@@ -240,8 +226,6 @@ export class VacationNovedadSyncService {
           }
         }
 
-        console.log(`📋 Vacation ${item.id}: period_id=${item.processed_in_period_id}, period_status=${periodStatusMap[item.processed_in_period_id]}, calculated_status=${calculatedStatus}`);
-
         return {
           source_type: 'vacation' as const,
           id: item.id,
@@ -249,12 +233,12 @@ export class VacationNovedadSyncService {
           company_id: item.company_id,
           periodo_id: item.processed_in_period_id,
           tipo_novedad: item.type,
-          subtipo: item.subtipo || '', // 🎯 String vacío en lugar de null
+          subtipo: item.subtipo || '',
           fecha_inicio: item.start_date,
           fecha_fin: item.end_date,
-          dias: item.days_count || 0, // 🎯 Número en lugar de null
+          dias: item.days_count || 0,
           valor: 0,
-          observacion: item.observations || '', // 🎯 String vacío en lugar de null
+          observacion: item.observations || '',
           status: calculatedStatus,
           creado_por: item.created_by,
           created_at: item.created_at,
@@ -263,8 +247,6 @@ export class VacationNovedadSyncService {
           employee_apellido: item.employee?.apellido || '',
           employee_cedula: item.employee?.cedula || '',
           employee: item.employee || { id: '', nombre: '', apellido: '', cedula: '' },
-          
-          // Mapped properties for compatibility
           employee_id: item.employee_id,
           type: item.type as any,
           start_date: item.start_date,
@@ -286,8 +268,6 @@ export class VacationNovedadSyncService {
           }
         }
 
-        console.log(`📋 Novedad ${item.id}: period_id=${item.periodo_id}, period_status=${periodStatusMap[item.periodo_id]}, calculated_status=${calculatedStatus}`);
-
         return {
           source_type: 'novedad' as const,
           id: item.id,
@@ -295,12 +275,12 @@ export class VacationNovedadSyncService {
           company_id: item.company_id,
           periodo_id: item.periodo_id,
           tipo_novedad: item.tipo_novedad,
-          subtipo: item.subtipo || '', // 🎯 String vacío en lugar de null
+          subtipo: item.subtipo || '',
           fecha_inicio: item.fecha_inicio,
           fecha_fin: item.fecha_fin,
-          dias: item.dias || 0, // 🎯 Número en lugar de null
-          valor: item.valor || 0, // 🎯 Número en lugar de null
-          observacion: item.observacion || '', // 🎯 String vacío en lugar de null
+          dias: item.dias || 0,
+          valor: item.valor || 0,
+          observacion: item.observacion || '',
           status: calculatedStatus,
           creado_por: item.creado_por,
           created_at: item.created_at,
@@ -309,8 +289,6 @@ export class VacationNovedadSyncService {
           employee_apellido: item.empleado?.apellido || '',
           employee_cedula: item.empleado?.cedula || '',
           employee: item.empleado || { id: '', nombre: '', apellido: '', cedula: '' },
-          
-          // Mapped properties for compatibility
           employee_id: item.empleado_id,
           type: item.tipo_novedad as any,
           start_date: item.fecha_inicio,
@@ -323,7 +301,6 @@ export class VacationNovedadSyncService {
       })
     ];
 
-    // ✅ SOLUCIÓN KISS: Deduplicar por ID antes de aplicar filtros
     const deduplicatedData = VacationNovedadSyncService.deduplicateUnifiedData(unifiedData);
 
     // Aplicar filtros
@@ -357,7 +334,6 @@ export class VacationNovedadSyncService {
       periodStatusMap
     });
 
-    // Ordenar por fecha de creación descendente
     return filteredData.sort((a, b) => 
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
