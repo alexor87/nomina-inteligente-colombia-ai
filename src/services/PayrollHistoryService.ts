@@ -43,14 +43,12 @@ export class PayrollHistoryService {
         period: period.periodo,
         startDate: period.fecha_inicio,
         endDate: period.fecha_fin,
-        type: period.tipo_periodo as "quincenal" | "mensual" | "semanal",
+        type: period.tipo_periodo,
         status: period.estado,
         employeesCount: period.empleados_count || 0,
         totalGrossPay: period.total_devengado || 0,
         totalDeductions: period.total_deducciones || 0,
         totalNetPay: period.total_neto || 0,
-        totalCost: period.total_devengado || 0,
-        employerContributions: Math.round((period.total_devengado || 0) * 0.205),
         createdAt: period.created_at,
         updatedAt: period.updated_at
       })) || [];

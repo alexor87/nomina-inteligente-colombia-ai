@@ -961,42 +961,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payroll_adjustments: {
-        Row: {
-          amount: number
-          concept: string
-          created_at: string
-          created_by: string
-          employee_id: string
-          id: string
-          observations: string | null
-          period_id: string
-          updated_at: string
-        }
-        Insert: {
-          amount?: number
-          concept: string
-          created_at?: string
-          created_by: string
-          employee_id: string
-          id?: string
-          observations?: string | null
-          period_id: string
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          concept?: string
-          created_at?: string
-          created_by?: string
-          employee_id?: string
-          id?: string
-          observations?: string | null
-          period_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       payroll_novedades: {
         Row: {
           adjunto_url: string | null
