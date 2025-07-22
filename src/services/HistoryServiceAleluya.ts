@@ -1,41 +1,43 @@
 
-/**
- * 📊 SERVICIO ALELUYA - HISTORIAL DE NÓMINA UNIFICADO
- * Reemplaza la arquitectura fragmentada con funcionalidades profesionales
- * Incluye edición de períodos, comprobantes y períodos pasados
- */
-
 import { supabase } from '@/integrations/supabase/client';
 
-export interface HistoryPeriod {
+export interface PayrollPeriodHistory {
   id: string;
   period: string;
   startDate: string;
   endDate: string;
-  type: 'quincenal' | 'mensual' | 'semanal';
+  type: 'mensual' | 'quincenal' | 'semanal';
   employeesCount: number;
-  status: 'borrador' | 'cerrado';
-  totalGrossPay: number;
   totalNetPay: number;
-  totalDeductions: number;
-  totalCost: number;
-  employerContributions: number;
+  status: 'original' | 'con_ajuste';
   createdAt: string;
   updatedAt: string;
-  editable: boolean;
+}
+
+export interface EmployeePayrollDetail {
+  id: string;
+  name: string;
+  netPay: number;
+  grossPay: number;
+  position: string;
+  hasVoucher: boolean;
+}
+
+export interface PayrollAdjustment {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  concept: string;
+  amount: number;
+  observations: string;
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface PeriodDetail {
-  period: HistoryPeriod;
-  employees: Array<{
-    id: string;
-    name: string;
-    position: string;
-    grossPay: number;
-    deductions: number;
-    netPay: number;
-    baseSalary: number;
-  }>;
+  period: PayrollPeriodHistory;
+  employees: EmployeePayrollDetail[];
+  adjustments: PayrollAdjustment[];
   summary: {
     totalDevengado: number;
     totalDeducciones: number;
@@ -47,59 +49,115 @@ export interface PeriodDetail {
 
 export class HistoryServiceAleluya {
   /**
-   * 📋 OBTENER HISTORIAL DE PERÍODOS
-   * Lista todos los períodos de nómina de la empresa
+   * Obtener períodos liquidados con filtros
    */
-  static async getHistoryPeriods(): Promise<HistoryPeriod[]> {
+  static async getPayrollHistory(filters: {
+    year?: number;
+    type?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<{
+    periods: PayrollPeriodHistory[];
+    total: number;
+    hasMore: boolean;
+  }> {
     try {
-      const companyId = await this.getCurrentCompanyId();
-      
-      const { data: periods, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('Empresa no encontrada');
+
+      let query = supabase
         .from('payroll_periods_real')
-        .select('*')
-        .eq('company_id', companyId)
+        .select('*', { count: 'exact' })
+        .eq('company_id', profile.company_id)
+        .eq('estado', 'cerrado')
         .order('fecha_inicio', { ascending: false });
+
+      // Aplicar filtros
+      if (filters.year) {
+        const startYear = new Date(filters.year, 0, 1).toISOString().split('T')[0];
+        const endYear = new Date(filters.year, 11, 31).toISOString().split('T')[0];
+        query = query.gte('fecha_inicio', startYear).lte('fecha_fin', endYear);
+      }
+
+      if (filters.type) {
+        query = query.eq('tipo_periodo', filters.type);
+      }
+
+      // Paginación
+      const page = filters.page || 1;
+      const limit = filters.limit || 10;
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+
+      const { data: periods, error, count } = await query.range(from, to);
 
       if (error) throw error;
 
-      return (periods || []).map(period => ({
-        id: period.id,
-        period: period.periodo,
-        startDate: period.fecha_inicio,
-        endDate: period.fecha_fin,
-        type: this.normalizeType(period.tipo_periodo),
-        employeesCount: period.empleados_count || 0,
-        status: this.normalizeStatus(period.estado),
-        totalGrossPay: period.total_devengado || 0,
-        totalNetPay: period.total_neto || 0,
-        totalDeductions: period.total_deducciones || 0,
-        totalCost: (period.total_devengado || 0) + ((period.total_devengado || 0) * 0.205),
-        employerContributions: (period.total_devengado || 0) * 0.205,
-        createdAt: period.created_at,
-        updatedAt: period.updated_at,
-        editable: period.estado === 'borrador'
-      }));
+      // Verificar si hay ajustes para cada período
+      const periodsWithAdjustments = await Promise.all(
+        (periods || []).map(async (period) => {
+          const { data: adjustments } = await supabase
+            .from('payroll_adjustments')
+            .select('id')
+            .eq('period_id', period.id)
+            .limit(1);
 
+          return {
+            id: period.id,
+            period: period.periodo,
+            startDate: period.fecha_inicio,
+            endDate: period.fecha_fin,
+            type: period.tipo_periodo as 'mensual' | 'quincenal' | 'semanal',
+            employeesCount: period.empleados_count || 0,
+            totalNetPay: period.total_neto || 0,
+            status: (adjustments && adjustments.length > 0) ? 'con_ajuste' : 'original',
+            createdAt: period.created_at,
+            updatedAt: period.updated_at
+          } as PayrollPeriodHistory;
+        })
+      );
+
+      return {
+        periods: periodsWithAdjustments,
+        total: count || 0,
+        hasMore: (count || 0) > page * limit
+      };
     } catch (error) {
-      console.error('Error obteniendo historial:', error);
-      throw new Error('No se pudo cargar el historial de nómina');
+      console.error('Error fetching payroll history:', error);
+      throw error;
     }
   }
 
   /**
-   * 👁️ OBTENER DETALLE DE PERÍODO
-   * Información completa de un período específico
+   * Obtener detalle de un período específico
    */
   static async getPeriodDetail(periodId: string): Promise<PeriodDetail> {
     try {
-      const companyId = await this.getCurrentCompanyId();
-      
-      // Obtener información del período
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('Empresa no encontrada');
+
+      // Obtener período
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('id', periodId)
-        .eq('company_id', companyId)
+        .eq('company_id', profile.company_id)
         .single();
 
       if (periodError) throw periodError;
@@ -109,8 +167,10 @@ export class HistoryServiceAleluya {
         .from('payrolls')
         .select(`
           *,
-          employees (
+          employees:employee_id (
+            id,
             nombre,
+            apellido,
             cargo
           )
         `)
@@ -118,313 +178,188 @@ export class HistoryServiceAleluya {
 
       if (payrollsError) throw payrollsError;
 
-      const employees = (payrolls || []).map(payroll => ({
+      // Obtener ajustes
+      const { data: adjustments, error: adjustmentsError } = await supabase
+        .from('payroll_adjustments')
+        .select(`
+          *,
+          employees:employee_id (
+            nombre,
+            apellido
+          ),
+          profiles:created_by (
+            email
+          )
+        `)
+        .eq('period_id', periodId)
+        .order('created_at', { ascending: false });
+
+      if (adjustmentsError) throw adjustmentsError;
+
+      // Verificar comprobantes
+      const { data: vouchers } = await supabase
+        .from('payroll_vouchers')
+        .select('employee_id')
+        .eq('periodo', period.periodo)
+        .eq('company_id', profile.company_id);
+
+      const voucherEmployeeIds = new Set(vouchers?.map(v => v.employee_id) || []);
+
+      // Formatear datos
+      const employees: EmployeePayrollDetail[] = (payrolls || []).map(payroll => ({
         id: payroll.employee_id,
-        name: payroll.employees?.nombre || 'Sin nombre',
-        position: payroll.employees?.cargo || 'Sin cargo',
-        grossPay: payroll.total_devengado || 0,
-        deductions: payroll.total_deducciones || 0,
+        name: `${payroll.employees?.nombre || ''} ${payroll.employees?.apellido || ''}`.trim(),
         netPay: payroll.neto_pagado || 0,
-        baseSalary: payroll.salario_base || 0
+        grossPay: payroll.total_devengado || 0,
+        position: payroll.employees?.cargo || 'N/A',
+        hasVoucher: voucherEmployeeIds.has(payroll.employee_id)
       }));
 
-      const historyPeriod: HistoryPeriod = {
+      const adjustmentsFormatted: PayrollAdjustment[] = (adjustments || []).map(adj => ({
+        id: adj.id,
+        employeeId: adj.employee_id,
+        employeeName: `${adj.employees?.nombre || ''} ${adj.employees?.apellido || ''}`.trim(),
+        concept: adj.concept,
+        amount: adj.amount,
+        observations: adj.observations || '',
+        createdBy: adj.profiles?.email || 'Usuario desconocido',
+        createdAt: adj.created_at
+      }));
+
+      const periodHistory: PayrollPeriodHistory = {
         id: period.id,
         period: period.periodo,
         startDate: period.fecha_inicio,
         endDate: period.fecha_fin,
-        type: this.normalizeType(period.tipo_periodo),
+        type: period.tipo_periodo as 'mensual' | 'quincenal' | 'semanal',
         employeesCount: period.empleados_count || 0,
-        status: this.normalizeStatus(period.estado),
-        totalGrossPay: period.total_devengado || 0,
         totalNetPay: period.total_neto || 0,
-        totalDeductions: period.total_deducciones || 0,
-        totalCost: (period.total_devengado || 0) + ((period.total_devengado || 0) * 0.205),
-        employerContributions: (period.total_devengado || 0) * 0.205,
+        status: adjustmentsFormatted.length > 0 ? 'con_ajuste' : 'original',
         createdAt: period.created_at,
-        updatedAt: period.updated_at,
-        editable: period.estado === 'borrador'
+        updatedAt: period.updated_at
       };
 
       return {
-        period: historyPeriod,
+        period: periodHistory,
         employees,
+        adjustments: adjustmentsFormatted,
         summary: {
           totalDevengado: period.total_devengado || 0,
           totalDeducciones: period.total_deducciones || 0,
           totalNeto: period.total_neto || 0,
-          costoTotal: (period.total_devengado || 0) + ((period.total_devengado || 0) * 0.205),
+          costoTotal: (period.total_devengado || 0) * 1.205, // Incluir aportes patronales
           aportesEmpleador: (period.total_devengado || 0) * 0.205
         }
       };
-
     } catch (error) {
-      console.error('Error obteniendo detalle del período:', error);
-      throw new Error('No se pudo cargar el detalle del período');
+      console.error('Error fetching period detail:', error);
+      throw error;
     }
   }
 
   /**
-   * ✏️ EDITAR PERÍODO (REAPERTURA PROFESIONAL)
-   * Permite editar períodos cerrados con auditoría
+   * Crear un ajuste para un período
    */
-  static async editPeriod(periodId: string, changes: {
-    reason: string;
-    employeeChanges?: Array<{
-      employeeId: string;
-      newSalary?: number;
-      newDeductions?: number;
-    }>;
-  }): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    try {
-      const companyId = await this.getCurrentCompanyId();
-      
-      // Reabrir período temporalmente
-      await supabase
-        .from('payroll_periods_real')
-        .update({ estado: 'borrador' })
-        .eq('id', periodId)
-        .eq('company_id', companyId);
-
-      // Aplicar cambios si los hay
-      if (changes.employeeChanges && changes.employeeChanges.length > 0) {
-        for (const change of changes.employeeChanges) {
-          const updateData: any = {};
-          if (change.newSalary !== undefined) {
-            updateData.total_devengado = change.newSalary;
-            updateData.neto_pagado = change.newSalary - (change.newDeductions || 0);
-          }
-          if (change.newDeductions !== undefined) {
-            updateData.total_deducciones = change.newDeductions;
-          }
-
-          await supabase
-            .from('payrolls')
-            .update(updateData)
-            .eq('period_id', periodId)
-            .eq('employee_id', change.employeeId);
-        }
-
-        // Recalcular totales del período
-        await this.recalculatePeriodTotals(periodId);
-      }
-
-      // Crear log de auditoría
-      await this.createAuditLog(periodId, 'edited', changes.reason);
-
-      return {
-        success: true,
-        message: 'Período editado exitosamente'
-      };
-
-    } catch (error) {
-      console.error('Error editando período:', error);
-      throw new Error('No se pudo editar el período');
-    }
-  }
-
-  /**
-   * 📄 GENERAR COMPROBANTES DE PAGO
-   * Genera y descarga comprobantes PDF del período
-   */
-  static async generateVouchers(periodId: string): Promise<{
-    success: boolean;
-    downloadUrl: string;
-    message: string;
-  }> {
-    try {
-      // Obtener detalles del período
-      const detail = await this.getPeriodDetail(periodId);
-      
-      // Simular generación de PDF (en implementación real se usaría jsPDF o similar)
-      const pdfContent = this.generatePDFContent(detail);
-      const blob = new Blob([pdfContent], { type: 'application/pdf' });
-      const downloadUrl = URL.createObjectURL(blob);
-      
-      // Descargar automáticamente
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = `comprobantes-${detail.period.period}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      return {
-        success: true,
-        downloadUrl,
-        message: `Comprobantes del período ${detail.period.period} generados`
-      };
-
-    } catch (error) {
-      console.error('Error generando comprobantes:', error);
-      throw new Error('No se pudieron generar los comprobantes');
-    }
-  }
-
-  /**
-   * 📅 CREAR PERÍODO PASADO
-   * Para migración de datos históricos
-   */
-  static async createPastPeriod(periodData: {
-    periodName: string;
-    startDate: string;
-    endDate: string;
-    type: 'quincenal' | 'mensual' | 'semanal';
-    employees: Array<{
-      employeeId: string;
-      baseSalary: number;
-      grossPay: number;
-      deductions: number;
-      netPay: number;
-    }>;
-  }): Promise<{
-    success: boolean;
+  static async createAdjustment(data: {
     periodId: string;
-    message: string;
-  }> {
+    employeeId: string;
+    concept: string;
+    amount: number;
+    observations?: string;
+  }): Promise<PayrollAdjustment> {
     try {
-      const companyId = await this.getCurrentCompanyId();
-      
-      // Crear período
-      const { data: newPeriod, error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .insert({
-          company_id: companyId,
-          periodo: periodData.periodName,
-          fecha_inicio: periodData.startDate,
-          fecha_fin: periodData.endDate,
-          tipo_periodo: periodData.type,
-          estado: 'cerrado', // Los períodos pasados se crean cerrados
-          empleados_count: periodData.employees.length,
-          total_devengado: periodData.employees.reduce((sum, emp) => sum + emp.grossPay, 0),
-          total_deducciones: periodData.employees.reduce((sum, emp) => sum + emp.deductions, 0),
-          total_neto: periodData.employees.reduce((sum, emp) => sum + emp.netPay, 0)
-        })
-        .select()
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      // Verificar si ya existe un ajuste para este empleado/concepto/período
+      const { data: existingAdjustment } = await supabase
+        .from('payroll_adjustments')
+        .select('id')
+        .eq('period_id', data.periodId)
+        .eq('employee_id', data.employeeId)
+        .eq('concept', data.concept)
         .single();
 
-      if (periodError) throw periodError;
+      if (existingAdjustment) {
+        throw new Error('Ya existe un ajuste para este empleado y concepto en este período');
+      }
 
-      // Crear registros de nómina
-      const payrollRecords = periodData.employees.map(emp => ({
-        company_id: companyId,
-        employee_id: emp.employeeId,
-        period_id: newPeriod.id,
-        periodo: periodData.periodName, // FIXED: Added missing periodo field
-        salario_base: emp.baseSalary,
-        dias_trabajados: periodData.type === 'quincenal' ? 15 : 30,
-        total_devengado: emp.grossPay,
-        total_deducciones: emp.deductions,
-        neto_pagado: emp.netPay,
-        estado: 'procesada'
-      }));
+      // Crear ajuste
+      const { data: adjustment, error } = await supabase
+        .from('payroll_adjustments')
+        .insert({
+          period_id: data.periodId,
+          employee_id: data.employeeId,
+          concept: data.concept,
+          amount: data.amount,
+          observations: data.observations || '',
+          created_by: user.id
+        })
+        .select(`
+          *,
+          employees:employee_id (
+            nombre,
+            apellido
+          ),
+          profiles:created_by (
+            email
+          )
+        `)
+        .single();
 
-      const { error: payrollError } = await supabase
-        .from('payrolls')
-        .insert(payrollRecords);
-
-      if (payrollError) throw payrollError;
+      if (error) throw error;
 
       return {
-        success: true,
-        periodId: newPeriod.id,
-        message: `Período pasado ${periodData.periodName} creado exitosamente`
+        id: adjustment.id,
+        employeeId: adjustment.employee_id,
+        employeeName: `${adjustment.employees?.nombre || ''} ${adjustment.employees?.apellido || ''}`.trim(),
+        concept: adjustment.concept,
+        amount: adjustment.amount,
+        observations: adjustment.observations || '',
+        createdBy: adjustment.profiles?.email || 'Usuario desconocido',
+        createdAt: adjustment.created_at
       };
-
     } catch (error) {
-      console.error('Error creando período pasado:', error);
-      throw new Error('No se pudo crear el período pasado');
+      console.error('Error creating adjustment:', error);
+      throw error;
     }
   }
 
-  // ===== MÉTODOS PRIVADOS =====
+  /**
+   * Generar comprobante PDF para un empleado
+   */
+  static async generateVoucherPDF(employeeId: string, periodId: string): Promise<string> {
+    try {
+      // Obtener datos del empleado y período
+      const { data: payroll } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees:employee_id (
+            nombre,
+            apellido,
+            cedula
+          )
+        `)
+        .eq('employee_id', employeeId)
+        .eq('period_id', periodId)
+        .single();
 
-  private static async getCurrentCompanyId(): Promise<string> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Usuario no autenticado');
+      if (!payroll) throw new Error('Liquidación no encontrada');
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!profile?.company_id) {
-      throw new Error('Usuario no tiene empresa asociada');
-    }
-
-    return profile.company_id;
-  }
-
-  private static normalizeType(type: string): 'quincenal' | 'mensual' | 'semanal' {
-    switch (type) {
-      case 'quincenal':
-        return 'quincenal';
-      case 'semanal':
-        return 'semanal';
-      default:
-        return 'mensual';
-    }
-  }
-
-  private static normalizeStatus(status: string): 'borrador' | 'cerrado' {
-    return status === 'cerrado' ? 'cerrado' : 'borrador';
-  }
-
-  private static async recalculatePeriodTotals(periodId: string): Promise<void> {
-    const { data: payrolls } = await supabase
-      .from('payrolls')
-      .select('total_devengado, total_deducciones, neto_pagado')
-      .eq('period_id', periodId);
-
-    if (payrolls && payrolls.length > 0) {
-      const totals = payrolls.reduce((acc, p) => ({
-        devengado: acc.devengado + (p.total_devengado || 0),
-        deducciones: acc.deducciones + (p.total_deducciones || 0),
-        neto: acc.neto + (p.neto_pagado || 0)
-      }), { devengado: 0, deducciones: 0, neto: 0 });
-
-      await supabase
+      const { data: period } = await supabase
         .from('payroll_periods_real')
-        .update({
-          empleados_count: payrolls.length,
-          total_devengado: totals.devengado,
-          total_deducciones: totals.deducciones,
-          total_neto: totals.neto
-        })
-        .eq('id', periodId);
+        .select('*')
+        .eq('id', periodId)
+        .single();
+
+      if (!period) throw new Error('Período no encontrado');
+
+      // Por ahora retornar URL mock - en producción integrar con servicio de PDF
+      return `/api/vouchers/${periodId}/${employeeId}.pdf`;
+    } catch (error) {
+      console.error('Error generating voucher PDF:', error);
+      throw error;
     }
-  }
-
-  private static async createAuditLog(
-    periodId: string, 
-    action: string, 
-    details: string
-  ): Promise<void> {
-    // En una implementación real, aquí se crearía un log de auditoría
-    console.log(`Audit Log: ${action} on period ${periodId} - ${details}`);
-  }
-
-  private static generatePDFContent(detail: PeriodDetail): string {
-    // Simulación de contenido PDF
-    // En implementación real se usaría jsPDF o similar
-    return `
-      COMPROBANTES DE PAGO
-      Período: ${detail.period.period}
-      
-      ${detail.employees.map(emp => `
-        Empleado: ${emp.name}
-        Cargo: ${emp.position}
-        Salario Bruto: $${emp.grossPay.toLocaleString()}
-        Deducciones: $${emp.deductions.toLocaleString()}
-        Salario Neto: $${emp.netPay.toLocaleString()}
-        ----------------------
-      `).join('')}
-      
-      Total Nómina: $${detail.summary.totalNeto.toLocaleString()}
-    `;
   }
 }
