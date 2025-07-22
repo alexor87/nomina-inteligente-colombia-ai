@@ -4,16 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
 import { Layout } from '@/components/layout/Layout';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { LoginPage } from '@/pages/LoginPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { EmployeesPage } from '@/pages/EmployeesPage';
-import { PayrollPage } from '@/pages/PayrollPage';
-import { PayrollHistoryPage } from '@/pages/PayrollHistoryPage';
-import { PayrollHistoryDetailsPage } from '@/pages/PayrollHistoryDetailsPage';
-import { PayrollAdjustmentPage } from '@/pages/PayrollAdjustmentPage';
-import { VacationsAbsencesPage } from '@/pages/VacationsAbsencesPage';
-import { ReportsPage } from '@/pages/ReportsPage';
-import { SettingsPage } from '@/pages/SettingsPage';
+import LoginPage from '@/pages/LoginPage';
+import DashboardPage from '@/pages/DashboardPage';
+import EmployeesPage from '@/pages/EmployeesPage';
+import PayrollLiquidationPageSimplified from '@/pages/PayrollLiquidationPageSimplified';
+import PayrollHistoryPage from '@/pages/PayrollHistoryPage';
+import PayrollHistoryDetailsPage from '@/pages/PayrollHistoryDetailsPage';
+import PayrollAdjustmentPage from '@/pages/PayrollAdjustmentPage';
+import VacationsAbsencesPage from '@/pages/VacationsAbsencesPage';
+import ReportsPage from '@/pages/ReportsPage';
+import SettingsPage from '@/pages/SettingsPage';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const queryClient = new QueryClient();
@@ -32,7 +32,7 @@ function App() {
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="employees" element={<EmployeesPage />} />
-            <Route path="payroll" element={<PayrollPage />} />
+            <Route path="payroll" element={<PayrollLiquidationPageSimplified />} />
             <Route path="payroll-history" element={<PayrollHistoryPage />} />
             <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailsPage />} />
             <Route path="payroll-history/:periodId/adjust" element={<PayrollAdjustmentPage />} />
