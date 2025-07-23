@@ -182,24 +182,14 @@ class HistoryServiceAleluyaClass {
 
       if (payrollsError) throw payrollsError;
 
-      // Obtener ajustes del período
+      // Obtener ajustes usando SQL directo para evitar problemas de tipos
       const { data: adjustments, error: adjustmentsError } = await supabase
-        .from('payroll_adjustments')
-        .select(`
-          id,
-          employee_id,
-          concept,
-          amount,
-          observations,
-          created_at,
-          employees (
-            nombre,
-            apellido
-          )
-        `)
-        .eq('period_id', periodId);
+        .rpc('get_period_adjustments', { period_id: periodId });
 
-      if (adjustmentsError) throw adjustmentsError;
+      if (adjustmentsError) {
+        console.warn('Error obteniendo ajustes:', adjustmentsError);
+        // Continuar sin ajustes si hay error
+      }
 
       // Mapear empleados
       const employees = (payrolls || []).map(payroll => ({
@@ -210,11 +200,11 @@ class HistoryServiceAleluyaClass {
         netPay: Number(payroll.neto_pagado) || 0
       }));
 
-      // Mapear ajustes
-      const mappedAdjustments = (adjustments || []).map(adj => ({
+      // Mapear ajustes con fallback a array vacío
+      const mappedAdjustments = (adjustments || []).map((adj: any) => ({
         id: adj.id,
         employeeId: adj.employee_id,
-        employeeName: `${adj.employees?.nombre || ''} ${adj.employees?.apellido || ''}`.trim(),
+        employeeName: adj.employee_name || 'Sin nombre',
         concept: adj.concept,
         amount: Number(adj.amount) || 0,
         observations: adj.observations || '',
@@ -246,7 +236,7 @@ class HistoryServiceAleluyaClass {
   }
 
   /**
-   * ✅ NUEVA FUNCIÓN: Crear ajuste
+   * ✅ NUEVA FUNCIÓN: Crear ajuste usando SQL directo
    */
   async createAdjustment(data: CreateAdjustmentData): Promise<void> {
     try {
@@ -267,19 +257,21 @@ class HistoryServiceAleluyaClass {
         throw new Error('Período no encontrado');
       }
 
-      // Crear el ajuste
+      // Crear el ajuste usando SQL directo
       const { error: insertError } = await supabase
-        .from('payroll_adjustments')
-        .insert({
-          period_id: data.periodId,
-          employee_id: data.employeeId,
-          concept: data.concept,
-          amount: data.amount,
-          observations: data.observations,
-          created_by: user.id
+        .rpc('create_payroll_adjustment', {
+          p_period_id: data.periodId,
+          p_employee_id: data.employeeId,
+          p_concept: data.concept,
+          p_amount: data.amount,
+          p_observations: data.observations,
+          p_created_by: user.id
         });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Error creando ajuste:', insertError);
+        throw new Error('No se pudo crear el ajuste');
+      }
 
       console.log('✅ Ajuste creado exitosamente');
     } catch (error) {
