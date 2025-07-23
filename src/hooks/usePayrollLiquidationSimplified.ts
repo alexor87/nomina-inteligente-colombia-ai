@@ -47,38 +47,38 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     endDate: string
   ) => {
     try {
-      console.log('🔄 Iniciando liquidación quincenal con sincronización robusta...');
+      console.log('🔄 Iniciando liquidación CORREGIDA con sincronización robusta...');
       
       // Liquidar usando el flujo unificado (incluye consolidación de novedades)
       await payrollHook.liquidatePayroll(startDate, endDate);
       
-      // ✅ SINCRONIZACIÓN ROBUSTA: Asegurar que los totales se actualicen correctamente
+      // ✅ SINCRONIZACIÓN ROBUSTA CORREGIDA: Asegurar que los totales se actualicen correctamente
       if (payrollHook.currentPeriodId) {
-        console.log('🔄 Ejecutando sincronización post-liquidación...');
+        console.log('🔄 Ejecutando sincronización CORREGIDA post-liquidación...');
         
         try {
-          // Consolidar novedades nuevamente por seguridad
+          // Consolidar novedades CORREGIDAS nuevamente por seguridad
           await PayrollLiquidationService.consolidatePayrollWithNovedades(payrollHook.currentPeriodId);
-          console.log('✅ Novedades consolidadas correctamente');
+          console.log('✅ Novedades consolidadas CORRECTAMENTE');
           
-          // Actualizar totales del período
+          // Actualizar totales del período CORREGIDOS
           await HistoryServiceAleluya.updatePeriodTotals(payrollHook.currentPeriodId);
-          console.log('✅ Totales del período actualizados');
+          console.log('✅ Totales del período actualizados CORRECTAMENTE');
           
           // Verificar sincronización
           const desynchronized = await HistoryServiceAleluya.detectDesynchronizedPeriods();
           if (desynchronized.includes(payrollHook.currentPeriodId)) {
-            console.warn('⚠️ Período aún desincronizado, ejecutando reparación...');
+            console.warn('⚠️ Período aún desincronizado, ejecutando reparación CORREGIDA...');
             await HistoryServiceAleluya.repairPeriodSync(payrollHook.currentPeriodId);
           }
           
         } catch (syncError) {
-          console.error('❌ Error en sincronización post-liquidación:', syncError);
+          console.error('❌ Error en sincronización CORREGIDA post-liquidación:', syncError);
           
           // Intentar reparación como último recurso
           try {
             await HistoryServiceAleluya.repairPeriodSync(payrollHook.currentPeriodId);
-            console.log('✅ Reparación de emergencia exitosa');
+            console.log('✅ Reparación de emergencia CORREGIDA exitosa');
           } catch (repairError) {
             console.error('❌ Error en reparación de emergencia:', repairError);
             
@@ -93,7 +93,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       
       toast({
         title: "✅ Liquidación Completada",
-        description: "Nómina liquidada y sincronizada correctamente",
+        description: "Nómina liquidada y sincronizada CORRECTAMENTE",
         className: "border-green-200 bg-green-50"
       });
       

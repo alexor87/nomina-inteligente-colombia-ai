@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
@@ -149,7 +148,7 @@ export class PayrollLiquidationService {
         const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
         const totalDevengado = salarioProporcional + auxilioTransporte;
         
-        // ✅ CÁLCULO DETALLADO DE DEDUCCIONES PARA AUDITORÍA
+        // ✅ CÁLCULO DETALLADO DE DEDUCCIONES CORREGIDO
         const deductionResult = await DeductionCalculationService.calculateDeductions({
           salarioBase: employee.salario_base,
           totalDevengado: totalDevengado,
@@ -223,7 +222,7 @@ export class PayrollLiquidationService {
         const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
         const totalDevengado = salarioProporcional + auxilioTransporte;
         
-        // ✅ CÁLCULO DETALLADO DE DEDUCCIONES PARA AUDITORÍA
+        // ✅ CÁLCULO DETALLADO DE DEDUCCIONES CORREGIDO
         const deductionResult = await DeductionCalculationService.calculateDeductions({
           salarioBase: employee.salario_base,
           totalDevengado: totalDevengado,
@@ -297,8 +296,14 @@ export class PayrollLiquidationService {
         throw periodError;
       }
 
-      // ✅ CREAR REGISTROS DE NÓMINA CON DEDUCCIONES DETALLADAS
+      // ✅ CREAR REGISTROS DE NÓMINA CON DEDUCCIONES CORRECTAS
       for (const employee of employees) {
+        // Calcular valores finales con novedades
+        const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
+        const totalDevengadoFinal = salarioProporcional + employee.auxilio_transporte + employee.devengos;
+        const totalDeduccionesFinal = employee.deducciones + employee.deducciones_novedades;
+        const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
+
         const { error: payrollError } = await supabase
           .from('payrolls')
           .insert({
@@ -309,15 +314,15 @@ export class PayrollLiquidationService {
             salario_base: employee.salario_base,
             dias_trabajados: employee.dias_trabajados,
             auxilio_transporte: employee.auxilio_transporte,
-            total_devengado: employee.salario_base + employee.devengos + employee.auxilio_transporte,
-            // ✅ DEDUCCIONES SEPARADAS PARA AUDITORÍA DIAN/UGPP
+            total_devengado: totalDevengadoFinal,
+            // ✅ DEDUCCIONES SEPARADAS CORRECTAS
             salud_empleado: employee.salud_empleado,
             pension_empleado: employee.pension_empleado,
             fondo_solidaridad: employee.fondo_solidaridad,
             retencion_fuente: employee.retencion_fuente,
-            otras_deducciones: employee.deducciones_novedades, // Solo novedades de deducciones
-            total_deducciones: employee.deducciones,
-            neto_pagado: employee.total_pagar,
+            otras_deducciones: employee.deducciones_novedades,
+            total_deducciones: totalDeduccionesFinal, // CORREGIDO: usar total final
+            neto_pagado: netoPagadoFinal, // CORREGIDO: usar neto final
             estado: 'procesada'
           });
 
@@ -335,7 +340,7 @@ export class PayrollLiquidationService {
             periodo: periodName,
             start_date: startDate,
             end_date: endDate,
-            net_pay: employee.total_pagar,
+            net_pay: netoPagadoFinal, // CORREGIDO: usar neto final
             voucher_status: 'generado'
           });
 
@@ -344,9 +349,36 @@ export class PayrollLiquidationService {
         }
       }
 
+      // ✅ ACTUALIZAR TOTALES DEL PERÍODO CON VALORES CORRECTOS
+      const finalTotalDevengado = employees.reduce((sum, emp) => {
+        const salarioProporcional = (emp.salario_base / 30) * emp.dias_trabajados;
+        return sum + salarioProporcional + emp.auxilio_transporte + emp.devengos;
+      }, 0);
+
+      const finalTotalDeducciones = employees.reduce((sum, emp) => {
+        return sum + emp.deducciones + emp.deducciones_novedades;
+      }, 0);
+
+      const finalTotalNeto = finalTotalDevengado - finalTotalDeducciones;
+
+      await supabase
+        .from('payroll_periods_real')
+        .update({
+          total_devengado: finalTotalDevengado,
+          total_deducciones: finalTotalDeducciones,
+          total_neto: finalTotalNeto
+        })
+        .eq('id', period.id);
+
+      console.log('✅ LIQUIDACIÓN COMPLETADA CON TOTALES CORRECTOS:', {
+        totalDevengado: finalTotalDevengado,
+        totalDeducciones: finalTotalDeducciones,
+        totalNeto: finalTotalNeto
+      });
+
       return {
         success: true,
-        message: `Liquidación completada para ${employees.length} empleados con deducciones detalladas`,
+        message: `Liquidación completada para ${employees.length} empleados con deducciones correctas`,
         periodId: period.id
       };
     } catch (error) {
@@ -359,12 +391,11 @@ export class PayrollLiquidationService {
   }
 
   /**
-   * ✅ NUEVO MÉTODO: Consolidar novedades en registros de payrolls
-   * Este método actualiza los registros de payrolls con los valores finales incluyendo novedades
+   * ✅ MÉTODO CONSOLIDADO: Consolidar novedades en registros de payrolls
    */
   static async consolidatePayrollWithNovedades(periodId: string): Promise<void> {
     try {
-      console.log('🔄 Iniciando consolidación de novedades para período:', periodId);
+      console.log('🔄 Iniciando consolidación CORREGIDA para período:', periodId);
       
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
@@ -374,7 +405,7 @@ export class PayrollLiquidationService {
       // Obtener todos los empleados del período
       const { data: payrollRecords, error: payrollError } = await supabase
         .from('payrolls')
-        .select('id, employee_id, salario_base, dias_trabajados, auxilio_transporte, total_devengado, total_deducciones')
+        .select('id, employee_id, salario_base, dias_trabajados, auxilio_transporte')
         .eq('period_id', periodId)
         .eq('company_id', companyId);
 
@@ -408,7 +439,7 @@ export class PayrollLiquidationService {
         // Calcular salario proporcional
         const salarioProporcional = (salarioBase / 30) * diasTrabajados;
         
-        // Calcular deducciones básicas
+        // ✅ CALCULAR DEDUCCIONES BÁSICAS CORRECTAMENTE
         const deductionResult = await DeductionCalculationService.calculateDeductions({
           salarioBase: salarioBase,
           totalDevengado: salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos,
@@ -416,7 +447,7 @@ export class PayrollLiquidationService {
           periodType: 'quincenal'
         });
 
-        // Valores finales consolidados
+        // Valores finales consolidados CORRECTOS
         const totalDevengadoFinal = salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos;
         const totalDeduccionesFinal = deductionResult.totalDeducciones + employeeNovedades.totalDeducciones;
         const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
@@ -456,20 +487,20 @@ export class PayrollLiquidationService {
           }
         });
 
-        // Actualizar registro en payrolls con valores consolidados
+        // ✅ ACTUALIZAR REGISTRO CON VALORES CONSOLIDADOS CORRECTOS
         const { error: updateError } = await supabase
           .from('payrolls')
           .update({
             total_devengado: totalDevengadoFinal,
-            total_deducciones: totalDeduccionesFinal,
-            neto_pagado: netoPagadoFinal,
+            total_deducciones: totalDeduccionesFinal, // CORREGIDO
+            neto_pagado: netoPagadoFinal, // CORREGIDO
             // Campos específicos de novedades
             horas_extra: horasExtra,
             licencias_remuneradas: licenciasRemuneradas,
             ausencias: ausencias,
             bonificaciones: bonificaciones,
             incapacidades: incapacidades,
-            // Deducciones detalladas
+            // Deducciones detalladas CORRECTAS
             salud_empleado: deductionResult.saludEmpleado,
             pension_empleado: deductionResult.pensionEmpleado,
             fondo_solidaridad: deductionResult.fondoSolidaridad,
@@ -482,26 +513,28 @@ export class PayrollLiquidationService {
         if (updateError) {
           console.error(`❌ Error actualizando payroll para empleado ${payrollRecord.employee_id}:`, updateError);
         } else {
-          console.log(`✅ Payroll consolidado para empleado ${payrollRecord.employee_id}: Neto = ${netoPagadoFinal}`);
+          console.log(`✅ Payroll CORREGIDO para empleado ${payrollRecord.employee_id}: Deducciones=${totalDeduccionesFinal}, Neto=${netoPagadoFinal}`);
         }
       }
 
       // Actualizar totales del período
       await this.updatePeriodTotals(periodId);
       
-      console.log('✅ Consolidación de novedades completada exitosamente');
+      console.log('✅ Consolidación CORREGIDA completada exitosamente');
       
     } catch (error) {
-      console.error('❌ Error en consolidación de novedades:', error);
+      console.error('❌ Error en consolidación corregida:', error);
       throw error;
     }
   }
 
   /**
-   * ✅ MÉTODO AUXILIAR: Actualizar totales del período
+   * ✅ MÉTODO CORREGIDO: Actualizar totales del período
    */
   private static async updatePeriodTotals(periodId: string): Promise<void> {
     try {
+      console.log('🔧 ACTUALIZANDO TOTALES CORREGIDOS para período:', periodId);
+      
       // Recalcular totales del período basados en los registros actualizados
       const { data: totalsData, error: totalsError } = await supabase
         .from('payrolls')
@@ -517,13 +550,20 @@ export class PayrollLiquidationService {
         const totalDeducciones = totalsData.reduce((sum, record) => sum + (Number(record.total_deducciones) || 0), 0);
         const totalNeto = totalsData.reduce((sum, record) => sum + (Number(record.neto_pagado) || 0), 0);
 
+        console.log('📊 TOTALES CORREGIDOS CALCULADOS:', {
+          totalDevengado,
+          totalDeducciones,
+          totalNeto,
+          empleados: totalsData.length
+        });
+
         // Actualizar totales en payroll_periods_real
         const { error: updatePeriodError } = await supabase
           .from('payroll_periods_real')
           .update({
             total_devengado: totalDevengado,
-            total_deducciones: totalDeducciones,
-            total_neto: totalNeto,
+            total_deducciones: totalDeducciones, // CORREGIDO
+            total_neto: totalNeto, // CORREGIDO
             updated_at: new Date().toISOString()
           })
           .eq('id', periodId);
@@ -531,11 +571,11 @@ export class PayrollLiquidationService {
         if (updatePeriodError) {
           console.error('❌ Error actualizando totales del período:', updatePeriodError);
         } else {
-          console.log(`✅ Totales del período actualizados: Devengado=${totalDevengado}, Neto=${totalNeto}`);
+          console.log(`✅ Totales del período CORREGIDOS: Devengado=${totalDevengado}, Deducciones=${totalDeducciones}, Neto=${totalNeto}`);
         }
       }
     } catch (error) {
-      console.error('❌ Error actualizando totales del período:', error);
+      console.error('❌ Error actualizando totales corregidos del período:', error);
     }
   }
 }

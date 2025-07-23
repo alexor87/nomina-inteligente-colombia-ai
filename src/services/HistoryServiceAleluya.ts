@@ -145,7 +145,7 @@ class HistoryServiceAleluyaClass {
   }
 
   /**
-   * ✅ NUEVA FUNCIÓN: Obtener detalle completo de un período
+   * ✅ FUNCIÓN CORREGIDA: Obtener detalle completo de un período
    */
   async getPeriodDetail(periodId: string): Promise<PeriodDetail> {
     try {
@@ -162,13 +162,14 @@ class HistoryServiceAleluyaClass {
       if (periodError) throw periodError;
       if (!period) throw new Error('Período no encontrado');
 
-      // Obtener empleados del período
+      // Obtener empleados del período con datos CORRECTOS
       const { data: payrolls, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
           id,
           employee_id,
           total_devengado,
+          total_deducciones,
           neto_pagado,
           employees (
             id,
@@ -182,7 +183,7 @@ class HistoryServiceAleluyaClass {
 
       if (payrollsError) throw payrollsError;
 
-      // Obtener ajustes del período usando acceso directo
+      // Obtener ajustes del período
       const { data: adjustments, error: adjustmentsError } = await supabase
         .from('payroll_adjustments')
         .select(`
@@ -197,21 +198,19 @@ class HistoryServiceAleluyaClass {
 
       if (adjustmentsError) {
         console.warn('Error obteniendo ajustes:', adjustmentsError);
-        // Continuar sin ajustes si hay error
       }
 
-      // Mapear empleados
+      // Mapear empleados con valores CORRECTOS
       const employees = (payrolls || []).map(payroll => ({
         id: payroll.employee_id,
         name: `${payroll.employees?.nombre || ''} ${payroll.employees?.apellido || ''}`.trim(),
         position: payroll.employees?.cargo || 'Sin cargo',
-        grossPay: Number(payroll.total_devengado) || 0,
-        netPay: Number(payroll.neto_pagado) || 0
+        grossPay: Number(payroll.total_devengado) || 0, // CORREGIDO
+        netPay: Number(payroll.neto_pagado) || 0 // CORREGIDO
       }));
 
-      // Mapear ajustes con fallback a array vacío y obtener nombres de empleados
+      // Mapear ajustes con nombres de empleados
       const mappedAdjustments = await Promise.all((adjustments || []).map(async (adj: any) => {
-        // Obtener nombre del empleado
         const { data: employee } = await supabase
           .from('employees')
           .select('nombre, apellido')
@@ -229,6 +228,19 @@ class HistoryServiceAleluyaClass {
         };
       }));
 
+      // ✅ CALCULAR TOTALES CORRECTOS desde los registros reales
+      const calculatedTotalDevengado = employees.reduce((sum, emp) => sum + emp.grossPay, 0);
+      const calculatedTotalNeto = employees.reduce((sum, emp) => sum + emp.netPay, 0);
+      const calculatedTotalDeducciones = calculatedTotalDevengado - calculatedTotalNeto;
+
+      console.log('📊 TOTALES CALCULADOS EN DETALLE:', {
+        periodId,
+        calculatedTotalDevengado,
+        calculatedTotalDeducciones,
+        calculatedTotalNeto,
+        employeesCount: employees.length
+      });
+
       return {
         period: {
           id: period.id,
@@ -239,10 +251,10 @@ class HistoryServiceAleluyaClass {
           type: period.tipo_periodo
         },
         summary: {
-          totalDevengado: Number(period.total_devengado) || 0,
-          totalDeducciones: Number(period.total_deducciones) || 0,
-          totalNeto: Number(period.total_neto) || 0,
-          costoTotal: Number(period.total_devengado) || 0
+          totalDevengado: calculatedTotalDevengado, // USAR VALORES CALCULADOS
+          totalDeducciones: calculatedTotalDeducciones, // USAR VALORES CALCULADOS
+          totalNeto: calculatedTotalNeto, // USAR VALORES CALCULADOS
+          costoTotal: calculatedTotalDevengado
         },
         employees,
         adjustments: mappedAdjustments
@@ -300,7 +312,7 @@ class HistoryServiceAleluyaClass {
   }
 
   /**
-   * ✅ NUEVA FUNCIÓN: Generar PDF de comprobante
+   * ✅ FUNCIÓN CORREGIDA: Generar PDF de comprobante
    */
   async generateVoucherPDF(employeeId: string, periodId: string): Promise<void> {
     try {
@@ -319,9 +331,12 @@ class HistoryServiceAleluyaClass {
     }
   }
 
+  /**
+   * ✅ FUNCIÓN CORREGIDA: Actualizar totales del período
+   */
   async updatePeriodTotals(periodId: string): Promise<void> {
     try {
-      console.log(`🔄 Actualizando totales para período: ${periodId}`);
+      console.log(`🔄 ACTUALIZANDO TOTALES CORREGIDOS para período: ${periodId}`);
       
       const companyId = await this.getCurrentUserCompanyId();
 
@@ -342,25 +357,26 @@ class HistoryServiceAleluyaClass {
         return;
       }
 
-      // Calcular totales
+      // Calcular totales CORRECTOS
       const totalDevengado = payrollTotals.reduce((sum, record) => sum + (Number(record.total_devengado) || 0), 0);
       const totalDeducciones = payrollTotals.reduce((sum, record) => sum + (Number(record.total_deducciones) || 0), 0);
       const totalNeto = payrollTotals.reduce((sum, record) => sum + (Number(record.neto_pagado) || 0), 0);
 
-      console.log(`📊 Totales calculados:`, {
+      console.log(`📊 TOTALES CORREGIDOS CALCULADOS:`, {
+        periodId,
         totalDevengado,
         totalDeducciones,
         totalNeto,
         empleados: payrollTotals.length
       });
 
-      // Actualizar período con totales correctos
+      // Actualizar período con totales CORRECTOS
       const { error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({
           total_devengado: totalDevengado,
-          total_deducciones: totalDeducciones,
-          total_neto: totalNeto,
+          total_deducciones: totalDeducciones, // CORREGIDO
+          total_neto: totalNeto, // CORREGIDO
           empleados_count: payrollTotals.length,
           updated_at: new Date().toISOString()
         })
@@ -372,7 +388,7 @@ class HistoryServiceAleluyaClass {
         throw updateError;
       }
 
-      console.log(`✅ Totales actualizados correctamente para período ${periodId}`);
+      console.log(`✅ Totales CORREGIDOS actualizados para período ${periodId}`);
     } catch (error) {
       console.error('Error en updatePeriodTotals:', error);
       throw error;
@@ -381,12 +397,12 @@ class HistoryServiceAleluyaClass {
 
   async consolidatePayrollWithNovedades(periodId: string): Promise<void> {
     try {
-      console.log(`🔄 Consolidando novedades para período: ${periodId}`);
+      console.log(`🔄 Consolidando novedades CORREGIDAS para período: ${periodId}`);
       
-      // Usar el servicio de liquidación para consolidar
+      // Usar el servicio de liquidación CORREGIDO para consolidar
       await PayrollLiquidationService.consolidatePayrollWithNovedades(periodId);
       
-      console.log(`✅ Novedades consolidadas exitosamente para período ${periodId}`);
+      console.log(`✅ Novedades consolidadas CORRECTAMENTE para período ${periodId}`);
     } catch (error) {
       console.error('Error consolidando novedades:', error);
       throw error;
@@ -395,15 +411,15 @@ class HistoryServiceAleluyaClass {
 
   async repairPeriodSync(periodId: string): Promise<void> {
     try {
-      console.log(`🔧 Iniciando reparación completa para período: ${periodId}`);
+      console.log(`🔧 Iniciando reparación COMPLETA para período: ${periodId}`);
       
-      // Paso 1: Consolidar novedades
+      // Paso 1: Consolidar novedades CORREGIDAS
       await this.consolidatePayrollWithNovedades(periodId);
       
-      // Paso 2: Actualizar totales
+      // Paso 2: Actualizar totales CORREGIDOS
       await this.updatePeriodTotals(periodId);
       
-      console.log(`✅ Reparación completa exitosa para período ${periodId}`);
+      console.log(`✅ Reparación COMPLETA exitosa para período ${periodId}`);
     } catch (error) {
       console.error('Error en reparación de período:', error);
       throw error;
