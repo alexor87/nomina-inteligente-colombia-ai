@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, Users, DollarSign, Download, Edit, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, DollarSign, Download, Edit, RefreshCw, AlertTriangle, Settings } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatCurrency } from '@/lib/utils';
 import { HistoryServiceAleluya } from '@/services/HistoryServiceAleluya';
+import { PeriodRepairService } from '@/services/PeriodRepairService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -43,9 +43,10 @@ export const PayrollHistoryDetailsPage = () => {
         
         setPeriodData(period);
         
-        // Verificar si necesita reparación (totales en 0 pero con empleados)
+        // Verificar si necesita reparación (totales en 0 o deducciones en 0)
         const needsRepairCheck = (period.empleados_count > 0) && 
-                               (!period.total_neto || period.total_neto === 0);
+                               ((!period.total_deducciones || period.total_deducciones === 0) || 
+                                (!period.total_neto || period.total_neto === 0));
         setNeedsRepair(needsRepairCheck);
         
       } catch (error) {
@@ -80,9 +81,9 @@ export const PayrollHistoryDetailsPage = () => {
     
     setIsRepairing(true);
     try {
-      console.log('🔧 Reparando sincronización del período...');
+      console.log('🔧 Reparando período específico...');
       
-      await HistoryServiceAleluya.repairPeriodSync(periodId);
+      await PeriodRepairService.repairSpecificPeriod(periodId);
       
       // Recargar datos del período
       const { data: updatedPeriod, error } = await supabase
@@ -97,16 +98,16 @@ export const PayrollHistoryDetailsPage = () => {
       setNeedsRepair(false);
       
       toast({
-        title: "✅ Sincronización Reparada",
-        description: "El período ha sido sincronizado correctamente",
+        title: "✅ Período Reparado",
+        description: "Las deducciones y totales han sido corregidos correctamente",
         className: "border-green-200 bg-green-50"
       });
       
     } catch (error) {
-      console.error('Error reparando sincronización:', error);
+      console.error('Error reparando período:', error);
       toast({
         title: "❌ Error en Reparación",
-        description: "No se pudo reparar la sincronización",
+        description: "No se pudo reparar el período",
         variant: "destructive"
       });
     } finally {
@@ -159,9 +160,9 @@ export const PayrollHistoryDetailsPage = () => {
               {isRepairing ? (
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <AlertTriangle className="h-4 w-4 mr-2" />
+                <Settings className="h-4 w-4 mr-2" />
               )}
-              {isRepairing ? 'Reparando...' : 'Reparar Sincronización'}
+              {isRepairing ? 'Reparando...' : 'Reparar Período'}
             </Button>
           )}
           
@@ -179,17 +180,17 @@ export const PayrollHistoryDetailsPage = () => {
         </div>
       </div>
 
-      {/* Alerta de desincronización */}
+      {/* Alerta de problemas con deducciones */}
       {needsRepair && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <AlertTriangle className="h-5 w-5 text-orange-600" />
               <div>
-                <h3 className="font-medium text-orange-900">Período Desincronizado</h3>
+                <h3 className="font-medium text-orange-900">Período Requiere Reparación</h3>
                 <p className="text-sm text-orange-700">
-                  Este período tiene empleados procesados pero los totales están en $0. 
-                  Haz clic en "Reparar Sincronización" para corregir los valores.
+                  Este período tiene deducciones en $0 o totales incorrectos. 
+                  Haz clic en "Reparar Período" para corregir los cálculos.
                 </p>
               </div>
             </div>
@@ -244,15 +245,15 @@ export const PayrollHistoryDetailsPage = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
-              Estado de Sincronización
+              Estado de Cálculos
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-green-600'}`}>
-              {needsRepair ? 'Desincronizado' : 'Sincronizado'}
+              {needsRepair ? 'Requiere Reparación' : 'Correcto'}
             </div>
             <p className="text-xs text-gray-500">
-              {needsRepair ? 'Requiere reparación' : 'Totales correctos'}
+              {needsRepair ? 'Deducciones incorrectas' : 'Cálculos correctos'}
             </p>
           </CardContent>
         </Card>
