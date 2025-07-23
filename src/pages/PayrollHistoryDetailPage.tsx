@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,11 +19,10 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { HistoryServiceAleluya, PeriodDetail } from '@/services/HistoryServiceAleluya';
 import { useToast } from '@/hooks/use-toast';
-import { usePayrollNovedadesOnlyUnified } from '@/hooks/usePayrollNovedadesOnlyUnified';
 
 /**
- * ✅ PÁGINA DE DETALLE DE PERÍODO LIQUIDADO - DATOS REALES
- * Muestra información detallada real del período, empleados y novedades
+ * ✅ PÁGINA DE DETALLE DE PERÍODO LIQUIDADO
+ * Muestra información detallada, empleados y historial de ajustes
  */
 export const PayrollHistoryDetailPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
@@ -34,13 +32,6 @@ export const PayrollHistoryDetailPage = () => {
   const [periodDetail, setPeriodDetail] = useState<PeriodDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloadingVoucher, setDownloadingVoucher] = useState<string | null>(null);
-  const [companyId, setCompanyId] = useState<string>('');
-
-  // Hook para obtener novedades reales
-  const { novedades, isLoading: novedadesLoading, loadNovedades } = usePayrollNovedadesOnlyUnified(
-    companyId, 
-    periodId || ''
-  );
 
   useEffect(() => {
     if (periodId) {
@@ -51,21 +42,10 @@ export const PayrollHistoryDetailPage = () => {
   const loadPeriodDetail = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Cargando detalle del período:', periodId);
-      
       const detail = await HistoryServiceAleluya.getPeriodDetail(periodId!);
       setPeriodDetail(detail);
-      
-      // Obtener company_id del período para cargar novedades
-      if (detail.period) {
-        // Extraer company_id del período o usar método del servicio
-        const { companyId: extractedCompanyId } = await HistoryServiceAleluya.getUserAndCompany();
-        setCompanyId(extractedCompanyId);
-      }
-      
-      console.log('✅ Detalle del período cargado:', detail);
     } catch (error) {
-      console.error('❌ Error loading period detail:', error);
+      console.error('Error loading period detail:', error);
       toast({
         title: "Error",
         description: "No se pudo cargar el detalle del período",
@@ -113,47 +93,9 @@ export const PayrollHistoryDetailPage = () => {
         return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Original</Badge>;
       case 'con_ajuste':
         return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">Con ajuste</Badge>;
-      case 'cerrado':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Cerrado</Badge>;
-      case 'borrador':
-        return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">Borrador</Badge>;
       default:
         return <Badge variant="outline">Desconocido</Badge>;
     }
-  };
-
-  // Función para obtener novedades de un empleado específico
-  const getEmployeeNovedades = (employeeId: string) => {
-    return novedades.filter(n => n.empleado_id === employeeId);
-  };
-
-  // Función para mostrar resumen de novedades de un empleado
-  const renderEmployeeNovedades = (employeeId: string) => {
-    const employeeNovedades = getEmployeeNovedades(employeeId);
-    
-    if (employeeNovedades.length === 0) {
-      return <span className="text-gray-500 text-sm">Sin novedades</span>;
-    }
-
-    return (
-      <div className="space-y-1">
-        {employeeNovedades.map((novedad, index) => (
-          <div key={index} className="flex items-center gap-2 text-sm">
-            <Badge variant="outline" className="text-xs">
-              {novedad.tipo_novedad}
-            </Badge>
-            <span className="text-gray-600">
-              {formatCurrency(novedad.valor || 0)}
-            </span>
-            {novedad.dias && (
-              <span className="text-gray-500">
-                ({novedad.dias} días)
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-    );
   };
 
   if (loading) {
@@ -285,15 +227,12 @@ export const PayrollHistoryDetailPage = () => {
         </Card>
       </div>
 
-      {/* Empleados liquidados con novedades reales */}
+      {/* Empleados liquidados */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5" />
             <span>Empleados Liquidados ({periodDetail.employees.length})</span>
-            {novedadesLoading && (
-              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -304,7 +243,6 @@ export const PayrollHistoryDetailPage = () => {
                   <th className="text-left p-4 font-medium text-gray-900">Empleado</th>
                   <th className="text-right p-4 font-medium text-gray-900">Bruto</th>
                   <th className="text-right p-4 font-medium text-gray-900">Neto</th>
-                  <th className="text-left p-4 font-medium text-gray-900">Novedades</th>
                   <th className="text-center p-4 font-medium text-gray-900">Comprobante</th>
                 </tr>
               </thead>
@@ -332,9 +270,6 @@ export const PayrollHistoryDetailPage = () => {
                         {formatCurrency(employee.netPay)}
                       </span>
                     </td>
-                    <td className="p-4">
-                      {renderEmployeeNovedades(employee.id)}
-                    </td>
                     <td className="p-4 text-center">
                       <Button
                         variant="outline"
@@ -360,58 +295,6 @@ export const PayrollHistoryDetailPage = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Resumen de Novedades del Período */}
-      {novedades.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <FileText className="h-5 w-5" />
-              <span>Novedades del Período ({novedades.length})</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {novedades.map((novedad) => (
-                <div key={novedad.id} className="border rounded-lg p-4 bg-blue-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <Calculator className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {periodDetail.employees.find(e => e.id === novedad.empleado_id)?.name || 'Empleado'}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {novedad.tipo_novedad} {novedad.subtipo && `- ${novedad.subtipo}`}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="text-right">
-                      <p className={`font-bold ${(novedad.valor || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatCurrency(novedad.valor || 0)}
-                      </p>
-                      {novedad.dias && (
-                        <p className="text-sm text-gray-600">
-                          {novedad.dias} días
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {novedad.observacion && (
-                    <div className="mt-3 p-3 bg-white rounded border">
-                      <p className="text-sm text-gray-700">{novedad.observacion}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Historial de ajustes */}
       {periodDetail.adjustments.length > 0 && (
