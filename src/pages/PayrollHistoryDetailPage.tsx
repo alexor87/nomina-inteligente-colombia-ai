@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,16 +15,14 @@ import {
   FileText,
   User,
   Calculator,
-  Loader2
+  Loader2,
+  TrendingUp,
+  Receipt
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { HistoryServiceAleluya, PeriodDetail } from '@/services/HistoryServiceAleluya';
 import { useToast } from '@/hooks/use-toast';
 
-/**
- * ✅ PÁGINA DE DETALLE DE PERÍODO LIQUIDADO
- * Muestra información detallada, empleados y historial de ajustes
- */
 export const PayrollHistoryDetailPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
@@ -160,6 +159,59 @@ export const PayrollHistoryDetailPage = () => {
         </div>
       </div>
 
+      {/* ✅ NUEVO: Desglose de totales consolidados */}
+      <Card className="border-2 border-blue-200 bg-blue-50">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-blue-900">
+            <Receipt className="h-5 w-5" />
+            <span>Desglose de Liquidación</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-blue-700">Salarios Base:</span>
+                <span className="font-bold text-blue-900">
+                  {formatCurrency(periodDetail.summary.salarioBase)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-blue-700">Novedades:</span>
+                <span className="font-bold text-green-600">
+                  + {formatCurrency(periodDetail.summary.novedades)}
+                </span>
+              </div>
+              <div className="border-t border-blue-300 pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-blue-900">Total Devengado:</span>
+                  <span className="font-bold text-lg text-blue-900">
+                    {formatCurrency(periodDetail.summary.totalDevengado)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-red-700">Total Deducciones:</span>
+                <span className="font-bold text-red-600">
+                  - {formatCurrency(periodDetail.summary.totalDeducciones)}
+                </span>
+              </div>
+              <div className="border-t border-blue-300 pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-blue-900">Total Neto:</span>
+                  <span className="font-bold text-lg text-green-600">
+                    {formatCurrency(periodDetail.summary.totalNeto)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Resumen del período */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -241,7 +293,9 @@ export const PayrollHistoryDetailPage = () => {
               <thead>
                 <tr className="border-b bg-gray-50">
                   <th className="text-left p-4 font-medium text-gray-900">Empleado</th>
-                  <th className="text-right p-4 font-medium text-gray-900">Bruto</th>
+                  <th className="text-right p-4 font-medium text-gray-900">Salario Base</th>
+                  <th className="text-right p-4 font-medium text-gray-900">Novedades</th>
+                  <th className="text-right p-4 font-medium text-gray-900">Total Bruto</th>
                   <th className="text-right p-4 font-medium text-gray-900">Neto</th>
                   <th className="text-center p-4 font-medium text-gray-900">Comprobante</th>
                 </tr>
@@ -259,6 +313,16 @@ export const PayrollHistoryDetailPage = () => {
                           <p className="text-sm text-gray-600">{employee.position}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="p-4 text-right">
+                      <span className="font-medium text-gray-900">
+                        {formatCurrency(employee.baseSalary)}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
+                      <span className={`font-medium ${employee.novedades >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {employee.novedades >= 0 ? '+' : ''}{formatCurrency(employee.novedades)}
+                      </span>
                     </td>
                     <td className="p-4 text-right">
                       <span className="font-medium text-gray-900">
@@ -296,6 +360,52 @@ export const PayrollHistoryDetailPage = () => {
         </CardContent>
       </Card>
 
+      {/* ✅ NUEVO: Novedades aplicadas */}
+      {periodDetail.novedades.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <TrendingUp className="h-5 w-5" />
+              <span>Novedades Aplicadas ({periodDetail.novedades.length})</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {periodDetail.novedades.map((novedad) => (
+                <div key={novedad.id} className="border rounded-lg p-4 bg-green-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{novedad.employeeName}</p>
+                        <p className="text-sm text-gray-600">{novedad.concept}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <p className={`font-bold ${novedad.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {novedad.amount >= 0 ? '+' : ''}{formatCurrency(novedad.amount)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {new Date(novedad.createdAt).toLocaleDateString('es-ES')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {novedad.observations && (
+                    <div className="mt-3 p-3 bg-white rounded border">
+                      <p className="text-sm text-gray-700">{novedad.observations}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Historial de ajustes */}
       {periodDetail.adjustments.length > 0 && (
         <Card>
@@ -322,7 +432,7 @@ export const PayrollHistoryDetailPage = () => {
                     
                     <div className="text-right">
                       <p className={`font-bold ${adjustment.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatCurrency(adjustment.amount)}
+                        {adjustment.amount >= 0 ? '+' : ''}{formatCurrency(adjustment.amount)}
                       </p>
                       <p className="text-sm text-gray-600">
                         {new Date(adjustment.createdAt).toLocaleDateString('es-ES')}

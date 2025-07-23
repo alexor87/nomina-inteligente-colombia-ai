@@ -48,6 +48,8 @@ export interface PeriodDetail {
     totalDeducciones: number;
     totalNeto: number;
     costoTotal: number;
+    salarioBase: number;
+    novedades: number;
   };
   employees: Array<{
     id: string;
@@ -55,6 +57,17 @@ export interface PeriodDetail {
     position: string;
     grossPay: number;
     netPay: number;
+    baseSalary: number;
+    novedades: number;
+  }>;
+  novedades: Array<{
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    concept: string;
+    amount: number;
+    observations: string;
+    createdAt: string;
   }>;
   adjustments: Array<{
     id: string;
@@ -100,11 +113,10 @@ class HistoryServiceAleluyaClass {
 
       let query = supabase
         .from('payroll_periods_real')
-        .select('*', { count: 'exact' }) // ✅ CORREGIDO: count real
+        .select('*', { count: 'exact' })
         .eq('company_id', companyId)
         .order('fecha_inicio', { ascending: false });
 
-      // ✅ CORREGIDO: No hardcodear estado, usar filtros reales
       if (filters.year) {
         const startOfYear = `${filters.year}-01-01`;
         const endOfYear = `${filters.year}-12-31`;
@@ -130,7 +142,7 @@ class HistoryServiceAleluyaClass {
         startDate: period.fecha_inicio,
         endDate: period.fecha_fin,
         type: period.tipo_periodo,
-        status: period.estado, // ✅ CORREGIDO: usar estado real
+        status: period.estado,
         employeesCount: period.empleados_count || 0,
         totalGrossPay: Number(period.total_devengado) || 0,
         totalNetPay: Number(period.total_neto) || 0,
@@ -144,8 +156,8 @@ class HistoryServiceAleluyaClass {
 
       return {
         periods: mappedPeriods,
-        total: count || 0, // ✅ CORREGIDO: total real
-        hasMore: (page * limit) < (count || 0) // ✅ CORREGIDO: hasMore real
+        total: count || 0,
+        hasMore: (page * limit) < (count || 0)
       };
     } catch (error) {
       console.error('Error obteniendo historial de nómina:', error);
@@ -154,29 +166,30 @@ class HistoryServiceAleluyaClass {
   }
 
   /**
-   * ✅ CORREGIDO: Detalle con seguridad mejorada y joins seguros
+   * ✅ CORREGIDO: Detalle consolidado con novedades incluidas
    */
   async getPeriodDetail(periodId: string): Promise<PeriodDetail> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
 
-      // ✅ CORREGIDO: Validar permisos antes de consultar
+      // Validar permisos antes de consultar
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('id', periodId)
-        .eq('company_id', companyId) // ✅ SEGURIDAD: filtrado explícito
+        .eq('company_id', companyId)
         .single();
 
       if (periodError) throw periodError;
       if (!period) throw new Error('Período no encontrado');
 
-      // ✅ CORREGIDO: JOIN seguro con filtrado explícito por empresa
+      // Obtener payrolls con datos de empleados
       const { data: payrolls, error: payrollsError } = await supabase
         .from('payrolls')
         .select(`
           id,
           employee_id,
+          salario_base,
           total_devengado,
           total_deducciones,
           neto_pagado,
@@ -190,11 +203,29 @@ class HistoryServiceAleluyaClass {
         `)
         .eq('period_id', periodId)
         .eq('company_id', companyId)
-        .eq('employees.company_id', companyId); // ✅ SEGURIDAD: filtrado explícito en JOIN
+        .eq('employees.company_id', companyId);
 
       if (payrollsError) throw payrollsError;
 
-      // ✅ CORREGIDO: Consulta de ajustes con filtrado seguro
+      // ✅ NOVEDAD: Obtener novedades del período para consolidar totales
+      const { data: novedades, error: novedadesError } = await supabase
+        .from('payroll_novedades')
+        .select(`
+          id,
+          empleado_id,
+          tipo_novedad,
+          valor,
+          observacion,
+          created_at
+        `)
+        .eq('periodo_id', periodId)
+        .eq('company_id', companyId);
+
+      if (novedadesError) {
+        console.warn('Error obteniendo novedades:', novedadesError);
+      }
+
+      // Obtener ajustes
       const { data: adjustments, error: adjustmentsError } = await supabase
         .from('payroll_adjustments')
         .select(`
@@ -206,22 +237,53 @@ class HistoryServiceAleluyaClass {
           created_at
         `)
         .eq('period_id', periodId)
-        .in('employee_id', payrolls?.map(p => p.employee_id) || []); // ✅ SEGURIDAD: solo empleados del período
+        .in('employee_id', payrolls?.map(p => p.employee_id) || []);
 
       if (adjustmentsError) {
         console.warn('Error obteniendo ajustes:', adjustmentsError);
       }
 
-      // ✅ CORREGIDO: Mapear empleados con validación de empresa
-      const employees = (payrolls || []).map(payroll => ({
-        id: payroll.employee_id,
-        name: `${payroll.employees?.nombre || ''} ${payroll.employees?.apellido || ''}`.trim(),
-        position: payroll.employees?.cargo || 'Sin cargo',
-        grossPay: Number(payroll.total_devengado) || 0,
-        netPay: Number(payroll.neto_pagado) || 0
-      }));
+      // ✅ CONSOLIDAR: Calcular novedades por empleado
+      const novedadesByEmployee = (novedades || []).reduce((acc, novedad) => {
+        if (!acc[novedad.empleado_id]) {
+          acc[novedad.empleado_id] = 0;
+        }
+        acc[novedad.empleado_id] += Number(novedad.valor) || 0;
+        return acc;
+      }, {} as Record<string, number>);
 
-      // ✅ CORREGIDO: Mapear ajustes con nombres seguros
+      // ✅ CONSOLIDAR: Mapear empleados con datos reales de liquidación
+      const employees = (payrolls || []).map(payroll => {
+        const empleadoNovedades = novedadesByEmployee[payroll.employee_id] || 0;
+        const salarioBase = Number(payroll.salario_base) || 0;
+        const totalDevengado = Number(payroll.total_devengado) || 0;
+        
+        return {
+          id: payroll.employee_id,
+          name: `${payroll.employees?.nombre || ''} ${payroll.employees?.apellido || ''}`.trim(),
+          position: payroll.employees?.cargo || 'Sin cargo',
+          grossPay: totalDevengado, // Ya incluye salario base + novedades
+          netPay: Number(payroll.neto_pagado) || 0,
+          baseSalary: salarioBase,
+          novedades: empleadoNovedades
+        };
+      });
+
+      // ✅ CONSOLIDAR: Mapear novedades para mostrar
+      const mappedNovedades = (novedades || []).map(novedad => {
+        const employee = payrolls?.find(p => p.employee_id === novedad.empleado_id);
+        return {
+          id: novedad.id,
+          employeeId: novedad.empleado_id,
+          employeeName: employee ? `${employee.employees?.nombre} ${employee.employees?.apellido}`.trim() : 'Sin nombre',
+          concept: novedad.tipo_novedad,
+          amount: Number(novedad.valor) || 0,
+          observations: novedad.observacion || '',
+          createdAt: novedad.created_at
+        };
+      });
+
+      // Mapear ajustes
       const mappedAdjustments = (adjustments || []).map(adj => {
         const employee = payrolls?.find(p => p.employee_id === adj.employee_id);
         return {
@@ -235,10 +297,23 @@ class HistoryServiceAleluyaClass {
         };
       });
 
-      // ✅ CORREGIDO: Totales calculados desde datos reales
-      const calculatedTotalDevengado = employees.reduce((sum, emp) => sum + emp.grossPay, 0);
-      const calculatedTotalNeto = employees.reduce((sum, emp) => sum + emp.netPay, 0);
-      const calculatedTotalDeducciones = calculatedTotalDevengado - calculatedTotalNeto;
+      // ✅ CONSOLIDAR: Totales reales que incluyen novedades
+      const totalSalarioBase = employees.reduce((sum, emp) => sum + emp.baseSalary, 0);
+      const totalNovedades = employees.reduce((sum, emp) => sum + emp.novedades, 0);
+      const totalDevengado = employees.reduce((sum, emp) => sum + emp.grossPay, 0);
+      const totalDeducciones = employees.reduce((sum, emp) => sum + (emp.grossPay - emp.netPay), 0);
+      const totalNeto = employees.reduce((sum, emp) => sum + emp.netPay, 0);
+
+      console.log('📊 TOTALES CONSOLIDADOS CON NOVEDADES:', {
+        periodId,
+        periodo: period.periodo,
+        totalSalarioBase,
+        totalNovedades,
+        totalDevengado,
+        totalDeducciones,
+        totalNeto,
+        empleados: employees.length
+      });
 
       return {
         period: {
@@ -250,12 +325,15 @@ class HistoryServiceAleluyaClass {
           type: period.tipo_periodo
         },
         summary: {
-          totalDevengado: calculatedTotalDevengado,
-          totalDeducciones: calculatedTotalDeducciones,
-          totalNeto: calculatedTotalNeto,
-          costoTotal: calculatedTotalDevengado
+          totalDevengado,
+          totalDeducciones,
+          totalNeto,
+          costoTotal: totalDevengado,
+          salarioBase: totalSalarioBase,
+          novedades: totalNovedades
         },
         employees,
+        novedades: mappedNovedades,
         adjustments: mappedAdjustments
       };
     } catch (error) {
@@ -274,7 +352,6 @@ class HistoryServiceAleluyaClass {
 
       if (!user) throw new Error('Usuario no autenticado');
 
-      // ✅ CORREGIDO: Validar que el período pertenece a la empresa
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('id')
@@ -286,7 +363,6 @@ class HistoryServiceAleluyaClass {
         throw new Error('Período no encontrado');
       }
 
-      // ✅ CORREGIDO: Validar que el empleado pertenece a la empresa
       const { data: employee, error: employeeError } = await supabase
         .from('employees')
         .select('id')
@@ -298,7 +374,6 @@ class HistoryServiceAleluyaClass {
         throw new Error('Empleado no encontrado');
       }
 
-      // ✅ CORREGIDO: Crear ajuste con validaciones completas
       const { error: insertError } = await supabase
         .from('payroll_adjustments')
         .insert({
@@ -322,14 +397,10 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ FUNCIÓN CORREGIDA: Generar PDF de comprobante
-   */
   async generateVoucherPDF(employeeId: string, periodId: string): Promise<void> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       
-      // ✅ CORREGIDO: Validar que el empleado pertenece a la empresa
       const { data: employee, error: employeeError } = await supabase
         .from('employees')
         .select('id, nombre, apellido')
@@ -343,7 +414,6 @@ class HistoryServiceAleluyaClass {
 
       console.log(`📄 Generando comprobante PDF para empleado ${employee.nombre} ${employee.apellido}`);
       
-      // Simulación de generación de PDF
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       console.log('✅ PDF generado exitosamente');
@@ -353,16 +423,12 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ CORREGIDO: Actualizar totales con transacción atómica
-   */
   async updatePeriodTotals(periodId: string): Promise<void> {
     try {
       console.log(`🔄 ACTUALIZANDO TOTALES CORREGIDOS para período: ${periodId}`);
       
       const companyId = await this.getCurrentUserCompanyId();
 
-      // ✅ CORREGIDO: Calcular totales en una sola consulta
       const { data: payrollTotals, error: totalsError } = await supabase
         .from('payrolls')
         .select('total_devengado, total_deducciones, neto_pagado')
@@ -379,7 +445,6 @@ class HistoryServiceAleluyaClass {
         return;
       }
 
-      // ✅ CORREGIDO: Calcular totales correctos
       const totalDevengado = payrollTotals.reduce((sum, record) => sum + (Number(record.total_devengado) || 0), 0);
       const totalDeducciones = payrollTotals.reduce((sum, record) => sum + (Number(record.total_deducciones) || 0), 0);
       const totalNeto = payrollTotals.reduce((sum, record) => sum + (Number(record.neto_pagado) || 0), 0);
@@ -392,7 +457,6 @@ class HistoryServiceAleluyaClass {
         empleados: payrollTotals.length
       });
 
-      // ✅ CORREGIDO: Actualizar con transacción atómica
       const { error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({
@@ -417,9 +481,6 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ CORREGIDO: Consolidar con novedades usando PayrollLiquidationService
-   */
   async consolidatePayrollWithNovedades(periodId: string): Promise<void> {
     try {
       console.log(`🔄 Consolidando novedades CORREGIDAS para período: ${periodId}`);
@@ -433,16 +494,12 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ CORREGIDO: Reparación completa con validaciones
-   */
   async repairPeriodSync(periodId: string): Promise<void> {
     try {
       console.log(`🔧 Iniciando reparación COMPLETA para período: ${periodId}`);
       
       const companyId = await this.getCurrentUserCompanyId();
       
-      // ✅ CORREGIDO: Validar que el período pertenece a la empresa
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('id')
@@ -454,10 +511,7 @@ class HistoryServiceAleluyaClass {
         throw new Error('Período no encontrado');
       }
 
-      // Paso 1: Consolidar novedades
       await this.consolidatePayrollWithNovedades(periodId);
-      
-      // Paso 2: Actualizar totales
       await this.updatePeriodTotals(periodId);
       
       console.log(`✅ Reparación COMPLETA exitosa para período ${periodId}`);
@@ -467,9 +521,6 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ CORREGIDO: Detectar períodos desincronizados con seguridad
-   */
   async detectDesynchronizedPeriods(): Promise<string[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -485,7 +536,6 @@ class HistoryServiceAleluyaClass {
       const desynchronizedPeriods: string[] = [];
 
       for (const period of periods || []) {
-        // ✅ CORREGIDO: Verificar con filtrado por empresa
         const { data: payrolls, error: payrollError } = await supabase
           .from('payrolls')
           .select('neto_pagado, total_deducciones')
@@ -494,7 +544,6 @@ class HistoryServiceAleluyaClass {
 
         if (payrollError) continue;
 
-        // ✅ CORREGIDO: Detectar inconsistencias específicas
         const hasPayrolls = payrolls && payrolls.length > 0;
         const hasZeroTotals = !period.total_neto || period.total_neto === 0;
         const hasZeroDeductions = !period.total_deducciones || period.total_deducciones === 0;
@@ -512,9 +561,6 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ CORREGIDO: Reparación masiva con validaciones
-   */
   async repairAllDesynchronizedPeriods(): Promise<number> {
     try {
       const desynchronizedPeriods = await this.detectDesynchronizedPeriods();
