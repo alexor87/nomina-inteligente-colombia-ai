@@ -1,5 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { EmployeeService } from './EmployeeService';
+import { EmployeeCRUDService } from './EmployeeCRUDService';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { PayrollCalculationBackendService } from './PayrollCalculationBackendService';
 import { DeductionCalculationService } from './DeductionCalculationService';
 import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025 } from '@/constants';
@@ -38,6 +40,42 @@ export class EmployeeUnifiedService {
     }
   }
 
+  // ✅ CRUD Methods - Delegating to existing services
+  static async create(employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>) {
+    console.log('🔄 EmployeeUnifiedService.create: Delegating to EmployeeService');
+    return EmployeeService.createEmployee(employeeData);
+  }
+
+  static async update(id: string, updates: Partial<EmployeeUnified>) {
+    console.log('🔄 EmployeeUnifiedService.update: Delegating to EmployeeService');
+    return EmployeeService.updateEmployee(id, updates);
+  }
+
+  static async delete(id: string) {
+    console.log('🔄 EmployeeUnifiedService.delete: Delegating to EmployeeService');
+    return EmployeeService.deleteEmployee(id);
+  }
+
+  static async getAll() {
+    console.log('🔄 EmployeeUnifiedService.getAll: Delegating to EmployeeService');
+    return EmployeeService.getEmployees();
+  }
+
+  static async getEmployeeById(id: string) {
+    console.log('🔄 EmployeeUnifiedService.getEmployeeById: Delegating to EmployeeService');
+    const employee = await EmployeeService.getEmployeeById(id);
+    if (!employee) {
+      return { success: false, error: 'Empleado no encontrado' };
+    }
+    return { success: true, data: employee };
+  }
+
+  static async changeStatus(id: string, newStatus: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad') {
+    console.log('🔄 EmployeeUnifiedService.changeStatus: Updating employee status');
+    return EmployeeService.updateEmployee(id, { estado: newStatus });
+  }
+
+  // ✅ PAYROLL Methods - Keep existing corrected payroll logic
   static async getEmployeesForPeriod(periodId: string): Promise<UnifiedEmployeeData[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
