@@ -47,8 +47,8 @@ export class PayrollCalculationSimple {
     // ✅ 3. TOTAL DEVENGADO
     const totalDevengado = salarioProporcional + auxilioTransporte;
 
-    // ✅ 4. IBC = salario_proporcional + auxilio_transporte
-    const ibc = salarioProporcional + auxilioTransporte;
+    // ✅ 4. IBC = SOLO salario_proporcional (auxilio NO se incluye en IBC)
+    const ibc = salarioProporcional;
 
     // ✅ 5. DEDUCCIONES: IBC * 4% (salud) + IBC * 4% (pensión)
     const saludEmpleado = ibc * 0.04;
