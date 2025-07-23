@@ -1,19 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, Users, DollarSign, Download, Edit, RefreshCw, AlertTriangle, Settings } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, DollarSign, Download, Edit, RefreshCw, AlertTriangle, Settings, CheckCircle } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatCurrency } from '@/lib/utils';
 import { HistoryServiceAleluya } from '@/services/HistoryServiceAleluya';
 import { PeriodRepairService } from '@/services/PeriodRepairService';
+import { PeriodValidationService } from '@/services/PeriodValidationService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-/**
- * ✅ PÁGINA DE DETALLES DEL PERÍODO - MEJORADA CON SINCRONIZACIÓN
- * Muestra información detallada de un período específico con capacidad de reparación
- */
 export const PayrollHistoryDetailsPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
@@ -22,7 +20,8 @@ export const PayrollHistoryDetailsPage = () => {
   const [periodData, setPeriodData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRepairing, setIsRepairing] = useState(false);
-  const [needsRepair, setNeedsRepair] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validation, setValidation] = useState<any>(null);
 
   // Cargar datos del período
   useEffect(() => {
@@ -43,11 +42,8 @@ export const PayrollHistoryDetailsPage = () => {
         
         setPeriodData(period);
         
-        // Verificar si necesita reparación (totales en 0 o deducciones en 0)
-        const needsRepairCheck = (period.empleados_count > 0) && 
-                               ((!period.total_deducciones || period.total_deducciones === 0) || 
-                                (!period.total_neto || period.total_neto === 0));
-        setNeedsRepair(needsRepairCheck);
+        // Validar período automáticamente
+        await validatePeriod();
         
       } catch (error) {
         console.error('Error cargando datos del período:', error);
@@ -63,6 +59,20 @@ export const PayrollHistoryDetailsPage = () => {
     
     loadPeriodData();
   }, [periodId, toast]);
+
+  const validatePeriod = async () => {
+    if (!periodId) return;
+    
+    try {
+      setIsValidating(true);
+      const validationResult = await PeriodValidationService.validateSpecificPeriod(periodId);
+      setValidation(validationResult);
+    } catch (error) {
+      console.error('Error validating period:', error);
+    } finally {
+      setIsValidating(false);
+    }
+  };
 
   const handleBack = () => {
     navigate('/app/payroll-history');
@@ -95,7 +105,9 @@ export const PayrollHistoryDetailsPage = () => {
       if (error) throw error;
       
       setPeriodData(updatedPeriod);
-      setNeedsRepair(false);
+      
+      // Revalidar período
+      await validatePeriod();
       
       toast({
         title: "✅ Período Reparado",
@@ -130,6 +142,8 @@ export const PayrollHistoryDetailsPage = () => {
       </div>
     );
   }
+
+  const needsRepair = validation && !validation.isValid;
 
   return (
     <div className="space-y-6">
@@ -180,18 +194,30 @@ export const PayrollHistoryDetailsPage = () => {
         </div>
       </div>
 
-      {/* Alerta de problemas con deducciones */}
-      {needsRepair && (
-        <Card className="border-orange-200 bg-orange-50">
+      {/* Estado de Validación */}
+      {validation && (
+        <Card className={`border-2 ${validation.isValid ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              {validation.isValid ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-orange-600" />
+              )}
               <div>
-                <h3 className="font-medium text-orange-900">Período Requiere Reparación</h3>
-                <p className="text-sm text-orange-700">
-                  Este período tiene deducciones en $0 o totales incorrectos. 
-                  Haz clic en "Reparar Período" para corregir los cálculos.
-                </p>
+                <h3 className={`font-medium ${validation.isValid ? 'text-green-900' : 'text-orange-900'}`}>
+                  {validation.isValid ? 'Período Validado Correctamente' : 'Período Requiere Atención'}
+                </h3>
+                {validation.issues.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {validation.issues.map((issue, index) => (
+                      <p key={index} className="text-sm text-orange-700">
+                        • {issue.description}
+                        {issue.autoRepairable && ' (Auto-reparable)'}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -238,6 +264,11 @@ export const PayrollHistoryDetailsPage = () => {
               {periodData.empleados_count || 0}
             </div>
             <p className="text-xs text-gray-500">Empleados procesados</p>
+            {validation && validation.summary.employeesWithIssues > 0 && (
+              <p className="text-xs text-orange-600 mt-1">
+                {validation.summary.employeesWithIssues} con problemas
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -250,10 +281,10 @@ export const PayrollHistoryDetailsPage = () => {
           </CardHeader>
           <CardContent>
             <div className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-green-600'}`}>
-              {needsRepair ? 'Requiere Reparación' : 'Correcto'}
+              {isValidating ? 'Validando...' : (needsRepair ? 'Requiere Reparación' : 'Correcto')}
             </div>
             <p className="text-xs text-gray-500">
-              {needsRepair ? 'Deducciones incorrectas' : 'Cálculos correctos'}
+              {needsRepair ? 'Cálculos incorrectos detectados' : 'Cálculos correctos'}
             </p>
           </CardContent>
         </Card>
