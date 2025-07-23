@@ -1,4 +1,3 @@
-
 import { NovedadType } from './novedades-enhanced';
 import { VacationAbsenceType } from './vacations';
 
@@ -24,6 +23,11 @@ export interface DisplayNovedad {
   // ✅ NUEVO: Flag para distinguir valores confirmados vs estimados
   isConfirmed: boolean;
   
+  // ✅ NUEVO: Soporte para fragmentación multi-período
+  isFragmented?: boolean;
+  originalDays?: number; // Días totales de la ausencia original
+  periodDays?: number;   // Días que corresponden a este período específico
+  
   // Permisos y visualización
   canEdit: boolean;
   canDelete: boolean;
@@ -45,7 +49,7 @@ export const UNIFIED_STATUS_MAPPING = {
     isConfirmed: false
   },
   'liquidada': {
-    display: 'Procesada', // ✅ CAMBIO: liquidada → Procesada
+    display: 'Procesada',
     color: 'bg-green-100 text-green-800',
     isConfirmed: true
   },
@@ -102,13 +106,38 @@ export const NOVEDAD_VISUAL_CONFIG = {
   badge: { icon: '📋', label: 'Novedad', color: 'bg-blue-100 text-blue-800' }
 };
 
-// ✅ ACTUALIZADO: Helpers para conversión con estados unificados
+// ✅ ACTUALIZADO: Convertir ausencias con fragmentación inteligente
 export const convertVacationToDisplay = (
   vacation: any, 
-  employeeSalary: number
+  employeeSalary: number,
+  periodStartDate?: string,
+  periodEndDate?: string
 ): DisplayNovedad => {
   const config = VACATION_VISUAL_CONFIG[vacation.type as VacationAbsenceType];
-  const valor = config.calculation(employeeSalary, vacation.days_count);
+  
+  // ✅ LÓGICA MEJORADA: Calcular días proporcionales al período
+  let displayDays = vacation.days_count;
+  let isFragmented = false;
+  
+  if (periodStartDate && periodEndDate) {
+    displayDays = calculatePeriodIntersectionDays(
+      vacation.start_date,
+      vacation.end_date,
+      periodStartDate,
+      periodEndDate
+    );
+    isFragmented = displayDays < vacation.days_count;
+    
+    console.log('🔄 Fragmentación aplicada:', {
+      originalDays: vacation.days_count,
+      periodDays: displayDays,
+      isFragmented,
+      vacationPeriod: `${vacation.start_date} - ${vacation.end_date}`,
+      payrollPeriod: `${periodStartDate} - ${periodEndDate}`
+    });
+  }
+  
+  const valor = config.calculation(employeeSalary, displayDays);
   
   // ✅ Determinar estado unificado
   const unifiedStatus = vacation.status === 'liquidada' ? 'procesada' : vacation.status;
@@ -120,7 +149,7 @@ export const convertVacationToDisplay = (
     periodo_id: vacation.processed_in_period_id,
     tipo_novedad: vacation.type,
     valor: Math.round(valor),
-    dias: vacation.days_count,
+    dias: displayDays,
     observacion: vacation.observations,
     fecha_inicio: vacation.start_date,
     fecha_fin: vacation.end_date,
@@ -132,17 +161,49 @@ export const convertVacationToDisplay = (
     // ✅ NUEVO: Estado confirmado basado en el status
     isConfirmed: statusConfig.isConfirmed,
     
-    canEdit: false, // Vacaciones se editan en su módulo
+    // ✅ NUEVO: Información de fragmentación
+    isFragmented,
+    originalDays: vacation.days_count,
+    periodDays: displayDays,
+    
+    canEdit: false,
     canDelete: vacation.status === 'pendiente',
     badgeColor: config.badge.color,
     badgeIcon: config.badge.icon,
-    badgeLabel: config.badge.label,
+    badgeLabel: isFragmented 
+      ? `${config.badge.label} (${displayDays}/${vacation.days_count} días)`
+      : config.badge.label,
     statusColor: statusConfig.color,
     
     created_at: vacation.created_at,
     updated_at: vacation.updated_at
   };
 };
+
+// ✅ NUEVA FUNCIÓN: Calcular intersección de días (centralizada)
+function calculatePeriodIntersectionDays(
+  vacationStart: string,
+  vacationEnd: string,
+  periodStart: string,
+  periodEnd: string
+): number {
+  const vacStartDate = new Date(vacationStart);
+  const vacEndDate = new Date(vacationEnd);
+  const perStartDate = new Date(periodStart);
+  const perEndDate = new Date(periodEnd);
+
+  const intersectionStart = new Date(Math.max(vacStartDate.getTime(), perStartDate.getTime()));
+  const intersectionEnd = new Date(Math.min(vacEndDate.getTime(), perEndDate.getTime()));
+
+  if (intersectionStart > intersectionEnd) {
+    return 0;
+  }
+
+  const diffTime = intersectionEnd.getTime() - intersectionStart.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+  return Math.max(0, diffDays);
+}
 
 export const convertNovedadToDisplay = (novedad: any): DisplayNovedad => {
   const statusConfig = UNIFIED_STATUS_MAPPING['registrada'];
@@ -161,7 +222,7 @@ export const convertNovedadToDisplay = (novedad: any): DisplayNovedad => {
     fecha_fin: novedad.fecha_fin,
     
     origen: 'novedades',
-    status: 'registrada', // Las novedades siempre están registradas
+    status: 'registrada',
     
     // ✅ NUEVO: Las novedades siempre están confirmadas
     isConfirmed: true,

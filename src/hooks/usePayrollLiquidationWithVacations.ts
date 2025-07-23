@@ -62,7 +62,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
       setConflictDetectionStep('completed');
       
       // ✅ USAR EL NUEVO MÉTODO CON INTEGRACIÓN AUTOMÁTICA
-      await payrollHook.loadEmployeesWithVacations(startDate, endDate);
+      await payrollHook.loadEmployees(startDate, endDate);
       
       console.log('✅ Employees loaded successfully with vacation integration');
       
@@ -117,7 +117,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
 
       // 2. Continuar con la carga de empleados + integración automática
       setConflictDetectionStep('completed');
-      await payrollHook.loadEmployeesWithVacations(startDate, endDate);
+      await payrollHook.loadEmployees(startDate, endDate);
 
       toast({
         title: "✅ Liquidación Lista",

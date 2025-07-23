@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 import { EmployeeSoftDeleteService } from './EmployeeSoftDeleteService';
@@ -181,5 +180,87 @@ export class EmployeeService {
    */
   static async restoreEmployee(id: string): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     return EmployeeSoftDeleteService.restoreEmployee(id);
+  }
+
+  /**
+   * Bulk delete employees (soft delete - changes status to 'eliminado')
+   */
+  static async bulkDeleteEmployees(employeeIds: string[]): Promise<{ success: boolean; results: { successful: number; failed: number; errors: string[] }; error?: string }> {
+    try {
+      console.log('🔄 EmployeeService: Bulk deleting employees:', employeeIds.length);
+      
+      const results = {
+        successful: 0,
+        failed: 0,
+        errors: [] as string[]
+      };
+
+      // Process each employee deletion
+      for (const employeeId of employeeIds) {
+        try {
+          const result = await EmployeeSoftDeleteService.softDeleteEmployee(employeeId);
+          if (result.success) {
+            results.successful++;
+          } else {
+            results.failed++;
+            results.errors.push(`Error eliminando empleado ${employeeId}: ${result.error}`);
+          }
+        } catch (error) {
+          results.failed++;
+          results.errors.push(`Error eliminando empleado ${employeeId}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+        }
+      }
+
+      console.log(`✅ EmployeeService: Bulk delete completed - ${results.successful} successful, ${results.failed} failed`);
+      return { success: true, results };
+    } catch (error) {
+      console.error('❌ EmployeeService: Error in bulkDeleteEmployees:', error);
+      return { 
+        success: false, 
+        results: { successful: 0, failed: employeeIds.length, errors: [] },
+        error: error instanceof Error ? error.message : 'Error desconocido' 
+      };
+    }
+  }
+
+  /**
+   * Bulk update employee status
+   */
+  static async bulkUpdateStatus(employeeIds: string[], newStatus: 'activo' | 'inactivo' | 'eliminado'): Promise<{ success: boolean; results: { successful: number; failed: number; errors: string[] }; error?: string }> {
+    try {
+      console.log('🔄 EmployeeService: Bulk updating employee status:', employeeIds.length, 'to', newStatus);
+      
+      const results = {
+        successful: 0,
+        failed: 0,
+        errors: [] as string[]
+      };
+
+      // Process each employee update
+      for (const employeeId of employeeIds) {
+        try {
+          const result = await this.updateEmployee(employeeId, { estado: newStatus });
+          if (result.success) {
+            results.successful++;
+          } else {
+            results.failed++;
+            results.errors.push(`Error actualizando empleado ${employeeId}: ${result.error}`);
+          }
+        } catch (error) {
+          results.failed++;
+          results.errors.push(`Error actualizando empleado ${employeeId}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+        }
+      }
+
+      console.log(`✅ EmployeeService: Bulk update completed - ${results.successful} successful, ${results.failed} failed`);
+      return { success: true, results };
+    } catch (error) {
+      console.error('❌ EmployeeService: Error in bulkUpdateStatus:', error);
+      return { 
+        success: false, 
+        results: { successful: 0, failed: employeeIds.length, errors: [] },
+        error: error instanceof Error ? error.message : 'Error desconocido' 
+      };
+    }
   }
 }

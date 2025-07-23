@@ -1,6 +1,6 @@
 
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
-import { VacationAbsence, VacationAbsenceFormData } from '@/types/vacations';
+import { VacationAbsence, VacationAbsenceFormData, requiresSubtype } from '@/types/vacations';
 import { CalendarDays } from 'lucide-react';
 import { useVacationAbsenceForm } from '@/hooks/useVacationAbsenceForm';
 import { useVacationEmployees } from '@/hooks/useVacationEmployees';
@@ -11,7 +11,7 @@ import { isValidDateRange } from '@/utils/dateUtils';
 interface VacationAbsenceFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: VacationAbsenceFormData) => Promise<void>;
+  onSubmit: (data: VacationAbsenceFormData, periodInfo?: any) => Promise<void>;
   editingVacation?: VacationAbsence | null;
   isSubmitting?: boolean;
 }
@@ -23,7 +23,14 @@ export const VacationAbsenceForm = ({
   editingVacation,
   isSubmitting = false
 }: VacationAbsenceFormProps) => {
-  const { formData, setFormData, calculatedDays } = useVacationAbsenceForm(editingVacation, isOpen);
+  const { 
+    formData, 
+    setFormData, 
+    calculatedDays, 
+    periodInfo, 
+    isDetectingPeriod 
+  } = useVacationAbsenceForm(editingVacation, isOpen);
+  
   const { data: employees = [] } = useVacationEmployees(isOpen);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,14 +40,27 @@ export const VacationAbsenceForm = ({
       return;
     }
 
+    // Verificar subtipo si es requerido
+    if (requiresSubtype(formData.type) && !formData.subtipo) {
+      alert('El subtipo es requerido para este tipo de ausencia');
+      return;
+    }
+
     // Use the centralized date validation utility
     if (!isValidDateRange(formData.start_date, formData.end_date)) {
       alert('La fecha de fin debe ser posterior a la fecha de inicio');
       return;
     }
 
+    // 🎯 VALIDACIÓN: Verificar que tengamos un período válido para nuevas ausencias
+    if (!editingVacation && (!periodInfo || !periodInfo.periodId)) {
+      alert('No se pudo determinar un período válido para las fechas seleccionadas. Por favor, seleccione fechas diferentes.');
+      return;
+    }
+
     try {
-      await onSubmit(formData);
+      // 🎯 CORRECCIÓN KISS: Pasar periodInfo como segundo parámetro
+      await onSubmit(formData, periodInfo);
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -63,6 +83,8 @@ export const VacationAbsenceForm = ({
           employees={employees}
           calculatedDays={calculatedDays}
           isSubmitting={isSubmitting}
+          periodInfo={periodInfo}
+          isDetectingPeriod={isDetectingPeriod}
         />
 
         <VacationFormActions

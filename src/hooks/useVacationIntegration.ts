@@ -14,15 +14,19 @@ export const useVacationIntegration = () => {
   ): Promise<VacationIntegrationResult> => {
     setIsProcessing(true);
     try {
-      console.log('🔄 Iniciando integración de vacaciones...');
+      console.log('🔄 Iniciando integración inteligente de vacaciones...');
       
       const result = await VacationPayrollIntegrationService.processVacationsForPayroll(options);
       setLastResult(result);
 
       if (result.success) {
+        // ✅ MEJORADO: Mensaje más descriptivo para fragmentación
+        const isFragmented = result.message.includes('intersections');
         toast({
           title: "✅ Integración completada",
-          description: result.message,
+          description: isFragmented 
+            ? `${result.message} - Días fragmentados correctamente por período`
+            : result.message,
           className: "border-green-200 bg-green-50"
         });
       } else {

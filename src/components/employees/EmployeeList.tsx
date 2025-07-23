@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2, Undo2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeService } from '@/services/EmployeeService';
+import { EmployeeBulkActions } from './EmployeeBulkActions';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
@@ -45,6 +46,8 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
   const [showFilters, setShowFilters] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedEmployees, setDeletedEmployees] = useState<EmployeeUnified[]>([]);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -145,6 +148,97 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
       await loadDeletedEmployees();
     }
     setShowDeleted(!showDeleted);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedEmployees.length === 0) return;
+
+    try {
+      setIsUpdating(true);
+      const result = await EmployeeService.bulkDeleteEmployees(selectedEmployees);
+      
+      if (result.success) {
+        const { results } = result;
+        if (results.successful > 0) {
+          toast({
+            title: "Empleados eliminados",
+            description: `${results.successful} empleado${results.successful !== 1 ? 's' : ''} eliminado${results.successful !== 1 ? 's' : ''} correctamente.`,
+          });
+        }
+        
+        if (results.failed > 0) {
+          toast({
+            title: "Algunos empleados no pudieron ser eliminados",
+            description: `${results.failed} empleado${results.failed !== 1 ? 's' : ''} no pudo${results.failed !== 1 ? 'ieron' : ''} ser eliminado${results.failed !== 1 ? 's' : ''}.`,
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "No se pudieron eliminar los empleados",
+          variant: "destructive"
+        });
+      }
+      
+      await refreshEmployees();
+      clearSelection();
+      setShowBulkDeleteDialog(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error inesperado al eliminar empleados",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleBulkUpdateStatus = async (newStatus: 'activo' | 'inactivo') => {
+    if (selectedEmployees.length === 0) return;
+
+    try {
+      setIsUpdating(true);
+      const result = await EmployeeService.bulkUpdateStatus(selectedEmployees, newStatus);
+      
+      if (result.success) {
+        const { results } = result;
+        const statusLabel = newStatus === 'activo' ? 'activado' : 'desactivado';
+        
+        if (results.successful > 0) {
+          toast({
+            title: "Estado actualizado",
+            description: `${results.successful} empleado${results.successful !== 1 ? 's' : ''} ${statusLabel}${results.successful !== 1 ? 's' : ''} correctamente.`,
+          });
+        }
+        
+        if (results.failed > 0) {
+          toast({
+            title: "Algunos empleados no pudieron ser actualizados",
+            description: `${results.failed} empleado${results.failed !== 1 ? 's' : ''} no pudo${results.failed !== 1 ? 'ieron' : ''} ser actualizado${results.failed !== 1 ? 's' : ''}.`,
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "No se pudo actualizar el estado de los empleados",
+          variant: "destructive"
+        });
+      }
+      
+      await refreshEmployees();
+      clearSelection();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error inesperado al actualizar empleados",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   if (isLoading) {
@@ -295,6 +389,16 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
         </div>
       )}
 
+      {/* Bulk Actions */}
+      {!showDeleted && (
+        <EmployeeBulkActions
+          selectedCount={selectedEmployees.length}
+          onBulkUpdateStatus={handleBulkUpdateStatus}
+          onBulkDelete={() => setShowBulkDeleteDialog(true)}
+          isUpdating={isUpdating}
+        />
+      )}
+
       {/* Employee Table */}
       <Card>
         <CardHeader>
@@ -416,6 +520,25 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar empleados seleccionados?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará (borrado lógico) {selectedEmployees.length} empleado{selectedEmployees.length !== 1 ? 's' : ''} seleccionado{selectedEmployees.length !== 1 ? 's' : ''}. 
+              Los empleados serán marcados como eliminados y podrán ser restaurados posteriormente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} disabled={isUpdating}>
+              {isUpdating ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

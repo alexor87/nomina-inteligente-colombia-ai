@@ -7,18 +7,19 @@ import { VacationAbsenceFiltersComponent } from '@/components/vacations/Vacation
 import { VacationAbsenceTable } from '@/components/vacations/VacationAbsenceTable';
 import { VacationAbsenceForm } from '@/components/vacations/VacationAbsenceForm';
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
+import { VacationConflictAlert } from '@/components/vacations/VacationConflictAlert';
 import { useUnifiedVacationsAbsences } from '@/hooks/useUnifiedVacationsAbsences';
 import { VacationAbsence, VacationAbsenceFilters } from '@/types/vacations';
 import { Plus, Calendar, Users, Clock, CheckCircle, RefreshCw, Database } from 'lucide-react';
 
-const VacationsAbsencesPage = () => {
+const VacationsAbsencesPageEnhanced = () => {
   const [filters, setFilters] = useState<VacationAbsenceFilters>({});
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [editingVacation, setEditingVacation] = useState<VacationAbsence | null>(null);
   const [selectedVacation, setSelectedVacation] = useState<VacationAbsence | null>(null);
 
-  console.log('🏖️ VacationsAbsencesPage rendered');
+  console.log('🏖️ VacationsAbsencesPageEnhanced rendered');
 
   const {
     vacationsAbsences,
@@ -76,25 +77,16 @@ const VacationsAbsencesPage = () => {
     setIsDetailOpen(true);
   };
 
-  const handleFormSubmit = async (formData: any, periodInfo?: any) => {
-    console.log('💾 Submitting form:', { formData, periodInfo });
-    
+  const handleFormSubmit = async (formData: any) => {
+    console.log('💾 Submitting form:', formData);
     try {
-      // 🎯 CORRECCIÓN KISS: Incluir periodo_id del periodInfo detectado
-      const submissionData = {
-        ...formData,
-        periodo_id: periodInfo?.periodId || null // Incluir el período detectado
-      };
-      
-      console.log('📋 Submission data with period:', submissionData);
-      
       if (editingVacation) {
         await updateVacationAbsence({
           id: editingVacation.id,
-          formData: submissionData
+          formData
         });
       } else {
-        await createVacationAbsence(submissionData);
+        await createVacationAbsence(formData);
       }
       setIsFormOpen(false);
       setEditingVacation(null);
@@ -121,7 +113,7 @@ const VacationsAbsencesPage = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header con información de integración */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Vacaciones y Ausencias</h1>
@@ -140,6 +132,11 @@ const VacationsAbsencesPage = () => {
           Nueva Ausencia
         </Button>
       </div>
+
+      {/* ✅ ALERTA DE CONFLICTOS EN EL MÓDULO CORRECTO */}
+      <VacationConflictAlert onConflictsResolved={() => {
+        // Recargar datos si es necesario
+      }} />
 
       {/* Estadísticas Unificadas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -209,20 +206,22 @@ const VacationsAbsencesPage = () => {
             <div>
               <h3 className="font-medium text-blue-800">Integración Automática Activa</h3>
               <p className="text-blue-700 text-sm">
-                Los registros creados aquí aparecen automáticamente en el módulo de novedades. 
-                Solo pasan a estado "liquidada" cuando se cierre el período de nómina.
+                Los registros creados aquí se sincronizan automáticamente con el módulo de novedades. 
+                El módulo de liquidación usa exclusivamente las novedades como fuente de datos.
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Filtros */}
       <VacationAbsenceFiltersComponent
         filters={filters}
         onFiltersChange={setFilters}
         onClearFilters={clearFilters}
       />
 
+      {/* Tabla */}
       <Card>
         <CardHeader>
           <CardTitle>Registros de Vacaciones y Ausencias</CardTitle>
@@ -274,4 +273,4 @@ const VacationsAbsencesPage = () => {
   );
 };
 
-export default VacationsAbsencesPage;
+export default VacationsAbsencesPageEnhanced;

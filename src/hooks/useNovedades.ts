@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
+import { PayrollIntegratedDataService } from '@/services/PayrollIntegratedDataService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -14,7 +15,6 @@ export const useNovedades = (periodId: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // ✅ FIXED: Updated to match actual service method signature
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['novedades', periodId],
     queryFn: async () => {
@@ -48,7 +48,7 @@ export const useNovedades = (periodId: string) => {
   });
 
   const createNovedad = useCallback(async (data: CreateNovedadData) => {
-    // ✅ FIXED: Ensure company_id is present
+    // Ensure company_id is present
     if (!data.company_id) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -69,17 +69,16 @@ export const useNovedades = (periodId: string) => {
     }
 
     try {
-      // ✅ Ensure all required fields are present
+      // Ensure all required fields are present
       const createData: CreateNovedadData = {
         ...data,
-        valor: data.valor || 0, // Ensure valor is never undefined
-        constitutivo_salario: data.constitutivo_salario || false // Provide default value
+        valor: data.valor || 0,
+        constitutivo_salario: data.constitutivo_salario || false
       };
 
       const result = await NovedadesEnhancedService.createNovedad(createData);
       
       if (result) {
-        // Refresh the list after creation
         await refetch();
         return { success: true, data: result };
       }
@@ -95,7 +94,6 @@ export const useNovedades = (periodId: string) => {
     try {
       const result = await NovedadesEnhancedService.updateNovedad(id, data);
       if (result) {
-        // Refresh the list after update
         await refetch();
         return { success: true, data: result };
       }
@@ -109,7 +107,6 @@ export const useNovedades = (periodId: string) => {
   const deleteNovedad = useCallback(async (id: string) => {
     try {
       await NovedadesEnhancedService.deleteNovedad(id);
-      // Refresh the list after deletion
       await refetch();
       return { success: true };
     } catch (error: any) {
@@ -118,43 +115,31 @@ export const useNovedades = (periodId: string) => {
     }
   }, [refetch]);
 
-  // ✅ FIXED: Properly type the returned objects to match DisplayNovedad interface
+  // SOLUCIÓN KISS: Usar servicio simplificado que ya no duplica datos
   const loadIntegratedNovedades = useCallback(async (employeeId: string): Promise<DisplayNovedad[]> => {
     try {
       if (!periodId) return [];
       
-      const novedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
-      
-      // Transform to expected format with all required properties properly typed
-      return novedades.map(novedad => {
-        const displayNovedad: DisplayNovedad = {
-          id: novedad.id,
-          empleado_id: novedad.empleado_id,
-          periodo_id: novedad.periodo_id,
-          tipo_novedad: novedad.tipo_novedad,
-          subtipo: (novedad as any).subtipo,
-          valor: novedad.valor || 0,
-          dias: novedad.dias,
-          horas: novedad.horas,
-          fecha_inicio: novedad.fecha_inicio,
-          fecha_fin: novedad.fecha_fin,
-          observacion: novedad.observacion,
-          origen: 'novedades' as const,
-          isConfirmed: true,
-          badgeLabel: 'Novedad',
-          badgeIcon: '📋',
-          badgeColor: 'bg-blue-100 text-blue-800',
-          status: 'registrada' as const, // ✅ FIXED: Explicitly type as const to ensure proper literal type
-          statusColor: 'text-blue-600',
-          canEdit: true,
-          canDelete: true,
-          created_at: novedad.created_at,
-          updated_at: novedad.updated_at
-        };
-        return displayNovedad;
+      console.log('🔄 useNovedades - Cargando datos unificados (sin duplicados):', {
+        employeeId,
+        periodId
       });
+
+      // Usar el servicio simplificado que solo consulta payroll_novedades
+      const unifiedData = await PayrollIntegratedDataService.getEmployeePeriodData(
+        employeeId,
+        periodId
+      );
+
+      console.log('✅ useNovedades - Datos unificados cargados sin duplicados:', {
+        totalElementos: unifiedData.length,
+        novedades: unifiedData.filter(item => item.origen === 'novedades').length,
+        ausenciasFragmentadas: unifiedData.filter(item => item.origen === 'vacaciones').length
+      });
+
+      return unifiedData;
     } catch (error) {
-      console.error('Error loading integrated novedades:', error);
+      console.error('❌ useNovedades - Error loading unified data:', error);
       return [];
     }
   }, [periodId]);
