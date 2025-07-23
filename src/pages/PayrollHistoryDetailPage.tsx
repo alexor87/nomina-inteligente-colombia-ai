@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +13,8 @@ import {
   Plus,
   FileText,
   User,
-  Calculator
+  Calculator,
+  Loader2
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { HistoryServiceAleluya, PeriodDetail } from '@/services/HistoryServiceAleluya';
@@ -59,20 +59,23 @@ export const PayrollHistoryDetailPage = () => {
   const handleDownloadVoucher = async (employeeId: string, employeeName: string) => {
     try {
       setDownloadingVoucher(employeeId);
-      const voucherUrl = await HistoryServiceAleluya.generateVoucherPDF(employeeId, periodId!);
-      
-      // Simular descarga (en producción abrir nueva ventana o descargar archivo)
-      window.open(voucherUrl, '_blank');
       
       toast({
-        title: "Comprobante generado",
-        description: `Comprobante de ${employeeName} generado exitosamente`,
+        title: "Generando comprobante",
+        description: `Preparando comprobante de ${employeeName}...`,
+      });
+
+      await HistoryServiceAleluya.generateVoucherPDF(employeeId, periodId!);
+      
+      toast({
+        title: "Comprobante descargado",
+        description: `Comprobante de ${employeeName} descargado exitosamente`,
       });
     } catch (error) {
       console.error('Error downloading voucher:', error);
       toast({
         title: "Error",
-        description: "No se pudo generar el comprobante",
+        description: error instanceof Error ? error.message : "No se pudo generar el comprobante",
         variant: "destructive",
       });
     } finally {
@@ -275,7 +278,11 @@ export const PayrollHistoryDetailPage = () => {
                         disabled={downloadingVoucher === employee.id}
                         className="flex items-center space-x-2"
                       >
-                        <Download className="h-4 w-4" />
+                        {downloadingVoucher === employee.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
                         <span>
                           {downloadingVoucher === employee.id ? 'Generando...' : 'Descargar'}
                         </span>
