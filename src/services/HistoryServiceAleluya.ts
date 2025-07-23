@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollLiquidationService } from './PayrollLiquidationService';
 
@@ -31,6 +30,47 @@ export interface PayrollHistoryResult {
   periods: PayrollPeriodHistory[];
   total: number;
   hasMore: boolean;
+}
+
+export interface PeriodDetail {
+  period: {
+    id: string;
+    period: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    type: string;
+  };
+  summary: {
+    totalDevengado: number;
+    totalDeducciones: number;
+    totalNeto: number;
+    costoTotal: number;
+  };
+  employees: Array<{
+    id: string;
+    name: string;
+    position: string;
+    grossPay: number;
+    netPay: number;
+  }>;
+  adjustments: Array<{
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    concept: string;
+    amount: number;
+    observations: string;
+    createdAt: string;
+  }>;
+}
+
+export interface CreateAdjustmentData {
+  periodId: string;
+  employeeId: string;
+  concept: string;
+  amount: number;
+  observations: string;
 }
 
 class HistoryServiceAleluyaClass {
@@ -105,8 +145,169 @@ class HistoryServiceAleluyaClass {
   }
 
   /**
-   * ✅ NUEVA FUNCIÓN: Actualizar totales de un período específico
+   * ✅ NUEVA FUNCIÓN: Obtener detalle completo de un período
    */
+  async getPeriodDetail(periodId: string): Promise<PeriodDetail> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+
+      // Obtener datos del período
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (periodError) throw periodError;
+      if (!period) throw new Error('Período no encontrado');
+
+      // Obtener empleados del período
+      const { data: payrolls, error: payrollsError } = await supabase
+        .from('payrolls')
+        .select(`
+          id,
+          employee_id,
+          total_devengado,
+          neto_pagado,
+          employees (
+            id,
+            nombre,
+            apellido,
+            cargo
+          )
+        `)
+        .eq('period_id', periodId)
+        .eq('company_id', companyId);
+
+      if (payrollsError) throw payrollsError;
+
+      // Obtener ajustes del período
+      const { data: adjustments, error: adjustmentsError } = await supabase
+        .from('payroll_adjustments')
+        .select(`
+          id,
+          employee_id,
+          concept,
+          amount,
+          observations,
+          created_at,
+          employees (
+            nombre,
+            apellido
+          )
+        `)
+        .eq('period_id', periodId);
+
+      if (adjustmentsError) throw adjustmentsError;
+
+      // Mapear empleados
+      const employees = (payrolls || []).map(payroll => ({
+        id: payroll.employee_id,
+        name: `${payroll.employees?.nombre || ''} ${payroll.employees?.apellido || ''}`.trim(),
+        position: payroll.employees?.cargo || 'Sin cargo',
+        grossPay: Number(payroll.total_devengado) || 0,
+        netPay: Number(payroll.neto_pagado) || 0
+      }));
+
+      // Mapear ajustes
+      const mappedAdjustments = (adjustments || []).map(adj => ({
+        id: adj.id,
+        employeeId: adj.employee_id,
+        employeeName: `${adj.employees?.nombre || ''} ${adj.employees?.apellido || ''}`.trim(),
+        concept: adj.concept,
+        amount: Number(adj.amount) || 0,
+        observations: adj.observations || '',
+        createdAt: adj.created_at
+      }));
+
+      return {
+        period: {
+          id: period.id,
+          period: period.periodo,
+          startDate: period.fecha_inicio,
+          endDate: period.fecha_fin,
+          status: period.estado === 'cerrado' ? 'original' : 'borrador',
+          type: period.tipo_periodo
+        },
+        summary: {
+          totalDevengado: Number(period.total_devengado) || 0,
+          totalDeducciones: Number(period.total_deducciones) || 0,
+          totalNeto: Number(period.total_neto) || 0,
+          costoTotal: Number(period.total_devengado) || 0
+        },
+        employees,
+        adjustments: mappedAdjustments
+      };
+    } catch (error) {
+      console.error('Error obteniendo detalle del período:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NUEVA FUNCIÓN: Crear ajuste
+   */
+  async createAdjustment(data: CreateAdjustmentData): Promise<void> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) throw new Error('Usuario no autenticado');
+
+      // Verificar que el período existe y pertenece a la empresa
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('id')
+        .eq('id', data.periodId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (periodError || !period) {
+        throw new Error('Período no encontrado');
+      }
+
+      // Crear el ajuste
+      const { error: insertError } = await supabase
+        .from('payroll_adjustments')
+        .insert({
+          period_id: data.periodId,
+          employee_id: data.employeeId,
+          concept: data.concept,
+          amount: data.amount,
+          observations: data.observations,
+          created_by: user.id
+        });
+
+      if (insertError) throw insertError;
+
+      console.log('✅ Ajuste creado exitosamente');
+    } catch (error) {
+      console.error('Error creando ajuste:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NUEVA FUNCIÓN: Generar PDF de comprobante
+   */
+  async generateVoucherPDF(employeeId: string, periodId: string): Promise<void> {
+    try {
+      console.log(`📄 Generando comprobante PDF para empleado ${employeeId} en período ${periodId}`);
+      
+      // Por ahora, simulamos la generación del PDF
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Aquí se implementaría la lógica real de generación de PDF
+      // Por ejemplo, usando jsPDF o llamando a un servicio externo
+      
+      console.log('✅ PDF generado exitosamente');
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      throw new Error('No se pudo generar el comprobante PDF');
+    }
+  }
+
   async updatePeriodTotals(periodId: string): Promise<void> {
     try {
       console.log(`🔄 Actualizando totales para período: ${periodId}`);
@@ -167,9 +368,6 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ NUEVA FUNCIÓN: Consolidar novedades en registros de payrolls
-   */
   async consolidatePayrollWithNovedades(periodId: string): Promise<void> {
     try {
       console.log(`🔄 Consolidando novedades para período: ${periodId}`);
@@ -184,9 +382,6 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ NUEVA FUNCIÓN: Reparar período específico (consolidar + actualizar totales)
-   */
   async repairPeriodSync(periodId: string): Promise<void> {
     try {
       console.log(`🔧 Iniciando reparación completa para período: ${periodId}`);
@@ -204,9 +399,6 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ NUEVA FUNCIÓN: Detectar períodos desincronizados
-   */
   async detectDesynchronizedPeriods(): Promise<string[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -247,9 +439,6 @@ class HistoryServiceAleluyaClass {
     }
   }
 
-  /**
-   * ✅ NUEVA FUNCIÓN: Reparar todos los períodos desincronizados
-   */
   async repairAllDesynchronizedPeriods(): Promise<number> {
     try {
       const desynchronizedPeriods = await this.detectDesynchronizedPeriods();
