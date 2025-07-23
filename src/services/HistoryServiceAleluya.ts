@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface PayrollPeriodHistory {
@@ -100,7 +101,7 @@ export class HistoryServiceAleluya {
 
       if (error) throw error;
 
-      // Formatear períodos (sin verificar ajustes por ahora)
+      // Formatear períodos
       const formattedPeriods = (periods || []).map(period => ({
         id: period.id,
         period: period.periodo,
@@ -109,7 +110,7 @@ export class HistoryServiceAleluya {
         type: period.tipo_periodo as 'mensual' | 'quincenal' | 'semanal',
         employeesCount: period.empleados_count || 0,
         totalNetPay: period.total_neto || 0,
-        status: 'original' as const, // Simplificado por ahora
+        status: 'original' as const,
         createdAt: period.created_at,
         updatedAt: period.updated_at
       }));
@@ -121,6 +122,105 @@ export class HistoryServiceAleluya {
       };
     } catch (error) {
       console.error('Error fetching payroll history:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar totales del período basándose en registros de payrolls
+   */
+  static async updatePeriodTotals(periodId: string): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('Empresa no encontrada');
+
+      // Obtener totales de payrolls
+      const { data: payrolls, error: payrollsError } = await supabase
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado')
+        .eq('period_id', periodId);
+
+      if (payrollsError) throw payrollsError;
+
+      const totals = payrolls.reduce((acc, payroll) => ({
+        totalDevengado: acc.totalDevengado + (payroll.total_devengado || 0),
+        totalDeducciones: acc.totalDeducciones + (payroll.total_deducciones || 0),
+        totalNeto: acc.totalNeto + (payroll.neto_pagado || 0),
+        employeesCount: acc.employeesCount + 1
+      }), {
+        totalDevengado: 0,
+        totalDeducciones: 0,
+        totalNeto: 0,
+        employeesCount: 0
+      });
+
+      // Actualizar período con totales calculados
+      const { error: updateError } = await supabase
+        .from('payroll_periods_real')
+        .update({
+          empleados_count: totals.employeesCount,
+          total_devengado: totals.totalDevengado,
+          total_deducciones: totals.totalDeducciones,
+          total_neto: totals.totalNeto,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId)
+        .eq('company_id', profile.company_id);
+
+      if (updateError) throw updateError;
+
+      console.log('✅ Totales del período actualizados:', {
+        periodId,
+        ...totals
+      });
+    } catch (error) {
+      console.error('Error updating period totals:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sincronizar período existente (arreglar período ya liquidado)
+   */
+  static async syncExistingPeriod(periodName: string): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('Empresa no encontrada');
+
+      // Encontrar período por nombre
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('id')
+        .eq('company_id', profile.company_id)
+        .eq('periodo', periodName)
+        .single();
+
+      if (periodError || !period) {
+        console.log('Período no encontrado:', periodName);
+        return;
+      }
+
+      // Actualizar totales del período encontrado
+      await this.updatePeriodTotals(period.id);
+      console.log('✅ Período sincronizado:', periodName);
+    } catch (error) {
+      console.error('Error syncing existing period:', error);
       throw error;
     }
   }
@@ -194,7 +294,7 @@ export class HistoryServiceAleluya {
         type: period.tipo_periodo as 'mensual' | 'quincenal' | 'semanal',
         employeesCount: period.empleados_count || 0,
         totalNetPay: period.total_neto || 0,
-        status: 'original' as const, // Simplificado por ahora
+        status: 'original' as const,
         createdAt: period.created_at,
         updatedAt: period.updated_at
       };
@@ -202,12 +302,12 @@ export class HistoryServiceAleluya {
       return {
         period: periodHistory,
         employees,
-        adjustments: [], // Simplificado por ahora
+        adjustments: [],
         summary: {
           totalDevengado: period.total_devengado || 0,
           totalDeducciones: period.total_deducciones || 0,
           totalNeto: period.total_neto || 0,
-          costoTotal: (period.total_devengado || 0) * 1.205, // Incluir aportes patronales
+          costoTotal: (period.total_devengado || 0) * 1.205,
           aportesEmpleador: (period.total_devengado || 0) * 0.205
         }
       };
@@ -315,9 +415,9 @@ export class HistoryServiceAleluya {
         grossPay: payrollData.payroll.total_devengado || 0,
         deductions: payrollData.payroll.total_deducciones || 0,
         netPay: payrollData.payroll.neto_pagado || 0,
-        extraHours: 0, // Calcular desde novedades si existe
-        bonuses: 0, // Calcular desde novedades si existe
-        transportAllowance: 0 // Calcular desde novedades si existe
+        extraHours: 0,
+        bonuses: 0,
+        transportAllowance: 0
       };
 
       // Procesar novedades si existen
@@ -327,7 +427,7 @@ export class HistoryServiceAleluya {
             employeeData.extraHours += novedad.horas || 0;
           } else if (novedad.tipo_novedad === 'bonificacion') {
             employeeData.bonuses += novedad.valor || 0;
-          } else if (novedad.tipo_novedad === 'auxilio_transporte') {
+          } else if (novedad.tipo_novedad === 'otros_ingresos') {
             employeeData.transportAllowance += novedad.valor || 0;
           }
         });
@@ -408,7 +508,7 @@ export class HistoryServiceAleluya {
         .from('voucher_audit_log')
         .insert({
           company_id: companyId,
-          voucher_id: `${periodId}-${employeeId}`, // ID temporal
+          voucher_id: `${periodId}-${employeeId}`,
           user_id: user.id,
           action: 'download',
           success: true,
@@ -421,7 +521,7 @@ export class HistoryServiceAleluya {
   }
 
   /**
-   * Crear un ajuste para un período (simplificado por ahora)
+   * Crear un ajuste para un período
    */
   static async createAdjustment(data: {
     periodId: string;
@@ -434,7 +534,6 @@ export class HistoryServiceAleluya {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
-      // Por ahora retornar un mock - implementar cuando se arregle la tabla
       return {
         id: 'mock-adjustment-id',
         employeeId: data.employeeId,

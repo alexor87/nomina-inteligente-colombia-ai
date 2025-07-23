@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { usePayrollUnified } from './usePayrollUnified';
 import { useToast } from '@/hooks/use-toast';
+import { HistoryServiceAleluya } from '@/services/HistoryServiceAleluya';
 
 export const usePayrollLiquidationSimplified = (companyId: string) => {
   const { toast } = useToast();
@@ -41,12 +42,50 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     }
   }, [companyId, payrollHook, toast]);
 
+  // ✅ MÉTODO DE LIQUIDACIÓN MEJORADO: Actualizar totales después de liquidar
+  const liquidatePayroll = useCallback(async (
+    startDate: string,
+    endDate: string
+  ) => {
+    try {
+      console.log('🔄 Iniciando liquidación de nómina...');
+      
+      // Ejecutar liquidación original
+      await payrollHook.liquidatePayroll(startDate, endDate);
+      
+      // Actualizar totales del período después de liquidar
+      if (payrollHook.currentPeriodId) {
+        console.log('🔄 Actualizando totales del período...');
+        await HistoryServiceAleluya.updatePeriodTotals(payrollHook.currentPeriodId);
+        console.log('✅ Totales actualizados');
+      }
+      
+      toast({
+        title: "✅ Liquidación Completada",
+        description: "Nómina liquidada y totales actualizados",
+        className: "border-green-200 bg-green-50"
+      });
+      
+    } catch (error) {
+      console.error('❌ Error en liquidación:', error);
+      
+      toast({
+        title: "❌ Error",
+        description: "Error al liquidar nómina",
+        variant: "destructive"
+      });
+      
+      throw error;
+    }
+  }, [payrollHook, toast]);
+
   return {
     // Estado del proceso de liquidación
     ...payrollHook,
     
-    // Método simplificado
+    // Métodos actualizados
     loadEmployees,
+    liquidatePayroll,
     
     // Estado calculado
     canProceedWithLiquidation: payrollHook.employees.length > 0,
