@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { usePayrollUnified } from './usePayrollUnified';
 import { useToast } from '@/hooks/use-toast';
 import { HistoryServiceAleluya } from '@/services/HistoryServiceAleluya';
+import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 
 export const usePayrollLiquidationSimplified = (companyId: string) => {
   const { toast } = useToast();
@@ -45,29 +46,30 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     endDate: string
   ) => {
     try {
-      console.log('🔄 Iniciando liquidación de nómina...');
+      console.log('🔄 Iniciando liquidación quincenal simplificada...');
       
+      // Liquidar usando el flujo unificado (incluye consolidación de novedades)
       await payrollHook.liquidatePayroll(startDate, endDate);
       
-      // Actualizar totales del período después de liquidar
+      // Actualizar totales del período después de liquidar y consolidar
       if (payrollHook.currentPeriodId) {
-        console.log('🔄 Actualizando totales del período...');
+        console.log('🔄 Actualizando totales del período post-consolidación...');
         await HistoryServiceAleluya.updatePeriodTotals(payrollHook.currentPeriodId);
-        console.log('✅ Totales actualizados');
+        console.log('✅ Totales finales actualizados');
       }
       
       toast({
-        title: "✅ Liquidación Completada",
-        description: "Nómina liquidada y totales actualizados",
+        title: "✅ Liquidación Quincenal Completada",
+        description: "Nómina liquidada con novedades consolidadas y totales actualizados",
         className: "border-green-200 bg-green-50"
       });
       
     } catch (error) {
-      console.error('❌ Error en liquidación:', error);
+      console.error('❌ Error en liquidación quincenal:', error);
       
       toast({
-        title: "❌ Error",
-        description: "Error al liquidar nómina",
+        title: "❌ Error en Liquidación",
+        description: "Error al liquidar nómina quincenal",
         variant: "destructive"
       });
       

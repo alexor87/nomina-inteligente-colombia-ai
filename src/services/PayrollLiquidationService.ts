@@ -356,4 +356,186 @@ export class PayrollLiquidationService {
       };
     }
   }
+
+  /**
+   * ✅ NUEVO MÉTODO: Consolidar novedades en registros de payrolls
+   * Este método actualiza los registros de payrolls con los valores finales incluyendo novedades
+   */
+  static async consolidatePayrollWithNovedades(periodId: string): Promise<void> {
+    try {
+      console.log('🔄 Iniciando consolidación de novedades para período:', periodId);
+      
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+
+      // Obtener todos los empleados del período
+      const { data: payrollRecords, error: payrollError } = await supabase
+        .from('payrolls')
+        .select('id, employee_id, salario_base, dias_trabajados, auxilio_transporte, total_devengado, total_deducciones')
+        .eq('period_id', periodId)
+        .eq('company_id', companyId);
+
+      if (payrollError) {
+        throw payrollError;
+      }
+
+      if (!payrollRecords || payrollRecords.length === 0) {
+        console.log('⚠️ No hay registros de payroll para consolidar');
+        return;
+      }
+
+      // Obtener totales de novedades para todos los empleados
+      const employeeIds = payrollRecords.map(record => record.employee_id);
+      const novedadesTotals = await NovedadesCalculationService.calculateAllEmployeesNovedadesTotals(employeeIds, periodId);
+
+      // Consolidar cada registro de payroll
+      for (const payrollRecord of payrollRecords) {
+        const employeeNovedades = novedadesTotals[payrollRecord.employee_id] || {
+          totalDevengos: 0,
+          totalDeducciones: 0,
+          totalNeto: 0,
+          hasNovedades: false
+        };
+
+        // Calcular valores consolidados
+        const salarioBase = Number(payrollRecord.salario_base) || 0;
+        const auxilioTransporte = Number(payrollRecord.auxilio_transporte) || 0;
+        const diasTrabajados = Number(payrollRecord.dias_trabajados) || 15;
+        
+        // Calcular salario proporcional
+        const salarioProporcional = (salarioBase / 30) * diasTrabajados;
+        
+        // Calcular deducciones básicas
+        const deductionResult = await DeductionCalculationService.calculateDeductions({
+          salarioBase: salarioBase,
+          totalDevengado: salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos,
+          auxilioTransporte: auxilioTransporte,
+          periodType: 'quincenal'
+        });
+
+        // Valores finales consolidados
+        const totalDevengadoFinal = salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos;
+        const totalDeduccionesFinal = deductionResult.totalDeducciones + employeeNovedades.totalDeducciones;
+        const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
+
+        // Obtener novedades específicas para campos detallados
+        const novedadesDetalle = await NovedadesCalculationService.getEmployeeNovedades(payrollRecord.employee_id, periodId);
+        
+        let horasExtra = 0;
+        let licenciasRemuneradas = 0;
+        let ausencias = 0;
+        let bonificaciones = 0;
+        let incapacidades = 0;
+        
+        novedadesDetalle.forEach(novedad => {
+          const valor = Number(novedad.valor) || 0;
+          switch (novedad.tipo_novedad) {
+            case 'horas_extra':
+            case 'recargo_nocturno':
+            case 'recargo_dominical':
+              horasExtra += valor;
+              break;
+            case 'licencia_remunerada':
+            case 'vacaciones':
+              licenciasRemuneradas += valor;
+              break;
+            case 'ausencia':
+            case 'licencia_no_remunerada':
+              ausencias += Math.abs(valor); // Valor absoluto para mostrar positivo
+              break;
+            case 'bonificacion':
+            case 'comision':
+            case 'prima':
+              bonificaciones += valor;
+              break;
+            case 'incapacidad':
+              incapacidades += valor;
+              break;
+          }
+        });
+
+        // Actualizar registro en payrolls con valores consolidados
+        const { error: updateError } = await supabase
+          .from('payrolls')
+          .update({
+            total_devengado: totalDevengadoFinal,
+            total_deducciones: totalDeduccionesFinal,
+            neto_pagado: netoPagadoFinal,
+            // Campos específicos de novedades
+            horas_extra: horasExtra,
+            licencias_remuneradas: licenciasRemuneradas,
+            ausencias: ausencias,
+            bonificaciones: bonificaciones,
+            incapacidades: incapacidades,
+            // Deducciones detalladas
+            salud_empleado: deductionResult.saludEmpleado,
+            pension_empleado: deductionResult.pensionEmpleado,
+            fondo_solidaridad: deductionResult.fondoSolidaridad,
+            retencion_fuente: deductionResult.retencionFuente,
+            otras_deducciones: employeeNovedades.totalDeducciones,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', payrollRecord.id);
+
+        if (updateError) {
+          console.error(`❌ Error actualizando payroll para empleado ${payrollRecord.employee_id}:`, updateError);
+        } else {
+          console.log(`✅ Payroll consolidado para empleado ${payrollRecord.employee_id}: Neto = ${netoPagadoFinal}`);
+        }
+      }
+
+      // Actualizar totales del período
+      await this.updatePeriodTotals(periodId);
+      
+      console.log('✅ Consolidación de novedades completada exitosamente');
+      
+    } catch (error) {
+      console.error('❌ Error en consolidación de novedades:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ MÉTODO AUXILIAR: Actualizar totales del período
+   */
+  private static async updatePeriodTotals(periodId: string): Promise<void> {
+    try {
+      // Recalcular totales del período basados en los registros actualizados
+      const { data: totalsData, error: totalsError } = await supabase
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado')
+        .eq('period_id', periodId);
+
+      if (totalsError) {
+        throw totalsError;
+      }
+
+      if (totalsData && totalsData.length > 0) {
+        const totalDevengado = totalsData.reduce((sum, record) => sum + (Number(record.total_devengado) || 0), 0);
+        const totalDeducciones = totalsData.reduce((sum, record) => sum + (Number(record.total_deducciones) || 0), 0);
+        const totalNeto = totalsData.reduce((sum, record) => sum + (Number(record.neto_pagado) || 0), 0);
+
+        // Actualizar totales en payroll_periods_real
+        const { error: updatePeriodError } = await supabase
+          .from('payroll_periods_real')
+          .update({
+            total_devengado: totalDevengado,
+            total_deducciones: totalDeducciones,
+            total_neto: totalNeto,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', periodId);
+
+        if (updatePeriodError) {
+          console.error('❌ Error actualizando totales del período:', updatePeriodError);
+        } else {
+          console.log(`✅ Totales del período actualizados: Devengado=${totalDevengado}, Neto=${totalNeto}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error actualizando totales del período:', error);
+    }
+  }
 }
