@@ -1,10 +1,9 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeService } from './EmployeeService';
 import { EmployeeCRUDService } from './EmployeeCRUDService';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { PayrollCalculationBackendService } from './PayrollCalculationBackendService';
-import { DeductionCalculationService } from './DeductionCalculationService';
-import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025 } from '@/constants';
+import { PayrollCalculationSimple } from './PayrollCalculationSimple';
 
 export interface UnifiedEmployeeData {
   id: string;
@@ -75,7 +74,7 @@ export class EmployeeUnifiedService {
     return EmployeeService.updateEmployee(id, { estado: newStatus });
   }
 
-  // ✅ PAYROLL Methods - Keep existing corrected payroll logic
+  // ✅ PAYROLL Methods - Usando ÚNICAMENTE PayrollCalculationSimple
   static async getEmployeesForPeriod(periodId: string): Promise<UnifiedEmployeeData[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -83,7 +82,7 @@ export class EmployeeUnifiedService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      console.log('🔄 Cargando empleados con cálculos corregidos 2025...');
+      console.log('🎯 Cargando empleados con cálculos SIMPLES 2025...');
 
       // Obtener empleados del período
       const { data: payrollData, error: payrollError } = await supabase
@@ -111,73 +110,56 @@ export class EmployeeUnifiedService {
         return [];
       }
 
-      // Procesar cada empleado con cálculos corregidos
-      const processedEmployees: UnifiedEmployeeData[] = await Promise.all(
-        payrollData.map(async (payroll) => {
-          const employee = payroll.employees;
-          const baseSalary = employee.salario_base;
-          const workedDays = payroll.dias_trabajados;
+      // Procesar cada empleado con cálculos SIMPLES
+      const processedEmployees: UnifiedEmployeeData[] = payrollData.map(payroll => {
+        const employee = payroll.employees;
+        const baseSalary = employee.salario_base;
+        const workedDays = payroll.dias_trabajados;
 
-          try {
-            // ✅ CORRECCIÓN: Usar valores 2025 correctos
-            const salarioProporcional = (baseSalary / 30) * workedDays;
-            
-            // ✅ CORRECCIÓN: Auxilio de transporte según límite 2025
-            const dosSmmlv2025 = SALARIO_MINIMO_2025 * 2; // $2,847,000
-            const transportAllowance = baseSalary <= dosSmmlv2025 
-              ? Math.round((AUXILIO_TRANSPORTE_2025 / 30) * workedDays)
-              : 0;
+        try {
+          // ✅ USAR ÚNICAMENTE PayrollCalculationSimple
+          const calculation = PayrollCalculationSimple.calculate({
+            salarioBase: baseSalary,
+            diasTrabajados: workedDays
+          });
 
-            const totalEarnings = salarioProporcional + transportAllowance;
+          console.log(`✅ ${employee.nombre}: Base $${baseSalary.toLocaleString()}, Días ${workedDays}, Auxilio $${calculation.auxilioTransporte.toLocaleString()}, Neto $${calculation.netoPagar.toLocaleString()}`);
 
-            // ✅ CORRECCIÓN: Usar servicio de deducciones corregido
-            const deductionResult = await DeductionCalculationService.calculateDeductions({
-              salarioBase: baseSalary,
-              totalDevengado: totalEarnings,
-              auxilioTransporte: transportAllowance,
-              periodType: workedDays === 15 ? 'quincenal' : 'mensual'
-            });
-
-            const netPay = totalEarnings - deductionResult.totalDeducciones;
-
-            console.log(`✅ Empleado ${employee.nombre}: Salario base: $${baseSalary.toLocaleString()}, Auxilio: $${transportAllowance.toLocaleString()}, Neto: $${netPay.toLocaleString()}`);
-
-            return {
-              id: employee.id,
-              name: `${employee.nombre} ${employee.apellido}`,
-              baseSalary,
-              workedDays,
-              transportAllowance,
-              totalEarnings: Math.round(totalEarnings),
-              healthDeduction: Math.round(deductionResult.saludEmpleado),
-              pensionDeduction: Math.round(deductionResult.pensionEmpleado),
-              totalDeductions: Math.round(deductionResult.totalDeducciones),
-              netPay: Math.round(netPay),
-              status: 'valid' as const,
-              errors: []
-            };
-          } catch (error) {
-            console.error(`❌ Error calculando empleado ${employee.nombre}:`, error);
-            return {
-              id: employee.id,
-              name: `${employee.nombre} ${employee.apellido}`,
-              baseSalary,
-              workedDays,
-              transportAllowance: 0,
-              totalEarnings: 0,
-              healthDeduction: 0,
-              pensionDeduction: 0,
-              totalDeductions: 0,
-              netPay: 0,
-              status: 'error' as const,
-              errors: ['Error en cálculo: ' + (error instanceof Error ? error.message : 'Error desconocido')]
-            };
-          }
-        })
-      );
+          return {
+            id: employee.id,
+            name: `${employee.nombre} ${employee.apellido}`,
+            baseSalary,
+            workedDays,
+            transportAllowance: calculation.auxilioTransporte,
+            totalEarnings: calculation.totalDevengado,
+            healthDeduction: calculation.saludEmpleado,
+            pensionDeduction: calculation.pensionEmpleado,
+            totalDeductions: calculation.totalDeducciones,
+            netPay: calculation.netoPagar,
+            status: 'valid' as const,
+            errors: []
+          };
+        } catch (error) {
+          console.error(`❌ Error calculando empleado ${employee.nombre}:`, error);
+          return {
+            id: employee.id,
+            name: `${employee.nombre} ${employee.apellido}`,
+            baseSalary,
+            workedDays,
+            transportAllowance: 0,
+            totalEarnings: 0,
+            healthDeduction: 0,
+            pensionDeduction: 0,
+            totalDeductions: 0,
+            netPay: 0,
+            status: 'error' as const,
+            errors: ['Error en cálculo: ' + (error instanceof Error ? error.message : 'Error desconocido')]
+          };
+        }
+      });
 
       console.log(`📊 Total empleados procesados: ${processedEmployees.length}`);
-      console.log(`💰 Resumen cálculos: Auxilio aplicado a ${processedEmployees.filter(e => e.transportAllowance > 0).length} empleados`);
+      console.log(`💰 Empleados con auxilio: ${processedEmployees.filter(e => e.transportAllowance > 0).length}`);
 
       return processedEmployees;
     } catch (error) {
@@ -193,9 +175,9 @@ export class EmployeeUnifiedService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      console.log('🔄 Actualizando registros de nómina con cálculos corregidos...');
+      console.log('🔄 Actualizando registros de nómina con cálculos SIMPLES...');
 
-      // Obtener empleados con cálculos corregidos
+      // Obtener empleados con cálculos SIMPLES
       const correctedEmployees = await this.getEmployeesForPeriod(periodId);
 
       // Actualizar cada registro en la base de datos
@@ -249,17 +231,7 @@ export class EmployeeUnifiedService {
     }
   }
 
-  static getConfigurationInfo(): {
-    salarioMinimo: number;
-    auxilioTransporte: number;
-    limitAuxilio: number;
-    year: string;
-  } {
-    return {
-      salarioMinimo: SALARIO_MINIMO_2025,
-      auxilioTransporte: AUXILIO_TRANSPORTE_2025,
-      limitAuxilio: SALARIO_MINIMO_2025 * 2,
-      year: '2025'
-    };
+  static getConfigurationInfo() {
+    return PayrollCalculationSimple.getConfigurationInfo();
   }
 }
