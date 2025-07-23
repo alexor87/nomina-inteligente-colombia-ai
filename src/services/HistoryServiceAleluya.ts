@@ -182,9 +182,18 @@ class HistoryServiceAleluyaClass {
 
       if (payrollsError) throw payrollsError;
 
-      // Obtener ajustes usando SQL directo para evitar problemas de tipos
+      // Obtener ajustes del período usando acceso directo
       const { data: adjustments, error: adjustmentsError } = await supabase
-        .rpc('get_period_adjustments', { period_id: periodId });
+        .from('payroll_adjustments')
+        .select(`
+          id,
+          employee_id,
+          concept,
+          amount,
+          observations,
+          created_at
+        `)
+        .eq('period_id', periodId);
 
       if (adjustmentsError) {
         console.warn('Error obteniendo ajustes:', adjustmentsError);
@@ -200,15 +209,24 @@ class HistoryServiceAleluyaClass {
         netPay: Number(payroll.neto_pagado) || 0
       }));
 
-      // Mapear ajustes con fallback a array vacío
-      const mappedAdjustments = (adjustments || []).map((adj: any) => ({
-        id: adj.id,
-        employeeId: adj.employee_id,
-        employeeName: adj.employee_name || 'Sin nombre',
-        concept: adj.concept,
-        amount: Number(adj.amount) || 0,
-        observations: adj.observations || '',
-        createdAt: adj.created_at
+      // Mapear ajustes con fallback a array vacío y obtener nombres de empleados
+      const mappedAdjustments = await Promise.all((adjustments || []).map(async (adj: any) => {
+        // Obtener nombre del empleado
+        const { data: employee } = await supabase
+          .from('employees')
+          .select('nombre, apellido')
+          .eq('id', adj.employee_id)
+          .single();
+
+        return {
+          id: adj.id,
+          employeeId: adj.employee_id,
+          employeeName: employee ? `${employee.nombre} ${employee.apellido}`.trim() : 'Sin nombre',
+          concept: adj.concept,
+          amount: Number(adj.amount) || 0,
+          observations: adj.observations || '',
+          createdAt: adj.created_at
+        };
       }));
 
       return {
@@ -257,15 +275,16 @@ class HistoryServiceAleluyaClass {
         throw new Error('Período no encontrado');
       }
 
-      // Crear el ajuste usando SQL directo
+      // Crear el ajuste usando acceso directo a tabla
       const { error: insertError } = await supabase
-        .rpc('create_payroll_adjustment', {
-          p_period_id: data.periodId,
-          p_employee_id: data.employeeId,
-          p_concept: data.concept,
-          p_amount: data.amount,
-          p_observations: data.observations,
-          p_created_by: user.id
+        .from('payroll_adjustments')
+        .insert({
+          period_id: data.periodId,
+          employee_id: data.employeeId,
+          concept: data.concept,
+          amount: data.amount,
+          observations: data.observations,
+          created_by: user.id
         });
 
       if (insertError) {
