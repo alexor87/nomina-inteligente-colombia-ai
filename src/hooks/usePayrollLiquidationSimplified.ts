@@ -8,7 +8,6 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   const { toast } = useToast();
   const payrollHook = usePayrollUnified(companyId);
 
-  // ✅ MÉTODO PRINCIPAL SIMPLIFICADO: Solo cargar empleados y usar novedades
   const loadEmployees = useCallback(async (
     startDate: string,
     endDate: string
@@ -16,7 +15,6 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     try {
       console.log('👥 Loading employees for payroll liquidation...');
       
-      // Cargar empleados directamente - las novedades se cargan automáticamente
       await payrollHook.loadEmployees(startDate, endDate);
       
       console.log('✅ Employees loaded successfully');
@@ -42,7 +40,6 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     }
   }, [companyId, payrollHook, toast]);
 
-  // ✅ MÉTODO DE LIQUIDACIÓN MEJORADO: Actualizar totales después de liquidar
   const liquidatePayroll = useCallback(async (
     startDate: string,
     endDate: string
@@ -50,7 +47,6 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     try {
       console.log('🔄 Iniciando liquidación de nómina...');
       
-      // Ejecutar liquidación original
       await payrollHook.liquidatePayroll(startDate, endDate);
       
       // Actualizar totales del período después de liquidar
@@ -80,18 +76,11 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   }, [payrollHook, toast]);
 
   return {
-    // Estado del proceso de liquidación
     ...payrollHook,
-    
-    // Métodos actualizados
     loadEmployees,
     liquidatePayroll,
-    
-    // Estado calculado
     canProceedWithLiquidation: payrollHook.employees.length > 0,
     isLoadingEmployees: payrollHook.isLoading,
-    
-    // Propiedades faltantes con valores por defecto
     isAutoSaving: false,
     lastAutoSaveTime: undefined,
     isRemovingEmployee: false

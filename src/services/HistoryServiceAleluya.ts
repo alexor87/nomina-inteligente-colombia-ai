@@ -49,6 +49,24 @@ export interface PeriodDetail {
 
 export class HistoryServiceAleluya {
   /**
+   * Helper para obtener datos de usuario y empresa
+   */
+  private static async getUserAndCompany() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Usuario no autenticado');
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!profile?.company_id) throw new Error('Empresa no encontrada');
+
+    return { user, companyId: profile.company_id };
+  }
+
+  /**
    * Obtener períodos liquidados con filtros
    */
   static async getPayrollHistory(filters: {
@@ -62,21 +80,12 @@ export class HistoryServiceAleluya {
     hasMore: boolean;
   }> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.company_id) throw new Error('Empresa no encontrada');
+      const { companyId } = await this.getUserAndCompany();
 
       let query = supabase
         .from('payroll_periods_real')
         .select('*', { count: 'exact' })
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .eq('estado', 'cerrado')
         .order('fecha_inicio', { ascending: false });
 
@@ -101,7 +110,6 @@ export class HistoryServiceAleluya {
 
       if (error) throw error;
 
-      // Formatear períodos
       const formattedPeriods = (periods || []).map(period => ({
         id: period.id,
         period: period.periodo,
@@ -131,16 +139,7 @@ export class HistoryServiceAleluya {
    */
   static async updatePeriodTotals(periodId: string): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.company_id) throw new Error('Empresa no encontrada');
+      const { companyId } = await this.getUserAndCompany();
 
       // Obtener totales de payrolls
       const { data: payrolls, error: payrollsError } = await supabase
@@ -173,7 +172,7 @@ export class HistoryServiceAleluya {
           updated_at: new Date().toISOString()
         })
         .eq('id', periodId)
-        .eq('company_id', profile.company_id);
+        .eq('company_id', companyId);
 
       if (updateError) throw updateError;
 
@@ -188,65 +187,18 @@ export class HistoryServiceAleluya {
   }
 
   /**
-   * Sincronizar período existente (arreglar período ya liquidado)
-   */
-  static async syncExistingPeriod(periodName: string): Promise<void> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.company_id) throw new Error('Empresa no encontrada');
-
-      // Encontrar período por nombre
-      const { data: period, error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .select('id')
-        .eq('company_id', profile.company_id)
-        .eq('periodo', periodName)
-        .single();
-
-      if (periodError || !period) {
-        console.log('Período no encontrado:', periodName);
-        return;
-      }
-
-      // Actualizar totales del período encontrado
-      await this.updatePeriodTotals(period.id);
-      console.log('✅ Período sincronizado:', periodName);
-    } catch (error) {
-      console.error('Error syncing existing period:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Obtener detalle de un período específico
    */
   static async getPeriodDetail(periodId: string): Promise<PeriodDetail> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.company_id) throw new Error('Empresa no encontrada');
+      const { companyId } = await this.getUserAndCompany();
 
       // Obtener período
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('id', periodId)
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .single();
 
       if (periodError) throw periodError;
@@ -272,7 +224,7 @@ export class HistoryServiceAleluya {
         .from('payroll_vouchers')
         .select('employee_id')
         .eq('periodo', period.periodo)
-        .eq('company_id', profile.company_id);
+        .eq('company_id', companyId);
 
       const voucherEmployeeIds = new Set(vouchers?.map(v => v.employee_id) || []);
 
@@ -322,16 +274,7 @@ export class HistoryServiceAleluya {
    */
   static async getEmployeePayrollData(employeeId: string, periodId: string) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.company_id) throw new Error('Empresa no encontrada');
+      const { companyId } = await this.getUserAndCompany();
 
       // Obtener datos del empleado y su liquidación
       const { data: payroll, error: payrollError } = await supabase
@@ -359,7 +302,7 @@ export class HistoryServiceAleluya {
         .from('payroll_periods_real')
         .select('*')
         .eq('id', periodId)
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .single();
 
       if (periodError) throw periodError;
@@ -369,7 +312,7 @@ export class HistoryServiceAleluya {
       const { data: company, error: companyError } = await supabase
         .from('companies')
         .select('*')
-        .eq('id', profile.company_id)
+        .eq('id', companyId)
         .single();
 
       if (companyError) throw companyError;
@@ -401,7 +344,6 @@ export class HistoryServiceAleluya {
     try {
       console.log('🔄 Generando comprobante PDF para empleado:', employeeId);
       
-      // Obtener datos completos del empleado y período
       const payrollData = await this.getEmployeePayrollData(employeeId, periodId);
       
       // Preparar datos para la Edge Function
@@ -487,7 +429,7 @@ export class HistoryServiceAleluya {
       
       console.log('📥 Descarga iniciada');
 
-      // Opcional: Registrar auditoría
+      // Registrar auditoría
       await this.logVoucherDownload(employeeId, periodId, payrollData.company.id);
       
     } catch (error) {
@@ -499,7 +441,7 @@ export class HistoryServiceAleluya {
   /**
    * Registrar descarga de comprobante en auditoría
    */
-  static async logVoucherDownload(employeeId: string, periodId: string, companyId: string) {
+  private static async logVoucherDownload(employeeId: string, periodId: string, companyId: string) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -516,7 +458,6 @@ export class HistoryServiceAleluya {
         });
     } catch (error) {
       console.error('Error logging voucher download:', error);
-      // No lanzar error ya que es solo logging
     }
   }
 
