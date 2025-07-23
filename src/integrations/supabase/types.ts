@@ -961,6 +961,42 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_adjustments: {
+        Row: {
+          amount: number
+          concept: string
+          created_at: string
+          created_by: string
+          employee_id: string
+          id: string
+          observations: string | null
+          period_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          concept: string
+          created_at?: string
+          created_by: string
+          employee_id: string
+          id?: string
+          observations?: string | null
+          period_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          concept?: string
+          created_at?: string
+          created_by?: string
+          employee_id?: string
+          id?: string
+          observations?: string | null
+          period_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payroll_novedades: {
         Row: {
           adjunto_url: string | null
@@ -1823,6 +1859,17 @@ export type Database = {
         }
         Returns: string
       }
+      create_payroll_adjustment: {
+        Args: {
+          p_period_id: string
+          p_employee_id: string
+          p_concept: string
+          p_amount: number
+          p_observations: string
+          p_created_by: string
+        }
+        Returns: undefined
+      }
       detect_current_smart_period: {
         Args: { p_company_id?: string }
         Returns: Json
@@ -1875,6 +1922,18 @@ export type Database = {
       get_payroll_history_periods: {
         Args: { p_company_id?: string }
         Returns: Json
+      }
+      get_period_adjustments: {
+        Args: { period_id: string }
+        Returns: {
+          id: string
+          employee_id: string
+          employee_name: string
+          concept: string
+          amount: number
+          observations: string
+          created_at: string
+        }[]
       }
       get_user_companies_simple: {
         Args: { _user_id?: string }

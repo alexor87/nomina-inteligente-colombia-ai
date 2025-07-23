@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadForIBC } from '@/types/payroll';
+import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025, RETENCION_FUENTE_2025 } from '@/constants';
 
 export interface PayrollCalculationInput {
   baseSalary: number;
@@ -140,9 +141,9 @@ export class PayrollCalculationBackendService {
     year: string;
   } {
     return {
-      salarioMinimo: 1423500, // ✅ SMMLV 2025 actualizado
-      auxilioTransporte: 200000,
-      uvt: 47065, // ✅ UVT 2025 actualizado  
+      salarioMinimo: SALARIO_MINIMO_2025, // ✅ CORREGIDO: 1,423,500
+      auxilioTransporte: AUXILIO_TRANSPORTE_2025, // ✅ CORRECTO: 200,000
+      uvt: RETENCION_FUENTE_2025.UVT, // ✅ CORRECTO: 47,065
       year: '2025'
     };
   }

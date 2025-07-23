@@ -1,3 +1,6 @@
+
+import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025, FONDO_SOLIDARIDAD_PENSIONAL_2025, CONTRIBUCIONES_SOLIDARIAS_2025, RETENCION_FUENTE_2025 } from '@/constants';
+
 export interface PayrollConfiguration {
   salarioMinimo: number;
   auxilioTransporte: number;
@@ -37,9 +40,9 @@ export interface YearlyConfiguration {
 }
 
 const DEFAULT_CONFIG_2025: PayrollConfiguration = {
-  salarioMinimo: 1300000,
-  auxilioTransporte: 200000,
-  uvt: 47065,
+  salarioMinimo: SALARIO_MINIMO_2025, // ✅ CORREGIDO: 1,423,500
+  auxilioTransporte: AUXILIO_TRANSPORTE_2025, // ✅ CORRECTO: 200,000
+  uvt: RETENCION_FUENTE_2025.UVT, // ✅ CORRECTO: 47,065
   porcentajes: {
     saludEmpleado: 0.04,
     pensionEmpleado: 0.04,
@@ -55,14 +58,7 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
     vacaciones: 0.0417,
   },
   fondoSolidaridad: {
-    ranges: [
-      { minSMMLV: 4, maxSMMLV: 16, percentage: 0.01 },   // 1.0%
-      { minSMMLV: 16, maxSMMLV: 17, percentage: 0.012 }, // 1.2%
-      { minSMMLV: 17, maxSMMLV: 18, percentage: 0.014 }, // 1.4%
-      { minSMMLV: 18, maxSMMLV: 19, percentage: 0.016 }, // 1.6%
-      { minSMMLV: 19, maxSMMLV: 20, percentage: 0.018 }, // 1.8%
-      { minSMMLV: 20, maxSMMLV: 999, percentage: 0.02 }  // 2.0%
-    ]
+    ranges: FONDO_SOLIDARIDAD_PENSIONAL_2025.RANGOS
   },
   arlRiskLevels: {
     I: 0.348,

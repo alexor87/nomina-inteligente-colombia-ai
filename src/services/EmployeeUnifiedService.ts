@@ -1,194 +1,237 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
-import { EmployeeSoftDeleteService } from './EmployeeSoftDeleteService';
+import { EmployeeService } from './EmployeeService';
+import { EmployeeCRUDService } from './EmployeeCRUDService';
+import { EmployeeUnified } from '@/types/employee-unified';
+import { PayrollCalculationSimple } from './PayrollCalculationSimple';
+
+export interface UnifiedEmployeeData {
+  id: string;
+  name: string;
+  baseSalary: number;
+  workedDays: number;
+  transportAllowance: number;
+  totalEarnings: number;
+  healthDeduction: number;
+  pensionDeduction: number;
+  totalDeductions: number;
+  netPay: number;
+  status: 'valid' | 'error';
+  errors: string[];
+}
 
 export class EmployeeUnifiedService {
-  static async getAll(): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
+  private static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
-      console.log('🔄 EmployeeUnifiedService: Fetching all employees');
-      
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .neq('estado', 'eliminado') // ✅ EXCLUDE soft deleted employees
-        .order('created_at', { ascending: false });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
 
-      if (error) {
-        console.error('❌ Error fetching employees:', error);
-        return { success: false, error: error.message };
-      }
-
-      console.log('✅ EmployeeUnifiedService: Fetched', data?.length || 0, 'employees');
-      
-      return {
-        success: true,
-        data: (data || []).map(mapDatabaseToUnified)
-      };
-    } catch (error: any) {
-      console.error('❌ EmployeeUnifiedService getAll error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  static async getById(id: string): Promise<{ success: boolean; data?: EmployeeUnified | null; error?: string }> {
-    try {
-      console.log('🔄 EmployeeUnifiedService: Fetching employee by ID:', id);
-      
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('id', id)
-        .neq('estado', 'eliminado') // ✅ EXCLUDE soft deleted employees
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
         .single();
 
-      if (error) {
-        console.error('❌ Error fetching employee:', error);
-        return { success: false, error: error.message };
-      }
-
-      console.log('✅ EmployeeUnifiedService: Fetched employee:', data?.nombre, data?.apellido);
-      
-      return {
-        success: true,
-        data: data ? mapDatabaseToUnified(data) : null
-      };
-    } catch (error: any) {
-      console.error('❌ EmployeeUnifiedService getById error:', error);
-      return { success: false, error: error.message };
+      return profile?.company_id || null;
+    } catch (error) {
+      console.error('Error getting company ID:', error);
+      return null;
     }
   }
 
-  static async getEmployeeById(id: string): Promise<{ success: boolean; data?: EmployeeUnified | null; error?: string }> {
-    return this.getById(id);
+  // ✅ CRUD Methods - Delegating to existing services
+  static async create(employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>) {
+    console.log('🔄 EmployeeUnifiedService.create: Delegating to EmployeeService');
+    return EmployeeService.createEmployee(employeeData);
   }
 
-  static async create(employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
-    try {
-      console.log('🔄 EmployeeUnifiedService: Creating employee with data:', employeeData);
-      
-      // Get current user's company ID
-      const { data: companyData, error: companyError } = await supabase
-        .rpc('get_current_user_company_id');
+  static async update(id: string, updates: Partial<EmployeeUnified>) {
+    console.log('🔄 EmployeeUnifiedService.update: Delegating to EmployeeService');
+    return EmployeeService.updateEmployee(id, updates);
+  }
 
-      if (companyError || !companyData) {
-        console.error('❌ Error getting company ID:', companyError);
+  static async delete(id: string) {
+    console.log('🔄 EmployeeUnifiedService.delete: Delegating to EmployeeService');
+    return EmployeeService.deleteEmployee(id);
+  }
+
+  static async getAll() {
+    console.log('🔄 EmployeeUnifiedService.getAll: Delegating to EmployeeService');
+    return EmployeeService.getEmployees();
+  }
+
+  static async getEmployeeById(id: string) {
+    console.log('🔄 EmployeeUnifiedService.getEmployeeById: Delegating to EmployeeService');
+    const employee = await EmployeeService.getEmployeeById(id);
+    if (!employee) {
+      return { success: false, error: 'Empleado no encontrado' };
+    }
+    return { success: true, data: employee };
+  }
+
+  static async changeStatus(id: string, newStatus: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad') {
+    console.log('🔄 EmployeeUnifiedService.changeStatus: Updating employee status');
+    return EmployeeService.updateEmployee(id, { estado: newStatus });
+  }
+
+  // ✅ PAYROLL Methods - Usando ÚNICAMENTE PayrollCalculationSimple
+  static async getEmployeesForPeriod(periodId: string): Promise<UnifiedEmployeeData[]> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // Map to database format
-      const dbData = mapUnifiedToDatabase({
-        ...employeeData,
-        id: '',
-        company_id: companyData
-      } as EmployeeUnified);
+      console.log('🎯 Cargando empleados con cálculos SIMPLES 2025...');
 
-      const { data, error } = await supabase
-        .from('employees')
-        .insert([dbData])
-        .select()
-        .single();
+      // Obtener empleados del período
+      const { data: payrollData, error: payrollError } = await supabase
+        .from('payrolls')
+        .select(`
+          id,
+          employee_id,
+          salario_base,
+          dias_trabajados,
+          employees!inner (
+            id,
+            nombre,
+            apellido,
+            salario_base
+          )
+        `)
+        .eq('period_id', periodId)
+        .eq('company_id', companyId);
 
-      if (error) {
-        console.error('❌ Error creating employee:', error);
-        throw error;
+      if (payrollError) {
+        throw payrollError;
       }
 
-      console.log('✅ EmployeeUnifiedService: Employee created successfully:', data);
-      
-      return {
-        success: true,
-        data: mapDatabaseToUnified(data)
-      };
-    } catch (error: any) {
-      console.error('❌ EmployeeUnifiedService create error:', error);
-      return {
-        success: false,
-        error: error.message || 'Error creating employee'
-      };
+      if (!payrollData || payrollData.length === 0) {
+        return [];
+      }
+
+      // Procesar cada empleado con cálculos SIMPLES
+      const processedEmployees: UnifiedEmployeeData[] = payrollData.map(payroll => {
+        const employee = payroll.employees;
+        const baseSalary = employee.salario_base;
+        const workedDays = payroll.dias_trabajados;
+
+        try {
+          // ✅ USAR ÚNICAMENTE PayrollCalculationSimple
+          const calculation = PayrollCalculationSimple.calculate({
+            salarioBase: baseSalary,
+            diasTrabajados: workedDays
+          });
+
+          console.log(`✅ ${employee.nombre}: Base $${baseSalary.toLocaleString()}, Días ${workedDays}, Auxilio $${calculation.auxilioTransporte.toLocaleString()}, Neto $${calculation.netoPagar.toLocaleString()}`);
+
+          return {
+            id: employee.id,
+            name: `${employee.nombre} ${employee.apellido}`,
+            baseSalary,
+            workedDays,
+            transportAllowance: calculation.auxilioTransporte,
+            totalEarnings: calculation.totalDevengado,
+            healthDeduction: calculation.saludEmpleado,
+            pensionDeduction: calculation.pensionEmpleado,
+            totalDeductions: calculation.totalDeducciones,
+            netPay: calculation.netoPagar,
+            status: 'valid' as const,
+            errors: []
+          };
+        } catch (error) {
+          console.error(`❌ Error calculando empleado ${employee.nombre}:`, error);
+          return {
+            id: employee.id,
+            name: `${employee.nombre} ${employee.apellido}`,
+            baseSalary,
+            workedDays,
+            transportAllowance: 0,
+            totalEarnings: 0,
+            healthDeduction: 0,
+            pensionDeduction: 0,
+            totalDeductions: 0,
+            netPay: 0,
+            status: 'error' as const,
+            errors: ['Error en cálculo: ' + (error instanceof Error ? error.message : 'Error desconocido')]
+          };
+        }
+      });
+
+      console.log(`📊 Total empleados procesados: ${processedEmployees.length}`);
+      console.log(`💰 Empleados con auxilio: ${processedEmployees.filter(e => e.transportAllowance > 0).length}`);
+
+      return processedEmployees;
+    } catch (error) {
+      console.error('❌ Error in getEmployeesForPeriod:', error);
+      throw error;
     }
   }
 
-  static async update(id: string, employeeData: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
+  static async updatePayrollRecords(periodId: string): Promise<void> {
     try {
-      console.log('🔄 EmployeeUnifiedService: Updating employee:', id, 'with data:', employeeData);
-      
-      // Map to database format
-      const dbData = mapUnifiedToDatabase({
-        ...employeeData,
-        id
-      } as EmployeeUnified);
-      
-      const { data, error } = await supabase
-        .from('employees')
-        .update(dbData)
-        .eq('id', id)
-        .neq('estado', 'eliminado') // ✅ PREVENT updating soft deleted employees
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ Error updating employee:', error);
-        return { success: false, error: error.message };
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      console.log('✅ EmployeeUnifiedService: Employee updated successfully:', data);
-      
-      return {
-        success: true,
-        data: mapDatabaseToUnified(data)
-      };
-    } catch (error: any) {
-      console.error('❌ EmployeeUnifiedService update error:', error);
-      return {
-        success: false,
-        error: error.message || 'Error updating employee'
-      };
+      console.log('🔄 Actualizando registros de nómina con cálculos SIMPLES...');
+
+      // Obtener empleados con cálculos SIMPLES
+      const correctedEmployees = await this.getEmployeesForPeriod(periodId);
+
+      // Actualizar cada registro en la base de datos
+      for (const employee of correctedEmployees) {
+        const { error } = await supabase
+          .from('payrolls')
+          .update({
+            auxilio_transporte: employee.transportAllowance,
+            total_devengado: employee.totalEarnings,
+            salud_empleado: employee.healthDeduction,
+            pension_empleado: employee.pensionDeduction,
+            total_deducciones: employee.totalDeductions,
+            neto_pagado: employee.netPay,
+            updated_at: new Date().toISOString()
+          })
+          .eq('employee_id', employee.id)
+          .eq('period_id', periodId)
+          .eq('company_id', companyId);
+
+        if (error) {
+          console.error(`❌ Error actualizando empleado ${employee.name}:`, error);
+        } else {
+          console.log(`✅ Actualizado ${employee.name}: Neto $${employee.netPay.toLocaleString()}`);
+        }
+      }
+
+      // Actualizar totales del período
+      const totalDevengado = correctedEmployees.reduce((sum, emp) => sum + emp.totalEarnings, 0);
+      const totalDeducciones = correctedEmployees.reduce((sum, emp) => sum + emp.totalDeductions, 0);
+      const totalNeto = correctedEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
+
+      const { error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .update({
+          total_devengado: totalDevengado,
+          total_deducciones: totalDeducciones,
+          total_neto: totalNeto,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId);
+
+      if (periodError) {
+        console.error('❌ Error actualizando totales del período:', periodError);
+      } else {
+        console.log('✅ Totales del período actualizados correctamente');
+      }
+
+    } catch (error) {
+      console.error('❌ Error in updatePayrollRecords:', error);
+      throw error;
     }
   }
 
-  /**
-   * Delete employee (soft delete - changes status to 'eliminado')
-   */
-  static async delete(id: string): Promise<{ success: boolean; error?: string }> {
-    console.log('🔄 EmployeeUnifiedService: Soft deleting employee:', id);
-    return EmployeeSoftDeleteService.softDeleteEmployee(id);
-  }
-
-  static async changeStatus(id: string, newStatus: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      console.log('🔄 EmployeeUnifiedService: Changing employee status:', id, 'to', newStatus);
-      
-      const { error } = await supabase
-        .from('employees')
-        .update({ estado: newStatus })
-        .eq('id', id)
-        .neq('estado', 'eliminado'); // ✅ PREVENT changing status of soft deleted employees
-
-      if (error) {
-        console.error('❌ Error changing employee status:', error);
-        return { success: false, error: error.message };
-      }
-
-      console.log('✅ EmployeeUnifiedService: Employee status changed successfully');
-      return { success: true };
-    } catch (error: any) {
-      console.error('❌ EmployeeUnifiedService changeStatus error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Get deleted employees (for recovery purposes)
-   */
-  static async getDeletedEmployees(): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
-    return EmployeeSoftDeleteService.getDeletedEmployees();
-  }
-
-  /**
-   * Restore a soft deleted employee
-   */
-  static async restoreEmployee(id: string): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
-    return EmployeeSoftDeleteService.restoreEmployee(id);
+  static getConfigurationInfo() {
+    return PayrollCalculationSimple.getConfigurationInfo();
   }
 }

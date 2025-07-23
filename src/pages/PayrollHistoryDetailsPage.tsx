@@ -1,37 +1,77 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, Users, DollarSign, Download, Edit } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, DollarSign, Download, Edit, RefreshCw, AlertTriangle, Settings, CheckCircle } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatCurrency } from '@/lib/utils';
+import { HistoryServiceAleluya } from '@/services/HistoryServiceAleluya';
+import { PeriodRepairService } from '@/services/PeriodRepairService';
+import { PeriodValidationService } from '@/services/PeriodValidationService';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-/**
- * ✅ PÁGINA DE DETALLES DEL PERÍODO - FASE 3
- * Muestra información detallada de un período específico
- */
 export const PayrollHistoryDetailsPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [periodData, setPeriodData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validation, setValidation] = useState<any>(null);
 
-  // Por ahora mostrar una página básica - en el futuro se conectará con datos reales
-  const mockPeriodData = {
-    id: periodId,
-    period: "1 - 15 Julio 2025",
-    startDate: "2025-07-01",
-    endDate: "2025-07-15",
-    type: "quincenal" as const,
-    status: "borrador" as const,
-    employeesCount: 2,
-    totalGrossPay: 1914001,
-    totalNetPay: 1777255,
-    totalDeductions: 136746,
-    totalCost: 1914001,
-    employerContributions: 392370.205,
-    paymentStatus: "pendiente" as const,
-    createdAt: "2025-07-03T04:35:13.929711+00:00",
-    updatedAt: "2025-07-04T19:17:03.813483+00:00"
+  // Cargar datos del período
+  useEffect(() => {
+    const loadPeriodData = async () => {
+      if (!periodId) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Obtener datos del período
+        const { data: period, error } = await supabase
+          .from('payroll_periods_real')
+          .select('*')
+          .eq('id', periodId)
+          .single();
+        
+        if (error) throw error;
+        
+        setPeriodData(period);
+        
+        // Validar período automáticamente
+        await validatePeriod();
+        
+      } catch (error) {
+        console.error('Error cargando datos del período:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los datos del período",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadPeriodData();
+  }, [periodId, toast]);
+
+  const validatePeriod = async () => {
+    if (!periodId) return;
+    
+    try {
+      setIsValidating(true);
+      const validationResult = await PeriodValidationService.validateSpecificPeriod(periodId);
+      setValidation(validationResult);
+    } catch (error) {
+      console.error('Error validating period:', error);
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   const handleBack = () => {
@@ -46,6 +86,65 @@ export const PayrollHistoryDetailsPage = () => {
     console.log('Exportar período:', periodId);
   };
 
+  const handleRepairSync = async () => {
+    if (!periodId) return;
+    
+    setIsRepairing(true);
+    try {
+      console.log('🔧 Reparando período específico...');
+      
+      await PeriodRepairService.repairSpecificPeriod(periodId);
+      
+      // Recargar datos del período
+      const { data: updatedPeriod, error } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+      
+      if (error) throw error;
+      
+      setPeriodData(updatedPeriod);
+      
+      // Revalidar período
+      await validatePeriod();
+      
+      toast({
+        title: "✅ Período Reparado",
+        description: "Las deducciones y totales han sido corregidos correctamente",
+        className: "border-green-200 bg-green-50"
+      });
+      
+    } catch (error) {
+      console.error('Error reparando período:', error);
+      toast({
+        title: "❌ Error en Reparación",
+        description: "No se pudo reparar el período",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRepairing(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (!periodData) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Período no encontrado</p>
+      </div>
+    );
+  }
+
+  const needsRepair = validation && !validation.isValid;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -59,16 +158,34 @@ export const PayrollHistoryDetailsPage = () => {
             <h1 className="text-2xl font-bold text-gray-900">
               Detalles del Período
             </h1>
-            <p className="text-gray-600">{mockPeriodData.period}</p>
+            <p className="text-gray-600">{periodData.periodo}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
+          {needsRepair && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRepairSync}
+              disabled={isRepairing}
+              className="border-orange-200 text-orange-700 hover:bg-orange-50"
+            >
+              {isRepairing ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Settings className="h-4 w-4 mr-2" />
+              )}
+              {isRepairing ? 'Reparando...' : 'Reparar Período'}
+            </Button>
+          )}
+          
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
-          {mockPeriodData.status === 'borrador' && (
+          
+          {periodData.estado === 'borrador' && (
             <Button size="sm" onClick={handleEdit}>
               <Edit className="h-4 w-4 mr-2" />
               Editar
@@ -76,6 +193,36 @@ export const PayrollHistoryDetailsPage = () => {
           )}
         </div>
       </div>
+
+      {/* Estado de Validación */}
+      {validation && (
+        <Card className={`border-2 ${validation.isValid ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              {validation.isValid ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-orange-600" />
+              )}
+              <div>
+                <h3 className={`font-medium ${validation.isValid ? 'text-green-900' : 'text-orange-900'}`}>
+                  {validation.isValid ? 'Período Validado Correctamente' : 'Período Requiere Atención'}
+                </h3>
+                {validation.issues.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {validation.issues.map((issue, index) => (
+                      <p key={index} className="text-sm text-orange-700">
+                        • {issue.description}
+                        {issue.autoRepairable && ' (Auto-reparable)'}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Información del período */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -89,17 +236,17 @@ export const PayrollHistoryDetailsPage = () => {
           <CardContent className="space-y-2">
             <div>
               <p className="text-xs text-gray-500">Tipo</p>
-              <p className="font-medium capitalize">{mockPeriodData.type}</p>
+              <p className="font-medium capitalize">{periodData.tipo_periodo}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Estado</p>
-              <p className="font-medium capitalize">{mockPeriodData.status}</p>
+              <p className="font-medium capitalize">{periodData.estado}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Fechas</p>
               <p className="font-medium">
-                {new Date(mockPeriodData.startDate).toLocaleDateString('es-ES')} - {' '}
-                {new Date(mockPeriodData.endDate).toLocaleDateString('es-ES')}
+                {new Date(periodData.fecha_inicio).toLocaleDateString('es-ES')} - {' '}
+                {new Date(periodData.fecha_fin).toLocaleDateString('es-ES')}
               </p>
             </div>
           </CardContent>
@@ -114,9 +261,14 @@ export const PayrollHistoryDetailsPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">
-              {mockPeriodData.employeesCount}
+              {periodData.empleados_count || 0}
             </div>
             <p className="text-xs text-gray-500">Empleados procesados</p>
+            {validation && validation.summary.employeesWithIssues > 0 && (
+              <p className="text-xs text-orange-600 mt-1">
+                {validation.summary.employeesWithIssues} con problemas
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -124,14 +276,16 @@ export const PayrollHistoryDetailsPage = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
-              Estado de Pago
+              Estado de Cálculos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold text-orange-600 capitalize">
-              {mockPeriodData.paymentStatus}
+            <div className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-green-600'}`}>
+              {isValidating ? 'Validando...' : (needsRepair ? 'Requiere Reparación' : 'Correcto')}
             </div>
-            <p className="text-xs text-gray-500">Estado actual</p>
+            <p className="text-xs text-gray-500">
+              {needsRepair ? 'Cálculos incorrectos detectados' : 'Cálculos correctos'}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -145,26 +299,26 @@ export const PayrollHistoryDetailsPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-gray-500">Total Devengado</p>
-              <p className="text-lg font-bold text-green-600">
-                {formatCurrency(mockPeriodData.totalGrossPay)}
+              <p className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-green-600'}`}>
+                {formatCurrency(periodData.total_devengado || 0)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Total Deducciones</p>
-              <p className="text-lg font-bold text-red-600">
-                {formatCurrency(mockPeriodData.totalDeductions)}
+              <p className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-red-600'}`}>
+                {formatCurrency(periodData.total_deducciones || 0)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Total Neto</p>
-              <p className="text-lg font-bold text-blue-600">
-                {formatCurrency(mockPeriodData.totalNetPay)}
+              <p className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-blue-600'}`}>
+                {formatCurrency(periodData.total_neto || 0)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Aportes Empleador</p>
-              <p className="text-lg font-bold text-purple-600">
-                {formatCurrency(mockPeriodData.employerContributions)}
+              <p className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-purple-600'}`}>
+                {formatCurrency((periodData.total_devengado || 0) * 0.205)}
               </p>
             </div>
           </div>

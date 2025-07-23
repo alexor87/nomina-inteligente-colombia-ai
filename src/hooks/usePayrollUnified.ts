@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
+import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 
 interface PayrollPeriod {
   id: string;
@@ -463,9 +464,9 @@ export const usePayrollUnified = (companyId: string) => {
 
     setIsLiquidating(true);
     try {
-      console.log('🏖️ Iniciando liquidación con integración completa de vacaciones...');
+      console.log('🏖️ Iniciando liquidación quincenal completa...');
 
-      // INTEGRACIÓN CRÍTICA: Procesar todas las vacaciones/ausencias pendientes
+      // PASO 1: Procesar todas las vacaciones/ausencias pendientes
       const integrationResult = await VacationPayrollIntegrationService.processVacationsForPayroll({
         periodId: currentPeriod.id,
         companyId: companyId,
@@ -475,23 +476,31 @@ export const usePayrollUnified = (companyId: string) => {
 
       console.log('✅ Resultado de integración de vacaciones:', integrationResult);
 
-      // Actualizar estado del período a cerrado
+      // PASO 2: ✅ NUEVO - Consolidar novedades en registros de payrolls
+      console.log('🔄 Consolidando novedades en registros de payrolls...');
+      await PayrollLiquidationService.consolidatePayrollWithNovedades(currentPeriod.id);
+      console.log('✅ Novedades consolidadas exitosamente');
+
+      // PASO 3: Actualizar estado del período a cerrado
       await supabase
         .from('payroll_periods_real')
-        .update({ estado: 'cerrado' })
+        .update({ 
+          estado: 'cerrado',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', currentPeriod.id);
 
       toast({
-        title: "Nómina liquidada exitosamente ✅",
-        description: `Se incluyeron ${integrationResult.processedVacations} ausencias/vacaciones automáticamente`,
+        title: "✅ Liquidación quincenal completada",
+        description: `Período liquidado con ${integrationResult.processedVacations} ausencias y novedades consolidadas`,
         variant: "default",
       });
 
     } catch (error) {
-      console.error('Error liquidando nómina:', error);
+      console.error('❌ Error en liquidación quincenal:', error);
       toast({
-        title: "Error",
-        description: "No se pudo liquidar la nómina",
+        title: "❌ Error en liquidación",
+        description: "No se pudo completar la liquidación del período",
         variant: "destructive",
       });
     } finally {

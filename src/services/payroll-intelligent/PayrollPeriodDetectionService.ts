@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PeriodDisplayService } from './PeriodDisplayService';
 import { PeriodNumberCalculationService } from './PeriodNumberCalculationService';
 

@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
-import { PayrollHistoryService } from '@/services/PayrollHistoryService';
 import { PostClosureDetectionService } from '@/services/payroll-intelligent/PostClosureDetectionService';
 
 /**
