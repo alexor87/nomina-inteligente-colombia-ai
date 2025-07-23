@@ -1,171 +1,275 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Search, Download, Calculator, Plus, Edit } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { NovedadType, NOVEDAD_TYPE_LABELS } from '@/types/novedades-enhanced';
-import { PayrollNovedad } from '@/types/novedades-enhanced';
+import { Loader2, RefreshCw, Calculator, Eye, EyeOff } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { EmployeeUnifiedService, UnifiedEmployeeData } from '@/services/EmployeeUnifiedService';
 import { useToast } from '@/hooks/use-toast';
-import { EmployeeUnified } from '@/types/employee-unified';
-import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 
 interface PayrollTableNewProps {
   periodId: string;
-  companyId: string;
-  onPeriodRefresh?: () => void;
+  onRefresh?: () => void;
 }
 
-export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, companyId, onPeriodRefresh }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, onRefresh }) => {
+  const [employees, setEmployees] = useState<UnifiedEmployeeData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const { toast } = useToast();
 
-  // Fetch employees for the company
-  const { data: employeesData, isLoading: isEmployeesLoading, error: employeesError, refetch: refetchEmployees } = useQuery({
-    queryKey: ['employees-for-company', companyId],
-    queryFn: async () => {
-      const result = await EmployeeUnifiedService.getAll();
-      return result.data || [];
-    },
-    enabled: !!companyId,
-  });
-
-  const employees = useMemo(() => {
-    return (employeesData || []).filter(employee =>
-      employee.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.cedula.includes(searchTerm)
-    );
-  }, [employeesData, searchTerm]);
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      'activo': 'bg-green-100 text-green-800',
-      'inactivo': 'bg-red-100 text-red-800',
-      'vacaciones': 'bg-blue-100 text-blue-800',
-      'incapacidad': 'bg-yellow-100 text-yellow-800'
-    };
-
-    const labels = {
-      'activo': 'Activo',
-      'inactivo': 'Inactivo',
-      'vacaciones': 'Vacaciones',
-      'incapacidad': 'Incapacidad'
-    };
-
-    return (
-      <Badge variant="outline" className={variants[status as keyof typeof variants] || 'bg-gray-100 text-gray-800'}>
-        {labels[status as keyof typeof labels] || status}
-      </Badge>
-    );
+  const loadEmployees = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Cargando empleados con cálculos corregidos 2025...');
+      
+      const employeeData = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      setEmployees(employeeData);
+      
+      console.log('✅ Empleados cargados:', employeeData.length);
+    } catch (error) {
+      console.error('❌ Error cargando empleados:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los empleados",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (isEmployeesLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const handleRecalculate = async () => {
+    try {
+      setUpdating(true);
+      console.log('🔄 Recalculando nómina con valores 2025...');
+      
+      await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      await loadEmployees();
+      
+      toast({
+        title: "✅ Nómina recalculada",
+        description: "Los cálculos se han actualizado con los valores 2025 correctos",
+        className: "border-green-200 bg-green-50"
+      });
+      
+      onRefresh?.();
+    } catch (error) {
+      console.error('❌ Error recalculando:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo recalcular la nómina",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
 
-  if (employeesError) {
+  useEffect(() => {
+    if (periodId) {
+      loadEmployees();
+    }
+  }, [periodId]);
+
+  const totalEarnings = employees.reduce((sum, emp) => sum + emp.totalEarnings, 0);
+  const totalDeductions = employees.reduce((sum, emp) => sum + emp.totalDeductions, 0);
+  const totalNetPay = employees.reduce((sum, emp) => sum + emp.netPay, 0);
+  const employeesWithTransport = employees.filter(emp => emp.transportAllowance > 0).length;
+
+  const configInfo = EmployeeUnifiedService.getConfigurationInfo();
+
+  if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-red-600">
-            Error: {employeesError.message}
-            <Button onClick={() => refetchEmployees()} className="ml-4">
-              Reintentar
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Cargando empleados...</span>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-4">
+      {/* Header con controles */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Nómina</h2>
-          <p className="text-gray-600">
-            Período: {periodId}
-          </p>
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-semibold">Nómina con Cálculos Corregidos 2025</h3>
+          <Badge variant="outline" className="text-green-600">
+            SMMLV: {formatCurrency(configInfo.salarioMinimo)}
+          </Badge>
+          <Badge variant="outline" className="text-blue-600">
+            Auxilio: {formatCurrency(configInfo.auxilioTransporte)}
+          </Badge>
         </div>
-        <div className="flex gap-2">
-          <Input
-            type="search"
-            placeholder="Buscar empleado..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs"
-          />
-          <Button>
-            <Download className="w-4 h-4 mr-2" />
-            Descargar
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            {showDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {showDetails ? 'Ocultar' : 'Mostrar'} Detalles
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadEmployees}
+            disabled={updating}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Actualizar
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleRecalculate}
+            disabled={updating}
+          >
+            {updating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Calculator className="h-4 w-4 mr-2" />
+            )}
+            Recalcular
           </Button>
         </div>
       </div>
 
-      {/* Employee Table */}
+      {/* Resumen */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Total Empleados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{employees.length}</div>
+            <p className="text-sm text-muted-foreground">
+              {employeesWithTransport} con auxilio
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Total Devengado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {formatCurrency(totalEarnings)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Total Deducciones</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {formatCurrency(totalDeductions)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Total Neto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {formatCurrency(totalNetPay)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabla de empleados */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Lista de Empleados
-            <Button onClick={() => refetchEmployees()}>
-              <Calculator className="w-4 h-4 mr-2" />
-              Actualizar
-            </Button>
-          </CardTitle>
+          <CardTitle>Empleados - Cálculos Corregidos 2025</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-auto">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-4">Empleado</th>
-                  <th className="text-left p-4">Cédula</th>
-                  <th className="text-left p-4">Cargo</th>
-                  <th className="text-left p-4">Estado</th>
-                  <th className="text-left p-4">Salario Base</th>
-                  <th className="text-left p-4">Acciones</th>
+                  <th className="text-left p-2">Empleado</th>
+                  <th className="text-right p-2">Salario Base</th>
+                  <th className="text-right p-2">Días</th>
+                  <th className="text-right p-2">Auxilio</th>
+                  <th className="text-right p-2">Devengado</th>
+                  {showDetails && (
+                    <>
+                      <th className="text-right p-2">Salud</th>
+                      <th className="text-right p-2">Pensión</th>
+                      <th className="text-right p-2">Deducciones</th>
+                    </>
+                  )}
+                  <th className="text-right p-2">Neto</th>
+                  <th className="text-center p-2">Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {employees.map((employee) => (
                   <tr key={employee.id} className="border-b hover:bg-gray-50">
-                    <td className="p-4">
-                      <div>
-                        <div className="font-medium">
-                          {employee.nombre} {employee.apellido}
-                        </div>
-                        <div className="text-sm text-gray-600">{employee.email}</div>
-                      </div>
+                    <td className="p-2 font-medium">{employee.name}</td>
+                    <td className="text-right p-2">{formatCurrency(employee.baseSalary)}</td>
+                    <td className="text-right p-2">{employee.workedDays}</td>
+                    <td className="text-right p-2">
+                      <span className={employee.transportAllowance > 0 ? 'text-green-600' : 'text-gray-400'}>
+                        {formatCurrency(employee.transportAllowance)}
+                      </span>
                     </td>
-                    <td className="p-4">{employee.cedula}</td>
-                    <td className="p-4">{employee.cargo || 'No especificado'}</td>
-                    <td className="p-4">{getStatusBadge(employee.estado)}</td>
-                    <td className="p-4 font-bold text-green-600">
-                      {formatCurrency(employee.salarioBase)}
+                    <td className="text-right p-2 font-medium">
+                      {formatCurrency(employee.totalEarnings)}
                     </td>
-                    <td className="p-4">
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    {showDetails && (
+                      <>
+                        <td className="text-right p-2 text-red-600">
+                          {formatCurrency(employee.healthDeduction)}
+                        </td>
+                        <td className="text-right p-2 text-red-600">
+                          {formatCurrency(employee.pensionDeduction)}
+                        </td>
+                        <td className="text-right p-2 text-red-600">
+                          {formatCurrency(employee.totalDeductions)}
+                        </td>
+                      </>
+                    )}
+                    <td className="text-right p-2 font-bold text-blue-600">
+                      {formatCurrency(employee.netPay)}
+                    </td>
+                    <td className="text-center p-2">
+                      <Badge variant={employee.status === 'valid' ? 'default' : 'destructive'}>
+                        {employee.status === 'valid' ? 'OK' : 'Error'}
+                      </Badge>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Información adicional */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Información de Cálculo 2025</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <strong>SMMLV 2025:</strong> {formatCurrency(configInfo.salarioMinimo)}
+            </div>
+            <div>
+              <strong>Auxilio Transporte:</strong> {formatCurrency(configInfo.auxilioTransporte)}
+            </div>
+            <div>
+              <strong>Límite Auxilio:</strong> {formatCurrency(configInfo.limitAuxilio)}
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            Los empleados con salario ≤ {formatCurrency(configInfo.limitAuxilio)} (2 SMMLV) reciben auxilio de transporte proporcional.
           </div>
         </CardContent>
       </Card>
