@@ -1,38 +1,67 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, Users, DollarSign, Download, Edit } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, DollarSign, Download, Edit, RefreshCw, AlertTriangle } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatCurrency } from '@/lib/utils';
+import { HistoryServiceAleluya } from '@/services/HistoryServiceAleluya';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
- * ✅ PÁGINA DE DETALLES DEL PERÍODO - FASE 3
- * Muestra información detallada de un período específico
+ * ✅ PÁGINA DE DETALLES DEL PERÍODO - MEJORADA CON SINCRONIZACIÓN
+ * Muestra información detallada de un período específico con capacidad de reparación
  */
 export const PayrollHistoryDetailsPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [periodData, setPeriodData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [needsRepair, setNeedsRepair] = useState(false);
 
-  // Por ahora mostrar una página básica - en el futuro se conectará con datos reales
-  const mockPeriodData = {
-    id: periodId,
-    period: "1 - 15 Julio 2025",
-    startDate: "2025-07-01",
-    endDate: "2025-07-15",
-    type: "quincenal" as const,
-    status: "borrador" as const,
-    employeesCount: 2,
-    totalGrossPay: 1914001,
-    totalNetPay: 1777255,
-    totalDeductions: 136746,
-    totalCost: 1914001,
-    employerContributions: 392370.205,
-    paymentStatus: "pendiente" as const,
-    createdAt: "2025-07-03T04:35:13.929711+00:00",
-    updatedAt: "2025-07-04T19:17:03.813483+00:00"
-  };
+  // Cargar datos del período
+  useEffect(() => {
+    const loadPeriodData = async () => {
+      if (!periodId) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Obtener datos del período
+        const { data: period, error } = await supabase
+          .from('payroll_periods_real')
+          .select('*')
+          .eq('id', periodId)
+          .single();
+        
+        if (error) throw error;
+        
+        setPeriodData(period);
+        
+        // Verificar si necesita reparación (totales en 0 pero con empleados)
+        const needsRepairCheck = (period.empleados_count > 0) && 
+                               (!period.total_neto || period.total_neto === 0);
+        setNeedsRepair(needsRepairCheck);
+        
+      } catch (error) {
+        console.error('Error cargando datos del período:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los datos del período",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadPeriodData();
+  }, [periodId, toast]);
 
   const handleBack = () => {
     navigate('/app/payroll-history');
@@ -45,6 +74,61 @@ export const PayrollHistoryDetailsPage = () => {
   const handleExport = () => {
     console.log('Exportar período:', periodId);
   };
+
+  const handleRepairSync = async () => {
+    if (!periodId) return;
+    
+    setIsRepairing(true);
+    try {
+      console.log('🔧 Reparando sincronización del período...');
+      
+      await HistoryServiceAleluya.repairPeriodSync(periodId);
+      
+      // Recargar datos del período
+      const { data: updatedPeriod, error } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+      
+      if (error) throw error;
+      
+      setPeriodData(updatedPeriod);
+      setNeedsRepair(false);
+      
+      toast({
+        title: "✅ Sincronización Reparada",
+        description: "El período ha sido sincronizado correctamente",
+        className: "border-green-200 bg-green-50"
+      });
+      
+    } catch (error) {
+      console.error('Error reparando sincronización:', error);
+      toast({
+        title: "❌ Error en Reparación",
+        description: "No se pudo reparar la sincronización",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRepairing(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (!periodData) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Período no encontrado</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -59,16 +143,34 @@ export const PayrollHistoryDetailsPage = () => {
             <h1 className="text-2xl font-bold text-gray-900">
               Detalles del Período
             </h1>
-            <p className="text-gray-600">{mockPeriodData.period}</p>
+            <p className="text-gray-600">{periodData.periodo}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
+          {needsRepair && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRepairSync}
+              disabled={isRepairing}
+              className="border-orange-200 text-orange-700 hover:bg-orange-50"
+            >
+              {isRepairing ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 mr-2" />
+              )}
+              {isRepairing ? 'Reparando...' : 'Reparar Sincronización'}
+            </Button>
+          )}
+          
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
-          {mockPeriodData.status === 'borrador' && (
+          
+          {periodData.estado === 'borrador' && (
             <Button size="sm" onClick={handleEdit}>
               <Edit className="h-4 w-4 mr-2" />
               Editar
@@ -76,6 +178,24 @@ export const PayrollHistoryDetailsPage = () => {
           )}
         </div>
       </div>
+
+      {/* Alerta de desincronización */}
+      {needsRepair && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              <div>
+                <h3 className="font-medium text-orange-900">Período Desincronizado</h3>
+                <p className="text-sm text-orange-700">
+                  Este período tiene empleados procesados pero los totales están en $0. 
+                  Haz clic en "Reparar Sincronización" para corregir los valores.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Información del período */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -89,17 +209,17 @@ export const PayrollHistoryDetailsPage = () => {
           <CardContent className="space-y-2">
             <div>
               <p className="text-xs text-gray-500">Tipo</p>
-              <p className="font-medium capitalize">{mockPeriodData.type}</p>
+              <p className="font-medium capitalize">{periodData.tipo_periodo}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Estado</p>
-              <p className="font-medium capitalize">{mockPeriodData.status}</p>
+              <p className="font-medium capitalize">{periodData.estado}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Fechas</p>
               <p className="font-medium">
-                {new Date(mockPeriodData.startDate).toLocaleDateString('es-ES')} - {' '}
-                {new Date(mockPeriodData.endDate).toLocaleDateString('es-ES')}
+                {new Date(periodData.fecha_inicio).toLocaleDateString('es-ES')} - {' '}
+                {new Date(periodData.fecha_fin).toLocaleDateString('es-ES')}
               </p>
             </div>
           </CardContent>
@@ -114,7 +234,7 @@ export const PayrollHistoryDetailsPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">
-              {mockPeriodData.employeesCount}
+              {periodData.empleados_count || 0}
             </div>
             <p className="text-xs text-gray-500">Empleados procesados</p>
           </CardContent>
@@ -124,14 +244,16 @@ export const PayrollHistoryDetailsPage = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
-              Estado de Pago
+              Estado de Sincronización
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold text-orange-600 capitalize">
-              {mockPeriodData.paymentStatus}
+            <div className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-green-600'}`}>
+              {needsRepair ? 'Desincronizado' : 'Sincronizado'}
             </div>
-            <p className="text-xs text-gray-500">Estado actual</p>
+            <p className="text-xs text-gray-500">
+              {needsRepair ? 'Requiere reparación' : 'Totales correctos'}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -145,26 +267,26 @@ export const PayrollHistoryDetailsPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-gray-500">Total Devengado</p>
-              <p className="text-lg font-bold text-green-600">
-                {formatCurrency(mockPeriodData.totalGrossPay)}
+              <p className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-green-600'}`}>
+                {formatCurrency(periodData.total_devengado || 0)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Total Deducciones</p>
-              <p className="text-lg font-bold text-red-600">
-                {formatCurrency(mockPeriodData.totalDeductions)}
+              <p className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-red-600'}`}>
+                {formatCurrency(periodData.total_deducciones || 0)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Total Neto</p>
-              <p className="text-lg font-bold text-blue-600">
-                {formatCurrency(mockPeriodData.totalNetPay)}
+              <p className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-blue-600'}`}>
+                {formatCurrency(periodData.total_neto || 0)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Aportes Empleador</p>
-              <p className="text-lg font-bold text-purple-600">
-                {formatCurrency(mockPeriodData.employerContributions)}
+              <p className={`text-lg font-bold ${needsRepair ? 'text-orange-600' : 'text-purple-600'}`}>
+                {formatCurrency((periodData.total_devengado || 0) * 0.205)}
               </p>
             </div>
           </div>

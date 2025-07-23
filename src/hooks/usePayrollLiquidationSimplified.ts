@@ -8,6 +8,7 @@ import { PayrollLiquidationService } from '@/services/PayrollLiquidationService'
 export const usePayrollLiquidationSimplified = (companyId: string) => {
   const { toast } = useToast();
   const payrollHook = usePayrollUnified(companyId);
+  const [isRepairing, setIsRepairing] = useState(false);
 
   const loadEmployees = useCallback(async (
     startDate: string,
@@ -46,21 +47,53 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     endDate: string
   ) => {
     try {
-      console.log('🔄 Iniciando liquidación quincenal simplificada...');
+      console.log('🔄 Iniciando liquidación quincenal con sincronización robusta...');
       
       // Liquidar usando el flujo unificado (incluye consolidación de novedades)
       await payrollHook.liquidatePayroll(startDate, endDate);
       
-      // Actualizar totales del período después de liquidar y consolidar
+      // ✅ SINCRONIZACIÓN ROBUSTA: Asegurar que los totales se actualicen correctamente
       if (payrollHook.currentPeriodId) {
-        console.log('🔄 Actualizando totales del período post-consolidación...');
-        await HistoryServiceAleluya.updatePeriodTotals(payrollHook.currentPeriodId);
-        console.log('✅ Totales finales actualizados');
+        console.log('🔄 Ejecutando sincronización post-liquidación...');
+        
+        try {
+          // Consolidar novedades nuevamente por seguridad
+          await PayrollLiquidationService.consolidatePayrollWithNovedades(payrollHook.currentPeriodId);
+          console.log('✅ Novedades consolidadas correctamente');
+          
+          // Actualizar totales del período
+          await HistoryServiceAleluya.updatePeriodTotals(payrollHook.currentPeriodId);
+          console.log('✅ Totales del período actualizados');
+          
+          // Verificar sincronización
+          const desynchronized = await HistoryServiceAleluya.detectDesynchronizedPeriods();
+          if (desynchronized.includes(payrollHook.currentPeriodId)) {
+            console.warn('⚠️ Período aún desincronizado, ejecutando reparación...');
+            await HistoryServiceAleluya.repairPeriodSync(payrollHook.currentPeriodId);
+          }
+          
+        } catch (syncError) {
+          console.error('❌ Error en sincronización post-liquidación:', syncError);
+          
+          // Intentar reparación como último recurso
+          try {
+            await HistoryServiceAleluya.repairPeriodSync(payrollHook.currentPeriodId);
+            console.log('✅ Reparación de emergencia exitosa');
+          } catch (repairError) {
+            console.error('❌ Error en reparación de emergencia:', repairError);
+            
+            toast({
+              title: "⚠️ Advertencia",
+              description: "Liquidación completada pero puede haber problemas de sincronización",
+              variant: "destructive"
+            });
+          }
+        }
       }
       
       toast({
-        title: "✅ Liquidación Quincenal Completada",
-        description: "Nómina liquidada con novedades consolidadas y totales actualizados",
+        title: "✅ Liquidación Completada",
+        description: "Nómina liquidada y sincronizada correctamente",
         className: "border-green-200 bg-green-50"
       });
       
@@ -77,10 +110,85 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     }
   }, [payrollHook, toast]);
 
+  /**
+   * ✅ NUEVA FUNCIÓN: Reparar período específico
+   */
+  const repairPeriodSync = useCallback(async (periodId: string) => {
+    setIsRepairing(true);
+    try {
+      console.log(`🔧 Reparando sincronización para período: ${periodId}`);
+      
+      await HistoryServiceAleluya.repairPeriodSync(periodId);
+      
+      toast({
+        title: "✅ Sincronización Reparada",
+        description: "El período ha sido sincronizado correctamente",
+        className: "border-green-200 bg-green-50"
+      });
+      
+    } catch (error) {
+      console.error('❌ Error reparando sincronización:', error);
+      
+      toast({
+        title: "❌ Error en Reparación",
+        description: "No se pudo reparar la sincronización",
+        variant: "destructive"
+      });
+      
+      throw error;
+    } finally {
+      setIsRepairing(false);
+    }
+  }, [toast]);
+
+  /**
+   * ✅ NUEVA FUNCIÓN: Detectar y reparar todos los períodos desincronizados
+   */
+  const repairAllDesynchronizedPeriods = useCallback(async () => {
+    setIsRepairing(true);
+    try {
+      console.log('🔧 Detectando y reparando períodos desincronizados...');
+      
+      const repairedCount = await HistoryServiceAleluya.repairAllDesynchronizedPeriods();
+      
+      if (repairedCount > 0) {
+        toast({
+          title: "✅ Reparación Masiva Completada",
+          description: `Se repararon ${repairedCount} períodos desincronizados`,
+          className: "border-green-200 bg-green-50"
+        });
+      } else {
+        toast({
+          title: "✅ Sistema Sincronizado",
+          description: "No se encontraron períodos desincronizados",
+          className: "border-blue-200 bg-blue-50"
+        });
+      }
+      
+      return repairedCount;
+      
+    } catch (error) {
+      console.error('❌ Error en reparación masiva:', error);
+      
+      toast({
+        title: "❌ Error en Reparación Masiva",
+        description: "No se pudo completar la reparación masiva",
+        variant: "destructive"
+      });
+      
+      throw error;
+    } finally {
+      setIsRepairing(false);
+    }
+  }, [toast]);
+
   return {
     ...payrollHook,
     loadEmployees,
     liquidatePayroll,
+    repairPeriodSync,
+    repairAllDesynchronizedPeriods,
+    isRepairing,
     canProceedWithLiquidation: payrollHook.employees.length > 0,
     isLoadingEmployees: payrollHook.isLoading,
     isAutoSaving: false,

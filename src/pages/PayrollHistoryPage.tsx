@@ -13,15 +13,17 @@ import {
   DollarSign,
   Filter,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle,
+  Wrench
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { HistoryServiceAleluya, PayrollPeriodHistory } from '@/services/HistoryServiceAleluya';
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * ✅ PÁGINA PRINCIPAL DE HISTORIAL DE NÓMINA
- * Lista paginada de períodos liquidados con filtros
+ * ✅ PÁGINA PRINCIPAL DE HISTORIAL DE NÓMINA - MEJORADA CON SINCRONIZACIÓN
+ * Lista paginada de períodos liquidados con filtros y reparación automática
  */
 export const PayrollHistoryPage = () => {
   const navigate = useNavigate();
@@ -29,6 +31,7 @@ export const PayrollHistoryPage = () => {
   
   const [periods, setPeriods] = useState<PayrollPeriodHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRepairing, setIsRepairing] = useState(false);
   const [filters, setFilters] = useState({
     year: new Date().getFullYear(),
     type: 'all'
@@ -68,6 +71,42 @@ export const PayrollHistoryPage = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRepairAllDesynchronized = async () => {
+    setIsRepairing(true);
+    try {
+      console.log('🔧 Detectando y reparando períodos desincronizados...');
+      
+      const repairedCount = await HistoryServiceAleluya.repairAllDesynchronizedPeriods();
+      
+      if (repairedCount > 0) {
+        toast({
+          title: "✅ Reparación Masiva Completada",
+          description: `Se repararon ${repairedCount} períodos desincronizados`,
+          className: "border-green-200 bg-green-50"
+        });
+        
+        // Recargar períodos para mostrar valores actualizados
+        await loadPeriods(pagination.page);
+      } else {
+        toast({
+          title: "✅ Sistema Sincronizado",
+          description: "No se encontraron períodos desincronizados",
+          className: "border-blue-200 bg-blue-50"
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error en reparación masiva:', error);
+      toast({
+        title: "❌ Error en Reparación Masiva",
+        description: "No se pudo completar la reparación masiva",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRepairing(false);
     }
   };
 
@@ -115,6 +154,11 @@ export const PayrollHistoryPage = () => {
     return typeMap[type as keyof typeof typeMap] || type;
   };
 
+  // Detectar períodos con posible desincronización
+  const hasDesynchronizedPeriods = periods.some(period => 
+    period.employeesCount > 0 && period.totalNetPay === 0
+  );
+
   if (loading && periods.length === 0) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -137,15 +181,51 @@ export const PayrollHistoryPage = () => {
           </div>
         </div>
         
-        <Button
-          variant="outline"
-          onClick={() => loadPeriods(pagination.page)}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          {hasDesynchronizedPeriods && (
+            <Button
+              variant="outline"
+              onClick={handleRepairAllDesynchronized}
+              disabled={isRepairing}
+              className="border-orange-200 text-orange-700 hover:bg-orange-50"
+            >
+              {isRepairing ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Wrench className="h-4 w-4 mr-2" />
+              )}
+              {isRepairing ? 'Reparando...' : 'Reparar Desincronizados'}
+            </Button>
+          )}
+          
+          <Button
+            variant="outline"
+            onClick={() => loadPeriods(pagination.page)}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        </div>
       </div>
+
+      {/* Alerta de desincronización */}
+      {hasDesynchronizedPeriods && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              <div>
+                <h3 className="font-medium text-orange-900">Períodos Desincronizados Detectados</h3>
+                <p className="text-sm text-orange-700">
+                  Se encontraron períodos con empleados procesados pero totales en $0. 
+                  Haz clic en "Reparar Desincronizados" para corregir automáticamente.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtros */}
       <Card>
@@ -216,61 +296,83 @@ export const PayrollHistoryPage = () => {
         </Card>
       ) : (
         <div className="space-y-4">
-          {periods.map((period) => (
-            <Card key={period.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-6">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <Calendar className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{period.period}</h3>
-                        <p className="text-sm text-gray-600">
-                          {new Date(period.startDate).toLocaleDateString('es-ES')} - {' '}
-                          {new Date(period.endDate).toLocaleDateString('es-ES')}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-1">
-                      <Badge variant="outline" className="bg-gray-50">
-                        {getTypeDisplay(period.type)}
-                      </Badge>
-                      {getStatusBadge(period.status)}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-8">
-                    <div className="flex items-center space-x-6 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <Users className="h-4 w-4 text-gray-500" />
-                        <span className="text-gray-700">{period.employeesCount} empleados</span>
+          {periods.map((period) => {
+            const isDesynchronized = period.employeesCount > 0 && period.totalNetPay === 0;
+            
+            return (
+              <Card 
+                key={period.id} 
+                className={`hover:shadow-md transition-shadow ${
+                  isDesynchronized ? 'border-orange-200 bg-orange-50' : ''
+                }`}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-6">
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-2 rounded-lg ${
+                          isDesynchronized ? 'bg-orange-100' : 'bg-green-100'
+                        }`}>
+                          {isDesynchronized ? (
+                            <AlertTriangle className="h-5 w-5 text-orange-600" />
+                          ) : (
+                            <Calendar className="h-5 w-5 text-green-600" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{period.period}</h3>
+                          <p className="text-sm text-gray-600">
+                            {new Date(period.startDate).toLocaleDateString('es-ES')} - {' '}
+                            {new Date(period.endDate).toLocaleDateString('es-ES')}
+                          </p>
+                        </div>
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        <DollarSign className="h-4 w-4 text-gray-500" />
-                        <span className="font-medium text-gray-900">
-                          {formatCurrency(period.totalNetPay)}
-                        </span>
+                        <Badge variant="outline" className="bg-gray-50">
+                          {getTypeDisplay(period.type)}
+                        </Badge>
+                        {getStatusBadge(period.status)}
+                        {isDesynchronized && (
+                          <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
+                            Desincronizado
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDetail(period.id)}
-                      className="flex items-center space-x-2"
-                    >
-                      <span>Ver detalle</span>
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center space-x-8">
+                      <div className="flex items-center space-x-6 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Users className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-700">{period.employeesCount} empleados</span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <DollarSign className="h-4 w-4 text-gray-500" />
+                          <span className={`font-medium ${
+                            isDesynchronized ? 'text-orange-600' : 'text-gray-900'
+                          }`}>
+                            {formatCurrency(period.totalNetPay)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDetail(period.id)}
+                        className="flex items-center space-x-2"
+                      >
+                        <span>Ver detalle</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
           
           {/* Paginación */}
           <div className="flex justify-center items-center space-x-4 pt-4">

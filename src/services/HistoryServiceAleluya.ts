@@ -1,57 +1,40 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { PayrollLiquidationService } from './PayrollLiquidationService';
 
 export interface PayrollPeriodHistory {
   id: string;
   period: string;
   startDate: string;
   endDate: string;
-  type: 'mensual' | 'quincenal' | 'semanal';
+  type: string;
+  status: string;
   employeesCount: number;
+  totalGrossPay: number;
   totalNetPay: number;
-  status: 'original' | 'con_ajuste';
+  totalDeductions: number;
+  totalCost: number;
+  employerContributions: number;
+  paymentStatus: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface EmployeePayrollDetail {
-  id: string;
-  name: string;
-  netPay: number;
-  grossPay: number;
-  position: string;
-  hasVoucher: boolean;
+export interface PayrollHistoryFilters {
+  year?: number;
+  type?: string;
+  page?: number;
+  limit?: number;
 }
 
-export interface PayrollAdjustment {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  concept: string;
-  amount: number;
-  observations: string;
-  createdBy: string;
-  createdAt: string;
+export interface PayrollHistoryResult {
+  periods: PayrollPeriodHistory[];
+  total: number;
+  hasMore: boolean;
 }
 
-export interface PeriodDetail {
-  period: PayrollPeriodHistory;
-  employees: EmployeePayrollDetail[];
-  adjustments: PayrollAdjustment[];
-  summary: {
-    totalDevengado: number;
-    totalDeducciones: number;
-    totalNeto: number;
-    costoTotal: number;
-    aportesEmpleador: number;
-  };
-}
-
-export class HistoryServiceAleluya {
-  /**
-   * Helper para obtener datos de usuario y empresa
-   */
-  private static async getUserAndCompany() {
+class HistoryServiceAleluyaClass {
+  private async getCurrentUserCompanyId(): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuario no autenticado');
 
@@ -62,432 +45,237 @@ export class HistoryServiceAleluya {
       .single();
 
     if (!profile?.company_id) throw new Error('Empresa no encontrada');
-
-    return { user, companyId: profile.company_id };
+    return profile.company_id;
   }
 
-  /**
-   * Obtener períodos liquidados con filtros
-   */
-  static async getPayrollHistory(filters: {
-    year?: number;
-    type?: string;
-    page?: number;
-    limit?: number;
-  } = {}): Promise<{
-    periods: PayrollPeriodHistory[];
-    total: number;
-    hasMore: boolean;
-  }> {
+  async getPayrollHistory(filters: PayrollHistoryFilters = {}): Promise<PayrollHistoryResult> {
     try {
-      const { companyId } = await this.getUserAndCompany();
+      const companyId = await this.getCurrentUserCompanyId();
+      const { page = 1, limit = 10 } = filters;
 
       let query = supabase
         .from('payroll_periods_real')
-        .select('*', { count: 'exact' })
+        .select('*')
         .eq('company_id', companyId)
         .eq('estado', 'cerrado')
         .order('fecha_inicio', { ascending: false });
 
-      // Aplicar filtros
       if (filters.year) {
-        const startYear = new Date(filters.year, 0, 1).toISOString().split('T')[0];
-        const endYear = new Date(filters.year, 11, 31).toISOString().split('T')[0];
-        query = query.gte('fecha_inicio', startYear).lte('fecha_fin', endYear);
+        const startOfYear = `${filters.year}-01-01`;
+        const endOfYear = `${filters.year}-12-31`;
+        query = query.gte('fecha_inicio', startOfYear).lte('fecha_fin', endOfYear);
       }
 
-      if (filters.type) {
+      if (filters.type && filters.type !== 'all') {
         query = query.eq('tipo_periodo', filters.type);
       }
 
-      // Paginación
-      const page = filters.page || 1;
-      const limit = filters.limit || 10;
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
-
-      const { data: periods, error, count } = await query.range(from, to);
+      const { data: periods, error, count } = await query
+        .range((page - 1) * limit, page * limit - 1);
 
       if (error) throw error;
 
-      const formattedPeriods = (periods || []).map(period => ({
+      const mappedPeriods: PayrollPeriodHistory[] = (periods || []).map(period => ({
         id: period.id,
         period: period.periodo,
         startDate: period.fecha_inicio,
         endDate: period.fecha_fin,
-        type: period.tipo_periodo as 'mensual' | 'quincenal' | 'semanal',
+        type: period.tipo_periodo,
+        status: 'original',
         employeesCount: period.empleados_count || 0,
-        totalNetPay: period.total_neto || 0,
-        status: 'original' as const,
+        totalGrossPay: Number(period.total_devengado) || 0,
+        totalNetPay: Number(period.total_neto) || 0,
+        totalDeductions: Number(period.total_deducciones) || 0,
+        totalCost: Number(period.total_devengado) || 0,
+        employerContributions: (Number(period.total_devengado) || 0) * 0.205,
+        paymentStatus: period.estado === 'cerrado' ? 'pagado' : 'pendiente',
         createdAt: period.created_at,
         updatedAt: period.updated_at
       }));
 
       return {
-        periods: formattedPeriods,
+        periods: mappedPeriods,
         total: count || 0,
-        hasMore: (count || 0) > page * limit
+        hasMore: (page * limit) < (count || 0)
       };
     } catch (error) {
-      console.error('Error fetching payroll history:', error);
+      console.error('Error obteniendo historial de nómina:', error);
       throw error;
     }
   }
 
   /**
-   * Actualizar totales del período basándose en registros de payrolls
+   * ✅ NUEVA FUNCIÓN: Actualizar totales de un período específico
    */
-  static async updatePeriodTotals(periodId: string): Promise<void> {
+  async updatePeriodTotals(periodId: string): Promise<void> {
     try {
-      const { companyId } = await this.getUserAndCompany();
+      console.log(`🔄 Actualizando totales para período: ${periodId}`);
+      
+      const companyId = await this.getCurrentUserCompanyId();
 
-      // Obtener totales de payrolls
-      const { data: payrolls, error: payrollsError } = await supabase
+      // Obtener totales reales de los registros de payrolls
+      const { data: payrollTotals, error: totalsError } = await supabase
         .from('payrolls')
         .select('total_devengado, total_deducciones, neto_pagado')
-        .eq('period_id', periodId);
+        .eq('period_id', periodId)
+        .eq('company_id', companyId);
 
-      if (payrollsError) throw payrollsError;
+      if (totalsError) {
+        console.error('Error obteniendo totales de payrolls:', totalsError);
+        throw totalsError;
+      }
 
-      const totals = payrolls.reduce((acc, payroll) => ({
-        totalDevengado: acc.totalDevengado + (payroll.total_devengado || 0),
-        totalDeducciones: acc.totalDeducciones + (payroll.total_deducciones || 0),
-        totalNeto: acc.totalNeto + (payroll.neto_pagado || 0),
-        employeesCount: acc.employeesCount + 1
-      }), {
-        totalDevengado: 0,
-        totalDeducciones: 0,
-        totalNeto: 0,
-        employeesCount: 0
+      if (!payrollTotals || payrollTotals.length === 0) {
+        console.warn(`⚠️ No se encontraron registros de payrolls para el período ${periodId}`);
+        return;
+      }
+
+      // Calcular totales
+      const totalDevengado = payrollTotals.reduce((sum, record) => sum + (Number(record.total_devengado) || 0), 0);
+      const totalDeducciones = payrollTotals.reduce((sum, record) => sum + (Number(record.total_deducciones) || 0), 0);
+      const totalNeto = payrollTotals.reduce((sum, record) => sum + (Number(record.neto_pagado) || 0), 0);
+
+      console.log(`📊 Totales calculados:`, {
+        totalDevengado,
+        totalDeducciones,
+        totalNeto,
+        empleados: payrollTotals.length
       });
 
-      // Actualizar período con totales calculados
+      // Actualizar período con totales correctos
       const { error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({
-          empleados_count: totals.employeesCount,
-          total_devengado: totals.totalDevengado,
-          total_deducciones: totals.totalDeducciones,
-          total_neto: totals.totalNeto,
+          total_devengado: totalDevengado,
+          total_deducciones: totalDeducciones,
+          total_neto: totalNeto,
+          empleados_count: payrollTotals.length,
           updated_at: new Date().toISOString()
         })
         .eq('id', periodId)
         .eq('company_id', companyId);
 
-      if (updateError) throw updateError;
-
-      console.log('✅ Totales del período actualizados:', {
-        periodId,
-        ...totals
-      });
-    } catch (error) {
-      console.error('Error updating period totals:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtener detalle de un período específico
-   */
-  static async getPeriodDetail(periodId: string): Promise<PeriodDetail> {
-    try {
-      const { companyId } = await this.getUserAndCompany();
-
-      // Obtener período
-      const { data: period, error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('id', periodId)
-        .eq('company_id', companyId)
-        .single();
-
-      if (periodError) throw periodError;
-
-      // Obtener empleados del período
-      const { data: payrolls, error: payrollsError } = await supabase
-        .from('payrolls')
-        .select(`
-          *,
-          employees:employee_id (
-            id,
-            nombre,
-            apellido,
-            cargo
-          )
-        `)
-        .eq('period_id', periodId);
-
-      if (payrollsError) throw payrollsError;
-
-      // Verificar comprobantes
-      const { data: vouchers } = await supabase
-        .from('payroll_vouchers')
-        .select('employee_id')
-        .eq('periodo', period.periodo)
-        .eq('company_id', companyId);
-
-      const voucherEmployeeIds = new Set(vouchers?.map(v => v.employee_id) || []);
-
-      // Formatear datos
-      const employees: EmployeePayrollDetail[] = (payrolls || []).map(payroll => ({
-        id: payroll.employee_id,
-        name: `${payroll.employees?.nombre || ''} ${payroll.employees?.apellido || ''}`.trim(),
-        netPay: payroll.neto_pagado || 0,
-        grossPay: payroll.total_devengado || 0,
-        position: payroll.employees?.cargo || 'N/A',
-        hasVoucher: voucherEmployeeIds.has(payroll.employee_id)
-      }));
-
-      const periodHistory: PayrollPeriodHistory = {
-        id: period.id,
-        period: period.periodo,
-        startDate: period.fecha_inicio,
-        endDate: period.fecha_fin,
-        type: period.tipo_periodo as 'mensual' | 'quincenal' | 'semanal',
-        employeesCount: period.empleados_count || 0,
-        totalNetPay: period.total_neto || 0,
-        status: 'original' as const,
-        createdAt: period.created_at,
-        updatedAt: period.updated_at
-      };
-
-      return {
-        period: periodHistory,
-        employees,
-        adjustments: [],
-        summary: {
-          totalDevengado: period.total_devengado || 0,
-          totalDeducciones: period.total_deducciones || 0,
-          totalNeto: period.total_neto || 0,
-          costoTotal: (period.total_devengado || 0) * 1.205,
-          aportesEmpleador: (period.total_devengado || 0) * 0.205
-        }
-      };
-    } catch (error) {
-      console.error('Error fetching period detail:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtener datos completos del empleado para generar comprobante
-   */
-  static async getEmployeePayrollData(employeeId: string, periodId: string) {
-    try {
-      const { companyId } = await this.getUserAndCompany();
-
-      // Obtener datos del empleado y su liquidación
-      const { data: payroll, error: payrollError } = await supabase
-        .from('payrolls')
-        .select(`
-          *,
-          employees:employee_id (
-            id,
-            nombre,
-            apellido,
-            cedula,
-            cargo,
-            salario_base
-          )
-        `)
-        .eq('employee_id', employeeId)
-        .eq('period_id', periodId)
-        .single();
-
-      if (payrollError) throw payrollError;
-      if (!payroll) throw new Error('Liquidación no encontrada');
-
-      // Obtener datos del período
-      const { data: period, error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('id', periodId)
-        .eq('company_id', companyId)
-        .single();
-
-      if (periodError) throw periodError;
-      if (!period) throw new Error('Período no encontrado');
-
-      // Obtener datos de la empresa
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', companyId)
-        .single();
-
-      if (companyError) throw companyError;
-
-      // Obtener novedades del empleado en el período
-      const { data: novedades } = await supabase
-        .from('payroll_novedades')
-        .select('*')
-        .eq('empleado_id', employeeId)
-        .eq('periodo_id', periodId);
-
-      return {
-        payroll,
-        employee: payroll.employees,
-        period,
-        company,
-        novedades: novedades || []
-      };
-    } catch (error) {
-      console.error('Error fetching employee payroll data:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Generar comprobante PDF para un empleado usando la Edge Function
-   */
-  static async generateVoucherPDF(employeeId: string, periodId: string): Promise<void> {
-    try {
-      console.log('🔄 Generando comprobante PDF para empleado:', employeeId);
-      
-      const payrollData = await this.getEmployeePayrollData(employeeId, periodId);
-      
-      // Preparar datos para la Edge Function
-      const employeeData = {
-        id: payrollData.employee.id,
-        name: `${payrollData.employee.nombre} ${payrollData.employee.apellido}`.trim(),
-        cedula: payrollData.employee.cedula,
-        position: payrollData.employee.cargo,
-        baseSalary: payrollData.employee.salario_base,
-        workedDays: payrollData.payroll.dias_trabajados || 30,
-        grossPay: payrollData.payroll.total_devengado || 0,
-        deductions: payrollData.payroll.total_deducciones || 0,
-        netPay: payrollData.payroll.neto_pagado || 0,
-        extraHours: 0,
-        bonuses: 0,
-        transportAllowance: 0
-      };
-
-      // Procesar novedades si existen
-      if (payrollData.novedades && payrollData.novedades.length > 0) {
-        payrollData.novedades.forEach(novedad => {
-          if (novedad.tipo_novedad === 'horas_extra') {
-            employeeData.extraHours += novedad.horas || 0;
-          } else if (novedad.tipo_novedad === 'bonificacion') {
-            employeeData.bonuses += novedad.valor || 0;
-          } else if (novedad.tipo_novedad === 'otros_ingresos') {
-            employeeData.transportAllowance += novedad.valor || 0;
-          }
-        });
+      if (updateError) {
+        console.error('Error actualizando totales del período:', updateError);
+        throw updateError;
       }
 
-      const periodData = {
-        startDate: payrollData.period.fecha_inicio,
-        endDate: payrollData.period.fecha_fin,
-        type: payrollData.period.tipo_periodo
-      };
-
-      const companyData = {
-        razon_social: payrollData.company.razon_social,
-        nit: payrollData.company.nit,
-        direccion: payrollData.company.direccion,
-        ciudad: payrollData.company.ciudad,
-        telefono: payrollData.company.telefono,
-        email: payrollData.company.email
-      };
-
-      console.log('📤 Enviando datos a Edge Function...');
-      
-      // Llamar a la Edge Function
-      const { data, error } = await supabase.functions.invoke('generate-voucher-pdf', {
-        body: {
-          employee: employeeData,
-          period: periodData,
-          company: companyData
-        }
-      });
-
-      if (error) {
-        console.error('❌ Error en Edge Function:', error);
-        throw new Error(`Error generando PDF: ${error.message}`);
-      }
-
-      console.log('✅ PDF generado exitosamente');
-
-      // Crear blob desde los datos binarios
-      const pdfBlob = new Blob([data], { type: 'application/pdf' });
-      
-      // Crear URL para descarga
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      
-      // Crear elemento de descarga
-      const link = document.createElement('a');
-      link.href = pdfUrl;
-      link.download = `comprobante-${employeeData.name.replace(/\s+/g, '-')}-${payrollData.period.periodo}.pdf`;
-      
-      // Triggerar descarga
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Limpiar URL
-      URL.revokeObjectURL(pdfUrl);
-      
-      console.log('📥 Descarga iniciada');
-
-      // Registrar auditoría
-      await this.logVoucherDownload(employeeId, periodId, payrollData.company.id);
-      
+      console.log(`✅ Totales actualizados correctamente para período ${periodId}`);
     } catch (error) {
-      console.error('❌ Error generando comprobante:', error);
+      console.error('Error en updatePeriodTotals:', error);
       throw error;
     }
   }
 
   /**
-   * Registrar descarga de comprobante en auditoría
+   * ✅ NUEVA FUNCIÓN: Consolidar novedades en registros de payrolls
    */
-  private static async logVoucherDownload(employeeId: string, periodId: string, companyId: string) {
+  async consolidatePayrollWithNovedades(periodId: string): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      await supabase
-        .from('voucher_audit_log')
-        .insert({
-          company_id: companyId,
-          voucher_id: `${periodId}-${employeeId}`,
-          user_id: user.id,
-          action: 'download',
-          success: true,
-          method: 'pdf_generation'
-        });
+      console.log(`🔄 Consolidando novedades para período: ${periodId}`);
+      
+      // Usar el servicio de liquidación para consolidar
+      await PayrollLiquidationService.consolidatePayrollWithNovedades(periodId);
+      
+      console.log(`✅ Novedades consolidadas exitosamente para período ${periodId}`);
     } catch (error) {
-      console.error('Error logging voucher download:', error);
+      console.error('Error consolidando novedades:', error);
+      throw error;
     }
   }
 
   /**
-   * Crear un ajuste para un período
+   * ✅ NUEVA FUNCIÓN: Reparar período específico (consolidar + actualizar totales)
    */
-  static async createAdjustment(data: {
-    periodId: string;
-    employeeId: string;
-    concept: string;
-    amount: number;
-    observations?: string;
-  }): Promise<PayrollAdjustment> {
+  async repairPeriodSync(periodId: string): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
-
-      return {
-        id: 'mock-adjustment-id',
-        employeeId: data.employeeId,
-        employeeName: 'Empleado Mock',
-        concept: data.concept,
-        amount: data.amount,
-        observations: data.observations || '',
-        createdBy: 'Usuario Mock',
-        createdAt: new Date().toISOString()
-      };
+      console.log(`🔧 Iniciando reparación completa para período: ${periodId}`);
+      
+      // Paso 1: Consolidar novedades
+      await this.consolidatePayrollWithNovedades(periodId);
+      
+      // Paso 2: Actualizar totales
+      await this.updatePeriodTotals(periodId);
+      
+      console.log(`✅ Reparación completa exitosa para período ${periodId}`);
     } catch (error) {
-      console.error('Error creating adjustment:', error);
+      console.error('Error en reparación de período:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NUEVA FUNCIÓN: Detectar períodos desincronizados
+   */
+  async detectDesynchronizedPeriods(): Promise<string[]> {
+    try {
+      const companyId = await this.getCurrentUserCompanyId();
+      
+      // Obtener períodos que podrían estar desincronizados
+      const { data: periods, error } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo, total_devengado, total_neto')
+        .eq('company_id', companyId)
+        .eq('estado', 'cerrado')
+        .or('total_devengado.is.null,total_devengado.eq.0,total_neto.is.null,total_neto.eq.0');
+
+      if (error) throw error;
+
+      const desynchronizedPeriods: string[] = [];
+
+      for (const period of periods || []) {
+        // Verificar si hay registros de payrolls para este período
+        const { data: payrolls, error: payrollError } = await supabase
+          .from('payrolls')
+          .select('neto_pagado')
+          .eq('period_id', period.id)
+          .eq('company_id', companyId);
+
+        if (payrollError) continue;
+
+        // Si hay payrolls pero el período tiene totales en 0, está desincronizado
+        if (payrolls && payrolls.length > 0 && (!period.total_neto || period.total_neto === 0)) {
+          desynchronizedPeriods.push(period.id);
+          console.warn(`⚠️ Período desincronizado detectado: ${period.periodo} (ID: ${period.id})`);
+        }
+      }
+
+      return desynchronizedPeriods;
+    } catch (error) {
+      console.error('Error detectando períodos desincronizados:', error);
+      return [];
+    }
+  }
+
+  /**
+   * ✅ NUEVA FUNCIÓN: Reparar todos los períodos desincronizados
+   */
+  async repairAllDesynchronizedPeriods(): Promise<number> {
+    try {
+      const desynchronizedPeriods = await this.detectDesynchronizedPeriods();
+      
+      if (desynchronizedPeriods.length === 0) {
+        console.log('✅ No se encontraron períodos desincronizados');
+        return 0;
+      }
+
+      console.log(`🔧 Reparando ${desynchronizedPeriods.length} períodos desincronizados`);
+
+      for (const periodId of desynchronizedPeriods) {
+        try {
+          await this.repairPeriodSync(periodId);
+        } catch (error) {
+          console.error(`❌ Error reparando período ${periodId}:`, error);
+        }
+      }
+
+      console.log(`✅ Reparación masiva completada: ${desynchronizedPeriods.length} períodos`);
+      return desynchronizedPeriods.length;
+    } catch (error) {
+      console.error('Error en reparación masiva:', error);
       throw error;
     }
   }
 }
+
+export const HistoryServiceAleluya = new HistoryServiceAleluyaClass();
