@@ -13,7 +13,6 @@ interface VacationAbsenceTableProps {
   onEdit: (vacation: VacationAbsence) => void;
   onDelete: (id: string) => void;
   isLoading: boolean;
-  getRecordOrigin?: (record: any) => { source: string; icon: string; color: string };
 }
 
 export const VacationAbsenceTable = ({
@@ -21,8 +20,7 @@ export const VacationAbsenceTable = ({
   onView,
   onEdit,
   onDelete,
-  isLoading,
-  getRecordOrigin
+  isLoading
 }: VacationAbsenceTableProps) => {
   if (isLoading) {
     return (

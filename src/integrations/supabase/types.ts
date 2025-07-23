@@ -705,7 +705,6 @@ export type Database = {
           processed_in_period_id: string | null
           start_date: string
           status: string
-          subtipo: string | null
           type: Database["public"]["Enums"]["novedad_type"]
           updated_at: string
         }
@@ -721,7 +720,6 @@ export type Database = {
           processed_in_period_id?: string | null
           start_date: string
           status?: string
-          subtipo?: string | null
           type?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
         }
@@ -737,7 +735,6 @@ export type Database = {
           processed_in_period_id?: string | null
           start_date?: string
           status?: string
-          subtipo?: string | null
           type?: Database["public"]["Enums"]["novedad_type"]
           updated_at?: string
         }
@@ -961,42 +958,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payroll_adjustments: {
-        Row: {
-          amount: number
-          concept: string
-          created_at: string
-          created_by: string
-          employee_id: string
-          id: string
-          observations: string | null
-          period_id: string
-          updated_at: string
-        }
-        Insert: {
-          amount?: number
-          concept: string
-          created_at?: string
-          created_by: string
-          employee_id: string
-          id?: string
-          observations?: string | null
-          period_id: string
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          concept?: string
-          created_at?: string
-          created_by?: string
-          employee_id?: string
-          id?: string
-          observations?: string | null
-          period_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       payroll_novedades: {
         Row: {
           adjunto_url: string | null
@@ -1167,7 +1128,6 @@ export type Database = {
           company_id: string
           created_at: string
           empleados_count: number | null
-          employees_loaded: boolean | null
           estado: string
           fecha_fin: string
           fecha_inicio: string
@@ -1185,7 +1145,6 @@ export type Database = {
           company_id: string
           created_at?: string
           empleados_count?: number | null
-          employees_loaded?: boolean | null
           estado?: string
           fecha_fin: string
           fecha_inicio: string
@@ -1203,7 +1162,6 @@ export type Database = {
           company_id?: string
           created_at?: string
           empleados_count?: number | null
-          employees_loaded?: boolean | null
           estado?: string
           fecha_fin?: string
           fecha_inicio?: string
@@ -1815,15 +1773,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      calculate_period_intersection_days: {
-        Args: {
-          absence_start: string
-          absence_end: string
-          period_start: string
-          period_end: string
-        }
-        Returns: number
-      }
       can_manage_company_users: {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
@@ -1859,17 +1808,6 @@ export type Database = {
         }
         Returns: string
       }
-      create_payroll_adjustment: {
-        Args: {
-          p_period_id: string
-          p_employee_id: string
-          p_concept: string
-          p_amount: number
-          p_observations: string
-          p_created_by: string
-        }
-        Returns: undefined
-      }
       detect_current_smart_period: {
         Args: { p_company_id?: string }
         Returns: Json
@@ -1885,14 +1823,6 @@ export type Database = {
       ensure_admin_role_for_company_users: {
         Args: Record<PropertyKey, never>
         Returns: undefined
-      }
-      fix_malformed_fragmented_absences: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      force_sync_existing_novedades: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       generate_payroll_records_for_period: {
         Args: { p_period_id: string }
@@ -1922,18 +1852,6 @@ export type Database = {
       get_payroll_history_periods: {
         Args: { p_company_id?: string }
         Returns: Json
-      }
-      get_period_adjustments: {
-        Args: { period_id: string }
-        Returns: {
-          id: string
-          employee_id: string
-          employee_name: string
-          concept: string
-          amount: number
-          observations: string
-          created_at: string
-        }[]
       }
       get_user_companies_simple: {
         Args: { _user_id?: string }
@@ -1965,10 +1883,6 @@ export type Database = {
       is_support_user: {
         Args: { _user_id?: string }
         Returns: boolean
-      }
-      sync_existing_vacation_data: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       sync_historical_payroll_data: {
         Args: { p_period_id: string; p_company_id?: string }

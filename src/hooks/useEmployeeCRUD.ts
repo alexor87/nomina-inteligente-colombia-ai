@@ -158,7 +158,7 @@ export const useEmployeeCRUD = () => {
     }
   };
 
-  const changeEmployeeStatus = async (id: string, newStatus: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad') => {
+  const changeEmployeeStatus = async (id: string, newStatus: string) => {
     setIsLoading(true);
     try {
       console.log('🔄 useEmployeeCRUD: Changing employee status:', id, 'to', newStatus);

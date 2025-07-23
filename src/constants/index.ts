@@ -1,12 +1,7 @@
 
-// Constantes de la aplicación colombiana - ACTUALIZADAS 2025
-export const SALARIO_MINIMO_2025 = 1423500;
-export const AUXILIO_TRANSPORTE_2025 = 200000;
+// Constantes de la aplicación colombiana
 export const SALARIO_MINIMO_2024 = 1300000;
 export const AUXILIO_TRANSPORTE_2024 = 162000;
-
-// ✅ LÍMITE AUXILIO DE TRANSPORTE 2025: 2 SMMLV
-export const LIMITE_AUXILIO_TRANSPORTE_2025 = SALARIO_MINIMO_2025 * 2; // $2,847,000
 
 export const PORCENTAJES_NOMINA = {
   SALUD_EMPLEADO: 0.04, // 4%
@@ -37,45 +32,6 @@ export const TIPOS_CONTRATO = [
   { value: 'obra', label: 'Obra o Labor' },
   { value: 'aprendizaje', label: 'Aprendizaje' },
 ];
-
-// ✅ NUEVO: Constantes para Fondo de Solidaridad Pensional 2025
-export const FONDO_SOLIDARIDAD_PENSIONAL_2025 = {
-  SMMLV_BASE: 1423500,
-  RANGOS: [
-    { minSMMLV: 4, maxSMMLV: 16, percentage: 0.01 },   // 1.0%
-    { minSMMLV: 16, maxSMMLV: 17, percentage: 0.012 }, // 1.2%
-    { minSMMLV: 17, maxSMMLV: 18, percentage: 0.014 }, // 1.4%
-    { minSMMLV: 18, maxSMMLV: 19, percentage: 0.016 }, // 1.6%
-    { minSMMLV: 19, maxSMMLV: 20, percentage: 0.018 }, // 1.8%
-    { minSMMLV: 20, maxSMMLV: 999, percentage: 0.02 }  // 2.0%
-  ]
-};
-
-// ✅ NUEVO: Constantes para Contribuciones Solidarias 2025
-export const CONTRIBUCIONES_SOLIDARIAS_2025 = {
-  CONTRIBUCION_SOLIDARIA_ADICIONAL: {
-    minSMMLV: 16,
-    percentage: 0.01 // 1%
-  },
-  FONDO_SUBSISTENCIA: {
-    minSMMLV: 20,
-    percentage: 0.01 // 1%
-  }
-};
-
-// ✅ NUEVO: Constantes para Retención en la Fuente 2025
-export const RETENCION_FUENTE_2025 = {
-  UVT: 47065,
-  TABLA_RETENCION: [
-    { minUVT: 0, maxUVT: 95, percentage: 0, baseUVT: 0 },
-    { minUVT: 95, maxUVT: 150, percentage: 0.19, baseUVT: 95 },
-    { minUVT: 150, maxUVT: 360, percentage: 0.28, baseUVT: 150 },
-    { minUVT: 360, maxUVT: 640, percentage: 0.33, baseUVT: 360 },
-    { minUVT: 640, maxUVT: 945, percentage: 0.35, baseUVT: 640 },
-    { minUVT: 945, maxUVT: 2300, percentage: 0.37, baseUVT: 945 },
-    { minUVT: 2300, maxUVT: 999999, percentage: 0.39, baseUVT: 2300 }
-  ]
-};
 
 export const PLANES_SAAS = [
   {

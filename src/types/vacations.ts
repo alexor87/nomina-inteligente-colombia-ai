@@ -16,8 +16,7 @@ export interface VacationAbsence {
   id: string;
   employee_id: string;
   company_id: string;
-  type: VacationAbsenceType;
-  subtipo?: string; // ✅ AGREGADO: Campo subtipo opcional
+  type: VacationAbsenceType; // ✅ USANDO TIPO FILTRADO DE NOVEDADES
   start_date: string;
   end_date: string;
   days_count: number;
@@ -47,8 +46,7 @@ export interface VacationAbsenceFilters {
 
 export interface VacationAbsenceFormData {
   employee_id: string;
-  type: VacationAbsenceType;
-  subtipo?: string; // ✅ AGREGADO: Campo subtipo opcional
+  type: VacationAbsenceType; // ✅ USANDO TIPO FILTRADO DE NOVEDADES
   start_date: string;
   end_date: string;
   observations?: string;
@@ -72,51 +70,6 @@ export const ABSENCE_TYPE_COLORS: Record<VacationAbsenceType, string> = {
   licencia_no_remunerada: 'bg-yellow-100 text-yellow-800',
   incapacidad: 'bg-purple-100 text-purple-800',
   ausencia: 'bg-red-100 text-red-800'
-};
-
-// ✅ MAPEO DE SUBTIPOS POR TIPO DE AUSENCIA (KISS: Reutilizar lógica de novedades)
-export const VACATION_SUBTYPES: Record<VacationAbsenceType, { value: string; label: string }[]> = {
-  vacaciones: [
-    { value: 'anuales', label: 'Vacaciones Anuales' },
-    { value: 'compensatorias', label: 'Vacaciones Compensatorias' },
-    { value: 'colectivas', label: 'Vacaciones Colectivas' }
-  ],
-  licencia_remunerada: [
-    { value: 'paternidad', label: 'Licencia de Paternidad' },
-    { value: 'maternidad', label: 'Licencia de Maternidad' },
-    { value: 'matrimonio', label: 'Licencia por Matrimonio' },
-    { value: 'luto', label: 'Licencia por Luto' },
-    { value: 'estudio', label: 'Licencia por Estudios' }
-  ],
-  licencia_no_remunerada: [
-    { value: 'personal', label: 'Licencia Personal' },
-    { value: 'estudios', label: 'Licencia por Estudios' },
-    { value: 'familiar', label: 'Licencia Familiar' },
-    { value: 'salud_no_eps', label: 'Licencia por Salud (No EPS)' },
-    { value: 'maternidad_extendida', label: 'Licencia Maternidad Extendida' },
-    { value: 'cuidado_hijo_menor', label: 'Licencia Cuidado Hijo Menor' }
-  ],
-  incapacidad: [
-    { value: 'comun', label: 'Incapacidad Común' },
-    { value: 'general', label: 'Incapacidad General' },
-    { value: 'laboral', label: 'Incapacidad Laboral' }
-  ],
-  ausencia: [
-    { value: 'injustificada', label: 'Ausencia Injustificada' },
-    { value: 'abandono_puesto', label: 'Abandono del Puesto' },
-    { value: 'suspension_disciplinaria', label: 'Suspensión Disciplinaria' },
-    { value: 'tardanza_excesiva', label: 'Tardanza Excesiva' }
-  ]
-};
-
-// ✅ FUNCIÓN HELPER PARA VALIDAR SI UN TIPO REQUIERE SUBTIPO
-export const requiresSubtype = (type: VacationAbsenceType): boolean => {
-  return ['licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'].includes(type);
-};
-
-// ✅ FUNCIÓN HELPER PARA OBTENER SUBTIPOS DE UN TIPO
-export const getSubtypesForType = (type: VacationAbsenceType) => {
-  return VACATION_SUBTYPES[type] || [];
 };
 
 // ✅ FUNCIÓN HELPER PARA FILTRAR TIPOS APLICABLES A VACACIONES/AUSENCIAS

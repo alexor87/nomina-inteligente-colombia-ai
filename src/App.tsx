@@ -19,17 +19,15 @@ import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
 import EditEmployeePage from "./pages/EditEmployeePage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
-import PayrollLiquidationPageSimplified from "./pages/PayrollLiquidationPageSimplified";
+import PlaceholderPage from "./pages/PlaceholderPage";
+import PayrollLiquidationPageSimple from "./pages/PayrollLiquidationPageSimple";
 import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
-import PayrollHistoryPage from "./pages/PayrollHistoryPage";
-import PayrollHistoryDetailPage from "./pages/PayrollHistoryDetailPage";
-import PayrollAdjustmentPage from "./pages/PayrollAdjustmentPage";
 
 const queryClient = new QueryClient();
 
 /**
- * ✅ APLICACIÓN PRINCIPAL CON MÓDULO DE HISTORIAL DE NÓMINA
- * Incluye el módulo completo de historial con páginas dedicadas
+ * ✅ APLICACIÓN PRINCIPAL CON SOLUCIÓN KISS SIMPLIFICADA
+ * Implementación simplificada del módulo de liquidación siguiendo principio KISS
  */
 function AppContent() {
   // Inicialización automática del sistema
@@ -48,13 +46,12 @@ function AppContent() {
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="employees/create" element={<CreateEmployeeModernPage />} />
           <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
-          <Route path="payroll" element={<PayrollLiquidationPageSimplified />} />
+          <Route path="payroll" element={<PayrollLiquidationPageSimple />} />
           <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
-          <Route path="payroll-history" element={<PayrollHistoryPage />} />
-          <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
-          <Route path="payroll-history/:periodId/adjust" element={<PayrollAdjustmentPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          {/* Placeholder para rutas eliminadas */}
+          <Route path="payroll-history" element={<PlaceholderPage />} />
         </Route>
       </Routes>
     </div>

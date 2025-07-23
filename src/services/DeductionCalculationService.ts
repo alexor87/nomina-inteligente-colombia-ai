@@ -1,10 +1,10 @@
+
 /**
  * Servicio de cálculo de deducciones según normativa colombiana
- * ACTUALIZADO 2025: Con deducciones de ley completas y fallback local robusto
+ * ACTUALIZADO 2025: Integración completa con backend para consistencia total
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025, FONDO_SOLIDARIDAD_PENSIONAL_2025, CONTRIBUCIONES_SOLIDARIAS_2025, RETENCION_FUENTE_2025 } from '@/constants';
 
 export interface DeductionInput {
   salarioBase: number;
@@ -21,8 +21,6 @@ export interface DeductionResult {
   saludEmpleado: number;
   pensionEmpleado: number;
   fondoSolidaridad: number;
-  contribucionSolidariaAdicional: number;
-  fondoSubsistencia: number;
   retencionFuente: number;
   novedadesDeducciones: number;
   totalDeducciones: number;
@@ -31,10 +29,7 @@ export interface DeductionResult {
     topeIbc: number;
     baseRetencion: number;
     uvtAplicable: number;
-    smmlvMultiple: number;
     fondoSolidaridadRate: number;
-    contribucionSolidariaRate: number;
-    fondoSubsistenciaRate: number;
     novedadesDetalle: Array<{
       tipo: string;
       valor: number;
@@ -66,6 +61,7 @@ export class DeductionCalculationService {
         return { total: 0, detalle: [] };
       }
 
+      // Tipos de novedades que son deducciones
       const tiposDeducciones = [
         'libranza', 'multa', 'ausencia', 'descuento_voluntario', 
         'retencion_fuente', 'deduccion_especial', 'salud', 'pension', 
@@ -128,161 +124,16 @@ export class DeductionCalculationService {
     }
   }
 
-  /**
-   * ✅ NUEVO: Cálculo de Fondo de Solidaridad Pensional
-   */
-  private static calculateFondoSolidaridad(salarioBase: number): {
-    valor: number;
-    rate: number;
-    smmlvMultiple: number;
-  } {
-    const smmlvMultiple = salarioBase / SALARIO_MINIMO_2025;
-    
-    // Solo aplica para salarios >= 4 SMMLV
-    if (smmlvMultiple < 4) {
-      return { valor: 0, rate: 0, smmlvMultiple };
-    }
-
-    const rango = FONDO_SOLIDARIDAD_PENSIONAL_2025.RANGOS.find(r => 
-      smmlvMultiple >= r.minSMMLV && smmlvMultiple < r.maxSMMLV
-    );
-
-    if (!rango) {
-      return { valor: 0, rate: 0, smmlvMultiple };
-    }
-
-    const valor = salarioBase * rango.percentage;
-    return { valor, rate: rango.percentage, smmlvMultiple };
-  }
-
-  /**
-   * ✅ NUEVO: Cálculo de Contribuciones Solidarias
-   */
-  private static calculateContribucionesSolidarias(salarioBase: number): {
-    contribucionSolidariaAdicional: number;
-    fondoSubsistencia: number;
-    contribucionSolidariaRate: number;
-    fondoSubsistenciaRate: number;
-  } {
-    const smmlvMultiple = salarioBase / SALARIO_MINIMO_2025;
-    
-    let contribucionSolidariaAdicional = 0;
-    let fondoSubsistencia = 0;
-    let contribucionSolidariaRate = 0;
-    let fondoSubsistenciaRate = 0;
-
-    // Contribución Solidaria Adicional (≥ 16 SMMLV)
-    if (smmlvMultiple >= CONTRIBUCIONES_SOLIDARIAS_2025.CONTRIBUCION_SOLIDARIA_ADICIONAL.minSMMLV) {
-      contribucionSolidariaRate = CONTRIBUCIONES_SOLIDARIAS_2025.CONTRIBUCION_SOLIDARIA_ADICIONAL.percentage;
-      contribucionSolidariaAdicional = salarioBase * contribucionSolidariaRate;
-    }
-
-    // Fondo de Subsistencia (≥ 20 SMMLV)
-    if (smmlvMultiple >= CONTRIBUCIONES_SOLIDARIAS_2025.FONDO_SUBSISTENCIA.minSMMLV) {
-      fondoSubsistenciaRate = CONTRIBUCIONES_SOLIDARIAS_2025.FONDO_SUBSISTENCIA.percentage;
-      fondoSubsistencia = salarioBase * fondoSubsistenciaRate;
-    }
-
-    return {
-      contribucionSolidariaAdicional,
-      fondoSubsistencia,
-      contribucionSolidariaRate,
-      fondoSubsistenciaRate
-    };
-  }
-
-  /**
-   * ✅ NUEVO: Cálculo mejorado de Retención en la Fuente
-   */
-  private static calculateRetencionFuente(baseRetencion: number): number {
-    const uvtValue = RETENCION_FUENTE_2025.UVT;
-    const baseUVT = baseRetencion / uvtValue;
-    
-    // Buscar el rango apropiado en la tabla
-    const rango = RETENCION_FUENTE_2025.TABLA_RETENCION.find(r => 
-      baseUVT >= r.minUVT && baseUVT < r.maxUVT
-    );
-
-    if (!rango || rango.percentage === 0) {
-      return 0;
-    }
-
-    // Calcular retención según la tabla
-    const exceso = baseUVT - rango.baseUVT;
-    const retencionUVT = exceso * rango.percentage;
-    const retencionPesos = retencionUVT * uvtValue;
-
-    return Math.max(0, retencionPesos);
-  }
-
-  /**
-   * ✅ FALLBACK LOCAL: Cálculo completo de deducciones con todas las deducciones de ley
-   */
-  private static calculateLocalDeductions(input: DeductionInput): {
-    healthDeduction: number;
-    pensionDeduction: number;
-    fondoSolidaridad: number;
-    contribucionSolidariaAdicional: number;
-    fondoSubsistencia: number;
-    retencionFuente: number;
-    smmlvMultiple: number;
-    rates: {
-      fondoSolidaridad: number;
-      contribucionSolidaria: number;
-      fondoSubsistencia: number;
-    };
-  } {
-    const baseIbc = input.totalDevengado - input.auxilioTransporte;
-    const topeIbc = SALARIO_MINIMO_2025 * 25;
-    
-    // Aplicar topes IBC
-    const ibcAplicable = Math.min(baseIbc, topeIbc);
-    
-    // Cálculos básicos según normativa colombiana 2025
-    const healthDeduction = Math.max(0, ibcAplicable * 0.04); // 4% salud
-    const pensionDeduction = Math.max(0, ibcAplicable * 0.04); // 4% pensión
-    
-    // ✅ NUEVO: Fondo de Solidaridad Pensional
-    const fondoSolidaridadResult = this.calculateFondoSolidaridad(input.salarioBase);
-    
-    // ✅ NUEVO: Contribuciones Solidarias
-    const contribucionesSolidarias = this.calculateContribucionesSolidarias(input.salarioBase);
-    
-    // ✅ NUEVO: Retención en la fuente mejorada
-    const baseRetencion = input.totalDevengado - healthDeduction - pensionDeduction - fondoSolidaridadResult.valor;
-    const retencionFuente = this.calculateRetencionFuente(baseRetencion);
-    
-    return {
-      healthDeduction,
-      pensionDeduction,
-      fondoSolidaridad: fondoSolidaridadResult.valor,
-      contribucionSolidariaAdicional: contribucionesSolidarias.contribucionSolidariaAdicional,
-      fondoSubsistencia: contribucionesSolidarias.fondoSubsistencia,
-      retencionFuente,
-      smmlvMultiple: fondoSolidaridadResult.smmlvMultiple,
-      rates: {
-        fondoSolidaridad: fondoSolidaridadResult.rate,
-        contribucionSolidaria: contribucionesSolidarias.contribucionSolidariaRate,
-        fondoSubsistencia: contribucionesSolidarias.fondoSubsistenciaRate
-      }
-    };
-  }
-
-  // ✅ MÉTODO PRINCIPAL: Con deducciones de ley completas
+  // ✅ MÉTODO PRINCIPAL: Ahora usa completamente el backend
   static async calculateDeductions(input: DeductionInput): Promise<DeductionResult> {
-    console.log('🔧 CÁLCULO DE DEDUCCIONES 2025 - Con deducciones de ley completas:', {
-      salarioBase: input.salarioBase,
+    console.log('🔧 BACKEND INTEGRATION - Cálculo unificado de deducciones:', {
       totalDevengado: input.totalDevengado,
       auxilioTransporte: input.auxilioTransporte,
       periodType: input.periodType
     });
     
-    let backendResult: any = null;
-    let usedFallback = false;
-    
     try {
-      // 1. Intentar usar el backend primero
-      console.log('🌐 Intentando cálculo backend...');
+      // 1. Usar el backend para todos los cálculos básicos
       const { data, error } = await supabase.functions.invoke('payroll-calculations', {
         body: {
           action: 'calculate',
@@ -299,87 +150,86 @@ export class DeductionCalculationService {
       });
 
       if (error) {
-        console.warn('⚠️ Backend error, usando fallback:', error);
-        throw new Error('Backend no disponible');
+        console.error('Error calling backend calculation:', error);
+        throw new Error('Error en el cálculo backend');
       }
 
-      if (!data?.success) {
-        console.warn('⚠️ Backend falló, usando fallback:', data?.error);
-        throw new Error('Backend calculation failed');
+      if (!data.success) {
+        throw new Error(data.error || 'Error desconocido en el cálculo');
       }
 
-      backendResult = data.data;
-      console.log('✅ Backend exitoso:', backendResult);
+      const backendResult = data.data;
+
+      // 2. Obtener novedades de deducciones específicas
+      let novedadesDeducciones = 0;
+      let novedadesDetalle: Array<{ tipo: string; valor: number; descripcion: string }> = [];
+      
+      if (input.empleadoId && input.periodoId) {
+        const novedadesResult = await this.getNovedadesDeducciones(input.empleadoId, input.periodoId);
+        novedadesDeducciones = novedadesResult.total;
+        novedadesDetalle = novedadesResult.detalle;
+      }
+
+      // 3. Calcular retención en la fuente usando backend actualizado
+      let retencionFuente = 0;
+      try {
+        const { data: retencionData, error: retencionError } = await supabase.functions.invoke('payroll-calculations', {
+          body: {
+            action: 'calculate-retencion-fuente',
+            data: { salarioBase: input.salarioBase }
+          }
+        });
+
+        if (!retencionError && retencionData.success) {
+          retencionFuente = retencionData.data.valor || 0;
+          console.log('✅ Retención 2025 calculada:', retencionFuente);
+        }
+      } catch (retencionErr) {
+        console.warn('Warning: Retención calculation failed, using backend default');
+        retencionFuente = backendResult.retencionFuente || 0;
+      }
+
+      // 4. Ensamblar resultado final
+      const totalDeducciones = backendResult.healthDeduction + 
+                              backendResult.pensionDeduction + 
+                              retencionFuente + 
+                              novedadesDeducciones;
+
+      console.log('📊 RESULTADO BACKEND INTEGRADO:', {
+        totalDevengado: input.totalDevengado,
+        totalDeducciones,
+        netoPagar: input.totalDevengado - totalDeducciones,
+        desglose: {
+          salud: backendResult.healthDeduction,
+          pension: backendResult.pensionDeduction,
+          retencion: retencionFuente,
+          novedades: novedadesDeducciones
+        }
+      });
+
+      return {
+        ibcSalud: input.totalDevengado - input.auxilioTransporte,
+        ibcPension: input.totalDevengado - input.auxilioTransporte,
+        saludEmpleado: backendResult.healthDeduction,
+        pensionEmpleado: backendResult.pensionDeduction,
+        fondoSolidaridad: 0, // Se maneja via novedades
+        retencionFuente,
+        novedadesDeducciones,
+        totalDeducciones,
+        detalleCalculo: {
+          baseIbc: input.totalDevengado - input.auxilioTransporte,
+          topeIbc: 1423500 * 25, // SMMLV 2025 * 25
+          baseRetencion: input.totalDevengado - backendResult.healthDeduction - backendResult.pensionDeduction,
+          uvtAplicable: 47065, // UVT 2025
+          fondoSolidaridadRate: 0,
+          novedadesDetalle
+        }
+      };
 
     } catch (error) {
-      console.warn('⚠️ Error en backend, activando fallback local:', error);
-      usedFallback = true;
-      
-      // Usar fallback local con deducciones completas
-      backendResult = this.calculateLocalDeductions(input);
-      console.log('🔄 Fallback local aplicado con deducciones completas:', backendResult);
+      console.error('Error in backend-integrated calculation:', error);
+      throw error;
     }
-
-    // 2. Obtener novedades de deducciones específicas
-    let novedadesDeducciones = 0;
-    let novedadesDetalle: Array<{ tipo: string; valor: number; descripcion: string }> = [];
-    
-    if (input.empleadoId && input.periodoId) {
-      const novedadesResult = await this.getNovedadesDeducciones(input.empleadoId, input.periodoId);
-      novedadesDeducciones = novedadesResult.total;
-      novedadesDetalle = novedadesResult.detalle;
-    }
-
-    // 3. Ensamblar resultado final con todas las deducciones
-    const totalDeducciones = backendResult.healthDeduction + 
-                            backendResult.pensionDeduction + 
-                            (backendResult.fondoSolidaridad || 0) +
-                            (backendResult.contribucionSolidariaAdicional || 0) +
-                            (backendResult.fondoSubsistencia || 0) +
-                            (backendResult.retencionFuente || 0) +
-                            novedadesDeducciones;
-
-    console.log('📊 RESULTADO FINAL CON DEDUCCIONES COMPLETAS:', {
-      metodo: usedFallback ? 'FALLBACK LOCAL' : 'BACKEND',
-      salarioBase: input.salarioBase,
-      smmlvMultiple: backendResult.smmlvMultiple || (input.salarioBase / SALARIO_MINIMO_2025),
-      totalDevengado: input.totalDevengado,
-      totalDeducciones,
-      netoPagar: input.totalDevengado - totalDeducciones,
-      desglose: {
-        salud: backendResult.healthDeduction,
-        pension: backendResult.pensionDeduction,
-        fondoSolidaridad: backendResult.fondoSolidaridad || 0,
-        contribucionSolidaria: backendResult.contribucionSolidariaAdicional || 0,
-        fondoSubsistencia: backendResult.fondoSubsistencia || 0,
-        retencion: backendResult.retencionFuente || 0,
-        novedades: novedadesDeducciones
-      }
-    });
-
-    return {
-      ibcSalud: input.totalDevengado - input.auxilioTransporte,
-      ibcPension: input.totalDevengado - input.auxilioTransporte,
-      saludEmpleado: backendResult.healthDeduction,
-      pensionEmpleado: backendResult.pensionDeduction,
-      fondoSolidaridad: backendResult.fondoSolidaridad || 0,
-      contribucionSolidariaAdicional: backendResult.contribucionSolidariaAdicional || 0,
-      fondoSubsistencia: backendResult.fondoSubsistencia || 0,
-      retencionFuente: backendResult.retencionFuente || 0,
-      novedadesDeducciones,
-      totalDeducciones,
-      detalleCalculo: {
-        baseIbc: input.totalDevengado - input.auxilioTransporte,
-        topeIbc: SALARIO_MINIMO_2025 * 25,
-        baseRetencion: input.totalDevengado - backendResult.healthDeduction - backendResult.pensionDeduction,
-        uvtAplicable: RETENCION_FUENTE_2025.UVT,
-        smmlvMultiple: backendResult.smmlvMultiple || (input.salarioBase / SALARIO_MINIMO_2025),
-        fondoSolidaridadRate: backendResult.rates?.fondoSolidaridad || 0,
-        contribucionSolidariaRate: backendResult.rates?.contribucionSolidaria || 0,
-        fondoSubsistenciaRate: backendResult.rates?.fondoSubsistencia || 0,
-        novedadesDetalle
-      }
-    };
   }
 
   static async calculateBatchDeductions(inputs: DeductionInput[]): Promise<DeductionResult[]> {
@@ -389,6 +239,7 @@ export class DeductionCalculationService {
     return results;
   }
 
+  // ✅ INFORMACIÓN ACTUALIZADA 2025
   static getConfigurationInfo(): {
     salarioMinimo: number;
     uvt: number;
@@ -404,68 +255,25 @@ export class DeductionCalculationService {
         percentage: number;
       }>;
     };
-    contribucionesSolidarias: {
-      contribucionSolidariaAdicional: {
-        minSMMLV: number;
-        percentage: number;
-      };
-      fondoSubsistencia: {
-        minSMMLV: number;
-        percentage: number;
-      };
-    };
   } {
     return {
-      salarioMinimo: SALARIO_MINIMO_2025,
-      uvt: RETENCION_FUENTE_2025.UVT,
+      salarioMinimo: 1423500, // ✅ SMMLV 2025
+      uvt: 47065, // ✅ UVT 2025
       porcentajes: {
         saludEmpleado: 0.04,
         pensionEmpleado: 0.04
       },
-      topeIbc: SALARIO_MINIMO_2025 * 25,
+      topeIbc: 1423500 * 25,
       fondoSolidaridad: {
-        ranges: FONDO_SOLIDARIDAD_PENSIONAL_2025.RANGOS
-      },
-      contribucionesSolidarias: {
-        contribucionSolidariaAdicional: CONTRIBUCIONES_SOLIDARIAS_2025.CONTRIBUCION_SOLIDARIA_ADICIONAL,
-        fondoSubsistencia: CONTRIBUCIONES_SOLIDARIAS_2025.FONDO_SUBSISTENCIA
+        ranges: [
+          { minSMMLV: 4, maxSMMLV: 16, percentage: 0.01 },
+          { minSMMLV: 16, maxSMMLV: 17, percentage: 0.012 },
+          { minSMMLV: 17, maxSMMLV: 18, percentage: 0.014 },
+          { minSMMLV: 18, maxSMMLV: 19, percentage: 0.016 },
+          { minSMMLV: 19, maxSMMLV: 20, percentage: 0.018 },
+          { minSMMLV: 20, maxSMMLV: Infinity, percentage: 0.02 }
+        ]
       }
     };
-  }
-
-  static async validatePeriodDeductions(periodId: string): Promise<{
-    hasIssues: boolean;
-    issueCount: number;
-    totalEmployees: number;
-    message: string;
-  }> {
-    try {
-      const { data: payrolls, error } = await supabase
-        .from('payrolls')
-        .select('id, total_deducciones, employee_id')
-        .eq('period_id', periodId);
-
-      if (error) throw error;
-
-      const totalEmployees = payrolls?.length || 0;
-      const issueCount = payrolls?.filter(p => !p.total_deducciones || p.total_deducciones === 0).length || 0;
-      
-      return {
-        hasIssues: issueCount > 0,
-        issueCount,
-        totalEmployees,
-        message: issueCount > 0 
-          ? `${issueCount} de ${totalEmployees} empleados tienen deducciones en $0`
-          : `Todas las deducciones están correctas`
-      };
-    } catch (error) {
-      console.error('Error validating period deductions:', error);
-      return {
-        hasIssues: true,
-        issueCount: -1,
-        totalEmployees: 0,
-        message: 'Error al validar deducciones'
-      };
-    }
   }
 }

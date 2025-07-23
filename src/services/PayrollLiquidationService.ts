@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
@@ -15,6 +14,7 @@ interface Employee {
   total_pagar: number;
   dias_trabajados: number;
   auxilio_transporte: number;
+  // Deducciones detalladas para auditoría
   salud_empleado: number;
   pension_empleado: number;
   fondo_solidaridad: number;
@@ -46,17 +46,20 @@ export class PayrollLiquidationService {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return Math.min(diffDays, 30);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both dates
+    return Math.min(diffDays, 30); // Max 30 days per month
   }
 
   static calculateTransportAllowance(baseSalary: number, workedDays: number): number {
     const currentYear = new Date().getFullYear().toString();
     const config = ConfigurationService.getConfiguration(currentYear);
     
+    // Calcular dos salarios mínimos legales
     const dosSmmlv = config.salarioMinimo * 2;
     
+    // Solo aplica auxilio de transporte si el salario es menor o igual a 2 SMMLV
     if (baseSalary <= dosSmmlv) {
+      // Calcular auxilio proporcional según días trabajados
       return Math.round((config.auxilioTransporte / 30) * workedDays);
     }
     
@@ -72,6 +75,7 @@ export class PayrollLiquidationService {
 
       const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
       
+      // Check if period already exists
       const { data: existingPeriod } = await supabase
         .from('payroll_periods_real')
         .select('id')
@@ -84,6 +88,7 @@ export class PayrollLiquidationService {
         return existingPeriod.id;
       }
 
+      // Create new period
       const { data: newPeriod, error } = await supabase
         .from('payroll_periods_real')
         .insert({
@@ -119,6 +124,7 @@ export class PayrollLiquidationService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
+      // Load active employees
       const { data: employees, error } = await supabase
         .from('employees')
         .select('id, nombre, apellido, salario_base')
@@ -133,13 +139,16 @@ export class PayrollLiquidationService {
         return [];
       }
 
+      // Calculate working days for the period
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
 
+      // Process each employee with detailed deduction calculation
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
         const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
         const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
         const totalDevengado = salarioProporcional + auxilioTransporte;
         
+        // ✅ CÁLCULO DETALLADO DE DEDUCCIONES PARA AUDITORÍA
         const deductionResult = await DeductionCalculationService.calculateDeductions({
           salarioBase: employee.salario_base,
           totalDevengado: totalDevengado,
@@ -147,21 +156,30 @@ export class PayrollLiquidationService {
           periodType: 'mensual'
         });
         
+        console.log(`📊 Empleado ${employee.nombre}: Deducciones detalladas`, {
+          salud: deductionResult.saludEmpleado,
+          pension: deductionResult.pensionEmpleado,
+          fondoSolidaridad: deductionResult.fondoSolidaridad,
+          retencion: deductionResult.retencionFuente,
+          total: deductionResult.totalDeducciones
+        });
+        
         return {
           id: employee.id,
           nombre: employee.nombre,
           apellido: employee.apellido,
           salario_base: employee.salario_base,
-          devengos: 0,
+          devengos: 0, // Will be filled with novedades
           deducciones: deductionResult.totalDeducciones,
           total_pagar: totalDevengado - deductionResult.totalDeducciones,
           dias_trabajados: diasTrabajados,
           auxilio_transporte: auxilioTransporte,
+          // ✅ DEDUCCIONES DETALLADAS PARA AUDITORÍA DIAN/UGPP
           salud_empleado: deductionResult.saludEmpleado,
           pension_empleado: deductionResult.pensionEmpleado,
           fondo_solidaridad: deductionResult.fondoSolidaridad,
           retencion_fuente: deductionResult.retencionFuente,
-          deducciones_novedades: 0
+          deducciones_novedades: 0 // Will be filled when processing novedades
         };
       }));
 
@@ -179,6 +197,7 @@ export class PayrollLiquidationService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
+      // Load specific employees
       const { data: employees, error } = await supabase
         .from('employees')
         .select('id, nombre, apellido, salario_base')
@@ -194,13 +213,16 @@ export class PayrollLiquidationService {
         return [];
       }
 
+      // Calculate working days for the period
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
 
+      // Process each employee with detailed deduction calculation
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
         const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
         const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
         const totalDevengado = salarioProporcional + auxilioTransporte;
         
+        // ✅ CÁLCULO DETALLADO DE DEDUCCIONES PARA AUDITORÍA
         const deductionResult = await DeductionCalculationService.calculateDeductions({
           salarioBase: employee.salario_base,
           totalDevengado: totalDevengado,
@@ -208,21 +230,30 @@ export class PayrollLiquidationService {
           periodType: 'mensual'
         });
         
+        console.log(`📊 Nuevo empleado ${employee.nombre}: Deducciones detalladas`, {
+          salud: deductionResult.saludEmpleado,
+          pension: deductionResult.pensionEmpleado,
+          fondoSolidaridad: deductionResult.fondoSolidaridad,
+          retencion: deductionResult.retencionFuente,
+          total: deductionResult.totalDeducciones
+        });
+        
         return {
           id: employee.id,
           nombre: employee.nombre,
           apellido: employee.apellido,
           salario_base: employee.salario_base,
-          devengos: 0,
+          devengos: 0, // Will be filled with novedades
           deducciones: deductionResult.totalDeducciones,
           total_pagar: totalDevengado - deductionResult.totalDeducciones,
           dias_trabajados: diasTrabajados,
           auxilio_transporte: auxilioTransporte,
+          // ✅ DEDUCCIONES DETALLADAS PARA AUDITORÍA DIAN/UGPP
           salud_empleado: deductionResult.saludEmpleado,
           pension_empleado: deductionResult.pensionEmpleado,
           fondo_solidaridad: deductionResult.fondoSolidaridad,
           retencion_fuente: deductionResult.retencionFuente,
-          deducciones_novedades: 0
+          deducciones_novedades: 0 // Will be filled when processing novedades
         };
       }));
 
@@ -233,9 +264,6 @@ export class PayrollLiquidationService {
     }
   }
 
-  /**
-   * ✅ CORREGIDO: Liquidación con cálculo único de totales
-   */
   static async liquidatePayroll(employees: Employee[], startDate: string, endDate: string) {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -243,9 +271,10 @@ export class PayrollLiquidationService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
+      // Create period name
       const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
 
-      // ✅ CORREGIDO: Crear período SIN totales iniciales
+      // Create period in payroll_periods_real
       const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
         .insert({
@@ -256,10 +285,9 @@ export class PayrollLiquidationService {
           tipo_periodo: 'personalizado',
           estado: 'cerrado',
           empleados_count: employees.length,
-          // ✅ CORREGIDO: NO escribir totales iniciales
-          total_devengado: 0,
-          total_deducciones: 0,
-          total_neto: 0
+          total_devengado: employees.reduce((sum, emp) => sum + emp.salario_base + emp.devengos + emp.auxilio_transporte, 0),
+          total_deducciones: employees.reduce((sum, emp) => sum + emp.deducciones, 0),
+          total_neto: employees.reduce((sum, emp) => sum + emp.total_pagar, 0)
         })
         .select()
         .single();
@@ -268,70 +296,56 @@ export class PayrollLiquidationService {
         throw periodError;
       }
 
-      // ✅ CORREGIDO: Crear registros de payroll
-      const payrollInserts = [];
+      // ✅ CREAR REGISTROS DE NÓMINA CON DEDUCCIONES DETALLADAS
       for (const employee of employees) {
-        const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
-        const totalDevengadoFinal = salarioProporcional + employee.auxilio_transporte + employee.devengos;
-        const totalDeduccionesFinal = employee.deducciones + employee.deducciones_novedades;
-        const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
+        const { error: payrollError } = await supabase
+          .from('payrolls')
+          .insert({
+            company_id: companyId,
+            employee_id: employee.id,
+            periodo: periodName,
+            period_id: period.id,
+            salario_base: employee.salario_base,
+            dias_trabajados: employee.dias_trabajados,
+            auxilio_transporte: employee.auxilio_transporte,
+            total_devengado: employee.salario_base + employee.devengos + employee.auxilio_transporte,
+            // ✅ DEDUCCIONES SEPARADAS PARA AUDITORÍA DIAN/UGPP
+            salud_empleado: employee.salud_empleado,
+            pension_empleado: employee.pension_empleado,
+            fondo_solidaridad: employee.fondo_solidaridad,
+            retencion_fuente: employee.retencion_fuente,
+            otras_deducciones: employee.deducciones_novedades, // Solo novedades de deducciones
+            total_deducciones: employee.deducciones,
+            neto_pagado: employee.total_pagar,
+            estado: 'procesada'
+          });
 
-        payrollInserts.push({
-          company_id: companyId,
-          employee_id: employee.id,
-          periodo: periodName,
-          period_id: period.id,
-          salario_base: employee.salario_base,
-          dias_trabajados: employee.dias_trabajados,
-          auxilio_transporte: employee.auxilio_transporte,
-          total_devengado: totalDevengadoFinal,
-          salud_empleado: employee.salud_empleado,
-          pension_empleado: employee.pension_empleado,
-          fondo_solidaridad: employee.fondo_solidaridad,
-          retencion_fuente: employee.retencion_fuente,
-          otras_deducciones: employee.deducciones_novedades,
-          total_deducciones: totalDeduccionesFinal,
-          neto_pagado: netoPagadoFinal,
-          estado: 'procesada'
-        });
+        if (payrollError) {
+          console.error('Error creating payroll record:', payrollError);
+        }
+
+        // Create voucher record
+        const { error: voucherError } = await supabase
+          .from('payroll_vouchers')
+          .insert({
+            company_id: companyId,
+            employee_id: employee.id,
+            payroll_id: null, // Will be updated if needed
+            periodo: periodName,
+            start_date: startDate,
+            end_date: endDate,
+            net_pay: employee.total_pagar,
+            voucher_status: 'generado'
+          });
+
+        if (voucherError) {
+          console.error('Error creating voucher record:', voucherError);
+        }
       }
-
-      const { error: payrollError } = await supabase
-        .from('payrolls')
-        .insert(payrollInserts);
-
-      if (payrollError) {
-        throw payrollError;
-      }
-
-      // ✅ CORREGIDO: Calcular totales CORRECTOS una sola vez
-      const finalTotalDevengado = payrollInserts.reduce((sum, p) => sum + p.total_devengado, 0);
-      const finalTotalDeducciones = payrollInserts.reduce((sum, p) => sum + p.total_deducciones, 0);
-      const finalTotalNeto = payrollInserts.reduce((sum, p) => sum + p.neto_pagado, 0);
-
-      // ✅ CORREGIDO: Actualizar totales UNA SOLA VEZ
-      const { error: updateError } = await supabase
-        .from('payroll_periods_real')
-        .update({
-          total_devengado: finalTotalDevengado,
-          total_deducciones: finalTotalDeducciones,
-          total_neto: finalTotalNeto
-        })
-        .eq('id', period.id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      console.log('✅ LIQUIDACIÓN COMPLETADA CON TOTALES ÚNICOS:', {
-        totalDevengado: finalTotalDevengado,
-        totalDeducciones: finalTotalDeducciones,
-        totalNeto: finalTotalNeto
-      });
 
       return {
         success: true,
-        message: `Liquidación completada para ${employees.length} empleados con cálculo único de totales`,
+        message: `Liquidación completada para ${employees.length} empleados con deducciones detalladas`,
         periodId: period.id
       };
     } catch (error) {
@@ -340,102 +354,6 @@ export class PayrollLiquidationService {
         success: false,
         message: error instanceof Error ? error.message : 'Error desconocido'
       };
-    }
-  }
-
-  /**
-   * ✅ CORREGIDO: Consolidar novedades con transacciones atómicas
-   */
-  static async consolidatePayrollWithNovedades(periodId: string): Promise<void> {
-    try {
-      console.log('🔄 Iniciando consolidación CORREGIDA para período:', periodId);
-      
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener la empresa del usuario');
-      }
-
-      const { data: payrollRecords, error: payrollError } = await supabase
-        .from('payrolls')
-        .select('id, employee_id, salario_base, dias_trabajados, auxilio_transporte')
-        .eq('period_id', periodId)
-        .eq('company_id', companyId);
-
-      if (payrollError) {
-        throw payrollError;
-      }
-
-      if (!payrollRecords || payrollRecords.length === 0) {
-        console.log('⚠️ No hay registros de payroll para consolidar');
-        return;
-      }
-
-      const employeeIds = payrollRecords.map(record => record.employee_id);
-      const novedadesTotals = await NovedadesCalculationService.calculateAllEmployeesNovedadesTotals(employeeIds, periodId);
-
-      // ✅ CORREGIDO: Procesar en lotes para evitar bloqueos
-      const batchSize = 10;
-      for (let i = 0; i < payrollRecords.length; i += batchSize) {
-        const batch = payrollRecords.slice(i, i + batchSize);
-        const updates = [];
-
-        for (const payrollRecord of batch) {
-          const employeeNovedades = novedadesTotals[payrollRecord.employee_id] || {
-            totalDevengos: 0,
-            totalDeducciones: 0,
-            totalNeto: 0,
-            hasNovedades: false
-          };
-
-          const salarioBase = Number(payrollRecord.salario_base) || 0;
-          const auxilioTransporte = Number(payrollRecord.auxilio_transporte) || 0;
-          const diasTrabajados = Number(payrollRecord.dias_trabajados) || 15;
-          
-          const salarioProporcional = (salarioBase / 30) * diasTrabajados;
-          
-          const deductionResult = await DeductionCalculationService.calculateDeductions({
-            salarioBase: salarioBase,
-            totalDevengado: salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos,
-            auxilioTransporte: auxilioTransporte,
-            periodType: 'quincenal'
-          });
-
-          const totalDevengadoFinal = salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos;
-          const totalDeduccionesFinal = deductionResult.totalDeducciones + employeeNovedades.totalDeducciones;
-          const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
-
-          updates.push({
-            id: payrollRecord.id,
-            total_devengado: totalDevengadoFinal,
-            total_deducciones: totalDeduccionesFinal,
-            neto_pagado: netoPagadoFinal,
-            salud_empleado: deductionResult.saludEmpleado,
-            pension_empleado: deductionResult.pensionEmpleado,
-            fondo_solidaridad: deductionResult.fondoSolidaridad,
-            retencion_fuente: deductionResult.retencionFuente,
-            otras_deducciones: employeeNovedades.totalDeducciones,
-            updated_at: new Date().toISOString()
-          });
-        }
-
-        // ✅ CORREGIDO: Actualizar en lotes
-        for (const update of updates) {
-          const { error: updateError } = await supabase
-            .from('payrolls')
-            .update(update)
-            .eq('id', update.id);
-
-          if (updateError) {
-            console.error(`❌ Error actualizando payroll ${update.id}:`, updateError);
-          }
-        }
-      }
-
-      console.log('✅ Consolidación CORREGIDA completada exitosamente');
-      
-    } catch (error) {
-      console.error('❌ Error en consolidación corregida:', error);
-      throw error;
     }
   }
 }
