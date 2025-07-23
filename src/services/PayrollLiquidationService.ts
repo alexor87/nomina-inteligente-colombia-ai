@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
@@ -434,7 +435,6 @@ export class PayrollLiquidationService {
           switch (novedad.tipo_novedad) {
             case 'horas_extra':
             case 'recargo_nocturno':
-            case 'recargo_dominical':
               horasExtra += valor;
               break;
             case 'licencia_remunerada':
