@@ -541,17 +541,24 @@ export const usePayrollUnified = (companyId: string) => {
       
       // Actualizar cada empleado en la tabla payrolls
       for (const [employeeId, calculation] of Object.entries(employeeCalculations)) {
-        // ✅ CORRECCIÓN CRÍTICA: Persistir valores reales calculados en BD
+        console.log('💾 Persistiendo valores exactos del backend para empleado:', employeeId, {
+          healthDeduction: calculation.healthDeduction,
+          pensionDeduction: calculation.pensionDeduction,
+          totalToPay: calculation.totalToPay,
+          grossPay: calculation.grossPay,
+          deductions: calculation.deductions
+        });
+
+        // ✅ CORRECCIÓN CRÍTICA: Persistir valores exactos calculados por el backend
         const { error } = await supabase
           .from('payrolls')
           .update({
             total_devengado: calculation.grossPay || calculation.totalToPay,
-            salud_empleado: calculation.healthDeduction || 0,
-            pension_empleado: calculation.pensionDeduction || 0,
+            salud_empleado: calculation.healthDeduction || 0, // ✅ Valor exacto del backend
+            pension_empleado: calculation.pensionDeduction || 0, // ✅ Valor exacto del backend  
             auxilio_transporte: calculation.transportAllowance || 0,
             total_deducciones: calculation.deductions || 0,
-            neto_pagado: calculation.totalToPay,
-            ibc: calculation.ibc || 0, // ✅ Persistir IBC correcto
+            neto_pagado: calculation.totalToPay, // ✅ Neto correcto del backend
             updated_at: new Date().toISOString()
           })
           .eq('company_id', companyId)
