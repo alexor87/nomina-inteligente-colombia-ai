@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { EmployeeService } from './EmployeeService';
 import { EmployeeCRUDService } from './EmployeeCRUDService';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { PayrollCalculationBackendService } from './PayrollCalculationBackendService';
+import { PayrollLiquidationNewService } from './PayrollLiquidationNewService';
+import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025, LIMITE_AUXILIO_TRANSPORTE_2025 } from '@/constants';
 
 export interface UnifiedEmployeeData {
   id: string;
@@ -16,7 +17,7 @@ export interface UnifiedEmployeeData {
   pensionDeduction: number;
   totalDeductions: number;
   netPay: number;
-  status: 'valid' | 'error';
+  status: 'valid' | 'error' | 'incomplete';
   errors: string[];
 }
 
@@ -74,7 +75,7 @@ export class EmployeeUnifiedService {
     return EmployeeService.updateEmployee(id, { estado: newStatus });
   }
 
-  // ✅ PAYROLL Methods - Usando ÚNICAMENTE PayrollCalculationSimple
+  // ✅ PAYROLL Methods - Usando PayrollLiquidationNewService con valores 2025
   static async getEmployeesForPeriod(periodId: string): Promise<UnifiedEmployeeData[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -82,90 +83,45 @@ export class EmployeeUnifiedService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      console.log('🎯 Cargando empleados con cálculos SIMPLES 2025...');
+      console.log('🎯 Cargando empleados con PayrollLiquidationNewService (valores 2025)...');
 
-      // Obtener empleados del período
-      const { data: payrollData, error: payrollError } = await supabase
-        .from('payrolls')
-        .select(`
-          id,
-          employee_id,
-          salario_base,
-          dias_trabajados,
-          employees!inner (
-            id,
-            nombre,
-            apellido,
-            salario_base
-          )
-        `)
-        .eq('period_id', periodId)
-        .eq('company_id', companyId);
+      // Obtener período para información adicional
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
 
-      if (payrollError) {
-        throw payrollError;
+      if (!period) {
+        throw new Error('Período no encontrado');
       }
 
-      if (!payrollData || payrollData.length === 0) {
-        return [];
-      }
+      // Usar PayrollLiquidationNewService para cargar empleados con cálculos correctos
+      const payrollEmployees = await PayrollLiquidationNewService.loadEmployeesForActivePeriod(period);
 
-      // Procesar cada empleado con cálculos BACKEND
-      const processedEmployees: UnifiedEmployeeData[] = await Promise.all(payrollData.map(async payroll => {
-        const employee = payroll.employees;
-        const baseSalary = employee.salario_base;
-        const workedDays = payroll.dias_trabajados;
+      // Convertir a formato UnifiedEmployeeData
+      const processedEmployees: UnifiedEmployeeData[] = payrollEmployees.map(employee => {
+        console.log(`✅ ALELUYA 2025 ${employee.name}: Base $${employee.baseSalary.toLocaleString()}, Días ${employee.workedDays}, Auxilio $${employee.transportAllowance.toLocaleString()}, Neto $${employee.netPay.toLocaleString()}`);
 
-        try {
-          // ✅ CAMBIO: Usar backend exclusivamente
-          const calculation = await PayrollCalculationBackendService.calculatePayroll({
-            baseSalary,
-            workedDays,
-            extraHours: 0,
-            disabilities: 0,
-            bonuses: 0,
-            absences: 0,
-            periodType: 'mensual',
-            novedades: []
-          });
+        return {
+          id: employee.id,
+          name: employee.name,
+          baseSalary: employee.baseSalary,
+          workedDays: employee.workedDays,
+          transportAllowance: employee.transportAllowance,
+          totalEarnings: employee.grossPay,
+          healthDeduction: employee.deductions / 2, // Aproximación salud (4%)
+          pensionDeduction: employee.deductions / 2, // Aproximación pensión (4%)
+          totalDeductions: employee.deductions,
+          netPay: employee.netPay,
+          status: employee.status === 'incomplete' ? 'error' : employee.status as 'valid' | 'error',
+          errors: employee.errors
+        };
+      });
 
-          console.log(`✅ BACKEND ${employee.nombre}: Base $${baseSalary.toLocaleString()}, Días ${workedDays}, Auxilio $${calculation.transportAllowance.toLocaleString()}, Neto $${calculation.netPay.toLocaleString()}`);
-
-          return {
-            id: employee.id,
-            name: `${employee.nombre} ${employee.apellido}`,
-            baseSalary,
-            workedDays,
-            transportAllowance: calculation.transportAllowance,
-            totalEarnings: calculation.grossPay,
-            healthDeduction: calculation.healthDeduction,
-            pensionDeduction: calculation.pensionDeduction,
-            totalDeductions: calculation.totalDeductions,
-            netPay: calculation.netPay,
-            status: 'valid' as const,
-            errors: []
-          };
-        } catch (error) {
-          console.error(`❌ Error calculando empleado ${employee.nombre}:`, error);
-          return {
-            id: employee.id,
-            name: `${employee.nombre} ${employee.apellido}`,
-            baseSalary,
-            workedDays,
-            transportAllowance: 0,
-            totalEarnings: 0,
-            healthDeduction: 0,
-            pensionDeduction: 0,
-            totalDeductions: 0,
-            netPay: 0,
-            status: 'error' as const,
-            errors: ['Error en cálculo: ' + (error instanceof Error ? error.message : 'Error desconocido')]
-          };
-        }
-      }));
-
-      console.log(`📊 Total empleados procesados: ${processedEmployees.length}`);
+      console.log(`📊 Total empleados procesados con ALELUYA 2025: ${processedEmployees.length}`);
       console.log(`💰 Empleados con auxilio: ${processedEmployees.filter(e => e.transportAllowance > 0).length}`);
+      console.log(`🔢 Valores 2025 - Salario mínimo: ${SALARIO_MINIMO_2025.toLocaleString()}, Auxilio: ${AUXILIO_TRANSPORTE_2025.toLocaleString()}, Límite: ${LIMITE_AUXILIO_TRANSPORTE_2025.toLocaleString()}`);
 
       return processedEmployees;
     } catch (error) {
@@ -181,9 +137,9 @@ export class EmployeeUnifiedService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      console.log('🔄 Actualizando registros de nómina con cálculos SIMPLES...');
+      console.log('🔄 Actualizando registros de nómina con PayrollLiquidationNewService (valores 2025)...');
 
-      // Obtener empleados con cálculos SIMPLES
+      // Obtener empleados con cálculos de PayrollLiquidationNewService
       const correctedEmployees = await this.getEmployeesForPeriod(periodId);
 
       // Actualizar cada registro en la base de datos
@@ -238,6 +194,10 @@ export class EmployeeUnifiedService {
   }
 
   static getConfigurationInfo() {
-    return PayrollCalculationBackendService.getConfigurationInfo();
+    return {
+      salarioMinimo: SALARIO_MINIMO_2025,
+      auxilioTransporte: AUXILIO_TRANSPORTE_2025,
+      limiteAuxilio: LIMITE_AUXILIO_TRANSPORTE_2025
+    };
   }
 }

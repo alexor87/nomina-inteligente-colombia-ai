@@ -206,10 +206,10 @@ export class PayrollLiquidationNewService {
       const dailySalary = baseSalary / 30;
       const proportionalSalary = Math.round(dailySalary * workedDays);
       
-      // 2. Auxilio de transporte proporcional (si aplica)
+      // 2. Auxilio de transporte proporcional (si aplica) - ✅ VALORES 2025
       let transportAllowance = 0;
-      if (baseSalary <= (1300000 * 2)) { // Si es beneficiario
-        const dailyTransport = 200000 / 30;
+      if (baseSalary <= 2847000) { // ✅ 2025: Límite 2 SMMLV = $2,847,000
+        const dailyTransport = 200000 / 30; // ✅ 2025: Auxilio $200,000
         transportAllowance = Math.round(dailyTransport * workedDays);
       }
 
@@ -261,17 +261,27 @@ export class PayrollLiquidationNewService {
         }
       }
 
-      // 4. ✅ CALCULAR BASE SALARIAL PARA APORTES (incluye bonificaciones constitutivas)
+      // 4. ✅ CALCULAR IBC 2025 (base para aportes con bonificaciones constitutivas)
       const salarioBaseParaAportes = proportionalSalary + bonusesConstitutivos;
-      console.log(`💰 Base para aportes: $${salarioBaseParaAportes.toLocaleString()} (salario: ${proportionalSalary.toLocaleString()} + constitutivas: ${bonusesConstitutivos.toLocaleString()})`);
+      
+      // ✅ CORRECCIÓN 2025: IBC mínimo debe ser el salario mínimo 2025
+      const ibcSalud = Math.max(salarioBaseParaAportes, 1423500); // Mínimo $1,423,500 (SMMLV 2025)
+      const ibcPension = Math.max(salarioBaseParaAportes, 1423500); // Mínimo $1,423,500 (SMMLV 2025)
+      
+      console.log(`💰 IBC 2025 para ${employee.nombre}:`, {
+        salarioBaseParaAportes: salarioBaseParaAportes.toLocaleString(),
+        ibcSalud: ibcSalud.toLocaleString(),
+        ibcPension: ibcPension.toLocaleString(),
+        aplicoMinimo: salarioBaseParaAportes < 1423500
+      });
 
       // 5. Total devengado (incluye todas las bonificaciones)
       const totalBonuses = bonusesConstitutivos + bonusesNoConstitutivos;
       const grossPay = proportionalSalary + transportAllowance + additionalEarnings;
       
-      // 6. ✅ DEDUCCIONES solo sobre la base para aportes (salario + bonificaciones constitutivas)
-      const healthDeduction = Math.round(salarioBaseParaAportes * 0.04); // 4%
-      const pensionDeduction = Math.round(salarioBaseParaAportes * 0.04); // 4%
+      // 6. ✅ DEDUCCIONES 2025 sobre el IBC (no sobre salario base)
+      const healthDeduction = Math.round(ibcSalud * 0.04); // 4% sobre IBC
+      const pensionDeduction = Math.round(ibcPension * 0.04); // 4% sobre IBC
       const totalDeductions = healthDeduction + pensionDeduction + additionalDeductions;
       
       // 7. Neto a pagar
