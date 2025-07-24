@@ -129,22 +129,16 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             baseSalary: employee.baseSalary
           });
 
-          // ✅ CORRECCIÓN NORMATIVA: Calcular salario proporcional para IBC correcto
-          const salarioBaseParaIBC = periodType === 'quincenal' 
-            ? employee.baseSalary / 2  // Para quincenal: mitad del salario mensual
-            : employee.baseSalary;     // Para mensual: salario completo
-
           console.log('💰 ENVIANDO AL BACKEND - IBC NORMATIVO:', {
             employee: employee.name,
             salarioOriginal: employee.baseSalary,
-            salarioBaseParaIBC,
             periodType,
             novedadesCount: novedadesForIBC.length
           });
 
-          // Calcular usando el backend con salario base para IBC correcto
+          // ✅ CORRECCIÓN CRÍTICA: Enviar salario mensual completo - el edge function hará la proporcionalidad
           const calculation = await PayrollCalculationBackendService.calculatePayroll({
-            baseSalary: salarioBaseParaIBC, // ✅ ENVIAR SALARIO PROPORCIONAL AL PERÍODO
+            baseSalary: employee.baseSalary, // ✅ ENVIAR SALARIO MENSUAL COMPLETO
             workedDays: currentWorkedDays,
             extraHours: 0,
             disabilities: 0,

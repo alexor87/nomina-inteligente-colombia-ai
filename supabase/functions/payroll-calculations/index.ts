@@ -392,15 +392,15 @@ function calculateIBC(baseSalary: number, novedades: NovedadForIBC[] = [], confi
     totalConstitutivo: ingresosConstitutivos
   });
 
-  // 2. Aplicar límites legales
+  // 2. Aplicar límites legales (SIN FORZAR MÍNIMO PARA PERÍODOS PROPORCIONALES)
   const topeIbcPension = config.salarioMinimo * 25; // 25 SMMLV para pensión
-  const minimoIbc = config.salarioMinimo; // Mínimo 1 SMMLV
   
-  // Para salud: sin límite superior
-  const ibcSalud = Math.max(ingresosConstitutivos, minimoIbc);
+  // ✅ CORRECCIÓN NORMATIVA: No aplicar mínimo cuando es cálculo proporcional
+  // El mínimo solo aplica para salarios reales, no para fracciones de período
+  const ibcSalud = ingresosConstitutivos; // Sin mínimo forzado
   
-  // Para pensión: tope de 25 SMMLV
-  const ibcPension = Math.min(Math.max(ingresosConstitutivos, minimoIbc), topeIbcPension);
+  // Para pensión: solo aplicar tope superior, no mínimo
+  const ibcPension = Math.min(ingresosConstitutivos, topeIbcPension);
   
   console.log('✅ [IBC v2.0] IBC calculados:', {
     ibcSalud,
