@@ -305,94 +305,168 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nombre Empleado</TableHead>
-            <TableHead className="text-right">Salario Base</TableHead>
-            <TableHead className="text-right">IBC</TableHead>
-            <TableHead className="text-center">Días Trabajados</TableHead>
-            <TableHead className="text-center">Novedades</TableHead>
-            <TableHead className="text-right">Total a Pagar Período</TableHead>
-            <TableHead className="text-center">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {employees.map((employee) => {
-            const novedades = getEmployeeNovedades(employee.id);
-            const totalToPay = getTotalToPay(employee);
-            const ibc = getEmployeeIBC(employee);
-            const hasNovedades = novedades.hasNovedades;
+      <div className="w-full overflow-x-auto">
+        <Table className="min-w-max">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">Nombre Empleado</TableHead>
+              <TableHead className="text-right min-w-[120px]">Salario Base</TableHead>
+              <TableHead className="text-right min-w-[120px]">IBC</TableHead>
+              <TableHead className="text-center min-w-[100px]">Días Trabajados</TableHead>
+              
+              {/* DEVENGOS */}
+              <TableHead className="text-right min-w-[120px] bg-green-50">Auxilio Transporte</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Horas Extra</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">H.E. Diurnas</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">H.E. Nocturnas</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Recargo Nocturno</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Recargo Dominical</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Bonificaciones</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Bonif. Adicionales</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Comisiones</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Prima</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Cesantías</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Intereses Cesantías</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Vacaciones</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Licencias Remuneradas</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-green-50">Otros Devengos</TableHead>
+              <TableHead className="text-right min-w-[140px] bg-green-100 font-semibold">Total Devengado</TableHead>
+              
+              {/* DEDUCCIONES */}
+              <TableHead className="text-right min-w-[120px] bg-red-50">Salud Empleado</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Pensión Empleado</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Retención Fuente</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Fondo Solidaridad</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Préstamos</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Embargos</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Incapacidades</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Descuentos Varios</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Otros Descuentos</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-red-50">Otras Deducciones</TableHead>
+              <TableHead className="text-right min-w-[140px] bg-red-100 font-semibold">Total Deducciones</TableHead>
+              
+              {/* TOTALES */}
+              <TableHead className="text-center min-w-[100px] bg-blue-50">Novedades</TableHead>
+              <TableHead className="text-right min-w-[140px] bg-blue-100 font-bold">Neto Pagado</TableHead>
+              <TableHead className="text-center min-w-[100px] sticky right-0 bg-background z-10">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {employees.map((employee) => {
+              const novedades = getEmployeeNovedades(employee.id);
+              const totalToPay = getTotalToPay(employee);
+              const ibc = getEmployeeIBC(employee);
+              const hasNovedades = novedades.hasNovedades;
+              const calc = employeeCalculations[employee.id];
 
-            return (
-              <TableRow key={employee.id}>
-                <TableCell>
-                  <div className="font-medium">{employee.name}</div>
-                  <div className="text-sm text-gray-500">{employee.position}</div>
-                </TableCell>
-                
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(employee.baseSalary)}
-                </TableCell>
+              return (
+                <TableRow key={employee.id}>
+                  {/* Empleado (Fijo) */}
+                  <TableCell className="sticky left-0 bg-background z-10">
+                    <div className="font-medium">{employee.name}</div>
+                    <div className="text-sm text-gray-500">{employee.position}</div>
+                  </TableCell>
+                  
+                  {/* Básicos */}
+                  <TableCell className="text-right font-medium">
+                    {formatCurrency(employee.baseSalary)}
+                  </TableCell>
 
-                <TableCell className="text-right">
-                  <div className={`font-medium ${ibc !== employee.baseSalary ? 'text-blue-600' : 'text-gray-600'}`}>
-                    {formatCurrency(ibc)}
-                  </div>
-                  {ibc !== employee.baseSalary && (
-                    <div className="text-xs text-blue-500">
-                      +{formatCurrency(ibc - employee.baseSalary)} constitutivo
+                  <TableCell className="text-right">
+                    <div className={`font-medium ${ibc !== employee.baseSalary ? 'text-blue-600' : 'text-gray-600'}`}>
+                      {formatCurrency(ibc)}
                     </div>
-                  )}
-                </TableCell>
-                
-                <TableCell className="text-center font-medium">
-                  {workedDays} días
-                </TableCell>
-                
-                <TableCell className="text-center">
-                  <div className="flex items-center justify-start space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenNovedadModal(employee)}
-                      disabled={isCreating}
-                      className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                    {hasNovedades && (
-                      <div className={`text-sm font-medium flex items-center space-x-1 ${
-                        novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {novedades.totalNeto >= 0 && <span>+</span>}
-                        <span>{formatCurrency(novedades.totalNeto)}</span>
+                    {ibc !== employee.baseSalary && (
+                      <div className="text-xs text-blue-500">
+                        +{formatCurrency(ibc - employee.baseSalary)} constitutivo
                       </div>
                     )}
-                  </div>
-                </TableCell>
-                
-                <TableCell className="text-right font-semibold text-lg">
-                  {formatCurrency(totalToPay)}
-                </TableCell>
+                  </TableCell>
+                  
+                  <TableCell className="text-center font-medium">
+                    {workedDays} días
+                  </TableCell>
+                  
+                  {/* DEVENGOS */}
+                  <TableCell className="text-right">{formatCurrency(calc?.transportAllowance || 0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right bg-green-100 font-semibold">
+                    {formatCurrency(calc?.grossPay || 0)}
+                  </TableCell>
+                  
+                  {/* DEDUCCIONES */}
+                  <TableCell className="text-right">{formatCurrency(calc?.healthDeduction || 0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(calc?.pensionDeduction || 0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  <TableCell className="text-right bg-red-100 font-semibold">
+                    {formatCurrency(calc?.deductions || 0)}
+                  </TableCell>
+                  
+                  {/* NOVEDADES Y TOTALES */}
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenNovedadModal(employee)}
+                        disabled={isCreating}
+                        className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      {hasNovedades && (
+                        <div className={`text-sm font-medium ${
+                          novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {novedades.totalNeto >= 0 ? '+' : ''}{formatCurrency(novedades.totalNeto)}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell className="text-right bg-blue-100 font-bold text-lg">
+                    {formatCurrency(totalToPay)}
+                  </TableCell>
 
-                <TableCell className="text-center">
-                  {onRemoveEmployee && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteEmployee(employee)}
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                  {/* Acciones (Fijo) */}
+                  <TableCell className="text-center sticky right-0 bg-background z-10">
+                    {onRemoveEmployee && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteEmployee(employee)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Modal de novedades */}
       {selectedEmployee && currentPeriodId && (
