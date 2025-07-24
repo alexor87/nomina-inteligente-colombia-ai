@@ -128,9 +128,22 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             baseSalary: employee.baseSalary
           });
 
+           // ✅ CORRECCIÓN NORMATIVA: Para quincenal, enviar salario proporcional
+          const salarioParaCalculo = periodType === 'quincenal' ? 
+            employee.baseSalary : // Para quincenal, enviar salario mensual completo
+            employee.baseSalary;   // Para mensual, enviar salario completo
+
+          console.log('💰 Enviando al backend:', {
+            employee: employee.name,
+            salarioOriginal: employee.baseSalary,
+            salarioParaCalculo,
+            periodType,
+            novedadesCount: novedadesForIBC.length
+          });
+
           // Calcular usando el backend con novedades y período correcto
           const calculation = await PayrollCalculationBackendService.calculatePayroll({
-            baseSalary: employee.baseSalary,
+            baseSalary: salarioParaCalculo, // ✅ El edge function hará la división internamente
             workedDays: workedDays,
             extraHours: 0,
             disabilities: 0,
