@@ -112,6 +112,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: true,
         requiere_dias: false,
         auto_calculo: true,
+        constitutivo_default: false, // ✅ Horas extra NO son constitutivas de salario
         subtipos: ['diurnas', 'nocturnas', 'dominicales_diurnas', 'dominicales_nocturnas', 'festivas_diurnas', 'festivas_nocturnas']
       },
       recargo_nocturno: {
@@ -119,6 +120,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: true,
         requiere_dias: false,
         auto_calculo: true,
+        constitutivo_default: false, // ✅ Recargos NO son constitutivos de salario
         subtipos: ['nocturno', 'nocturno_dominical', 'nocturno_festivo']
       },
       bonificacion: {
@@ -126,6 +128,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: false,
         auto_calculo: false,
+        constitutivo_default: false, // ⚠️ Depende si es habitual (usuario decide)
         subtipos: ['productividad', 'ventas', 'puntualidad', 'permanencia']
       },
       comision: {
@@ -133,6 +136,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: false,
         auto_calculo: false,
+        constitutivo_default: true, // ✅ Comisiones generalmente SÍ son constitutivas
         subtipos: ['ventas', 'cobranza', 'meta']
       },
       prima: {
@@ -140,6 +144,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: false,
         auto_calculo: false,
+        constitutivo_default: true, // ✅ Primas extralegales SÍ son constitutivas
         subtipos: ['servicios', 'navidad', 'vacaciones']
       },
       vacaciones: {
@@ -147,6 +152,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: true,
         auto_calculo: true,
+        constitutivo_default: true, // ✅ Vacaciones SÍ son constitutivas
         subtipos: []
       },
       incapacidad: {
@@ -154,6 +160,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: true,
         auto_calculo: true,
+        constitutivo_default: false, // ✅ Incapacidades NO son constitutivas
         subtipos: ['general', 'laboral', 'maternidad']
       },
       licencia_remunerada: {
@@ -161,6 +168,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: true,
         auto_calculo: true,
+        constitutivo_default: true, // ✅ Licencias remuneradas SÍ son constitutivas
         subtipos: ['paternidad', 'matrimonio', 'luto', 'estudio']
       },
       licencia_no_remunerada: {
@@ -169,6 +177,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: true,
         auto_calculo: true,
+        constitutivo_default: false, // ✅ Licencias no remuneradas NO son constitutivas
         legal_note: 'Suspende temporalmente prestaciones sociales según Art. 51 CST',
         affects_benefits: true,
         subtipos: [
@@ -186,6 +195,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: false,
         requiere_dias: false,
         auto_calculo: false,
+        constitutivo_default: false, // ⚠️ Depende del tipo específico (usuario decide)
         subtipos: ['subsidios', 'reintegros', 'compensaciones']
       }
     }

@@ -113,9 +113,17 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           const novedadesList = await getEmployeeNovedadesList(employee.id);
           const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(novedadesList);
 
-          console.log('📝 Novedades para empleado:', employee.name, {
-            count: novedadesForIBC.length,
-            constitutivas: novedadesForIBC.filter(n => n.constitutivo_salario).length
+          // ✅ INFORMACIÓN NORMATIVA DE NOVEDADES
+          const constitutivas = novedadesForIBC.filter(n => n.constitutivo_salario);
+          const noConstitutivas = novedadesForIBC.filter(n => !n.constitutivo_salario);
+          
+          console.log('📊 Análisis normativo de novedades:', employee.name, {
+            totalNovedades: novedadesForIBC.length,
+            constitutivas: constitutivas.length,
+            noConstitutivas: noConstitutivas.length,
+            impactoIBC: constitutivas.reduce((sum, n) => sum + n.valor, 0),
+            detalleConstitutivas: constitutivas.map(n => `${n.tipo_novedad}: $${n.valor}`),
+            detalleNoConstitutivas: noConstitutivas.map(n => `${n.tipo_novedad}: $${n.valor}`)
           });
 
           // ✅ CORRECCIÓN CRÍTICA: Determinar tipo de período correcto basado en días trabajados
