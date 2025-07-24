@@ -232,11 +232,20 @@ export class DeductionCalculationService {
       fondoSubsistencia: number;
     };
   } {
-    const baseIbc = input.totalDevengado - input.auxilioTransporte;
-    const topeIbc = SALARIO_MINIMO_2025 * 25;
+    // ✅ CORRECCIÓN NORMATIVA: IBC se calcula sobre salario base, no sobre devengado
+    // El auxilio de transporte NO hace parte del IBC según normativa colombiana
+    const baseIbc = Math.max(input.salarioBase, SALARIO_MINIMO_2025); // Mínimo 1 SMMLV
+    const topeIbc = SALARIO_MINIMO_2025 * 25; // Máximo 25 SMMLV
     
-    // Aplicar topes IBC
+    // Aplicar topes IBC según normativa
     const ibcAplicable = Math.min(baseIbc, topeIbc);
+    
+    console.log('📐 [FALLBACK] Cálculo IBC normativo:', {
+      salarioBase: input.salarioBase,
+      baseIbc: baseIbc,
+      ibcAplicable: ibcAplicable,
+      periodType: input.periodType
+    });
     
     // Cálculos básicos según normativa colombiana 2025
     const healthDeduction = Math.max(0, ibcAplicable * 0.04); // 4% salud
@@ -268,26 +277,35 @@ export class DeductionCalculationService {
     };
   }
 
-  // ✅ MÉTODO PRINCIPAL: Con deducciones de ley completas
+  // ✅ MÉTODO PRINCIPAL: Con deducciones de ley completas y corrección normativa IBC
   static async calculateDeductions(input: DeductionInput): Promise<DeductionResult> {
-    console.log('🔧 [DEDUCTION SERVICE] CÁLCULO DE DEDUCCIONES 2025 - Período:', input.periodType, {
-      salarioBase: input.salarioBase,
+    // ✅ CORRECCIÓN NORMATIVA: Calcular salario base proporcional para IBC según período
+    const salarioBaseParaIBC = input.periodType === 'quincenal' 
+      ? input.salarioBase / 2  // Para quincenal: mitad del salario mensual
+      : input.periodType === 'semanal'
+      ? input.salarioBase / 4  // Para semanal: cuarta parte del salario mensual
+      : input.salarioBase;     // Para mensual: salario completo
+
+    console.log('🔧 [DEDUCTION SERVICE] CÁLCULO NORMATIVO IBC 2025:', {
+      salarioBaseOriginal: input.salarioBase,
+      salarioBaseParaIBC: salarioBaseParaIBC,
+      periodType: input.periodType,
       totalDevengado: input.totalDevengado,
-      auxilioTransporte: input.auxilioTransporte,
-      periodType: input.periodType
+      auxilioTransporte: input.auxilioTransporte
     });
     
     let backendResult: any = null;
     let usedFallback = false;
     
     try {
-      // 1. Intentar usar el backend primero
-      console.log('🌐 Intentando cálculo backend...');
+      // 1. Intentar usar el backend con salario proporcional correcto
+      console.log('🌐 Enviando al backend con salario IBC correcto:', salarioBaseParaIBC);
       const { data, error } = await supabase.functions.invoke('payroll-calculations', {
         body: {
           action: 'calculate',
           data: {
-            baseSalary: input.salarioBase,
+            baseSalary: input.salarioBase, // Salario original para cálculo de devengado
+            salarioBaseParaIBC: salarioBaseParaIBC, // ✅ Salario proporcional para IBC
             workedDays: input.periodType === 'quincenal' ? 15 : 30,
             extraHours: 0,
             disabilities: 0,
@@ -315,9 +333,10 @@ export class DeductionCalculationService {
       console.warn('⚠️ Error en backend, activando fallback local:', error);
       usedFallback = true;
       
-      // Usar fallback local con deducciones completas
-      backendResult = this.calculateLocalDeductions(input);
-      console.log('🔄 Fallback local aplicado con deducciones completas:', backendResult);
+      // Usar fallback local con salario IBC correcto
+      const inputCorregido = { ...input, salarioBase: salarioBaseParaIBC };
+      backendResult = this.calculateLocalDeductions(inputCorregido);
+      console.log('🔄 Fallback local con IBC normativo aplicado:', backendResult);
     }
 
     // 2. Obtener novedades de deducciones específicas
@@ -357,12 +376,19 @@ export class DeductionCalculationService {
       }
     });
 
-    // ✅ CORRECCIÓN CRÍTICA: IBC debe calcularse sobre salario proporcional para quincenal
-    const ibcCorrect = input.salarioBase; // Ya viene proporcional desde PayrollCalculationEnhancedService
+    // ✅ CORRECCIÓN NORMATIVA: IBC correcto según período
+    const ibcFinal = salarioBaseParaIBC;
+    
+    console.log('📊 IBC FINAL NORMATIVO:', {
+      salarioOriginal: input.salarioBase,
+      salarioIBC: salarioBaseParaIBC,
+      periodType: input.periodType,
+      factor: input.periodType === 'quincenal' ? '1/2' : '1/1'
+    });
     
     return {
-      ibcSalud: ibcCorrect,
-      ibcPension: ibcCorrect,
+      ibcSalud: ibcFinal,
+      ibcPension: ibcFinal,
       saludEmpleado: backendResult.healthDeduction,
       pensionEmpleado: backendResult.pensionDeduction,
       fondoSolidaridad: backendResult.fondoSolidaridad || 0,
@@ -372,11 +398,11 @@ export class DeductionCalculationService {
       novedadesDeducciones,
       totalDeducciones,
       detalleCalculo: {
-        baseIbc: ibcCorrect, // ✅ Usar IBC correcto proporcional
+        baseIbc: ibcFinal, // ✅ IBC normativo proporcional al período
         topeIbc: SALARIO_MINIMO_2025 * 25,
         baseRetencion: input.totalDevengado - backendResult.healthDeduction - backendResult.pensionDeduction,
         uvtAplicable: RETENCION_FUENTE_2025.UVT,
-        smmlvMultiple: backendResult.smmlvMultiple || (input.salarioBase / SALARIO_MINIMO_2025),
+        smmlvMultiple: salarioBaseParaIBC / SALARIO_MINIMO_2025, // ✅ Múltiple correcto
         fondoSolidaridadRate: backendResult.rates?.fondoSolidaridad || 0,
         contribucionSolidariaRate: backendResult.rates?.contribucionSolidaria || 0,
         fondoSubsistenciaRate: backendResult.rates?.fondoSubsistencia || 0,
