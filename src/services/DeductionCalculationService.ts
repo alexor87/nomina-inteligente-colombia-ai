@@ -270,7 +270,7 @@ export class DeductionCalculationService {
 
   // ✅ MÉTODO PRINCIPAL: Con deducciones de ley completas
   static async calculateDeductions(input: DeductionInput): Promise<DeductionResult> {
-    console.log('🔧 CÁLCULO DE DEDUCCIONES 2025 - Con deducciones de ley completas:', {
+    console.log('🔧 [DEDUCTION SERVICE] CÁLCULO DE DEDUCCIONES 2025 - Período:', input.periodType, {
       salarioBase: input.salarioBase,
       totalDevengado: input.totalDevengado,
       auxilioTransporte: input.auxilioTransporte,
@@ -357,9 +357,12 @@ export class DeductionCalculationService {
       }
     });
 
+    // ✅ CORRECCIÓN CRÍTICA: IBC debe calcularse sobre salario proporcional para quincenal
+    const ibcCorrect = input.salarioBase; // Ya viene proporcional desde PayrollCalculationEnhancedService
+    
     return {
-      ibcSalud: input.totalDevengado - input.auxilioTransporte,
-      ibcPension: input.totalDevengado - input.auxilioTransporte,
+      ibcSalud: ibcCorrect,
+      ibcPension: ibcCorrect,
       saludEmpleado: backendResult.healthDeduction,
       pensionEmpleado: backendResult.pensionDeduction,
       fondoSolidaridad: backendResult.fondoSolidaridad || 0,
@@ -369,7 +372,7 @@ export class DeductionCalculationService {
       novedadesDeducciones,
       totalDeducciones,
       detalleCalculo: {
-        baseIbc: input.totalDevengado - input.auxilioTransporte,
+        baseIbc: ibcCorrect, // ✅ Usar IBC correcto proporcional
         topeIbc: SALARIO_MINIMO_2025 * 25,
         baseRetencion: input.totalDevengado - backendResult.healthDeduction - backendResult.pensionDeduction,
         uvtAplicable: RETENCION_FUENTE_2025.UVT,
