@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
+import { ConfigurationService } from './ConfigurationService';
+import { PORCENTAJES_NOMINA } from '@/constants';
 
 export class PayrollLiquidationNewService {
   static async loadEmployeesForActivePeriod(period: any): Promise<PayrollEmployee[]> {
@@ -201,15 +203,21 @@ export class PayrollLiquidationNewService {
         novedades: novedades.length
       });
       
+      // ✅ OBTENER CONFIGURACIÓN DINÁMICA
+      const currentYear = new Date().getFullYear().toString();
+      const config = ConfigurationService.getConfiguration(currentYear);
+      console.log(`⚙️ Usando configuración para año: ${currentYear}`, config);
+      
       // ✅ CÁLCULO ALELUYA EXACTO
       // 1. Salario proporcional: (salario_mensual / 30) × días_trabajados
-      const dailySalary = baseSalary / 30;
+      const dailySalary = Number(baseSalary) / 30;
       const proportionalSalary = Math.round(dailySalary * workedDays);
       
-      // 2. Auxilio de transporte proporcional (si aplica) - ✅ VALORES 2025
+      // 2. Auxilio de transporte proporcional (si aplica) - ✅ VALORES DINÁMICOS
       let transportAllowance = 0;
-      if (baseSalary <= 2847000) { // ✅ 2025: Límite 2 SMMLV = $2,847,000
-        const dailyTransport = 200000 / 30; // ✅ 2025: Auxilio $200,000
+      const transportLimit = config.salarioMinimo * 2; // Límite 2 SMMLV
+      if (Number(baseSalary) <= transportLimit) {
+        const dailyTransport = config.auxilioTransporte / 30;
         transportAllowance = Math.round(dailyTransport * workedDays);
       }
 
@@ -261,38 +269,40 @@ export class PayrollLiquidationNewService {
         }
       }
 
-      // 4. ✅ CALCULAR IBC 2025 CORRECTO (según lógica de Aleluya)
-      const salarioBaseParaAportes = proportionalSalary + bonusesConstitutivos;
+      // 4. ✅ CALCULAR IBC CORRECTO CON HORAS EXTRA (según lógica de Aleluya)
+      const salarioBaseParaAportes = proportionalSalary + bonusesConstitutivos + extraHours;
       
       // ✅ LÓGICA ALELUYA: Solo aplicar IBC mínimo si el salario base mensual < SMMLV
       // Si el salario base mensual >= SMMLV, usar el salario proporcional real
-      const salarioBaseMensual = employee.salario_base;
+      const salarioBaseMensual = Number(employee.salario_base);
       let ibcSalud, ibcPension;
       
-      if (salarioBaseMensual >= 1423500) {
-        // Empleado con salario >= SMMLV: usar salario proporcional real
+      if (salarioBaseMensual >= config.salarioMinimo) {
+        // Empleado con salario >= SMMLV: usar salario proporcional real + horas extra
         ibcSalud = salarioBaseParaAportes;
         ibcPension = salarioBaseParaAportes;
       } else {
-        // Empleado con salario < SMMLV: aplicar IBC mínimo
-        ibcSalud = Math.max(salarioBaseParaAportes, 1423500);
-        ibcPension = Math.max(salarioBaseParaAportes, 1423500);
+        // Empleado con salario < SMMLV: aplicar IBC mínimo proporcional
+        const minIbc = (config.salarioMinimo / 30) * workedDays;
+        ibcSalud = Math.max(salarioBaseParaAportes, minIbc);
+        ibcPension = Math.max(salarioBaseParaAportes, minIbc);
       }
       
-      console.log(`💰 IBC 2025 para ${employee.nombre}:`, {
+      console.log(`💰 IBC para ${employee.nombre}:`, {
         salarioBaseParaAportes: salarioBaseParaAportes.toLocaleString(),
         ibcSalud: ibcSalud.toLocaleString(),
         ibcPension: ibcPension.toLocaleString(),
-        aplicoMinimo: salarioBaseParaAportes < 1423500
+        incluyeHorasExtra: extraHours > 0,
+        salarioMinimo: config.salarioMinimo.toLocaleString()
       });
 
       // 5. Total devengado (incluye todas las bonificaciones)
       const totalBonuses = bonusesConstitutivos + bonusesNoConstitutivos;
       const grossPay = proportionalSalary + transportAllowance + additionalEarnings;
       
-      // 6. ✅ DEDUCCIONES 2025 sobre el IBC (no sobre salario base)
-      const healthDeduction = Math.round(ibcSalud * 0.04); // 4% sobre IBC
-      const pensionDeduction = Math.round(ibcPension * 0.04); // 4% sobre IBC
+      // 6. ✅ DEDUCCIONES sobre el IBC (no sobre salario base) - PORCENTAJES DINÁMICOS
+      const healthDeduction = Math.round(ibcSalud * PORCENTAJES_NOMINA.SALUD_EMPLEADO);
+      const pensionDeduction = Math.round(ibcPension * PORCENTAJES_NOMINA.PENSION_EMPLEADO);
       const totalDeductions = healthDeduction + pensionDeduction + additionalDeductions;
       
       // 7. Neto a pagar
@@ -366,8 +376,28 @@ export class PayrollLiquidationNewService {
   }
 
   private static calculateEmployerContributions(salarioBaseParaAportes: number): number {
-    // ✅ Cálculo de aportes patronales basado en la base correcta (incluye bonificaciones constitutivas)
-    return salarioBaseParaAportes * 0.325;
+    // ✅ Cálculo detallado de aportes patronales usando porcentajes configurados
+    const saludEmpleador = salarioBaseParaAportes * PORCENTAJES_NOMINA.SALUD_EMPLEADOR;
+    const pensionEmpleador = salarioBaseParaAportes * PORCENTAJES_NOMINA.PENSION_EMPLEADOR;
+    const arl = salarioBaseParaAportes * PORCENTAJES_NOMINA.ARL;
+    const cajaCompensacion = salarioBaseParaAportes * PORCENTAJES_NOMINA.CAJA_COMPENSACION;
+    const icbf = salarioBaseParaAportes * PORCENTAJES_NOMINA.ICBF;
+    const sena = salarioBaseParaAportes * PORCENTAJES_NOMINA.SENA;
+    
+    const totalContributions = saludEmpleador + pensionEmpleador + arl + cajaCompensacion + icbf + sena;
+    
+    console.log(`👔 Aportes patronales detallados:`, {
+      base: salarioBaseParaAportes.toLocaleString(),
+      salud: saludEmpleador.toLocaleString(),
+      pension: pensionEmpleador.toLocaleString(),
+      arl: arl.toLocaleString(),
+      caja: cajaCompensacion.toLocaleString(),
+      icbf: icbf.toLocaleString(),
+      sena: sena.toLocaleString(),
+      total: totalContributions.toLocaleString()
+    });
+    
+    return Math.round(totalContributions);
   }
 
   static async updateEmployeeCount(periodId: string, count: number): Promise<void> {
