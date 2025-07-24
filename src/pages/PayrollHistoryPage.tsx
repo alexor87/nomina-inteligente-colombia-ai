@@ -18,7 +18,7 @@ import {
   Wrench
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { PayrollHistoryServiceKISS, PayrollPeriodHistory } from '@/services/PayrollHistoryServiceKISS';
+import { HistoryServiceAleluya, PayrollPeriodHistory } from '@/services/HistoryServiceAleluya';
 import { useToast } from '@/hooks/use-toast';
 
 /**
@@ -53,7 +53,7 @@ export const PayrollHistoryPage = () => {
         limit: pagination.limit
       };
 
-      const result = await PayrollHistoryServiceKISS.getPayrollHistory(filterParams);
+      const result = await HistoryServiceAleluya.getPayrollHistory(filterParams);
       
       setPeriods(result.periods);
       setPagination(prev => ({
@@ -79,8 +79,7 @@ export const PayrollHistoryPage = () => {
     try {
       console.log('🔧 Detectando y reparando períodos desincronizados...');
       
-      // Note: Repair functionality removed in KISS approach
-      const repairedCount = 0;
+      const repairedCount = await HistoryServiceAleluya.repairAllDesynchronizedPeriods();
       
       if (repairedCount > 0) {
         toast({

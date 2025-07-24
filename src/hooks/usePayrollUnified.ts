@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
-// Removed PayrollLiquidationService - using KISS approach
+import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 
 interface PayrollPeriod {
   id: string;
@@ -484,7 +484,7 @@ export const usePayrollUnified = (companyId: string) => {
 
       // PASO 2: ✅ NUEVO - Consolidar novedades en registros de payrolls
       console.log('🔄 Consolidando novedades en registros de payrolls...');
-      // Note: Consolidation logic moved to KISS approach - no longer needed
+      await PayrollLiquidationService.consolidatePayrollWithNovedades(currentPeriod.id);
       console.log('✅ Novedades consolidadas exitosamente');
 
       // PASO 3: Actualizar estado del período a cerrado
