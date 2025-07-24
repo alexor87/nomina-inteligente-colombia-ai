@@ -101,7 +101,7 @@ export class EmployeeUnifiedService {
 
       // Convertir a formato UnifiedEmployeeData
       const processedEmployees: UnifiedEmployeeData[] = payrollEmployees.map(employee => {
-        console.log(`✅ ALELUYA 2025 ${employee.name}: Base $${employee.baseSalary.toLocaleString()}, Días ${employee.workedDays}, Auxilio $${employee.transportAllowance.toLocaleString()}, Neto $${employee.netPay.toLocaleString()}`);
+        console.log(`✅ ALELUYA 2025 ${employee.name}: Base $${employee.baseSalary.toLocaleString()}, Días ${employee.workedDays}, Auxilio $${employee.transportAllowance.toLocaleString()}, Salud $${employee.healthDeduction.toLocaleString()}, Pensión $${employee.pensionDeduction.toLocaleString()}, Neto $${employee.netPay.toLocaleString()}`);
 
         return {
           id: employee.id,
@@ -110,8 +110,8 @@ export class EmployeeUnifiedService {
           workedDays: employee.workedDays,
           transportAllowance: employee.transportAllowance,
           totalEarnings: employee.grossPay,
-          healthDeduction: employee.deductions / 2, // Aproximación salud (4%)
-          pensionDeduction: employee.deductions / 2, // Aproximación pensión (4%)
+          healthDeduction: employee.healthDeduction, // ✅ Usar valor real calculado
+          pensionDeduction: employee.pensionDeduction, // ✅ Usar valor real calculado
           totalDeductions: employee.deductions,
           netPay: employee.netPay,
           status: employee.status === 'incomplete' ? 'error' : employee.status as 'valid' | 'error',
