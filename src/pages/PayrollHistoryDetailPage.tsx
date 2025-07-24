@@ -20,7 +20,7 @@ import {
   Receipt
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { HistoryServiceAleluya, PeriodDetail } from '@/services/HistoryServiceAleluya';
+import { PayrollHistoryServiceKISS, PeriodDetail } from '@/services/PayrollHistoryServiceKISS';
 import { useToast } from '@/hooks/use-toast';
 
 export const PayrollHistoryDetailPage = () => {
@@ -41,7 +41,7 @@ export const PayrollHistoryDetailPage = () => {
   const loadPeriodDetail = async () => {
     try {
       setLoading(true);
-      const detail = await HistoryServiceAleluya.getPeriodDetail(periodId!);
+      const detail = await PayrollHistoryServiceKISS.getPeriodDetail(periodId!);
       setPeriodDetail(detail);
     } catch (error) {
       console.error('Error loading period detail:', error);
@@ -64,7 +64,7 @@ export const PayrollHistoryDetailPage = () => {
         description: `Preparando comprobante de ${employeeName}...`,
       });
 
-      await HistoryServiceAleluya.generateVoucherPDF(employeeId, periodId!);
+      await PayrollHistoryServiceKISS.generateVoucherPDF(employeeId, periodId!);
       
       toast({
         title: "Comprobante descargado",

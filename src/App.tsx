@@ -19,7 +19,7 @@ import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
 import EditEmployeePage from "./pages/EditEmployeePage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
-import PayrollLiquidationPageSimplified from "./pages/PayrollLiquidationPageSimplified";
+import PayrollLiquidationPageKISS from "./pages/PayrollLiquidationPageKISS";
 import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
 import PayrollHistoryPage from "./pages/PayrollHistoryPage";
 import PayrollHistoryDetailPage from "./pages/PayrollHistoryDetailPage";
@@ -48,7 +48,7 @@ function AppContent() {
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="employees/create" element={<CreateEmployeeModernPage />} />
           <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
-          <Route path="payroll" element={<PayrollLiquidationPageSimplified />} />
+          <Route path="payroll" element={<PayrollLiquidationPageKISS />} />
           <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
           <Route path="payroll-history" element={<PayrollHistoryPage />} />
           <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />

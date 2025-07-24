@@ -17,8 +17,9 @@ import {
   FileText
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { HistoryServiceAleluya, PeriodDetail } from '@/services/HistoryServiceAleluya';
+import { PayrollHistoryServiceKISS, PeriodDetail } from '@/services/PayrollHistoryServiceKISS';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * ✅ PÁGINA DE REGISTRO DE AJUSTES
@@ -48,7 +49,7 @@ export const PayrollAdjustmentPage = () => {
   const loadPeriodDetail = async () => {
     try {
       setLoading(true);
-      const detail = await HistoryServiceAleluya.getPeriodDetail(periodId!);
+      const detail = await PayrollHistoryServiceKISS.getPeriodDetail(periodId!);
       setPeriodDetail(detail);
     } catch (error) {
       console.error('Error loading period detail:', error);
@@ -108,13 +109,22 @@ export const PayrollAdjustmentPage = () => {
     try {
       setSubmitting(true);
       
-      await HistoryServiceAleluya.createAdjustment({
-        periodId: periodId!,
-        employeeId: formData.employeeId,
-        concept: formData.concept.trim(),
-        amount: Number(formData.amount),
-        observations: formData.observations.trim()
-      });
+      // KISS approach: Direct database insertion
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { error } = await supabase
+        .from('payroll_adjustments')
+        .insert({
+          period_id: periodId!,
+          employee_id: formData.employeeId,
+          concept: formData.concept.trim(),
+          amount: Number(formData.amount),
+          observations: formData.observations.trim(),
+          created_by: user.id
+        });
+
+      if (error) throw error;
       
       toast({
         title: "Ajuste creado",
