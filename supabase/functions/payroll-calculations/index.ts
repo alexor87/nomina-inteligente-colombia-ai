@@ -859,8 +859,15 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const grossSalary = regularPay + extraPay + input.bonuses;
   const grossPay = grossSalary + transportAllowance;
   
-  // ✅ CORREGIDO: Calcular IBC SOLO con salario base (SIN auxilio de transporte)
-  const ibcCalculation = calculateIBC(input.baseSalary, input.novedades || [], config);
+  // ✅ CORRECCIÓN CRÍTICA: Para períodos quincenales, usar salario proporcional para IBC
+  const salarioBaseParaIBC = input.periodType === 'quincenal' ? 
+    input.baseSalary / 2 : // Para quincenal, usar la mitad del salario
+    input.baseSalary; // Para mensual, usar salario completo
+    
+  console.log(`🎯 [PAYROLL v3.0] Iniciando cálculo con IBC correcto: { baseSalary: ${input.baseSalary}, salarioBaseParaIBC: ${salarioBaseParaIBC}, periodType: ${input.periodType}, novedadesCount: ${(input.novedades || []).length} }`);
+  
+  // Calcular IBC con salario proporcional para períodos quincenales
+  const ibcCalculation = calculateIBC(salarioBaseParaIBC, input.novedades || [], config);
   
   // ✅ CORREGIDO: Usar IBC para calcular deducciones
   const healthDeduction = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleado);

@@ -218,9 +218,16 @@ export class PayrollCalculationEnhancedService {
     
     console.log(`📊 Total devengado: $${grossPay.toFixed(2)} (Regular: ${regularPay.toFixed(2)} + Extra: ${extraPay.toFixed(2)} + Bonos: ${input.bonuses} + Auxilio: ${transportAllowance})`);
 
-    // Calcular deducciones correctamente usando el nuevo servicio
+    // ✅ CORRECCIÓN CRÍTICA: Usar salario proporcional para cálculo de deducciones
+    const salarioBaseParaDeducciones = input.periodType === 'quincenal' ? 
+      input.baseSalary / 2 : // Para quincenal, usar la mitad del salario
+      input.baseSalary; // Para mensual, usar salario completo
+      
+    console.log(`🎯 CORRECCIÓN DEDUCCIONES - Período: ${input.periodType}, Salario original: $${input.baseSalary}, Salario para deducciones: $${salarioBaseParaDeducciones}`);
+
+    // Calcular deducciones correctamente usando el salario proporcional
     const deductionResult = await DeductionCalculationService.calculateDeductions({
-      salarioBase: input.baseSalary,
+      salarioBase: salarioBaseParaDeducciones,
       totalDevengado: grossPay,
       auxilioTransporte: transportAllowance,
       periodType: input.periodType,
