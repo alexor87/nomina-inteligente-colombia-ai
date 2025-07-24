@@ -23,12 +23,30 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, onRe
   const loadEmployees = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Cargando empleados con cálculos corregidos 2025...');
+      console.log('🔄 Actualizando automáticamente con cálculos backend...');
       
+      // 1. Automáticamente calcular y persistir valores correctos
+      await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      console.log('✅ Registros actualizados automáticamente');
+      
+      // 2. Cargar datos actualizados desde BD (sin cálculos frontend)
       const employeeData = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
       setEmployees(employeeData);
       
-      console.log('✅ Empleados cargados:', employeeData.length);
+      console.log('✅ Empleados cargados desde BD:', employeeData.length);
+      
+      // Log para verificar valores específicos de Yohanna
+      const yohanna = employeeData.find(emp => emp.name?.includes('Yohanna'));
+      if (yohanna) {
+        console.log('🎯 Yohanna - Valores desde BD:', {
+          nombre: yohanna.name,
+          salario: yohanna.baseSalary,
+          auxilio: yohanna.transportAllowance,
+          deducciones: yohanna.totalDeductions,
+          neto: yohanna.netPay
+        });
+      }
+      
     } catch (error) {
       console.error('❌ Error cargando empleados:', error);
       toast({

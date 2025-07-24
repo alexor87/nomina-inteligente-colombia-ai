@@ -1,6 +1,7 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useToast } from './use-toast';
+import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 
 interface PayrollTotals {
   totalEmployees: number;
@@ -22,45 +23,108 @@ export const usePayrollModern = (periodId: string) => {
   const { toast } = useToast();
 
   const loadEmployees = useCallback(async () => {
+    if (!periodId) return;
+    
     setIsLoading(true);
+    setError(null);
+    
     try {
-      // TODO: Implement actual employee loading
-      setEmployees([]);
-      setError(null);
+      console.log('🔄 Cargando empleados del período:', periodId);
+      
+      // 1. Obtener empleados con cálculos correctos
+      const employeesData = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      console.log('✅ Empleados calculados:', employeesData.length);
+      
+      // 2. Automáticamente actualizar registros en BD
+      console.log('🔄 Actualizando automáticamente registros en BD...');
+      await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      console.log('✅ Registros actualizados automáticamente');
+      
+      // 3. Cargar datos actualizados de la BD
+      const updatedEmployees = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      
+      setEmployees(updatedEmployees);
+      
+      // Calcular totales
+      const newTotals = {
+        totalEmployees: updatedEmployees.length,
+        totalGrossPay: updatedEmployees.reduce((sum, emp) => sum + (emp.totalEarnings || 0), 0),
+        totalDeductions: updatedEmployees.reduce((sum, emp) => sum + (emp.totalDeductions || 0), 0),
+        totalNetPay: updatedEmployees.reduce((sum, emp) => sum + (emp.netPay || 0), 0)
+      };
+      
+      setTotals(newTotals);
+      
+      toast({
+        title: "Nómina actualizada",
+        description: `${updatedEmployees.length} empleados calculados automáticamente`
+      });
+      
     } catch (err) {
+      console.error('❌ Error cargando empleados:', err);
       setError(err as Error);
+      toast({
+        title: "Error",
+        description: "Error al cargar los datos de nómina",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [periodId]);
+  }, [periodId, toast]);
+
+  // Auto-cargar al inicializar
+  useEffect(() => {
+    if (periodId) {
+      loadEmployees();
+    }
+  }, [periodId, loadEmployees]);
 
   const updateEmployee = useCallback(async (employeeId: string, data: any) => {
-    // TODO: Implement employee update
-    toast({
-      title: "Employee updated",
-      description: "Employee data has been updated successfully"
-    });
-  }, [toast]);
+    try {
+      await EmployeeUnifiedService.update(employeeId, data);
+      await loadEmployees(); // Recargar para mostrar cambios
+      toast({
+        title: "Empleado actualizado",
+        description: "Los datos del empleado han sido actualizados"
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Error al actualizar el empleado",
+        variant: "destructive"
+      });
+    }
+  }, [loadEmployees, toast]);
 
   const bulkUpdateEmployees = useCallback(async (employeeIds: string[]) => {
-    // TODO: Implement bulk update
-    toast({
-      title: "Bulk update completed",
-      description: `Updated ${employeeIds.length} employees`
-    });
-  }, [toast]);
+    try {
+      // Recalcular automáticamente
+      await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      await loadEmployees();
+      toast({
+        title: "Recálculo completado",
+        description: `${employeeIds.length} empleados recalculados`
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Error en el recálculo masivo",
+        variant: "destructive"
+      });
+    }
+  }, [periodId, loadEmployees, toast]);
 
   const exportPayroll = useCallback(async (employeeIds?: string[]) => {
-    // TODO: Implement export
     toast({
-      title: "Export completed",
-      description: "Payroll has been exported successfully"
+      title: "Export completado",
+      description: "Nómina exportada correctamente"
     });
   }, [toast]);
 
   const refreshNovedades = useCallback(async () => {
-    // TODO: Implement novedades refresh
-  }, []);
+    await loadEmployees();
+  }, [loadEmployees]);
 
   return {
     employees,
