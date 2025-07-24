@@ -261,12 +261,23 @@ export class PayrollLiquidationNewService {
         }
       }
 
-      // 4. ✅ CALCULAR IBC 2025 (base para aportes con bonificaciones constitutivas)
+      // 4. ✅ CALCULAR IBC 2025 CORRECTO (según lógica de Aleluya)
       const salarioBaseParaAportes = proportionalSalary + bonusesConstitutivos;
       
-      // ✅ CORRECCIÓN 2025: IBC mínimo debe ser el salario mínimo 2025
-      const ibcSalud = Math.max(salarioBaseParaAportes, 1423500); // Mínimo $1,423,500 (SMMLV 2025)
-      const ibcPension = Math.max(salarioBaseParaAportes, 1423500); // Mínimo $1,423,500 (SMMLV 2025)
+      // ✅ LÓGICA ALELUYA: Solo aplicar IBC mínimo si el salario base mensual < SMMLV
+      // Si el salario base mensual >= SMMLV, usar el salario proporcional real
+      const salarioBaseMensual = employee.salario_base;
+      let ibcSalud, ibcPension;
+      
+      if (salarioBaseMensual >= 1423500) {
+        // Empleado con salario >= SMMLV: usar salario proporcional real
+        ibcSalud = salarioBaseParaAportes;
+        ibcPension = salarioBaseParaAportes;
+      } else {
+        // Empleado con salario < SMMLV: aplicar IBC mínimo
+        ibcSalud = Math.max(salarioBaseParaAportes, 1423500);
+        ibcPension = Math.max(salarioBaseParaAportes, 1423500);
+      }
       
       console.log(`💰 IBC 2025 para ${employee.nombre}:`, {
         salarioBaseParaAportes: salarioBaseParaAportes.toLocaleString(),
