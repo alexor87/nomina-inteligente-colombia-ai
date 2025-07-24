@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { EmployeeService } from './EmployeeService';
 import { EmployeeCRUDService } from './EmployeeCRUDService';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { PayrollCalculationSimple } from './PayrollCalculationSimple';
+import { PayrollCalculationBackendService } from './PayrollCalculationBackendService';
 
 export interface UnifiedEmployeeData {
   id: string;
@@ -110,32 +110,38 @@ export class EmployeeUnifiedService {
         return [];
       }
 
-      // Procesar cada empleado con cálculos SIMPLES
-      const processedEmployees: UnifiedEmployeeData[] = payrollData.map(payroll => {
+      // Procesar cada empleado con cálculos BACKEND
+      const processedEmployees: UnifiedEmployeeData[] = await Promise.all(payrollData.map(async payroll => {
         const employee = payroll.employees;
         const baseSalary = employee.salario_base;
         const workedDays = payroll.dias_trabajados;
 
         try {
-          // ✅ USAR ÚNICAMENTE PayrollCalculationSimple
-          const calculation = PayrollCalculationSimple.calculate({
-            salarioBase: baseSalary,
-            diasTrabajados: workedDays
+          // ✅ CAMBIO: Usar backend exclusivamente
+          const calculation = await PayrollCalculationBackendService.calculatePayroll({
+            baseSalary,
+            workedDays,
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            periodType: 'mensual',
+            novedades: []
           });
 
-          console.log(`✅ ${employee.nombre}: Base $${baseSalary.toLocaleString()}, Días ${workedDays}, Auxilio $${calculation.auxilioTransporte.toLocaleString()}, Neto $${calculation.netoPagar.toLocaleString()}`);
+          console.log(`✅ BACKEND ${employee.nombre}: Base $${baseSalary.toLocaleString()}, Días ${workedDays}, Auxilio $${calculation.transportAllowance.toLocaleString()}, Neto $${calculation.netPay.toLocaleString()}`);
 
           return {
             id: employee.id,
             name: `${employee.nombre} ${employee.apellido}`,
             baseSalary,
             workedDays,
-            transportAllowance: calculation.auxilioTransporte,
-            totalEarnings: calculation.totalDevengado,
-            healthDeduction: calculation.saludEmpleado,
-            pensionDeduction: calculation.pensionEmpleado,
-            totalDeductions: calculation.totalDeducciones,
-            netPay: calculation.netoPagar,
+            transportAllowance: calculation.transportAllowance,
+            totalEarnings: calculation.grossPay,
+            healthDeduction: calculation.healthDeduction,
+            pensionDeduction: calculation.pensionDeduction,
+            totalDeductions: calculation.totalDeductions,
+            netPay: calculation.netPay,
             status: 'valid' as const,
             errors: []
           };
@@ -156,7 +162,7 @@ export class EmployeeUnifiedService {
             errors: ['Error en cálculo: ' + (error instanceof Error ? error.message : 'Error desconocido')]
           };
         }
-      });
+      }));
 
       console.log(`📊 Total empleados procesados: ${processedEmployees.length}`);
       console.log(`💰 Empleados con auxilio: ${processedEmployees.filter(e => e.transportAllowance > 0).length}`);
@@ -232,6 +238,6 @@ export class EmployeeUnifiedService {
   }
 
   static getConfigurationInfo() {
-    return PayrollCalculationSimple.getConfigurationInfo();
+    return PayrollCalculationBackendService.getConfigurationInfo();
   }
 }

@@ -283,11 +283,11 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, onRe
               <strong>Auxilio Transporte:</strong> {formatCurrency(configInfo.auxilioTransporte)}
             </div>
             <div>
-              <strong>Límite Auxilio:</strong> {formatCurrency(configInfo.limiteAuxilio)}
+              <strong>Límite Auxilio:</strong> {formatCurrency(configInfo.salarioMinimo * 2)}
             </div>
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
-            Los empleados con salario ≤ {formatCurrency(configInfo.limiteAuxilio)} (2 SMMLV) reciben auxilio de transporte proporcional.
+            Los empleados con salario ≤ {formatCurrency(configInfo.salarioMinimo * 2)} (2 SMMLV) reciben auxilio de transporte proporcional.
           </div>
         </CardContent>
       </Card>

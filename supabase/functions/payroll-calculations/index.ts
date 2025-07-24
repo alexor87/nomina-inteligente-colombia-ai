@@ -859,7 +859,7 @@ function calculatePayroll(input: PayrollCalculationInput) {
   const grossSalary = regularPay + extraPay + input.bonuses;
   const grossPay = grossSalary + transportAllowance;
   
-  // ✅ NUEVO: Calcular IBC incluyendo novedades constitutivas
+  // ✅ CORREGIDO: Calcular IBC SOLO con salario base (SIN auxilio de transporte)
   const ibcCalculation = calculateIBC(input.baseSalary, input.novedades || [], config);
   
   // ✅ CORREGIDO: Usar IBC para calcular deducciones
