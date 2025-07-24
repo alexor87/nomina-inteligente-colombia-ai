@@ -118,15 +118,25 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             constitutivas: novedadesForIBC.filter(n => n.constitutivo_salario).length
           });
 
-          // Calcular usando el backend con novedades
+          // ✅ CORRECCIÓN CRÍTICA: Determinar tipo de período correcto basado en días trabajados
+          const periodType = workedDays <= 15 ? 'quincenal' : 'mensual';
+          
+          console.log('🎯 Calculando empleado con período correcto:', {
+            employee: employee.name,
+            workedDays,
+            periodType,
+            baseSalary: employee.baseSalary
+          });
+
+          // Calcular usando el backend con novedades y período correcto
           const calculation = await PayrollCalculationBackendService.calculatePayroll({
             baseSalary: employee.baseSalary,
-            workedDays: calculateWorkedDays(),
+            workedDays: workedDays,
             extraHours: 0,
             disabilities: 0,
             bonuses: 0,
             absences: 0,
-            periodType: 'mensual',
+            periodType: periodType, // ✅ Usar tipo de período correcto
             novedades: novedadesForIBC
           });
 

@@ -541,6 +541,7 @@ export const usePayrollUnified = (companyId: string) => {
       
       // Actualizar cada empleado en la tabla payrolls
       for (const [employeeId, calculation] of Object.entries(employeeCalculations)) {
+        // ✅ CORRECCIÓN CRÍTICA: Persistir valores reales calculados en BD
         const { error } = await supabase
           .from('payrolls')
           .update({
@@ -550,6 +551,7 @@ export const usePayrollUnified = (companyId: string) => {
             auxilio_transporte: calculation.transportAllowance || 0,
             total_deducciones: calculation.deductions || 0,
             neto_pagado: calculation.totalToPay,
+            ibc: calculation.ibc || 0, // ✅ Persistir IBC correcto
             updated_at: new Date().toISOString()
           })
           .eq('company_id', companyId)
