@@ -522,6 +522,73 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, loadEmployees]);
 
+  // ✅ NUEVA FUNCIÓN: Persistir cálculos de preliquidación automáticamente
+  const updateEmployeeCalculationsInDB = useCallback(async (
+    employeeCalculations: Record<string, { 
+      totalToPay: number; 
+      ibc: number; 
+      grossPay?: number; 
+      deductions?: number; 
+      healthDeduction?: number; 
+      pensionDeduction?: number; 
+      transportAllowance?: number; 
+    }>
+  ) => {
+    if (!currentPeriod?.id || Object.keys(employeeCalculations).length === 0) return;
+
+    try {
+      console.log('💾 Persistiendo cálculos de preliquidación para', Object.keys(employeeCalculations).length, 'empleados');
+      
+      // Actualizar cada empleado en la tabla payrolls
+      for (const [employeeId, calculation] of Object.entries(employeeCalculations)) {
+        const { error } = await supabase
+          .from('payrolls')
+          .update({
+            total_devengado: calculation.grossPay || calculation.totalToPay,
+            salud_empleado: calculation.healthDeduction || 0,
+            pension_empleado: calculation.pensionDeduction || 0,
+            auxilio_transporte: calculation.transportAllowance || 0,
+            total_deducciones: calculation.deductions || 0,
+            neto_pagado: calculation.totalToPay,
+            updated_at: new Date().toISOString()
+          })
+          .eq('company_id', companyId)
+          .eq('employee_id', employeeId)
+          .eq('period_id', currentPeriod.id);
+
+        if (error) {
+          console.error('❌ Error actualizando empleado:', employeeId, error);
+        } else {
+          console.log('✅ Empleado actualizado:', employeeId, 'Neto:', calculation.totalToPay);
+        }
+      }
+
+      // Actualizar totales del período
+      const totalDevengado = Object.values(employeeCalculations).reduce((sum, calc) => sum + (calc.grossPay || calc.totalToPay), 0);
+      const totalDeducciones = Object.values(employeeCalculations).reduce((sum, calc) => sum + (calc.deductions || 0), 0);
+      const totalNeto = Object.values(employeeCalculations).reduce((sum, calc) => sum + calc.totalToPay, 0);
+
+      await supabase
+        .from('payroll_periods_real')
+        .update({
+          total_devengado: totalDevengado,
+          total_deducciones: totalDeducciones,
+          total_neto: totalNeto,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentPeriod.id);
+
+      console.log('✅ Totales del período actualizados:', {
+        devengado: totalDevengado,
+        deducciones: totalDeducciones,
+        neto: totalNeto
+      });
+
+    } catch (error) {
+      console.error('❌ Error persistiendo cálculos:', error);
+    }
+  }, [currentPeriod, companyId]);
+
   return {
     currentPeriod,
     employees,
@@ -532,6 +599,7 @@ export const usePayrollUnified = (companyId: string) => {
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
+    updateEmployeeCalculationsInDB,
     currentPeriodId: currentPeriod?.id
   };
 };

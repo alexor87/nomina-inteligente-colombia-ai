@@ -30,6 +30,15 @@ interface PayrollLiquidationSimpleTableProps {
   currentPeriodId: string | undefined;
   onEmployeeNovedadesChange: (employeeId: string) => Promise<void>;
   onRemoveEmployee?: (employeeId: string) => void;
+  updateEmployeeCalculationsInDB?: (calculations: Record<string, {
+    totalToPay: number; 
+    ibc: number; 
+    grossPay?: number; 
+    deductions?: number; 
+    healthDeduction?: number; 
+    pensionDeduction?: number; 
+    transportAllowance?: number; 
+  }>) => Promise<void>;
 }
 
 export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTableProps> = ({
@@ -38,12 +47,21 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   endDate,
   currentPeriodId,
   onEmployeeNovedadesChange,
-  onRemoveEmployee
+  onRemoveEmployee,
+  updateEmployeeCalculationsInDB
 }) => {
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
-  const [employeeCalculations, setEmployeeCalculations] = useState<Record<string, { totalToPay: number; ibc: number }>>({});
+  const [employeeCalculations, setEmployeeCalculations] = useState<Record<string, { 
+    totalToPay: number; 
+    ibc: number; 
+    grossPay: number; 
+    deductions: number; 
+    healthDeduction: number; 
+    pensionDeduction: number; 
+    transportAllowance: number; 
+  }>>({});
   const { toast } = useToast();
 
   // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
@@ -79,7 +97,15 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       if (!currentPeriodId || employees.length === 0) return;
 
       console.log('🔄 Recalculando empleados con IBC correcto...');
-      const newCalculations: Record<string, { totalToPay: number; ibc: number }> = {};
+      const newCalculations: Record<string, { 
+        totalToPay: number; 
+        ibc: number; 
+        grossPay: number; 
+        deductions: number; 
+        healthDeduction: number; 
+        pensionDeduction: number; 
+        transportAllowance: number; 
+      }> = {};
 
       for (const employee of employees) {
         try {
@@ -106,28 +132,51 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
           newCalculations[employee.id] = {
             totalToPay: calculation.netPay,
-            ibc: calculation.ibc
+            ibc: calculation.ibc,
+            grossPay: calculation.grossPay,
+            deductions: calculation.totalDeductions,
+            healthDeduction: calculation.healthDeduction,
+            pensionDeduction: calculation.pensionDeduction,
+            transportAllowance: calculation.transportAllowance
           };
 
           console.log('✅ Empleado calculado:', employee.name, {
             ibc: calculation.ibc,
-            netPay: calculation.netPay
+            netPay: calculation.netPay,
+            healthDeduction: calculation.healthDeduction,
+            pensionDeduction: calculation.pensionDeduction
           });
 
         } catch (error) {
           console.error('❌ Error calculando empleado:', employee.name, error);
           newCalculations[employee.id] = {
             totalToPay: 0,
-            ibc: employee.baseSalary
+            ibc: employee.baseSalary,
+            grossPay: 0,
+            deductions: 0,
+            healthDeduction: 0,
+            pensionDeduction: 0,
+            transportAllowance: 0
           };
         }
       }
 
       setEmployeeCalculations(newCalculations);
+
+      // ✅ NUEVA FUNCIONALIDAD: Persistir automáticamente en la BD
+      if (updateEmployeeCalculationsInDB && Object.keys(newCalculations).length > 0) {
+        console.log('💾 Activando persistencia automática de cálculos...');
+        try {
+          await updateEmployeeCalculationsInDB(newCalculations);
+          console.log('✅ Cálculos persistidos automáticamente en BD');
+        } catch (error) {
+          console.error('❌ Error persistiendo cálculos:', error);
+        }
+      }
     };
 
     recalculateAllEmployees();
-  }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList]);
+  }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList, updateEmployeeCalculationsInDB]);
 
   const calculateWorkedDays = () => {
     if (!startDate || !endDate) return 30;

@@ -27,6 +27,7 @@ const PayrollLiquidationPageSimple = () => {
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
+    updateEmployeeCalculationsInDB,
     
     // Propiedades para manejo de conflictos
     conflictDetectionStep,
@@ -225,6 +226,7 @@ const PayrollLiquidationPageSimple = () => {
               currentPeriodId={currentPeriodId}
               onRemoveEmployee={removeEmployee}
               onEmployeeNovedadesChange={refreshEmployeeNovedades}
+              updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
             />
           </CardContent>
         </Card>

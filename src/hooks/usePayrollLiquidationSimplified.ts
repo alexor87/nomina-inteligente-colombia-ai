@@ -176,6 +176,8 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     isLoadingEmployees: payrollHook.isLoading,
     isAutoSaving: false,
     lastAutoSaveTime: undefined,
-    isRemovingEmployee: false
+    isRemovingEmployee: false,
+    // ✅ NUEVO: Exponer función de persistencia para preliquidación
+    updateEmployeeCalculationsInDB: payrollHook.updateEmployeeCalculationsInDB
   };
 };

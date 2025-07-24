@@ -10,6 +10,15 @@ interface PayrollLiquidationTableProps {
   currentPeriodId: string | undefined;
   onRemoveEmployee: (employeeId: string) => void;
   onEmployeeNovedadesChange: (employeeId: string) => Promise<void>;
+  updateEmployeeCalculationsInDB?: (calculations: Record<string, {
+    totalToPay: number; 
+    ibc: number; 
+    grossPay?: number; 
+    deductions?: number; 
+    healthDeduction?: number; 
+    pensionDeduction?: number; 
+    transportAllowance?: number; 
+  }>) => Promise<void>;
 }
 
 export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = ({
@@ -18,7 +27,8 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
   endDate,
   currentPeriodId,
   onRemoveEmployee,
-  onEmployeeNovedadesChange
+  onEmployeeNovedadesChange,
+  updateEmployeeCalculationsInDB
 }) => {
   return (
     <PayrollLiquidationSimpleTable
@@ -28,6 +38,7 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
       currentPeriodId={currentPeriodId}
       onRemoveEmployee={onRemoveEmployee}
       onEmployeeNovedadesChange={onEmployeeNovedadesChange}
+      updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
     />
   );
 };

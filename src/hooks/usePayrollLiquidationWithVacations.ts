@@ -166,6 +166,9 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
     cancelConflictResolution,
     resetConflictDetection,
     
+    // ✅ NUEVO: Exponer función de persistencia para preliquidación
+    updateEmployeeCalculationsInDB: payrollHook.updateEmployeeCalculationsInDB,
+    
     // Estados calculados
     canProceedWithLiquidation: conflictDetectionStep === 'completed' && payrollHook.employees.length > 0,
     needsConflictResolution: conflictDetectionStep === 'resolving' && conflictHook.hasConflicts,

@@ -32,6 +32,7 @@ const PayrollLiquidationPageSimplified = () => {
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
+    updateEmployeeCalculationsInDB,
     isAutoSaving,
     lastAutoSaveTime,
     isRemovingEmployee,
@@ -202,6 +203,7 @@ const PayrollLiquidationPageSimplified = () => {
               currentPeriodId={currentPeriodId}
               onRemoveEmployee={removeEmployee}
               onEmployeeNovedadesChange={refreshEmployeeNovedades}
+              updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
             />
           </CardContent>
         </Card>
