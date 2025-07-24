@@ -10,6 +10,9 @@ export interface PayrollEmployeeModern {
   totalNeto: number;
   estado: string;
   cargo?: string;
+  // ✅ NUEVOS CAMPOS: Deducciones separadas para persistencia correcta
+  healthDeduction: number;
+  pensionDeduction: number;
 }
 
 export interface PayrollModernTotals {

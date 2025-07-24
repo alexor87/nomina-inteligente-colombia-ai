@@ -48,7 +48,9 @@ export const calculateEmployeeBackend = async (
       // ✅ NUEVO: Incluir IBC calculado
       ibc: calculation.ibc,
       status: validation.isValid ? 'valid' : 'error',
-      errors: [...validation.errors, ...validation.warnings]
+      errors: [...validation.errors, ...validation.warnings],
+      healthDeduction: calculation.healthDeduction || 0,
+      pensionDeduction: calculation.pensionDeduction || 0
     };
   } catch (error) {
     console.error('Error calculating employee payroll:', error);
@@ -61,7 +63,9 @@ export const calculateEmployeeBackend = async (
       employerContributions: 0,
       ibc: 0,
       status: 'error',
-      errors: ['Error en el cálculo de nómina: ' + (error instanceof Error ? error.message : 'Error desconocido')]
+      errors: ['Error en el cálculo de nómina: ' + (error instanceof Error ? error.message : 'Error desconocido')],
+      healthDeduction: 0,
+      pensionDeduction: 0
     };
   }
 };

@@ -112,7 +112,9 @@ export class PayrollLiquidationNewService {
             eps: employee.eps || '',
             afp: employee.afp || '',
             transportAllowance: 0,
-            employerContributions: 0
+            employerContributions: 0,
+            healthDeduction: 0,
+            pensionDeduction: 0
           });
         }
       }
@@ -163,6 +165,9 @@ export class PayrollLiquidationNewService {
     
     console.log(`📊 ALELUYA - ${employee.nombre}: días=${validatedWorkedDays}, periodicidad=${periodicity}`);
     
+    const healthDeduction = Number(payroll.salud_empleado) || 0;
+    const pensionDeduction = Number(payroll.pension_empleado) || 0;
+    
     return {
       id: employee.id,
       name: `${employee.nombre} ${employee.apellido}`,
@@ -181,7 +186,9 @@ export class PayrollLiquidationNewService {
       eps: employee.eps || '',
       afp: employee.afp || '',
       transportAllowance: Number(payroll.auxilio_transporte) || 0,
-      employerContributions: this.calculateEmployerContributions(Number(payroll.salario_base) || 0)
+      employerContributions: this.calculateEmployerContributions(Number(payroll.salario_base) || 0),
+      healthDeduction,
+      pensionDeduction
     };
   }
 
@@ -343,7 +350,9 @@ export class PayrollLiquidationNewService {
         eps: employee.eps || '',
         afp: employee.afp || '',
         transportAllowance,
-        employerContributions: this.calculateEmployerContributions(salarioBaseParaAportes) // ✅ Usar base para aportes
+        employerContributions: this.calculateEmployerContributions(salarioBaseParaAportes), // ✅ Usar base para aportes
+        healthDeduction,
+        pensionDeduction
       };
     } catch (error) {
       console.error('❌ Error en cálculo ALELUYA:', error);
@@ -370,7 +379,9 @@ export class PayrollLiquidationNewService {
         eps: employee.eps || '',
         afp: employee.afp || '',
         transportAllowance: 0,
-        employerContributions: 0
+        employerContributions: 0,
+        healthDeduction: 0,
+        pensionDeduction: 0
       };
     }
   }

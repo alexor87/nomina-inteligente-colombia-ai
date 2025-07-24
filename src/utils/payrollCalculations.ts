@@ -27,7 +27,9 @@ export const calculateEmployee = async (
     transportAllowance: calculation.transportAllowance,
     employerContributions: calculation.employerContributions,
     status: validation.isValid ? 'valid' : 'error',
-    errors: [...validation.errors, ...validation.warnings]
+    errors: [...validation.errors, ...validation.warnings],
+    healthDeduction: calculation.healthDeduction || 0,
+    pensionDeduction: calculation.pensionDeduction || 0
   };
 };
 

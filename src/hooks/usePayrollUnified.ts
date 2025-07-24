@@ -289,7 +289,9 @@ export const usePayrollUnified = (companyId: string) => {
             eps: emp.eps,
             afp: emp.afp,
             transportAllowance: 0,
-            employerContributions: 0
+            employerContributions: 0,
+            healthDeduction: 0,
+            pensionDeduction: 0
           }));
 
           setEmployees(employeesList);
@@ -321,7 +323,9 @@ export const usePayrollUnified = (companyId: string) => {
             eps: emp.eps,
             afp: emp.afp,
             transportAllowance: payroll.auxilio_transporte || 0,
-            employerContributions: 0
+            employerContributions: 0,
+            healthDeduction: payroll.salud_empleado || 0,
+            pensionDeduction: payroll.pension_empleado || 0
           };
         });
 
@@ -399,7 +403,9 @@ export const usePayrollUnified = (companyId: string) => {
         eps: emp.eps,
         afp: emp.afp,
         transportAllowance: 0,
-        employerContributions: 0
+        employerContributions: 0,
+        healthDeduction: 0,
+        pensionDeduction: 0
       }));
 
       setEmployees(prev => [...prev, ...newEmployeesList]);

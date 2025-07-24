@@ -47,6 +47,9 @@ export interface PayrollEmployee {
   ibc?: number;
   // ✅ NUEVO CAMPO: novedades para cálculo de IBC
   novedades?: NovedadForIBC[];
+  // ✅ NUEVOS CAMPOS: Deducciones separadas para persistencia correcta
+  healthDeduction: number;
+  pensionDeduction: number;
 }
 
 export interface PayrollSummary {

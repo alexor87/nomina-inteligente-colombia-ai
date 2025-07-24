@@ -43,7 +43,9 @@ export const usePayrollIntelligentLoad = () => {
     status: 'valid',
     errors: [],
     transportAllowance: dbEmployee.auxilio_transporte,
-    employerContributions: 0
+    employerContributions: 0,
+    healthDeduction: dbEmployee.salud_empleado,
+    pensionDeduction: dbEmployee.pension_empleado
   });
 
   const intelligentLoad = useCallback(async (
