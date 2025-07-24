@@ -492,6 +492,8 @@ export class PayrollLiquidationNewService {
             bonificaciones: employee.bonuses,
             auxilio_transporte: employee.transportAllowance,
             total_devengado: employee.grossPay,
+            salud_empleado: employee.healthDeduction, // ✅ Agregar campo faltante
+            pension_empleado: employee.pensionDeduction, // ✅ Agregar campo faltante
             total_deducciones: employee.deductions,
             neto_pagado: employee.netPay,
             estado: 'procesada',
