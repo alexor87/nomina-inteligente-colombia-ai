@@ -832,7 +832,7 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
   };
 }
 
-// ✅ FUNCIÓN PRINCIPAL ACTUALIZADA: Ahora calcula IBC correctamente
+// ✅ FUNCIÓN PRINCIPAL ACTUALIZADA: Ahora incluye TODAS las novedades en liquidación
 function calculatePayroll(input: PayrollCalculationInput) {
   const config = DEFAULT_CONFIG_2025;
   const horasMensuales = getHorasMensuales(input.periodDate);
@@ -856,7 +856,41 @@ function calculatePayroll(input: PayrollCalculationInput) {
     transportAllowance = Math.round(dailyTransportAllowance * input.workedDays);
   }
 
-  const grossSalary = regularPay + extraPay + input.bonuses;
+  // ✅ NUEVA LÓGICA: Procesar TODAS las novedades para incluirlas en el total final
+  let totalDevengosNovedades = 0;
+  let totalDeduccionesNovedades = 0;
+  
+  if (input.novedades && input.novedades.length > 0) {
+    console.log('📊 [PAYROLL v3.0] Procesando novedades para liquidación:', {
+      cantidad: input.novedades.length,
+      novedades: input.novedades.map(n => ({ tipo: n.tipo_novedad, valor: n.valor }))
+    });
+    
+    input.novedades.forEach(novedad => {
+      const valor = Number(novedad.valor || 0);
+      
+      // Categorizar novedades por tipo para devengos vs deducciones
+      const tiposDevengo = [
+        'horas_extra', 'bonificacion', 'comision', 'prima', 'otros_ingresos',
+        'recargo_nocturno', 'recargo_dominical', 'recargo_festivo'
+      ];
+      
+      const tiposDeduccion = [
+        'incapacidad', 'ausencia', 'libranza', 'retencion_fuente', 
+        'deduccion_especial', 'fondo_solidaridad', 'descuento_nomina'
+      ];
+      
+      if (tiposDevengo.includes(novedad.tipo_novedad)) {
+        totalDevengosNovedades += valor;
+        console.log(`💰 [PAYROLL v3.0] Devengo agregado: ${novedad.tipo_novedad} = $${valor.toLocaleString()}`);
+      } else if (tiposDeduccion.includes(novedad.tipo_novedad)) {
+        totalDeduccionesNovedades += valor;
+        console.log(`📉 [PAYROLL v3.0] Deducción agregada: ${novedad.tipo_novedad} = $${valor.toLocaleString()}`);
+      }
+    });
+  }
+
+  const grossSalary = regularPay + extraPay + input.bonuses + totalDevengosNovedades;
   const grossPay = grossSalary + transportAllowance;
   
   // ✅ CORRECCIÓN CRÍTICA: Para períodos quincenales, usar salario proporcional para IBC
@@ -869,12 +903,22 @@ function calculatePayroll(input: PayrollCalculationInput) {
   // Calcular IBC con salario proporcional para períodos quincenales
   const ibcCalculation = calculateIBC(salarioBaseParaIBC, input.novedades || [], config);
   
-  // ✅ CORREGIDO: Usar IBC para calcular deducciones
+  // ✅ CORREGIDO: Usar IBC para calcular deducciones de seguridad social
   const healthDeduction = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleado);
   const pensionDeduction = Math.round(ibcCalculation.ibcPension * config.porcentajes.pensionEmpleado);
-  const totalDeductions = healthDeduction + pensionDeduction;
+  const totalDeductions = healthDeduction + pensionDeduction + totalDeduccionesNovedades;
 
-  const netPay = grossPay - totalDeductions;
+  // ✅ NUEVA FÓRMULA COMPLETA: Incluye TODAS las novedades en el cálculo final
+  const netPay = grossPay - healthDeduction - pensionDeduction - totalDeduccionesNovedades;
+  
+  console.log('💼 [PAYROLL v3.0] Cálculo final completo:', {
+    grossPay,
+    healthDeduction,
+    pensionDeduction,
+    totalDeduccionesNovedades,
+    netPay,
+    totalDevengosNovedades
+  });
 
   // ✅ CORREGIDO: Aportes patronales también se calculan sobre IBC
   const employerHealth = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleador);
