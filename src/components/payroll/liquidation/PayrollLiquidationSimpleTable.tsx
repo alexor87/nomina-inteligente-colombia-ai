@@ -119,32 +119,33 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           });
 
           // ✅ CORRECCIÓN CRÍTICA: Determinar tipo de período correcto basado en días trabajados
-          const periodType = workedDays <= 15 ? 'quincenal' : 'mensual';
+          const currentWorkedDays = calculateWorkedDays();
+          const periodType = currentWorkedDays <= 15 ? 'quincenal' : 'mensual';
           
           console.log('🎯 Calculando empleado con período correcto:', {
             employee: employee.name,
-            workedDays,
+            workedDays: currentWorkedDays,
             periodType,
             baseSalary: employee.baseSalary
           });
 
-           // ✅ CORRECCIÓN NORMATIVA: Para quincenal, enviar salario proporcional
-          const salarioParaCalculo = periodType === 'quincenal' ? 
-            employee.baseSalary : // Para quincenal, enviar salario mensual completo
-            employee.baseSalary;   // Para mensual, enviar salario completo
+          // ✅ CORRECCIÓN NORMATIVA: Calcular salario proporcional para IBC correcto
+          const salarioBaseParaIBC = periodType === 'quincenal' 
+            ? employee.baseSalary / 2  // Para quincenal: mitad del salario mensual
+            : employee.baseSalary;     // Para mensual: salario completo
 
-          console.log('💰 Enviando al backend:', {
+          console.log('💰 ENVIANDO AL BACKEND - IBC NORMATIVO:', {
             employee: employee.name,
             salarioOriginal: employee.baseSalary,
-            salarioParaCalculo,
+            salarioBaseParaIBC,
             periodType,
             novedadesCount: novedadesForIBC.length
           });
 
-          // Calcular usando el backend con novedades y período correcto
+          // Calcular usando el backend con salario base para IBC correcto
           const calculation = await PayrollCalculationBackendService.calculatePayroll({
-            baseSalary: salarioParaCalculo, // ✅ El edge function hará la división internamente
-            workedDays: workedDays,
+            baseSalary: salarioBaseParaIBC, // ✅ ENVIAR SALARIO PROPORCIONAL AL PERÍODO
+            workedDays: currentWorkedDays,
             extraHours: 0,
             disabilities: 0,
             bonuses: 0,
