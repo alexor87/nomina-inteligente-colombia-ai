@@ -16,11 +16,14 @@ import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { PayrollProgressIndicator } from '@/components/payroll/liquidation/PayrollProgressIndicator';
 import { ReliquidationDialog } from '@/components/payroll/liquidation/ReliquidationDialog';
 import { PayrollValidationService } from '@/services/PayrollValidationService';
+import { PayrollWorldClassControlPanel } from '@/components/payroll/liquidation/PayrollWorldClassControlPanel';
+import { PayrollRecoveryPanel } from '@/components/payroll/recovery/PayrollRecoveryPanel';
 
 const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [showReliquidationDialog, setShowReliquidationDialog] = useState(false);
+  const [showRecoveryPanel, setShowRecoveryPanel] = useState(false);
   const [periodSelected, setPeriodSelected] = useState(false);
   const [periodAlreadyLiquidated, setPeriodAlreadyLiquidated] = useState(false);
   const [validationSummary, setValidationSummary] = useState<any>(null);
@@ -50,7 +53,16 @@ const PayrollLiquidationPageSimplified = () => {
     liquidationStep,
     liquidationProgress,
     processedEmployees,
-    liquidationErrors
+    liquidationErrors,
+    // World-class features
+    useAtomicLiquidation,
+    setUseAtomicLiquidation,
+    useExhaustiveValidation,
+    setUseExhaustiveValidation,
+    exhaustiveValidationResults,
+    isValidating,
+    performExhaustiveValidation,
+    autoRepairValidationIssues
   } = usePayrollLiquidationSimplified(companyId || '');
 
   const {
@@ -166,18 +178,68 @@ const PayrollLiquidationPageSimplified = () => {
         </div>
       </div>
 
+      {/* World-Class Control Panel */}
+      {periodSelected && selectedPeriod && (
+        <PayrollWorldClassControlPanel
+          useAtomicLiquidation={useAtomicLiquidation}
+          setUseAtomicLiquidation={setUseAtomicLiquidation}
+          useExhaustiveValidation={useExhaustiveValidation}
+          setUseExhaustiveValidation={setUseExhaustiveValidation}
+          exhaustiveValidationResults={exhaustiveValidationResults}
+          isValidating={isValidating}
+          onPerformExhaustiveValidation={async () => { await performExhaustiveValidation(); }}
+          onAutoRepairIssues={async () => { await autoRepairValidationIssues(); }}
+          onStartLiquidation={handleLiquidate}
+          canProceedWithLiquidation={canProceedWithLiquidation}
+          showProgress={showProgress}
+          liquidationProgress={liquidationProgress}
+          liquidationStep={liquidationStep}
+        />
+      )}
+
+      {/* Recovery Panel */}
+      {showRecoveryPanel && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg text-orange-800">Diagnóstico y Reparación del Sistema</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowRecoveryPanel(false)}
+                className="text-orange-600"
+              >
+                ✕
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <PayrollRecoveryPanel onClose={() => setShowRecoveryPanel(false)} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* ✅ INFORMACIÓN ARQUITECTÓNICA */}
       <Card className="border-blue-200 bg-blue-50">
         <CardContent className="pt-4">
-          <div className="flex items-center space-x-2">
-            <Calculator className="h-5 w-5 text-blue-600" />
-            <div>
-              <h3 className="font-medium text-blue-800">Módulo de Liquidación Simplificado</h3>
-              <p className="text-blue-700 text-sm">
-                Este módulo usa exclusivamente las novedades como fuente de información. 
-                Las vacaciones/ausencias se sincronizan automáticamente con las novedades.
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Calculator className="h-5 w-5 text-blue-600" />
+              <div>
+                <h3 className="font-medium text-blue-800">Sistema de Liquidación de Clase Mundial</h3>
+                <p className="text-blue-700 text-sm">
+                  Liquidación atómica con validaciones exhaustivas, detección automática de problemas y recuperación inteligente.
+                </p>
+              </div>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowRecoveryPanel(true)}
+              className="border-orange-300 text-orange-700 hover:bg-orange-100"
+            >
+              Diagnóstico y Reparación
+            </Button>
           </div>
         </CardContent>
       </Card>
