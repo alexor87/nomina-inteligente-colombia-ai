@@ -34,8 +34,21 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    const { action, data } = await req.json()
+    const body = await req.json()
+    const { action, data } = body
+    
     console.log(`🚀 Payroll Liquidation Atomic: ${action}`)
+    console.log(`📋 [PAYLOAD DEBUG] Body recibido:`, JSON.stringify(body, null, 2))
+    console.log(`📋 [PAYLOAD DEBUG] Data extraído:`, JSON.stringify(data, null, 2))
+    
+    // Validación crítica del payload
+    if (!action) {
+      throw new Error('Action no especificada en el payload')
+    }
+    
+    if (!data) {
+      throw new Error('Data no especificado en el payload')
+    }
 
     switch (action) {
       case 'validate_pre_liquidation':
@@ -66,7 +79,16 @@ serve(async (req) => {
 async function validatePreLiquidation(supabase: any, data: any) {
   console.log('🔍 VALIDACIÓN PRE-LIQUIDACIÓN:', data)
   
+  // Validación de entrada
+  if (!data) {
+    throw new Error('Datos no proporcionados para validación')
+  }
+  
   const { period_id, company_id } = data
+  
+  if (!period_id || !company_id) {
+    throw new Error('period_id y company_id son requeridos')
+  }
   const issues = []
   let totalEmployees = 0
   let employeesWithIssues = 0
@@ -264,7 +286,18 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
     timestamp: new Date().toISOString()
   });
   
+  // Validación crítica de entrada
+  if (!data) {
+    console.error(`🔍 [EDGE-${edgeTraceId}] ❌ DATOS UNDEFINED`);
+    throw new Error('Datos no proporcionados para liquidación atómica')
+  }
+  
   const { period_id, company_id, validated_employees } = data
+  
+  if (!period_id || !company_id) {
+    console.error(`🔍 [EDGE-${edgeTraceId}] ❌ PARÁMETROS FALTANTES:`, { period_id, company_id });
+    throw new Error('period_id y company_id son requeridos para liquidación')
+  }
   const auditLog = []
   let totalProcessed = 0
   let totalVouchers = 0
@@ -580,7 +613,16 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
 async function repairPeriod(supabase: any, data: any, userId: string) {
   console.log('🔧 REPARANDO PERÍODO:', data)
   
+  // Validación de entrada
+  if (!data) {
+    throw new Error('Datos no proporcionados para reparación')
+  }
+  
   const { period_id, company_id } = data
+  
+  if (!period_id || !company_id) {
+    throw new Error('period_id y company_id son requeridos')
+  }
   const repairLog = []
 
   try {
