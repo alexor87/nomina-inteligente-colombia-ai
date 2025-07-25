@@ -4,42 +4,16 @@ import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
 import { PayrollValidationService } from '@/services/PayrollValidationService';
+import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 
-// Función para calcular días trabajados correctamente según tipo de período
+// MIGRADO: Usar servicio centralizado para cálculo de días trabajados
 const calculateWorkedDaysForPeriod = (startDate: string, endDate: string, tipoPeriodo?: string): number => {
-  // CORRECCIÓN DEFINITIVA: Usar lógica del SimplePeriodService para consistencia total
-  
-  // Para períodos quincenales, SIEMPRE 15 días (ley laboral colombiana)
-  if (tipoPeriodo === 'quincenal') {
-    console.log('📊 DÍAS TRABAJADOS QUINCENAL FIJO:', {
-      startDate,
-      endDate,
-      tipoPeriodo,
-      diasAsignados: 15,
-      motivo: 'Legislación laboral - períodos quincenales = 15 días'
-    });
-    return 15;
-  }
-  
-  // Para períodos semanales, siempre 7 días
-  if (tipoPeriodo === 'semanal') {
-    return 7;
-  }
-  
-  // Para otros tipos, calcular días reales
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const diffTime = end.getTime() - start.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  
-  console.log('📊 DÍAS TRABAJADOS CALCULADOS:', {
-    startDate,
-    endDate,
-    tipoPeriodo: tipoPeriodo || 'mensual',
-    diasCalculados: diffDays
-  });
-  
-  return Math.max(1, diffDays);
+  const period = {
+    tipo_periodo: (tipoPeriodo as 'quincenal' | 'mensual' | 'semanal') || 'mensual',
+    fecha_inicio: startDate,
+    fecha_fin: endDate
+  };
+  return PayrollCalculationService.calculateWorkedDays(period);
 };
 
 // Función de compatibilidad (mantener por compatibilidad hacia atrás)

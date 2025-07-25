@@ -1,96 +1,90 @@
+import { differenceInDays, parseISO } from 'date-fns';
 
+export interface PayrollPeriod {
+  tipo_periodo: 'quincenal' | 'mensual' | 'semanal';
+  fecha_inicio: string;
+  fecha_fin: string;
+}
 
 /**
- * Servicio de cálculo de nómina con jornada legal dinámica según Ley 2101 de 2021
- * DEPRECATED: Usar PayrollCalculationEnhancedService en su lugar
- * Se mantiene por compatibilidad pero redirige al servicio mejorado
+ * Servicio centralizado para cálculos de nómina
+ * FUENTE ÚNICA DE VERDAD para días trabajados
  */
-
-import { PayrollCalculationEnhancedService, PayrollCalculationInputEnhanced, PayrollCalculationResultEnhanced, ValidationResultEnhanced } from './PayrollCalculationEnhancedService';
-
-export interface PayrollCalculationInput extends PayrollCalculationInputEnhanced {
-  // Mantener compatibilidad con la interfaz antigua
-}
-
-export interface PayrollCalculationResult extends PayrollCalculationResultEnhanced {
-  // Mantener compatibilidad con la interfaz antigua
-}
-
-export interface ValidationResult extends ValidationResultEnhanced {
-  // Mantener compatibilidad con la interfaz antigua
-}
-
 export class PayrollCalculationService {
   /**
-   * @deprecated Usar PayrollCalculationEnhancedService.validateEmployee en su lugar
+   * Calcula días trabajados basándose en el tipo de período según legislación colombiana
+   * @param period - Período de nómina con tipo y fechas
+   * @returns Número de días trabajados según el estándar legal
    */
-  static validateEmployee(
-    input: PayrollCalculationInput,
-    eps?: string,
-    afp?: string
-  ): ValidationResult {
-    console.warn('⚠️ PayrollCalculationService.validateEmployee is deprecated. Use PayrollCalculationEnhancedService.validateEmployee instead');
-    return PayrollCalculationEnhancedService.validateEmployee(input, eps, afp);
+  static calculateWorkedDays(period: PayrollPeriod | null): number {
+    if (!period) return 30;
+
+    const { tipo_periodo, fecha_inicio, fecha_fin } = period;
+
+    // LEGISLACIÓN COLOMBIANA: Usar tipo de período como fuente de verdad
+    switch (tipo_periodo) {
+      case 'quincenal':
+        // Los períodos quincenales SIEMPRE son 15 días según legislación
+        console.log('📊 PERÍODO QUINCENAL - ASIGNANDO 15 DÍAS (Legislación Colombiana)');
+        return 15;
+        
+      case 'semanal':
+        // Los períodos semanales SIEMPRE son 7 días
+        console.log('📊 PERÍODO SEMANAL - ASIGNANDO 7 DÍAS');
+        return 7;
+        
+      case 'mensual':
+        // Para períodos mensuales, calcular días reales del mes
+        if (fecha_inicio && fecha_fin) {
+          const startDate = parseISO(fecha_inicio);
+          const endDate = parseISO(fecha_fin);
+          const realDays = differenceInDays(endDate, startDate) + 1;
+          console.log('📊 PERÍODO MENSUAL - CALCULANDO DÍAS REALES:', realDays);
+          return realDays;
+        }
+        return 30; // Fallback para mensual
+        
+      default:
+        console.warn('⚠️ TIPO DE PERÍODO DESCONOCIDO:', tipo_periodo);
+        return 30;
+    }
   }
 
   /**
-   * @deprecated Usar PayrollCalculationEnhancedService.calculatePayroll en su lugar
+   * Calcula días reales del calendario (para información adicional)
+   * @param fecha_inicio - Fecha de inicio del período
+   * @param fecha_fin - Fecha de fin del período
+   * @returns Número de días calendario entre las fechas
    */
-  static async calculatePayroll(input: PayrollCalculationInput): Promise<PayrollCalculationResult> {
-    console.warn('⚠️ PayrollCalculationService.calculatePayroll is deprecated. Use PayrollCalculationEnhancedService.calculatePayroll instead');
+  static calculateRealDays(fecha_inicio: string, fecha_fin: string): number {
+    if (!fecha_inicio || !fecha_fin) return 0;
     
-    // Asegurar que se incluya la fecha del período para cálculos precisos
-    const enhancedInput: PayrollCalculationInputEnhanced = {
-      ...input,
-      periodDate: input.periodDate || new Date()
+    const startDate = parseISO(fecha_inicio);
+    const endDate = parseISO(fecha_fin);
+    return differenceInDays(endDate, startDate) + 1;
+  }
+
+  /**
+   * Obtiene información completa de días para un período
+   * @param period - Período de nómina
+   * @returns Objeto con días legales y días reales
+   */
+  static getDaysInfo(period: PayrollPeriod | null) {
+    if (!period) {
+      return {
+        legalDays: 30,
+        realDays: 30,
+        periodType: 'mensual' as const
+      };
+    }
+
+    const legalDays = this.calculateWorkedDays(period);
+    const realDays = this.calculateRealDays(period.fecha_inicio, period.fecha_fin);
+
+    return {
+      legalDays,
+      realDays,
+      periodType: period.tipo_periodo
     };
-    
-    return await PayrollCalculationEnhancedService.calculatePayroll(enhancedInput);
-  }
-
-  /**
-   * @deprecated Usar PayrollCalculationEnhancedService.calculateBatch en su lugar
-   */
-  static async calculateBatch(inputs: PayrollCalculationInput[]): Promise<PayrollCalculationResult[]> {
-    console.warn('⚠️ PayrollCalculationService.calculateBatch is deprecated. Use PayrollCalculationEnhancedService.calculateBatch instead');
-    
-    const enhancedInputs = inputs.map(input => ({
-      ...input,
-      periodDate: input.periodDate || new Date()
-    }));
-    
-    return await PayrollCalculationEnhancedService.calculateBatch(enhancedInputs);
-  }
-
-  /**
-   * @deprecated Usar PayrollCalculationEnhancedService.getUserConfiguredPeriodicity en su lugar
-   */
-  static async getUserConfiguredPeriodicity(): Promise<'quincenal' | 'mensual' | 'semanal'> {
-    console.warn('⚠️ PayrollCalculationService.getUserConfiguredPeriodicity is deprecated. Use PayrollCalculationEnhancedService.getUserConfiguredPeriodicity instead');
-    return PayrollCalculationEnhancedService.getUserConfiguredPeriodicity();
-  }
-
-  /**
-   * @deprecated Usar PayrollCalculationEnhancedService.getConfigurationInfo en su lugar
-   */
-  static getConfigurationInfo(fecha: Date = new Date()) {
-    console.warn('⚠️ PayrollCalculationService.getConfigurationInfo is deprecated. Use PayrollCalculationEnhancedService.getConfigurationInfo instead');
-    return PayrollCalculationEnhancedService.getConfigurationInfo(fecha);
-  }
-
-  /**
-   * @deprecated This method has been removed. Configuration updates should be done through PayrollCalculationEnhancedService
-   */
-  static updateConfiguration() {
-    console.error('❌ PayrollCalculationService.updateConfiguration has been removed. Use PayrollCalculationEnhancedService for configuration management.');
-    throw new Error('Method removed. Use PayrollCalculationEnhancedService instead.');
   }
 }
-
-// Re-exportar tipos del servicio mejorado para mantener compatibilidad
-export type {
-  PayrollCalculationInputEnhanced,
-  PayrollCalculationResultEnhanced,
-  ValidationResultEnhanced
-} from './PayrollCalculationEnhancedService';
-

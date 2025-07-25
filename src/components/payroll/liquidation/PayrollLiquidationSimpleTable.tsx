@@ -22,6 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { PayrollCalculationBackendService } from '@/services/PayrollCalculationBackendService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
+import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -126,8 +127,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             detalleNoConstitutivas: noConstitutivas.map(n => `${n.tipo_novedad}: $${n.valor}`)
           });
 
-          // ✅ CORRECCIÓN CRÍTICA: Determinar tipo de período correcto basado en días trabajados
-          const currentWorkedDays = calculateWorkedDays();
+          // ✅ CORRECCIÓN CRÍTICA: Usar servicio centralizado para días trabajados
+          const currentWorkedDays = workedDays;
           const periodType = currentWorkedDays <= 15 ? 'quincenal' : 'mensual';
           
           console.log('🎯 Calculando empleado con período correcto:', {
@@ -204,56 +205,30 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     recalculateAllEmployees();
   }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList, updateEmployeeCalculationsInDB]);
 
-  const calculateWorkedDays = () => {
-    if (!startDate || !endDate) return 30;
-    
-    // CORRECCIÓN DEFINITIVA: Para períodos quincenales SIEMPRE usar 15 días
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const startDay = start.getDate();
-    const endDay = end.getDate();
-    const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
-    
-    // DETECTAR PERÍODOS QUINCENALES POR PATRÓN DE FECHAS MÁS FLEXIBLE
-    const isFirstQuincenal = startDay === 1 && sameMonth;
-    const isSecondQuincenal = startDay === 16 && sameMonth;
-    
-    // VERIFICACIÓN ADICIONAL: Si el período empieza en 16, es quincenal independientemente del día final
-    const isDefinitelyQuincenal = startDay === 16;
-    
-    console.log('🔍 ANÁLISIS DE PERÍODO:', {
-      startDate,
-      endDate,
-      startDay,
-      endDay,
-      sameMonth,
-      isFirstQuincenal,
-      isSecondQuincenal,
-      isDefinitelyQuincenal
-    });
-    
-    if (isFirstQuincenal || isSecondQuincenal || isDefinitelyQuincenal) {
-      console.log('📊 PERÍODO QUINCENAL DETECTADO - ASIGNANDO 15 DÍAS:', {
-        motivo: isDefinitelyQuincenal ? 'Inicia día 16' : 'Patrón quincenal detectado',
-        diasAsignados: 15
-      });
-      return 15;
-    }
-    
-    // Para períodos no quincenales, calcular normalmente
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    
-    console.log('📊 PERÍODO NO QUINCENAL - DÍAS CALCULADOS:', {
-      startDate,
-      endDate,
-      diasCalculados: diffDays
-    });
-    
-    return Math.max(1, diffDays);
+  // USAR SERVICIO CENTRALIZADO: Fuente única de verdad para días trabajados
+  // Detectar tipo de período basándose en fechas (lógica mejorada)
+  const start = new Date(startDate);
+  const startDay = start.getDate();
+  const isQuincenal = startDay === 1 || startDay === 16;
+  
+  const periodForCalculation = {
+    tipo_periodo: (isQuincenal ? 'quincenal' : 'mensual') as 'quincenal' | 'mensual',
+    fecha_inicio: startDate,
+    fecha_fin: endDate
   };
-
-  const workedDays = calculateWorkedDays();
+  
+  const daysInfo = PayrollCalculationService.getDaysInfo(periodForCalculation);
+  const workedDays = daysInfo.legalDays;
+  
+  console.log('🎯 SERVICIO CENTRALIZADO - DÍAS TRABAJADOS:', {
+    startDate,
+    endDate,
+    startDay,
+    isQuincenal,
+    periodType: periodForCalculation.tipo_periodo,
+    legalDays: daysInfo.legalDays,
+    realDays: daysInfo.realDays
+  });
 
   // Obtener configuración legal actual
   const getCurrentYearConfig = () => {
