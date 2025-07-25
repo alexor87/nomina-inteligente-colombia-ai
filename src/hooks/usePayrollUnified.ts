@@ -5,6 +5,41 @@ import { useToast } from '@/hooks/use-toast';
 import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
 import { PayrollValidationService } from '@/services/PayrollValidationService';
 
+// Función para calcular días trabajados correctamente para períodos quincenales
+const calculateWorkedDays = (startDate: string, endDate: string): number => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // CORRECCIÓN ESPECIAL PARA PERÍODOS QUINCENALES EN FEBRERO
+  // Según legislación laboral colombiana, los períodos quincenales siempre son de 15 días
+  const startDay = start.getDate();
+  const endDay = end.getDate();
+  const month = start.getMonth();
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  
+  // Si es primera quincena (1-15), siempre 15 días
+  if (startDay === 1 && endDay === 15 && sameMonth) {
+    return 15;
+  }
+  
+  // Si es segunda quincena que inicia en 16, siempre 15 días (incluso en febrero)
+  if (startDay === 16 && sameMonth) {
+    // Para febrero, la segunda quincena va del 16 al 30 (días ficticios) = 15 días
+    if (month === 1) { // Febrero
+      return 15;
+    }
+    // Para otros meses, calcular días reales pero asegurar máximo 15
+    const realDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) + 1;
+    return Math.min(15, Math.max(1, Math.ceil(realDays)));
+  }
+  
+  // Para períodos no quincenales estándar, calcular normalmente
+  const diffTime = end.getTime() - start.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  
+  return Math.max(1, diffDays);
+};
+
 interface PayrollPeriod {
   id: string;
   periodo: string;
@@ -234,13 +269,14 @@ export const usePayrollUnified = (companyId: string) => {
         if (activeEmployees && activeEmployees.length > 0) {
           console.log(`✅ Encontrados ${activeEmployees.length} empleados activos`);
           
+          const workedDays = calculateWorkedDays(startDate, endDate);
           const payrollRecords = activeEmployees.map(emp => ({
             company_id: companyId,
             employee_id: emp.id,
             period_id: period.id,
             periodo: period.periodo,
             salario_base: Number(emp.salario_base) || 0,
-            dias_trabajados: 15,
+            dias_trabajados: workedDays,
             total_devengado: Number(emp.salario_base) || 0,
             total_deducciones: 0,
             neto_pagado: Number(emp.salario_base) || 0,
@@ -276,7 +312,7 @@ export const usePayrollUnified = (companyId: string) => {
             name: `${emp.nombre} ${emp.apellido}`,
             position: emp.cargo || 'Sin cargo',
             baseSalary: Number(emp.salario_base) || 0,
-            workedDays: 15,
+            workedDays: workedDays,
             extraHours: 0,
             disabilities: 0,
             bonuses: 0,
@@ -356,6 +392,9 @@ export const usePayrollUnified = (companyId: string) => {
 
       if (error) throw error;
 
+      // Calcular días trabajados correctamente para el período actual
+      const workedDays = calculateWorkedDays(currentPeriod.fecha_inicio, currentPeriod.fecha_fin);
+      
       // Crear registros en payrolls para persistencia
       const payrollRecords = (newEmployees || []).map(emp => ({
         company_id: companyId,
@@ -363,7 +402,7 @@ export const usePayrollUnified = (companyId: string) => {
         period_id: currentPeriod.id,
         periodo: currentPeriod.periodo,
         salario_base: Number(emp.salario_base) || 0,
-        dias_trabajados: 15,
+        dias_trabajados: workedDays,
         total_devengado: Number(emp.salario_base) || 0,
         total_deducciones: 0,
         neto_pagado: Number(emp.salario_base) || 0,
@@ -390,7 +429,7 @@ export const usePayrollUnified = (companyId: string) => {
         name: `${emp.nombre} ${emp.apellido}`,
         position: emp.cargo || 'Sin cargo',
         baseSalary: Number(emp.salario_base) || 0,
-        workedDays: 15,
+        workedDays: workedDays,
         extraHours: 0,
         disabilities: 0,
         bonuses: 0,
