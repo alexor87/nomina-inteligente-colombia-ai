@@ -13,6 +13,7 @@ import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollCleanupService } from '@/services/PayrollCleanupService';
 import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
+import { PayrollProgressIndicator } from '@/components/payroll/liquidation/PayrollProgressIndicator';
 
 const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -38,7 +39,13 @@ const PayrollLiquidationPageSimplified = () => {
     lastAutoSaveTime,
     isRemovingEmployee,
     canProceedWithLiquidation,
-    isLoadingEmployees
+    isLoadingEmployees,
+    validatePeriod,
+    showProgress,
+    liquidationStep,
+    liquidationProgress,
+    processedEmployees,
+    liquidationErrors
   } = usePayrollLiquidationSimplified(companyId || '');
 
   const {
@@ -64,16 +71,13 @@ const PayrollLiquidationPageSimplified = () => {
   };
 
   const handleLiquidate = async () => {
-    if (!selectedPeriod || employees.length === 0) {
-      return;
-    }
-
-    const confirmMessage = `¿Deseas cerrar este periodo de nómina y generar los comprobantes de pago?\n\nPeríodo: ${selectedPeriod.label}\nEmpleados: ${employees.length}`;
+    if (!selectedPeriod || employees.length === 0) return;
     
-    if (window.confirm(confirmMessage)) {
-      await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
-      await markCurrentPeriodAsLiquidated();
-    }
+    // Validar primero si es necesario
+    await validatePeriod?.(selectedPeriod.startDate, selectedPeriod.endDate);
+    
+    await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
+    await markCurrentPeriodAsLiquidated();
   };
 
   const handleAddEmployees = async (employeeIds: string[]) => {
@@ -210,6 +214,16 @@ const PayrollLiquidationPageSimplified = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Indicador de Progreso */}
+      <PayrollProgressIndicator
+        currentStep={liquidationStep}
+        progress={liquidationProgress}
+        totalEmployees={employees.length}
+        processedEmployees={processedEmployees}
+        errors={liquidationErrors}
+        isVisible={showProgress}
+      />
 
       {/* Modales */}
       <PeriodCleanupDialog
