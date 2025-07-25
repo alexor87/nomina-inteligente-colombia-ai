@@ -35,8 +35,8 @@ export const PayrollHistoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredPeriods = periods.filter(period => {
-    const matchesYear = !yearFilter || new Date(period.fecha_inicio).getFullYear().toString() === yearFilter;
-    const matchesType = !typeFilter || period.tipo_periodo === typeFilter;
+    const matchesYear = !yearFilter || yearFilter === 'all-years' || new Date(period.fecha_inicio).getFullYear().toString() === yearFilter;
+    const matchesType = !typeFilter || typeFilter === 'all-types' || period.tipo_periodo === typeFilter;
     const matchesSearch = !searchQuery || 
       period.periodo.toLowerCase().includes(searchQuery.toLowerCase()) ||
       period.empleados_count.toString().includes(searchQuery);
@@ -140,7 +140,7 @@ export const PayrollHistoryPage = () => {
                   <SelectValue placeholder="Filtrar por año" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los años</SelectItem>
+                  <SelectItem value="all-years">Todos los años</SelectItem>
                   {getAvailableYears().map(year => (
                     <SelectItem key={year} value={year.toString()}>
                       {year}
@@ -154,7 +154,7 @@ export const PayrollHistoryPage = () => {
                   <SelectValue placeholder="Tipo de período" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los tipos</SelectItem>
+                  <SelectItem value="all-types">Todos los tipos</SelectItem>
                   <SelectItem value="mensual">Mensual</SelectItem>
                   <SelectItem value="quincenal">Quincenal</SelectItem>
                   <SelectItem value="semanal">Semanal</SelectItem>
