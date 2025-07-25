@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
-import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
+import { PayrollValidationService } from '@/services/PayrollValidationService';
 
 interface PayrollPeriod {
   id: string;
@@ -482,24 +482,57 @@ export const usePayrollUnified = (companyId: string) => {
 
       console.log('✅ Resultado de integración de vacaciones:', integrationResult);
 
-      // PASO 2: ✅ NUEVO - Consolidar novedades en registros de payrolls
-      console.log('🔄 Consolidando novedades en registros de payrolls...');
-      await PayrollLiquidationService.consolidatePayrollWithNovedades(currentPeriod.id);
-      console.log('✅ Novedades consolidadas exitosamente');
+      // PASO 2: Validación pre-liquidación
+      console.log('🔍 Ejecutando validación pre-liquidación...');
+      const { data: validationData, error: validationError } = await supabase.functions.invoke('payroll-liquidation-atomic', {
+        body: {
+          action: 'validate_pre_liquidation',
+          data: {
+            period_id: currentPeriod.id,
+            company_id: companyId
+          }
+        }
+      });
 
-      // PASO 3: Actualizar estado del período a cerrado
-      await supabase
-        .from('payroll_periods_real')
-        .update({ 
-          estado: 'cerrado',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentPeriod.id);
+      if (validationError || !validationData.success) {
+        throw new Error(`Error en validación: ${validationError?.message || validationData.error || 'Error desconocido'}`);
+      }
+
+      const validation = validationData.validation;
+      
+      // Verificar si hay errores críticos
+      const criticalIssues = validation.issues.filter((issue: any) => issue.severity === 'high');
+      if (criticalIssues.length > 0) {
+        throw new Error(`Validación fallida: ${criticalIssues.map((i: any) => i.message).join(', ')}`);
+      }
+
+      console.log('✅ Validación pre-liquidación completada:', validation.summary);
+
+      // PASO 3: Ejecutar liquidación atómica
+      console.log('💰 Ejecutando liquidación atómica...');
+      const { data: liquidationData, error: liquidationError } = await supabase.functions.invoke('payroll-liquidation-atomic', {
+        body: {
+          action: 'execute_atomic_liquidation',
+          data: {
+            period_id: currentPeriod.id,
+            company_id: companyId,
+            validated_employees: validation.summary.totalEmployees
+          }
+        }
+      });
+
+      if (liquidationError || !liquidationData.success) {
+        throw new Error(`Error en liquidación: ${liquidationError?.message || liquidationData.error || 'Error desconocido'}`);
+      }
+
+      const liquidation = liquidationData.liquidation;
+
+      console.log('✅ LIQUIDACIÓN ATÓMICA COMPLETADA:', liquidation);
 
       toast({
-        title: "✅ Liquidación quincenal completada",
-        description: `Período liquidado con ${integrationResult.processedVacations} ausencias y novedades consolidadas`,
-        variant: "default",
+        title: "✅ Liquidación Exitosa",
+        description: `${liquidation.employees_processed} empleados procesados, ${liquidation.vouchers_generated} vouchers generados`,
+        className: "border-green-200 bg-green-50"
       });
 
     } catch (error) {
