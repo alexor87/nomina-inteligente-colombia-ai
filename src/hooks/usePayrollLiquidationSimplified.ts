@@ -7,6 +7,8 @@ import { PayrollLiquidationService } from '@/services/PayrollLiquidationService'
 import { PayrollValidationService, PayrollValidationResults } from '@/services/PayrollValidationService';
 import { PayrollReopenService } from '@/services/PayrollReopenService';
 import { LiquidationStep } from '@/components/payroll/liquidation/PayrollProgressIndicator';
+import { PayrollAtomicLiquidationService } from '@/services/PayrollAtomicLiquidationService';
+import { PayrollExhaustiveValidationService, ValidationResult } from '@/services/PayrollExhaustiveValidationService';
 
 export const usePayrollLiquidationSimplified = (companyId: string) => {
   const { toast } = useToast();
@@ -15,6 +17,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   
   // ✅ NUEVOS ESTADOS PARA MEJORAS
   const [validationResults, setValidationResults] = useState<PayrollValidationResults | null>(null);
+  const [exhaustiveValidationResults, setExhaustiveValidationResults] = useState<ValidationResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [liquidationStep, setLiquidationStep] = useState<LiquidationStep>('validating');
   const [liquidationProgress, setLiquidationProgress] = useState(0);
@@ -23,6 +26,8 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   const [showProgress, setShowProgress] = useState(false);
   const [autoSendEmails, setAutoSendEmails] = useState(true);
   const [canRollback, setCanRollback] = useState(false);
+  const [useAtomicLiquidation, setUseAtomicLiquidation] = useState(true);
+  const [useExhaustiveValidation, setUseExhaustiveValidation] = useState(true);
 
   const loadEmployees = useCallback(async (
     startDate: string,
@@ -107,6 +112,95 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     }
   }, [payrollHook.employees, payrollHook.currentPeriodId, toast]);
 
+  // ✅ NUEVA FUNCIÓN: Validación exhaustiva
+  const performExhaustiveValidation = useCallback(async () => {
+    if (!payrollHook.currentPeriodId || !companyId) {
+      throw new Error('No hay período o empresa para validar');
+    }
+
+    setIsValidating(true);
+    try {
+      console.log('🔍 Ejecutando validación exhaustiva...');
+      
+      const results = await PayrollExhaustiveValidationService.validateForLiquidation(
+        payrollHook.currentPeriodId,
+        companyId
+      );
+      
+      setExhaustiveValidationResults(results);
+      
+      if (results.canProceed) {
+        toast({
+          title: "✅ Validación Exhaustiva Exitosa",
+          description: `Score: ${results.score}/100 - Listo para liquidar`,
+          className: "border-green-200 bg-green-50"
+        });
+      } else {
+        toast({
+          title: "⚠️ Validación Exhaustiva Falló",
+          description: `Score: ${results.score}/100 - ${results.mustRepair.length} errores críticos`,
+          variant: "destructive"
+        });
+      }
+      
+      return results;
+      
+    } catch (error) {
+      console.error('❌ Error en validación exhaustiva:', error);
+      toast({
+        title: "❌ Error en Validación Exhaustiva",
+        description: "Error al validar el período",
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setIsValidating(false);
+    }
+  }, [payrollHook.currentPeriodId, companyId, toast]);
+
+  // ✅ NUEVA FUNCIÓN: Reparación automática
+  const autoRepairValidationIssues = useCallback(async () => {
+    if (!exhaustiveValidationResults) {
+      throw new Error('No hay resultados de validación para reparar');
+    }
+
+    try {
+      console.log('🔧 Iniciando reparación automática...');
+      
+      const repairResult = await PayrollExhaustiveValidationService.autoRepairIssues(
+        exhaustiveValidationResults
+      );
+      
+      if (repairResult.success) {
+        toast({
+          title: "✅ Reparación Automática Exitosa",
+          description: `Se repararon ${repairResult.repairedCount} problemas`,
+          className: "border-green-200 bg-green-50"
+        });
+        
+        // Re-validar después de la reparación
+        await performExhaustiveValidation();
+      } else {
+        toast({
+          title: "⚠️ Reparación Parcial",
+          description: `Se repararon ${repairResult.repairedCount} de ${exhaustiveValidationResults.mustRepair.length} problemas`,
+          variant: "destructive"
+        });
+      }
+      
+      return repairResult;
+      
+    } catch (error) {
+      console.error('❌ Error en reparación automática:', error);
+      toast({
+        title: "❌ Error en Reparación",
+        description: "No se pudo completar la reparación automática",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  }, [exhaustiveValidationResults, performExhaustiveValidation, toast]);
+
   const liquidatePayroll = useCallback(async (
     startDate: string,
     endDate: string,
@@ -129,6 +223,54 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       setLiquidationErrors([]);
       setProcessedEmployees(0);
       setCanRollback(false);
+
+      // ===== USAR LIQUIDACIÓN ATÓMICA SI ESTÁ HABILITADA =====
+      if (useAtomicLiquidation && payrollHook.currentPeriodId) {
+        console.log(`🔄 [ATOMIC-${simplifiedTraceId}] USANDO LIQUIDACIÓN ATÓMICA`);
+        
+        setLiquidationStep('validating');
+        setLiquidationProgress(20);
+        
+        const atomicResult = await PayrollAtomicLiquidationService.executeLiquidation(
+          payrollHook.currentPeriodId,
+          companyId,
+          'current-user-id', // TODO: Obtener user ID real
+          {
+            generateVouchers: true,
+            sendEmails: autoSendEmails,
+            validateExhaustively: useExhaustiveValidation
+          }
+        );
+
+        if (atomicResult.success) {
+          setLiquidationStep('completed');
+          setLiquidationProgress(100);
+          setProcessedEmployees(atomicResult.employeesProcessed);
+          
+          toast({
+            title: "✅ Liquidación Atómica Completada",
+            description: `${atomicResult.employeesProcessed} empleados procesados con ${atomicResult.vouchersGenerated} comprobantes`,
+            className: "border-green-200 bg-green-50"
+          });
+          
+          setTimeout(() => setShowProgress(false), 3000);
+          return;
+        } else {
+          setLiquidationStep('error');
+          setLiquidationErrors([atomicResult.error || 'Error en liquidación atómica']);
+          
+          toast({
+            title: atomicResult.rollbackPerformed ? "⚠️ Liquidación Falló - Rollback Ejecutado" : "❌ Liquidación Falló",
+            description: atomicResult.error || 'Error desconocido en liquidación atómica',
+            variant: "destructive"
+          });
+          
+          throw new Error(atomicResult.error || 'Error en liquidación atómica');
+        }
+      }
+      
+      // ===== LIQUIDACIÓN TRADICIONAL (FALLBACK) =====
+      console.log(`🔄 [LEGACY-${simplifiedTraceId}] USANDO LIQUIDACIÓN TRADICIONAL`);
       
       // Paso 1: Validación final y verificación de estado
       setLiquidationStep('validating');
@@ -408,6 +550,15 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     showProgress,
     autoSendEmails,
     setAutoSendEmails,
-    canRollback
+    canRollback,
+    
+    // ✅ FUNCIONALIDADES CLASE MUNDIAL
+    performExhaustiveValidation,
+    autoRepairValidationIssues,
+    exhaustiveValidationResults,
+    useAtomicLiquidation,
+    setUseAtomicLiquidation,
+    useExhaustiveValidation,
+    setUseExhaustiveValidation
   };
 };
