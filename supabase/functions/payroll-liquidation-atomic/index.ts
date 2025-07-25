@@ -256,7 +256,13 @@ async function validatePreLiquidation(supabase: any, data: any) {
 }
 
 async function executeAtomicLiquidation(supabase: any, data: any, userId: string) {
-  console.log('💰 EJECUTANDO LIQUIDACIÓN ATÓMICA:', data)
+  // ===== TRAZA TEMPORAL EDGE FUNCTION =====
+  const edgeTraceId = `edge_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  console.log(`🔍 [EDGE-${edgeTraceId}] INICIANDO LIQUIDACIÓN ATÓMICA:`, {
+    data: data,
+    userId: userId,
+    timestamp: new Date().toISOString()
+  });
   
   const { period_id, company_id, validated_employees } = data
   const auditLog = []
@@ -265,16 +271,31 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
 
   try {
     // TRANSACCIÓN ATÓMICA - TODO O NADA
-    auditLog.push({ step: 'start', timestamp: new Date().toISOString(), user_id: userId })
+    auditLog.push({ step: 'start', timestamp: new Date().toISOString(), user_id: userId, trace_id: edgeTraceId })
+    console.log(`🔍 [EDGE-${edgeTraceId}] AUDIT: Inicio de transacción atómica`);
 
     // 1. Obtener período y empleados
-    const { data: period } = await supabase
+    console.log(`🔍 [EDGE-${edgeTraceId}] PASO 1: Cargando datos del período ${period_id}`);
+    
+    const { data: period, error: periodError } = await supabase
       .from('payroll_periods_real')
       .select('*')
       .eq('id', period_id)
       .single()
 
-    const { data: payrolls } = await supabase
+    if (periodError || !period) {
+      console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error cargando período:`, periodError);
+      throw new Error(`Error cargando período: ${periodError?.message || 'Período no encontrado'}`);
+    }
+
+    console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Período cargado:`, {
+      id: period.id,
+      periodo: period.periodo,
+      estado: period.estado,
+      fechas: `${period.fecha_inicio} - ${period.fecha_fin}`
+    });
+
+    const { data: payrolls, error: payrollsError } = await supabase
       .from('payrolls')
       .select(`
         id, employee_id, salario_base,
@@ -282,22 +303,52 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
       `)
       .eq('period_id', period_id)
 
-    const { data: novedades } = await supabase
+    if (payrollsError) {
+      console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error cargando payrolls:`, payrollsError);
+      throw new Error(`Error cargando nóminas: ${payrollsError.message}`);
+    }
+
+    console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Payrolls cargados: ${payrolls?.length || 0} registros`);
+
+    const { data: novedades, error: novedadesError } = await supabase
       .from('payroll_novedades')
       .select('*')
       .eq('periodo_id', period_id)
 
-    auditLog.push({ step: 'data_loaded', timestamp: new Date().toISOString(), employees: payrolls?.length })
+    if (novedadesError) {
+      console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error cargando novedades:`, novedadesError);
+    }
+
+    console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Novedades cargadas: ${novedades?.length || 0} registros`);
+
+    auditLog.push({ 
+      step: 'data_loaded', 
+      timestamp: new Date().toISOString(), 
+      employees: payrolls?.length,
+      novedades: novedades?.length,
+      trace_id: edgeTraceId 
+    });
 
     // 2. Procesar cada empleado con cálculos centralizados
+    console.log(`🔍 [EDGE-${edgeTraceId}] PASO 2: Iniciando procesamiento de ${payrolls?.length || 0} empleados`);
+    
     let totalDevengado = 0
     let totalDeducciones = 0
     let totalNeto = 0
     const processedPayrolls = []
+    let employeeIndex = 0;
 
     for (const payroll of payrolls || []) {
+      employeeIndex++;
       const employee = payroll.employees
       const employeeNovedades = novedades?.filter(n => n.empleado_id === employee.id) || []
+      
+      console.log(`🔍 [EDGE-${edgeTraceId}] Procesando empleado ${employeeIndex}/${payrolls?.length}:`, {
+        id: employee.id,
+        nombre: `${employee.nombre} ${employee.apellido}`,
+        salario_base: employee.salario_base,
+        novedades_count: employeeNovedades.length
+      });
       
       const calculationInput = {
         baseSalary: employee.salario_base,
@@ -316,8 +367,11 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
         }))
       }
 
+      console.log(`🔍 [EDGE-${edgeTraceId}] Input de cálculo para ${employee.nombre}:`, calculationInput);
+
       // Calcular con edge function
-      const { data: calculationResult } = await supabase.functions.invoke(
+      const calcStart = performance.now();
+      const { data: calculationResult, error: calcError } = await supabase.functions.invoke(
         'payroll-calculations',
         {
           body: {
@@ -325,13 +379,30 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
             data: calculationInput
           }
         }
-      )
+      );
+
+      const calcDuration = performance.now() - calcStart;
+      
+      if (calcError) {
+        console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error en cálculo para ${employee.nombre}:`, calcError);
+        throw new Error(`Error calculando empleado ${employee.nombre}: ${calcError.message}`);
+      }
+
+      console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Cálculo completado para ${employee.nombre}:`, {
+        resultado: calculationResult,
+        duracion: `${calcDuration.toFixed(2)}ms`
+      });
 
       if (calculationResult?.success) {
         const calc = calculationResult.data
         
+        console.log(`🔍 [EDGE-${edgeTraceId}] Actualizando payroll para ${employee.nombre}:`, {
+          payroll_id: payroll.id,
+          calculo: calc
+        });
+        
         // Actualizar payroll con valores calculados
-        await supabase
+        const { error: updateError } = await supabase
           .from('payrolls')
           .update({
             total_devengado: calc.grossPay,
@@ -343,6 +414,13 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
             updated_at: new Date().toISOString()
           })
           .eq('id', payroll.id)
+
+        if (updateError) {
+          console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error actualizando payroll para ${employee.nombre}:`, updateError);
+          throw new Error(`Error actualizando nómina de ${employee.nombre}: ${updateError.message}`);
+        }
+
+        console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Payroll actualizado para ${employee.nombre}`);
 
         totalDevengado += calc.grossPay
         totalDeducciones += calc.totalDeductions
@@ -356,13 +434,31 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
         })
         
         totalProcessed++
+      } else {
+        console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Cálculo no exitoso para ${employee.nombre}:`, calculationResult);
+        throw new Error(`Cálculo fallido para empleado ${employee.nombre}`);
       }
     }
 
-    auditLog.push({ step: 'calculations_completed', timestamp: new Date().toISOString(), processed: totalProcessed })
+    console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Cálculos completados. Totales:`, {
+      empleados_procesados: totalProcessed,
+      total_devengado: totalDevengado,
+      total_deducciones: totalDeducciones,
+      total_neto: totalNeto
+    });
+
+    auditLog.push({ 
+      step: 'calculations_completed', 
+      timestamp: new Date().toISOString(), 
+      processed: totalProcessed,
+      totals: { totalDevengado, totalDeducciones, totalNeto },
+      trace_id: edgeTraceId 
+    });
 
     // 3. Actualizar totales del período
-    await supabase
+    console.log(`🔍 [EDGE-${edgeTraceId}] PASO 3: Actualizando totales del período`);
+    
+    const { error: periodUpdateError } = await supabase
       .from('payroll_periods_real')
       .update({
         empleados_count: totalProcessed,
@@ -374,10 +470,26 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
       })
       .eq('id', period_id)
 
-    auditLog.push({ step: 'period_updated', timestamp: new Date().toISOString(), totals: { totalDevengado, totalDeducciones, totalNeto } })
+    if (periodUpdateError) {
+      console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error actualizando período:`, periodUpdateError);
+      throw new Error(`Error actualizando período: ${periodUpdateError.message}`);
+    }
+
+    console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Período actualizado exitosamente`);
+
+    auditLog.push({ 
+      step: 'period_updated', 
+      timestamp: new Date().toISOString(), 
+      totals: { totalDevengado, totalDeducciones, totalNeto },
+      trace_id: edgeTraceId 
+    });
 
     // 4. Generar vouchers automáticamente
+    console.log(`🔍 [EDGE-${edgeTraceId}] PASO 4: Generando ${processedPayrolls.length} vouchers`);
+    
     for (const processed of processedPayrolls) {
+      console.log(`🔍 [EDGE-${edgeTraceId}] Generando voucher para ${processed.employee_name}`);
+      
       const { error: voucherError } = await supabase
         .from('payroll_vouchers')
         .insert({
@@ -393,10 +505,15 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
           created_at: new Date().toISOString()
         })
 
-      if (!voucherError) {
+      if (voucherError) {
+        console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error generando voucher para ${processed.employee_name}:`, voucherError);
+      } else {
+        console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Voucher generado para ${processed.employee_name}`);
         totalVouchers++
       }
     }
+
+    console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Vouchers generados: ${totalVouchers}/${processedPayrolls.length}`);
 
     auditLog.push({ step: 'vouchers_generated', timestamp: new Date().toISOString(), vouchers: totalVouchers })
 

@@ -112,8 +112,19 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     endDate: string,
     isReliquidation = false
   ) => {
+    // ===== TRAZA TEMPORAL SIMPLIFIED =====
+    const simplifiedTraceId = `simplified_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] INICIANDO LIQUIDACIÓN SIMPLIFICADA`, {
+      isReliquidation: isReliquidation,
+      startDate: startDate,
+      endDate: endDate,
+      currentPeriodId: payrollHook.currentPeriodId,
+      companyId: companyId,
+      employeesCount: payrollHook.employees.length,
+      timestamp: new Date().toISOString()
+    });
+
     try {
-      console.log('🔄 Iniciando liquidación mejorada...', { isReliquidation });
       setShowProgress(true);
       setLiquidationErrors([]);
       setProcessedEmployees(0);
@@ -123,25 +134,44 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       setLiquidationStep('validating');
       setLiquidationProgress(10);
       
+      console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] PASO 1: Validación y verificación de estado`);
+      
       if (payrollHook.currentPeriodId && companyId) {
+        const validationStart = performance.now();
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] Ejecutando validación pre-liquidación...`);
+        
         const validation = await PayrollValidationService.validatePreLiquidation(
           payrollHook.currentPeriodId,
           companyId
         );
+        
+        const validationDuration = performance.now() - validationStart;
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] VALIDACIÓN RESPONSE:`, {
+          validation: validation,
+          duracion: `${validationDuration.toFixed(2)}ms`,
+          issuesCount: validation.issues.length
+        });
         
         // Si el período ya está liquidado y no es re-liquidación, lanzar error específico
         const isAlreadyLiquidated = validation.issues.some(
           issue => issue.type === 'period_already_liquidated'
         );
         
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] Estado de liquidación:`, {
+          isAlreadyLiquidated: isAlreadyLiquidated,
+          isReliquidation: isReliquidation
+        });
+        
         if (isAlreadyLiquidated && !isReliquidation) {
+          console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ❌ Período ya liquidado - lanzando error específico`);
           throw new Error('PERIOD_ALREADY_LIQUIDATED');
         }
         
         // Si es re-liquidación, reabrir el período primero
         if (isReliquidation && isAlreadyLiquidated) {
-          console.log('🔄 Re-abriendo período para re-liquidación...');
+          console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] 🔄 Re-abriendo período para re-liquidación...`);
           await PayrollReopenService.reopenPayrollPeriod(payrollHook.currentPeriodId);
+          console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ✅ Período reabierto exitosamente`);
         }
       }
       
@@ -150,7 +180,18 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       // Paso 2: Cálculos
       setLiquidationStep('calculating');
       setLiquidationProgress(25);
+      
+      console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] PASO 2: Ejecutando cálculos principales...`);
+      const calculationStart = performance.now();
+      
       await payrollHook.liquidatePayroll(startDate, endDate);
+      
+      const calculationDuration = performance.now() - calculationStart;
+      console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ✅ Cálculos completados`, {
+        duracion: `${calculationDuration.toFixed(2)}ms`,
+        empleadosProcesados: payrollHook.employees.length
+      });
+      
       setProcessedEmployees(payrollHook.employees.length);
       
       // Paso 3: Generar comprobantes
@@ -208,11 +249,20 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       setTimeout(() => setShowProgress(false), 3000);
       
     } catch (error: any) {
-      console.error('❌ Error en liquidación:', error);
+      console.error(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ❌ ERROR EN LIQUIDACIÓN SIMPLIFICADA:`, {
+        error: error,
+        message: error.message,
+        stack: error.stack,
+        isReliquidation: isReliquidation,
+        currentStep: liquidationStep,
+        currentProgress: liquidationProgress
+      });
+      
       setLiquidationStep('error');
       
       // Manejar error específico de período ya liquidado
       if (error.message === 'PERIOD_ALREADY_LIQUIDATED') {
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ⚠️ Error específico: Período ya liquidado`);
         setLiquidationErrors(prev => [...prev, 'El período ya fue liquidado anteriormente']);
         toast({
           title: "⚠️ Período Ya Liquidado",
@@ -220,6 +270,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
           variant: "destructive"
         });
       } else {
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ❌ Error general en liquidación`);
         setLiquidationErrors(prev => [...prev, 'Error general en liquidación']);
         toast({
           title: "❌ Error en Liquidación",

@@ -493,9 +493,22 @@ export const usePayrollUnified = (companyId: string) => {
 
     setIsLiquidating(true);
     try {
-      console.log('🏖️ Iniciando liquidación quincenal completa...');
+      // ===== TRAZA TEMPORAL: INICIO DE LIQUIDACIÓN =====
+      const traceId = `liquidation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const vacationStart = performance.now();
+      console.log(`🔍 [TRACE-${traceId}] INICIANDO LIQUIDACIÓN COMPLETA`, {
+        periodId: currentPeriod.id,
+        periodo: currentPeriod.periodo,
+        companyId: companyId,
+        startDate: startDate,
+        endDate: endDate,
+        employeesCount: employees.length,
+        timestamp: new Date().toISOString()
+      });
 
       // PASO 1: Procesar todas las vacaciones/ausencias pendientes
+      console.log(`🔍 [TRACE-${traceId}] PASO 1: Integrando vacaciones para período...`, currentPeriod.periodo);
+      
       const integrationResult = await VacationPayrollIntegrationService.processVacationsForPayroll({
         periodId: currentPeriod.id,
         companyId: companyId,
@@ -503,7 +516,11 @@ export const usePayrollUnified = (companyId: string) => {
         endDate: endDate
       });
 
-      console.log('✅ Resultado de integración de vacaciones:', integrationResult);
+      const vacationDuration = performance.now() - vacationStart;
+      console.log(`🔍 [TRACE-${traceId}] ✅ Integración de vacaciones completada`, {
+        resultado: integrationResult,
+        duracion: `${vacationDuration.toFixed(2)}ms`
+      });
 
       // PASO 2: Validación pre-liquidación
       console.log('🔍 Ejecutando validación pre-liquidación...');
@@ -518,6 +535,11 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
       if (validationError || !validationData.success) {
+        console.error(`🔍 [TRACE-${traceId}] ❌ ERROR EN VALIDACIÓN:`, {
+          validationError: validationError,
+          validationData: validationData,
+          success: validationData?.success
+        });
         throw new Error(`Error en validación: ${validationError?.message || validationData.error || 'Error desconocido'}`);
       }
 
@@ -526,13 +548,16 @@ export const usePayrollUnified = (companyId: string) => {
       // Verificar si hay errores críticos
       const criticalIssues = validation.issues.filter((issue: any) => issue.severity === 'high');
       if (criticalIssues.length > 0) {
+        console.error(`🔍 [TRACE-${traceId}] ❌ ISSUES CRÍTICOS ENCONTRADOS:`, criticalIssues);
         throw new Error(`Validación fallida: ${criticalIssues.map((i: any) => i.message).join(', ')}`);
       }
 
-      console.log('✅ Validación pre-liquidación completada:', validation.summary);
+      console.log(`🔍 [TRACE-${traceId}] ✅ Validación pre-liquidación completada:`, validation.summary);
 
       // PASO 3: Ejecutar liquidación atómica
-      console.log('💰 Ejecutando liquidación atómica...');
+      const liquidationStart = performance.now();
+      console.log(`🔍 [TRACE-${traceId}] PASO 3: Ejecutando liquidación atómica...`);
+      
       const { data: liquidationData, error: liquidationError } = await supabase.functions.invoke('payroll-liquidation-atomic', {
         body: {
           action: 'execute_atomic_liquidation',
@@ -544,13 +569,32 @@ export const usePayrollUnified = (companyId: string) => {
         }
       });
 
+      const liquidationDuration = performance.now() - liquidationStart;
+      console.log(`🔍 [TRACE-${traceId}] LIQUIDACIÓN ATÓMICA RESPONSE:`, {
+        success: liquidationData?.success,
+        error: liquidationError,
+        data: liquidationData,
+        duracion: `${liquidationDuration.toFixed(2)}ms`
+      });
+
       if (liquidationError || !liquidationData.success) {
+        console.error(`🔍 [TRACE-${traceId}] ❌ ERROR EN LIQUIDACIÓN ATÓMICA:`, {
+          liquidationError: liquidationError,
+          liquidationData: liquidationData,
+          success: liquidationData?.success
+        });
         throw new Error(`Error en liquidación: ${liquidationError?.message || liquidationData.error || 'Error desconocido'}`);
       }
 
       const liquidation = liquidationData.liquidation;
+      const totalDuration = performance.now() - vacationStart;
 
-      console.log('✅ LIQUIDACIÓN ATÓMICA COMPLETADA:', liquidation);
+      console.log(`🔍 [TRACE-${traceId}] ✅ LIQUIDACIÓN ATÓMICA COMPLETADA:`, {
+        liquidation: liquidation,
+        duracionTotal: `${totalDuration.toFixed(2)}ms`,
+        empleadosProcesados: liquidation.employees_processed,
+        vouchersGenerados: liquidation.vouchers_generated
+      });
 
       toast({
         title: "✅ Liquidación Exitosa",
@@ -558,8 +602,14 @@ export const usePayrollUnified = (companyId: string) => {
         className: "border-green-200 bg-green-50"
       });
 
-    } catch (error) {
-      console.error('❌ Error en liquidación quincenal:', error);
+    } catch (error: any) {
+      console.error(`🔍 [TRACE-ERROR] ❌ ERROR GENERAL EN LIQUIDACIÓN:`, {
+        error: error,
+        message: error?.message,
+        stack: error?.stack,
+        currentPeriod: currentPeriod,
+        employeesCount: employees.length
+      });
       toast({
         title: "❌ Error en liquidación",
         description: "No se pudo completar la liquidación del período",
@@ -567,6 +617,7 @@ export const usePayrollUnified = (companyId: string) => {
       });
     } finally {
       setIsLiquidating(false);
+      console.log(`🔍 [TRACE-FINAL] FINALIZANDO LIQUIDACIÓN - setIsLiquidating(false)`);
     }
   }, [currentPeriod, employees, companyId, toast]);
 
