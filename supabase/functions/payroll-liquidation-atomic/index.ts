@@ -301,22 +301,28 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
 
   // VALIDACIÓN CRÍTICA: Verificar que el usuario tiene acceso a la empresa
   console.log(`🔍 [EDGE-${edgeTraceId}] VALIDANDO ACCESO A EMPRESA: ${company_id}`);
-  const { data: hasAccess, error: accessError } = await supabase.rpc('user_has_access_to_company', {
-    p_user_id: userId,
-    p_company_id: company_id
-  });
+  
+  try {
+    const { data: hasAccess, error: accessError } = await supabase.rpc('user_has_access_to_company', {
+      p_user_id: userId,
+      p_company_id: company_id
+    });
 
-  if (accessError) {
-    console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error validando acceso:`, accessError);
-    throw new Error('Error validando acceso a la empresa')
+    if (accessError) {
+      console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error validando acceso:`, accessError);
+      throw new Error(`Error validando acceso a la empresa: ${accessError.message}`)
+    }
+
+    if (!hasAccess) {
+      console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Usuario no tiene acceso a empresa ${company_id}`);
+      throw new Error('Usuario no tiene acceso a esta empresa')
+    }
+
+    console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Acceso validado para empresa ${company_id}`);
+  } catch (rpcError) {
+    console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error en RPC user_has_access_to_company:`, rpcError);
+    throw new Error(`Error crítico validando acceso: ${rpcError.message}`)
   }
-
-  if (!hasAccess) {
-    console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Usuario no tiene acceso a empresa ${company_id}`);
-    throw new Error('Usuario no tiene acceso a esta empresa')
-  }
-
-  console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Acceso validado para empresa ${company_id}`);
   
   const auditLog = []
   let totalProcessed = 0
