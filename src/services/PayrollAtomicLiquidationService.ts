@@ -263,8 +263,10 @@ export class PayrollAtomicLiquidationService {
           const response = await supabase.functions.invoke('payroll-liquidation-atomic', {
             body: {
               action: 'validate_pre_liquidation',
-              period_id: periodId,
-              company_id: companyId
+              data: {
+                period_id: periodId,
+                company_id: companyId
+              }
             }
           });
           
@@ -402,8 +404,10 @@ export class PayrollAtomicLiquidationService {
         const response = await supabase.functions.invoke('payroll-liquidation-atomic', {
           body: {
             action: 'execute_atomic_liquidation',
-            period_id: periodId,
-            company_id: companyId
+            data: {
+              period_id: periodId,
+              company_id: companyId
+            }
           }
         });
         
