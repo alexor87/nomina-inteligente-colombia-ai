@@ -18,6 +18,8 @@ import { ReliquidationDialog } from '@/components/payroll/liquidation/Reliquidat
 import { PayrollValidationService } from '@/services/PayrollValidationService';
 import { PayrollWorldClassControlPanel } from '@/components/payroll/liquidation/PayrollWorldClassControlPanel';
 import { PayrollRecoveryPanel } from '@/components/payroll/recovery/PayrollRecoveryPanel';
+import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
+import { useNavigate } from 'react-router-dom';
 
 const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -27,6 +29,10 @@ const PayrollLiquidationPageSimplified = () => {
   const [periodSelected, setPeriodSelected] = useState(false);
   const [periodAlreadyLiquidated, setPeriodAlreadyLiquidated] = useState(false);
   const [validationSummary, setValidationSummary] = useState<any>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [liquidationResult, setLiquidationResult] = useState<any>(null);
+  
+  const navigate = useNavigate();
   
   const { companyId } = useCurrentCompany();
   
@@ -112,6 +118,23 @@ const PayrollLiquidationPageSimplified = () => {
       // Si no está liquidado, proceder normalmente
       await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
       await markCurrentPeriodAsLiquidated();
+      
+      // Show success modal with results after successful liquidation
+      setLiquidationResult({
+        periodData: {
+          startDate: selectedPeriod.startDate,
+          endDate: selectedPeriod.endDate,
+          type: 'mensual'
+        },
+        summary: {
+          processedEmployees: employees.length,
+          totalEarned: 0,
+          totalDeductions: 0,
+          netPay: 0,
+          generatedVouchers: employees.length
+        }
+      });
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error en handleLiquidate:', error);
     }
@@ -125,6 +148,23 @@ const PayrollLiquidationPageSimplified = () => {
       await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate, true);
       await markCurrentPeriodAsLiquidated();
       setPeriodAlreadyLiquidated(false);
+      
+      // Show success modal with re-liquidation results
+      setLiquidationResult({
+        periodData: {
+          startDate: selectedPeriod.startDate,
+          endDate: selectedPeriod.endDate,
+          type: 'mensual'
+        },
+        summary: {
+          processedEmployees: employees.length,
+          totalEarned: 0,
+          totalDeductions: 0,
+          netPay: 0,
+          generatedVouchers: employees.length
+        }
+      });
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error en re-liquidación:', error);
     }
@@ -148,6 +188,12 @@ const PayrollLiquidationPageSimplified = () => {
   const handleReset = () => {
     resetSelection();
     setPeriodSelected(false);
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    setLiquidationResult(null);
+    navigate('/app/payroll/history');
   };
 
   return (
@@ -358,6 +404,16 @@ const PayrollLiquidationPageSimplified = () => {
         summary={validationSummary}
         isReliquidating={isLiquidating}
       />
+
+      {/* Success Modal */}
+      {showSuccessModal && liquidationResult && (
+        <PayrollSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleSuccessModalClose}
+          periodData={liquidationResult.periodData}
+          summary={liquidationResult.summary}
+        />
+      )}
     </div>
   );
 };
