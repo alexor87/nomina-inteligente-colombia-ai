@@ -1991,7 +1991,7 @@ export type Database = {
         Returns: undefined
       }
       user_has_access_to_company: {
-        Args: { _user_id: string; _company_id: string }
+        Args: { p_user_id: string; p_company_id: string }
         Returns: boolean
       }
     }
