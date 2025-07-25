@@ -21,6 +21,8 @@ import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import PayrollLiquidationPageSimplified from "./pages/PayrollLiquidationPageSimplified";
 import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
+import { PayrollHistoryPage } from "./pages/PayrollHistoryPage";
+import { PayrollHistoryDetailPage } from "./pages/PayrollHistoryDetailPage";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +48,8 @@ function AppContent() {
           <Route path="employees/create" element={<CreateEmployeeModernPage />} />
           <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
           <Route path="payroll" element={<PayrollLiquidationPageSimplified />} />
+          <Route path="payroll-history" element={<PayrollHistoryPage />} />
+          <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
           <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
