@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -269,7 +269,7 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
   }, []);
 
   // Calculate financial impact
-  const calculateImpact = (employeeId: string, amount: number, type: 'devengo' | 'deduccion'): FinancialImpact => {
+  const calculateImpact = useCallback((employeeId: string, amount: number, type: 'devengo' | 'deduccion'): FinancialImpact => {
     const employee = employees.find(e => e.employee_id === employeeId);
     if (!employee) {
       return {
@@ -304,7 +304,7 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
       employerContributionsImpact,
       totalCostImpact
     };
-  };
+  }, [employees]);
 
   const handleAddAdjustment = () => {
     setAdjustments([...adjustments, {
@@ -340,7 +340,7 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
     setAdjustments(newAdjustments);
   };
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const errors: string[] = [];
 
     for (let i = 0; i < adjustments.length; i++) {
@@ -381,20 +381,19 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
       }
     }
 
-    if (errors.length > 0) {
-      toast({
-        title: "Errores de validación",
-        description: errors.join('. '),
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    return true;
-  };
+    return errors.length === 0;
+  }, [adjustments, existingAdjustments, toast]);
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    const isValid = validateForm();
+    if (!isValid) {
+      toast({
+        title: "Errores de validación",
+        description: "Por favor corrige los errores antes de continuar",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
       setLoading(true);
@@ -461,7 +460,7 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
       }
       return total;
     }, 0);
-  }, [adjustments, employees]);
+  }, [adjustments, calculateImpact]);
 
   if (showPreview) {
     return (
