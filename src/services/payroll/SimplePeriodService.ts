@@ -233,10 +233,17 @@ export class SimplePeriodService {
 
       // Segunda quincena (16-fin de mes)
       const secondStart = new Date(year, month, 16);
-      const secondEnd = new Date(year, month + 1, 0);
+      let secondEnd: Date;
+      
+      // CORRECCIÓN ESPECIAL PARA FEBRERO: usar día 30 ficticio para legislación laboral
+      if (month === 1) { // Febrero
+        secondEnd = new Date(year, month, 30); // Día ficticio para mantener 15 días
+      } else {
+        secondEnd = new Date(year, month + 1, 0); // Último día real del mes
+      }
       
       periods.push({
-        label: `16 - ${secondEnd.getDate()} ${monthNames[month]} ${year}`,
+        label: `16 - ${month === 1 ? '30' : secondEnd.getDate()} ${monthNames[month]} ${year}`,
         startDate: secondStart.toISOString().split('T')[0],
         endDate: secondEnd.toISOString().split('T')[0],
         periodNumber: periodNumber++
