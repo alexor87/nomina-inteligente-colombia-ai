@@ -25,6 +25,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
+import { NovedadType, NOVEDAD_TYPE_LABELS, NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
 
 interface Employee {
   id: string;
@@ -53,24 +54,27 @@ interface AdjustmentModalProProps {
   onSuccess: () => void;
 }
 
-interface ConceptDefinition {
+interface NovedadConceptDefinition {
   id: string;
-  code: string;
+  type: NovedadType;
+  category: 'devengados' | 'deducciones';
   name: string;
-  type: 'devengo' | 'deduccion';
-  category: string;
   description?: string;
-  maxAmount?: number;
+  requiresHours: boolean;
+  requiresDays: boolean;
+  autoCalculation: boolean;
+  constitutiveDefault: boolean;
+  subtipos: string[];
   requiresJustification: boolean;
-  affectsSocialBenefits: boolean;
   requiresApproval: boolean;
 }
 
 interface AdjustmentForm {
   employee_id: string;
-  concept_id: string;
+  concept_type: NovedadType | '';
   concept_name: string;
-  type: 'devengo' | 'deduccion';
+  subtipo: string;
+  category: 'devengados' | 'deducciones' | '';
   amount: number | '';
   observations: string;
   justification: string;
@@ -86,132 +90,50 @@ interface FinancialImpact {
   totalCostImpact: number;
 }
 
-// Catálogo de conceptos predefinidos
-const CONCEPT_CATALOG: ConceptDefinition[] = [
-  // DEVENGOS
-  {
-    id: 'dev_001',
-    code: 'BON_ESP',
-    name: 'Bonificación Especial',
-    type: 'devengo',
-    category: 'Bonificaciones',
-    description: 'Bonificación extraordinaria por desempeño o logros específicos',
-    maxAmount: 2000000,
-    requiresJustification: true,
-    affectsSocialBenefits: true,
-    requiresApproval: true
-  },
-  {
-    id: 'dev_002',
-    code: 'HRS_EXT',
-    name: 'Horas Extras Adicionales',
-    type: 'devengo',
-    category: 'Tiempo Extra',
-    description: 'Horas extras no contempladas en la liquidación original',
-    maxAmount: 500000,
-    requiresJustification: true,
-    affectsSocialBenefits: true,
-    requiresApproval: false
-  },
-  {
-    id: 'dev_003',
-    code: 'AUX_TRA',
-    name: 'Auxilio de Transporte Adicional',
-    type: 'devengo',
-    category: 'Auxilios',
-    description: 'Auxilio de transporte extraordinario',
-    maxAmount: 200000,
-    requiresJustification: false,
-    affectsSocialBenefits: false,
-    requiresApproval: false
-  },
-  {
-    id: 'dev_004',
-    code: 'COM_VEN',
-    name: 'Comisiones por Ventas',
-    type: 'devengo',
-    category: 'Comisiones',
-    description: 'Comisiones variables por cumplimiento de metas',
-    maxAmount: 1000000,
-    requiresJustification: true,
-    affectsSocialBenefits: true,
-    requiresApproval: false
-  },
-  {
-    id: 'dev_005',
-    code: 'REC_SAL',
-    name: 'Reconocimiento Salarial',
-    type: 'devengo',
-    category: 'Reconocimientos',
-    description: 'Ajuste por reconocimiento o corrección salarial',
-    maxAmount: 1500000,
-    requiresJustification: true,
-    affectsSocialBenefits: true,
-    requiresApproval: true
-  },
+// Generate concept catalog from novedades module
+const generateConceptCatalog = (): NovedadConceptDefinition[] => {
+  const concepts: NovedadConceptDefinition[] = [];
   
-  // DEDUCCIONES
-  {
-    id: 'ded_001',
-    code: 'DES_MED',
-    name: 'Descuento Médico',
-    type: 'deduccion',
-    category: 'Salud',
-    description: 'Descuentos por servicios médicos o medicamentos',
-    maxAmount: 300000,
-    requiresJustification: true,
-    affectsSocialBenefits: false,
-    requiresApproval: false
-  },
-  {
-    id: 'ded_002',
-    code: 'DES_AUS',
-    name: 'Descuento por Ausencias',
-    type: 'deduccion',
-    category: 'Tiempo',
-    description: 'Descuento por ausencias no justificadas',
-    maxAmount: 500000,
-    requiresJustification: true,
-    affectsSocialBenefits: true,
-    requiresApproval: false
-  },
-  {
-    id: 'ded_003',
-    code: 'DES_DAN',
-    name: 'Descuento por Daños',
-    type: 'deduccion',
-    category: 'Responsabilidades',
-    description: 'Descuento por daños a equipos o instalaciones',
-    maxAmount: 800000,
-    requiresJustification: true,
-    affectsSocialBenefits: false,
-    requiresApproval: true
-  },
-  {
-    id: 'ded_004',
-    code: 'DES_PRE',
-    name: 'Descuento de Préstamo',
-    type: 'deduccion',
-    category: 'Financiero',
-    description: 'Cuota de préstamo o anticipo de sueldo',
-    maxAmount: 1000000,
-    requiresJustification: false,
-    affectsSocialBenefits: false,
-    requiresApproval: false
-  },
-  {
-    id: 'ded_005',
-    code: 'DES_JUD',
-    name: 'Descuento Judicial',
-    type: 'deduccion',
-    category: 'Legal',
-    description: 'Embargo o descuento por orden judicial',
-    maxAmount: 999999999,
-    requiresJustification: true,
-    affectsSocialBenefits: false,
-    requiresApproval: true
-  }
-];
+  // Process devengados
+  Object.entries(NOVEDAD_CATEGORIES.devengados.types).forEach(([key, config]) => {
+    concepts.push({
+      id: key,
+      type: key as NovedadType,
+      category: 'devengados',
+      name: config.label,
+      description: 'description' in config ? config.description : undefined,
+      requiresHours: config.requiere_horas,
+      requiresDays: config.requiere_dias,
+      autoCalculation: config.auto_calculo,
+      constitutiveDefault: config.constitutivo_default,
+      subtipos: Array.isArray(config.subtipos) ? [...config.subtipos] : [],
+      requiresJustification: ['bonificacion', 'comision', 'prima'].includes(key),
+      requiresApproval: ['bonificacion', 'prima'].includes(key)
+    });
+  });
+  
+  // Process deducciones
+  Object.entries(NOVEDAD_CATEGORIES.deducciones.types).forEach(([key, config]) => {
+    concepts.push({
+      id: key,
+      type: key as NovedadType,
+      category: 'deducciones',
+      name: config.label,
+      description: 'description' in config ? config.description : undefined,
+      requiresHours: config.requiere_horas,
+      requiresDays: config.requiere_dias,
+      autoCalculation: config.auto_calculo,
+      constitutiveDefault: false, // Deducciones no son constitutivas
+      subtipos: Array.isArray(config.subtipos) ? [...config.subtipos] : [],
+      requiresJustification: ['multa', 'ausencia'].includes(key),
+      requiresApproval: ['multa'].includes(key)
+    });
+  });
+  
+  return concepts;
+};
+
+const CONCEPT_CATALOG = generateConceptCatalog();
 
 export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
   isOpen,
@@ -226,9 +148,10 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [adjustments, setAdjustments] = useState<AdjustmentForm[]>([{
     employee_id: '',
-    concept_id: '',
+    concept_type: '',
     concept_name: '',
-    type: 'devengo',
+    subtipo: '',
+    category: '',
     amount: '',
     observations: '',
     justification: ''
@@ -258,18 +181,19 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
 
   // Get concepts by category
   const conceptsByCategory = useMemo(() => {
-    const categories: Record<string, ConceptDefinition[]> = {};
+    const categories: Record<string, NovedadConceptDefinition[]> = {};
     CONCEPT_CATALOG.forEach(concept => {
-      if (!categories[concept.category]) {
-        categories[concept.category] = [];
+      const categoryKey = concept.category === 'devengados' ? 'Devengados' : 'Deducciones';
+      if (!categories[categoryKey]) {
+        categories[categoryKey] = [];
       }
-      categories[concept.category].push(concept);
+      categories[categoryKey].push(concept);
     });
     return categories;
   }, []);
 
   // Calculate financial impact
-  const calculateImpact = useCallback((employeeId: string, amount: number, type: 'devengo' | 'deduccion'): FinancialImpact => {
+  const calculateImpact = useCallback((employeeId: string, amount: number, category: 'devengados' | 'deducciones'): FinancialImpact => {
     const employee = employees.find(e => e.employee_id === employeeId);
     if (!employee) {
       return {
@@ -282,17 +206,17 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
       };
     }
 
-    const adjustmentAmount = type === 'deduccion' ? -Math.abs(amount) : Math.abs(amount);
+    const adjustmentAmount = category === 'deducciones' ? -Math.abs(amount) : Math.abs(amount);
     const originalNetPay = employee.neto_pagado;
     const newNetPay = originalNetPay + adjustmentAmount;
     
     // Calcular impacto en prestaciones sociales (8.33% para cesantías, 8.33% para intereses, 8.33% para primas)
     const socialBenefitsRate = 0.25; // 25% aproximado
-    const socialBenefitsImpact = type === 'devengo' ? amount * socialBenefitsRate : 0;
+    const socialBenefitsImpact = category === 'devengados' ? amount * socialBenefitsRate : 0;
     
     // Calcular impacto en aportes patronales (20.5% aproximado)
     const employerContributionsRate = 0.205;
-    const employerContributionsImpact = type === 'devengo' ? amount * employerContributionsRate : 0;
+    const employerContributionsImpact = category === 'devengados' ? amount * employerContributionsRate : 0;
     
     const totalCostImpact = adjustmentAmount + socialBenefitsImpact + employerContributionsImpact;
 
@@ -309,9 +233,10 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
   const handleAddAdjustment = () => {
     setAdjustments([...adjustments, {
       employee_id: '',
-      concept_id: '',
+      concept_type: '',
       concept_name: '',
-      type: 'devengo',
+      subtipo: '',
+      category: '',
       amount: '',
       observations: '',
       justification: ''
@@ -329,11 +254,12 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
     newAdjustments[index] = { ...newAdjustments[index], [field]: value };
 
     // If concept is changed, update related fields
-    if (field === 'concept_id') {
-      const concept = CONCEPT_CATALOG.find(c => c.id === value);
+    if (field === 'concept_type') {
+      const concept = CONCEPT_CATALOG.find(c => c.type === value);
       if (concept) {
         newAdjustments[index].concept_name = concept.name;
-        newAdjustments[index].type = concept.type;
+        newAdjustments[index].category = concept.category;
+        newAdjustments[index].subtipo = concept.subtipos.length > 0 ? concept.subtipos[0] : '';
       }
     }
 
@@ -345,13 +271,13 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
 
     for (let i = 0; i < adjustments.length; i++) {
       const adjustment = adjustments[i];
-      const concept = CONCEPT_CATALOG.find(c => c.id === adjustment.concept_id);
+      const concept = CONCEPT_CATALOG.find(c => c.type === adjustment.concept_type);
 
       // Required fields
       if (!adjustment.employee_id) {
         errors.push(`Ajuste ${i + 1}: Debe seleccionar un empleado`);
       }
-      if (!adjustment.concept_id) {
+      if (!adjustment.concept_type) {
         errors.push(`Ajuste ${i + 1}: Debe seleccionar un concepto`);
       }
       if (adjustment.amount === '' || adjustment.amount <= 0) {
@@ -359,11 +285,6 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
       }
 
       if (concept && typeof adjustment.amount === 'number') {
-        // Max amount validation
-        if (concept.maxAmount && adjustment.amount > concept.maxAmount) {
-          errors.push(`Ajuste ${i + 1}: El valor no puede exceder ${formatCurrency(concept.maxAmount)}`);
-        }
-
         // Justification required
         if (concept.requiresJustification && !adjustment.justification.trim()) {
           errors.push(`Ajuste ${i + 1}: Este concepto requiere justificación`);
@@ -381,26 +302,27 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
       }
     }
 
-    return errors.length === 0;
+    if (errors.length > 0) {
+      toast({
+        title: "Errores de validación",
+        description: errors.join('. '),
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    return true;
   }, [adjustments, existingAdjustments, toast]);
 
   const handleSubmit = async () => {
-    const isValid = validateForm();
-    if (!isValid) {
-      toast({
-        title: "Errores de validación",
-        description: "Por favor corrige los errores antes de continuar",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       setLoading(true);
 
       for (const adjustment of adjustments) {
-        const concept = CONCEPT_CATALOG.find(c => c.id === adjustment.concept_id);
-        const finalAmount = adjustment.type === 'deduccion' ? -Math.abs(Number(adjustment.amount)) : Number(adjustment.amount);
+        const concept = CONCEPT_CATALOG.find(c => c.type === adjustment.concept_type);
+        const finalAmount = adjustment.category === 'deducciones' ? -Math.abs(Number(adjustment.amount)) : Number(adjustment.amount);
 
         const { error } = await supabase.rpc('create_payroll_adjustment', {
           p_period_id: periodId,
@@ -432,9 +354,10 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
   const handleClose = () => {
     setAdjustments([{
       employee_id: '',
-      concept_id: '',
+      concept_type: '',
       concept_name: '',
-      type: 'devengo',
+      subtipo: '',
+      category: '',
       amount: '',
       observations: '',
       justification: ''
@@ -447,15 +370,15 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
     return employees.find(e => e.employee_id === employeeId);
   };
 
-  const getSelectedConcept = (conceptId: string) => {
-    return CONCEPT_CATALOG.find(c => c.id === conceptId);
+  const getSelectedConcept = (conceptType: NovedadType | '') => {
+    return CONCEPT_CATALOG.find(c => c.type === conceptType);
   };
 
   // Calculate total impact
   const totalImpact = useMemo(() => {
     return adjustments.reduce((total, adjustment) => {
-      if (adjustment.employee_id && typeof adjustment.amount === 'number') {
-        const impact = calculateImpact(adjustment.employee_id, adjustment.amount, adjustment.type);
+      if (adjustment.employee_id && typeof adjustment.amount === 'number' && adjustment.category) {
+        const impact = calculateImpact(adjustment.employee_id, adjustment.amount, adjustment.category);
         return total + impact.totalCostImpact;
       }
       return total;
@@ -502,17 +425,17 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
                 <div className="space-y-4">
                   {adjustments.map((adjustment, index) => {
                     const employee = getEmployeeData(adjustment.employee_id);
-                    const concept = getSelectedConcept(adjustment.concept_id);
-                    const impact = typeof adjustment.amount === 'number' 
-                      ? calculateImpact(adjustment.employee_id, adjustment.amount, adjustment.type)
+                    const concept = getSelectedConcept(adjustment.concept_type);
+                    const impact = typeof adjustment.amount === 'number' && adjustment.category
+                      ? calculateImpact(adjustment.employee_id, adjustment.amount, adjustment.category)
                       : null;
 
                     return (
                       <div key={index} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <h4 className="font-medium">Ajuste {index + 1}</h4>
-                          <Badge variant={adjustment.type === 'devengo' ? 'default' : 'destructive'}>
-                            {adjustment.type === 'devengo' ? 'Devengo' : 'Deducción'}
+                          <Badge variant={adjustment.category === 'devengados' ? 'default' : 'destructive'}>
+                            {adjustment.category === 'devengados' ? 'Devengo' : 'Deducción'}
                           </Badge>
                         </div>
                         
@@ -581,7 +504,7 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
                     <Label className="text-sm">Prestaciones</Label>
                     <p className="text-xl font-bold text-orange-600">
                       {formatCurrency(adjustments.reduce((total, adj) => {
-                        if (typeof adj.amount === 'number' && adj.type === 'devengo') {
+                        if (typeof adj.amount === 'number' && adj.category === 'devengados') {
                           return total + (adj.amount * 0.25);
                         }
                         return total;
@@ -592,7 +515,7 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
                     <Label className="text-sm">Aportes Patronales</Label>
                     <p className="text-xl font-bold text-blue-600">
                       {formatCurrency(adjustments.reduce((total, adj) => {
-                        if (typeof adj.amount === 'number' && adj.type === 'devengo') {
+                        if (typeof adj.amount === 'number' && adj.category === 'devengados') {
                           return total + (adj.amount * 0.205);
                         }
                         return total;
@@ -632,9 +555,9 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
           <div className="lg:col-span-2 space-y-6">
             {adjustments.map((adjustment, index) => {
               const selectedEmployee = getEmployeeData(adjustment.employee_id);
-              const selectedConcept = getSelectedConcept(adjustment.concept_id);
-              const impact = selectedEmployee && typeof adjustment.amount === 'number' 
-                ? calculateImpact(adjustment.employee_id, adjustment.amount, adjustment.type)
+              const selectedConcept = getSelectedConcept(adjustment.concept_type);
+              const impact = selectedEmployee && typeof adjustment.amount === 'number' && adjustment.category
+                ? calculateImpact(adjustment.employee_id, adjustment.amount, adjustment.category)
                 : null;
 
               return (
@@ -643,14 +566,14 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg flex items-center gap-2">
                         Ajuste {index + 1}
-                        {adjustment.type && (
-                          <Badge variant={adjustment.type === 'devengo' ? 'default' : 'destructive'}>
-                            {adjustment.type === 'devengo' ? (
+                        {adjustment.category && (
+                          <Badge variant={adjustment.category === 'devengados' ? 'default' : 'destructive'}>
+                            {adjustment.category === 'devengados' ? (
                               <TrendingUp className="h-3 w-3 mr-1" />
                             ) : (
                               <TrendingDown className="h-3 w-3 mr-1" />
                             )}
-                            {adjustment.type === 'devengo' ? 'Devengo' : 'Deducción'}
+                            {adjustment.category === 'devengados' ? 'Devengo' : 'Deducción'}
                           </Badge>
                         )}
                       </CardTitle>
@@ -694,8 +617,8 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
                     <div className="space-y-2">
                       <Label htmlFor={`concept-${index}`}>Concepto *</Label>
                       <Select 
-                        value={adjustment.concept_id} 
-                        onValueChange={(value) => handleAdjustmentChange(index, 'concept_id', value)}
+                        value={adjustment.concept_type} 
+                        onValueChange={(value) => handleAdjustmentChange(index, 'concept_type', value as NovedadType)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona un concepto" />
@@ -707,9 +630,9 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
                                 {category}
                               </div>
                               {concepts.map((concept) => (
-                                <SelectItem key={concept.id} value={concept.id}>
+                                <SelectItem key={concept.id} value={concept.type}>
                                   <div className="flex items-center gap-2">
-                                    {concept.type === 'devengo' ? (
+                                    {concept.category === 'devengados' ? (
                                       <TrendingUp className="h-3 w-3 text-green-600" />
                                     ) : (
                                       <TrendingDown className="h-3 w-3 text-red-600" />
@@ -728,12 +651,31 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
                       {selectedConcept && (
                         <div className="text-xs text-muted-foreground">
                           {selectedConcept.description}
-                          {selectedConcept.maxAmount && (
-                            <span className="block">Valor máximo: {formatCurrency(selectedConcept.maxAmount)}</span>
-                          )}
                         </div>
                       )}
                     </div>
+
+                    {/* Subtipo selection */}
+                    {selectedConcept && selectedConcept.subtipos.length > 0 && (
+                      <div className="space-y-2">
+                        <Label htmlFor={`subtipo-${index}`}>Subtipo</Label>
+                        <Select 
+                          value={adjustment.subtipo} 
+                          onValueChange={(value) => handleAdjustmentChange(index, 'subtipo', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un subtipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {selectedConcept.subtipos.map((subtipo) => (
+                              <SelectItem key={subtipo} value={subtipo}>
+                                {subtipo.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
                     {/* Amount */}
                     <div className="space-y-2">
