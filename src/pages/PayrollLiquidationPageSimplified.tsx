@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Settings } from 'lucide-react';
+import { Calculator, Users, Settings, RotateCcw } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
@@ -14,11 +14,16 @@ import { PayrollCleanupService } from '@/services/PayrollCleanupService';
 import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { PayrollProgressIndicator } from '@/components/payroll/liquidation/PayrollProgressIndicator';
+import { ReliquidationDialog } from '@/components/payroll/liquidation/ReliquidationDialog';
+import { PayrollValidationService } from '@/services/PayrollValidationService';
 
 const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  const [showReliquidationDialog, setShowReliquidationDialog] = useState(false);
   const [periodSelected, setPeriodSelected] = useState(false);
+  const [periodAlreadyLiquidated, setPeriodAlreadyLiquidated] = useState(false);
+  const [validationSummary, setValidationSummary] = useState<any>(null);
   
   const { companyId } = useCurrentCompany();
   
@@ -71,13 +76,52 @@ const PayrollLiquidationPageSimplified = () => {
   };
 
   const handleLiquidate = async () => {
-    if (!selectedPeriod || employees.length === 0) return;
+    if (!selectedPeriod || employees.length === 0 || !currentPeriodId || !companyId) return;
     
-    // Validar primero si es necesario
-    await validatePeriod?.(selectedPeriod.startDate, selectedPeriod.endDate);
+    try {
+      // Validar período antes de liquidar
+      const validation = await PayrollValidationService.validatePreLiquidation(
+        currentPeriodId,
+        companyId
+      );
+      
+      // Verificar si el período ya está liquidado
+      const isAlreadyLiquidated = validation.issues.some(
+        issue => issue.type === 'period_already_liquidated'
+      );
+      
+      if (isAlreadyLiquidated) {
+        setValidationSummary(validation.summary);
+        setShowReliquidationDialog(true);
+        setPeriodAlreadyLiquidated(true);
+        return;
+      }
+      
+      // Si no está liquidado, proceder normalmente
+      await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
+      await markCurrentPeriodAsLiquidated();
+    } catch (error) {
+      console.error('Error en handleLiquidate:', error);
+    }
+  };
+
+  const handleReliquidate = async () => {
+    if (!selectedPeriod || !currentPeriodId) return;
     
-    await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
-    await markCurrentPeriodAsLiquidated();
+    try {
+      setShowReliquidationDialog(false);
+      await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate, true);
+      await markCurrentPeriodAsLiquidated();
+      setPeriodAlreadyLiquidated(false);
+    } catch (error) {
+      console.error('Error en re-liquidación:', error);
+    }
+  };
+
+  const handleViewResults = () => {
+    setShowReliquidationDialog(false);
+    // TODO: Implementar navegación a vista de resultados
+    console.log('Ver resultados de liquidación...');
   };
 
   const handleAddEmployees = async (employeeIds: string[]) => {
@@ -193,9 +237,10 @@ const PayrollLiquidationPageSimplified = () => {
                 <Button 
                   onClick={handleLiquidate}
                   disabled={isLiquidating || !canProceedWithLiquidation || isRemovingEmployee}
-                  className="bg-green-600 hover:bg-green-700"
+                  className={periodAlreadyLiquidated ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700"}
                 >
-                  {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
+                  {isLiquidating ? 'Liquidando...' : periodAlreadyLiquidated ? 'Re-liquidar' : 'Liquidar Nómina'}
+                  {periodAlreadyLiquidated && <RotateCcw className="h-4 w-4 ml-2" />}
                 </Button>
               </div>
             </div>
@@ -240,6 +285,16 @@ const PayrollLiquidationPageSimplified = () => {
         onAddEmployees={handleAddEmployees}
         currentEmployeeIds={employees.map(emp => emp.id)}
         companyId={companyId || ''}
+      />
+
+      <ReliquidationDialog
+        isOpen={showReliquidationDialog}
+        onClose={() => setShowReliquidationDialog(false)}
+        onViewResults={handleViewResults}
+        onReliquidate={handleReliquidate}
+        periodName={selectedPeriod?.label || ''}
+        summary={validationSummary}
+        isReliquidating={isLiquidating}
       />
     </div>
   );

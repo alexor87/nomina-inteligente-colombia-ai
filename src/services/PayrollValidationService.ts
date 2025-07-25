@@ -1,3 +1,4 @@
+import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
 import { ValidationIssue } from '@/components/payroll/liquidation/PayrollValidationAlert';
 
@@ -101,19 +102,83 @@ export class PayrollValidationService {
       
       const issues: PreLiquidationValidation['issues'] = [];
       
-      // Simulación de validaciones básicas
-      const mockSummary = {
-        totalEmployees: 10,
-        employeesWithIssues: 0,
-        totalDevengado: 15000000,
-        totalDeducciones: 3000000,
-        totalNeto: 12000000
-      };
+      // Verificar estado del período
+      const { data: period, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (periodError) {
+        issues.push({
+          type: 'period_not_found',
+          description: 'No se encontró el período de nómina',
+          severity: 'high',
+          autoRepairable: false
+        });
+      } else if (period) {
+        // Verificar si el período ya está cerrado/liquidado
+        if (period.estado === 'cerrado') {
+          issues.push({
+            type: 'period_already_liquidated',
+            description: `El período ${period.periodo} ya fue liquidado. Puede ver los resultados o re-liquidar si es necesario.`,
+            severity: 'high',
+            autoRepairable: true
+          });
+        }
+
+        // Verificar si hay empleados en el período
+        const { data: payrolls, error: payrollsError } = await supabase
+          .from('payrolls')
+          .select('*')
+          .eq('period_id', periodId);
+
+        if (payrollsError) {
+          issues.push({
+            type: 'payrolls_error',
+            description: 'Error al verificar empleados del período',
+            severity: 'medium',
+            autoRepairable: false
+          });
+        } else if (!payrolls || payrolls.length === 0) {
+          issues.push({
+            type: 'no_employees',
+            description: 'No hay empleados cargados en este período',
+            severity: 'high',
+            autoRepairable: false
+          });
+        }
+
+        // Calcular resumen real
+        const totalEmployees = payrolls?.length || 0;
+        const totalDevengado = payrolls?.reduce((sum, p) => sum + (p.total_devengado || 0), 0) || 0;
+        const totalDeducciones = payrolls?.reduce((sum, p) => sum + (p.total_deducciones || 0), 0) || 0;
+        const totalNeto = payrolls?.reduce((sum, p) => sum + (p.neto_pagado || 0), 0) || 0;
+
+        return {
+          isValid: issues.filter(i => i.severity === 'high').length === 0,
+          issues,
+          summary: {
+            totalEmployees,
+            employeesWithIssues: 0,
+            totalDevengado,
+            totalDeducciones,
+            totalNeto
+          }
+        };
+      }
 
       return {
-        isValid: issues.length === 0,
+        isValid: false,
         issues,
-        summary: mockSummary
+        summary: {
+          totalEmployees: 0,
+          employeesWithIssues: 0,
+          totalDevengado: 0,
+          totalDeducciones: 0,
+          totalNeto: 0
+        }
       };
     } catch (error) {
       console.error('Error en validatePreLiquidation:', error);

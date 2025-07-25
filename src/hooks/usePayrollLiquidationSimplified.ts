@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { HistoryServiceAleluya } from '@/services/HistoryServiceAleluya';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { PayrollValidationService, PayrollValidationResults } from '@/services/PayrollValidationService';
+import { PayrollReopenService } from '@/services/PayrollReopenService';
 import { LiquidationStep } from '@/components/payroll/liquidation/PayrollProgressIndicator';
 
 export const usePayrollLiquidationSimplified = (companyId: string) => {
@@ -108,18 +109,42 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
 
   const liquidatePayroll = useCallback(async (
     startDate: string,
-    endDate: string
+    endDate: string,
+    isReliquidation = false
   ) => {
     try {
-      console.log('🔄 Iniciando liquidación mejorada...');
+      console.log('🔄 Iniciando liquidación mejorada...', { isReliquidation });
       setShowProgress(true);
       setLiquidationErrors([]);
       setProcessedEmployees(0);
       setCanRollback(false);
       
-      // Paso 1: Validación final
+      // Paso 1: Validación final y verificación de estado
       setLiquidationStep('validating');
       setLiquidationProgress(10);
+      
+      if (payrollHook.currentPeriodId && companyId) {
+        const validation = await PayrollValidationService.validatePreLiquidation(
+          payrollHook.currentPeriodId,
+          companyId
+        );
+        
+        // Si el período ya está liquidado y no es re-liquidación, lanzar error específico
+        const isAlreadyLiquidated = validation.issues.some(
+          issue => issue.type === 'period_already_liquidated'
+        );
+        
+        if (isAlreadyLiquidated && !isReliquidation) {
+          throw new Error('PERIOD_ALREADY_LIQUIDATED');
+        }
+        
+        // Si es re-liquidación, reabrir el período primero
+        if (isReliquidation && isAlreadyLiquidated) {
+          console.log('🔄 Re-abriendo período para re-liquidación...');
+          await PayrollReopenService.reopenPayrollPeriod(payrollHook.currentPeriodId);
+        }
+      }
+      
       await new Promise(resolve => setTimeout(resolve, 500)); // UX delay
       
       // Paso 2: Cálculos
@@ -182,20 +207,30 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       // Ocultar progreso después de 3 segundos
       setTimeout(() => setShowProgress(false), 3000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error en liquidación:', error);
       setLiquidationStep('error');
-      setLiquidationErrors(prev => [...prev, 'Error general en liquidación']);
       
-      toast({
-        title: "❌ Error en Liquidación",
-        description: "Error al liquidar nómina",
-        variant: "destructive"
-      });
+      // Manejar error específico de período ya liquidado
+      if (error.message === 'PERIOD_ALREADY_LIQUIDATED') {
+        setLiquidationErrors(prev => [...prev, 'El período ya fue liquidado anteriormente']);
+        toast({
+          title: "⚠️ Período Ya Liquidado",
+          description: "Este período ya fue liquidado. Use la opción de re-liquidar si es necesario.",
+          variant: "destructive"
+        });
+      } else {
+        setLiquidationErrors(prev => [...prev, 'Error general en liquidación']);
+        toast({
+          title: "❌ Error en Liquidación",
+          description: "Error al liquidar nómina",
+          variant: "destructive"
+        });
+      }
       
       throw error;
     }
-  }, [payrollHook, toast, autoSendEmails]);
+  }, [payrollHook, toast, autoSendEmails, companyId]);
 
   // ✅ NUEVA FUNCIÓN: Rollback de liquidación
   const rollbackLiquidation = useCallback(async () => {
