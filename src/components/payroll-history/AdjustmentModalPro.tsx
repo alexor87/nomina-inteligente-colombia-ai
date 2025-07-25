@@ -159,6 +159,9 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
 
   // Existing adjustments for validation
   const [existingAdjustments, setExistingAdjustments] = useState<any[]>([]);
+  
+  // Separate form validation state
+  const [isFormValid, setIsFormValid] = useState(false);
 
   // Load existing adjustments for duplicate validation
   useEffect(() => {
@@ -166,6 +169,41 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
       loadExistingAdjustments();
     }
   }, [isOpen, periodId]);
+
+  // Update form validation state when adjustments or existing adjustments change
+  useEffect(() => {
+    const checkFormValidity = () => {
+      for (let i = 0; i < adjustments.length; i++) {
+        const adjustment = adjustments[i];
+        const concept = CONCEPT_CATALOG.find(c => c.type === adjustment.concept_type);
+
+        // Required fields
+        if (!adjustment.employee_id || !adjustment.concept_type || adjustment.amount === '' || adjustment.amount <= 0) {
+          return false;
+        }
+
+        if (concept && typeof adjustment.amount === 'number') {
+          // Justification required
+          if (concept.requiresJustification && !adjustment.justification.trim()) {
+            return false;
+          }
+
+          // Check for duplicates
+          const duplicateExists = existingAdjustments.some(existing => 
+            existing.employee_id === adjustment.employee_id && 
+            existing.concept === concept.name
+          );
+          
+          if (duplicateExists) {
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    setIsFormValid(checkFormValidity());
+  }, [adjustments, existingAdjustments]);
 
   const loadExistingAdjustments = async () => {
     try {
@@ -878,13 +916,13 @@ export const AdjustmentModalPro: React.FC<AdjustmentModalProProps> = ({
           <Button 
             variant="outline" 
             onClick={() => setShowPreview(true)} 
-            disabled={!validateForm()}
+            disabled={!isFormValid}
             className="flex items-center gap-2"
           >
             <Eye className="h-4 w-4" />
             Vista previa
           </Button>
-          <Button onClick={handleSubmit} disabled={loading || !validateForm()}>
+          <Button onClick={handleSubmit} disabled={loading || !isFormValid}>
             {loading ? 'Guardando...' : 'Registrar ajustes'}
           </Button>
         </div>
