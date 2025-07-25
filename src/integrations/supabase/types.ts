@@ -1824,6 +1824,14 @@ export type Database = {
         }
         Returns: number
       }
+      calculate_worked_days_for_period: {
+        Args: {
+          p_tipo_periodo: string
+          p_fecha_inicio: string
+          p_fecha_fin: string
+        }
+        Returns: number
+      }
       can_manage_company_users: {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
@@ -1965,6 +1973,10 @@ export type Database = {
       is_support_user: {
         Args: { _user_id?: string }
         Returns: boolean
+      }
+      normalize_biweekly_period_labels: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       sync_existing_vacation_data: {
         Args: Record<PropertyKey, never>

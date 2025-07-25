@@ -5,39 +5,46 @@ import { useToast } from '@/hooks/use-toast';
 import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
 import { PayrollValidationService } from '@/services/PayrollValidationService';
 
-// Función para calcular días trabajados correctamente para períodos quincenales
-const calculateWorkedDays = (startDate: string, endDate: string): number => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+// Función para calcular días trabajados correctamente según tipo de período
+const calculateWorkedDaysForPeriod = (startDate: string, endDate: string, tipoPeriodo?: string): number => {
+  // CORRECCIÓN DEFINITIVA: Usar lógica del SimplePeriodService para consistencia total
   
-  // CORRECCIÓN ESPECIAL PARA PERÍODOS QUINCENALES EN FEBRERO
-  // Según legislación laboral colombiana, los períodos quincenales siempre son de 15 días
-  const startDay = start.getDate();
-  const endDay = end.getDate();
-  const month = start.getMonth();
-  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
-  
-  // Si es primera quincena (1-15), siempre 15 días
-  if (startDay === 1 && endDay === 15 && sameMonth) {
+  // Para períodos quincenales, SIEMPRE 15 días (ley laboral colombiana)
+  if (tipoPeriodo === 'quincenal') {
+    console.log('📊 DÍAS TRABAJADOS QUINCENAL FIJO:', {
+      startDate,
+      endDate,
+      tipoPeriodo,
+      diasAsignados: 15,
+      motivo: 'Legislación laboral - períodos quincenales = 15 días'
+    });
     return 15;
   }
   
-  // Si es segunda quincena que inicia en 16, siempre 15 días (incluso en febrero)
-  if (startDay === 16 && sameMonth) {
-    // Para febrero, la segunda quincena va del 16 al 30 (días ficticios) = 15 días
-    if (month === 1) { // Febrero
-      return 15;
-    }
-    // Para otros meses, calcular días reales pero asegurar máximo 15
-    const realDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) + 1;
-    return Math.min(15, Math.max(1, Math.ceil(realDays)));
+  // Para períodos semanales, siempre 7 días
+  if (tipoPeriodo === 'semanal') {
+    return 7;
   }
   
-  // Para períodos no quincenales estándar, calcular normalmente
+  // Para otros tipos, calcular días reales
+  const start = new Date(startDate);
+  const end = new Date(endDate);
   const diffTime = end.getTime() - start.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   
+  console.log('📊 DÍAS TRABAJADOS CALCULADOS:', {
+    startDate,
+    endDate,
+    tipoPeriodo: tipoPeriodo || 'mensual',
+    diasCalculados: diffDays
+  });
+  
   return Math.max(1, diffDays);
+};
+
+// Función de compatibilidad (mantener por compatibilidad hacia atrás)
+const calculateWorkedDays = (startDate: string, endDate: string): number => {
+  return calculateWorkedDaysForPeriod(startDate, endDate, 'quincenal');
 };
 
 interface PayrollPeriod {
