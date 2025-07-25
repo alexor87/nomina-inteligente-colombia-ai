@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { DeductionCalculationService } from './DeductionCalculationService';
-import { HistoryServiceAleluya } from './HistoryServiceAleluya';
+
 
 export class PeriodRepairService {
   /**
@@ -111,8 +111,20 @@ export class PeriodRepairService {
         }
       }
 
-      // ✅ CORREGIDO: Usar HistoryServiceAleluya para actualizar totales
-      await HistoryServiceAleluya.updatePeriodTotals(periodId);
+      // ✅ CORREGIDO: Actualizar totales del período (sin servicio de historial)
+      const totalDevengado = updates.reduce((sum, update) => sum + (update.neto_pagado + update.total_deducciones), 0);
+      const totalDeducciones = updates.reduce((sum, update) => sum + update.total_deducciones, 0);
+      const netoPagado = updates.reduce((sum, update) => sum + update.neto_pagado, 0);
+
+      await supabase
+        .from('payroll_periods_real')
+        .update({
+          total_devengado: totalDevengado,
+          total_deducciones: totalDeducciones,
+          neto_pagado: netoPagado,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId);
 
       console.log(`✅ PERÍODO REPARADO EXITOSAMENTE: ${period.periodo}`);
 

@@ -41,12 +41,6 @@ export const QuickActions: React.FC = () => {
       color: 'bg-orange-600 hover:bg-orange-700',
     },
     {
-      title: 'Historial',
-      icon: <FileText className="h-5 w-5" />,
-      action: () => navigate('/app/payroll-history'),
-      color: 'bg-teal-600 hover:bg-teal-700',
-    },
-    {
       title: 'Configuración',
       icon: <Settings className="h-5 w-5" />,
       action: () => navigate('/app/settings'),

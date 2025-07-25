@@ -23,7 +23,6 @@ const navigation = [
   { name: 'Empleados', href: '/app/employees', icon: Users, module: 'employees' },
   { name: 'Liquidar Nómina', href: '/app/payroll', icon: Calculator, module: 'payroll' },
   { name: 'Vacaciones y Ausencias', href: '/app/vacations-absences', icon: Calendar, module: 'vacations-absences' },
-  { name: 'Historial Nómina', href: '/app/payroll-history', icon: History, module: 'payroll-history' },
   { name: 'Reportes', href: '/app/reports', icon: BarChart3, module: 'reports' },
   { name: 'Configuración', href: '/app/settings', icon: Settings, module: 'settings' },
 ];

@@ -95,7 +95,7 @@ const PayrollLiquidationPage = () => {
 
   const handleSuccessModalClose = () => {
     closeSuccessModal();
-    navigate('/app/payroll-history');
+    navigate('/app/dashboard');
   };
 
   return (

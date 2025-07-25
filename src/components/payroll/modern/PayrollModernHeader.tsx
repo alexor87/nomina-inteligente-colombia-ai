@@ -30,12 +30,6 @@ export const PayrollModernHeader = ({
             </h1>
           </div>
 
-          <Button
-            variant="outline"
-            onClick={() => window.location.href = '/app/payroll-history'}
-          >
-            Historial de períodos
-          </Button>
         </div>
       </div>
     </div>

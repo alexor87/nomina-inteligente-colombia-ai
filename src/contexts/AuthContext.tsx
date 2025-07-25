@@ -45,12 +45,12 @@ export const useAuth = () => {
   return context;
 };
 
-// Matriz de permisos por rol - ACTUALIZADA con vacations-absences
+// Matriz de permisos por rol - ACTUALIZADA sin historial
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
-  administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences'],
-  rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
-  contador: ['dashboard', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
-  visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
+  administrador: ['dashboard', 'employees', 'payroll', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences'],
+  rrhh: ['dashboard', 'employees', 'vouchers', 'reports', 'vacations-absences'],
+  contador: ['dashboard', 'vouchers', 'reports', 'vacations-absences'],
+  visualizador: ['dashboard', 'vouchers', 'reports', 'vacations-absences'],
   soporte: ['dashboard', 'reports', 'employees']
 };
 

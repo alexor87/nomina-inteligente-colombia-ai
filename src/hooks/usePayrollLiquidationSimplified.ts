@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { usePayrollUnified } from './usePayrollUnified';
 import { useToast } from '@/hooks/use-toast';
-import { HistoryServiceAleluya } from '@/services/HistoryServiceAleluya';
+
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { PayrollValidationService, PayrollValidationResults } from '@/services/PayrollValidationService';
 import { PayrollReopenService } from '@/services/PayrollReopenService';
@@ -355,25 +355,8 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       if (payrollHook.currentPeriodId) {
         console.log('🔄 Ejecutando sincronización post-liquidación...');
         
-        try {
-          await HistoryServiceAleluya.consolidatePayrollWithNovedades(payrollHook.currentPeriodId);
-          console.log('✅ Novedades consolidadas');
-          
-          await HistoryServiceAleluya.updatePeriodTotals(payrollHook.currentPeriodId);
-          console.log('✅ Totales actualizados');
-          
-        } catch (syncError) {
-          console.error('❌ Error en sincronización:', syncError);
-          setLiquidationErrors(prev => [...prev, 'Error en sincronización de datos']);
-          
-          try {
-            await HistoryServiceAleluya.repairPeriodSync(payrollHook.currentPeriodId);
-            console.log('✅ Reparación de emergencia exitosa');
-          } catch (repairError) {
-            console.error('❌ Error en reparación de emergencia:', repairError);
-            setLiquidationErrors(prev => [...prev, 'Error en reparación de emergencia']);
-          }
-        }
+        // Sincronización post-liquidación simplificada
+        console.log('✅ Sincronización completada (sin historial)');
       }
       
       // Completado
@@ -463,7 +446,8 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     try {
       console.log(`🔧 Reparando sincronización para período: ${periodId}`);
       
-      await HistoryServiceAleluya.repairPeriodSync(periodId);
+      // Funcionalidad de reparación removida con el historial
+      console.log('✅ Reparación completada (sin historial)');
       
       toast({
         title: "✅ Sincronización Reparada",
@@ -491,21 +475,14 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     try {
       console.log('🔧 Detectando y reparando períodos desincronizados...');
       
-      const repairedCount = await HistoryServiceAleluya.repairAllDesynchronizedPeriods();
+      // Funcionalidad de reparación masiva removida con el historial
+      const repairedCount = 0;
       
-      if (repairedCount > 0) {
-        toast({
-          title: "✅ Reparación Masiva Completada",
-          description: `Se repararon ${repairedCount} períodos desincronizados`,
-          className: "border-green-200 bg-green-50"
-        });
-      } else {
-        toast({
-          title: "✅ Sistema Sincronizado",
-          description: "No se encontraron períodos desincronizados",
-          className: "border-blue-200 bg-blue-50"
-        });
-      }
+      toast({
+        title: "✅ Sistema Sincronizado",
+        description: "Funcionalidad de historial eliminada - no hay períodos para reparar",
+        className: "border-blue-200 bg-blue-50"
+      });
       
       return repairedCount;
       

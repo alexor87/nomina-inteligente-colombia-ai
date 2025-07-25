@@ -183,7 +183,7 @@ export const PeriodEditPage = () => {
   };
 
   const handleBack = () => {
-    navigate('/app/payroll-history');
+    navigate('/app/dashboard');
   };
 
   if (isLoading) {

@@ -172,7 +172,7 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
   };
 
   const handleViewInHistory = () => {
-    navigate('/app/payroll-history');
+    console.log('Historial eliminado');
   };
 
   const getStatusBadge = (period: UnifiedPeriod) => {
