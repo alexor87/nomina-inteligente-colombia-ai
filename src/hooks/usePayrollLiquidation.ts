@@ -5,6 +5,7 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { formatCurrency } from '@/lib/utils';
 import { PeriodNumberCalculationService } from '@/services/payroll-intelligent/PeriodNumberCalculationService';
+import { PayrollSummary } from '@/types/payroll';
 
 interface EmployeePayrollData {
   employeeId: string;
@@ -293,6 +294,12 @@ export const usePayrollLiquidation = () => {
     }
   }, [currentPeriodId, employees, toast, triggerManualSave]);
 
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [liquidationResult, setLiquidationResult] = useState<{
+    periodData: { startDate: string; endDate: string; type: string };
+    summary: PayrollSummary;
+  } | null>(null);
+
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
     if (!currentPeriodId || employees.length === 0) {
       toast({
@@ -318,11 +325,25 @@ export const usePayrollLiquidation = () => {
       if (result.success) {
         console.log('✅ Liquidación exitosa:', result.message);
         
-        toast({
-          title: "✅ Nómina liquidada exitosamente",
-          description: result.message,
-          className: "border-green-200 bg-green-50"
+        // Preparar datos para el modal de éxito
+        const periodType = detectPeriodType(startDate, endDate);
+        const summary: PayrollSummary = {
+          totalEmployees: employees.length,
+          validEmployees: employees.length, // Todos los empleados son válidos al liquidar
+          totalGrossPay: employees.reduce((sum, emp) => sum + emp.total_devengado, 0),
+          totalDeductions: employees.reduce((sum, emp) => sum + emp.total_deducciones, 0),
+          totalNetPay: employees.reduce((sum, emp) => sum + emp.neto_pagado, 0),
+          employerContributions: employees.reduce((sum, emp) => sum + (emp.total_devengado * 0.205), 0), // Aproximado 20.5%
+          totalPayrollCost: employees.reduce((sum, emp) => sum + emp.total_devengado + (emp.total_devengado * 0.205), 0)
+        };
+
+        setLiquidationResult({
+          periodData: { startDate, endDate, type: periodType },
+          summary
         });
+
+        // Mostrar modal de éxito en lugar de toast
+        setShowSuccessModal(true);
 
         // Limpiar el estado después de liquidar
         setEmployees([]);
@@ -343,6 +364,11 @@ export const usePayrollLiquidation = () => {
       setIsLiquidating(false);
     }
   }, [currentPeriodId, employees, toast]);
+
+  const closeSuccessModal = useCallback(() => {
+    setShowSuccessModal(false);
+    setLiquidationResult(null);
+  }, []);
 
   const detectPeriodType = (startDate: string, endDate: string): 'semanal' | 'quincenal' | 'mensual' => {
     const start = new Date(startDate);
@@ -394,6 +420,10 @@ export const usePayrollLiquidation = () => {
     isAutoSaving,
     lastAutoSaveTime,
     triggerManualSave,
-    isRemovingEmployee
+    isRemovingEmployee,
+    // ✅ NUEVO: Estado del modal de éxito
+    showSuccessModal,
+    liquidationResult,
+    closeSuccessModal
   };
 };

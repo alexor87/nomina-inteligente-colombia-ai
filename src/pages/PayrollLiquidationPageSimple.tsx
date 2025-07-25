@@ -1,61 +1,50 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Calculator, Users, Loader2 } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
-import { ConflictResolutionPanel } from '@/components/vacation-integration/ConflictResolutionPanel';
+import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { usePayrollLiquidationWithVacations } from '@/hooks/usePayrollLiquidationWithVacations';
+import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
+import { useNavigate } from 'react-router-dom';
 
 const PayrollLiquidationPageSimple = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<SelectablePeriod | null>(null);
   
   const { companyId } = useCurrentCompany();
+  const navigate = useNavigate();
   
   const {
-    currentPeriodId,
     employees,
     isLoading,
     isLiquidating,
+    currentPeriodId,
     loadEmployees,
     addEmployees,
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
-    updateEmployeeCalculationsInDB,
-    
-    // Propiedades para manejo de conflictos
-    conflictDetectionStep,
-    conflictReport,
-    hasConflicts,
-    isDetectingConflicts,
-    isResolvingConflicts,
-    resolveConflictsAndContinue,
-    cancelConflictResolution,
-    canProceedWithLiquidation,
-    needsConflictResolution,
-    isLoadingWithConflicts
-  } = usePayrollLiquidationWithVacations(companyId || '');
+    showSuccessModal,
+    liquidationResult,
+    closeSuccessModal
+  } = usePayrollLiquidation();
 
   const handlePeriodSelection = async (period: SelectablePeriod) => {
     console.log('🎯 Período seleccionado:', period.label);
     setSelectedPeriod(period);
-    
-    // Cargar empleados con detección de conflictos e integración automática
     await loadEmployees(period.startDate, period.endDate);
   };
 
   const handleLiquidate = async () => {
-    if (!selectedPeriod || employees.length === 0 || !canProceedWithLiquidation) {
+    if (!selectedPeriod || employees.length === 0) {
       return;
     }
 
-    const confirmMessage = `¿Deseas cerrar este periodo de nómina y generar los comprobantes de pago?\n\nPeríodo: ${selectedPeriod.label}\nEmpleados: ${employees.length}\n\n⚠️ Las vacaciones y ausencias pendientes serán procesadas automáticamente.`;
+    const confirmMessage = `¿Deseas cerrar este periodo de nómina y generar los comprobantes de pago?\n\nPeríodo: ${selectedPeriod.label}\nEmpleados: ${employees.length}`;
     
     if (window.confirm(confirmMessage)) {
       await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
@@ -75,14 +64,9 @@ const PayrollLiquidationPageSimple = () => {
     setSelectedPeriod(null);
   };
 
-  const handleConflictResolution = async (resolutions: any[]) => {
-    if (!selectedPeriod) return;
-    
-    await resolveConflictsAndContinue(
-      resolutions,
-      selectedPeriod.startDate,
-      selectedPeriod.endDate
-    );
+  const handleSuccessModalClose = () => {
+    closeSuccessModal();
+    navigate('/app/payroll-history');
   };
 
   return (
@@ -91,69 +75,26 @@ const PayrollLiquidationPageSimple = () => {
         <div className="flex items-center space-x-2">
           <Calculator className="h-6 w-6 text-blue-600" />
           <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
-          {isLoadingWithConflicts && (
-            <div className="flex items-center space-x-1 text-blue-600">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm font-medium">
-                {isDetectingConflicts ? 'Detectando conflictos...' : 'Procesando integración automática...'}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Selector de Período */}
-      {companyId && !selectedPeriod && !needsConflictResolution && (
+      {companyId && !selectedPeriod && (
         <SimplePeriodSelector
           companyId={companyId}
           onPeriodSelected={handlePeriodSelection}
-          disabled={isLoading || isLoadingWithConflicts}
+          disabled={isLoading}
         />
       )}
 
-      {/* Panel de Resolución de Conflictos */}
-      {needsConflictResolution && conflictReport && (
-        <div className="space-y-4">
-          <Card className="border-orange-200 bg-orange-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="h-5 w-5 text-orange-600" />
-                <div>
-                  <h3 className="font-medium text-orange-800">Resolución de Conflictos Requerida</h3>
-                  <p className="text-orange-700 text-sm">
-                    Período: {selectedPeriod?.label} - Se detectaron conflictos entre ausencias y novedades
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <ConflictResolutionPanel
-            conflictReport={conflictReport}
-            onResolveConflicts={handleConflictResolution}
-            onCancel={cancelConflictResolution}
-            isResolving={isResolvingConflicts}
-          />
-        </div>
-      )}
-
       {/* Información del Período Seleccionado */}
-      {selectedPeriod && currentPeriodId && !needsConflictResolution && (
+      {selectedPeriod && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium text-green-800">Período Activo</h3>
                 <p className="text-green-700">{selectedPeriod.label}</p>
-                <p className="text-sm text-green-600">ID: {currentPeriodId}</p>
-                {conflictDetectionStep === 'completed' && (
-                  <div className="flex items-center space-x-1 mt-1">
-                    <CheckCircle className="h-3 w-3 text-green-500" />
-                    <p className="text-xs text-green-500">
-                      Integración automática completada - Vacaciones y ausencias sincronizadas
-                    </p>
-                  </div>
-                )}
               </div>
               <Button
                 variant="outline"
@@ -168,23 +109,20 @@ const PayrollLiquidationPageSimple = () => {
         </Card>
       )}
 
-      {/* Loading State */}
-      {(isLoading || isLoadingWithConflicts) && !needsConflictResolution && (
-        <Card>
+      {/* Estado de carga */}
+      {isLoading && (
+        <Card className="border-blue-200 bg-blue-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>
-                {isDetectingConflicts ? 'Detectando conflictos entre ausencias y novedades...' : 
-                 'Cargando empleados e integrando vacaciones automáticamente...'}
-              </span>
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <span className="text-blue-800 font-medium">Cargando empleados...</span>
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Tabla de Empleados */}
-      {employees.length > 0 && selectedPeriod && currentPeriodId && canProceedWithLiquidation && (
+      {employees.length > 0 && selectedPeriod && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -193,30 +131,19 @@ const PayrollLiquidationPageSimple = () => {
                 <Button 
                   onClick={() => setShowAddEmployeeModal(true)}
                   variant="outline"
-                  disabled={isLoading || !currentPeriodId}
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Agregar Empleado
                 </Button>
                 <Button 
                   onClick={handleLiquidate}
-                  disabled={isLiquidating || employees.length === 0 || !canProceedWithLiquidation}
+                  disabled={employees.length === 0 || isLiquidating}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  {isLiquidating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Liquidando...
-                    </>
-                  ) : (
-                    '🏖️ Liquidar Nómina'
-                  )}
+                  {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
                 </Button>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Las vacaciones y ausencias pendientes se procesarán automáticamente al liquidar
-            </p>
           </CardHeader>
           <CardContent className="p-0">
             <PayrollLiquidationTable
@@ -226,13 +153,11 @@ const PayrollLiquidationPageSimple = () => {
               currentPeriodId={currentPeriodId}
               onRemoveEmployee={removeEmployee}
               onEmployeeNovedadesChange={refreshEmployeeNovedades}
-              updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
             />
           </CardContent>
         </Card>
       )}
 
-      {/* Add Employee Modal */}
       <EmployeeAddModal
         isOpen={showAddEmployeeModal}
         onClose={() => setShowAddEmployeeModal(false)}
@@ -240,6 +165,16 @@ const PayrollLiquidationPageSimple = () => {
         currentEmployeeIds={employees.map(emp => emp.id)}
         companyId={companyId || ''}
       />
+
+      {/* Success Modal */}
+      {showSuccessModal && liquidationResult && (
+        <PayrollSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleSuccessModalClose}
+          periodData={liquidationResult.periodData}
+          summary={liquidationResult.summary}
+        />
+      )}
     </div>
   );
 };

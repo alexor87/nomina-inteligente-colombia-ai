@@ -146,7 +146,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
   }, [conflictHook]);
 
   return {
-    // Estado del proceso de liquidación extendido
+    // Estado del proceso de liquidación extendido (incluye modal de éxito)
     ...payrollHook,
     
     // Estado de detección de conflictos
@@ -165,9 +165,6 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
     resolveConflictsAndContinue,
     cancelConflictResolution,
     resetConflictDetection,
-    
-    // ✅ NUEVO: Exponer función de persistencia para preliquidación
-    updateEmployeeCalculationsInDB: payrollHook.updateEmployeeCalculationsInDB,
     
     // Estados calculados
     canProceedWithLiquidation: conflictDetectionStep === 'completed' && payrollHook.employees.length > 0,

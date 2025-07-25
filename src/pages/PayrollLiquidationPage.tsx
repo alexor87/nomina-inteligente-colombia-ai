@@ -14,7 +14,9 @@ import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollCleanupService } from '@/services/PayrollCleanupService';
 import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
+import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
+import { useNavigate } from 'react-router-dom';
 
 const PayrollLiquidationPage = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -22,6 +24,7 @@ const PayrollLiquidationPage = () => {
   const [periodSelected, setPeriodSelected] = useState(false);
   
   const { companyId } = useCurrentCompany();
+  const navigate = useNavigate();
   
   const {
     employees,
@@ -35,7 +38,11 @@ const PayrollLiquidationPage = () => {
     refreshEmployeeNovedades,
     isAutoSaving,
     lastAutoSaveTime,
-    isRemovingEmployee
+    isRemovingEmployee,
+    // ✅ NUEVO: Estado del modal de éxito
+    showSuccessModal,
+    liquidationResult,
+    closeSuccessModal
   } = usePayrollLiquidation();
 
   const {
@@ -84,6 +91,11 @@ const PayrollLiquidationPage = () => {
   const handleReset = () => {
     resetSelection();
     setPeriodSelected(false);
+  };
+
+  const handleSuccessModalClose = () => {
+    closeSuccessModal();
+    navigate('/app/payroll-history');
   };
 
   return (
@@ -231,6 +243,16 @@ const PayrollLiquidationPage = () => {
         currentEmployeeIds={employees.map(emp => emp.id)}
         companyId={companyId || ''}
       />
+
+      {/* Success Modal */}
+      {showSuccessModal && liquidationResult && (
+        <PayrollSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleSuccessModalClose}
+          periodData={liquidationResult.periodData}
+          summary={liquidationResult.summary}
+        />
+      )}
     </div>
   );
 };
