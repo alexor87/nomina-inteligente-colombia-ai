@@ -29,6 +29,7 @@ interface PayrollLiquidationSimpleTableProps {
   startDate: string;
   endDate: string;
   currentPeriodId: string | undefined;
+  currentPeriod?: { tipo_periodo?: string } | null;
   onEmployeeNovedadesChange: (employeeId: string) => Promise<void>;
   onRemoveEmployee?: (employeeId: string) => void;
   updateEmployeeCalculationsInDB?: (calculations: Record<string, {
@@ -47,6 +48,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   startDate,
   endDate,
   currentPeriodId,
+  currentPeriod,
   onEmployeeNovedadesChange,
   onRemoveEmployee,
   updateEmployeeCalculationsInDB
@@ -129,7 +131,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
           // ✅ CORRECCIÓN CRÍTICA: Usar servicio centralizado para días trabajados
           const currentWorkedDays = workedDays;
-          const periodType = currentWorkedDays <= 15 ? 'quincenal' : 'mensual';
+          const periodType = periodForCalculation.tipo_periodo;
           
           console.log('🎯 Calculando empleado con período correcto:', {
             employee: employee.name,
@@ -206,13 +208,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList, updateEmployeeCalculationsInDB]);
 
   // USAR SERVICIO CENTRALIZADO: Fuente única de verdad para días trabajados
-  // Detectar tipo de período basándose en fechas (lógica mejorada)
-  const start = new Date(startDate);
-  const startDay = start.getDate();
-  const isQuincenal = startDay === 1 || startDay === 16;
-  
+  // Usar el tipo de período desde el hook (datos de BD)
   const periodForCalculation = {
-    tipo_periodo: (isQuincenal ? 'quincenal' : 'mensual') as 'quincenal' | 'mensual',
+    tipo_periodo: (currentPeriod?.tipo_periodo || 'quincenal') as 'quincenal' | 'mensual',
     fecha_inicio: startDate,
     fecha_fin: endDate
   };
@@ -223,8 +221,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   console.log('🎯 SERVICIO CENTRALIZADO - DÍAS TRABAJADOS:', {
     startDate,
     endDate,
-    startDay,
-    isQuincenal,
     periodType: periodForCalculation.tipo_periodo,
     legalDays: daysInfo.legalDays,
     realDays: daysInfo.realDays

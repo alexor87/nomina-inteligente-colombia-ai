@@ -27,6 +27,7 @@ interface PayrollPeriod {
   fecha_inicio: string;
   fecha_fin: string;
   estado: string;
+  tipo_periodo?: string;
 }
 
 export const usePayrollUnified = (companyId: string) => {
@@ -110,7 +111,8 @@ export const usePayrollUnified = (companyId: string) => {
           periodo: period.periodo,
           fecha_inicio: period.fecha_inicio,
           fecha_fin: period.fecha_fin,
-          estado: period.estado
+          estado: period.estado,
+          tipo_periodo: period.tipo_periodo || 'quincenal'
         };
       }
 
@@ -140,7 +142,8 @@ export const usePayrollUnified = (companyId: string) => {
         periodo: newPeriod.periodo,
         fecha_inicio: newPeriod.fecha_inicio,
         fecha_fin: newPeriod.fecha_fin,
-        estado: newPeriod.estado
+        estado: newPeriod.estado,
+        tipo_periodo: newPeriod.tipo_periodo
       };
 
     } catch (error) {

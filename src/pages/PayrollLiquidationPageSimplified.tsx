@@ -27,6 +27,7 @@ const PayrollLiquidationPageSimplified = () => {
     isLoading,
     isLiquidating,
     currentPeriodId,
+    currentPeriod,
     loadEmployees,
     addEmployees,
     removeEmployee,
@@ -201,6 +202,7 @@ const PayrollLiquidationPageSimplified = () => {
               startDate={selectedPeriod.startDate}
               endDate={selectedPeriod.endDate}
               currentPeriodId={currentPeriodId}
+              currentPeriod={currentPeriod}
               onRemoveEmployee={removeEmployee}
               onEmployeeNovedadesChange={refreshEmployeeNovedades}
               updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
