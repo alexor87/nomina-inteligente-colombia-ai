@@ -12,15 +12,21 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        auth: {
-          persistSession: false,
-        },
+    // Initialize Supabase client with Service Role for administrative operations
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    
+    if (!serviceRoleKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY no configurado')
+    }
+    
+    // Use Service Role Key for bypassing RLS in administrative operations
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    )
+    })
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -327,7 +333,7 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
       .from('payroll_periods_real')
       .select('*')
       .eq('id', period_id)
-      .single()
+      .maybeSingle()
 
     if (periodError || !period) {
       console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error cargando período:`, periodError);
