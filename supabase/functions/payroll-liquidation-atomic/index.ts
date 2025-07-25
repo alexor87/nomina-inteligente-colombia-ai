@@ -305,17 +305,26 @@ async function executeAtomicLiquidation(supabase: any, data: any, userId: string
     throw new Error('period_id y company_id son requeridos para liquidación')
   }
 
-  // VALIDACIÓN TEMPORAL DESHABILITADA: Debugging error 500
-  console.log(`🔍 [EDGE-${edgeTraceId}] TEMPORALMENTE SALTANDO VALIDACIÓN DE ACCESO - DEBUGGING`);
+  // VALIDACIÓN DE ACCESO A LA EMPRESA
+  console.log(`🔍 [EDGE-${edgeTraceId}] 🔐 Validando acceso del usuario a la empresa`);
   console.log(`🔍 [EDGE-${edgeTraceId}] Usuario: ${userId}, Empresa: ${company_id}`);
   
-  // TODO: Re-habilitar después de identificar causa del error 500
-  // const { data: hasAccess, error: accessError } = await supabase.rpc('user_has_access_to_company', {
-  //   p_user_id: userId,
-  //   p_company_id: company_id
-  // });
+  const { data: hasAccess, error: accessError } = await supabase.rpc('user_has_access_to_company', {
+    p_user_id: userId,
+    p_company_id: company_id
+  });
 
-  console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Acceso asumido válido (validación deshabilitada temporalmente)`);
+  if (accessError) {
+    console.error(`🔍 [EDGE-${edgeTraceId}] ❌ Error validando acceso:`, accessError);
+    throw new Error(`Error de validación de acceso: ${accessError.message}`)
+  }
+
+  if (!hasAccess) {
+    console.error(`🔍 [EDGE-${edgeTraceId}] 🚫 Acceso denegado - Usuario sin permisos en empresa`);
+    throw new Error('Usuario no tiene permisos para liquidar nómina en esta empresa')
+  }
+
+  console.log(`🔍 [EDGE-${edgeTraceId}] ✅ Acceso validado correctamente`);
   
   const auditLog = []
   let totalProcessed = 0
