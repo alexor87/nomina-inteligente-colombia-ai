@@ -7,7 +7,7 @@ import { ArrowLeft, Download, Plus, Calendar, Users, DollarSign } from 'lucide-r
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { AdjustmentModal } from '@/components/payroll-history/AdjustmentModal';
+import { AdjustmentModalPro } from '@/components/payroll-history/AdjustmentModalPro';
 
 interface PeriodDetail {
   id: string;
@@ -333,10 +333,11 @@ export const PayrollHistoryDetailPage = () => {
       )}
 
       {/* Adjustment Modal */}
-      <AdjustmentModal
+      <AdjustmentModalPro
         isOpen={showAdjustmentModal}
         onClose={() => setShowAdjustmentModal(false)}
         periodId={periodId!}
+        period={period}
         employees={employees}
         onSuccess={handleAdjustmentSuccess}
       />
