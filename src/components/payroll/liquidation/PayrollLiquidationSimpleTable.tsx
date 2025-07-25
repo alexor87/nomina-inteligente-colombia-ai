@@ -208,23 +208,33 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     if (!startDate || !endDate) return 30;
     
     // CORRECCIÓN DEFINITIVA: Para períodos quincenales SIEMPRE usar 15 días
-    // Detectar si es período quincenal por las fechas
     const start = new Date(startDate);
     const end = new Date(endDate);
     const startDay = start.getDate();
+    const endDay = end.getDate();
     const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
     
-    // Detectar períodos quincenales por patrón de fechas
+    // DETECTAR PERÍODOS QUINCENALES POR PATRÓN DE FECHAS MÁS FLEXIBLE
     const isFirstQuincenal = startDay === 1 && sameMonth;
     const isSecondQuincenal = startDay === 16 && sameMonth;
     
-    if (isFirstQuincenal || isSecondQuincenal) {
+    // VERIFICACIÓN ADICIONAL: Si el período empieza en 16, es quincenal independientemente del día final
+    const isDefinitelyQuincenal = startDay === 16;
+    
+    console.log('🔍 ANÁLISIS DE PERÍODO:', {
+      startDate,
+      endDate,
+      startDay,
+      endDay,
+      sameMonth,
+      isFirstQuincenal,
+      isSecondQuincenal,
+      isDefinitelyQuincenal
+    });
+    
+    if (isFirstQuincenal || isSecondQuincenal || isDefinitelyQuincenal) {
       console.log('📊 PERÍODO QUINCENAL DETECTADO - ASIGNANDO 15 DÍAS:', {
-        startDate,
-        endDate,
-        startDay,
-        isFirstQuincenal,
-        isSecondQuincenal,
+        motivo: isDefinitelyQuincenal ? 'Inicia día 16' : 'Patrón quincenal detectado',
         diasAsignados: 15
       });
       return 15;
