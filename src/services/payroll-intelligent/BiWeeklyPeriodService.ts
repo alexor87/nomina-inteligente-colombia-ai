@@ -79,7 +79,7 @@ export class BiWeeklyPeriodService {
 
   /**
    * NUEVA LÓGICA ESTRICTA: Generar siguiente período consecutivo
-   * REGLAS ABSOLUTAS: Solo 1-15 y 16-fin de mes
+   * REGLAS ABSOLUTAS: Solo 1-15 y 16-30 (FEBRERO CORREGIDO)
    */
   static generateStrictNextConsecutivePeriod(lastPeriodEndDate: string): {
     startDate: string;
@@ -100,19 +100,28 @@ export class BiWeeklyPeriodService {
     let finalStartDate: Date;
     let finalEndDate: Date;
     
-    console.log('🔍 ANÁLISIS: Día de inicio calculado:', startDay);
+    console.log('🔍 ANÁLISIS: Día de inicio calculado:', startDay, 'Mes:', month + 1);
     
-    // REGLAS ESTRICTAS ABSOLUTAS
+    // REGLAS ESTRICTAS ABSOLUTAS CON CORRECCIÓN PARA FEBRERO
     if (startDay === 1) {
       // Si inicia el 1, es primera quincena (1-15)
       finalStartDate = new Date(year, month, 1);
       finalEndDate = new Date(year, month, 15);
       console.log('✅ PRIMERA QUINCENA ESTRICTA (1-15)');
     } else if (startDay === 16) {
-      // Si inicia el 16, es segunda quincena (16-fin del mes)
+      // Si inicia el 16, es segunda quincena (16-30, incluso en febrero)
       finalStartDate = new Date(year, month, 16);
-      finalEndDate = new Date(year, month + 1, 0); // Último día del mes
-      console.log('✅ SEGUNDA QUINCENA ESTRICTA (16-fin de mes)');
+      
+      // CORRECCIÓN ESPECIAL PARA FEBRERO: SIEMPRE USAR DÍA 30
+      if (month === 1) { // Febrero (mes 1 en JavaScript)
+        // En febrero, la segunda quincena va del 16 al 30 (días ficticios para legislación laboral)
+        finalEndDate = new Date(year, month, 30);
+        console.log('✅ SEGUNDA QUINCENA FEBRERO CORREGIDA (16-30 con días ficticios)');
+      } else {
+        // Para otros meses, usar el último día real del mes
+        finalEndDate = new Date(year, month + 1, 0);
+        console.log('✅ SEGUNDA QUINCENA ESTRICTA (16-fin de mes)');
+      }
     } else {
       // CORRECCIÓN AUTOMÁTICA FORZADA
       console.log('⚠️ FECHA IRREGULAR DETECTADA - APLICANDO CORRECCIÓN AUTOMÁTICA');
@@ -123,10 +132,15 @@ export class BiWeeklyPeriodService {
         finalEndDate = new Date(year, month, 15);
         console.log('🔧 CORREGIDO A PRIMERA QUINCENA (1-15)');
       } else {
-        // Forzar a segunda quincena
+        // Forzar a segunda quincena con corrección de febrero
         finalStartDate = new Date(year, month, 16);
-        finalEndDate = new Date(year, month + 1, 0);
-        console.log('🔧 CORREGIDO A SEGUNDA QUINCENA (16-fin de mes)');
+        if (month === 1) { // Febrero
+          finalEndDate = new Date(year, month, 30);
+          console.log('🔧 CORREGIDO A SEGUNDA QUINCENA FEBRERO (16-30)');
+        } else {
+          finalEndDate = new Date(year, month + 1, 0);
+          console.log('🔧 CORREGIDO A SEGUNDA QUINCENA (16-fin de mes)');
+        }
       }
     }
     
@@ -140,14 +154,14 @@ export class BiWeeklyPeriodService {
   }
 
   /**
-   * MÉTODO ACTUALIZADO: Generar período actual estricto
+   * MÉTODO ACTUALIZADO: Generar período actual estricto CON CORRECCIÓN FEBRERO
    * ELIMINA dependencia del día actual para ser más predecible
    */
   static generateCurrentBiWeeklyPeriod(): {
     startDate: string;
     endDate: string;
   } {
-    console.log('📅 GENERANDO PERÍODO ACTUAL ESTRICTO');
+    console.log('📅 GENERANDO PERÍODO ACTUAL ESTRICTO CON CORRECCIÓN FEBRERO');
     
     const today = new Date();
     const day = today.getDate();
@@ -163,12 +177,26 @@ export class BiWeeklyPeriodService {
       console.log('✅ PERÍODO ACTUAL: Primera quincena', result);
       return result;
     } else {
-      // Segunda quincena (16-fin de mes)
+      // Segunda quincena (16-30, incluso en febrero)
+      const startDate = new Date(year, month, 16);
+      let endDate: Date;
+      
+      // CORRECCIÓN ESPECIAL PARA FEBRERO
+      if (month === 1) { // Febrero
+        // En febrero, forzar día 30 para mantener 15 días
+        endDate = new Date(year, month, 30);
+        console.log('✅ PERÍODO ACTUAL: Segunda quincena FEBRERO CORREGIDA (16-30)');
+      } else {
+        // Para otros meses, usar el último día real
+        endDate = new Date(year, month + 1, 0);
+        console.log('✅ PERÍODO ACTUAL: Segunda quincena', startDate.toISOString().split('T')[0], '-', endDate.toISOString().split('T')[0]);
+      }
+      
       const result = {
-        startDate: new Date(year, month, 16).toISOString().split('T')[0],
-        endDate: new Date(year, month + 1, 0).toISOString().split('T')[0]
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
       };
-      console.log('✅ PERÍODO ACTUAL: Segunda quincena', result);
+      
       return result;
     }
   }
@@ -184,7 +212,7 @@ export class BiWeeklyPeriodService {
   }
   
   /**
-   * VALIDADOR ESTRICTO MEJORADO
+   * VALIDADOR ESTRICTO MEJORADO CON CORRECCIÓN FEBRERO
    */
   static validateBiWeeklyPeriod(startDate: string, endDate: string): {
     isValid: boolean;
@@ -196,6 +224,7 @@ export class BiWeeklyPeriodService {
     
     const startDay = start.getDate();
     const endDay = end.getDate();
+    const month = start.getMonth();
     const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
     
     // Validar primera quincena (1-15)
@@ -206,16 +235,27 @@ export class BiWeeklyPeriodService {
       };
     }
     
-    // Validar segunda quincena (16-fin de mes)
-    const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-    if (startDay === 16 && endDay === lastDayOfMonth && sameMonth) {
-      return {
-        isValid: true,
-        message: '✅ Período válido: Segunda quincena (16-fin de mes)'
-      };
+    // Validar segunda quincena CON CORRECCIÓN ESPECIAL PARA FEBRERO
+    if (startDay === 16 && sameMonth) {
+      // Para febrero, validar que termine en día 30 (legislación laboral)
+      if (month === 1 && endDay === 30) { // Febrero con día ficticio 30
+        return {
+          isValid: true,
+          message: '✅ Período válido: Segunda quincena FEBRERO (16-30 con días ficticios)'
+        };
+      }
+      
+      // Para otros meses, validar que termine en el último día real del mes
+      const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+      if (month !== 1 && endDay === lastDayOfMonth) {
+        return {
+          isValid: true,
+          message: '✅ Período válido: Segunda quincena (16-fin de mes)'
+        };
+      }
     }
     
-    // Si no es válido, generar corrección ESTRICTA
+    // Si no es válido, generar corrección ESTRICTA CON FEBRERO
     let correctedPeriod: { startDate: string; endDate: string };
     
     if (startDay <= 15) {
@@ -225,10 +265,19 @@ export class BiWeeklyPeriodService {
         endDate: new Date(start.getFullYear(), start.getMonth(), 15).toISOString().split('T')[0]
       };
     } else {
-      // Corregir a segunda quincena
+      // Corregir a segunda quincena CON CORRECCIÓN FEBRERO
+      const correctedStart = new Date(start.getFullYear(), start.getMonth(), 16);
+      let correctedEnd: Date;
+      
+      if (month === 1) { // Febrero
+        correctedEnd = new Date(start.getFullYear(), start.getMonth(), 30);
+      } else {
+        correctedEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+      }
+      
       correctedPeriod = {
-        startDate: new Date(start.getFullYear(), start.getMonth(), 16).toISOString().split('T')[0],
-        endDate: new Date(start.getFullYear(), start.getMonth() + 1, 0).toISOString().split('T')[0]
+        startDate: correctedStart.toISOString().split('T')[0],
+        endDate: correctedEnd.toISOString().split('T')[0]
       };
     }
     
