@@ -310,6 +310,51 @@ export const PayrollHistoryDetailPage = () => {
     setPendingNovedades(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Helper function to calculate preview totals with pending novelties
+  const calculateEmployeePreview = (employee: EmployeePayroll) => {
+    const pendingForEmployee = pendingNovedades.filter(p => p.employee_id === employee.employee_id);
+    
+    if (pendingForEmployee.length === 0) {
+      return {
+        originalDevengado: employee.total_devengado,
+        originalDeducciones: employee.total_deducciones,
+        originalNeto: employee.neto_pagado,
+        newDevengado: employee.total_devengado,
+        newDeducciones: employee.total_deducciones,
+        newNeto: employee.neto_pagado,
+        hasPending: false,
+        pendingCount: 0
+      };
+    }
+
+    let totalPendingDevengos = 0;
+    let totalPendingDeducciones = 0;
+
+    pendingForEmployee.forEach(pending => {
+      const { novedadData } = pending;
+      if (novedadData.valor > 0) {
+        totalPendingDevengos += novedadData.valor;
+      } else {
+        totalPendingDeducciones += Math.abs(novedadData.valor);
+      }
+    });
+
+    const newDevengado = employee.total_devengado + totalPendingDevengos;
+    const newDeducciones = employee.total_deducciones + totalPendingDeducciones;
+    const newNeto = newDevengado - newDeducciones;
+
+    return {
+      originalDevengado: employee.total_devengado,
+      originalDeducciones: employee.total_deducciones,
+      originalNeto: employee.neto_pagado,
+      newDevengado,
+      newDeducciones,
+      newNeto,
+      hasPending: true,
+      pendingCount: pendingForEmployee.length
+    };
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -458,40 +503,100 @@ export const PayrollHistoryDetailPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map((employee) => (
-                      <tr key={employee.id} className="border-b hover:bg-muted/50">
-                        <td className="p-4">
-                          <div className="font-medium">
-                            {employee.employee_name} {employee.employee_lastname}
-                          </div>
-                        </td>
-                        <td className="p-4 font-mono">{formatCurrency(employee.salario_base)}</td>
-                        <td className="p-4 font-mono">{formatCurrency(employee.total_devengado)}</td>
-                        <td className="p-4 font-mono">{formatCurrency(employee.total_deducciones)}</td>
-                        <td className="p-4 font-mono font-semibold">{formatCurrency(employee.neto_pagado)}</td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
-                              className="flex items-center gap-2"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
-                              className="flex items-center gap-2"
-                            >
-                              <Download className="h-4 w-4" />
-                              Comprobante
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {employees.map((employee) => {
+                      const preview = calculateEmployeePreview(employee);
+                      return (
+                        <tr key={employee.id} className="border-b hover:bg-muted/50">
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium">
+                                {employee.employee_name} {employee.employee_lastname}
+                              </div>
+                              {preview.hasPending && (
+                                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                                  {preview.pendingCount} pendiente{preview.pendingCount > 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 font-mono">{formatCurrency(employee.salario_base)}</td>
+                          <td className="p-4 font-mono">
+                            {preview.hasPending ? (
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground line-through text-sm">
+                                  {formatCurrency(preview.originalDevengado)}
+                                </div>
+                                <div className="text-green-600 font-medium">
+                                  {formatCurrency(preview.newDevengado)}
+                                  <span className="text-xs ml-1">
+                                    (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              formatCurrency(employee.total_devengado)
+                            )}
+                          </td>
+                          <td className="p-4 font-mono">
+                            {preview.hasPending ? (
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground line-through text-sm">
+                                  {formatCurrency(preview.originalDeducciones)}
+                                </div>
+                                <div className="text-red-600 font-medium">
+                                  {formatCurrency(preview.newDeducciones)}
+                                  {preview.newDeducciones !== preview.originalDeducciones && (
+                                    <span className="text-xs ml-1">
+                                      ({preview.newDeducciones > preview.originalDeducciones ? '+' : ''}{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              formatCurrency(employee.total_deducciones)
+                            )}
+                          </td>
+                          <td className="p-4 font-mono font-semibold">
+                            {preview.hasPending ? (
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground line-through text-sm">
+                                  {formatCurrency(preview.originalNeto)}
+                                </div>
+                                <div className="text-primary font-bold">
+                                  {formatCurrency(preview.newNeto)}
+                                  <span className="text-xs ml-1">
+                                    ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              formatCurrency(employee.neto_pagado)
+                            )}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
+                                className="flex items-center gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
+                                className="flex items-center gap-2"
+                              >
+                                <Download className="h-4 w-4" />
+                                Comprobante
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
