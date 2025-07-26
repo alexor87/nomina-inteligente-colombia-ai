@@ -1993,14 +1993,15 @@ export type Database = {
         Returns: Json
       }
       get_period_adjustments: {
-        Args: { period_id: string }
+        Args: { p_period_id: string }
         Returns: {
           id: string
-          employee_id: string
           employee_name: string
           concept: string
           amount: number
           observations: string
+          novedad_type: string
+          created_by_email: string
           created_at: string
         }[]
       }
