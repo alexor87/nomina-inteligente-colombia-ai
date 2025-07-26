@@ -27,6 +27,29 @@ export class PendingNovedadesService {
     try {
       console.log('🔄 Aplicando ajustes pendientes:', data);
 
+      // Validate and fix company_id before proceeding
+      for (const novedadData of data.novedades) {
+        if (!novedadData.company_id) {
+          // Get company_id from user profile as fallback
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('company_id')
+              .eq('user_id', user.id)
+              .single();
+            
+            if (profile?.company_id) {
+              novedadData.company_id = profile.company_id;
+            } else {
+              throw new Error('No se pudo obtener el company_id del usuario');
+            }
+          } else {
+            throw new Error('Usuario no autenticado');
+          }
+        }
+      }
+
       // Step 1: Create all novelties in a single transaction
       const createdNovedades = [];
       for (const novedadData of data.novedades) {

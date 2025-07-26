@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useCompanyId } from '@/components/employees/form/useCompanyId';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -77,9 +78,13 @@ export const PayrollHistoryDetailPage = () => {
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
   const [pendingNovedades, setPendingNovedades] = useState<PendingNovedad[]>([]);
   const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   
   // Hook para gestionar novedades
   const { createNovedad } = usePayrollNovedadesUnified(periodId || '');
+  
+  // Hook para obtener company_id
+  useCompanyId(setCompanyId);
 
   const loadPeriodDetail = async () => {
     if (!periodId) return;
@@ -685,6 +690,7 @@ export const PayrollHistoryDetailPage = () => {
         selectedNovedadType={null}
         startDate={period?.fecha_inicio}
         endDate={period?.fecha_fin}
+        companyId={companyId}
         onClose={() => setShowAdjustmentModal(false)}
       />
 
