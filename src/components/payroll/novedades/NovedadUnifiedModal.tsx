@@ -281,8 +281,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       onSubmit: handleFormSubmit,
       employeeSalary: employeeSalary || 0,
       calculateSuggestedValue: calculateSuggestedValue,
-      isSubmitting,
-      mode
+      isSubmitting
     };
 
     switch (selectedType) {

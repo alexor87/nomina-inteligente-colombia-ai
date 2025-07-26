@@ -9,8 +9,6 @@ import { ArrowLeft, Clock, Plus, Trash2, Calculator } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
-import { AdjustmentCauseSelector } from '../AdjustmentCauseSelector';
-import { AdjustmentCause } from '@/types/adjustmentCauses';
 
 interface HorasExtraEntry {
   id: string;
@@ -36,7 +34,6 @@ interface NovedadHorasExtraConsolidatedFormProps {
   employeeSalary: number;
   isSubmitting?: boolean;
   periodoFecha?: Date;
-  mode?: 'liquidacion' | 'ajustes';
 }
 
 export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsolidatedFormProps> = ({
@@ -44,8 +41,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
   onSubmit,
   employeeSalary,
   isSubmitting = false,
-  periodoFecha,
-  mode = 'liquidacion'
+  periodoFecha
 }) => {
   const [entries, setEntries] = useState<HorasExtraEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState({
@@ -54,8 +50,6 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     horas: '',
     observacion: ''
   });
-  const [adjustmentCause, setAdjustmentCause] = useState<AdjustmentCause | null>(null);
-  const [adjustmentObservation, setAdjustmentObservation] = useState<string>('');
 
   const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
 
@@ -114,21 +108,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
 
   const handleSubmit = () => {
     if (entries.length === 0) return;
-    
-    // For adjustments mode, validate that cause and observation are provided
-    if (mode === 'ajustes' && (!adjustmentCause || !adjustmentObservation.trim())) {
-      return;
-    }
-    
-    // Format entries with adjustment information if in adjustments mode
-    const formattedEntries = entries.map(entry => ({
-      ...entry,
-      observacion: mode === 'ajustes' 
-        ? `CAUSAL: ${adjustmentCause?.label} | OBSERVACIÓN: ${adjustmentObservation}${entry.observacion ? ` | DETALLE: ${entry.observacion}` : ''}`
-        : entry.observacion
-    }));
-    
-    onSubmit(formattedEntries);
+    onSubmit(entries);
   };
 
   const totalHoras = entries.reduce((sum, entry) => sum + entry.horas, 0);
@@ -144,21 +124,8 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">
-          {mode === 'ajustes' ? 'Ajuste de Horas Extra' : 'Horas Extra'}
-        </h3>
+        <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
-
-      {/* Adjustment Cause Selector - Only for adjustments mode */}
-      {mode === 'ajustes' && (
-        <AdjustmentCauseSelector
-          onCauseChange={(cause, observation) => {
-            setAdjustmentCause(cause);
-            setAdjustmentObservation(observation);
-          }}
-          initialObservation={adjustmentObservation}
-        />
-      )}
 
       {/* Current Entry Form */}
       <Card>
@@ -290,11 +257,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={
-            entries.length === 0 || 
-            isSubmitting || 
-            (mode === 'ajustes' && (!adjustmentCause || !adjustmentObservation.trim()))
-          }
+          disabled={entries.length === 0 || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
         >
           {isSubmitting ? 'Guardando...' : `Guardar ${entries.length} Entrada${entries.length > 1 ? 's' : ''}`}
