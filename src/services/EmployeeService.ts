@@ -78,47 +78,4 @@ export class EmployeeService {
     console.warn('🔒 [SECURITY] EmployeeService.bulkDeleteEmployees is deprecated. Use SecureEmployeeService.');
     return SecureEmployeeService.bulkDeleteEmployees(employeeIds);
   }
-        } catch (error) {
-          results.failed++;
-          results.errors.push(`Error eliminando empleado ${employeeId}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-        }
-      }
-
-      console.log(`✅ EmployeeService: Bulk delete completed - ${results.successful} successful, ${results.failed} failed`);
-      return { success: true, results };
-    } catch (error) {
-      console.error('❌ EmployeeService: Error in bulkDeleteEmployees:', error);
-      return { 
-        success: false, 
-        results: { successful: 0, failed: employeeIds.length, errors: [] },
-        error: error instanceof Error ? error.message : 'Error desconocido' 
-      };
-    }
-  }
-
-  /**
-   * Bulk update employee status
-   * 🔒 SECURITY: Delegated to SecureEmployeeService
-   */
-  static async bulkUpdateStatus(employeeIds: string[], newStatus: 'activo' | 'inactivo' | 'eliminado'): Promise<{ success: boolean; results: { successful: number; failed: number; errors: string[] }; error?: string }> {
-    console.warn('🔒 [SECURITY] EmployeeService.bulkUpdateStatus is deprecated. Use SecureEmployeeService.');
-    return SecureEmployeeService.bulkUpdateStatus(employeeIds, newStatus);
-  }
-        } catch (error) {
-          results.failed++;
-          results.errors.push(`Error actualizando empleado ${employeeId}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-        }
-      }
-
-      console.log(`✅ EmployeeService: Bulk update completed - ${results.successful} successful, ${results.failed} failed`);
-      return { success: true, results };
-    } catch (error) {
-      console.error('❌ EmployeeService: Error in bulkUpdateStatus:', error);
-      return { 
-        success: false, 
-        results: { successful: 0, failed: employeeIds.length, errors: [] },
-        error: error instanceof Error ? error.message : 'Error desconocido' 
-      };
-    }
-  }
 }
