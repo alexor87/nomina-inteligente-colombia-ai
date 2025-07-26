@@ -21,6 +21,7 @@ interface NovedadTypeSelectorProps {
   onClose: () => void;
   onSelectCategory: (category: NovedadCategory) => void;
   employeeName: string;
+  mode?: 'liquidacion' | 'ajustes';
 }
 
 const devengadosCategorias = [
@@ -132,8 +133,21 @@ const deduccionesCategorias = [
 export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
   onClose,
   onSelectCategory,
-  employeeName
+  employeeName,
+  mode = 'liquidacion'
 }) => {
+  
+  // Filtrar categorías para modo ajustes (conceptos más comunes)
+  const ajustesDevengadosCategorias = devengadosCategorias.filter(cat => 
+    ['bonificaciones', 'ingresos_adicionales'].includes(cat.id)
+  );
+  
+  const ajustesDeduccionesCategorias = deduccionesCategorias.filter(cat => 
+    ['deducciones_especiales', 'retefuente'].includes(cat.id)
+  );
+  
+  const devengadosToShow = mode === 'ajustes' ? ajustesDevengadosCategorias : devengadosCategorias;
+  const deduccionesToShow = mode === 'ajustes' ? ajustesDeduccionesCategorias : deduccionesCategorias;
   const renderCategoriesGrid = (categorias: typeof devengadosCategorias, onSelectCategoryFn: (category: NovedadCategory) => void) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {categorias.map((categoria) => {
@@ -195,7 +209,7 @@ export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
             <h4 className="font-medium text-green-700 mb-2">Conceptos que incrementan el salario</h4>
             <p className="text-sm text-gray-600">Selecciona los conceptos que aumentan el pago del empleado</p>
           </div>
-          {renderCategoriesGrid(devengadosCategorias, onSelectCategory)}
+          {renderCategoriesGrid(devengadosToShow, onSelectCategory)}
         </TabsContent>
 
         <TabsContent value="deducciones" className="mt-6">
@@ -203,7 +217,7 @@ export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
             <h4 className="font-medium text-red-700 mb-2">Conceptos que reducen el salario</h4>
             <p className="text-sm text-gray-600">Selecciona los conceptos que reducen el pago del empleado</p>
           </div>
-          {renderCategoriesGrid(deduccionesCategorias, onSelectCategory)}
+          {renderCategoriesGrid(deduccionesToShow, onSelectCategory)}
         </TabsContent>
       </Tabs>
 

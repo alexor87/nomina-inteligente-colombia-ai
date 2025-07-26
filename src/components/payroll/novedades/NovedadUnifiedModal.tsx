@@ -30,6 +30,7 @@ interface NovedadUnifiedModalProps {
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
   startDate?: string;
   endDate?: string;
+  mode?: 'liquidacion' | 'ajustes';
 }
 
 const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
@@ -57,7 +58,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   onClose,
   onEmployeeNovedadesChange,
   startDate,
-  endDate
+  endDate,
+  mode = 'liquidacion'
 }) => {
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
@@ -83,10 +85,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       setSelectedType(selectedNovedadType);
       setCurrentStep('form');
     } else {
-      setCurrentStep('list');
+      // En modo ajustes, ir directamente al selector
+      if (mode === 'ajustes') {
+        setCurrentStep('selector');
+      } else {
+        setCurrentStep('list');
+      }
       setSelectedType(null);
     }
-  }, [selectedNovedadType, open]);
+  }, [selectedNovedadType, open, mode]);
 
   useEffect(() => {
     if (open) {
@@ -122,9 +129,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleBackToList = () => {
-    setCurrentStep('list');
-    setSelectedType(null);
-    setRefreshTrigger(Date.now());
+    // En modo ajustes, cerrar el modal en lugar de ir a la lista
+    if (mode === 'ajustes') {
+      handleClose();
+    } else {
+      setCurrentStep('list');
+      setSelectedType(null);
+      setRefreshTrigger(Date.now());
+    }
   };
 
   const handleAddNew = () => {
@@ -220,9 +232,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       
       console.log('✅ All novelty entries processed successfully');
       
-      setCurrentStep('list');
-      setSelectedType(null);
-      setRefreshTrigger(Date.now());
+      // En modo ajustes, cerrar el modal directamente
+      if (mode === 'ajustes') {
+        handleClose();
+      } else {
+        setCurrentStep('list');
+        setSelectedType(null);
+        setRefreshTrigger(Date.now());
+      }
       
     } catch (error: any) {
       console.error('❌ Error processing novelties:', error);
@@ -346,6 +363,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           onClose={handleBackToList}
           onSelectCategory={handleCategorySelect}
           employeeName={employeeName}
+          mode={mode}
         />
       );
     }
@@ -367,9 +385,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         {currentStep === 'form' && (
           <>
             <DialogHeader>
-              <DialogTitle>Agregar Novedad</DialogTitle>
+              <DialogTitle>
+                {mode === 'ajustes' ? 'Registrar Ajuste de Nómina' : 'Agregar Novedad'}
+              </DialogTitle>
               <DialogDescription>
-                Completa los campos para agregar una novedad al empleado.
+                {mode === 'ajustes' 
+                  ? 'Registra un ajuste manual para el empleado en este período.'
+                  : 'Completa los campos para agregar una novedad al empleado.'
+                }
               </DialogDescription>
             </DialogHeader>
           </>

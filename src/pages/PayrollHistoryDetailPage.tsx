@@ -7,7 +7,9 @@ import { ArrowLeft, Download, Plus, Calendar, Users, DollarSign } from 'lucide-r
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { AdjustmentModalPro } from '@/components/payroll-history/AdjustmentModalPro';
+import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
+import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
+import { CreateNovedadData } from '@/types/novedades-enhanced';
 
 interface PeriodDetail {
   id: string;
@@ -53,6 +55,12 @@ export const PayrollHistoryDetailPage = () => {
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showEmployeeSelector, setShowEmployeeSelector] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [selectedEmployeeSalary, setSelectedEmployeeSalary] = useState<number>(0);
+  
+  // Hook para gestionar novedades
+  const { createNovedad } = usePayrollNovedadesUnified(periodId || '');
 
   const loadPeriodDetail = async () => {
     if (!periodId) return;
@@ -136,6 +144,36 @@ export const PayrollHistoryDetailPage = () => {
     });
   };
 
+  const handleOpenAdjustmentModal = (employeeId?: string, employeeSalary?: number) => {
+    if (employeeId && employeeSalary) {
+      // Ajuste para empleado específico
+      setSelectedEmployeeId(employeeId);
+      setSelectedEmployeeSalary(employeeSalary);
+      setShowAdjustmentModal(true);
+    } else if (employees.length > 0) {
+      // Usar el primer empleado como fallback
+      setSelectedEmployeeId(employees[0].employee_id);
+      setSelectedEmployeeSalary(employees[0].salario_base);
+      setShowAdjustmentModal(true);
+    } else {
+      toast({
+        title: "Error",
+        description: "No hay empleados disponibles para ajustar",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleNovedadSubmit = async (data: CreateNovedadData) => {
+    try {
+      await createNovedad(data);
+      handleAdjustmentSuccess();
+    } catch (error) {
+      console.error('Error creating novedad:', error);
+      throw error;
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -186,7 +224,7 @@ export const PayrollHistoryDetailPage = () => {
         </div>
         
         <Button 
-          onClick={() => setShowAdjustmentModal(true)}
+          onClick={() => handleOpenAdjustmentModal()}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
@@ -271,15 +309,26 @@ export const PayrollHistoryDetailPage = () => {
                     <td className="p-4 font-mono">{formatCurrency(employee.total_deducciones)}</td>
                     <td className="p-4 font-mono font-semibold">{formatCurrency(employee.neto_pagado)}</td>
                     <td className="p-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
-                        className="flex items-center gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        Comprobante
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
+                          className="flex items-center gap-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Ajustar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
+                          className="flex items-center gap-2"
+                        >
+                          <Download className="h-4 w-4" />
+                          Comprobante
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -333,13 +382,18 @@ export const PayrollHistoryDetailPage = () => {
       )}
 
       {/* Adjustment Modal */}
-      <AdjustmentModalPro
-        isOpen={showAdjustmentModal}
-        onClose={() => setShowAdjustmentModal(false)}
-        periodId={periodId!}
-        period={period}
-        employees={employees}
-        onSuccess={handleAdjustmentSuccess}
+      <NovedadUnifiedModal
+        mode="ajustes"
+        open={showAdjustmentModal}
+        setOpen={setShowAdjustmentModal}
+        employeeId={selectedEmployeeId}
+        employeeSalary={selectedEmployeeSalary}
+        periodId={periodId}
+        onSubmit={handleNovedadSubmit}
+        selectedNovedadType={null}
+        startDate={period?.fecha_inicio}
+        endDate={period?.fecha_fin}
+        onClose={handleAdjustmentSuccess}
       />
     </div>
   );
