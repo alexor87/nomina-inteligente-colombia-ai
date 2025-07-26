@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, DollarSign, Info, Plus, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useMultipleNovedadEntries } from '@/hooks/useMultipleNovedadEntries';
+import { AdjustmentCauseSelector } from '../AdjustmentCauseSelector';
+import { AdjustmentCause } from '@/types/adjustmentCauses';
 
 interface BonificacionEntry {
   id: string;
@@ -23,6 +25,7 @@ interface NovedadBonificacionesConsolidatedFormProps {
   onBack: () => void;
   onSubmit: (formDataArray: any[]) => void;
   employeeSalary: number;
+  mode?: 'liquidacion' | 'ajustes';
 }
 
 const tiposBonificacion = [
@@ -49,7 +52,8 @@ const tiposBonificacion = [
 export const NovedadBonificacionesConsolidatedForm: React.FC<NovedadBonificacionesConsolidatedFormProps> = ({
   onBack,
   onSubmit,
-  employeeSalary
+  employeeSalary,
+  mode = 'liquidacion'
 }) => {
   const { entries, addEntry, updateEntry, removeEntry, getTotalValue } = useMultipleNovedadEntries<BonificacionEntry>();
   
@@ -59,6 +63,8 @@ export const NovedadBonificacionesConsolidatedForm: React.FC<NovedadBonificacion
     observacion: '',
     constitutivo: false
   });
+  const [adjustmentCause, setAdjustmentCause] = useState<AdjustmentCause | null>(null);
+  const [adjustmentObservation, setAdjustmentObservation] = useState<string>('');
 
   const handleTipoBonificacionChange = (tipo: string) => {
     const selectedType = tiposBonificacion.find(t => t.value === tipo);
@@ -111,12 +117,26 @@ export const NovedadBonificacionesConsolidatedForm: React.FC<NovedadBonificacion
       alert('Agregue al menos una bonificación');
       return;
     }
+    
+    // For adjustments mode, validate that cause and observation are provided
+    if (mode === 'ajustes' && (!adjustmentCause || !adjustmentObservation.trim())) {
+      alert('Para ajustes debe seleccionar una causal y agregar observaciones');
+      return;
+    }
 
-    const formDataArray = entries.map(entry => ({
-      tipo_novedad: entry.tipo_novedad,
-      valor: entry.valor,
-      observacion: `${entry.observacion || ''} ${entry.constitutivo ? '(Constitutivo de salario)' : '(No constitutivo de salario)'}`.trim()
-    }));
+    const formDataArray = entries.map(entry => {
+      let observacion = `${entry.observacion || ''} ${entry.constitutivo ? '(Constitutivo de salario)' : '(No constitutivo de salario)'}`.trim();
+      
+      if (mode === 'ajustes') {
+        observacion = `CAUSAL: ${adjustmentCause?.label} | OBSERVACIÓN: ${adjustmentObservation} | DETALLE: ${observacion}`;
+      }
+      
+      return {
+        tipo_novedad: entry.tipo_novedad,
+        valor: entry.valor,
+        observacion
+      };
+    });
 
     onSubmit(formDataArray);
   };
@@ -136,8 +156,21 @@ export const NovedadBonificacionesConsolidatedForm: React.FC<NovedadBonificacion
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold text-gray-900">Bonificaciones y Auxilios</h3>
+        <h3 className="text-lg font-semibold text-gray-900">
+          {mode === 'ajustes' ? 'Ajuste de Bonificaciones y Auxilios' : 'Bonificaciones y Auxilios'}
+        </h3>
       </div>
+
+      {/* Adjustment Cause Selector - Only for adjustments mode */}
+      {mode === 'ajustes' && (
+        <AdjustmentCauseSelector
+          onCauseChange={(cause, observation) => {
+            setAdjustmentCause(cause);
+            setAdjustmentObservation(observation);
+          }}
+          initialObservation={adjustmentObservation}
+        />
+      )}
 
       {/* Form to add new entry */}
       <div className="bg-blue-50 p-4 rounded-lg space-y-4">
@@ -291,7 +324,10 @@ export const NovedadBonificacionesConsolidatedForm: React.FC<NovedadBonificacion
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={entries.length === 0}
+          disabled={
+            entries.length === 0 ||
+            (mode === 'ajustes' && (!adjustmentCause || !adjustmentObservation.trim()))
+          }
           className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
         >
           Guardar {entries.length} Bonificacion{entries.length !== 1 ? 'es' : ''}
