@@ -151,12 +151,31 @@ export class PeriodDisplayService {
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
 
+    // CORRECCIÓN: Para períodos quincenales, siempre usar el mes de la fecha de INICIO
+    if (type === 'quincenal') {
+      const monthName = monthNames[startMonth];
+      
+      // Primera quincena (1-15)
+      if (startDay === 1 && endDay === 15) {
+        const name = `1 - 15 ${monthName} ${startYear}`;
+        console.log('📅 First fortnight detected (corrected):', name);
+        return name;
+      }
+      
+      // Segunda quincena (16-fin de mes)
+      if (startDay === 16) {
+        const name = `16 - ${endDay} ${monthName} ${startYear}`;
+        console.log('📅 Second fortnight detected (corrected):', name);
+        return name;
+      }
+    }
+
     // Si es el mismo mes y año
     if (startMonth === endMonth && startYear === endYear) {
       const monthName = monthNames[startMonth];
       
-      // Verificar si es primera quincena (1-15)
-      if (startDay === 1 && endDay === 15) {
+      // Verificar si es primera quincena (1-15) - ya manejado arriba para quincenal
+      if (startDay === 1 && endDay === 15 && type !== 'quincenal') {
         const name = `1 - 15 ${monthName} ${startYear}`;
         console.log('📅 First fortnight detected:', name);
         return name;
