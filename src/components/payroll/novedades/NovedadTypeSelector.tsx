@@ -137,17 +137,9 @@ export const NovedadTypeSelector: React.FC<NovedadTypeSelectorProps> = ({
   mode = 'liquidacion'
 }) => {
   
-  // Filtrar categorías para modo ajustes (conceptos más comunes)
-  const ajustesDevengadosCategorias = devengadosCategorias.filter(cat => 
-    ['bonificaciones', 'ingresos_adicionales'].includes(cat.id)
-  );
-  
-  const ajustesDeduccionesCategorias = deduccionesCategorias.filter(cat => 
-    ['deducciones_especiales', 'retefuente'].includes(cat.id)
-  );
-  
-  const devengadosToShow = mode === 'ajustes' ? ajustesDevengadosCategorias : devengadosCategorias;
-  const deduccionesToShow = mode === 'ajustes' ? ajustesDeduccionesCategorias : deduccionesCategorias;
+  // Mostrar todas las categorías sin filtros para ambos modos
+  const devengadosToShow = devengadosCategorias;
+  const deduccionesToShow = deduccionesCategorias;
   const renderCategoriesGrid = (categorias: typeof devengadosCategorias, onSelectCategoryFn: (category: NovedadCategory) => void) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {categorias.map((categoria) => {

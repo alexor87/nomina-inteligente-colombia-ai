@@ -129,11 +129,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }, [employeeId]);
 
   const handleClose = () => {
-    setOpen(false);
+    // Reset all states before closing
+    setIsSubmitting(false);
     setCurrentStep('list');
     setSelectedType(null);
     setRefreshTrigger(0);
-    setIsSubmitting(false);
+    setOpen(false);
     onClose?.();
   };
 
