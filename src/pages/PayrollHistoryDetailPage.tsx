@@ -12,8 +12,8 @@ import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAuditSummary';
 import { NovedadAuditHistoryModal } from '@/components/payroll/audit/NovedadAuditHistoryModal';
-import { ClosedPeriodAdjustmentModal, AdjustmentData } from '@/components/payroll/corrections/ClosedPeriodAdjustmentModal';
-import { ClosedPeriodAdjustmentService } from '@/services/ClosedPeriodAdjustmentService';
+import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
+import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PeriodDetail {
@@ -50,6 +50,15 @@ interface Adjustment {
   created_at: string;
 }
 
+interface PendingNovedad {
+  employee_id: string;
+  employee_name: string;
+  tipo_novedad: string;
+  valor: number;
+  observacion?: string;
+  novedadData: CreateNovedadData;
+}
+
 export const PayrollHistoryDetailPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
@@ -60,13 +69,14 @@ export const PayrollHistoryDetailPage = () => {
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
-  const [showClosedPeriodModal, setShowClosedPeriodModal] = useState(false);
-  const [showEmployeeSelector, setShowEmployeeSelector] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [selectedEmployeeSalary, setSelectedEmployeeSalary] = useState<number>(0);
   const [selectedNovedadId, setSelectedNovedadId] = useState<string | null>(null);
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
+  const [pendingNovedades, setPendingNovedades] = useState<PendingNovedad[]>([]);
+  const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
   
   // Hook para gestionar novedades
   const { createNovedad } = usePayrollNovedadesUnified(periodId || '');
@@ -160,24 +170,13 @@ export const PayrollHistoryDetailPage = () => {
       setSelectedEmployeeSalary(employeeSalary);
       const employeeData = employees.find(e => e.employee_id === employeeId);
       setSelectedEmployeeName(employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : '');
-      
-      // Check if period is closed and use appropriate modal
-      if (period?.estado === 'cerrado') {
-        setShowClosedPeriodModal(true);
-      } else {
-        setShowAdjustmentModal(true);
-      }
+      setShowAdjustmentModal(true);
     } else if (employees.length > 0) {
       // Usar el primer empleado como fallback
       setSelectedEmployeeId(employees[0].employee_id);
       setSelectedEmployeeSalary(employees[0].salario_base);
       setSelectedEmployeeName(`${employees[0].employee_name} ${employees[0].employee_lastname}`);
-      
-      if (period?.estado === 'cerrado') {
-        setShowClosedPeriodModal(true);
-      } else {
-        setShowAdjustmentModal(true);
-      }
+      setShowAdjustmentModal(true);
     } else {
       toast({
         title: "Error",
@@ -189,43 +188,105 @@ export const PayrollHistoryDetailPage = () => {
 
   const handleNovedadSubmit = async (data: CreateNovedadData) => {
     try {
-      await createNovedad(data);
-      handleAdjustmentSuccess();
+      // For closed periods, add to pending list instead of applying immediately
+      if (period?.estado === 'cerrado') {
+        const employeeData = employees.find(e => e.employee_id === selectedEmployeeId);
+        const newPendingNovedad: PendingNovedad = {
+          employee_id: selectedEmployeeId,
+          employee_name: employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : selectedEmployeeName,
+          tipo_novedad: data.tipo_novedad,
+          valor: data.valor || 0,
+          observacion: data.observacion,
+          novedadData: data
+        };
+        
+        setPendingNovedades(prev => [...prev, newPendingNovedad]);
+        setShowAdjustmentModal(false);
+        
+        toast({
+          title: "Novedad agregada",
+          description: "La novedad se agregó a la lista de ajustes pendientes",
+        });
+      } else {
+        // For open periods, apply immediately
+        await createNovedad(data);
+        handleAdjustmentSuccess();
+      }
     } catch (error) {
       console.error('Error creating novedad:', error);
       throw error;
     }
   };
 
-  const handleClosedPeriodAdjustment = async (data: AdjustmentData) => {
-    if (!selectedEmployeeId || !periodId) return;
+  const handleApplyPendingAdjustments = async (justification: string) => {
+    if (!periodId || pendingNovedades.length === 0) return;
 
     try {
-      const result = await ClosedPeriodAdjustmentService.processAdjustment(
+      setIsApplyingAdjustments(true);
+
+      // Group novelties by employee
+      const employeeGroups = pendingNovedades.reduce((groups, novedad) => {
+        if (!groups[novedad.employee_id]) {
+          groups[novedad.employee_id] = {
+            employeeId: novedad.employee_id,
+            employeeName: novedad.employee_name,
+            novedades: []
+          };
+        }
+        groups[novedad.employee_id].novedades.push(novedad.novedadData);
+        return groups;
+      }, {} as Record<string, { employeeId: string; employeeName: string; novedades: CreateNovedadData[] }>);
+
+      // Apply adjustments for each employee
+      for (const group of Object.values(employeeGroups)) {
+        const adjustmentData: PendingAdjustmentData = {
+          periodId,
+          employeeId: group.employeeId,
+          employeeName: group.employeeName,
+          justification,
+          novedades: group.novedades
+        };
+
+        const result = await PendingNovedadesService.applyPendingAdjustments(adjustmentData);
+        
+        if (!result.success) {
+          throw new Error(result.message);
+        }
+      }
+
+      // Create notification
+      await PendingNovedadesService.createAdjustmentNotification(
         periodId,
-        selectedEmployeeId,
-        data
+        Object.keys(employeeGroups).length,
+        pendingNovedades.length
       );
 
-      if (result.success) {
-        toast({
-          title: "Ajuste aplicado",
-          description: result.message
-        });
-        
-        setShowClosedPeriodModal(false);
-        loadPeriodDetail();
-      } else {
-        throw new Error(result.message);
-      }
+      toast({
+        title: "Ajustes aplicados",
+        description: `Se aplicaron ${pendingNovedades.length} ajustes correctamente`,
+      });
+
+      // Clear pending novelties and close modal
+      setPendingNovedades([]);
+      setShowConfirmModal(false);
+      
+      // Reload data
+      loadPeriodDetail();
+
     } catch (error) {
-      console.error("Error processing adjustment:", error);
+      console.error("Error applying adjustments:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo procesar el ajuste",
+        description: error instanceof Error ? error.message : "No se pudieron aplicar los ajustes",
         variant: "destructive"
       });
+    } finally {
+      setIsApplyingAdjustments(false);
     }
+  };
+
+  const handleRemovePendingNovedad = (index: number) => {
+    setPendingNovedades(prev => prev.filter((_, i) => i !== index));
   };
 
   if (loading) {
@@ -276,6 +337,21 @@ export const PayrollHistoryDetailPage = () => {
             </p>
           </div>
         </div>
+        
+        {/* Show save button for closed periods with pending novelties */}
+        {period?.estado === 'cerrado' && pendingNovedades.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="animate-pulse">
+              {pendingNovedades.length} novedades pendientes
+            </Badge>
+            <Button 
+              onClick={() => setShowConfirmModal(true)}
+              className="bg-warning hover:bg-warning/90 text-warning-foreground"
+            >
+              Guardar Novedades
+            </Button>
+          </div>
+        )}
         
       </div>
 
@@ -375,13 +451,12 @@ export const PayrollHistoryDetailPage = () => {
                         <td className="p-4">
                           <div className="flex items-center gap-2">
                             <Button
-                              variant={period?.estado === 'cerrado' ? "default" : "outline"}
+                              variant="outline"
                               size="sm"
                               onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
-                              className={`flex items-center gap-2 ${period?.estado === 'cerrado' ? 'bg-warning/10 text-warning border-warning hover:bg-warning/20' : ''}`}
+                              className="flex items-center gap-2"
                             >
                               <Plus className="h-4 w-4" />
-                              {period?.estado === 'cerrado' ? 'Ajustar Período Cerrado' : 'Ajustar'}
                             </Button>
                             <Button
                               variant="outline"
@@ -484,21 +559,17 @@ export const PayrollHistoryDetailPage = () => {
         selectedNovedadType={null}
         startDate={period?.fecha_inicio}
         endDate={period?.fecha_fin}
-        onClose={handleAdjustmentSuccess}
+        onClose={() => setShowAdjustmentModal(false)}
       />
 
-      {/* Closed Period Adjustment Modal */}
-      <ClosedPeriodAdjustmentModal
-        isOpen={showClosedPeriodModal}
-        onClose={() => {
-          setShowClosedPeriodModal(false);
-          setSelectedEmployeeId('');
-          setSelectedEmployeeName('');
-        }}
-        employeeName={selectedEmployeeName}
+      {/* Confirmation Modal for Pending Adjustments */}
+      <ConfirmAdjustmentModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleApplyPendingAdjustments}
+        pendingNovedades={pendingNovedades}
         periodName={period?.periodo || ''}
-        periodStatus={period?.estado || ''}
-        onSubmit={handleClosedPeriodAdjustment}
+        isLoading={isApplyingAdjustments}
       />
 
       {/* Audit History Modal */}
