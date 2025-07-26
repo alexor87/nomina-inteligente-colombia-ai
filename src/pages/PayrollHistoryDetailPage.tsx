@@ -41,15 +41,6 @@ interface EmployeePayroll {
   salario_base: number;
 }
 
-interface Adjustment {
-  id: string;
-  employee_id: string;
-  employee_name: string;
-  concept: string;
-  amount: number;
-  observations: string;
-  created_at: string;
-}
 
 interface PendingNovedad {
   employee_id: string;
@@ -67,7 +58,7 @@ export const PayrollHistoryDetailPage = () => {
   
   const [period, setPeriod] = useState<PeriodDetail | null>(null);
   const [employees, setEmployees] = useState<EmployeePayroll[]>([]);
-  const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -126,15 +117,6 @@ export const PayrollHistoryDetailPage = () => {
       
       setEmployees(employeesWithNames);
 
-      // Load adjustments using Supabase function
-      const { data: adjustmentsData, error: adjustmentsError } = await supabase
-        .rpc('get_period_adjustments', { period_id: periodId });
-      
-      if (adjustmentsError) {
-        console.error('Error loading adjustments:', adjustmentsError);
-      } else {
-        setAdjustments(adjustmentsData || []);
-      }
       
     } catch (error) {
       console.error('Error loading period detail:', error);
@@ -474,14 +456,10 @@ export const PayrollHistoryDetailPage = () => {
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="employees" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="employees" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Empleados
-          </TabsTrigger>
-          <TabsTrigger value="adjustments" className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Ajustes ({adjustments.length})
           </TabsTrigger>
           <TabsTrigger value="audit" className="flex items-center gap-2">
             <History className="h-4 w-4" />
@@ -609,66 +587,6 @@ export const PayrollHistoryDetailPage = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="adjustments">
-          {adjustments.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Historial de Ajustes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-4 font-medium">Fecha</th>
-                        <th className="text-left p-4 font-medium">Empleado</th>
-                        <th className="text-left p-4 font-medium">Concepto</th>
-                        <th className="text-left p-4 font-medium">Valor</th>
-                        <th className="text-left p-4 font-medium">Observaciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {adjustments.map((adjustment) => (
-                        <tr key={adjustment.id} className="border-b hover:bg-muted/50">
-                          <td className="p-4">
-                            {new Date(adjustment.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="p-4">{adjustment.employee_name}</td>
-                          <td className="p-4">{adjustment.concept}</td>
-                          <td className="p-4 font-mono">
-                            <span className={adjustment.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
-                              {formatCurrency(adjustment.amount)}
-                            </span>
-                          </td>
-                          <td className="p-4 text-sm text-muted-foreground">
-                            {adjustment.observations || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Plus className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No hay ajustes registrados</h3>
-                <p className="text-gray-500 text-center mb-4">
-                  Los ajustes realizados a los empleados aparecerán aquí
-                </p>
-                <Button
-                  onClick={() => handleOpenAdjustmentModal()}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Crear primer ajuste
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
 
         <TabsContent value="audit">
           <PeriodAuditSummaryComponent 
