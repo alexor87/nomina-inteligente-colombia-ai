@@ -170,11 +170,12 @@ export class PayrollAtomicService {
       errors.push('Período ya está cerrado');
     }
     
-    // Verificar que hay empleados para procesar
+    // 🔒 SECURITY FIX: Verificar que hay empleados para procesar CON FILTRO DE EMPRESA
     const { data: payrolls } = await supabase
       .from('payrolls')
       .select('id')
-      .eq('period_id', periodId);
+      .eq('period_id', periodId)
+      .eq('company_id', companyId); // CRITICAL: Add company filter
     
     if (!payrolls || payrolls.length === 0) {
       errors.push('No hay empleados para procesar');
@@ -194,14 +195,15 @@ export class PayrollAtomicService {
     periodId: string, 
     companyId: string
   ) {
-    // Obtener empleados del período
+    // 🔒 SECURITY FIX: Obtener empleados del período CON FILTRO DE EMPRESA
     const { data: payrolls, error } = await supabase
       .from('payrolls')
       .select(`
         id, employee_id, salario_base,
         employees(nombre, apellido, cedula)
       `)
-      .eq('period_id', periodId);
+      .eq('period_id', periodId)
+      .eq('company_id', companyId); // CRITICAL: Add company filter
     
     if (error || !payrolls) {
       throw new Error('Error obteniendo empleados para procesar');
@@ -288,11 +290,12 @@ export class PayrollAtomicService {
     companyId: string,
     employeeData: any[]
   ) {
-    // Obtener datos del período
+    // 🔒 SECURITY FIX: Obtener datos del período CON FILTRO DE EMPRESA
     const { data: period } = await supabase
       .from('payroll_periods_real')
       .select('*')
       .eq('id', periodId)
+      .eq('company_id', companyId) // CRITICAL: Add company filter
       .single();
     
     if (!period) {

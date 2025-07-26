@@ -1648,6 +1648,48 @@ export type Database = {
           },
         ]
       }
+      security_audit_log: {
+        Row: {
+          action: string
+          additional_data: Json | null
+          company_id: string | null
+          created_at: string
+          id: string
+          ip_address: unknown | null
+          query_attempted: string | null
+          table_name: string
+          user_agent: string | null
+          user_id: string | null
+          violation_type: string
+        }
+        Insert: {
+          action: string
+          additional_data?: Json | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          query_attempted?: string | null
+          table_name: string
+          user_agent?: string | null
+          user_id?: string | null
+          violation_type: string
+        }
+        Update: {
+          action?: string
+          additional_data?: Json | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          query_attempted?: string | null
+          table_name?: string
+          user_agent?: string | null
+          user_id?: string | null
+          violation_type?: string
+        }
+        Relationships: []
+      }
       subtipos_cotizante: {
         Row: {
           activo: boolean
@@ -2027,6 +2069,10 @@ export type Database = {
         Args: { _user_id: string; _company_id: string }
         Returns: string
       }
+      has_company_access: {
+        Args: { p_company_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _user_id: string
@@ -2046,6 +2092,16 @@ export type Database = {
       is_support_user: {
         Args: { _user_id?: string }
         Returns: boolean
+      }
+      log_security_violation: {
+        Args: {
+          p_table_name: string
+          p_action: string
+          p_violation_type: string
+          p_query_attempted?: string
+          p_additional_data?: Json
+        }
+        Returns: undefined
       }
       normalize_biweekly_period_labels: {
         Args: Record<PropertyKey, never>
