@@ -1115,6 +1115,57 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_period_corrections: {
+        Row: {
+          affected_novedad_id: string | null
+          company_id: string
+          concept: string
+          correction_type: string
+          created_at: string
+          created_by: string
+          employee_id: string
+          id: string
+          justification: string
+          new_value: number | null
+          period_id: string
+          previous_value: number | null
+          updated_at: string
+          value_difference: number
+        }
+        Insert: {
+          affected_novedad_id?: string | null
+          company_id: string
+          concept: string
+          correction_type: string
+          created_at?: string
+          created_by: string
+          employee_id: string
+          id?: string
+          justification: string
+          new_value?: number | null
+          period_id: string
+          previous_value?: number | null
+          updated_at?: string
+          value_difference: number
+        }
+        Update: {
+          affected_novedad_id?: string | null
+          company_id?: string
+          concept?: string
+          correction_type?: string
+          created_at?: string
+          created_by?: string
+          employee_id?: string
+          id?: string
+          justification?: string
+          new_value?: number | null
+          period_id?: string
+          previous_value?: number | null
+          updated_at?: string
+          value_difference?: number
+        }
+        Relationships: []
+      }
       payroll_periods: {
         Row: {
           company_id: string

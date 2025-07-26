@@ -12,6 +12,8 @@ import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAuditSummary';
 import { NovedadAuditHistoryModal } from '@/components/payroll/audit/NovedadAuditHistoryModal';
+import { ClosedPeriodAdjustmentModal, AdjustmentData } from '@/components/payroll/corrections/ClosedPeriodAdjustmentModal';
+import { ClosedPeriodAdjustmentService } from '@/services/ClosedPeriodAdjustmentService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PeriodDetail {
@@ -58,6 +60,7 @@ export const PayrollHistoryDetailPage = () => {
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showClosedPeriodModal, setShowClosedPeriodModal] = useState(false);
   const [showEmployeeSelector, setShowEmployeeSelector] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
@@ -155,12 +158,26 @@ export const PayrollHistoryDetailPage = () => {
       // Ajuste para empleado específico
       setSelectedEmployeeId(employeeId);
       setSelectedEmployeeSalary(employeeSalary);
-      setShowAdjustmentModal(true);
+      const employeeData = employees.find(e => e.employee_id === employeeId);
+      setSelectedEmployeeName(employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : '');
+      
+      // Check if period is closed and use appropriate modal
+      if (period?.estado === 'cerrado') {
+        setShowClosedPeriodModal(true);
+      } else {
+        setShowAdjustmentModal(true);
+      }
     } else if (employees.length > 0) {
       // Usar el primer empleado como fallback
       setSelectedEmployeeId(employees[0].employee_id);
       setSelectedEmployeeSalary(employees[0].salario_base);
-      setShowAdjustmentModal(true);
+      setSelectedEmployeeName(`${employees[0].employee_name} ${employees[0].employee_lastname}`);
+      
+      if (period?.estado === 'cerrado') {
+        setShowClosedPeriodModal(true);
+      } else {
+        setShowAdjustmentModal(true);
+      }
     } else {
       toast({
         title: "Error",
@@ -177,6 +194,37 @@ export const PayrollHistoryDetailPage = () => {
     } catch (error) {
       console.error('Error creating novedad:', error);
       throw error;
+    }
+  };
+
+  const handleClosedPeriodAdjustment = async (data: AdjustmentData) => {
+    if (!selectedEmployeeId || !periodId) return;
+
+    try {
+      const result = await ClosedPeriodAdjustmentService.processAdjustment(
+        periodId,
+        selectedEmployeeId,
+        data
+      );
+
+      if (result.success) {
+        toast({
+          title: "Ajuste aplicado",
+          description: result.message
+        });
+        
+        setShowClosedPeriodModal(false);
+        loadPeriodDetail();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error("Error processing adjustment:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo procesar el ajuste",
+        variant: "destructive"
+      });
     }
   };
 
@@ -327,13 +375,13 @@ export const PayrollHistoryDetailPage = () => {
                         <td className="p-4">
                           <div className="flex items-center gap-2">
                             <Button
-                              variant="outline"
+                              variant={period?.estado === 'cerrado' ? "default" : "outline"}
                               size="sm"
                               onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
-                              className="flex items-center gap-2"
+                              className={`flex items-center gap-2 ${period?.estado === 'cerrado' ? 'bg-warning/10 text-warning border-warning hover:bg-warning/20' : ''}`}
                             >
                               <Plus className="h-4 w-4" />
-                              Ajustar
+                              {period?.estado === 'cerrado' ? 'Ajustar Período Cerrado' : 'Ajustar'}
                             </Button>
                             <Button
                               variant="outline"
@@ -437,6 +485,20 @@ export const PayrollHistoryDetailPage = () => {
         startDate={period?.fecha_inicio}
         endDate={period?.fecha_fin}
         onClose={handleAdjustmentSuccess}
+      />
+
+      {/* Closed Period Adjustment Modal */}
+      <ClosedPeriodAdjustmentModal
+        isOpen={showClosedPeriodModal}
+        onClose={() => {
+          setShowClosedPeriodModal(false);
+          setSelectedEmployeeId('');
+          setSelectedEmployeeName('');
+        }}
+        employeeName={selectedEmployeeName}
+        periodName={period?.periodo || ''}
+        periodStatus={period?.estado || ''}
+        onSubmit={handleClosedPeriodAdjustment}
       />
 
       {/* Audit History Modal */}
