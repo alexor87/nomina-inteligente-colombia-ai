@@ -37,22 +37,26 @@ interface PeriodDetail {
 interface EmployeePayroll {
   id: string;
   empleado_id: string;
+  employee_id: string;
   employee_name: string;
   employee_identification: string;
   total_devengado: number;
   total_deducciones: number;
   total_neto: number;
+  neto_pagado: number;
   tiene_novedades: boolean;
 }
-
 
 interface PendingNovedad {
   id: string;
   empleado_id: string;
+  employee_id: string;
+  employee_name: string;
   tipo_novedad: string;
   concepto: string;
   valor: number;
   estado: string;
+  novedadData: CreateNovedadData;
 }
 
 export const PayrollHistoryDetailPage = () => {
@@ -102,7 +106,7 @@ export const PayrollHistoryDetailPage = () => {
         .from('payrolls')
         .select(`
           *,
-          employees!inner(nombre, apellido, identificacion)
+          employees!inner(nombre, apellido, cedula)
         `)
         .eq('period_id', periodId);
       
@@ -111,11 +115,13 @@ export const PayrollHistoryDetailPage = () => {
       const employeesWithNames = payrollData?.map(p => ({
         id: p.id,
         empleado_id: p.employee_id,
+        employee_id: p.employee_id,
         employee_name: p.employees.nombre,
-        employee_identification: p.employees.identificacion || p.employees.apellido || '',
+        employee_identification: p.employees.cedula || '',
         total_devengado: p.total_devengado || 0,
         total_deducciones: p.total_deducciones || 0,
         total_neto: p.neto_pagado || 0,
+        neto_pagado: p.neto_pagado || 0,
         tiene_novedades: false
       })) || [];
       
