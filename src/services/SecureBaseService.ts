@@ -11,23 +11,41 @@ export abstract class SecureBaseService {
    */
   protected static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log('🔍 [DEBUG] Starting getCurrentUserCompanyId...');
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('🔍 [DEBUG] Auth user result:', { user: user?.id, userError });
+      
+      if (userError) {
+        console.error('🔒 [SECURITY] Error getting user:', userError);
+        return null;
+      }
+      
       if (!user) {
         console.warn('🔒 [SECURITY] No authenticated user found');
         return null;
       }
 
+      console.log('🔍 [DEBUG] Fetching profile for user:', user.id);
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
         .single();
 
-      if (error || !profile?.company_id) {
-        console.warn('🔒 [SECURITY] No company_id found for user:', user.id);
+      console.log('🔍 [DEBUG] Profile query result:', { profile, error });
+
+      if (error) {
+        console.error('🔒 [SECURITY] Profile query error:', error);
+        return null;
+      }
+      
+      if (!profile?.company_id) {
+        console.warn('🔒 [SECURITY] No company_id found for user:', user.id, 'Profile:', profile);
         return null;
       }
 
+      console.log('✅ [DEBUG] Company ID found:', profile.company_id);
       return profile.company_id;
     } catch (error) {
       console.error('🔒 [SECURITY] Error getting company ID:', error);

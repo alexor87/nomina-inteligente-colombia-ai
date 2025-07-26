@@ -96,39 +96,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const currentUser = (await supabase.auth.getUser()).data.user;
     if (!currentUser) {
-      console.log('❌ No current user found');
+      console.log('❌ [AUTH] No current user found');
       return;
     }
 
     isRefreshingUserData.current = true;
-    console.log('🔄 Refreshing user data for:', currentUser.email);
+    console.log('🔄 [AUTH] Refreshing user data for:', currentUser.email);
 
     try {
       // Fetch profile
+      console.log('🔍 [AUTH] Fetching profile...');
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', currentUser.id)
         .single();
       
+      console.log('🔍 [AUTH] Profile result:', { profileData, profileError });
+      
       if (!profileError && profileData) {
         setProfile(profileData);
-        console.log('👤 User profile fetched successfully');
+        console.log('👤 [AUTH] User profile fetched successfully, company_id:', profileData.company_id);
         
         // Only run role check if user has a company
         if (profileData.company_id) {
-          console.log('🔧 Running role check for company:', profileData.company_id);
+          console.log('🔧 [AUTH] Running role check for company:', profileData.company_id);
           await performCompleteRoleCheck(currentUser.id);
         }
       } else {
-        console.error('❌ Error fetching user profile:', profileError);
+        console.error('❌ [AUTH] Error fetching user profile:', profileError);
         setProfile(null);
       }
 
       // Fetch roles with fallback
+      console.log('🔍 [AUTH] Fetching roles...');
       try {
         const { data: userRoles, error: rolesError } = await supabase
           .rpc('get_user_companies_simple', { _user_id: currentUser.id });
+        
+        console.log('🔍 [AUTH] RPC roles result:', { userRoles, rolesError });
         
         if (!rolesError && userRoles) {
           const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
@@ -136,9 +142,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             company_id: role.company_id
           }));
           setRoles(transformedRoles);
-          console.log('👥 User roles fetched:', transformedRoles.length, 'roles');
+          console.log('👥 [AUTH] User roles fetched:', transformedRoles.length, 'roles');
         } else {
-          console.error('❌ Error fetching user roles via RPC, trying direct query:', rolesError);
+          console.error('❌ [AUTH] Error fetching user roles via RPC, trying direct query:', rolesError);
           
           // Fallback: direct query to user_roles table
           const { data: directRoles, error: directError } = await supabase
@@ -146,25 +152,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .select('role, company_id')
             .eq('user_id', currentUser.id);
           
+          console.log('🔍 [AUTH] Direct roles result:', { directRoles, directError });
+          
           if (!directError && directRoles) {
             const fallbackRoles: UserRole[] = directRoles.map((role: any) => ({
               role: role.role as AppRole,
               company_id: role.company_id
             }));
             setRoles(fallbackRoles);
-            console.log('👥 User roles fetched via fallback:', fallbackRoles.length, 'roles');
+            console.log('👥 [AUTH] User roles fetched via fallback:', fallbackRoles.length, 'roles');
           } else {
-            console.error('❌ Error with direct roles query:', directError);
+            console.error('❌ [AUTH] Error with direct roles query:', directError);
             setRoles([]);
           }
         }
       } catch (rolesFetchError) {
-        console.error('❌ Critical error fetching roles:', rolesFetchError);
+        console.error('❌ [AUTH] Critical error fetching roles:', rolesFetchError);
         setRoles([]);
       }
 
+      console.log('✅ [AUTH] User data refresh complete');
     } catch (error) {
-      console.error('❌ Error refreshing user data:', error);
+      console.error('❌ [AUTH] Error refreshing user data:', error);
     } finally {
       isRefreshingUserData.current = false;
     }

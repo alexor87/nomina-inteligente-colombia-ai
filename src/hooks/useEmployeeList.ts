@@ -68,19 +68,30 @@ export const useEmployeeList = (): EmployeeListHook => {
 
   const loadEmployees = async () => {
     try {
+      console.log('🔄 [HOOK] Loading employees...');
       setIsLoading(true);
       setError(null);
       
+      console.log('🔄 [HOOK] Calling EmployeeUnifiedService.getAll()...');
       const result = await EmployeeUnifiedService.getAll();
+      
+      console.log('🔄 [HOOK] Service result:', result);
+      
       if (result.success && result.data) {
         setEmployees(result.data);
+        console.log(`✅ [HOOK] Loaded ${result.data.length} employees successfully`);
       } else {
-        setError(result.error || 'Error loading employees');
+        const errorMsg = result.error || 'Error loading employees';
+        setError(errorMsg);
+        console.error('❌ [HOOK] Failed to load employees:', errorMsg);
       }
     } catch (err: any) {
-      setError(err.message || 'Error loading employees');
+      const errorMsg = err.message || 'Error loading employees';
+      setError(errorMsg);
+      console.error('❌ [HOOK] Exception loading employees:', err);
     } finally {
       setIsLoading(false);
+      console.log('🔄 [HOOK] Loading complete, isLoading set to false');
     }
   };
 

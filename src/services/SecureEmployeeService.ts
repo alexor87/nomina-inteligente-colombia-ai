@@ -15,6 +15,27 @@ export class SecureEmployeeService extends SecureBaseService {
    */
   static async getEmployees(): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
     try {
+      console.log('🔍 [SECURE-EMPLOYEES] Starting getEmployees...');
+      
+      // First, let's verify we can get the company ID
+      const companyId = await this.getCurrentUserCompanyId();
+      console.log('🔍 [SECURE-EMPLOYEES] Company ID for query:', companyId);
+      
+      if (!companyId) {
+        console.error('🔍 [SECURE-EMPLOYEES] No company ID available - session might not be ready');
+        
+        // Retry mechanism - wait 200ms and try once more
+        console.log('🔍 [SECURE-EMPLOYEES] Retrying after short delay...');
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        const retryCompanyId = await this.getCurrentUserCompanyId();
+        console.log('🔍 [SECURE-EMPLOYEES] Retry company ID:', retryCompanyId);
+        
+        if (!retryCompanyId) {
+          return { success: false, error: 'No company context available. Please refresh the page.' };
+        }
+      }
+      
       console.log('🔒 SecureEmployeeService: Fetching employees with company filter');
       
       const query = await this.secureQuery(
@@ -23,7 +44,10 @@ export class SecureEmployeeService extends SecureBaseService {
         { estado: { neq: 'eliminado' } } // Exclude soft deleted
       );
       
+      console.log('🔍 [SECURE-EMPLOYEES] Executing employee query...');
       const { data, error } = await query.order('created_at', { ascending: false });
+
+      console.log('🔍 [SECURE-EMPLOYEES] Query result:', { dataCount: data?.length, error });
 
       if (error) {
         console.error('❌ SecureEmployeeService: Error fetching employees:', error);
@@ -39,7 +63,7 @@ export class SecureEmployeeService extends SecureBaseService {
       // Map database records to EmployeeUnified format
       const employees = data.map(mapDatabaseToUnified);
       
-      console.log(`✅ SecureEmployeeService: Successfully fetched ${employees.length} secure employees`);
+      console.log(`✅ SecureEmployeeService: Successfully fetched ${employees.length} secure employees for company:`, companyId);
       return { success: true, data: employees };
     } catch (error) {
       console.error('❌ SecureEmployeeService: Error in getEmployees:', error);
