@@ -56,7 +56,11 @@ export abstract class SecureBaseService {
     // Add additional filters if provided
     if (additionalFilters) {
       Object.entries(additionalFilters).forEach(([key, value]) => {
-        query = query.eq(key, value);
+        if (typeof value === 'object' && value !== null && 'neq' in value) {
+          query = query.neq(key, value.neq);
+        } else {
+          query = query.eq(key, value);
+        }
       });
     }
 
@@ -105,7 +109,11 @@ export abstract class SecureBaseService {
 
     // Add conditions
     Object.entries(conditions).forEach(([key, value]) => {
-      query = query.eq(key, value);
+      if (typeof value === 'object' && value !== null && 'neq' in value) {
+        query = query.neq(key, value.neq);
+      } else {
+        query = query.eq(key, value);
+      }
     });
 
     console.log(`🔒 [SECURITY] Secure update to ${tableName} for company ${companyId}`);

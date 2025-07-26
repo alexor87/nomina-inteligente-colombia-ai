@@ -70,7 +70,7 @@ export class SecureEmployeeService extends SecureBaseService {
         }
       );
       
-      const { data, error } = await query.single();
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.error('❌ SecureEmployeeService: Error fetching employee:', error);
