@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCompanyId } from '@/components/employees/form/useCompanyId';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Download, Plus, Calendar, Users, DollarSign, History } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
@@ -16,10 +15,7 @@ import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAu
 import { NovedadAuditHistoryModal } from '@/components/payroll/audit/NovedadAuditHistoryModal';
 import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
 import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
-import { PayrollHistoryModernHeader } from '@/components/payroll/history/PayrollHistoryModernHeader';
-import { PayrollHistoryModernStats } from '@/components/payroll/history/PayrollHistoryModernStats';
-import { PayrollHistoryModernTable } from '@/components/payroll/history/PayrollHistoryModernTable';
-import { PayrollHistoryModernActions } from '@/components/payroll/history/PayrollHistoryModernActions';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PeriodDetail {
   id: string;
@@ -36,26 +32,22 @@ interface PeriodDetail {
 
 interface EmployeePayroll {
   id: string;
-  empleado_id: string;
   employee_id: string;
   employee_name: string;
-  employee_identification: string;
+  employee_lastname: string;
   total_devengado: number;
   total_deducciones: number;
-  total_neto: number;
   neto_pagado: number;
-  tiene_novedades: boolean;
+  salario_base: number;
 }
 
+
 interface PendingNovedad {
-  id: string;
-  empleado_id: string;
   employee_id: string;
   employee_name: string;
   tipo_novedad: string;
-  concepto: string;
   valor: number;
-  estado: string;
+  observacion?: string;
   novedadData: CreateNovedadData;
 }
 
@@ -106,7 +98,7 @@ export const PayrollHistoryDetailPage = () => {
         .from('payrolls')
         .select(`
           *,
-          employees!inner(nombre, apellido, cedula)
+          employees!inner(nombre, apellido)
         `)
         .eq('period_id', periodId);
       
@@ -114,15 +106,13 @@ export const PayrollHistoryDetailPage = () => {
       
       const employeesWithNames = payrollData?.map(p => ({
         id: p.id,
-        empleado_id: p.employee_id,
         employee_id: p.employee_id,
         employee_name: p.employees.nombre,
-        employee_identification: p.employees.cedula || '',
+        employee_lastname: p.employees.apellido,
         total_devengado: p.total_devengado || 0,
         total_deducciones: p.total_deducciones || 0,
-        total_neto: p.neto_pagado || 0,
         neto_pagado: p.neto_pagado || 0,
-        tiene_novedades: false
+        salario_base: p.salario_base || 0
       })) || [];
       
       setEmployees(employeesWithNames);
@@ -169,15 +159,15 @@ export const PayrollHistoryDetailPage = () => {
       // Ajuste para empleado específico
       setSelectedEmployeeId(employeeId);
       setSelectedEmployeeSalary(employeeSalary);
-      const employeeData = employees.find(e => e.empleado_id === employeeId);
-      setSelectedEmployeeName(employeeData ? employeeData.employee_name : '');
+      const employeeData = employees.find(e => e.employee_id === employeeId);
+      setSelectedEmployeeName(employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : '');
       setShowAdjustmentModal(true);
       console.log('🔵 Set specific employee data and modal to true');
     } else if (employees.length > 0) {
       // Usar el primer empleado como fallback
-      setSelectedEmployeeId(employees[0].empleado_id);
-      setSelectedEmployeeSalary(0);
-      setSelectedEmployeeName(employees[0].employee_name);
+      setSelectedEmployeeId(employees[0].employee_id);
+      setSelectedEmployeeSalary(employees[0].salario_base);
+      setSelectedEmployeeName(`${employees[0].employee_name} ${employees[0].employee_lastname}`);
       setShowAdjustmentModal(true);
       console.log('🔵 Set fallback employee data and modal to true');
     } else {
@@ -191,12 +181,47 @@ export const PayrollHistoryDetailPage = () => {
   };
 
   const handleNovedadSubmit = async (data: CreateNovedadData) => {
-    // Simplified for modern UI - just apply immediately
+    console.log('🟢 handleNovedadSubmit called with data:', data);
+    console.log('🟢 Period estado:', period?.estado);
+    console.log('🟢 selectedEmployeeId:', selectedEmployeeId);
+    console.log('🟢 Current pendingNovedades length:', pendingNovedades.length);
+    
     try {
-      await createNovedad(data);
-      handleAdjustmentSuccess();
+      // For closed periods, add to pending list instead of applying immediately
+      if (period?.estado === 'cerrado') {
+        const employeeData = employees.find(e => e.employee_id === selectedEmployeeId);
+        console.log('🟢 Found employee data:', employeeData);
+        
+        const newPendingNovedad: PendingNovedad = {
+          employee_id: selectedEmployeeId,
+          employee_name: employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : selectedEmployeeName,
+          tipo_novedad: data.tipo_novedad,
+          valor: data.valor || 0,
+          observacion: data.observacion,
+          novedadData: data
+        };
+        
+        console.log('🟢 Creating new pending novedad:', newPendingNovedad);
+        setPendingNovedades(prev => {
+          const newArray = [...prev, newPendingNovedad];
+          console.log('🟢 Updated pendingNovedades array:', newArray);
+          return newArray;
+        });
+        setShowAdjustmentModal(false);
+        console.log('🟢 Modal closed, pending novedad added');
+        
+        toast({
+          title: "Novedad agregada",
+          description: "La novedad se agregó a la lista de ajustes pendientes",
+        });
+      } else {
+        // For open periods, apply immediately
+        console.log('🟢 Applying novedad immediately for open period');
+        await createNovedad(data);
+        handleAdjustmentSuccess();
+      }
     } catch (error) {
-      console.error('Error creating novedad:', error);
+      console.error('❌ Error creating novedad:', error);
       throw error;
     }
   };
@@ -319,76 +344,257 @@ export const PayrollHistoryDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Cargando detalle del período...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!period) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-foreground mb-2">Período no encontrado</h2>
+      <div className="container mx-auto p-6">
+        <div className="text-center py-12">
+          <h3 className="text-lg font-medium mb-2">Período no encontrado</h3>
           <p className="text-muted-foreground mb-4">El período solicitado no existe o no tienes permisos para verlo.</p>
+          <Button onClick={() => navigate('/app/payroll-history')}>
+            Volver al historial
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <PayrollHistoryModernHeader period={period} />
-
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <PayrollHistoryModernStats
-          totalEmployees={employees.length}
-          totalGrossPay={period.total_devengado}
-          totalDeductions={period.total_deducciones}
-          totalNetPay={period.total_neto}
-        />
-
-        <div className="mt-8">
-          <PayrollHistoryModernActions
-            pendingNovedades={pendingNovedades}
-            isLoading={isApplyingAdjustments}
-            onApplyPendingAdjustments={() => {}}
-            canApplyAdjustments={period.estado === 'closed'}
-          />
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => navigate('/app/payroll-history')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{period.periodo}</h1>
+            <p className="text-muted-foreground">
+              {new Date(period.fecha_inicio).toLocaleDateString()} - {new Date(period.fecha_fin).toLocaleDateString()}
+            </p>
+          </div>
         </div>
-
-        <div className="mt-8">
-          <Tabs defaultValue="employees" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="employees">Empleados</TabsTrigger>
-              <TabsTrigger value="audit">Historial de Auditoría</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="employees" className="mt-6">
-              <PayrollHistoryModernTable
-                employees={employees}
-                pendingNovedades={pendingNovedades}
-                isLoading={false}
-                onDownloadVoucher={(employeeId) => handleDownloadVoucher(employeeId, '')}
-                onOpenAdjustmentModal={(employeeId) => handleOpenAdjustmentModal(employeeId)}
-                calculateEmployeePreview={(employee) => ({
-                  totalDevengado: employee.total_devengado,
-                  totalDeducciones: employee.total_deducciones,
-                  totalNeto: employee.total_neto,
-                  hasPendingChanges: false
-                })}
-              />
-            </TabsContent>
-
-            <TabsContent value="audit" className="mt-6">
-              <PeriodAuditSummaryComponent 
-                periodId={periodId || ''} 
-                periodName={period.periodo} 
-              />
-            </TabsContent>
-          </Tabs>
-        </div>
+        
+        {/* Show save button for closed periods with pending novelties */}
+        {period?.estado === 'cerrado' && pendingNovedades.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="animate-pulse">
+              {pendingNovedades.length} novedades pendientes
+            </Badge>
+            <Button 
+              onClick={() => setShowConfirmModal(true)}
+              className="bg-warning hover:bg-warning/90 text-warning-foreground"
+            >
+              Guardar Novedades
+            </Button>
+          </div>
+        )}
+        
       </div>
+
+      {/* Period Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tipo</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold capitalize">{period.tipo_periodo}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Empleados</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{period.empleados_count}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Devengado</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(period.total_devengado)}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Neto</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(period.total_neto)}</div>
+            <div className="text-xs text-muted-foreground">
+              Deducciones: {formatCurrency(period.total_deducciones)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content with Tabs */}
+      <Tabs defaultValue="employees" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="employees" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Empleados
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Auditoría
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="employees">
+          <Card>
+            <CardHeader>
+              <CardTitle>Empleados Liquidados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 font-medium">Empleado</th>
+                      <th className="text-left p-4 font-medium">Salario Base</th>
+                      <th className="text-left p-4 font-medium">Devengado</th>
+                      <th className="text-left p-4 font-medium">Deducciones</th>
+                      <th className="text-left p-4 font-medium">Neto Pagado</th>
+                      <th className="text-left p-4 font-medium">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employees.map((employee) => {
+                      const preview = calculateEmployeePreview(employee);
+                      return (
+                        <tr key={employee.id} className="border-b hover:bg-muted/50">
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium">
+                                {employee.employee_name} {employee.employee_lastname}
+                              </div>
+                              {preview.hasPending && (
+                                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                                  {preview.pendingCount} pendiente{preview.pendingCount > 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 font-mono">{formatCurrency(employee.salario_base)}</td>
+                          <td className="p-4 font-mono">
+                            {preview.hasPending ? (
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground line-through text-sm">
+                                  {formatCurrency(preview.originalDevengado)}
+                                </div>
+                                <div className="text-green-600 font-medium">
+                                  {formatCurrency(preview.newDevengado)}
+                                  <span className="text-xs ml-1">
+                                    (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              formatCurrency(employee.total_devengado)
+                            )}
+                          </td>
+                          <td className="p-4 font-mono">
+                            {preview.hasPending ? (
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground line-through text-sm">
+                                  {formatCurrency(preview.originalDeducciones)}
+                                </div>
+                                <div className="text-red-600 font-medium">
+                                  {formatCurrency(preview.newDeducciones)}
+                                  {preview.newDeducciones !== preview.originalDeducciones && (
+                                    <span className="text-xs ml-1">
+                                      ({preview.newDeducciones > preview.originalDeducciones ? '+' : ''}{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              formatCurrency(employee.total_deducciones)
+                            )}
+                          </td>
+                          <td className="p-4 font-mono font-semibold">
+                            {preview.hasPending ? (
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground line-through text-sm">
+                                  {formatCurrency(preview.originalNeto)}
+                                </div>
+                                <div className="text-primary font-bold">
+                                  {formatCurrency(preview.newNeto)}
+                                  <span className="text-xs ml-1">
+                                    ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              formatCurrency(employee.neto_pagado)
+                            )}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
+                                className="flex items-center gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
+                                className="flex items-center gap-2"
+                              >
+                                <Download className="h-4 w-4" />
+                                Comprobante
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+
+        <TabsContent value="audit">
+          <PeriodAuditSummaryComponent 
+            periodId={periodId || ''} 
+            periodName={period.periodo} 
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Adjustment Modal */}
       <NovedadUnifiedModal

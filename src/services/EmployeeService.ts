@@ -4,46 +4,15 @@ import { EmployeeSoftDeleteService } from './EmployeeSoftDeleteService';
 
 export class EmployeeService {
   /**
-   * Get current user's company ID
-   */
-  private static async getCurrentUserCompanyId(): Promise<string | null> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      return profile?.company_id || null;
-    } catch (error) {
-      console.error('Error getting company ID:', error);
-      return null;
-    }
-  }
-
-  /**
    * Get all employees for the current company (excluding soft deleted)
    */
   static async getEmployees(): Promise<{ success: boolean; data?: EmployeeUnified[]; error?: string }> {
     try {
       console.log('🔄 EmployeeService: Fetching employees');
       
-      // Get current user's company ID
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        console.error('❌ EmployeeService: No company ID found for current user');
-        return { success: false, error: 'No se pudo determinar la empresa del usuario' };
-      }
-
-      console.log(`🔍 EmployeeService: Filtering employees for company: ${companyId}`);
-      
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('company_id', companyId) // ✅ FILTER by company
         .neq('estado', 'eliminado') // ✅ EXCLUDE soft deleted employees
         .order('created_at', { ascending: false });
 
@@ -60,7 +29,7 @@ export class EmployeeService {
       // Map database records to EmployeeUnified format
       const employees = data.map(mapDatabaseToUnified);
       
-      console.log(`✅ EmployeeService: Successfully fetched ${employees.length} employees for company ${companyId}`);
+      console.log(`✅ EmployeeService: Successfully fetched ${employees.length} employees`);
       return { success: true, data: employees };
     } catch (error) {
       console.error('❌ EmployeeService: Error in getEmployees:', error);
@@ -78,18 +47,10 @@ export class EmployeeService {
     try {
       console.log('🔄 EmployeeService: Fetching employee by ID:', id);
       
-      // Get current user's company ID
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        console.error('❌ EmployeeService: No company ID found for current user');
-        return null;
-      }
-      
       const { data, error } = await supabase
         .from('employees')
         .select('*')
         .eq('id', id)
-        .eq('company_id', companyId) // ✅ FILTER by company
         .neq('estado', 'eliminado') // ✅ EXCLUDE soft deleted employees
         .single();
 
