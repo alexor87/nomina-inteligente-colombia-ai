@@ -1,5 +1,5 @@
 
-import { supabase } from '@/integrations/supabase/client';
+import { SecureBaseService } from './SecureBaseService';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
 import { DeductionCalculationService } from './DeductionCalculationService';
@@ -22,25 +22,11 @@ interface Employee {
   deducciones_novedades: number;
 }
 
-export class PayrollLiquidationService {
-  
-  static async getCurrentUserCompanyId(): Promise<string | null> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      return profile?.company_id || null;
-    } catch (error) {
-      console.error('Error getting company ID:', error);
-      return null;
-    }
-  }
+/**
+ * 🔒 SECURITY MIGRATION: PayrollLiquidationService now extends SecureBaseService
+ * All database operations are automatically secured with company_id filtering
+ */
+export class PayrollLiquidationService extends SecureBaseService {
 
   static calculateWorkingDays(startDate: string, endDate: string): number {
     const start = new Date(startDate);
@@ -65,47 +51,39 @@ export class PayrollLiquidationService {
 
   static async ensurePeriodExists(startDate: string, endDate: string): Promise<string> {
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener la empresa del usuario');
-      }
-
+      console.log('🔒 Ensuring period exists securely');
       const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
       
-      const { data: existingPeriod } = await supabase
-        .from('payroll_periods_real')
-        .select('id')
-        .eq('company_id', companyId)
-        .eq('fecha_inicio', startDate)
-        .eq('fecha_fin', endDate)
-        .single();
+      // Use secure query to check for existing period
+      const existingQuery = await this.secureQuery('payroll_periods_real', 'id', {
+        fecha_inicio: startDate,
+        fecha_fin: endDate
+      });
+      
+      const { data: existingPeriod } = await existingQuery.single();
 
       if (existingPeriod) {
         return existingPeriod.id;
       }
 
-      const { data: newPeriod, error } = await supabase
-        .from('payroll_periods_real')
-        .insert({
-          company_id: companyId,
-          periodo: periodName,
-          fecha_inicio: startDate,
-          fecha_fin: endDate,
-          tipo_periodo: 'personalizado',
-          estado: 'borrador',
-          empleados_count: 0,
-          total_devengado: 0,
-          total_deducciones: 0,
-          total_neto: 0
-        })
-        .select('id')
-        .single();
+      // Use secure insert to create new period
+      const { data: newPeriod, error } = await this.secureInsert('payroll_periods_real', {
+        periodo: periodName,
+        fecha_inicio: startDate,
+        fecha_fin: endDate,
+        tipo_periodo: 'personalizado',
+        estado: 'borrador',
+        empleados_count: 0,
+        total_devengado: 0,
+        total_deducciones: 0,
+        total_neto: 0
+      });
 
       if (error) {
         throw error;
       }
 
-      return newPeriod.id;
+      return newPeriod[0].id;
     } catch (error) {
       console.error('Error ensuring period exists:', error);
       throw error;
@@ -114,16 +92,14 @@ export class PayrollLiquidationService {
 
   static async loadEmployeesForPeriod(startDate: string, endDate: string): Promise<Employee[]> {
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener la empresa del usuario');
-      }
+      console.log('🔒 Loading employees for period securely');
 
-      const { data: employees, error } = await supabase
-        .from('employees')
-        .select('id, nombre, apellido, salario_base')
-        .eq('company_id', companyId)
-        .eq('estado', 'activo');
+      // Use secure query to get active employees
+      const employeesQuery = await this.secureQuery('employees', 'id, nombre, apellido, salario_base', {
+        estado: 'activo'
+      });
+      
+      const { data: employees, error } = await employeesQuery;
 
       if (error) {
         throw error;
@@ -174,17 +150,14 @@ export class PayrollLiquidationService {
 
   static async loadSpecificEmployeesForPeriod(employeeIds: string[], startDate: string, endDate: string): Promise<Employee[]> {
     try {
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener la empresa del usuario');
-      }
+      console.log('🔒 Loading specific employees for period securely');
 
-      const { data: employees, error } = await supabase
-        .from('employees')
-        .select('id, nombre, apellido, salario_base')
-        .eq('company_id', companyId)
-        .eq('estado', 'activo')
-        .in('id', employeeIds);
+      // Use secure query with IN filter for specific employees
+      const employeesQuery = await this.secureQuery('employees', 'id, nombre, apellido, salario_base', {
+        estado: 'activo'
+      });
+      
+      const { data: employees, error } = await employeesQuery.in('id', employeeIds);
 
       if (error) {
         throw error;

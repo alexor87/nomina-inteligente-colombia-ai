@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { EmployeeService } from './EmployeeService';
+import { SecureEmployeeService } from './SecureEmployeeService';
 import { EmployeeCRUDService } from './EmployeeCRUDService';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { PayrollLiquidationNewService } from './PayrollLiquidationNewService';
@@ -40,30 +40,30 @@ export class EmployeeUnifiedService {
     }
   }
 
-  // ✅ CRUD Methods - Delegating to existing services
+  // 🔒 CRUD Methods - Delegating to SecureEmployeeService for security
   static async create(employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>) {
-    console.log('🔄 EmployeeUnifiedService.create: Delegating to EmployeeService');
-    return EmployeeService.createEmployee(employeeData);
+    console.log('🔒 EmployeeUnifiedService.create: Delegating to SecureEmployeeService');
+    return SecureEmployeeService.createEmployee(employeeData);
   }
 
   static async update(id: string, updates: Partial<EmployeeUnified>) {
-    console.log('🔄 EmployeeUnifiedService.update: Delegating to EmployeeService');
-    return EmployeeService.updateEmployee(id, updates);
+    console.log('🔒 EmployeeUnifiedService.update: Delegating to SecureEmployeeService');
+    return SecureEmployeeService.updateEmployee(id, updates);
   }
 
   static async delete(id: string) {
-    console.log('🔄 EmployeeUnifiedService.delete: Delegating to EmployeeService');
-    return EmployeeService.deleteEmployee(id);
+    console.log('🔒 EmployeeUnifiedService.delete: Delegating to SecureEmployeeService');
+    return SecureEmployeeService.deleteEmployee(id);
   }
 
   static async getAll() {
-    console.log('🔄 EmployeeUnifiedService.getAll: Delegating to EmployeeService');
-    return EmployeeService.getEmployees();
+    console.log('🔒 EmployeeUnifiedService.getAll: Delegating to SecureEmployeeService');
+    return SecureEmployeeService.getEmployees();
   }
 
   static async getEmployeeById(id: string) {
-    console.log('🔄 EmployeeUnifiedService.getEmployeeById: Delegating to EmployeeService');
-    const employee = await EmployeeService.getEmployeeById(id);
+    console.log('🔒 EmployeeUnifiedService.getEmployeeById: Delegating to SecureEmployeeService');
+    const employee = await SecureEmployeeService.getEmployeeById(id);
     if (!employee) {
       return { success: false, error: 'Empleado no encontrado' };
     }
@@ -71,8 +71,8 @@ export class EmployeeUnifiedService {
   }
 
   static async changeStatus(id: string, newStatus: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad') {
-    console.log('🔄 EmployeeUnifiedService.changeStatus: Updating employee status');
-    return EmployeeService.updateEmployee(id, { estado: newStatus });
+    console.log('🔒 EmployeeUnifiedService.changeStatus: Updating employee status securely');
+    return SecureEmployeeService.updateEmployee(id, { estado: newStatus });
   }
 
   // ✅ PAYROLL Methods - Usando PayrollLiquidationNewService con valores 2025
