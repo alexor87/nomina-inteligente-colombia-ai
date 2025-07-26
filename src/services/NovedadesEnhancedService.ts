@@ -128,6 +128,22 @@ export class NovedadesEnhancedService {
         throw error;
       }
 
+      // Log manual audit action for business context
+      try {
+        const { PayrollAuditEnhancedService } = await import('@/services/PayrollAuditEnhancedService');
+        await PayrollAuditEnhancedService.logManualAction(novedad.id, 'ADJUSTMENT', {
+          reason: 'Novedad creada desde interfaz de ajustes',
+          source: 'adjustment',
+          metadata: {
+            original_data: insertData,
+            user_context: 'PayrollHistoryDetailPage',
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (auditError) {
+        console.warn('⚠️ No se pudo registrar acción de auditoría:', auditError);
+      }
+
       console.log('✅ Novedad creada exitosamente');
       return novedad as PayrollNovedad;
       

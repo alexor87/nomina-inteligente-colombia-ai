@@ -3,13 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Plus, Calendar, Users, DollarSign } from 'lucide-react';
+import { ArrowLeft, Download, Plus, Calendar, Users, DollarSign, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAuditSummary';
+import { NovedadAuditHistoryModal } from '@/components/payroll/audit/NovedadAuditHistoryModal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PeriodDetail {
   id: string;
@@ -56,8 +59,11 @@ export const PayrollHistoryDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showEmployeeSelector, setShowEmployeeSelector] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [selectedEmployeeSalary, setSelectedEmployeeSalary] = useState<number>(0);
+  const [selectedNovedadId, setSelectedNovedadId] = useState<string | null>(null);
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
   
   // Hook para gestionar novedades
   const { createNovedad } = usePayrollNovedadesUnified(periodId || '');
@@ -271,108 +277,152 @@ export const PayrollHistoryDetailPage = () => {
         </Card>
       </div>
 
-      {/* Employees Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Empleados Liquidados</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-4 font-medium">Empleado</th>
-                  <th className="text-left p-4 font-medium">Salario Base</th>
-                  <th className="text-left p-4 font-medium">Devengado</th>
-                  <th className="text-left p-4 font-medium">Deducciones</th>
-                  <th className="text-left p-4 font-medium">Neto Pagado</th>
-                  <th className="text-left p-4 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map((employee) => (
-                  <tr key={employee.id} className="border-b hover:bg-muted/50">
-                    <td className="p-4">
-                      <div className="font-medium">
-                        {employee.employee_name} {employee.employee_lastname}
-                      </div>
-                    </td>
-                    <td className="p-4 font-mono">{formatCurrency(employee.salario_base)}</td>
-                    <td className="p-4 font-mono">{formatCurrency(employee.total_devengado)}</td>
-                    <td className="p-4 font-mono">{formatCurrency(employee.total_deducciones)}</td>
-                    <td className="p-4 font-mono font-semibold">{formatCurrency(employee.neto_pagado)}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
-                          className="flex items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Ajustar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
-                          className="flex items-center gap-2"
-                        >
-                          <Download className="h-4 w-4" />
-                          Comprobante
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Main Content with Tabs */}
+      <Tabs defaultValue="employees" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="employees" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Empleados
+          </TabsTrigger>
+          <TabsTrigger value="adjustments" className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Ajustes ({adjustments.length})
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Auditoría
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Adjustments History */}
-      {adjustments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Historial de Ajustes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4 font-medium">Fecha</th>
-                    <th className="text-left p-4 font-medium">Empleado</th>
-                    <th className="text-left p-4 font-medium">Concepto</th>
-                    <th className="text-left p-4 font-medium">Valor</th>
-                    <th className="text-left p-4 font-medium">Observaciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {adjustments.map((adjustment) => (
-                    <tr key={adjustment.id} className="border-b hover:bg-muted/50">
-                      <td className="p-4">
-                        {new Date(adjustment.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="p-4">{adjustment.employee_name}</td>
-                      <td className="p-4">{adjustment.concept}</td>
-                      <td className="p-4 font-mono">
-                        <span className={adjustment.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
-                          {formatCurrency(adjustment.amount)}
-                        </span>
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {adjustment.observations || '-'}
-                      </td>
+        <TabsContent value="employees">
+          <Card>
+            <CardHeader>
+              <CardTitle>Empleados Liquidados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 font-medium">Empleado</th>
+                      <th className="text-left p-4 font-medium">Salario Base</th>
+                      <th className="text-left p-4 font-medium">Devengado</th>
+                      <th className="text-left p-4 font-medium">Deducciones</th>
+                      <th className="text-left p-4 font-medium">Neto Pagado</th>
+                      <th className="text-left p-4 font-medium">Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  </thead>
+                  <tbody>
+                    {employees.map((employee) => (
+                      <tr key={employee.id} className="border-b hover:bg-muted/50">
+                        <td className="p-4">
+                          <div className="font-medium">
+                            {employee.employee_name} {employee.employee_lastname}
+                          </div>
+                        </td>
+                        <td className="p-4 font-mono">{formatCurrency(employee.salario_base)}</td>
+                        <td className="p-4 font-mono">{formatCurrency(employee.total_devengado)}</td>
+                        <td className="p-4 font-mono">{formatCurrency(employee.total_deducciones)}</td>
+                        <td className="p-4 font-mono font-semibold">{formatCurrency(employee.neto_pagado)}</td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
+                              className="flex items-center gap-2"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Ajustar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
+                              className="flex items-center gap-2"
+                            >
+                              <Download className="h-4 w-4" />
+                              Comprobante
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="adjustments">
+          {adjustments.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Historial de Ajustes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-4 font-medium">Fecha</th>
+                        <th className="text-left p-4 font-medium">Empleado</th>
+                        <th className="text-left p-4 font-medium">Concepto</th>
+                        <th className="text-left p-4 font-medium">Valor</th>
+                        <th className="text-left p-4 font-medium">Observaciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adjustments.map((adjustment) => (
+                        <tr key={adjustment.id} className="border-b hover:bg-muted/50">
+                          <td className="p-4">
+                            {new Date(adjustment.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="p-4">{adjustment.employee_name}</td>
+                          <td className="p-4">{adjustment.concept}</td>
+                          <td className="p-4 font-mono">
+                            <span className={adjustment.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              {formatCurrency(adjustment.amount)}
+                            </span>
+                          </td>
+                          <td className="p-4 text-sm text-muted-foreground">
+                            {adjustment.observations || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Plus className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium mb-2">No hay ajustes registrados</h3>
+                <p className="text-gray-500 text-center mb-4">
+                  Los ajustes realizados a los empleados aparecerán aquí
+                </p>
+                <Button
+                  onClick={() => handleOpenAdjustmentModal()}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Crear primer ajuste
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="audit">
+          <PeriodAuditSummaryComponent 
+            periodId={periodId || ''} 
+            periodName={period.periodo} 
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Adjustment Modal */}
       <NovedadUnifiedModal
@@ -387,6 +437,14 @@ export const PayrollHistoryDetailPage = () => {
         startDate={period?.fecha_inicio}
         endDate={period?.fecha_fin}
         onClose={handleAdjustmentSuccess}
+      />
+
+      {/* Audit History Modal */}
+      <NovedadAuditHistoryModal
+        open={showAuditModal}
+        onClose={() => setShowAuditModal(false)}
+        novedadId={selectedNovedadId}
+        employeeName={selectedEmployeeName}
       />
     </div>
   );

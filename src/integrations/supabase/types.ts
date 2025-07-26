@@ -1927,6 +1927,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_novedad_audit_history: {
+        Args: { p_novedad_id: string }
+        Returns: {
+          action: string
+          old_values: Json
+          new_values: Json
+          user_email: string
+          created_at: string
+        }[]
+      }
       get_payroll_history_periods: {
         Args: { p_company_id?: string }
         Returns: Json
@@ -1940,6 +1950,17 @@ export type Database = {
           concept: string
           amount: number
           observations: string
+          created_at: string
+        }[]
+      }
+      get_period_audit_summary: {
+        Args: { p_period_id: string }
+        Returns: {
+          employee_name: string
+          novedad_type: string
+          action: string
+          value_change: number
+          user_email: string
           created_at: string
         }[]
       }
