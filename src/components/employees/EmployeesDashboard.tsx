@@ -28,7 +28,7 @@ export const EmployeesDashboard = () => {
   } = useEmployeeList();
 
   const activeEmployees = employees.filter(emp => emp.estado === 'activo').length;
-  const hasIssues = totalEmployees === 0 || activeEmployees === 0 || error;
+  const hasEmployeeIssues = totalEmployees === 0 || activeEmployees === 0 || error;
 
   return (
     <div className="space-y-6">
@@ -60,11 +60,11 @@ export const EmployeesDashboard = () => {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Estado del Sistema</CardTitle>
+            <CardTitle className="text-sm">Estado de Empleados</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant={hasIssues ? 'destructive' : 'default'}>
-              {hasIssues ? 'Requiere atención' : 'Funcionando'}
+            <Badge variant={hasEmployeeIssues ? 'destructive' : 'default'}>
+              {hasEmployeeIssues ? 'Requiere empleados' : 'Funcionando'}
             </Badge>
           </CardContent>
         </Card>
@@ -76,14 +76,14 @@ export const EmployeesDashboard = () => {
           <CardContent>
             <Button
               onClick={() => setShowRepairPanel(!showRepairPanel)}
-              variant={hasIssues ? 'destructive' : 'outline'}
+              variant={hasEmployeeIssues ? 'destructive' : 'outline'}
               size="sm"
               className="w-full"
             >
-              {hasIssues ? (
+              {hasEmployeeIssues ? (
                 <>
                   <AlertTriangle className="h-4 w-4 mr-2" />
-                  Diagnosticar
+                  Crear Empleados
                 </>
               ) : (
                 <>

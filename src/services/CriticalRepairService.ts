@@ -108,8 +108,7 @@ export class CriticalRepairService {
       }
       
       if (activePeriodCount === 0) {
-        issues.push('Sin períodos activos');
-        recommendations.push('Crear período activo para liquidación');
+        recommendations.push('Nota: Se requiere período activo solo para liquidación de nómina');
       }
     }
     
@@ -409,8 +408,7 @@ export class CriticalRepairService {
             recommendations.push('Crear o activar empleados');
           }
         } else {
-          issues.push('Flujo de liquidación: Sin período activo');
-          recommendations.push('Crear período de nómina activo');
+          recommendations.push('Para liquidación: Crear período de nómina activo');
         }
       }
     } catch (error) {
