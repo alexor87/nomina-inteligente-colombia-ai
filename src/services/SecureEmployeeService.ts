@@ -166,7 +166,6 @@ export class SecureEmployeeService extends SecureBaseService {
 
       // Remove fields that shouldn't be updated
       delete dbUpdates.company_id; // This shouldn't change
-      delete dbUpdates.id; // ID is in the condition
       
       const { data, error } = await this.secureUpdate(
         'employees', 

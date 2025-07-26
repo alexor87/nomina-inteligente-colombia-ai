@@ -78,4 +78,13 @@ export class EmployeeService {
     console.warn('🔒 [SECURITY] EmployeeService.bulkDeleteEmployees is deprecated. Use SecureEmployeeService.');
     return SecureEmployeeService.bulkDeleteEmployees(employeeIds);
   }
+
+  /**
+   * Bulk update employee status
+   * 🔒 SECURITY: Delegated to SecureEmployeeService
+   */
+  static async bulkUpdateStatus(employeeIds: string[], newStatus: 'activo' | 'inactivo' | 'eliminado'): Promise<{ success: boolean; results: { successful: number; failed: number; errors: string[] }; error?: string }> {
+    console.warn('🔒 [SECURITY] EmployeeService.bulkUpdateStatus is deprecated. Use SecureEmployeeService.');
+    return SecureEmployeeService.bulkUpdateStatus(employeeIds, newStatus);
+  }
 }

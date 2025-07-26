@@ -1,4 +1,5 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { SecureBaseService } from './SecureBaseService';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
