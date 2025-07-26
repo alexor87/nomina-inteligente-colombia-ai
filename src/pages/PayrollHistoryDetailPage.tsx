@@ -223,13 +223,6 @@ export const PayrollHistoryDetailPage = () => {
           </div>
         </div>
         
-        <Button 
-          onClick={() => handleOpenAdjustmentModal()}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Registrar ajuste
-        </Button>
       </div>
 
       {/* Period Summary */}

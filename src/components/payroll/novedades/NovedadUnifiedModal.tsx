@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
@@ -64,6 +65,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
   const [employeeName, setEmployeeName] = useState<string>('');
+  const [employeeFullName, setEmployeeFullName] = useState<string>('');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -103,9 +105,27 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }, [open]);
 
   useEffect(() => {
-    if (employeeId) {
-      setEmployeeName('Empleado');
-    }
+    const loadEmployeeName = async () => {
+      if (!employeeId) return;
+      
+      try {
+        const { data: employee } = await supabase
+          .from('employees')
+          .select('nombre, apellido')
+          .eq('id', employeeId)
+          .single();
+        
+        if (employee) {
+          const fullName = `${employee.nombre} ${employee.apellido}`;
+          setEmployeeName(fullName);
+          setEmployeeFullName(fullName);
+        }
+      } catch (error) {
+        console.error('Error loading employee name:', error);
+      }
+    };
+
+    loadEmployeeName();
   }, [employeeId]);
 
   const handleClose = () => {
@@ -394,6 +414,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
                   : 'Completa los campos para agregar una novedad al empleado.'
                 }
               </DialogDescription>
+              {employeeFullName && (
+                <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+                  <span className="font-medium">Empleado:</span>
+                  <span className="bg-muted px-2 py-1 rounded text-foreground">
+                    {employeeFullName}
+                  </span>
+                </div>
+              )}
             </DialogHeader>
           </>
         )}
