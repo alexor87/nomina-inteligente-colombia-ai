@@ -164,6 +164,10 @@ export const PayrollHistoryDetailPage = () => {
   };
 
   const handleOpenAdjustmentModal = (employeeId?: string, employeeSalary?: number) => {
+    console.log('🔵 handleOpenAdjustmentModal called with:', { employeeId, employeeSalary });
+    console.log('🔵 Period status:', period?.estado);
+    console.log('🔵 Current showAdjustmentModal:', showAdjustmentModal);
+    
     if (employeeId && employeeSalary) {
       // Ajuste para empleado específico
       setSelectedEmployeeId(employeeId);
@@ -171,13 +175,16 @@ export const PayrollHistoryDetailPage = () => {
       const employeeData = employees.find(e => e.employee_id === employeeId);
       setSelectedEmployeeName(employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : '');
       setShowAdjustmentModal(true);
+      console.log('🔵 Set specific employee data and modal to true');
     } else if (employees.length > 0) {
       // Usar el primer empleado como fallback
       setSelectedEmployeeId(employees[0].employee_id);
       setSelectedEmployeeSalary(employees[0].salario_base);
       setSelectedEmployeeName(`${employees[0].employee_name} ${employees[0].employee_lastname}`);
       setShowAdjustmentModal(true);
+      console.log('🔵 Set fallback employee data and modal to true');
     } else {
+      console.log('🔵 No employees available');
       toast({
         title: "Error",
         description: "No hay empleados disponibles para ajustar",
@@ -187,10 +194,17 @@ export const PayrollHistoryDetailPage = () => {
   };
 
   const handleNovedadSubmit = async (data: CreateNovedadData) => {
+    console.log('🟢 handleNovedadSubmit called with data:', data);
+    console.log('🟢 Period estado:', period?.estado);
+    console.log('🟢 selectedEmployeeId:', selectedEmployeeId);
+    console.log('🟢 Current pendingNovedades length:', pendingNovedades.length);
+    
     try {
       // For closed periods, add to pending list instead of applying immediately
       if (period?.estado === 'cerrado') {
         const employeeData = employees.find(e => e.employee_id === selectedEmployeeId);
+        console.log('🟢 Found employee data:', employeeData);
+        
         const newPendingNovedad: PendingNovedad = {
           employee_id: selectedEmployeeId,
           employee_name: employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : selectedEmployeeName,
@@ -200,8 +214,14 @@ export const PayrollHistoryDetailPage = () => {
           novedadData: data
         };
         
-        setPendingNovedades(prev => [...prev, newPendingNovedad]);
+        console.log('🟢 Creating new pending novedad:', newPendingNovedad);
+        setPendingNovedades(prev => {
+          const newArray = [...prev, newPendingNovedad];
+          console.log('🟢 Updated pendingNovedades array:', newArray);
+          return newArray;
+        });
         setShowAdjustmentModal(false);
+        console.log('🟢 Modal closed, pending novedad added');
         
         toast({
           title: "Novedad agregada",
@@ -209,11 +229,12 @@ export const PayrollHistoryDetailPage = () => {
         });
       } else {
         // For open periods, apply immediately
+        console.log('🟢 Applying novedad immediately for open period');
         await createNovedad(data);
         handleAdjustmentSuccess();
       }
     } catch (error) {
-      console.error('Error creating novedad:', error);
+      console.error('❌ Error creating novedad:', error);
       throw error;
     }
   };
