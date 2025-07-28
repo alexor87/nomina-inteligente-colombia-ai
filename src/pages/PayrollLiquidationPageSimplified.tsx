@@ -97,12 +97,12 @@ const PayrollLiquidationPageSimplified = () => {
     setPeriodSelected(true);
     
     // Cargar empleados con el método simplificado
-    const periodId = await loadEmployees(period.startDate, period.endDate);
+    const loadedPeriodId: string | undefined = await loadEmployees(period.startDate, period.endDate);
     
     // Ejecutar validación automática si está habilitada
-    if (useExhaustiveValidation && periodId) {
+    if (useExhaustiveValidation && loadedPeriodId) {
       console.log('🔍 Ejecutando validación automática...');
-      await performExhaustiveValidation(periodId);
+      await performExhaustiveValidation(loadedPeriodId);
     }
   };
 

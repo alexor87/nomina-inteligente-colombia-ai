@@ -32,11 +32,11 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   const loadEmployees = useCallback(async (
     startDate: string,
     endDate: string
-  ) => {
+  ): Promise<string | undefined> => {
     try {
       console.log('👥 Loading employees for payroll liquidation...');
       
-      await payrollHook.loadEmployees(startDate, endDate);
+      const periodId = await payrollHook.loadEmployees(startDate, endDate);
       
       console.log('✅ Employees loaded successfully');
       
@@ -46,7 +46,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
         className: "border-green-200 bg-green-50"
       });
       
-      return true;
+      return periodId;
 
     } catch (error) {
       console.error('❌ Error loading employees:', error);
