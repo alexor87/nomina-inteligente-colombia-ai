@@ -263,7 +263,7 @@ const PayrollLiquidationPageSimplified = () => {
         </div>
       </div>
 
-      {/* World-Class Control Panel */}
+      {/* World-Class Control Panel - OCULTO: Validación automática activa
       {periodSelected && selectedPeriod && (
         <PayrollWorldClassControlPanel
           exhaustiveValidationResults={exhaustiveValidationResults}
@@ -276,6 +276,7 @@ const PayrollLiquidationPageSimplified = () => {
           liquidationStep={liquidationStep}
         />
       )}
+      */}
 
       {/* Recovery Panel */}
       {showRecoveryPanel && (
