@@ -11,7 +11,7 @@ import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollCleanupService } from '@/services/PayrollCleanupService';
-import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
+
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { PayrollProgressIndicator } from '@/components/payroll/liquidation/PayrollProgressIndicator';
 import { ReliquidationDialog } from '@/components/payroll/liquidation/ReliquidationDialog';
@@ -27,7 +27,7 @@ import { calculatePayrollSummary } from '@/utils/payrollCalculations';
 
 const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
-  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  
   const [showReliquidationDialog, setShowReliquidationDialog] = useState(false);
   const [showRecoveryPanel, setShowRecoveryPanel] = useState(false);
   const [periodSelected, setPeriodSelected] = useState(false);
@@ -251,15 +251,6 @@ const PayrollLiquidationPageSimplified = () => {
             />
           )}
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowCleanupDialog(true)}
-            className="flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Limpiar Períodos
-          </Button>
         </div>
       </div>
 
@@ -416,13 +407,6 @@ const PayrollLiquidationPageSimplified = () => {
       />
 
       {/* Modales */}
-      <PeriodCleanupDialog
-        isOpen={showCleanupDialog}
-        onClose={() => setShowCleanupDialog(false)}
-        onCleanupComplete={() => {
-          // Opcional: recargar períodos si es necesario
-        }}
-      />
 
       <EmployeeAddModal
         isOpen={showAddEmployeeModal}
