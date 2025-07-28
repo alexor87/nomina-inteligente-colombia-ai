@@ -534,7 +534,7 @@ export const PayrollHistoryDetailPage = () => {
                             {formatCurrency(employee.ibc || employee.salario_base)}
                           </TableCell>
                           <TableCell className="text-center font-medium">
-                            {employee.dias_trabajados || 30}
+                            {employee.dias_trabajados || (period?.tipo_periodo === 'quincenal' ? 15 : 30)}
                           </TableCell>
                           <TableCell className="bg-green-100 text-right font-medium">
                             {preview.hasPending ? (
@@ -617,9 +617,10 @@ export const PayrollHistoryDetailPage = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
+                              aria-label="Descargar comprobante"
+                              title="Descargar comprobante"
                             >
-                              <FileText className="h-4 w-4 mr-2" />
-                              Comprobante
+                              <FileText className="h-4 w-4" />
                             </Button>
                           </TableCell>
                         </TableRow>
