@@ -98,6 +98,12 @@ const PayrollLiquidationPageSimplified = () => {
     
     // Cargar empleados con el método simplificado
     await loadEmployees(period.startDate, period.endDate);
+    
+    // Ejecutar validación automática si está habilitada
+    if (useExhaustiveValidation) {
+      console.log('🔍 Ejecutando validación automática...');
+      await performExhaustiveValidation();
+    }
   };
 
   const handleLiquidate = async () => {
