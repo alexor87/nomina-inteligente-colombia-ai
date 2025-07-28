@@ -113,8 +113,8 @@ export const PayrollHistoryPage = () => {
       {/* Header */}
       <div className="flex flex-col space-y-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Historial de Nómina</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-semibold">Historial de Nómina</h1>
+          <p className="text-sm text-muted-foreground">
             Consulta períodos liquidados, ajustes y comprobantes generados
           </p>
         </div>
@@ -172,7 +172,7 @@ export const PayrollHistoryPage = () => {
             <div className="text-center py-12">
               <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">Sin períodos liquidados</h3>
-              <p className="text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 {periods.length === 0 
                   ? "Aún no tienes períodos liquidados." 
                   : "No se encontraron períodos que coincidan con los filtros aplicados."
@@ -191,7 +191,7 @@ export const PayrollHistoryPage = () => {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{filteredPeriods.length}</div>
+                <div className="text-xl font-semibold">{filteredPeriods.length}</div>
               </CardContent>
             </Card>
             
@@ -201,7 +201,7 @@ export const PayrollHistoryPage = () => {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-xl font-semibold">
                   {filteredPeriods.reduce((sum, period) => sum + period.empleados_count, 0)}
                 </div>
               </CardContent>
@@ -213,7 +213,7 @@ export const PayrollHistoryPage = () => {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-xl font-semibold">
                   {formatCurrency(filteredPeriods.reduce((sum, period) => sum + period.total_neto, 0))}
                 </div>
               </CardContent>
@@ -223,19 +223,19 @@ export const PayrollHistoryPage = () => {
           {/* Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Períodos Liquidados</CardTitle>
+              <CardTitle className="text-lg font-medium">Períodos Liquidados</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-4 font-medium">Período</th>
-                      <th className="text-left p-4 font-medium">Tipo</th>
-                      <th className="text-left p-4 font-medium">Empleados</th>
-                      <th className="text-left p-4 font-medium">Total Neto</th>
-                      <th className="text-left p-4 font-medium">Estado</th>
-                      <th className="text-left p-4 font-medium">Acciones</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Período</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Tipo</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Empleados</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Total Neto</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Estado</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -243,26 +243,26 @@ export const PayrollHistoryPage = () => {
                       <tr key={period.id} className="border-b hover:bg-muted/50">
                         <td className="p-4">
                           <div>
-                            <div className="font-medium">{period.periodo}</div>
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm font-medium">{period.periodo}</div>
+                            <div className="text-xs text-muted-foreground">
                               {new Date(period.fecha_inicio).toLocaleDateString()} - {new Date(period.fecha_fin).toLocaleDateString()}
                             </div>
                           </div>
                         </td>
                         <td className="p-4">
-                          <Badge variant="outline" className="capitalize">
+                          <Badge variant="outline" className="capitalize text-xs">
                             {period.tipo_periodo}
                           </Badge>
                         </td>
-                        <td className="p-4">{period.empleados_count}</td>
-                        <td className="p-4 font-mono">{formatCurrency(period.total_neto)}</td>
+                        <td className="p-4 text-sm font-normal">{period.empleados_count}</td>
+                        <td className="p-4 text-sm font-medium">{formatCurrency(period.total_neto)}</td>
                         <td className="p-4">{getStatusBadge(period)}</td>
                         <td className="p-4">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => navigate(`/app/payroll-history/${period.id}`)}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-2 text-sm"
                           >
                             <Eye className="h-4 w-4" />
                             Ver detalle
@@ -278,7 +278,7 @@ export const PayrollHistoryPage = () => {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-6">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       Mostrando {((currentPage - 1) * pageSize) + 1} a {Math.min(currentPage * pageSize, filteredPeriods.length)} de {filteredPeriods.length} períodos
                     </span>
                   </div>
