@@ -536,7 +536,7 @@ export const PayrollHistoryDetailPage = () => {
                           <TableCell className="text-center font-medium">
                             {employee.dias_trabajados || (period?.tipo_periodo === 'quincenal' ? 15 : 30)}
                           </TableCell>
-                          <TableCell className="bg-green-100 text-right font-medium">
+                          <TableCell className="bg-green-100 text-right">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
@@ -555,7 +555,7 @@ export const PayrollHistoryDetailPage = () => {
                                </span>
                             )}
                           </TableCell>
-                          <TableCell className="bg-red-100 text-right font-medium">
+                          <TableCell className="bg-red-100 text-right">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
@@ -593,7 +593,7 @@ export const PayrollHistoryDetailPage = () => {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="bg-blue-100 text-right font-medium">
+                          <TableCell className="bg-blue-100 text-right">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
