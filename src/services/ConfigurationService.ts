@@ -113,18 +113,15 @@ export class ConfigurationService {
     }
   }
 
-  static createNewYear(year: string, baseYear?: string): PayrollConfiguration {
+  static createNewYear(year: string): PayrollConfiguration {
     const yearlyConfig = this.getYearlyConfiguration();
     
     if (yearlyConfig[year]) {
       throw new Error(`El año ${year} ya existe`);
     }
 
-    const baseConfig = baseYear && yearlyConfig[baseYear] 
-      ? yearlyConfig[baseYear] 
-      : DEFAULT_CONFIG_2025;
-
-    yearlyConfig[year] = { ...baseConfig };
+    // Siempre usar valores por defecto del sistema
+    yearlyConfig[year] = { ...DEFAULT_CONFIG_2025 };
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(yearlyConfig));
     
     return yearlyConfig[year];

@@ -63,7 +63,7 @@ export const ParametrosLegalesSettings = () => {
     }
 
     try {
-      ConfigurationService.createNewYear(newYear, selectedYear);
+      ConfigurationService.createNewYear(newYear);
       loadAvailableYears();
       setSelectedYear(newYear);
       setNewYear('');

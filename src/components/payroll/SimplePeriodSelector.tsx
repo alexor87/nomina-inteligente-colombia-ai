@@ -8,8 +8,7 @@ import { SimplePeriodService, SelectablePeriod } from '@/services/payroll/Simple
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ConfigurationService } from '@/services/ConfigurationService';
-import { EndOfYearDetectionService } from '@/services/EndOfYearDetectionService';
-import { NewYearConfigurationModal } from './modals/NewYearConfigurationModal';
+import { MissingConfigurationModal } from './modals/MissingConfigurationModal';
 
 interface SimplePeriodSelectorProps {
   companyId: string;
@@ -29,7 +28,6 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
   const [isSelecting, setIsSelecting] = useState(false);
   const [periodicity, setPeriodicity] = useState<string>('mensual');
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [endOfYearSituation, setEndOfYearSituation] = useState<any>(null);
   const [hasValidConfiguration, setHasValidConfiguration] = useState(true);
   const { toast } = useToast();
 
@@ -54,9 +52,6 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
         setPeriods([]);
         setSelectedPeriodNumber('');
         
-        // Detectar situación de fin de año para el modal
-        const endOfYear = await EndOfYearDetectionService.detectEndOfYearSituation(companyId);
-        setEndOfYearSituation(endOfYear);
         setShowConfigModal(true);
         
         toast({
@@ -102,22 +97,8 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
 
   const loadPeriods = validateConfigurationAndLoadPeriods;
 
-  const handleYearCreated = () => {
-    setShowConfigModal(false);
-    setEndOfYearSituation(null);
-    // Recargar períodos después de crear el año
-    loadPeriods();
-    
-    toast({
-      title: "Configuración creada",
-      description: `La configuración para el año ${selectedYear} ha sido creada exitosamente.`,
-      variant: "default"
-    });
-  };
-
   const handleCloseConfigModal = () => {
     setShowConfigModal(false);
-    setEndOfYearSituation(null);
   };
 
   const handleContinue = async () => {
@@ -324,15 +305,12 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
         </CardContent>
       </Card>
 
-      {/* Modal de configuración de nuevo año */}
-      {showConfigModal && endOfYearSituation && (
-        <NewYearConfigurationModal
-          isOpen={showConfigModal}
-          onClose={handleCloseConfigModal}
-          endOfYearSituation={endOfYearSituation}
-          onYearCreated={handleYearCreated}
-        />
-      )}
+      {/* Modal de configuración requerida */}
+      <MissingConfigurationModal 
+        isOpen={showConfigModal}
+        onClose={handleCloseConfigModal}
+        year={selectedYear.toString()}
+      />
     </>
   );
 };

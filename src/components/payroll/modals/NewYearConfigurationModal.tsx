@@ -51,7 +51,7 @@ export const NewYearConfigurationModal: React.FC<NewYearConfigurationModalProps>
       console.log(`🗓️ Creando nuevo año ${selectedYear} basado en ${baseYear}`);
       
       // Crear el nuevo año usando el servicio existente
-      const newConfig = ConfigurationService.createNewYear(selectedYear, baseYear);
+      const newConfig = ConfigurationService.createNewYear(selectedYear);
       
       toast({
         title: "✅ Año Creado Exitosamente",
