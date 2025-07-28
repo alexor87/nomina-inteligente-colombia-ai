@@ -349,7 +349,7 @@ export const PayrollHistoryDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="px-6 py-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
@@ -362,7 +362,7 @@ export const PayrollHistoryDetailPage = () => {
 
   if (!period) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="px-6 py-6">
         <div className="text-center py-12">
           <h3 className="text-lg font-medium mb-2">Período no encontrado</h3>
           <p className="text-muted-foreground mb-4">El período solicitado no existe o no tienes permisos para verlo.</p>
@@ -375,7 +375,7 @@ export const PayrollHistoryDetailPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="px-6 py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

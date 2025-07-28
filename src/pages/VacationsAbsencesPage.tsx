@@ -120,7 +120,7 @@ const VacationsAbsencesPage = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="px-6 py-6 space-y-6">
       {/* Header con información de integración */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
