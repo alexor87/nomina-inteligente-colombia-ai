@@ -156,43 +156,45 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        
+        {/* Selector de Año - Siempre visible */}
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Seleccionar Año
+            </label>
+            <Select 
+              value={selectedYear.toString()} 
+              onValueChange={(value) => {
+                setSelectedYear(parseInt(value));
+                setSelectedPeriodNumber(''); // Reset period selection when year changes
+              }}
+              disabled={disabled || isSelecting}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona un año" />
+              </SelectTrigger>
+              <SelectContent className="max-h-64 bg-white">
+                {availableYears.map((year) => (
+                  <SelectItem 
+                    key={year} 
+                    value={year.toString()}
+                    className="hover:bg-gray-50"
+                  >
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         {availablePeriods.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-600">No hay períodos disponibles para liquidar</p>
+            <p className="text-gray-600">No hay períodos disponibles para liquidar en {selectedYear}</p>
+            <p className="text-sm text-gray-500 mt-2">Prueba seleccionando otro año</p>
           </div>
         ) : (
           <>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Seleccionar Año
-                </label>
-                <Select 
-                  value={selectedYear.toString()} 
-                  onValueChange={(value) => {
-                    setSelectedYear(parseInt(value));
-                    setSelectedPeriodNumber(''); // Reset period selection when year changes
-                  }}
-                  disabled={disabled || isSelecting}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona un año" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64 bg-white">
-                    {availableYears.map((year) => (
-                      <SelectItem 
-                        key={year} 
-                        value={year.toString()}
-                        className="hover:bg-gray-50"
-                      >
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
             <div>
               <Select 
