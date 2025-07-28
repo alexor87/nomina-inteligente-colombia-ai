@@ -485,22 +485,22 @@ export const PayrollHistoryDetailPage = () => {
                       <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
                         Empleado
                       </TableHead>
-                      <TableHead>Salario Base</TableHead>
-                      <TableHead>IBC</TableHead>
-                      <TableHead className="text-center">Días Trabajados</TableHead>
-                      <TableHead className="bg-green-100 text-center font-semibold">
+                      <TableHead className="min-w-[120px] text-right">Salario Base</TableHead>
+                      <TableHead className="min-w-[120px] text-right">IBC</TableHead>
+                      <TableHead className="min-w-[100px] text-center">Días Trabajados</TableHead>
+                      <TableHead className="min-w-[140px] bg-green-100 text-right font-semibold">
                         Total Devengado
                       </TableHead>
-                      <TableHead className="bg-red-100 text-center font-semibold">
+                      <TableHead className="min-w-[140px] bg-red-100 text-right font-semibold">
                         Total Deducciones
                       </TableHead>
-                      <TableHead className="bg-blue-50 text-center">
+                      <TableHead className="min-w-[100px] bg-blue-50 text-center">
                         Novedades
                       </TableHead>
-                      <TableHead className="bg-blue-100 text-center font-bold">
+                      <TableHead className="min-w-[140px] bg-blue-100 text-right font-bold">
                         Neto Pagado
                       </TableHead>
-                      <TableHead className="sticky right-0 bg-background z-10 text-center">
+                      <TableHead className="min-w-[100px] sticky right-0 bg-background z-10 text-center">
                         Acciones
                       </TableHead>
                     </TableRow>
