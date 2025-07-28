@@ -3,13 +3,13 @@ import { useState, useEffect } from 'react';
 import { SimplePeriodService, SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { useToast } from '@/hooks/use-toast';
 
-export const useSimplePeriodSelection = (companyId: string) => {
+export const useSimplePeriodSelection = (companyId: string, year: number = new Date().getFullYear()) => {
   const [selectedPeriod, setSelectedPeriod] = useState<SelectablePeriod | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   // Clave para persistir la selección en localStorage
-  const STORAGE_KEY = `selected_period_${companyId}`;
+  const STORAGE_KEY = `selected_period_${companyId}_${year}`;
 
   // Cargar período guardado al inicializar
   useEffect(() => {
@@ -26,7 +26,7 @@ export const useSimplePeriodSelection = (companyId: string) => {
         }
       }
     }
-  }, [companyId]);
+  }, [companyId, year]);
 
   const handlePeriodSelect = async (period: SelectablePeriod) => {
     setIsLoading(true);
@@ -102,11 +102,16 @@ export const useSimplePeriodSelection = (companyId: string) => {
     }
   };
 
+  const loadPeriods = async () => {
+    return SimplePeriodService.getSelectablePeriods(companyId, year);
+  };
+
   return {
     selectedPeriod,
     isLoading,
     handlePeriodSelect,
     resetSelection,
-    markCurrentPeriodAsLiquidated
+    markCurrentPeriodAsLiquidated,
+    loadPeriods
   };
 };

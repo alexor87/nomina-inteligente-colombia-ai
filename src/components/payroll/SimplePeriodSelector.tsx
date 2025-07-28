@@ -21,16 +21,20 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
 }) => {
   const [periods, setPeriods] = useState<SelectablePeriod[]>([]);
   const [selectedPeriodNumber, setSelectedPeriodNumber] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [isLoading, setIsLoading] = useState(true);
   const [isSelecting, setIsSelecting] = useState(false);
   const [periodicity, setPeriodicity] = useState<string>('mensual');
   const { toast } = useToast();
 
+  // Generar años disponibles (2021-2040)
+  const availableYears = Array.from({ length: 20 }, (_, i) => 2021 + i);
+
   useEffect(() => {
     if (companyId) {
       loadPeriods();
     }
-  }, [companyId]);
+  }, [companyId, selectedYear]);
 
   const loadPeriods = async () => {
     setIsLoading(true);
@@ -45,7 +49,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
       const currentPeriodicity = companySettings?.periodicity || 'mensual';
       setPeriodicity(currentPeriodicity);
 
-      const loadedPeriods = await SimplePeriodService.getSelectablePeriods(companyId);
+      const loadedPeriods = await SimplePeriodService.getSelectablePeriods(companyId, selectedYear);
       setPeriods(loadedPeriods);
       
       // Auto-seleccionar el primer período disponible
@@ -118,7 +122,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
         <CardContent className="pt-6">
           <div className="flex items-center space-x-3">
             <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-            <p className="text-blue-700">Cargando períodos 2025...</p>
+            <p className="text-blue-700">Cargando períodos {selectedYear}...</p>
           </div>
         </CardContent>
       </Card>
@@ -144,7 +148,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
           <Calendar className="h-5 w-5 text-blue-600" />
           <span>Seleccionar Período de Nómina</span>
           <Badge variant="outline" className="text-xs bg-blue-50">
-            2025
+            {selectedYear}
           </Badge>
           <Badge variant="secondary" className="text-xs">
             {getPeriodTypeLabel(periodicity)}
@@ -159,6 +163,37 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
           </div>
         ) : (
           <>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Seleccionar Año
+                </label>
+                <Select 
+                  value={selectedYear.toString()} 
+                  onValueChange={(value) => {
+                    setSelectedYear(parseInt(value));
+                    setSelectedPeriodNumber(''); // Reset period selection when year changes
+                  }}
+                  disabled={disabled || isSelecting}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona un año" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64 bg-white">
+                    {availableYears.map((year) => (
+                      <SelectItem 
+                        key={year} 
+                        value={year.toString()}
+                        className="hover:bg-gray-50"
+                      >
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div>
               <Select 
                 value={selectedPeriodNumber} 

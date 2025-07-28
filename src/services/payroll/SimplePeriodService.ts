@@ -12,9 +12,9 @@ export interface SelectablePeriod {
 
 export class SimplePeriodService {
   /**
-   * Obtener períodos seleccionables para el año 2025 según configuración de empresa
+   * Obtener períodos seleccionables para el año especificado según configuración de empresa
    */
-  static async getSelectablePeriods(companyId: string): Promise<SelectablePeriod[]> {
+  static async getSelectablePeriods(companyId: string, year: number = new Date().getFullYear()): Promise<SelectablePeriod[]> {
     try {
       console.log('📋 Cargando períodos seleccionables según configuración de empresa...');
       
@@ -29,15 +29,15 @@ export class SimplePeriodService {
       console.log('⚙️ Periodicidad configurada:', periodicity);
       
       // Generar períodos según la configuración (KISS: solo mensual y quincenal)
-      const expectedPeriods = this.generatePeriods2025(periodicity);
+      const expectedPeriods = this.generatePeriods(periodicity, year);
       
       // Obtener períodos existentes en BD
       const { data: existingPeriods } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
-        .gte('fecha_inicio', '2025-01-01')
-        .lte('fecha_fin', '2025-12-31')
+        .gte('fecha_inicio', `${year}-01-01`)
+        .lte('fecha_fin', `${year}-12-31`)
         .in('estado', ['borrador', 'en_proceso', 'cerrado'])
         .order('numero_periodo_anual');
       
@@ -145,9 +145,9 @@ export class SimplePeriodService {
   }
 
   /**
-   * Generar períodos para 2025 según tipo de periodicidad (KISS: solo mensual y quincenal)
+   * Generar períodos para el año especificado según tipo de periodicidad (KISS: solo mensual y quincenal)
    */
-  private static generatePeriods2025(periodicity: string): Array<{
+  private static generatePeriods(periodicity: string, year: number): Array<{
     label: string;
     startDate: string;
     endDate: string;
@@ -155,26 +155,25 @@ export class SimplePeriodService {
   }> {
     switch (periodicity) {
       case 'mensual':
-        return this.generateMonthlyPeriods2025();
+        return this.generateMonthlyPeriods(year);
       case 'quincenal':
-        return this.generateBiWeeklyPeriods2025();
+        return this.generateBiWeeklyPeriods(year);
       default:
         console.warn('⚠️ Periodicidad no reconocida, usando mensual por defecto');
-        return this.generateMonthlyPeriods2025();
+        return this.generateMonthlyPeriods(year);
     }
   }
 
   /**
-   * Generar períodos mensuales para 2025
+   * Generar períodos mensuales para el año especificado
    */
-  private static generateMonthlyPeriods2025(): Array<{
+  private static generateMonthlyPeriods(year: number): Array<{
     label: string;
     startDate: string;
     endDate: string;
     periodNumber: number;
   }> {
     const periods = [];
-    const year = 2025;
     const monthNames = [
       'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
@@ -192,7 +191,7 @@ export class SimplePeriodService {
       });
     }
 
-    console.log('✅ PERÍODOS MENSUALES 2025 GENERADOS:', {
+    console.log(`✅ PERÍODOS MENSUALES ${year} GENERADOS:`, {
       totalPeriods: periods.length,
       firstPeriod: periods[0],
       lastPeriod: periods[periods.length - 1]
@@ -202,16 +201,15 @@ export class SimplePeriodService {
   }
 
   /**
-   * Generar períodos quincenales para 2025
+   * Generar períodos quincenales para el año especificado
    */
-  private static generateBiWeeklyPeriods2025(): Array<{
+  private static generateBiWeeklyPeriods(year: number): Array<{
     label: string;
     startDate: string;
     endDate: string;
     periodNumber: number;
   }> {
     const periods = [];
-    const year = 2025;
     const monthNames = [
       'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
@@ -250,7 +248,7 @@ export class SimplePeriodService {
       });
     }
 
-    console.log('✅ PERÍODOS QUINCENALES 2025 GENERADOS:', {
+    console.log(`✅ PERÍODOS QUINCENALES ${year} GENERADOS:`, {
       totalPeriods: periods.length,
       firstPeriod: periods[0],
       lastPeriod: periods[periods.length - 1]
