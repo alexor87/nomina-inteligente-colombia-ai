@@ -324,7 +324,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
               <TableHead className="text-center min-w-[100px]">Días Trabajados</TableHead>
               <TableHead className="text-right min-w-[140px] bg-green-100 font-semibold">Total Devengado</TableHead>
               <TableHead className="text-right min-w-[140px] bg-red-100 font-semibold">Total Deducciones</TableHead>
-              <TableHead className="text-center min-w-[100px] bg-blue-50">Novedades</TableHead>
+              <TableHead className="text-center min-w-[100px]">Novedades</TableHead>
               <TableHead className="text-right min-w-[140px] bg-blue-100 font-bold">Neto Pagado</TableHead>
               <TableHead className="text-center min-w-[100px] sticky right-0 bg-background z-10">Acciones</TableHead>
             </TableRow>
