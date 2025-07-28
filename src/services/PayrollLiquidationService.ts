@@ -56,7 +56,12 @@ export class PayrollLiquidationService extends SecureBaseService {
       const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
       
       // Use secure query to check for existing period
-      const existingQuery = await this.secureQuery('payroll_periods_real', 'id', {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('🔒 [SECURITY] Access denied: No company context');
+      }
+      
+      const existingQuery = this.secureQuery('payroll_periods_real', companyId, 'id', {
         fecha_inicio: startDate,
         fecha_fin: endDate
       });
@@ -96,7 +101,12 @@ export class PayrollLiquidationService extends SecureBaseService {
       console.log('🔒 Loading employees for period securely');
 
       // Use secure query to get active employees
-      const employeesQuery = await this.secureQuery('employees', 'id, nombre, apellido, salario_base', {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('🔒 [SECURITY] Access denied: No company context');
+      }
+      
+      const employeesQuery = this.secureQuery('employees', companyId, 'id, nombre, apellido, salario_base', {
         estado: 'activo'
       });
       
@@ -154,7 +164,12 @@ export class PayrollLiquidationService extends SecureBaseService {
       console.log('🔒 Loading specific employees for period securely');
 
       // Use secure query with IN filter for specific employees
-      const employeesQuery = await this.secureQuery('employees', 'id, nombre, apellido, salario_base', {
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('🔒 [SECURITY] Access denied: No company context');
+      }
+      
+      const employeesQuery = this.secureQuery('employees', companyId, 'id, nombre, apellido, salario_base', {
         estado: 'activo'
       });
       

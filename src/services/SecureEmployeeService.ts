@@ -17,35 +17,22 @@ export class SecureEmployeeService extends SecureBaseService {
     try {
       console.log('🔍 [SECURE-EMPLOYEES] Starting getEmployees...');
       
-      // First, let's verify we can get the company ID
-      const companyId = await this.getCurrentUserCompanyId();
-      console.log('🔍 [SECURE-EMPLOYEES] Company ID for query:', companyId);
-      
-      if (!companyId) {
-        console.error('🔍 [SECURE-EMPLOYEES] No company ID available - session might not be ready');
-        
-        // Retry mechanism - wait 200ms and try once more
-        console.log('🔍 [SECURE-EMPLOYEES] Retrying after short delay...');
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        const retryCompanyId = await this.getCurrentUserCompanyId();
-        console.log('🔍 [SECURE-EMPLOYEES] Retry company ID:', retryCompanyId);
-        
-        if (!retryCompanyId) {
-          return { success: false, error: 'No company context available. Please refresh the page.' };
-        }
-      }
-      
       console.log('🔒 SecureEmployeeService: Fetching employees with company filter');
+      
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('🔒 [SECURITY] Access denied: No company context');
+      }
       
       const query = this.secureQuery(
         'employees',
+        companyId,
         '*',
         { estado: { neq: 'eliminado' } } // Exclude soft deleted
       );
       
       console.log('🔍 [SECURE-EMPLOYEES] Executing employee query...');
-      const { data, error } = await (await query).order('created_at', { ascending: false });
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       console.log('🔍 [SECURE-EMPLOYEES] Query result:', { dataCount: data?.length, error });
 
@@ -85,16 +72,22 @@ export class SecureEmployeeService extends SecureBaseService {
     try {
       console.log('🔒 SecureEmployeeService: Fetching employee by ID:', id);
       
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('🔒 [SECURITY] Access denied: No company context');
+      }
+      
       const query = this.secureQuery(
         'employees',
+        companyId,
         '*',
         { 
-          id: id,
-          estado: { neq: 'eliminado' } // Exclude soft deleted
+          id,
+          estado: { neq: 'eliminado' }
         }
       );
       
-      const { data, error } = await (await query).maybeSingle();
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.error('❌ SecureEmployeeService: Error fetching employee:', error);
@@ -255,13 +248,19 @@ export class SecureEmployeeService extends SecureBaseService {
     try {
       console.log('🔒 SecureEmployeeService: Fetching deleted employees');
       
+      const companyId = await this.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('🔒 [SECURITY] Access denied: No company context');
+      }
+      
       const query = this.secureQuery(
         'employees',
+        companyId,
         '*',
         { estado: 'eliminado' }
       );
       
-      const { data, error } = await (await query).order('updated_at', { ascending: false });
+      const { data, error } = await query.order('updated_at', { ascending: false });
 
       if (error) {
         console.error('❌ SecureEmployeeService: Error fetching deleted employees:', error);

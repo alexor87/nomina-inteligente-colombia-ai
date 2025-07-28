@@ -55,17 +55,14 @@ export abstract class SecureBaseService {
 
   /**
    * Secure query builder - automatically adds company_id filter
+   * Now synchronous - company_id must be provided
    */
-  protected static async secureQuery<T = any>(
+  protected static secureQuery<T = any>(
     tableName: string,
+    companyId: string,
     select: string = '*',
     additionalFilters?: Record<string, any>
   ) {
-    const companyId = await this.getCurrentUserCompanyId();
-    if (!companyId) {
-      throw new Error('🔒 [SECURITY] Access denied: No company context');
-    }
-
     let query = (supabase as any)
       .from(tableName)
       .select(select)

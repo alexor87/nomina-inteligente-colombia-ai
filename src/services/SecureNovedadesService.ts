@@ -15,11 +15,12 @@ export class SecureNovedadesService extends SecureBaseService {
       console.log('🔒 [SECURITY] Creating novedad with secure validation for company:', companyId);
 
       // Validate period belongs to user's company
-      const { data: periodExists, error: periodError } = await (await this.secureQuery(
+      const { data: periodExists, error: periodError } = await this.secureQuery(
         'payroll_periods_real',
+        companyId,
         'id',
         { id: novedadData.periodo_id }
-      ));
+      );
 
       if (periodError || !periodExists?.length) {
         console.error('🔒 [SECURITY] Period validation failed:', periodError);
@@ -27,11 +28,12 @@ export class SecureNovedadesService extends SecureBaseService {
       }
 
       // Validate employee belongs to user's company
-      const { data: employeeExists, error: employeeError } = await (await this.secureQuery(
+      const { data: employeeExists, error: employeeError } = await this.secureQuery(
         'employees',
+        companyId,
         'id',
         { id: novedadData.empleado_id }
-      ));
+      );
 
       if (employeeError || !employeeExists?.length) {
         console.error('🔒 [SECURITY] Employee validation failed:', employeeError);
@@ -98,8 +100,9 @@ export class SecureNovedadesService extends SecureBaseService {
 
       console.log('🔒 [SECURITY] Loading novedades for employee:', empleadoId, 'period:', periodId, 'company:', companyId);
 
-      const { data, error } = await (await this.secureQuery(
+      const { data, error } = await this.secureQuery(
         'payroll_novedades',
+        companyId,
         `
           id,
           company_id,
@@ -120,7 +123,7 @@ export class SecureNovedadesService extends SecureBaseService {
           empleado_id: empleadoId,
           periodo_id: periodId
         }
-      ));
+      );
 
       if (error) {
         console.error('🔒 [SECURITY] Error loading novedades:', error);
