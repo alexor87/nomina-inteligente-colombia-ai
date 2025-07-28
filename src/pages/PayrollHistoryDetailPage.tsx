@@ -478,51 +478,47 @@ export const PayrollHistoryDetailPage = () => {
               <CardTitle>Empleados Liquidados</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="min-w-max w-full border-collapse bg-white rounded-lg shadow-sm">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="sticky left-0 bg-gray-50 z-10 min-w-[200px] px-4 py-3 text-left text-sm font-semibold text-gray-900 border-r">
-                        Nombre Empleado
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                        Salario Base
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                        IBC
-                      </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900">
-                        Días Trabajados
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 bg-green-100">
+              <div className="w-full overflow-x-auto">
+                <Table className="min-w-max">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
+                        Empleado
+                      </TableHead>
+                      <TableHead>Salario Base</TableHead>
+                      <TableHead>IBC</TableHead>
+                      <TableHead className="text-center">Días Trabajados</TableHead>
+                      <TableHead className="bg-green-100 text-center font-semibold">
                         Total Devengado
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 bg-red-100">
+                      </TableHead>
+                      <TableHead className="bg-red-100 text-center font-semibold">
                         Total Deducciones
-                      </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 bg-blue-50">
+                      </TableHead>
+                      <TableHead className="bg-blue-50 text-center">
                         Novedades
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 bg-blue-100">
+                      </TableHead>
+                      <TableHead className="bg-blue-100 text-center font-bold">
                         Neto Pagado
-                      </th>
-                      <th className="sticky right-0 bg-gray-50 z-10 px-4 py-3 text-center text-sm font-semibold text-gray-900 border-l">
+                      </TableHead>
+                      <TableHead className="sticky right-0 bg-background z-10 text-center">
                         Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {employees.map((employee) => {
                       const preview = calculateEmployeePreview(employee);
                       return (
-                        <tr key={employee.id} className="border-b hover:bg-gray-50 transition-colors">
-                          <td className="sticky left-0 bg-white z-10 px-4 py-3 border-r">
-                            <div>
-                              <div className="font-medium text-gray-900">
-                                {employee.employee_name} {employee.employee_lastname}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                Sin cargo definido
+                        <TableRow key={employee.id}>
+                          <TableCell className="sticky left-0 bg-background z-10 min-w-[200px]">
+                            <div className="flex items-center">
+                              <div>
+                                <div className="font-medium">
+                                  {employee.employee_name} {employee.employee_lastname}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  Sin cargo definido
+                                </div>
                               </div>
                             </div>
                             {preview.hasPending && (
@@ -530,23 +526,17 @@ export const PayrollHistoryDetailPage = () => {
                                 {preview.pendingCount} pendiente{preview.pendingCount > 1 ? 's' : ''}
                               </Badge>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className="font-medium text-gray-900">
-                              {formatCurrency(employee.salario_base)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className="font-medium text-gray-900">
-                              {formatCurrency(employee.ibc || employee.salario_base)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="font-medium text-gray-900">
-                              {employee.dias_trabajados || 30}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right bg-green-100">
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {formatCurrency(employee.salario_base)}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {formatCurrency(employee.ibc || employee.salario_base)}
+                          </TableCell>
+                          <TableCell className="text-center font-medium">
+                            {employee.dias_trabajados || 30}
+                          </TableCell>
+                          <TableCell className="bg-green-100 text-right font-medium">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
@@ -564,8 +554,8 @@ export const PayrollHistoryDetailPage = () => {
                                 {formatCurrency(employee.total_devengado)}
                               </span>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-right bg-red-100">
+                          </TableCell>
+                          <TableCell className="bg-red-100 text-right font-medium">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
@@ -585,25 +575,25 @@ export const PayrollHistoryDetailPage = () => {
                                 {formatCurrency(employee.total_deducciones)}
                               </span>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-center bg-blue-50">
-                            <div className="flex items-center justify-center space-x-2">
+                          </TableCell>
+                          <TableCell className="bg-blue-50 text-center">
+                            <div className="flex items-center justify-center gap-2">
                               <Button
-                                variant="outline"
                                 size="sm"
-                                onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
+                                variant="outline"
                                 className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
                               {preview.pendingCount > 0 && (
-                                <Badge variant="default" className="ml-2 text-xs">
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                                   {preview.pendingCount}
                                 </Badge>
                               )}
                             </div>
-                          </td>
-                          <td className="px-4 py-3 text-right bg-blue-100">
+                          </TableCell>
+                          <TableCell className="bg-blue-100 text-right text-lg font-medium">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
@@ -621,25 +611,22 @@ export const PayrollHistoryDetailPage = () => {
                                 {formatCurrency(employee.neto_pagado)}
                               </span>
                             )}
-                          </td>
-                          <td className="sticky right-0 bg-white z-10 px-4 py-3 border-l">
-                            <div className="flex justify-center">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
-                                className="text-green-600 border-green-200 hover:bg-green-50"
-                              >
-                                <Download className="h-4 w-4 mr-1" />
-                                Descargar
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                          <TableCell className="sticky right-0 bg-background z-10 text-center">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Comprobante
+                            </Button>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
