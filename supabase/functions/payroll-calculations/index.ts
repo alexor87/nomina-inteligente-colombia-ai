@@ -88,7 +88,7 @@ const CONFIGURATIONS_BY_YEAR: Record<string, PayrollConfiguration> = {
   '2025': {
     salarioMinimo: 1423500, // Salario mínimo 2025
     auxilioTransporte: 200000, // Auxilio transporte 2025
-    uvt: 50000, // UVT 2025 actualizado
+    uvt: 49799, // UVT 2025 oficial DIAN
     porcentajes: {
       saludEmpleado: 0.04,
       pensionEmpleado: 0.04,

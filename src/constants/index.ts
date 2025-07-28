@@ -65,7 +65,7 @@ export const CONTRIBUCIONES_SOLIDARIAS_2025 = {
 
 // ✅ NUEVO: Constantes para Retención en la Fuente 2025
 export const RETENCION_FUENTE_2025 = {
-  UVT: 47065,
+  UVT: 49799,
   TABLA_RETENCION: [
     { minUVT: 0, maxUVT: 95, percentage: 0, baseUVT: 0 },
     { minUVT: 95, maxUVT: 150, percentage: 0.19, baseUVT: 95 },
