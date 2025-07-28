@@ -321,7 +321,16 @@ export class PayrollLiquidationService extends SecureBaseService {
       return {
         success: true,
         message: `Liquidación completada para ${employees.length} empleados con cálculo único de totales`,
-        periodId: period.id
+        periodId: period.id,
+        summary: {
+          totalEmployees: employees.length,
+          validEmployees: employees.length,
+          totalGrossPay: finalTotalDevengado,
+          totalDeductions: finalTotalDeducciones,
+          totalNetPay: finalTotalNeto,
+          employerContributions: finalTotalDevengado * 0.205,
+          totalPayrollCost: finalTotalDevengado + (finalTotalDevengado * 0.205)
+        }
       };
     } catch (error) {
       console.error('Error liquidating payroll:', error);
