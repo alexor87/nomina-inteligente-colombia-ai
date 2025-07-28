@@ -23,6 +23,7 @@ import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessM
 import { NewYearConfigurationModal } from '@/components/payroll/modals/NewYearConfigurationModal';
 import { EndOfYearDetectionService, EndOfYearSituation } from '@/services/EndOfYearDetectionService';
 import { useNavigate } from 'react-router-dom';
+import { calculatePayrollSummary } from '@/utils/payrollCalculations';
 
 const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -126,6 +127,7 @@ const PayrollLiquidationPageSimplified = () => {
       await markCurrentPeriodAsLiquidated();
       
       // Show success modal with results after successful liquidation
+      const realSummary = calculatePayrollSummary(employees);
       setLiquidationResult({
         periodData: {
           startDate: selectedPeriod.startDate,
@@ -134,9 +136,10 @@ const PayrollLiquidationPageSimplified = () => {
         },
         summary: {
           processedEmployees: employees.length,
-          totalEarned: 0,
-          totalDeductions: 0,
-          netPay: 0,
+          totalEarned: realSummary.totalGrossPay,
+          totalDeductions: realSummary.totalDeductions,
+          totalNetPay: realSummary.totalNetPay,
+          netPay: realSummary.totalNetPay,
           generatedVouchers: employees.length
         }
       });
@@ -159,6 +162,7 @@ const PayrollLiquidationPageSimplified = () => {
       setPeriodAlreadyLiquidated(false);
       
       // Show success modal with re-liquidation results
+      const realSummary = calculatePayrollSummary(employees);
       setLiquidationResult({
         periodData: {
           startDate: selectedPeriod.startDate,
@@ -167,9 +171,10 @@ const PayrollLiquidationPageSimplified = () => {
         },
         summary: {
           processedEmployees: employees.length,
-          totalEarned: 0,
-          totalDeductions: 0,
-          netPay: 0,
+          totalEarned: realSummary.totalGrossPay,
+          totalDeductions: realSummary.totalDeductions,
+          totalNetPay: realSummary.totalNetPay,
+          netPay: realSummary.totalNetPay,
           generatedVouchers: employees.length
         }
       });
