@@ -19,7 +19,7 @@ export const MissingConfigurationModal: React.FC<MissingConfigurationModalProps>
   const navigate = useNavigate();
 
   const handleGoToConfiguration = () => {
-    navigate('/app/configuracion/legal');
+    navigate('/app/settings', { state: { activeTab: 'parametros-legales' } });
     onClose();
   };
 

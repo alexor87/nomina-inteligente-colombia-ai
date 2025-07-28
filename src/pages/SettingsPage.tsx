@@ -1,5 +1,6 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmpresaSettings } from '@/components/settings/EmpresaSettings';
@@ -15,6 +16,13 @@ import { ParametrosLegalesSettings } from '@/components/settings/ParametrosLegal
 
 const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState('empresa');
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
 
   return (
     <div className="space-y-6">
