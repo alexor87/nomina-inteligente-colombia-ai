@@ -26,55 +26,8 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   const [showProgress, setShowProgress] = useState(false);
   const [autoSendEmails, setAutoSendEmails] = useState(true);
   const [canRollback, setCanRollback] = useState(false);
-  // Always use atomic liquidation and exhaustive validation (mandatory)
-  const useAtomicLiquidation = true;
-  const useExhaustiveValidation = true;
-
-  // ✅ NUEVA FUNCIÓN: Validación exhaustiva (declared first to avoid hoisting issues)
-  const performExhaustiveValidation = useCallback(async () => {
-    if (!payrollHook.currentPeriodId || !companyId) {
-      throw new Error('No hay período o empresa para validar');
-    }
-
-    setIsValidating(true);
-    try {
-      console.log('🔍 Ejecutando validación exhaustiva...');
-      
-      const results = await PayrollExhaustiveValidationService.validateForLiquidation(
-        payrollHook.currentPeriodId,
-        companyId
-      );
-      
-      setExhaustiveValidationResults(results);
-      
-      if (results.canProceed) {
-        toast({
-          title: "✅ Validación Exhaustiva Exitosa",
-          description: `Score: ${results.score}/100 - Listo para liquidar`,
-          className: "border-green-200 bg-green-50"
-        });
-      } else {
-        toast({
-          title: "⚠️ Validación Exhaustiva Falló",
-          description: `Score: ${results.score}/100 - ${results.mustRepair.length} errores críticos`,
-          variant: "destructive"
-        });
-      }
-      
-      return results;
-      
-    } catch (error) {
-      console.error('❌ Error en validación exhaustiva:', error);
-      toast({
-        title: "❌ Error en Validación Exhaustiva",
-        description: "Error al validar el período",
-        variant: "destructive"
-      });
-      throw error;
-    } finally {
-      setIsValidating(false);
-    }
-  }, [payrollHook.currentPeriodId, companyId, toast]);
+  const [useAtomicLiquidation, setUseAtomicLiquidation] = useState(true);
+  const [useExhaustiveValidation, setUseExhaustiveValidation] = useState(true);
 
   const loadEmployees = useCallback(async (
     startDate: string,
@@ -86,10 +39,6 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       await payrollHook.loadEmployees(startDate, endDate);
       
       console.log('✅ Employees loaded successfully');
-      
-      // Always perform exhaustive validation after loading employees
-      console.log('🔍 Auto-performing exhaustive validation after loading employees...');
-      await performExhaustiveValidation();
       
       toast({
         title: "✅ Empleados Cargados",
@@ -110,7 +59,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       
       throw error;
     }
-  }, [companyId, payrollHook, toast, performExhaustiveValidation]);
+  }, [companyId, payrollHook, toast]);
 
   // ✅ NUEVA FUNCIÓN: Validar período antes de liquidar
   const validatePeriod = useCallback(async (
@@ -163,7 +112,51 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     }
   }, [payrollHook.employees, payrollHook.currentPeriodId, toast]);
 
-  // Function already moved above loadEmployees
+  // ✅ NUEVA FUNCIÓN: Validación exhaustiva
+  const performExhaustiveValidation = useCallback(async () => {
+    if (!payrollHook.currentPeriodId || !companyId) {
+      throw new Error('No hay período o empresa para validar');
+    }
+
+    setIsValidating(true);
+    try {
+      console.log('🔍 Ejecutando validación exhaustiva...');
+      
+      const results = await PayrollExhaustiveValidationService.validateForLiquidation(
+        payrollHook.currentPeriodId,
+        companyId
+      );
+      
+      setExhaustiveValidationResults(results);
+      
+      if (results.canProceed) {
+        toast({
+          title: "✅ Validación Exhaustiva Exitosa",
+          description: `Score: ${results.score}/100 - Listo para liquidar`,
+          className: "border-green-200 bg-green-50"
+        });
+      } else {
+        toast({
+          title: "⚠️ Validación Exhaustiva Falló",
+          description: `Score: ${results.score}/100 - ${results.mustRepair.length} errores críticos`,
+          variant: "destructive"
+        });
+      }
+      
+      return results;
+      
+    } catch (error) {
+      console.error('❌ Error en validación exhaustiva:', error);
+      toast({
+        title: "❌ Error en Validación Exhaustiva",
+        description: "Error al validar el período",
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setIsValidating(false);
+    }
+  }, [payrollHook.currentPeriodId, companyId, toast]);
 
   // ✅ NUEVA FUNCIÓN: Reparación automática
   const autoRepairValidationIssues = useCallback(async () => {
@@ -540,7 +533,9 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     performExhaustiveValidation,
     autoRepairValidationIssues,
     exhaustiveValidationResults,
-    useAtomicLiquidation, // Always true (mandatory)
-    useExhaustiveValidation // Always true (mandatory)
+    useAtomicLiquidation,
+    setUseAtomicLiquidation,
+    useExhaustiveValidation,
+    setUseExhaustiveValidation
   };
 };

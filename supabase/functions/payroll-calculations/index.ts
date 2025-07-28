@@ -141,8 +141,8 @@ async function getConfigurationByYear(year: string = '2025', companyId?: string)
   return config;
 }
 
-// Mantener compatibilidad con código existente  
-const DEFAULT_CONFIG_2025 = getFallbackConfiguration('2025');
+// Mantener compatibilidad con código existente
+const DEFAULT_CONFIG_2025 = CONFIGURATIONS_BY_YEAR['2025'];
 
 // ✅ NUEVA TABLA DE RETENCIÓN EN LA FUENTE 2025 (actualizada)
 const RETENCION_FUENTE_2025 = [
@@ -347,13 +347,13 @@ function getFactorHoraExtra(subtipo: string, fechaPeriodo?: string): number {
 }
 
 // ✅ FUNCIÓN ACTUALIZADA: Calcular retención en la fuente por año
-async function calculateRetencionFuente(salarioMensual: number, year: string = '2025'): Promise<{ 
+function calculateRetencionFuente(salarioMensual: number, year: string = '2025'): { 
   valor: number; 
   detalle: string; 
   baseEnUvt: number;
   rangoAplicado: any;
-}> {
-  const config = await getConfigurationByYear(year);
+} {
+  const config = getConfigurationByYear(year);
   const baseEnUvt = salarioMensual / config.uvt;
   
   console.log(`🏦 Calculando Retención en la Fuente ${year}:`, {
@@ -484,7 +484,7 @@ function calculateIBC(baseSalary: number, novedades: NovedadForIBC[] = [], confi
 }
 
 // ✅ FUNCIÓN MEJORADA: Cálculo de novedades con nuevos tipos
-async function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
+function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, valorManual, cuotas } = input;
   
   let valor = 0;
@@ -585,7 +585,7 @@ async function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           console.log(`🏥 [INCAPACIDAD v3.0] Calculando incapacidad general: ${dias} días, salario base: ${salarioBase}`);
           
           const valorDiarioCalculado = salarioDiario * 0.6667;
-          const config = await getConfigurationByYear('2025'); // Usar configuración dinámica
+          const config = getConfigurationByYear('2025'); // Usar configuración dinámica
           const smldv = config.salarioMinimo / 30;
           const valorDiarioFinal = Math.max(valorDiarioCalculado, smldv);
           
@@ -719,14 +719,14 @@ async function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         detalleCalculo = `Retención manual: $${valor.toLocaleString()} (${(factorCalculo * 100).toFixed(2)}% del salario)`;
       } else {
         // Cálculo automático usando tabla por año
-        const retencionResult = await calculateRetencionFuente(salarioBase, '2025');
+        const retencionResult = calculateRetencionFuente(salarioBase, '2025');
         valor = retencionResult.valor;
         factorCalculo = valor > 0 ? valor / salarioBase : 0;
         
         detalleCalculo = `Retención automática: ${retencionResult.detalle}`;
         
         // Información adicional para debug
-        const configForUvt = await getConfigurationByYear('2025');
+        const configForUvt = getConfigurationByYear('2025');
         validationResult = {
           baseEnUvt: retencionResult.baseEnUvt,
           rangoAplicado: retencionResult.rangoAplicado,
@@ -773,7 +773,7 @@ async function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
       break;
 
     case 'fondo_solidaridad':
-      const configSolidaridad = await getConfigurationByYear('2025'); // Usar configuración dinámica
+      const configSolidaridad = getConfigurationByYear('2025'); // Usar configuración dinámica
       if (salarioBase >= (configSolidaridad.salarioMinimo * 4)) {
         valor = Math.round(salarioBase * 0.01);
         factorCalculo = 0.01;
@@ -813,8 +813,8 @@ async function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
   return result;
 }
 
-async function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: string) {
-  const config = await getConfigurationByYear(input.year || '2025');
+function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: string) {
+  const config = getConfigurationByYear(input.year || '2025');
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -896,8 +896,8 @@ async function validateEmployee(input: PayrollCalculationInput, eps?: string, af
 }
 
 // ✅ FUNCIÓN PRINCIPAL ACTUALIZADA: Ahora incluye TODAS las novedades en liquidación
-async function calculatePayroll(input: PayrollCalculationInput) {
-  const config = await getConfigurationByYear(input.year || '2025');
+function calculatePayroll(input: PayrollCalculationInput) {
+  const config = getConfigurationByYear(input.year || '2025');
   console.log(`🎯 [PAYROLL v4.0] Usando configuración para año ${input.year || '2025'}:`, {
     salarioMinimo: config.salarioMinimo,
     auxilioTransporte: config.auxilioTransporte,
@@ -1055,26 +1055,26 @@ serve(async (req) => {
 
     switch (action) {
       case 'calculate':
-        const calculation = await calculatePayroll(data);
+        const calculation = calculatePayroll(data);
         return new Response(JSON.stringify({ success: true, data: calculation }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
       case 'validate':
-        const validation = await validateEmployee(data, data.eps, data.afp);
+        const validation = validateEmployee(data, data.eps, data.afp);
         return new Response(JSON.stringify({ success: true, data: validation }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
       case 'batch-calculate':
-        const batchResults = await Promise.all(data.inputs.map((input: PayrollCalculationInput) => calculatePayroll(input)));
+        const batchResults = data.inputs.map((input: PayrollCalculationInput) => calculatePayroll(input));
         return new Response(JSON.stringify({ success: true, data: batchResults }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
       case 'calculate-novedad':
         console.log(`🎯 [EDGE v4.0] Calculating novedad: ${data.tipoNovedad} - ${data.subtipo}`);
-        const novedadResult = await calculateNovedadUltraKiss(data);
+        const novedadResult = calculateNovedadUltraKiss(data);
         console.log(`🎯 [EDGE v4.0] Novedad result: valor=${novedadResult.valor}, validation=${JSON.stringify(novedadResult.validationResult)}`);
         return new Response(JSON.stringify({ success: true, data: novedadResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1098,7 +1098,7 @@ serve(async (req) => {
       // ✅ NUEVA ACCIÓN: Calcular solo retención en la fuente
       case 'calculate-retencion-fuente':
         console.log(`🏦 [EDGE v4.0] Calculating retención fuente for salary: ${data.salarioBase}`);
-        const retencionResult = await calculateRetencionFuente(data.salarioBase, data.year || '2025');
+        const retencionResult = calculateRetencionFuente(data.salarioBase, data.year || '2025');
         return new Response(JSON.stringify({ success: true, data: retencionResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

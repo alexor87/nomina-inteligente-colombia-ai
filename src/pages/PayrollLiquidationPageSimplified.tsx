@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Settings, RotateCcw, Zap } from 'lucide-react';
+import { Calculator, Users, Settings, RotateCcw } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
@@ -66,9 +66,11 @@ const PayrollLiquidationPageSimplified = () => {
     liquidationProgress,
     processedEmployees,
     liquidationErrors,
-    // World-class features (always mandatory)
-    useAtomicLiquidation, // Always true (mandatory)
-    useExhaustiveValidation, // Always true (mandatory)
+    // World-class features
+    useAtomicLiquidation,
+    setUseAtomicLiquidation,
+    useExhaustiveValidation,
+    setUseExhaustiveValidation,
     exhaustiveValidationResults,
     isValidating,
     performExhaustiveValidation,
@@ -266,7 +268,9 @@ const PayrollLiquidationPageSimplified = () => {
       {periodSelected && selectedPeriod && (
         <PayrollWorldClassControlPanel
           useAtomicLiquidation={useAtomicLiquidation}
+          setUseAtomicLiquidation={setUseAtomicLiquidation}
           useExhaustiveValidation={useExhaustiveValidation}
+          setUseExhaustiveValidation={setUseExhaustiveValidation}
           exhaustiveValidationResults={exhaustiveValidationResults}
           isValidating={isValidating}
           onPerformExhaustiveValidation={async () => { await performExhaustiveValidation(); }}
@@ -378,13 +382,13 @@ const PayrollLiquidationPageSimplified = () => {
                   <Users className="h-4 w-4 mr-2" />
                   Agregar Empleado
                 </Button>
-                <Button
+                <Button 
                   onClick={handleLiquidate}
-                  disabled={!canProceedWithLiquidation || showProgress || (exhaustiveValidationResults && !exhaustiveValidationResults.canProceed)}
-                  className="flex items-center gap-2"
+                  disabled={isLiquidating || !canProceedWithLiquidation || isRemovingEmployee}
+                  className={periodAlreadyLiquidated ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700"}
                 >
-                  <Zap className="h-4 w-4" />
-                  {useAtomicLiquidation ? 'Liquidar (Atómico)' : 'Liquidar (Tradicional)'}
+                  {isLiquidating ? 'Liquidando...' : periodAlreadyLiquidated ? 'Re-liquidar' : 'Liquidar Nómina'}
+                  {periodAlreadyLiquidated && <RotateCcw className="h-4 w-4 ml-2" />}
                 </Button>
               </div>
             </div>
