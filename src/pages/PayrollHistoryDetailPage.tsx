@@ -4,6 +4,7 @@ import { useCompanyId } from '@/components/employees/form/useCompanyId';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Download, Plus, Calendar, Users, DollarSign, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
@@ -39,6 +40,8 @@ interface EmployeePayroll {
   total_deducciones: number;
   neto_pagado: number;
   salario_base: number;
+  ibc?: number;
+  dias_trabajados?: number;
 }
 
 
@@ -112,7 +115,9 @@ export const PayrollHistoryDetailPage = () => {
         total_devengado: p.total_devengado || 0,
         total_deducciones: p.total_deducciones || 0,
         neto_pagado: p.neto_pagado || 0,
-        salario_base: p.salario_base || 0
+        salario_base: p.salario_base || 0,
+        ibc: p.salario_base || 0,
+        dias_trabajados: 30
       })) || [];
       
       setEmployees(employeesWithNames);
@@ -474,25 +479,28 @@ export const PayrollHistoryDetailPage = () => {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-4 font-medium">Empleado</th>
-                      <th className="text-left p-4 font-medium">Salario Base</th>
-                      <th className="text-left p-4 font-medium">Devengado</th>
-                      <th className="text-left p-4 font-medium">Deducciones</th>
-                      <th className="text-left p-4 font-medium">Neto Pagado</th>
-                      <th className="text-left p-4 font-medium">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="sticky left-0 z-10 bg-background">Nombre Empleado</TableHead>
+                      <TableHead>Salario Base</TableHead>
+                      <TableHead>IBC</TableHead>
+                      <TableHead>Días Trabajados</TableHead>
+                      <TableHead className="bg-green-50 text-green-700">Total Devengado</TableHead>
+                      <TableHead className="bg-red-50 text-red-700">Total Deducciones</TableHead>
+                      <TableHead>Novedades</TableHead>
+                      <TableHead className="bg-blue-50 text-blue-700">Neto Pagado</TableHead>
+                      <TableHead className="sticky right-0 z-10 bg-background">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {employees.map((employee) => {
                       const preview = calculateEmployeePreview(employee);
                       return (
-                        <tr key={employee.id} className="border-b hover:bg-muted/50">
-                          <td className="p-4">
+                        <TableRow key={employee.id} className="hover:bg-muted/50">
+                          <TableCell className="sticky left-0 z-10 bg-background">
                             <div className="flex items-center gap-2">
-                              <div className="font-medium">
+                              <div className="font-medium min-w-[200px]">
                                 {employee.employee_name} {employee.employee_lastname}
                               </div>
                               {preview.hasPending && (
@@ -501,9 +509,11 @@ export const PayrollHistoryDetailPage = () => {
                                 </Badge>
                               )}
                             </div>
-                          </td>
-                          <td className="p-4 font-mono">{formatCurrency(employee.salario_base)}</td>
-                          <td className="p-4 font-mono">
+                          </TableCell>
+                          <TableCell className="font-mono">{formatCurrency(employee.salario_base)}</TableCell>
+                          <TableCell className="font-mono">{formatCurrency(employee.ibc || employee.salario_base)}</TableCell>
+                          <TableCell className="text-center">{employee.dias_trabajados || 30}</TableCell>
+                          <TableCell className="font-mono bg-green-50">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
@@ -519,8 +529,8 @@ export const PayrollHistoryDetailPage = () => {
                             ) : (
                               formatCurrency(employee.total_devengado)
                             )}
-                          </td>
-                          <td className="p-4 font-mono">
+                          </TableCell>
+                          <TableCell className="font-mono bg-red-50">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
@@ -538,8 +548,13 @@ export const PayrollHistoryDetailPage = () => {
                             ) : (
                               formatCurrency(employee.total_deducciones)
                             )}
-                          </td>
-                          <td className="p-4 font-mono font-semibold">
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="min-w-[40px]">
+                              {preview.pendingCount}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-mono font-semibold bg-blue-50">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
@@ -555,14 +570,15 @@ export const PayrollHistoryDetailPage = () => {
                             ) : (
                               formatCurrency(employee.neto_pagado)
                             )}
-                          </td>
-                          <td className="p-4">
+                          </TableCell>
+                          <TableCell className="sticky right-0 z-10 bg-background">
                             <div className="flex items-center gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
                                 className="flex items-center gap-2"
+                                title="Agregar Ajuste"
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
@@ -571,17 +587,17 @@ export const PayrollHistoryDetailPage = () => {
                                 size="sm"
                                 onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
                                 className="flex items-center gap-2"
+                                title="Descargar Comprobante"
                               >
                                 <Download className="h-4 w-4" />
-                                Comprobante
                               </Button>
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
