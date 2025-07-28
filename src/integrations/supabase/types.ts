@@ -222,6 +222,48 @@ export type Database = {
           },
         ]
       }
+      company_payroll_configurations: {
+        Row: {
+          arl_risk_levels: Json
+          company_id: string
+          created_at: string
+          fondo_solidaridad: Json
+          id: string
+          percentages: Json
+          salary_min: number
+          transport_allowance: number
+          updated_at: string
+          uvt: number
+          year: string
+        }
+        Insert: {
+          arl_risk_levels?: Json
+          company_id: string
+          created_at?: string
+          fondo_solidaridad?: Json
+          id?: string
+          percentages?: Json
+          salary_min?: number
+          transport_allowance?: number
+          updated_at?: string
+          uvt?: number
+          year: string
+        }
+        Update: {
+          arl_risk_levels?: Json
+          company_id?: string
+          created_at?: string
+          fondo_solidaridad?: Json
+          id?: string
+          percentages?: Json
+          salary_min?: number
+          transport_allowance?: number
+          updated_at?: string
+          uvt?: number
+          year?: string
+        }
+        Relationships: []
+      }
       company_schema_versions: {
         Row: {
           changes_summary: string

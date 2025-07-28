@@ -13,32 +13,87 @@ export const ParametrosLegalesSettings = () => {
   const { toast } = useToast();
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('2025');
-  const [config, setConfig] = useState<PayrollConfiguration>(() => 
-    ConfigurationService.getConfiguration('2025')
-  );
+  const [config, setConfig] = useState<PayrollConfiguration>({
+    salarioMinimo: 1423500,
+    auxilioTransporte: 200000,
+    uvt: 49799,
+    porcentajes: {
+      saludEmpleado: 0.04,
+      pensionEmpleado: 0.04,
+      saludEmpleador: 0.085,
+      pensionEmpleador: 0.12,
+      arl: 0.00522,
+      cajaCompensacion: 0.04,
+      icbf: 0.03,
+      sena: 0.02,
+      cesantias: 0.0833,
+      interesesCesantias: 0.12,
+      prima: 0.0833,
+      vacaciones: 0.0417,
+    },
+    fondoSolidaridad: {
+      ranges: [
+        { minSMMLV: 4, maxSMMLV: 16, percentage: 1 },
+        { minSMMLV: 16, maxSMMLV: 17, percentage: 1.2 },
+        { minSMMLV: 17, maxSMMLV: 18, percentage: 1.4 },
+        { minSMMLV: 18, maxSMMLV: 19, percentage: 1.6 },
+        { minSMMLV: 19, maxSMMLV: 20, percentage: 1.8 },
+        { minSMMLV: 20, maxSMMLV: null, percentage: 2 }
+      ]
+    },
+    arlRiskLevels: {
+      I: 0.348,
+      II: 0.435,
+      III: 0.783,
+      IV: 1.740,
+      V: 3.219,
+    }
+  });
   const [newYear, setNewYear] = useState('');
   const [showNewYearForm, setShowNewYearForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadAvailableYears();
   }, []);
 
   useEffect(() => {
-    const yearConfig = ConfigurationService.getConfiguration(selectedYear);
-    setConfig(yearConfig);
+    loadYearConfiguration();
   }, [selectedYear]);
 
-  const loadAvailableYears = () => {
-    const years = ConfigurationService.getAvailableYears();
-    setAvailableYears(years);
-    if (years.length > 0 && !years.includes(selectedYear)) {
-      setSelectedYear(years[0]);
+  const loadAvailableYears = async () => {
+    try {
+      const years = await ConfigurationService.getAvailableYears();
+      setAvailableYears(years);
+      if (years.length > 0 && !years.includes(selectedYear)) {
+        setSelectedYear(years[0]);
+      }
+    } catch (error) {
+      console.error('Error loading available years:', error);
+      setAvailableYears(['2025', '2024']);
     }
   };
 
-  const handleSave = () => {
+  const loadYearConfiguration = async () => {
+    setIsLoading(true);
     try {
-      ConfigurationService.updateYearConfiguration(selectedYear, config);
+      const yearConfig = await ConfigurationService.getConfiguration(selectedYear);
+      setConfig(yearConfig);
+    } catch (error) {
+      console.error('Error loading configuration:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la configuración.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      await ConfigurationService.updateYearConfiguration(selectedYear, config);
       toast({
         title: "Parámetros legales guardados",
         description: `Los valores para el año ${selectedYear} han sido actualizados correctamente.`,
@@ -52,7 +107,7 @@ export const ParametrosLegalesSettings = () => {
     }
   };
 
-  const handleCreateNewYear = () => {
+  const handleCreateNewYear = async () => {
     if (!newYear || newYear.length !== 4 || isNaN(parseInt(newYear))) {
       toast({
         title: "Error",
@@ -63,8 +118,8 @@ export const ParametrosLegalesSettings = () => {
     }
 
     try {
-      ConfigurationService.createNewYear(newYear);
-      loadAvailableYears();
+      await ConfigurationService.createNewYear(newYear);
+      await loadAvailableYears();
       setSelectedYear(newYear);
       setNewYear('');
       setShowNewYearForm(false);
@@ -81,7 +136,7 @@ export const ParametrosLegalesSettings = () => {
     }
   };
 
-  const handleDeleteYear = (year: string) => {
+  const handleDeleteYear = async (year: string) => {
     if (availableYears.length <= 1) {
       toast({
         title: "Error",
@@ -92,9 +147,9 @@ export const ParametrosLegalesSettings = () => {
     }
 
     try {
-      ConfigurationService.deleteYear(year);
-      loadAvailableYears();
-      const remainingYears = ConfigurationService.getAvailableYears();
+      await ConfigurationService.deleteYear(year);
+      await loadAvailableYears();
+      const remainingYears = await ConfigurationService.getAvailableYears();
       if (remainingYears.length > 0) {
         setSelectedYear(remainingYears[0]);
       }
@@ -538,8 +593,8 @@ export const ParametrosLegalesSettings = () => {
         </Button>
         <Button 
           variant="outline"
-          onClick={() => {
-            const yearConfig = ConfigurationService.getConfiguration(selectedYear);
+          onClick={async () => {
+            const yearConfig = await ConfigurationService.getConfiguration(selectedYear);
             setConfig(yearConfig);
             toast({
               title: "Cambios revertidos",

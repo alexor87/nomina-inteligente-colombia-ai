@@ -64,60 +64,80 @@ interface PayrollConfiguration {
   };
 }
 
-// ✅ CONFIGURACIONES POR AÑO
-const CONFIGURATIONS_BY_YEAR: Record<string, PayrollConfiguration> = {
-  '2024': {
-    salarioMinimo: 1300000, // Salario mínimo 2024
-    auxilioTransporte: 162000, // Auxilio transporte 2024
-    uvt: 47065, // UVT 2024
-    porcentajes: {
-      saludEmpleado: 0.04,
-      pensionEmpleado: 0.04,
-      saludEmpleador: 0.085,
-      pensionEmpleador: 0.12,
-      arl: 0.00522,
-      cajaCompensacion: 0.04,
-      icbf: 0.03,
-      sena: 0.02,
-      cesantias: 0.0833,
-      interesesCesantias: 0.12,
-      prima: 0.0833,
-      vacaciones: 0.0417,
-    }
-  },
-  '2025': {
-    salarioMinimo: 1423500, // Salario mínimo 2025
-    auxilioTransporte: 200000, // Auxilio transporte 2025
-    uvt: 49799, // UVT 2025 oficial DIAN
-    porcentajes: {
-      saludEmpleado: 0.04,
-      pensionEmpleado: 0.04,
-      saludEmpleador: 0.085,
-      pensionEmpleador: 0.12,
-      arl: 0.00522,
-      cajaCompensacion: 0.04,
-      icbf: 0.03,
-      sena: 0.02,
-      cesantias: 0.0833,
-      interesesCesantias: 0.12,
-      prima: 0.0833,
-      vacaciones: 0.0417,
-    }
-  }
-};
+// Helper function to get company configuration from database
+async function getCompanyConfiguration(companyId: string, year: string = '2025'): Promise<PayrollConfiguration> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// ✅ FUNCIÓN PARA OBTENER CONFIGURACIÓN POR AÑO
-function getConfigurationByYear(year: string = '2025'): PayrollConfiguration {
-  const config = CONFIGURATIONS_BY_YEAR[year];
-  if (!config) {
-    console.warn(`⚠️ Configuración para año ${year} no encontrada, usando 2025 por defecto`);
-    return CONFIGURATIONS_BY_YEAR['2025'];
+    const { data, error } = await supabase
+      .from('company_payroll_configurations')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('year', year)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error loading configuration:', error);
+      throw new Error('Error cargando configuración');
+    }
+
+    if (data) {
+      return {
+        salarioMinimo: data.salary_min,
+        auxilioTransporte: data.transport_allowance,
+        uvt: data.uvt,
+        porcentajes: data.percentages
+      };
+    }
+
+    // Return fallback defaults if no configuration found
+    return getFallbackConfiguration(year);
+  } catch (error) {
+    console.error('Error in getCompanyConfiguration:', error);
+    return getFallbackConfiguration(year);
   }
-  console.log(`📅 [CONFIG] Usando configuración para año ${year}:`, {
-    salarioMinimo: config.salarioMinimo,
-    auxilioTransporte: config.auxilioTransporte,
-    uvt: config.uvt
-  });
+}
+
+function getFallbackConfiguration(year: string): PayrollConfiguration {
+  const is2024 = year === '2024';
+  return {
+    salarioMinimo: is2024 ? 1300000 : 1423500,
+    auxilioTransporte: is2024 ? 162000 : 200000,
+    uvt: is2024 ? 47065 : 49799,
+    porcentajes: {
+      saludEmpleado: 0.04,
+      pensionEmpleado: 0.04,
+      saludEmpleador: 0.085,
+      pensionEmpleador: 0.12,
+      arl: 0.00522,
+      cajaCompensacion: 0.04,
+      icbf: 0.03,
+      sena: 0.02,
+      cesantias: 0.0833,
+      interesesCesantias: 0.12,
+      prima: 0.0833,
+      vacaciones: 0.0417,
+    }
+  };
+}
+
+// ✅ FUNCIÓN PARA OBTENER CONFIGURACIÓN POR AÑO Y EMPRESA
+async function getConfigurationByYear(year: string = '2025', companyId?: string): Promise<PayrollConfiguration> {
+  if (companyId) {
+    const config = await getCompanyConfiguration(companyId, year);
+    console.log(`📅 [CONFIG] Usando configuración de empresa ${companyId} para año ${year}:`, {
+      salarioMinimo: config.salarioMinimo,
+      auxilioTransporte: config.auxilioTransporte,
+      uvt: config.uvt
+    });
+    return config;
+  }
+  
+  // Fallback to default configuration
+  const config = getFallbackConfiguration(year);
+  console.warn(`⚠️ Sin companyId, usando configuración por defecto para año ${year}`);
   return config;
 }
 
