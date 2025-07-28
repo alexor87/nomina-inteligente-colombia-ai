@@ -127,21 +127,14 @@ const PayrollLiquidationPageSimplified = () => {
       await markCurrentPeriodAsLiquidated();
       
       // Show success modal with results after successful liquidation
-      const realSummary = calculatePayrollSummary(employees);
+      const summary = calculatePayrollSummary(employees);
       setLiquidationResult({
         periodData: {
           startDate: selectedPeriod.startDate,
           endDate: selectedPeriod.endDate,
           type: 'mensual'
         },
-        summary: {
-          processedEmployees: employees.length,
-          totalEarned: realSummary.totalGrossPay,
-          totalDeductions: realSummary.totalDeductions,
-          totalNetPay: realSummary.totalNetPay,
-          netPay: realSummary.totalNetPay,
-          generatedVouchers: employees.length
-        }
+        summary
       });
       setShowSuccessModal(true);
       
@@ -162,21 +155,14 @@ const PayrollLiquidationPageSimplified = () => {
       setPeriodAlreadyLiquidated(false);
       
       // Show success modal with re-liquidation results
-      const realSummary = calculatePayrollSummary(employees);
+      const summary = calculatePayrollSummary(employees);
       setLiquidationResult({
         periodData: {
           startDate: selectedPeriod.startDate,
           endDate: selectedPeriod.endDate,
           type: 'mensual'
         },
-        summary: {
-          processedEmployees: employees.length,
-          totalEarned: realSummary.totalGrossPay,
-          totalDeductions: realSummary.totalDeductions,
-          totalNetPay: realSummary.totalNetPay,
-          netPay: realSummary.totalNetPay,
-          generatedVouchers: employees.length
-        }
+        summary
       });
       setShowSuccessModal(true);
       
