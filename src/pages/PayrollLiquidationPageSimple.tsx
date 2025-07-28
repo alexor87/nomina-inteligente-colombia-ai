@@ -10,6 +10,7 @@ import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { useNavigate } from 'react-router-dom';
+import { useYear } from '@/contexts/YearContext';
 
 const PayrollLiquidationPageSimple = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -17,6 +18,7 @@ const PayrollLiquidationPageSimple = () => {
   
   const { companyId } = useCurrentCompany();
   const navigate = useNavigate();
+  const { selectedYear } = useYear();
   
   const {
     employees,
@@ -154,6 +156,7 @@ const PayrollLiquidationPageSimple = () => {
               currentPeriodId={currentPeriodId}
               onRemoveEmployee={removeEmployee}
               onEmployeeNovedadesChange={refreshEmployeeNovedades}
+              year={selectedYear}
             />
           </CardContent>
         </Card>

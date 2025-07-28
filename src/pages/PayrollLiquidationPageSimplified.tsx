@@ -18,6 +18,7 @@ import { ReliquidationDialog } from '@/components/payroll/liquidation/Reliquidat
 import { PayrollValidationService } from '@/services/PayrollValidationService';
 import { PayrollWorldClassControlPanel } from '@/components/payroll/liquidation/PayrollWorldClassControlPanel';
 import { PayrollRecoveryPanel } from '@/components/payroll/recovery/PayrollRecoveryPanel';
+import { useYear } from '@/contexts/YearContext';
 import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
 import { NewYearConfigurationModal } from '@/components/payroll/modals/NewYearConfigurationModal';
 import { EndOfYearDetectionService, EndOfYearSituation } from '@/services/EndOfYearDetectionService';
@@ -39,6 +40,7 @@ const PayrollLiquidationPageSimplified = () => {
   const navigate = useNavigate();
   
   const { companyId } = useCurrentCompany();
+  const { selectedYear } = useYear();
   
   // ✅ USAR HOOK SIMPLIFICADO
   const {
@@ -401,6 +403,7 @@ const PayrollLiquidationPageSimplified = () => {
               onRemoveEmployee={removeEmployee}
               onEmployeeNovedadesChange={refreshEmployeeNovedades}
               updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
+              year={selectedYear}
             />
           </CardContent>
         </Card>

@@ -17,6 +17,7 @@ import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
 import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { useNavigate } from 'react-router-dom';
+import { useYear } from '@/contexts/YearContext';
 
 const PayrollLiquidationPage = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -25,6 +26,7 @@ const PayrollLiquidationPage = () => {
   
   const { companyId } = useCurrentCompany();
   const navigate = useNavigate();
+  const { selectedYear } = useYear();
   
   const {
     employees,
@@ -215,6 +217,7 @@ const PayrollLiquidationPage = () => {
                   currentPeriodId={currentPeriodId}
                   onRemoveEmployee={removeEmployee}
                   onEmployeeNovedadesChange={refreshEmployeeNovedades}
+                  year={selectedYear}
                 />
               </CardContent>
             </Card>

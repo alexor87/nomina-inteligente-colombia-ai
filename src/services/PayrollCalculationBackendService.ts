@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadForIBC } from '@/types/payroll';
-import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025, RETENCION_FUENTE_2025 } from '@/constants';
+import { ConfigurationService } from './ConfigurationService';
 
 export interface PayrollCalculationInput {
   baseSalary: number;
@@ -13,6 +13,8 @@ export interface PayrollCalculationInput {
   periodType: 'quincenal' | 'mensual';
   // ✅ NUEVO CAMPO: novedades para cálculo correcto de IBC
   novedades?: NovedadForIBC[];
+  // ✅ NUEVO CAMPO: año para configuración específica
+  year?: string;
 }
 
 export interface PayrollCalculationResult {
@@ -134,17 +136,18 @@ export class PayrollCalculationBackendService {
     }
   }
 
-  static getConfigurationInfo(): {
+  static getConfigurationInfo(year: string = '2025'): {
     salarioMinimo: number;
     auxilioTransporte: number;
     uvt: number;
     year: string;
   } {
+    const config = ConfigurationService.getConfiguration(year);
     return {
-      salarioMinimo: SALARIO_MINIMO_2025, // ✅ CORREGIDO: 1,423,500
-      auxilioTransporte: AUXILIO_TRANSPORTE_2025, // ✅ CORRECTO: 200,000
-      uvt: RETENCION_FUENTE_2025.UVT, // ✅ CORRECTO: 47,065
-      year: '2025'
+      salarioMinimo: config.salarioMinimo,
+      auxilioTransporte: config.auxilioTransporte,
+      uvt: config.uvt,
+      year: year
     };
   }
 }

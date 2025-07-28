@@ -41,6 +41,7 @@ interface PayrollLiquidationSimpleTableProps {
     pensionDeduction?: number; 
     transportAllowance?: number; 
   }>) => Promise<void>;
+  year: string;
 }
 
 export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTableProps> = ({
@@ -51,7 +52,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   currentPeriod,
   onEmployeeNovedadesChange,
   onRemoveEmployee,
-  updateEmployeeCalculationsInDB
+  updateEmployeeCalculationsInDB,
+  year
 }) => {
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
@@ -156,7 +158,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             bonuses: 0,
             absences: 0,
             periodType: periodType, // ✅ Usar tipo de período correcto
-            novedades: novedadesForIBC
+            novedades: novedadesForIBC,
+            year: year // ✅ AGREGAR EL AÑO PARA CÁLCULOS ESPECÍFICOS
           });
 
           newCalculations[employee.id] = {
@@ -226,10 +229,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     realDays: daysInfo.realDays
   });
 
-  // Obtener configuración legal actual
+  // Obtener configuración legal por año seleccionado
   const getCurrentYearConfig = () => {
-    const currentYear = new Date().getFullYear().toString();
-    return ConfigurationService.getConfiguration(currentYear);
+    return ConfigurationService.getConfiguration(year);
   };
 
   const handleOpenNovedadModal = (employee: PayrollEmployee) => {
