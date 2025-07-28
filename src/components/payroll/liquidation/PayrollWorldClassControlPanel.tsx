@@ -25,7 +25,6 @@ interface PayrollWorldClassControlPanelProps {
   // Acciones
   onPerformExhaustiveValidation: () => Promise<void>;
   onAutoRepairIssues: () => Promise<void>;
-  onStartLiquidation: () => void;
   
   // Estado
   canProceedWithLiquidation: boolean;
@@ -39,7 +38,6 @@ export const PayrollWorldClassControlPanel = ({
   isValidating,
   onPerformExhaustiveValidation,
   onAutoRepairIssues,
-  onStartLiquidation,
   canProceedWithLiquidation,
   showProgress,
   liquidationProgress,
@@ -195,14 +193,6 @@ export const PayrollWorldClassControlPanel = ({
               </Button>
             )}
 
-            <Button
-              onClick={onStartLiquidation}
-              disabled={!canProceedWithLiquidation || showProgress || (exhaustiveValidationResults && !exhaustiveValidationResults.canProceed)}
-              className="flex items-center gap-2"
-            >
-              <Zap className="h-4 w-4" />
-              Liquidar
-            </Button>
           </div>
 
           {/* Estado de la Liquidación */}

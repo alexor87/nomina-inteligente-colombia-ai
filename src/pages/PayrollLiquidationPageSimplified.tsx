@@ -264,7 +264,6 @@ const PayrollLiquidationPageSimplified = () => {
           isValidating={isValidating}
           onPerformExhaustiveValidation={async () => { await performExhaustiveValidation(); }}
           onAutoRepairIssues={async () => { await autoRepairValidationIssues(); }}
-          onStartLiquidation={handleLiquidate}
           canProceedWithLiquidation={canProceedWithLiquidation}
           showProgress={showProgress}
           liquidationProgress={liquidationProgress}
@@ -370,6 +369,14 @@ const PayrollLiquidationPageSimplified = () => {
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Agregar Empleado
+                </Button>
+                <Button 
+                  onClick={handleLiquidate}
+                  disabled={isLiquidating || !canProceedWithLiquidation || isRemovingEmployee || (useExhaustiveValidation && !exhaustiveValidationResults?.canProceed)}
+                  className={periodAlreadyLiquidated ? "bg-orange-600 hover:bg-orange-700" : ""}
+                >
+                  {isLiquidating ? 'Liquidando...' : periodAlreadyLiquidated ? 'Re-liquidar' : `Liquidar${useAtomicLiquidation ? ' (Atómico)' : ''}`}
+                  {periodAlreadyLiquidated && <RotateCcw className="h-4 w-4 ml-2" />}
                 </Button>
               </div>
             </div>
