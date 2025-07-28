@@ -599,15 +599,15 @@ export const PayrollHistoryDetailPage = () => {
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalNeto)}
                                 </div>
-                                 <div className="font-semibold text-blue-600">
-                                   {formatCurrency(preview.newNeto)}
-                                   <span className="text-xs ml-1">
-                                     ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
-                                   </span>
+                                 <div className="font-medium text-blue-600">
+                                    {formatCurrency(preview.newNeto)}
+                                    <span className="text-xs ml-1">
+                                      ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
+                                    </span>
                                  </div>
                                </div>
                              ) : (
-                               <span className="font-semibold text-blue-600">
+                               <span className="font-medium text-blue-600">
                                  {formatCurrency(employee.neto_pagado)}
                                </span>
                              )}
