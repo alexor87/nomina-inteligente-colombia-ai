@@ -384,10 +384,10 @@ const PayrollLiquidationPageSimplified = () => {
                 </Button>
                 <Button 
                   onClick={handleLiquidate}
-                  disabled={isLiquidating || !canProceedWithLiquidation || isRemovingEmployee}
+                  disabled={isLiquidating || !canProceedWithLiquidation || isRemovingEmployee || (useExhaustiveValidation && !exhaustiveValidationResults?.canProceed)}
                   className={periodAlreadyLiquidated ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700"}
                 >
-                  {isLiquidating ? 'Liquidando...' : periodAlreadyLiquidated ? 'Re-liquidar' : 'Liquidar Nómina'}
+                  {isLiquidating ? 'Liquidando...' : periodAlreadyLiquidated ? 'Re-liquidar' : `Liquidar Nómina${useAtomicLiquidation ? ' (Atómico)' : ''}`}
                   {periodAlreadyLiquidated && <RotateCcw className="h-4 w-4 ml-2" />}
                 </Button>
               </div>
