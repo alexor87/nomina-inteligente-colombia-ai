@@ -18,12 +18,6 @@ import {
 import { ValidationResult } from "@/services/PayrollExhaustiveValidationService";
 
 interface PayrollWorldClassControlPanelProps {
-  // Estados de configuración
-  useAtomicLiquidation: boolean;
-  setUseAtomicLiquidation: (value: boolean) => void;
-  useExhaustiveValidation: boolean;
-  setUseExhaustiveValidation: (value: boolean) => void;
-  
   // Resultados de validación
   exhaustiveValidationResults: ValidationResult | null;
   isValidating: boolean;
@@ -41,10 +35,6 @@ interface PayrollWorldClassControlPanelProps {
 }
 
 export const PayrollWorldClassControlPanel = ({
-  useAtomicLiquidation,
-  setUseAtomicLiquidation,
-  useExhaustiveValidation,
-  setUseExhaustiveValidation,
   exhaustiveValidationResults,
   isValidating,
   onPerformExhaustiveValidation,
@@ -94,37 +84,6 @@ export const PayrollWorldClassControlPanel = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          
-          {/* Configuración del Sistema */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-blue-600" />
-                <div>
-                  <p className="font-medium">Liquidación Atómica</p>
-                  <p className="text-sm text-muted-foreground">Rollback automático en caso de error</p>
-                </div>
-              </div>
-              <Switch
-                checked={useAtomicLiquidation}
-                onCheckedChange={setUseAtomicLiquidation}
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-green-600" />
-                <div>
-                  <p className="font-medium">Validación Exhaustiva</p>
-                  <p className="text-sm text-muted-foreground">15+ validaciones críticas</p>
-                </div>
-              </div>
-              <Switch
-                checked={useExhaustiveValidation}
-                onCheckedChange={setUseExhaustiveValidation}
-              />
-            </div>
-          </div>
 
           {/* Estado de Validación */}
           {exhaustiveValidationResults && (
@@ -242,7 +201,7 @@ export const PayrollWorldClassControlPanel = ({
               className="flex items-center gap-2"
             >
               <Zap className="h-4 w-4" />
-              {useAtomicLiquidation ? 'Liquidar (Atómico)' : 'Liquidar (Tradicional)'}
+              Liquidar
             </Button>
           </div>
 
@@ -268,41 +227,6 @@ export const PayrollWorldClassControlPanel = ({
         </CardContent>
       </Card>
 
-      {/* Panel de Configuración Avanzada */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Configuración Avanzada
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="p-3 border rounded">
-              <h4 className="font-medium mb-1">Liquidación Atómica</h4>
-              <p className="text-muted-foreground">
-                {useAtomicLiquidation 
-                  ? "✅ Activada - Rollback automático garantizado" 
-                  : "⚠️ Desactivada - Sin protección de rollback"
-                }
-              </p>
-            </div>
-            <div className="p-3 border rounded">
-              <h4 className="font-medium mb-1">Validación Exhaustiva</h4>
-              <p className="text-muted-foreground">
-                {useExhaustiveValidation 
-                  ? "✅ Activada - 15+ validaciones críticas" 
-                  : "⚠️ Desactivada - Solo validaciones básicas"
-                }
-              </p>
-            </div>
-          </div>
-          
-          <div className="text-xs text-muted-foreground">
-            <p><strong>Recomendación:</strong> Mantener ambas opciones activadas para máxima seguridad y confiabilidad.</p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

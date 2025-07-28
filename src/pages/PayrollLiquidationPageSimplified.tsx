@@ -260,10 +260,6 @@ const PayrollLiquidationPageSimplified = () => {
       {/* World-Class Control Panel */}
       {periodSelected && selectedPeriod && (
         <PayrollWorldClassControlPanel
-          useAtomicLiquidation={useAtomicLiquidation}
-          setUseAtomicLiquidation={setUseAtomicLiquidation}
-          useExhaustiveValidation={useExhaustiveValidation}
-          setUseExhaustiveValidation={setUseExhaustiveValidation}
           exhaustiveValidationResults={exhaustiveValidationResults}
           isValidating={isValidating}
           onPerformExhaustiveValidation={async () => { await performExhaustiveValidation(); }}
