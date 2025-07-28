@@ -322,39 +322,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
               <TableHead className="text-right min-w-[120px]">Salario Base</TableHead>
               <TableHead className="text-right min-w-[120px]">IBC</TableHead>
               <TableHead className="text-center min-w-[100px]">Días Trabajados</TableHead>
-              
-              {/* DEVENGOS */}
-              <TableHead className="text-right min-w-[120px] bg-green-50">Auxilio Transporte</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Horas Extra</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">H.E. Diurnas</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">H.E. Nocturnas</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Recargo Nocturno</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Recargo Dominical</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Bonificaciones</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Bonif. Adicionales</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Comisiones</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Prima</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Cesantías</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Intereses Cesantías</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Vacaciones</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Licencias Remuneradas</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-green-50">Otros Devengos</TableHead>
               <TableHead className="text-right min-w-[140px] bg-green-100 font-semibold">Total Devengado</TableHead>
-              
-              {/* DEDUCCIONES */}
-              <TableHead className="text-right min-w-[120px] bg-red-50">Salud Empleado</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Pensión Empleado</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Retención Fuente</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Fondo Solidaridad</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Préstamos</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Embargos</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Incapacidades</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Descuentos Varios</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Otros Descuentos</TableHead>
-              <TableHead className="text-right min-w-[120px] bg-red-50">Otras Deducciones</TableHead>
               <TableHead className="text-right min-w-[140px] bg-red-100 font-semibold">Total Deducciones</TableHead>
-              
-              {/* TOTALES */}
               <TableHead className="text-center min-w-[100px] bg-blue-50">Novedades</TableHead>
               <TableHead className="text-right min-w-[140px] bg-blue-100 font-bold">Neto Pagado</TableHead>
               <TableHead className="text-center min-w-[100px] sticky right-0 bg-background z-10">Acciones</TableHead>
@@ -396,37 +365,12 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                     {workedDays} días
                   </TableCell>
                   
-                  {/* DEVENGOS */}
-                  <TableCell className="text-right">{formatCurrency(calc?.transportAllowance || 0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  {/* Total Devengado */}
                   <TableCell className="text-right bg-green-100 font-semibold">
                     {formatCurrency(calc?.grossPay || 0)}
                   </TableCell>
                   
-                  {/* DEDUCCIONES */}
-                  <TableCell className="text-right">{formatCurrency(calc?.healthDeduction || 0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(calc?.pensionDeduction || 0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(0)}</TableCell>
+                  {/* Total Deducciones */}
                   <TableCell className="text-right bg-red-100 font-semibold">
                     {formatCurrency(calc?.deductions || 0)}
                   </TableCell>
