@@ -22,6 +22,7 @@ interface PayrollCalculationInput {
   periodType: 'quincenal' | 'mensual' | 'semanal';
   periodDate?: string;
   novedades?: NovedadForIBC[];
+  year?: string; // ✅ NUEVO: Año para configuración dinámica
 }
 
 interface NovedadCalculationInput {
@@ -63,26 +64,65 @@ interface PayrollConfiguration {
   };
 }
 
-// ✅ CORREGIDO: Salario mínimo 2025 según normativa colombiana
-const DEFAULT_CONFIG_2025: PayrollConfiguration = {
-  salarioMinimo: 1423500, // ✅ ACTUALIZADO: Salario mínimo 2025
-  auxilioTransporte: 200000,
-  uvt: 47065, // ✅ UVT 2025 actualizado
-  porcentajes: {
-    saludEmpleado: 0.04,
-    pensionEmpleado: 0.04,
-    saludEmpleador: 0.085,
-    pensionEmpleador: 0.12,
-    arl: 0.00522,
-    cajaCompensacion: 0.04,
-    icbf: 0.03,
-    sena: 0.02,
-    cesantias: 0.0833,
-    interesesCesantias: 0.12,
-    prima: 0.0833,
-    vacaciones: 0.0417,
+// ✅ CONFIGURACIONES POR AÑO
+const CONFIGURATIONS_BY_YEAR: Record<string, PayrollConfiguration> = {
+  '2024': {
+    salarioMinimo: 1300000, // Salario mínimo 2024
+    auxilioTransporte: 162000, // Auxilio transporte 2024
+    uvt: 47065, // UVT 2024
+    porcentajes: {
+      saludEmpleado: 0.04,
+      pensionEmpleado: 0.04,
+      saludEmpleador: 0.085,
+      pensionEmpleador: 0.12,
+      arl: 0.00522,
+      cajaCompensacion: 0.04,
+      icbf: 0.03,
+      sena: 0.02,
+      cesantias: 0.0833,
+      interesesCesantias: 0.12,
+      prima: 0.0833,
+      vacaciones: 0.0417,
+    }
+  },
+  '2025': {
+    salarioMinimo: 1423500, // Salario mínimo 2025
+    auxilioTransporte: 200000, // Auxilio transporte 2025
+    uvt: 50000, // UVT 2025 actualizado
+    porcentajes: {
+      saludEmpleado: 0.04,
+      pensionEmpleado: 0.04,
+      saludEmpleador: 0.085,
+      pensionEmpleador: 0.12,
+      arl: 0.00522,
+      cajaCompensacion: 0.04,
+      icbf: 0.03,
+      sena: 0.02,
+      cesantias: 0.0833,
+      interesesCesantias: 0.12,
+      prima: 0.0833,
+      vacaciones: 0.0417,
+    }
   }
 };
+
+// ✅ FUNCIÓN PARA OBTENER CONFIGURACIÓN POR AÑO
+function getConfigurationByYear(year: string = '2025'): PayrollConfiguration {
+  const config = CONFIGURATIONS_BY_YEAR[year];
+  if (!config) {
+    console.warn(`⚠️ Configuración para año ${year} no encontrada, usando 2025 por defecto`);
+    return CONFIGURATIONS_BY_YEAR['2025'];
+  }
+  console.log(`📅 [CONFIG] Usando configuración para año ${year}:`, {
+    salarioMinimo: config.salarioMinimo,
+    auxilioTransporte: config.auxilioTransporte,
+    uvt: config.uvt
+  });
+  return config;
+}
+
+// Mantener compatibilidad con código existente
+const DEFAULT_CONFIG_2025 = CONFIGURATIONS_BY_YEAR['2025'];
 
 // ✅ NUEVA TABLA DE RETENCIÓN EN LA FUENTE 2025 (actualizada)
 const RETENCION_FUENTE_2025 = [
@@ -286,17 +326,17 @@ function getFactorHoraExtra(subtipo: string, fechaPeriodo?: string): number {
   }
 }
 
-// ✅ NUEVA FUNCIÓN: Calcular retención en la fuente 2025
-function calculateRetencionFuente2025(salarioMensual: number): { 
+// ✅ FUNCIÓN ACTUALIZADA: Calcular retención en la fuente por año
+function calculateRetencionFuente(salarioMensual: number, year: string = '2025'): { 
   valor: number; 
   detalle: string; 
   baseEnUvt: number;
   rangoAplicado: any;
 } {
-  const config = DEFAULT_CONFIG_2025;
+  const config = getConfigurationByYear(year);
   const baseEnUvt = salarioMensual / config.uvt;
   
-  console.log('🏦 Calculando Retención en la Fuente 2025:', {
+  console.log(`🏦 Calculando Retención en la Fuente ${year}:`, {
     salarioMensual,
     uvt: config.uvt,
     baseEnUvt: baseEnUvt.toFixed(2)
@@ -525,7 +565,8 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           console.log(`🏥 [INCAPACIDAD v3.0] Calculando incapacidad general: ${dias} días, salario base: ${salarioBase}`);
           
           const valorDiarioCalculado = salarioDiario * 0.6667;
-          const smldv = DEFAULT_CONFIG_2025.salarioMinimo / 30;
+          const config = getConfigurationByYear('2025'); // Usar configuración dinámica
+          const smldv = config.salarioMinimo / 30;
           const valorDiarioFinal = Math.max(valorDiarioCalculado, smldv);
           
           valor = Math.round(valorDiarioFinal * dias);
@@ -534,7 +575,7 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
           console.log(`🧮 [INCAPACIDAD v3.0] CÁLCULO DETALLADO:`);
           console.log(`  - Salario diario: $${salarioDiario.toFixed(2)}`);
           console.log(`  - Valor al 66.67%: $${valorDiarioCalculado.toFixed(2)}`);
-          console.log(`  - SMLDV 2025: $${smldv.toFixed(2)}`);
+          console.log(`  - SMLDV: $${smldv.toFixed(2)}`);
           console.log(`  - Valor diario final: $${valorDiarioFinal.toFixed(2)}`);
           console.log(`  - Total ${dias} días: $${valor}`);
           
@@ -657,18 +698,19 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
         factorCalculo = valor / salarioBase;
         detalleCalculo = `Retención manual: $${valor.toLocaleString()} (${(factorCalculo * 100).toFixed(2)}% del salario)`;
       } else {
-        // Cálculo automático usando tabla 2025
-        const retencionResult = calculateRetencionFuente2025(salarioBase);
+        // Cálculo automático usando tabla por año
+        const retencionResult = calculateRetencionFuente(salarioBase, '2025');
         valor = retencionResult.valor;
         factorCalculo = valor > 0 ? valor / salarioBase : 0;
         
-        detalleCalculo = `Retención automática 2025: ${retencionResult.detalle}`;
+        detalleCalculo = `Retención automática: ${retencionResult.detalle}`;
         
         // Información adicional para debug
+        const configForUvt = getConfigurationByYear('2025');
         validationResult = {
           baseEnUvt: retencionResult.baseEnUvt,
           rangoAplicado: retencionResult.rangoAplicado,
-          uvt2025: DEFAULT_CONFIG_2025.uvt
+          uvt: configForUvt.uvt
         };
       }
       break;
@@ -711,7 +753,8 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
       break;
 
     case 'fondo_solidaridad':
-      if (salarioBase >= (DEFAULT_CONFIG_2025.salarioMinimo * 4)) {
+      const configSolidaridad = getConfigurationByYear('2025'); // Usar configuración dinámica
+      if (salarioBase >= (configSolidaridad.salarioMinimo * 4)) {
         valor = Math.round(salarioBase * 0.01);
         factorCalculo = 0.01;
         detalleCalculo = `Fondo de solidaridad: ${salarioBase.toLocaleString()} × 1% = ${valor.toLocaleString()}`;
@@ -751,7 +794,7 @@ function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
 }
 
 function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: string) {
-  const config = DEFAULT_CONFIG_2025;
+  const config = getConfigurationByYear(input.year || '2025');
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -834,7 +877,12 @@ function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: st
 
 // ✅ FUNCIÓN PRINCIPAL ACTUALIZADA: Ahora incluye TODAS las novedades en liquidación
 function calculatePayroll(input: PayrollCalculationInput) {
-  const config = DEFAULT_CONFIG_2025;
+  const config = getConfigurationByYear(input.year || '2025');
+  console.log(`🎯 [PAYROLL v4.0] Usando configuración para año ${input.year || '2025'}:`, {
+    salarioMinimo: config.salarioMinimo,
+    auxilioTransporte: config.auxilioTransporte,
+    uvt: config.uvt
+  });
   const horasMensuales = getHorasMensuales(input.periodDate);
   const horasSemanales = getHorasSemanales(input.periodDate);
   
@@ -1030,7 +1078,7 @@ serve(async (req) => {
       // ✅ NUEVA ACCIÓN: Calcular solo retención en la fuente
       case 'calculate-retencion-fuente':
         console.log(`🏦 [EDGE v4.0] Calculating retención fuente for salary: ${data.salarioBase}`);
-        const retencionResult = calculateRetencionFuente2025(data.salarioBase);
+        const retencionResult = calculateRetencionFuente(data.salarioBase, data.year || '2025');
         return new Response(JSON.stringify({ success: true, data: retencionResult }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
