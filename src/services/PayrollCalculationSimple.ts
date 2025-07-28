@@ -5,11 +5,12 @@
  * Principio KISS: Keep It Simple, Stupid
  */
 
-import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025 } from '@/constants';
+import { ConfigurationService } from './ConfigurationService';
 
 export interface SimplePayrollInput {
   salarioBase: number;
   diasTrabajados: number;
+  year?: string;
 }
 
 export interface SimplePayrollResult {
@@ -33,15 +34,19 @@ export class PayrollCalculationSimple {
   static calculate(input: SimplePayrollInput): SimplePayrollResult {
     console.log('🎯 PayrollCalculationSimple: Calculando nómina simple:', input);
 
+    // ✅ Obtener configuración por año
+    const year = input.year || '2025';
+    const config = ConfigurationService.getConfiguration(year);
+    
     // ✅ 1. SALARIO PROPORCIONAL: (salario_base / 30) * dias_trabajados
     const salarioProporcional = (input.salarioBase / 30) * input.diasTrabajados;
 
     // ✅ 2. AUXILIO DE TRANSPORTE: Solo si salario ≤ 2 SMMLV
-    const limiteAuxilio = SALARIO_MINIMO_2025 * 2; // $2,847,000
+    const limiteAuxilio = config.salarioMinimo * 2;
     let auxilioTransporte = 0;
     
     if (input.salarioBase <= limiteAuxilio) {
-      auxilioTransporte = (AUXILIO_TRANSPORTE_2025 / 30) * input.diasTrabajados;
+      auxilioTransporte = (config.auxilioTransporte / 30) * input.diasTrabajados;
     }
 
     // ✅ 3. TOTAL DEVENGADO
@@ -86,24 +91,26 @@ export class PayrollCalculationSimple {
   /**
    * Validar si un empleado debe recibir auxilio de transporte
    */
-  static shouldReceiveTransportAllowance(salarioBase: number): boolean {
-    const limiteAuxilio = SALARIO_MINIMO_2025 * 2; // $2,847,000
+  static shouldReceiveTransportAllowance(salarioBase: number, year: string = '2025'): boolean {
+    const config = ConfigurationService.getConfiguration(year);
+    const limiteAuxilio = config.salarioMinimo * 2;
     return salarioBase <= limiteAuxilio;
   }
 
   /**
    * Información de configuración actual
    */
-  static getConfigurationInfo() {
+  static getConfigurationInfo(year: string = '2025') {
+    const config = ConfigurationService.getConfiguration(year);
     return {
-      salarioMinimo: SALARIO_MINIMO_2025,
-      auxilioTransporte: AUXILIO_TRANSPORTE_2025,
-      limiteAuxilio: SALARIO_MINIMO_2025 * 2,
+      salarioMinimo: config.salarioMinimo,
+      auxilioTransporte: config.auxilioTransporte,
+      limiteAuxilio: config.salarioMinimo * 2,
       porcentajes: {
-        salud: 0.04,
-        pension: 0.04
+        salud: config.porcentajes.saludEmpleado,
+        pension: config.porcentajes.pensionEmpleado
       },
-      year: '2025'
+      year: year
     };
   }
 }

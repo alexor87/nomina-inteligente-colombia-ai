@@ -18,12 +18,12 @@ export const useSimplePayrollCalculation = () => {
     }
   }, []);
 
-  const shouldReceiveTransportAllowance = useCallback((salarioBase: number): boolean => {
-    return PayrollCalculationSimple.shouldReceiveTransportAllowance(salarioBase);
+  const shouldReceiveTransportAllowance = useCallback((salarioBase: number, year?: string): boolean => {
+    return PayrollCalculationSimple.shouldReceiveTransportAllowance(salarioBase, year);
   }, []);
 
-  const getConfigurationInfo = useCallback(() => {
-    return PayrollCalculationSimple.getConfigurationInfo();
+  const getConfigurationInfo = useCallback((year?: string) => {
+    return PayrollCalculationSimple.getConfigurationInfo(year);
   }, []);
 
   return {
