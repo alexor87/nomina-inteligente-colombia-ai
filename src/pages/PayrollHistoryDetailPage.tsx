@@ -510,7 +510,7 @@ export const PayrollHistoryDetailPage = () => {
                       const preview = calculateEmployeePreview(employee);
                       return (
                         <TableRow key={employee.id}>
-                          <TableCell className="sticky left-0 bg-background z-10 min-w-[200px]">
+                          <TableCell className="sticky left-0 bg-background z-10 min-w-[200px] font-medium">
                             <div className="flex items-center">
                               <div>
                                 <div className="font-medium">
@@ -576,7 +576,7 @@ export const PayrollHistoryDetailPage = () => {
                                </span>
                             )}
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center font-medium">
                             <div className="flex items-center justify-center gap-2">
                               <Button
                                 size="sm"
@@ -593,13 +593,13 @@ export const PayrollHistoryDetailPage = () => {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="bg-blue-100 text-right text-lg font-medium">
+                          <TableCell className="bg-blue-100 text-right font-medium">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalNeto)}
                                 </div>
-                                 <div className="font-bold text-lg text-blue-600">
+                                 <div className="font-bold text-blue-600">
                                    {formatCurrency(preview.newNeto)}
                                    <span className="text-xs ml-1">
                                      ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
@@ -607,12 +607,12 @@ export const PayrollHistoryDetailPage = () => {
                                  </div>
                                </div>
                              ) : (
-                               <span className="font-bold text-lg text-blue-600">
+                               <span className="font-bold text-blue-600">
                                  {formatCurrency(employee.neto_pagado)}
                                </span>
                             )}
                           </TableCell>
-                          <TableCell className="sticky right-0 bg-background z-10 text-center">
+                          <TableCell className="sticky right-0 bg-background z-10 text-center font-medium">
                             <Button
                               size="sm"
                               variant="outline"
