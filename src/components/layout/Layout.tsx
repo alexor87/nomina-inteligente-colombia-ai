@@ -35,7 +35,7 @@ export const Layout = () => {
         }`}
       >
         <Header />
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-gray-50">
           <Outlet />
         </div>
       </main>
