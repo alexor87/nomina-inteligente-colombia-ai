@@ -38,14 +38,14 @@ export class SecureEmployeeService extends SecureBaseService {
       
       console.log('🔒 SecureEmployeeService: Fetching employees with company filter');
       
-      const query = await this.secureQuery(
+      const query = this.secureQuery(
         'employees',
         '*',
         { estado: { neq: 'eliminado' } } // Exclude soft deleted
       );
       
       console.log('🔍 [SECURE-EMPLOYEES] Executing employee query...');
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await (await query).order('created_at', { ascending: false });
 
       console.log('🔍 [SECURE-EMPLOYEES] Query result:', { dataCount: data?.length, error });
 
@@ -85,7 +85,7 @@ export class SecureEmployeeService extends SecureBaseService {
     try {
       console.log('🔒 SecureEmployeeService: Fetching employee by ID:', id);
       
-      const query = await this.secureQuery(
+      const query = this.secureQuery(
         'employees',
         '*',
         { 
@@ -94,7 +94,7 @@ export class SecureEmployeeService extends SecureBaseService {
         }
       );
       
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await (await query).maybeSingle();
 
       if (error) {
         console.error('❌ SecureEmployeeService: Error fetching employee:', error);
@@ -255,13 +255,13 @@ export class SecureEmployeeService extends SecureBaseService {
     try {
       console.log('🔒 SecureEmployeeService: Fetching deleted employees');
       
-      const query = await this.secureQuery(
+      const query = this.secureQuery(
         'employees',
         '*',
         { estado: 'eliminado' }
       );
       
-      const { data, error } = await query.order('updated_at', { ascending: false });
+      const { data, error } = await (await query).order('updated_at', { ascending: false });
 
       if (error) {
         console.error('❌ SecureEmployeeService: Error fetching deleted employees:', error);
