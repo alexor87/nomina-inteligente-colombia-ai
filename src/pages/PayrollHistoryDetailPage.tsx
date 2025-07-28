@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Download, Plus, Calendar, Users, DollarSign, History } from 'lucide-react';
+import { ArrowLeft, FileText, Plus, Calendar, Users, DollarSign, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -485,8 +485,8 @@ export const PayrollHistoryDetailPage = () => {
                       <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
                         Empleado
                       </TableHead>
-                      <TableHead className="min-w-[120px] text-right">Salario Base</TableHead>
-                      <TableHead className="min-w-[120px] text-right">IBC</TableHead>
+                      <TableHead className="min-w-[140px] text-right">Salario Base</TableHead>
+                      <TableHead className="min-w-[140px] text-right">IBC</TableHead>
                       <TableHead className="min-w-[100px] text-center">Días Trabajados</TableHead>
                       <TableHead className="min-w-[140px] bg-green-100 text-right font-semibold">
                         Total Devengado
@@ -618,7 +618,7 @@ export const PayrollHistoryDetailPage = () => {
                               variant="outline"
                               onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
                             >
-                              <Download className="h-4 w-4 mr-2" />
+                              <FileText className="h-4 w-4 mr-2" />
                               Comprobante
                             </Button>
                           </TableCell>
