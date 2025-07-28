@@ -1,6 +1,11 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CompanyConfigurationService } from './CompanyConfigurationService';
+
+// Cache for synchronous access
+let configCache: Map<string, PayrollConfiguration> = new Map();
+let availableYearsCache: string[] = ['2025', '2024'];
+let lastCacheUpdate: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export interface PayrollConfiguration {
   salarioMinimo: number;
@@ -54,10 +59,50 @@ interface DBPayrollConfiguration {
 
 export class ConfigurationService {
   private static cache: Map<string, PayrollConfiguration> = new Map();
-  private static readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   private static cacheTimestamps: Map<string, number> = new Map();
+  private static readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-  static async getConfiguration(year: string = '2025'): Promise<PayrollConfiguration> {
+  // SYNC METHODS (for existing code compatibility)
+  static getConfiguration(year: string = '2025'): PayrollConfiguration {
+    return this.getConfigurationSync(year);
+  }
+
+  static getAvailableYears(): string[] {
+    return this.getAvailableYearsSync();
+  }
+
+  static getConfigurationSync(year: string = '2025'): PayrollConfiguration {
+    // Try to get from cache first
+    try {
+      const companyId = 'default'; // Use fallback for sync access
+      const cacheKey = `${companyId}-${year}`;
+      const cached = configCache.get(cacheKey);
+      if (cached) return cached;
+    } catch (error) {
+      // Ignore errors in sync method
+    }
+
+    // Initialize cache in background if not already done
+    this.initializeCache().catch(console.error);
+
+    // Return fallback immediately
+    return this.getFallbackConfig(year);
+  }
+
+  static getAvailableYearsSync(): string[] {
+    const now = Date.now();
+    if (now - lastCacheUpdate < CACHE_DURATION && availableYearsCache.length > 0) {
+      return availableYearsCache;
+    }
+
+    // Initialize cache in background
+    this.initializeCache().catch(console.error);
+
+    return ['2025', '2024'];
+  }
+
+  // ASYNC METHODS (for new database-driven functionality)
+  static async getConfigurationAsync(year: string = '2025'): Promise<PayrollConfiguration> {
     try {
       const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
       if (!companyId) {
@@ -107,6 +152,37 @@ export class ConfigurationService {
     }
   }
 
+  static async getAvailableYearsAsync(): Promise<string[]> {
+    try {
+      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!companyId) {
+        return ['2025', '2024'];
+      }
+
+      const { data, error } = await supabase
+        .from('company_payroll_configurations')
+        .select('year')
+        .eq('company_id', companyId)
+        .order('year', { ascending: false });
+
+      if (error) {
+        console.error('Error loading available years:', error);
+        return ['2025', '2024'];
+      }
+
+      const years = data?.map(d => d.year) || [];
+      
+      // Ensure at least 2025 and 2024 exist
+      if (!years.includes('2025')) years.unshift('2025');
+      if (!years.includes('2024')) years.push('2024');
+
+      return years.sort((a, b) => parseInt(b) - parseInt(a));
+    } catch (error) {
+      console.error('Error getting available years:', error);
+      return ['2025', '2024'];
+    }
+  }
+
   static async updateYearConfiguration(year: string, config: PayrollConfiguration): Promise<void> {
     try {
       const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
@@ -136,37 +212,6 @@ export class ConfigurationService {
     } catch (error) {
       console.error('Error updating configuration:', error);
       throw error;
-    }
-  }
-
-  static async getAvailableYears(): Promise<string[]> {
-    try {
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) {
-        return ['2025', '2024'];
-      }
-
-      const { data, error } = await supabase
-        .from('company_payroll_configurations')
-        .select('year')
-        .eq('company_id', companyId)
-        .order('year', { ascending: false });
-
-      if (error) {
-        console.error('Error loading available years:', error);
-        return ['2025', '2024'];
-      }
-
-      const years = data?.map(d => d.year) || [];
-      
-      // Ensure at least 2025 and 2024 exist
-      if (!years.includes('2025')) years.unshift('2025');
-      if (!years.includes('2024')) years.push('2024');
-
-      return years.sort((a, b) => parseInt(b) - parseInt(a));
-    } catch (error) {
-      console.error('Error getting available years:', error);
-      return ['2025', '2024'];
     }
   }
 
@@ -203,7 +248,7 @@ export class ConfigurationService {
         throw new Error('No se pudo determinar la empresa del usuario');
       }
 
-      const availableYears = await this.getAvailableYears();
+      const availableYears = await this.getAvailableYearsAsync();
       if (availableYears.length <= 1) {
         throw new Error('No se puede eliminar el último año configurado');
       }
@@ -226,6 +271,44 @@ export class ConfigurationService {
     } catch (error) {
       console.error('Error deleting year:', error);
       throw error;
+    }
+  }
+
+  // Background cache initialization
+  private static initializationPromise: Promise<void> | null = null;
+
+  private static async initializeCache(): Promise<void> {
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.initializationPromise = this._initializeCache();
+    return this.initializationPromise;
+  }
+
+  private static async _initializeCache(): Promise<void> {
+    try {
+      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!companyId) return;
+
+      // Load configurations directly from database to avoid circular dependency
+      const { data: configs, error } = await supabase
+        .from('company_payroll_configurations')
+        .select('*')
+        .eq('company_id', companyId);
+
+      if (!error && configs) {
+        configs.forEach(config => {
+          const key = `${companyId}-${config.year}`;
+          configCache.set(key, this.transformDBToConfig(config));
+        });
+      }
+
+      // Update global cache
+      availableYearsCache = configs?.map(c => c.year)?.sort((a, b) => parseInt(b) - parseInt(a)) || ['2025', '2024'];
+      lastCacheUpdate = Date.now();
+    } catch (error) {
+      console.error('Error initializing cache:', error);
     }
   }
 

@@ -594,7 +594,7 @@ export const ParametrosLegalesSettings = () => {
         <Button 
           variant="outline"
           onClick={async () => {
-            const yearConfig = await ConfigurationService.getConfiguration(selectedYear);
+            const yearConfig = await ConfigurationService.getConfigurationAsync(selectedYear);
             setConfig(yearConfig);
             toast({
               title: "Cambios revertidos",

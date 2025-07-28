@@ -142,7 +142,7 @@ export class PayrollCalculationBackendService {
     uvt: number;
     year: string;
   } {
-    const config = ConfigurationService.getConfiguration(year);
+    const config = ConfigurationService.getConfigurationSync(year);
     return {
       salarioMinimo: config.salarioMinimo,
       auxilioTransporte: config.auxilioTransporte,

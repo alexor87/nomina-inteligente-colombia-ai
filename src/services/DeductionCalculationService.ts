@@ -138,7 +138,7 @@ export class DeductionCalculationService {
     rate: number;
     smmlvMultiple: number;
   } {
-    const config = ConfigurationService.getConfiguration(year);
+    const config = ConfigurationService.getConfigurationSync(year);
     const smmlvMultiple = salarioBase / config.salarioMinimo;
     
     // Solo aplica para salarios >= 4 SMMLV
