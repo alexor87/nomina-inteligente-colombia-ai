@@ -494,9 +494,9 @@ export const PayrollHistoryDetailPage = () => {
                       <TableHead className="min-w-[140px] bg-red-100 text-right font-semibold">
                         Total Deducciones
                       </TableHead>
-                      <TableHead className="min-w-[100px] bg-blue-50 text-center">
-                        Novedades
-                      </TableHead>
+                       <TableHead className="min-w-[100px] text-center">
+                         Novedades
+                       </TableHead>
                       <TableHead className="min-w-[140px] bg-blue-100 text-right font-bold">
                         Neto Pagado
                       </TableHead>
@@ -576,7 +576,7 @@ export const PayrollHistoryDetailPage = () => {
                                </span>
                             )}
                           </TableCell>
-                          <TableCell className="bg-blue-50 text-center">
+                          <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-2">
                               <Button
                                 size="sm"
