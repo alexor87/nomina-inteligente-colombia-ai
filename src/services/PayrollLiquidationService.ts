@@ -351,9 +351,9 @@ export class PayrollLiquidationService extends SecureBaseService {
         summary: {
           totalEmployees: employees.length,
           validEmployees: employees.length,
-          totalGrossPay: finalTotalDevengado,
-          totalDeductions: finalTotalDeducciones,
-          totalNetPay: finalTotalNeto,
+          totalGrossPay: Number.isFinite(finalTotalDevengado) ? finalTotalDevengado : 0,
+          totalDeductions: Number.isFinite(finalTotalDeducciones) ? finalTotalDeducciones : 0,
+          totalNetPay: Number.isFinite(finalTotalNeto) ? finalTotalNeto : 0,
           employerContributions: finalTotalDevengado * 0.205,
           totalPayrollCost: finalTotalDevengado + (finalTotalDevengado * 0.205)
         }
