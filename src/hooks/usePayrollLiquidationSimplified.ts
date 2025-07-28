@@ -113,8 +113,9 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   }, [payrollHook.employees, payrollHook.currentPeriodId, toast]);
 
   // ✅ NUEVA FUNCIÓN: Validación exhaustiva
-  const performExhaustiveValidation = useCallback(async () => {
-    if (!payrollHook.currentPeriodId || !companyId) {
+  const performExhaustiveValidation = useCallback(async (periodId?: string) => {
+    const targetPeriodId = periodId || payrollHook.currentPeriodId;
+    if (!targetPeriodId || !companyId) {
       throw new Error('No hay período o empresa para validar');
     }
 
@@ -123,7 +124,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       console.log('🔍 Ejecutando validación exhaustiva...');
       
       const results = await PayrollExhaustiveValidationService.validateForLiquidation(
-        payrollHook.currentPeriodId,
+        targetPeriodId,
         companyId
       );
       

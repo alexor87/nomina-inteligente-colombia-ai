@@ -153,8 +153,10 @@ export const usePayrollUnified = (companyId: string) => {
   }, [companyId, cleanDuplicates]);
 
   // Cargar empleados con integración automática de vacaciones
-  const loadEmployees = useCallback(async (startDate: string, endDate: string) => {
+  const loadEmployees = useCallback(async (startDate: string, endDate: string): Promise<string | undefined> => {
     setIsLoading(true);
+    let periodId: string | undefined;
+    
     try {
       console.log('📋 Cargando empleados para período:', { startDate, endDate });
 
@@ -163,6 +165,7 @@ export const usePayrollUnified = (companyId: string) => {
         throw new Error('No se pudo encontrar o crear el período');
       }
 
+      periodId = period.id;
       setCurrentPeriod(period);
 
       // Procesar vacaciones/ausencias automáticamente al cargar empleados
@@ -363,6 +366,8 @@ export const usePayrollUnified = (companyId: string) => {
     } finally {
       setIsLoading(false);
     }
+    
+    return periodId; // ✅ NUEVO: Retornar el periodId para validación automática
   }, [companyId, findOrCreatePeriod, toast]);
 
   const addEmployees = useCallback(async (employeeIds: string[]) => {
