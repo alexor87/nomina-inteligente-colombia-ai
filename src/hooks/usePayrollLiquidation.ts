@@ -68,13 +68,13 @@ export const usePayrollLiquidation = () => {
     triggerAutoSave();
   }, [triggerAutoSave]);
 
-  const loadEmployees = useCallback(async (startDate: string, endDate: string) => {
+  const loadEmployees = useCallback(async (startDate: string, endDate: string, year?: string) => {
     setIsLoading(true);
     try {
       console.log('🔄 Cargando empleados con cálculos correctos...');
       
-      // ✅ CORREGIDO: Usar el servicio que ya calcula correctamente
-      const employeesData = await PayrollLiquidationService.loadEmployeesForPeriod(startDate, endDate);
+      // ✅ CORREGIDO: Usar el servicio que ya calcula correctamente con año
+      const employeesData = await PayrollLiquidationService.loadEmployeesForPeriod(startDate, endDate, year);
       
       // ✅ CORREGIDO: Obtener o crear período usando el servicio
       const periodId = await PayrollLiquidationService.ensurePeriodExists(startDate, endDate);
@@ -133,12 +133,13 @@ export const usePayrollLiquidation = () => {
     try {
       setIsLoading(true);
 
-      // ✅ CORREGIDO: Usar el servicio para cargar empleados específicos
+      // ✅ CORREGIDO: Usar el servicio para cargar empleados específicos con año
       const newEmployeesData = await PayrollLiquidationService.loadSpecificEmployeesForPeriod(
         employeeIds, 
         // Obtener fechas del período actual
         new Date().toISOString().split('T')[0],
-        new Date().toISOString().split('T')[0]
+        new Date().toISOString().split('T')[0],
+        new Date().getFullYear().toString() // Usar año actual como fallback
       );
 
       // Mapear nuevos empleados

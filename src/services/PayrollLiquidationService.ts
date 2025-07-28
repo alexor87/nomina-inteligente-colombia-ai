@@ -37,9 +37,9 @@ export class PayrollLiquidationService extends SecureBaseService {
     return Math.min(diffDays, 30);
   }
 
-  static calculateTransportAllowance(baseSalary: number, workedDays: number): number {
-    const currentYear = new Date().getFullYear().toString();
-    const config = ConfigurationService.getConfiguration(currentYear);
+  static calculateTransportAllowance(baseSalary: number, workedDays: number, year?: string): number {
+    const configYear = year || new Date().getFullYear().toString();
+    const config = ConfigurationService.getConfiguration(configYear);
     
     const dosSmmlv = config.salarioMinimo * 2;
     
@@ -96,7 +96,7 @@ export class PayrollLiquidationService extends SecureBaseService {
     }
   }
 
-  static async loadEmployeesForPeriod(startDate: string, endDate: string): Promise<Employee[]> {
+  static async loadEmployeesForPeriod(startDate: string, endDate: string, year?: string): Promise<Employee[]> {
     try {
       console.log('🔒 Loading employees for period securely');
 
@@ -122,16 +122,19 @@ export class PayrollLiquidationService extends SecureBaseService {
 
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
 
+      const configYear = year || new Date().getFullYear().toString();
+      
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
         const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
-        const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
+        const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados, configYear);
         const totalDevengado = salarioProporcional + auxilioTransporte;
         
         const deductionResult = await DeductionCalculationService.calculateDeductions({
           salarioBase: employee.salario_base,
           totalDevengado: totalDevengado,
           auxilioTransporte: auxilioTransporte,
-          periodType: 'mensual'
+          periodType: 'mensual',
+          year: configYear
         });
         
         return {
@@ -159,7 +162,7 @@ export class PayrollLiquidationService extends SecureBaseService {
     }
   }
 
-  static async loadSpecificEmployeesForPeriod(employeeIds: string[], startDate: string, endDate: string): Promise<Employee[]> {
+  static async loadSpecificEmployeesForPeriod(employeeIds: string[], startDate: string, endDate: string, year?: string): Promise<Employee[]> {
     try {
       console.log('🔒 Loading specific employees for period securely');
 
@@ -185,16 +188,19 @@ export class PayrollLiquidationService extends SecureBaseService {
 
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
 
+      const configYear = year || new Date().getFullYear().toString();
+      
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
         const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
-        const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados);
+        const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados, configYear);
         const totalDevengado = salarioProporcional + auxilioTransporte;
         
         const deductionResult = await DeductionCalculationService.calculateDeductions({
           salarioBase: employee.salario_base,
           totalDevengado: totalDevengado,
           auxilioTransporte: auxilioTransporte,
-          periodType: 'mensual'
+          periodType: 'mensual',
+          year: configYear
         });
         
         return {
@@ -421,7 +427,8 @@ export class PayrollLiquidationService extends SecureBaseService {
             salarioBase: salarioBase,
             totalDevengado: salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos,
             auxilioTransporte: auxilioTransporte,
-            periodType: 'quincenal'
+            periodType: 'quincenal',
+            year: new Date().getFullYear().toString() // Usar año actual para consolidación
           });
 
           const totalDevengadoFinal = salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos;

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { YearProvider } from "@/contexts/YearContext";
 import { useSystemInitialization } from "@/hooks/useSystemInitialization";
 import { Layout } from "@/components/layout/Layout";
 
@@ -65,11 +66,13 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <SubscriptionProvider>
+            <YearProvider>
             <BrowserRouter>
               <AppContent />
               <Toaster />
               <Sonner />
-            </BrowserRouter>
+              </BrowserRouter>
+            </YearProvider>
           </SubscriptionProvider>
         </AuthProvider>
       </TooltipProvider>

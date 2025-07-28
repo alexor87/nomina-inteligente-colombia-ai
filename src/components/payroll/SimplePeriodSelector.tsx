@@ -9,10 +9,11 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { MissingConfigurationModal } from './modals/MissingConfigurationModal';
+import { useYear } from '@/contexts/YearContext';
 
 interface SimplePeriodSelectorProps {
   companyId: string;
-  onPeriodSelected: (period: SelectablePeriod) => void;
+  onPeriodSelected: (period: SelectablePeriod & { year?: string }) => void;
   disabled?: boolean;
 }
 
@@ -23,16 +24,15 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
 }) => {
   const [periods, setPeriods] = useState<SelectablePeriod[]>([]);
   const [selectedPeriodNumber, setSelectedPeriodNumber] = useState<string>('');
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [isLoading, setIsLoading] = useState(true);
   const [isSelecting, setIsSelecting] = useState(false);
   const [periodicity, setPeriodicity] = useState<string>('mensual');
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [hasValidConfiguration, setHasValidConfiguration] = useState(true);
   const { toast } = useToast();
-
-  // Generar años disponibles (2021-2040)
-  const availableYears = Array.from({ length: 20 }, (_, i) => 2021 + i);
+  
+  // ✅ NUEVO: Usar contexto de año
+  const { selectedYear, setSelectedYear, availableYears } = useYear();
 
   useEffect(() => {
     if (companyId) {
@@ -45,7 +45,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
     try {
       // Verificar si existe configuración legal para el año seleccionado
       const availableConfigYears = ConfigurationService.getAvailableYears();
-      const hasConfiguration = availableConfigYears.includes(selectedYear.toString());
+      const hasConfiguration = availableConfigYears.includes(selectedYear);
       
       if (!hasConfiguration) {
         setHasValidConfiguration(false);
@@ -74,7 +74,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
       const currentPeriodicity = companySettings?.periodicity || 'mensual';
       setPeriodicity(currentPeriodicity);
 
-      const loadedPeriods = await SimplePeriodService.getSelectablePeriods(companyId, selectedYear);
+      const loadedPeriods = await SimplePeriodService.getSelectablePeriods(companyId, parseInt(selectedYear));
       setPeriods(loadedPeriods);
       
       // Auto-seleccionar el primer período disponible
@@ -127,7 +127,8 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
       const finalPeriod = await SimplePeriodService.selectPeriod(companyId, selectedPeriod);
       
       if (finalPeriod) {
-        onPeriodSelected(finalPeriod);
+        // ✅ NUEVO: Pasar el año seleccionado junto con el período
+        onPeriodSelected({ ...finalPeriod, year: selectedYear });
       } else {
         toast({
           title: "Error",
@@ -195,9 +196,9 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
                 Seleccionar Año
               </label>
               <Select 
-                value={selectedYear.toString()} 
+                value={selectedYear} 
                 onValueChange={(value) => {
-                  setSelectedYear(parseInt(value));
+                  setSelectedYear(value);
                   setSelectedPeriodNumber(''); // Reset period selection when year changes
                 }}
                 disabled={disabled || isSelecting}
@@ -209,7 +210,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
                   {availableYears.map((year) => (
                     <SelectItem 
                       key={year} 
-                      value={year.toString()}
+                      value={year}
                       className="hover:bg-gray-50"
                     >
                       {year}
@@ -309,7 +310,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
       <MissingConfigurationModal 
         isOpen={showConfigModal}
         onClose={handleCloseConfigModal}
-        year={selectedYear.toString()}
+        year={selectedYear}
       />
     </>
   );

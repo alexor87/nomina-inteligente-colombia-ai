@@ -33,10 +33,11 @@ const PayrollLiquidationPageSimple = () => {
     closeSuccessModal
   } = usePayrollLiquidation();
 
-  const handlePeriodSelection = async (period: SelectablePeriod) => {
-    console.log('🎯 Período seleccionado:', period.label);
+  const handlePeriodSelection = async (period: SelectablePeriod & { year?: string }) => {
+    console.log('🎯 Período seleccionado:', period.label, 'Año:', period.year);
     setSelectedPeriod(period);
-    await loadEmployees(period.startDate, period.endDate);
+    // ✅ NUEVO: Pasar el año al cargar empleados
+    await loadEmployees(period.startDate, period.endDate, period.year);
   };
 
   const handleLiquidate = async () => {

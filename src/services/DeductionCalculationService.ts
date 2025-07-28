@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { ConfigurationService } from '@/services/ConfigurationService';
 import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025, FONDO_SOLIDARIDAD_PENSIONAL_2025, CONTRIBUCIONES_SOLIDARIAS_2025, RETENCION_FUENTE_2025 } from '@/constants';
 
 export interface DeductionInput {
@@ -13,6 +14,7 @@ export interface DeductionInput {
   periodType: 'quincenal' | 'mensual' | 'semanal';
   empleadoId?: string;
   periodoId?: string;
+  year?: string; // ✅ NUEVO: Año para configuración dinámica
 }
 
 export interface DeductionResult {
@@ -129,21 +131,22 @@ export class DeductionCalculationService {
   }
 
   /**
-   * ✅ NUEVO: Cálculo de Fondo de Solidaridad Pensional
+   * ✅ ACTUALIZADO: Cálculo de Fondo de Solidaridad Pensional con año dinámico
    */
-  private static calculateFondoSolidaridad(salarioBase: number): {
+  private static calculateFondoSolidaridad(salarioBase: number, year: string = '2025'): {
     valor: number;
     rate: number;
     smmlvMultiple: number;
   } {
-    const smmlvMultiple = salarioBase / SALARIO_MINIMO_2025;
+    const config = ConfigurationService.getConfiguration(year);
+    const smmlvMultiple = salarioBase / config.salarioMinimo;
     
     // Solo aplica para salarios >= 4 SMMLV
     if (smmlvMultiple < 4) {
       return { valor: 0, rate: 0, smmlvMultiple };
     }
 
-    const rango = FONDO_SOLIDARIDAD_PENSIONAL_2025.RANGOS.find(r => 
+    const rango = config.fondoSolidaridad.ranges.find(r => 
       smmlvMultiple >= r.minSMMLV && smmlvMultiple < r.maxSMMLV
     );
 
@@ -156,30 +159,34 @@ export class DeductionCalculationService {
   }
 
   /**
-   * ✅ NUEVO: Cálculo de Contribuciones Solidarias
+   * ✅ ACTUALIZADO: Cálculo de Contribuciones Solidarias con año dinámico
    */
-  private static calculateContribucionesSolidarias(salarioBase: number): {
+  private static calculateContribucionesSolidarias(salarioBase: number, year: string = '2025'): {
     contribucionSolidariaAdicional: number;
     fondoSubsistencia: number;
     contribucionSolidariaRate: number;
     fondoSubsistenciaRate: number;
   } {
-    const smmlvMultiple = salarioBase / SALARIO_MINIMO_2025;
+    const config = ConfigurationService.getConfiguration(year);
+    const smmlvMultiple = salarioBase / config.salarioMinimo;
     
     let contribucionSolidariaAdicional = 0;
     let fondoSubsistencia = 0;
     let contribucionSolidariaRate = 0;
     let fondoSubsistenciaRate = 0;
 
-    // Contribución Solidaria Adicional (≥ 16 SMMLV)
-    if (smmlvMultiple >= CONTRIBUCIONES_SOLIDARIAS_2025.CONTRIBUCION_SOLIDARIA_ADICIONAL.minSMMLV) {
-      contribucionSolidariaRate = CONTRIBUCIONES_SOLIDARIAS_2025.CONTRIBUCION_SOLIDARIA_ADICIONAL.percentage;
+    // Obtener configuraciones dinámicas según el año
+    const contribucionesSolidarias = year === '2024' ? null : config.porcentajes; // 2024 no tiene estas contribuciones
+    
+    // Contribución Solidaria Adicional (≥ 16 SMMLV) - Solo desde 2025
+    if (contribucionesSolidarias && smmlvMultiple >= 16) {
+      contribucionSolidariaRate = 0.01; // 1% para salarios >= 16 SMMLV
       contribucionSolidariaAdicional = salarioBase * contribucionSolidariaRate;
     }
 
-    // Fondo de Subsistencia (≥ 20 SMMLV)
-    if (smmlvMultiple >= CONTRIBUCIONES_SOLIDARIAS_2025.FONDO_SUBSISTENCIA.minSMMLV) {
-      fondoSubsistenciaRate = CONTRIBUCIONES_SOLIDARIAS_2025.FONDO_SUBSISTENCIA.percentage;
+    // Fondo de Subsistencia (≥ 20 SMMLV) - Solo desde 2025
+    if (contribucionesSolidarias && smmlvMultiple >= 20) {
+      fondoSubsistenciaRate = 0.01; // 1% para salarios >= 20 SMMLV
       fondoSubsistencia = salarioBase * fondoSubsistenciaRate;
     }
 
@@ -192,16 +199,34 @@ export class DeductionCalculationService {
   }
 
   /**
-   * ✅ NUEVO: Cálculo mejorado de Retención en la Fuente
+   * ✅ ACTUALIZADO: Cálculo mejorado de Retención en la Fuente con año dinámico
    */
-  private static calculateRetencionFuente(baseRetencion: number): number {
-    const uvtValue = RETENCION_FUENTE_2025.UVT;
+  private static calculateRetencionFuente(baseRetencion: number, year: string = '2025'): number {
+    const config = ConfigurationService.getConfiguration(year);
+    const uvtValue = config.uvt;
     const baseUVT = baseRetencion / uvtValue;
     
-    // Buscar el rango apropiado en la tabla
-    const rango = RETENCION_FUENTE_2025.TABLA_RETENCION.find(r => 
-      baseUVT >= r.minUVT && baseUVT < r.maxUVT
-    );
+    // Para 2024, usar tabla simplificada
+    if (year === '2024') {
+      // Tabla simplificada 2024
+      if (baseUVT < 95) return 0;
+      if (baseUVT < 150) return (baseUVT - 95) * 0.19 * uvtValue;
+      if (baseUVT < 360) return ((55 * 0.19) + ((baseUVT - 150) * 0.28)) * uvtValue;
+      return ((55 * 0.19) + (210 * 0.28) + ((baseUVT - 360) * 0.33)) * uvtValue;
+    }
+
+    // Para 2025 y posteriores, usar tabla detallada
+    const tablasRetencion = {
+      '2025': [
+        { minUVT: 0, maxUVT: 95, baseUVT: 0, percentage: 0 },
+        { minUVT: 95, maxUVT: 150, baseUVT: 95, percentage: 0.19 },
+        { minUVT: 150, maxUVT: 360, baseUVT: 150, percentage: 0.28 },
+        { minUVT: 360, maxUVT: Infinity, baseUVT: 360, percentage: 0.33 }
+      ]
+    };
+
+    const tablaActual = tablasRetencion[year] || tablasRetencion['2025'];
+    const rango = tablaActual.find(r => baseUVT >= r.minUVT && baseUVT < r.maxUVT);
 
     if (!rango || rango.percentage === 0) {
       return 0;
@@ -216,7 +241,7 @@ export class DeductionCalculationService {
   }
 
   /**
-   * ✅ FALLBACK LOCAL: Cálculo completo de deducciones con todas las deducciones de ley
+   * ✅ ACTUALIZADO: Cálculo completo de deducciones con año dinámico
    */
   private static calculateLocalDeductions(input: DeductionInput): {
     healthDeduction: number;
@@ -234,8 +259,10 @@ export class DeductionCalculationService {
   } {
     // ✅ CORRECCIÓN NORMATIVA: IBC se calcula sobre salario base, no sobre devengado
     // El auxilio de transporte NO hace parte del IBC según normativa colombiana
-    const baseIbc = Math.max(input.salarioBase, SALARIO_MINIMO_2025); // Mínimo 1 SMMLV
-    const topeIbc = SALARIO_MINIMO_2025 * 25; // Máximo 25 SMMLV
+    const year = input.year || '2025';
+    const config = ConfigurationService.getConfiguration(year);
+    const baseIbc = Math.max(input.salarioBase, config.salarioMinimo); // Mínimo 1 SMMLV
+    const topeIbc = config.salarioMinimo * 25; // Máximo 25 SMMLV
     
     // Aplicar topes IBC según normativa
     const ibcAplicable = Math.min(baseIbc, topeIbc);
@@ -251,15 +278,15 @@ export class DeductionCalculationService {
     const healthDeduction = Math.max(0, ibcAplicable * 0.04); // 4% salud
     const pensionDeduction = Math.max(0, ibcAplicable * 0.04); // 4% pensión
     
-    // ✅ NUEVO: Fondo de Solidaridad Pensional
-    const fondoSolidaridadResult = this.calculateFondoSolidaridad(input.salarioBase);
+    // ✅ ACTUALIZADO: Fondo de Solidaridad Pensional con año dinámico
+    const fondoSolidaridadResult = this.calculateFondoSolidaridad(input.salarioBase, year);
     
-    // ✅ NUEVO: Contribuciones Solidarias
-    const contribucionesSolidarias = this.calculateContribucionesSolidarias(input.salarioBase);
+    // ✅ ACTUALIZADO: Contribuciones Solidarias con año dinámico
+    const contribucionesSolidarias = this.calculateContribucionesSolidarias(input.salarioBase, year);
     
-    // ✅ NUEVO: Retención en la fuente mejorada
+    // ✅ ACTUALIZADO: Retención en la fuente mejorada con año dinámico
     const baseRetencion = input.totalDevengado - healthDeduction - pensionDeduction - fondoSolidaridadResult.valor;
-    const retencionFuente = this.calculateRetencionFuente(baseRetencion);
+    const retencionFuente = this.calculateRetencionFuente(baseRetencion, year);
     
     return {
       healthDeduction,
@@ -277,9 +304,12 @@ export class DeductionCalculationService {
     };
   }
 
-  // ✅ MÉTODO PRINCIPAL: Con deducciones de ley completas y corrección normativa IBC
+  // ✅ MÉTODO PRINCIPAL: Con deducciones de ley completas y año dinámico
   static async calculateDeductions(input: DeductionInput): Promise<DeductionResult> {
     // ✅ CORRECCIÓN NORMATIVA: Calcular salario base proporcional para IBC según período
+    const year = input.year || '2025';
+    const config = ConfigurationService.getConfiguration(year);
+    
     const salarioBaseParaIBC = input.periodType === 'quincenal' 
       ? input.salarioBase / 2  // Para quincenal: mitad del salario mensual
       : input.periodType === 'semanal'
@@ -333,8 +363,8 @@ export class DeductionCalculationService {
       console.warn('⚠️ Error en backend, activando fallback local:', error);
       usedFallback = true;
       
-      // Usar fallback local con salario IBC correcto
-      const inputCorregido = { ...input, salarioBase: salarioBaseParaIBC };
+      // Usar fallback local con salario IBC correcto y año
+      const inputCorregido = { ...input, salarioBase: salarioBaseParaIBC, year: year };
       backendResult = this.calculateLocalDeductions(inputCorregido);
       console.log('🔄 Fallback local con IBC normativo aplicado:', backendResult);
     }
@@ -360,8 +390,9 @@ export class DeductionCalculationService {
 
     console.log('📊 RESULTADO FINAL CON DEDUCCIONES COMPLETAS:', {
       metodo: usedFallback ? 'FALLBACK LOCAL' : 'BACKEND',
+      año: year,
       salarioBase: input.salarioBase,
-      smmlvMultiple: backendResult.smmlvMultiple || (input.salarioBase / SALARIO_MINIMO_2025),
+      smmlvMultiple: backendResult.smmlvMultiple || (input.salarioBase / config.salarioMinimo),
       totalDevengado: input.totalDevengado,
       totalDeducciones,
       netoPagar: input.totalDevengado - totalDeducciones,
@@ -399,10 +430,10 @@ export class DeductionCalculationService {
       totalDeducciones,
       detalleCalculo: {
         baseIbc: ibcFinal, // ✅ IBC normativo proporcional al período
-        topeIbc: SALARIO_MINIMO_2025 * 25,
+        topeIbc: config.salarioMinimo * 25,
         baseRetencion: input.totalDevengado - backendResult.healthDeduction - backendResult.pensionDeduction,
-        uvtAplicable: RETENCION_FUENTE_2025.UVT,
-        smmlvMultiple: salarioBaseParaIBC / SALARIO_MINIMO_2025, // ✅ Múltiple correcto
+        uvtAplicable: config.uvt,
+        smmlvMultiple: salarioBaseParaIBC / config.salarioMinimo, // ✅ Múltiple correcto
         fondoSolidaridadRate: backendResult.rates?.fondoSolidaridad || 0,
         contribucionSolidariaRate: backendResult.rates?.contribucionSolidaria || 0,
         fondoSubsistenciaRate: backendResult.rates?.fondoSubsistencia || 0,
@@ -418,7 +449,7 @@ export class DeductionCalculationService {
     return results;
   }
 
-  static getConfigurationInfo(): {
+  static getConfigurationInfo(year: string = '2025'): {
     salarioMinimo: number;
     uvt: number;
     porcentajes: {
@@ -433,7 +464,7 @@ export class DeductionCalculationService {
         percentage: number;
       }>;
     };
-    contribucionesSolidarias: {
+    contribucionesSolidarias?: {
       contribucionSolidariaAdicional: {
         minSMMLV: number;
         percentage: number;
@@ -444,22 +475,36 @@ export class DeductionCalculationService {
       };
     };
   } {
-    return {
-      salarioMinimo: SALARIO_MINIMO_2025,
-      uvt: RETENCION_FUENTE_2025.UVT,
+    const config = ConfigurationService.getConfiguration(year);
+    
+    const result: any = {
+      salarioMinimo: config.salarioMinimo,
+      uvt: config.uvt,
       porcentajes: {
-        saludEmpleado: 0.04,
-        pensionEmpleado: 0.04
+        saludEmpleado: config.porcentajes.saludEmpleado,
+        pensionEmpleado: config.porcentajes.pensionEmpleado
       },
-      topeIbc: SALARIO_MINIMO_2025 * 25,
+      topeIbc: config.salarioMinimo * 25,
       fondoSolidaridad: {
-        ranges: FONDO_SOLIDARIDAD_PENSIONAL_2025.RANGOS
-      },
-      contribucionesSolidarias: {
-        contribucionSolidariaAdicional: CONTRIBUCIONES_SOLIDARIAS_2025.CONTRIBUCION_SOLIDARIA_ADICIONAL,
-        fondoSubsistencia: CONTRIBUCIONES_SOLIDARIAS_2025.FONDO_SUBSISTENCIA
+        ranges: config.fondoSolidaridad.ranges
       }
     };
+
+    // Solo incluir contribuciones solidarias desde 2025
+    if (year !== '2024') {
+      result.contribucionesSolidarias = {
+        contribucionSolidariaAdicional: {
+          minSMMLV: 16,
+          percentage: 0.01
+        },
+        fondoSubsistencia: {
+          minSMMLV: 20,
+          percentage: 0.01
+        }
+      };
+    }
+
+    return result;
   }
 
   static async validatePeriodDeductions(periodId: string): Promise<{
