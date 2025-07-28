@@ -497,7 +497,7 @@ export const PayrollHistoryDetailPage = () => {
                        <TableHead className="min-w-[100px] text-center">
                          Novedades
                        </TableHead>
-                      <TableHead className="min-w-[140px] bg-blue-100 text-right font-bold">
+                      <TableHead className="min-w-[140px] bg-blue-100 text-right font-semibold">
                         Neto Pagado
                       </TableHead>
                       <TableHead className="min-w-[100px] sticky right-0 bg-background z-10 text-center">
@@ -599,7 +599,7 @@ export const PayrollHistoryDetailPage = () => {
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalNeto)}
                                 </div>
-                                 <div className="font-bold text-lg text-blue-600">
+                                 <div className="font-semibold text-blue-600">
                                    {formatCurrency(preview.newNeto)}
                                    <span className="text-xs ml-1">
                                      ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
@@ -607,10 +607,10 @@ export const PayrollHistoryDetailPage = () => {
                                  </div>
                                </div>
                              ) : (
-                               <span className="font-bold text-lg text-blue-600">
+                               <span className="font-semibold text-blue-600">
                                  {formatCurrency(employee.neto_pagado)}
                                </span>
-                            )}
+                             )}
                           </TableCell>
                           <TableCell className="sticky right-0 bg-background z-10 text-center font-medium">
                             <Button
