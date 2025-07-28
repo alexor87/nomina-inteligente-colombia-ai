@@ -35,7 +35,7 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
 
   const handleGoToHistory = () => {
     onClose();
-    navigate('/app/payroll/history');
+    navigate('/app/payroll-history');
   };
 
   return (

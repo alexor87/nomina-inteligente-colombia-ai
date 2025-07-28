@@ -330,11 +330,11 @@ export const usePayrollLiquidation = () => {
         const summary: PayrollSummary = {
           totalEmployees: employees.length,
           validEmployees: employees.length, // Todos los empleados son válidos al liquidar
-          totalGrossPay: employees.reduce((sum, emp) => sum + emp.total_devengado, 0),
-          totalDeductions: employees.reduce((sum, emp) => sum + emp.total_deducciones, 0),
-          totalNetPay: employees.reduce((sum, emp) => sum + emp.neto_pagado, 0),
-          employerContributions: employees.reduce((sum, emp) => sum + (emp.total_devengado * 0.205), 0), // Aproximado 20.5%
-          totalPayrollCost: employees.reduce((sum, emp) => sum + emp.total_devengado + (emp.total_devengado * 0.205), 0)
+          totalGrossPay: employees.reduce((sum, emp) => sum + (emp.total_devengado || 0), 0),
+          totalDeductions: employees.reduce((sum, emp) => sum + (emp.total_deducciones || 0), 0),
+          totalNetPay: employees.reduce((sum, emp) => sum + (emp.neto_pagado || 0), 0),
+          employerContributions: employees.reduce((sum, emp) => sum + ((emp.total_devengado || 0) * 0.205), 0), // Aproximado 20.5%
+          totalPayrollCost: employees.reduce((sum, emp) => sum + (emp.total_devengado || 0) + ((emp.total_devengado || 0) * 0.205), 0)
         };
 
         setLiquidationResult({
