@@ -20,9 +20,32 @@ export class PayrollPDFService {
         id: employee.id,
         nombre: employee.name, // Usar 'name' en lugar de 'nombre'
         apellido: '', // PayrollEmployee no tiene apellido separado
-        cedula: employee.id // Usar ID como cedula temporal
+        cedula: employee.id, // Usar ID como cedula temporal
+        cargo: employee.position,
+        eps: employee.eps,
+        afp: employee.afp,
+        salarioBase: employee.baseSalary,
+        diasTrabajados: employee.workedDays,
+        horasExtra: employee.extraHours,
+        incapacidades: employee.disabilities,
+        bonificaciones: employee.bonuses,
+        ausencias: employee.absences,
+        totalDevengado: employee.grossPay,
+        totalDeducciones: employee.deductions,
+        totalNeto: employee.netPay,
+        deduccionSalud: employee.healthDeduction,
+        deduccionPension: employee.pensionDeduction,
+        aportePatronalSalud: employee.employerContributions * 0.4,
+        aportePatronalPension: employee.employerContributions * 0.35,
+        aportePatronalARL: employee.employerContributions * 0.1,
+        aportePatronalCCF: employee.employerContributions * 0.08,
+        aportePatronalICBF: employee.employerContributions * 0.05,
+        aportePatronalSENA: employee.employerContributions * 0.02
       },
-      period,
+      period: {
+        ...period,
+        numeroComprobante: `${period.type.toUpperCase()}-${employee.id}-${new Date().getFullYear()}`
+      },
       company: companyInfo || {
         razon_social: 'Mi Empresa',
         nit: 'N/A'
