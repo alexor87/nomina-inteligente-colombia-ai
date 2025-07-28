@@ -479,47 +479,80 @@ export const PayrollHistoryDetailPage = () => {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="sticky left-0 z-10 bg-background">Nombre Empleado</TableHead>
-                      <TableHead>Salario Base</TableHead>
-                      <TableHead>IBC</TableHead>
-                      <TableHead>Días Trabajados</TableHead>
-                      <TableHead className="bg-green-50 text-green-700">Total Devengado</TableHead>
-                      <TableHead className="bg-red-50 text-red-700">Total Deducciones</TableHead>
-                      <TableHead>Novedades</TableHead>
-                      <TableHead className="bg-blue-50 text-blue-700">Neto Pagado</TableHead>
-                      <TableHead className="sticky right-0 z-10 bg-background">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table className="min-w-max w-full border-collapse bg-white rounded-lg shadow-sm">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="sticky left-0 bg-gray-50 z-10 min-w-[200px] px-4 py-3 text-left text-sm font-semibold text-gray-900 border-r">
+                        Nombre Empleado
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                        Salario Base
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                        IBC
+                      </th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900">
+                        Días Trabajados
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 bg-green-100">
+                        Total Devengado
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 bg-red-100">
+                        Total Deducciones
+                      </th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 bg-blue-50">
+                        Novedades
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 bg-blue-100">
+                        Neto Pagado
+                      </th>
+                      <th className="sticky right-0 bg-gray-50 z-10 px-4 py-3 text-center text-sm font-semibold text-gray-900 border-l">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {employees.map((employee) => {
                       const preview = calculateEmployeePreview(employee);
                       return (
-                        <TableRow key={employee.id} className="hover:bg-muted/50">
-                          <TableCell className="sticky left-0 z-10 bg-background">
-                            <div className="flex items-center gap-2">
-                              <div className="font-medium min-w-[200px]">
+                        <tr key={employee.id} className="border-b hover:bg-gray-50 transition-colors">
+                          <td className="sticky left-0 bg-white z-10 px-4 py-3 border-r">
+                            <div>
+                              <div className="font-medium text-gray-900">
                                 {employee.employee_name} {employee.employee_lastname}
                               </div>
-                              {preview.hasPending && (
-                                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                                  {preview.pendingCount} pendiente{preview.pendingCount > 1 ? 's' : ''}
-                                </Badge>
-                              )}
+                              <div className="text-sm text-gray-500">
+                                Sin cargo definido
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="font-mono">{formatCurrency(employee.salario_base)}</TableCell>
-                          <TableCell className="font-mono">{formatCurrency(employee.ibc || employee.salario_base)}</TableCell>
-                          <TableCell className="text-center">{employee.dias_trabajados || 30}</TableCell>
-                          <TableCell className="font-mono bg-green-50">
+                            {preview.hasPending && (
+                              <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 mt-1">
+                                {preview.pendingCount} pendiente{preview.pendingCount > 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="font-medium text-gray-900">
+                              {formatCurrency(employee.salario_base)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="font-medium text-gray-900">
+                              {formatCurrency(employee.ibc || employee.salario_base)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="font-medium text-gray-900">
+                              {employee.dias_trabajados || 30}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right bg-green-100">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalDevengado)}
                                 </div>
-                                <div className="text-green-600 font-medium">
+                                <div className="font-semibold text-green-700">
                                   {formatCurrency(preview.newDevengado)}
                                   <span className="text-xs ml-1">
                                     (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
@@ -527,16 +560,18 @@ export const PayrollHistoryDetailPage = () => {
                                 </div>
                               </div>
                             ) : (
-                              formatCurrency(employee.total_devengado)
+                              <span className="font-semibold text-green-700">
+                                {formatCurrency(employee.total_devengado)}
+                              </span>
                             )}
-                          </TableCell>
-                          <TableCell className="font-mono bg-red-50">
+                          </td>
+                          <td className="px-4 py-3 text-right bg-red-100">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalDeducciones)}
                                 </div>
-                                <div className="text-red-600 font-medium">
+                                <div className="font-semibold text-red-700">
                                   {formatCurrency(preview.newDeducciones)}
                                   {preview.newDeducciones !== preview.originalDeducciones && (
                                     <span className="text-xs ml-1">
@@ -546,21 +581,35 @@ export const PayrollHistoryDetailPage = () => {
                                 </div>
                               </div>
                             ) : (
-                              formatCurrency(employee.total_deducciones)
+                              <span className="font-semibold text-red-700">
+                                {formatCurrency(employee.total_deducciones)}
+                              </span>
                             )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className="min-w-[40px]">
-                              {preview.pendingCount}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-mono font-semibold bg-blue-50">
+                          </td>
+                          <td className="px-4 py-3 text-center bg-blue-50">
+                            <div className="flex items-center justify-center space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
+                                className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                              {preview.pendingCount > 0 && (
+                                <Badge variant="default" className="ml-2 text-xs">
+                                  {preview.pendingCount}
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right bg-blue-100">
                             {preview.hasPending ? (
                               <div className="space-y-1">
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalNeto)}
                                 </div>
-                                <div className="text-primary font-bold">
+                                <div className="font-bold text-lg text-blue-700">
                                   {formatCurrency(preview.newNeto)}
                                   <span className="text-xs ml-1">
                                     ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
@@ -568,36 +617,29 @@ export const PayrollHistoryDetailPage = () => {
                                 </div>
                               </div>
                             ) : (
-                              formatCurrency(employee.neto_pagado)
+                              <span className="font-bold text-lg text-blue-700">
+                                {formatCurrency(employee.neto_pagado)}
+                              </span>
                             )}
-                          </TableCell>
-                          <TableCell className="sticky right-0 z-10 bg-background">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
-                                className="flex items-center gap-2"
-                                title="Agregar Ajuste"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
+                          </td>
+                          <td className="sticky right-0 bg-white z-10 px-4 py-3 border-l">
+                            <div className="flex justify-center">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
-                                className="flex items-center gap-2"
-                                title="Descargar Comprobante"
+                                className="text-green-600 border-green-200 hover:bg-green-50"
                               >
-                                <Download className="h-4 w-4" />
+                                <Download className="h-4 w-4 mr-1" />
+                                Descargar
                               </Button>
                             </div>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
