@@ -3,7 +3,7 @@ import { EmployeesDashboard } from '@/components/employees/EmployeesDashboard';
 
 const EmployeesPage = () => {
   return (
-    <div className="px-6">
+    <div className="container mx-auto p-6">
       <EmployeesDashboard />
     </div>
   );
