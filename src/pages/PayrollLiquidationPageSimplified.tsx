@@ -19,6 +19,8 @@ import { PayrollValidationService } from '@/services/PayrollValidationService';
 import { PayrollWorldClassControlPanel } from '@/components/payroll/liquidation/PayrollWorldClassControlPanel';
 import { PayrollRecoveryPanel } from '@/components/payroll/recovery/PayrollRecoveryPanel';
 import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
+import { NewYearConfigurationModal } from '@/components/payroll/modals/NewYearConfigurationModal';
+import { EndOfYearDetectionService, EndOfYearSituation } from '@/services/EndOfYearDetectionService';
 import { useNavigate } from 'react-router-dom';
 
 const PayrollLiquidationPageSimplified = () => {
@@ -31,6 +33,8 @@ const PayrollLiquidationPageSimplified = () => {
   const [validationSummary, setValidationSummary] = useState<any>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [liquidationResult, setLiquidationResult] = useState<any>(null);
+  const [showNewYearModal, setShowNewYearModal] = useState(false);
+  const [endOfYearSituation, setEndOfYearSituation] = useState<EndOfYearSituation | null>(null);
   
   const navigate = useNavigate();
   
@@ -135,6 +139,9 @@ const PayrollLiquidationPageSimplified = () => {
         }
       });
       setShowSuccessModal(true);
+      
+      // 🎯 DETECCIÓN DE FIN DE AÑO después de liquidación exitosa
+      await checkEndOfYearSituation();
     } catch (error) {
       console.error('Error en handleLiquidate:', error);
     }
@@ -165,6 +172,9 @@ const PayrollLiquidationPageSimplified = () => {
         }
       });
       setShowSuccessModal(true);
+      
+      // 🎯 DETECCIÓN DE FIN DE AÑO después de re-liquidación exitosa
+      await checkEndOfYearSituation();
     } catch (error) {
       console.error('Error en re-liquidación:', error);
     }
@@ -188,6 +198,34 @@ const PayrollLiquidationPageSimplified = () => {
   const handleReset = () => {
     resetSelection();
     setPeriodSelected(false);
+  };
+
+  // 🎯 NUEVA FUNCIÓN: Detectar situación de fin de año
+  const checkEndOfYearSituation = async () => {
+    if (!companyId) return;
+    
+    try {
+      console.log('🔍 Verificando situación de fin de año...');
+      
+      const situation = await EndOfYearDetectionService.detectEndOfYearSituation(companyId);
+      
+      if (situation.needsNewYear) {
+        console.log('🎯 Se detectó necesidad de crear nuevo año:', situation);
+        setEndOfYearSituation(situation);
+        setShowNewYearModal(true);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error detectando fin de año:', error);
+      // No mostrar error al usuario, es una función auxiliar
+    }
+  };
+
+  const handleYearCreated = () => {
+    console.log('✅ Nuevo año creado exitosamente');
+    // El modal se cierra automáticamente
+    setShowNewYearModal(false);
+    setEndOfYearSituation(null);
   };
 
   const handleSuccessModalClose = () => {
@@ -412,6 +450,16 @@ const PayrollLiquidationPageSimplified = () => {
           onClose={handleSuccessModalClose}
           periodData={liquidationResult.periodData}
           summary={liquidationResult.summary}
+        />
+      )}
+
+      {/* New Year Configuration Modal */}
+      {showNewYearModal && endOfYearSituation && (
+        <NewYearConfigurationModal
+          isOpen={showNewYearModal}
+          onClose={() => setShowNewYearModal(false)}
+          endOfYearSituation={endOfYearSituation}
+          onYearCreated={handleYearCreated}
         />
       )}
     </div>
