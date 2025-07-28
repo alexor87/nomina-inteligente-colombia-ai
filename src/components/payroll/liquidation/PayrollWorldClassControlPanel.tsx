@@ -226,14 +226,6 @@ export const PayrollWorldClassControlPanel = ({
               </Button>
             )}
 
-            <Button
-              onClick={onStartLiquidation}
-              disabled={!canProceedWithLiquidation || showProgress || (exhaustiveValidationResults && !exhaustiveValidationResults.canProceed)}
-              className="flex items-center gap-2"
-            >
-              <Zap className="h-4 w-4" />
-              {useAtomicLiquidation ? 'Liquidar (Atómico)' : 'Liquidar (Tradicional)'}
-            </Button>
           </div>
 
           {/* Estado de la Liquidación */}

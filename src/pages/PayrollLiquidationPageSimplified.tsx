@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Settings, RotateCcw } from 'lucide-react';
+import { Calculator, Users, Settings, RotateCcw, Zap } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
@@ -377,6 +377,14 @@ const PayrollLiquidationPageSimplified = () => {
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Agregar Empleado
+                </Button>
+                <Button
+                  onClick={handleLiquidate}
+                  disabled={!canProceedWithLiquidation || showProgress || (exhaustiveValidationResults && !exhaustiveValidationResults.canProceed)}
+                  className="flex items-center gap-2"
+                >
+                  <Zap className="h-4 w-4" />
+                  {useAtomicLiquidation ? 'Liquidar (Atómico)' : 'Liquidar (Tradicional)'}
                 </Button>
               </div>
             </div>
