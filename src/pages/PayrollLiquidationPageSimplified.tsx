@@ -66,11 +66,9 @@ const PayrollLiquidationPageSimplified = () => {
     liquidationProgress,
     processedEmployees,
     liquidationErrors,
-    // World-class features
-    useAtomicLiquidation,
-    setUseAtomicLiquidation,
-    useExhaustiveValidation,
-    setUseExhaustiveValidation,
+    // World-class features (always mandatory)
+    useAtomicLiquidation, // Always true (mandatory)
+    useExhaustiveValidation, // Always true (mandatory)
     exhaustiveValidationResults,
     isValidating,
     performExhaustiveValidation,
@@ -268,9 +266,7 @@ const PayrollLiquidationPageSimplified = () => {
       {periodSelected && selectedPeriod && (
         <PayrollWorldClassControlPanel
           useAtomicLiquidation={useAtomicLiquidation}
-          setUseAtomicLiquidation={setUseAtomicLiquidation}
           useExhaustiveValidation={useExhaustiveValidation}
-          setUseExhaustiveValidation={setUseExhaustiveValidation}
           exhaustiveValidationResults={exhaustiveValidationResults}
           isValidating={isValidating}
           onPerformExhaustiveValidation={async () => { await performExhaustiveValidation(); }}

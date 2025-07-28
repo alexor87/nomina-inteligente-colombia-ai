@@ -18,11 +18,9 @@ import {
 import { ValidationResult } from "@/services/PayrollExhaustiveValidationService";
 
 interface PayrollWorldClassControlPanelProps {
-  // Estados de configuración
+  // Estados de configuración (now read-only)
   useAtomicLiquidation: boolean;
-  setUseAtomicLiquidation: (value: boolean) => void;
   useExhaustiveValidation: boolean;
-  setUseExhaustiveValidation: (value: boolean) => void;
   
   // Resultados de validación
   exhaustiveValidationResults: ValidationResult | null;
@@ -42,9 +40,7 @@ interface PayrollWorldClassControlPanelProps {
 
 export const PayrollWorldClassControlPanel = ({
   useAtomicLiquidation,
-  setUseAtomicLiquidation,
   useExhaustiveValidation,
-  setUseExhaustiveValidation,
   exhaustiveValidationResults,
   isValidating,
   onPerformExhaustiveValidation,
@@ -102,13 +98,10 @@ export const PayrollWorldClassControlPanel = ({
                 <Zap className="h-4 w-4 text-blue-600" />
                 <div>
                   <p className="font-medium">Liquidación Atómica</p>
-                  <p className="text-sm text-muted-foreground">Rollback automático en caso de error</p>
+                  <p className="text-sm text-muted-foreground">Rollback automático en caso de error (Obligatorio)</p>
                 </div>
               </div>
-              <Switch
-                checked={useAtomicLiquidation}
-                onCheckedChange={setUseAtomicLiquidation}
-              />
+              <div className="text-sm font-medium text-green-600">Siempre Activo</div>
             </div>
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -116,13 +109,10 @@ export const PayrollWorldClassControlPanel = ({
                 <Shield className="h-4 w-4 text-green-600" />
                 <div>
                   <p className="font-medium">Validación Exhaustiva</p>
-                  <p className="text-sm text-muted-foreground">15+ validaciones críticas</p>
+                  <p className="text-sm text-muted-foreground">15+ validaciones críticas (Obligatorio)</p>
                 </div>
               </div>
-              <Switch
-                checked={useExhaustiveValidation}
-                onCheckedChange={setUseExhaustiveValidation}
-              />
+              <div className="text-sm font-medium text-green-600">Siempre Activo</div>
             </div>
           </div>
 
@@ -280,26 +270,20 @@ export const PayrollWorldClassControlPanel = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="p-3 border rounded">
               <h4 className="font-medium mb-1">Liquidación Atómica</h4>
-              <p className="text-muted-foreground">
-                {useAtomicLiquidation 
-                  ? "✅ Activada - Rollback automático garantizado" 
-                  : "⚠️ Desactivada - Sin protección de rollback"
-                }
+              <p className="text-muted-foreground text-green-600 font-medium">
+                ✅ Siempre Activa - Rollback automático garantizado
               </p>
             </div>
             <div className="p-3 border rounded">
               <h4 className="font-medium mb-1">Validación Exhaustiva</h4>
-              <p className="text-muted-foreground">
-                {useExhaustiveValidation 
-                  ? "✅ Activada - 15+ validaciones críticas" 
-                  : "⚠️ Desactivada - Solo validaciones básicas"
-                }
+              <p className="text-muted-foreground text-green-600 font-medium">
+                ✅ Siempre Activa - 15+ validaciones críticas
               </p>
             </div>
           </div>
           
           <div className="text-xs text-muted-foreground">
-            <p><strong>Recomendación:</strong> Mantener ambas opciones activadas para máxima seguridad y confiabilidad.</p>
+            <p><strong>Sistema Optimizado:</strong> Ambas funciones están siempre activas para garantizar máxima seguridad y consistencia.</p>
           </div>
         </CardContent>
       </Card>
