@@ -293,10 +293,36 @@ export class PayrollLiquidationService extends SecureBaseService {
         throw payrollError;
       }
 
-      // ✅ CORREGIDO: Calcular totales CORRECTOS una sola vez
-      const finalTotalDevengado = payrollInserts.reduce((sum, p) => sum + p.total_devengado, 0);
-      const finalTotalDeducciones = payrollInserts.reduce((sum, p) => sum + p.total_deducciones, 0);
-      const finalTotalNeto = payrollInserts.reduce((sum, p) => sum + p.neto_pagado, 0);
+      // ✅ CORREGIDO: Calcular totales CORRECTOS una sola vez con validación
+      console.log('🧮 Calculando totales. Registros:', payrollInserts.length);
+      
+      // Log valores para debugging
+      payrollInserts.forEach((p, index) => {
+        if (!Number.isFinite(p.neto_pagado) || p.neto_pagado == null) {
+          console.warn(`⚠️ Valor inválido en empleado ${index}:`, {
+            employee_id: p.employee_id,
+            neto_pagado: p.neto_pagado,
+            tipo: typeof p.neto_pagado
+          });
+        }
+      });
+      
+      const finalTotalDevengado = payrollInserts.reduce((sum, p) => sum + (Number(p.total_devengado) || 0), 0);
+      const finalTotalDeducciones = payrollInserts.reduce((sum, p) => sum + (Number(p.total_deducciones) || 0), 0);
+      const finalTotalNeto = payrollInserts.reduce((sum, p) => sum + (Number(p.neto_pagado) || 0), 0);
+      
+      console.log('💰 Totales calculados:', {
+        devengado: finalTotalDevengado,
+        deducciones: finalTotalDeducciones,
+        neto: finalTotalNeto,
+        neto_valid: Number.isFinite(finalTotalNeto)
+      });
+      
+      // Validación adicional
+      if (!Number.isFinite(finalTotalNeto) || finalTotalNeto < 0) {
+        console.error('❌ Error en cálculo de neto total:', finalTotalNeto);
+        throw new Error(`Error en cálculo de neto total: ${finalTotalNeto}`);
+      }
 
       // ✅ CORREGIDO: Actualizar totales UNA SOLA VEZ
       const { error: updateError } = await supabase
