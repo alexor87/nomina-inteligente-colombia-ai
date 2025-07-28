@@ -71,9 +71,9 @@ const DEFAULT_CONFIG_2025: PayrollConfiguration = {
 
 const DEFAULT_CONFIG_2024: PayrollConfiguration = {
   ...DEFAULT_CONFIG_2025,
-  salarioMinimo: 1160000,
+  salarioMinimo: 1300000, // ✅ CORREGIDO: Salario mínimo 2024
   auxilioTransporte: 162000,
-  uvt: 42412,
+  uvt: 47065, // ✅ CORREGIDO: UVT 2024 oficial
 };
 
 const DEFAULT_YEARLY_CONFIG: YearlyConfiguration = {
