@@ -300,7 +300,7 @@ const PayrollLiquidationPageSimplified = () => {
         </Card>
       )}
 
-      {/* ✅ INFORMACIÓN ARQUITECTÓNICA */}
+      {/* ✅ INFORMACIÓN ARQUITECTÓNICA - OCULTO: Banner técnico removido para UI más limpia
       <Card className="border-blue-200 bg-blue-50">
         <CardContent className="pt-4">
           <div className="flex items-center justify-between">
@@ -324,6 +324,7 @@ const PayrollLiquidationPageSimplified = () => {
           </div>
         </CardContent>
       </Card>
+      */}
 
       {/* Selector de Período */}
       {companyId && !periodSelected && (
