@@ -7,6 +7,12 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(value: number): string {
+  // ✅ VALIDACIÓN DEFENSIVA
+  if (!Number.isFinite(value) || value === null || value === undefined) {
+    console.warn('⚠️ formatCurrency recibió valor inválido:', value);
+    return '$0';
+  }
+  
   return new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',

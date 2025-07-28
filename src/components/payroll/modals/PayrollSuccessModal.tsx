@@ -79,7 +79,7 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
             </div>
             <div>
               <span className="text-muted-foreground">Neto a pagar</span>
-              <div className="font-medium">{formatCurrency(summary.totalNetPay)}</div>
+              <div className="font-medium">{formatCurrency(summary.totalNetPay || 0)}</div>
             </div>
           </div>
         </div>

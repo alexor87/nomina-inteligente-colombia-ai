@@ -325,6 +325,13 @@ export const usePayrollLiquidation = () => {
       if (result.success && result.summary) {
         console.log('✅ Liquidación exitosa:', result.message);
         
+        // 🔍 DEBUGGING summary antes del modal
+        console.log('🔍 DEBUGGING summary antes del modal:', {
+          totalNetPay: result.summary.totalNetPay,
+          tipo: typeof result.summary.totalNetPay,
+          isFinite: Number.isFinite(result.summary.totalNetPay)
+        });
+        
         // Usar el resumen calculado directamente del servicio de liquidación
         const periodType = detectPeriodType(startDate, endDate);
 
