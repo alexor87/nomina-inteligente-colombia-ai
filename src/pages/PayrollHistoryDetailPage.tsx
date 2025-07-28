@@ -542,17 +542,17 @@ export const PayrollHistoryDetailPage = () => {
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalDevengado)}
                                 </div>
-                                <div className="font-semibold text-green-700">
-                                  {formatCurrency(preview.newDevengado)}
-                                  <span className="text-xs ml-1">
-                                    (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
-                                  </span>
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="font-semibold text-green-700">
-                                {formatCurrency(employee.total_devengado)}
-                              </span>
+                                <div className="font-semibold text-green-600">
+                                   {formatCurrency(preview.newDevengado)}
+                                   <span className="text-xs ml-1">
+                                     (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
+                                   </span>
+                                 </div>
+                               </div>
+                             ) : (
+                               <span className="font-semibold text-green-600">
+                                 {formatCurrency(employee.total_devengado)}
+                               </span>
                             )}
                           </TableCell>
                           <TableCell className="bg-red-100 text-right font-medium">
@@ -561,19 +561,19 @@ export const PayrollHistoryDetailPage = () => {
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalDeducciones)}
                                 </div>
-                                <div className="font-semibold text-red-700">
-                                  {formatCurrency(preview.newDeducciones)}
-                                  {preview.newDeducciones !== preview.originalDeducciones && (
-                                    <span className="text-xs ml-1">
-                                      ({preview.newDeducciones > preview.originalDeducciones ? '+' : ''}{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="font-semibold text-red-700">
-                                {formatCurrency(employee.total_deducciones)}
-                              </span>
+                                 <div className="font-semibold text-red-600">
+                                   {formatCurrency(preview.newDeducciones)}
+                                   {preview.newDeducciones !== preview.originalDeducciones && (
+                                     <span className="text-xs ml-1">
+                                       ({preview.newDeducciones > preview.originalDeducciones ? '+' : ''}{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
+                                     </span>
+                                   )}
+                                 </div>
+                               </div>
+                             ) : (
+                               <span className="font-semibold text-red-600">
+                                 {formatCurrency(employee.total_deducciones)}
+                               </span>
                             )}
                           </TableCell>
                           <TableCell className="bg-blue-50 text-center">
@@ -599,17 +599,17 @@ export const PayrollHistoryDetailPage = () => {
                                 <div className="text-muted-foreground line-through text-sm">
                                   {formatCurrency(preview.originalNeto)}
                                 </div>
-                                <div className="font-bold text-lg text-blue-700">
-                                  {formatCurrency(preview.newNeto)}
-                                  <span className="text-xs ml-1">
-                                    ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
-                                  </span>
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="font-bold text-lg text-blue-700">
-                                {formatCurrency(employee.neto_pagado)}
-                              </span>
+                                 <div className="font-bold text-lg text-blue-600">
+                                   {formatCurrency(preview.newNeto)}
+                                   <span className="text-xs ml-1">
+                                     ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
+                                   </span>
+                                 </div>
+                               </div>
+                             ) : (
+                               <span className="font-bold text-lg text-blue-600">
+                                 {formatCurrency(employee.neto_pagado)}
+                               </span>
                             )}
                           </TableCell>
                           <TableCell className="sticky right-0 bg-background z-10 text-center">
