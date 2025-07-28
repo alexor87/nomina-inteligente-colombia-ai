@@ -17,6 +17,7 @@ import { NovedadAuditHistoryModal } from '@/components/payroll/audit/NovedadAudi
 import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
 import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
 
 interface PeriodDetail {
   id: string;
@@ -73,6 +74,8 @@ export const PayrollHistoryDetailPage = () => {
   const [pendingNovedades, setPendingNovedades] = useState<PendingNovedad[]>([]);
   const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [selectedVoucherEmployee, setSelectedVoucherEmployee] = useState<any>(null);
   
   // Hook para gestionar novedades
   const { createNovedad } = usePayrollNovedadesUnified(periodId || '');
@@ -140,10 +143,32 @@ export const PayrollHistoryDetailPage = () => {
   }, [periodId]);
 
   const handleDownloadVoucher = async (employeeId: string, employeeName: string) => {
-    toast({
-      title: "Funcionalidad pendiente",
-      description: `Descarga de comprobante para ${employeeName} - En desarrollo`,
-    });
+    // Find the employee in current data
+    const employeePayroll = employees.find(emp => emp.employee_id === employeeId);
+    if (!employeePayroll) {
+      toast({
+        title: "Error",
+        description: "No se encontraron datos del empleado",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Map to expected format for VoucherPreviewModal
+    const mappedEmployee = {
+      id: employeePayroll.employee_id,
+      nombre: employeePayroll.employee_name,
+      apellido: employeePayroll.employee_lastname,
+      salario_base: employeePayroll.salario_base,
+      total_devengado: employeePayroll.total_devengado,
+      total_deducciones: employeePayroll.total_deducciones,
+      neto_pagado: employeePayroll.neto_pagado,
+      ibc: employeePayroll.ibc || employeePayroll.salario_base,
+      dias_trabajados: employeePayroll.dias_trabajados || 30
+    };
+
+    setSelectedVoucherEmployee(mappedEmployee);
+    setIsVoucherModalOpen(true);
   };
 
   const handleAdjustmentSuccess = () => {
@@ -674,6 +699,18 @@ export const PayrollHistoryDetailPage = () => {
         onClose={() => setShowAuditModal(false)}
         novedadId={selectedNovedadId}
         employeeName={selectedEmployeeName}
+      />
+
+      {/* Voucher Preview Modal */}
+      <VoucherPreviewModal
+        isOpen={isVoucherModalOpen}
+        onClose={() => setIsVoucherModalOpen(false)}
+        employee={selectedVoucherEmployee}
+        period={period ? {
+          startDate: period.fecha_inicio,
+          endDate: period.fecha_fin,
+          type: period.tipo_periodo
+        } : null}
       />
     </div>
   );
