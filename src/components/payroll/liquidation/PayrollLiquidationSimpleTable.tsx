@@ -399,7 +399,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                     </div>
                   </TableCell>
                   
-                  <TableCell className="text-right bg-blue-100 font-bold text-lg">
+                  <TableCell className="text-right bg-blue-100 font-semibold text-blue-600">
                     {formatCurrency(totalToPay)}
                   </TableCell>
 
