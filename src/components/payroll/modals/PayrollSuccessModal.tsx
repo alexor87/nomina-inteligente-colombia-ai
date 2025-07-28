@@ -15,13 +15,15 @@ interface PayrollSuccessModalProps {
     type: string;
   };
   summary: PayrollSummary;
+  periodId?: string;
 }
 
 export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
   isOpen,
   onClose,
   periodData,
-  summary
+  summary,
+  periodId
 }) => {
   const navigate = useNavigate();
 
@@ -35,7 +37,7 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
 
   const handleGoToHistory = () => {
     onClose();
-    navigate('/app/payroll-history');
+    navigate(periodId ? `/app/payroll-history/${periodId}` : '/app/payroll-history');
   };
 
   return (

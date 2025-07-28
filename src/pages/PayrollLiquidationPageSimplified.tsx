@@ -134,7 +134,8 @@ const PayrollLiquidationPageSimplified = () => {
           endDate: selectedPeriod.endDate,
           type: 'mensual'
         },
-        summary
+        summary,
+        periodId: selectedPeriod.id
       });
       setShowSuccessModal(true);
       
@@ -162,7 +163,8 @@ const PayrollLiquidationPageSimplified = () => {
           endDate: selectedPeriod.endDate,
           type: 'mensual'
         },
-        summary
+        summary,
+        periodId: selectedPeriod.id
       });
       setShowSuccessModal(true);
       
@@ -444,6 +446,7 @@ const PayrollLiquidationPageSimplified = () => {
           onClose={handleSuccessModalClose}
           periodData={liquidationResult.periodData}
           summary={liquidationResult.summary}
+          periodId={liquidationResult.periodId}
         />
       )}
 
