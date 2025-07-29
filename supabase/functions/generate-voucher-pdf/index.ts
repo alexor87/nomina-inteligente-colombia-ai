@@ -143,7 +143,7 @@ endstream`);
   }
 
   private generateContentStream(employee: any, period: any, company: any, data: any): string {
-    console.log('✨ Generating premium aesthetic PDF...');
+    console.log('🎨 UX DESIGNER MODE: Creating pixel-perfect PDF...');
     
     const { salarioBase, diasTrabajados, salarioNeto, deducciones, 
             horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
@@ -163,541 +163,597 @@ endstream`);
       }).format(amount);
     };
 
-    // Premium PDF with refined aesthetics matching modal exactly
+    // Calculo del ancho del título para centrarlo perfectamente
+    const titleText = 'COMPROBANTE DE NÓMINA';
+    const titleWidth = titleText.length * 12; // Aproximación
+    const pageWidth = 612;
+    const titleX = (pageWidth - titleWidth) / 2;
+
+    // PREMIUM PDF - UX REPLICA 100% MODAL
     return `
-% ===== PREMIUM HEADER - Perfectly Centered =====
+% ============= PREMIUM HEADER - PERFECTAMENTE CENTRADO =============
+% Título principal centrado dinámicamente
 BT
-/F2 20 Tf
+/F2 22 Tf
 0.118 0.165 0.478 rg
-200 750 Td
-(${this.escapeText('COMPROBANTE DE NÓMINA')}) Tj
+${titleX} 750 Td
+(${this.escapeText(titleText)}) Tj
 ET
 
-% Period subtitle with elegant spacing
+% Subtítulo del período - elegante y sutil
 BT
-/F1 10 Tf
-0.4 0.4 0.4 rg
-50 720 Td
+/F1 12 Tf
+0.3 0.3 0.3 rg
+${titleX} 725 Td
 (${this.escapeText('Período: ' + fechaInicio + ' - ' + fechaFin)}) Tj
 ET
 
-% ===== REFINED INFORMATION CARDS - MODAL REPLICA =====
-
-% ===== CARD 1: EMPRESA - Premium Design =====
-% Card background with subtle shadow effect
-q
-0.953 0.969 0.988 rg
-50 640 200 90 re
-f
-Q
-
-% Blue left border (premium style)
+% Separador horizontal elegante
 q
 0.118 0.165 0.478 rg
-50 640 5 90 re
+50 710 512 1 re
 f
 Q
 
-% Company logo circle - Refined design
+% ============= INFORMACIÓN CARDS - DISEÑO MODAL EXACTO =============
+
+% CARD 1: EMPRESA - Diseño Premium con sombra
+q
+0.95 0.97 0.99 rg
+40 630 170 80 re
+f
+Q
+
+% Borde izquierdo azul distintivo
 q
 0.118 0.165 0.478 rg
-70 690 28 28 re
+40 630 4 80 re
 f
 Q
 
-% Company initial in white
+% Sombra sutil de la card
+q
+0.85 0.85 0.85 rg
+42 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+40 630 170 80 re
+f
+Q
+
+% Logo circular de empresa - profesional
+q
+0.118 0.165 0.478 rg
+55 680 24 24 re
+f
+Q
+
+% Inicial de empresa en blanco
 BT
-/F2 14 Tf
+/F2 12 Tf
 1 1 1 rg
-78 700 Td
+64 689 Td
 (${this.escapeText(companyInitial)}) Tj
 ET
 
-% Company section labels and info
+% Labels y datos de empresa
 BT
-/F2 10 Tf
+/F2 9 Tf
 0.118 0.165 0.478 rg
-108 705 Td
+88 695 Td
 (${this.escapeText('EMPRESA')}) Tj
 ET
 
 BT
-/F1 9 Tf
+/F1 8 Tf
 0.2 0.2 0.2 rg
-108 690 Td
-(${this.escapeText(companyName)}) Tj
+88 680 Td
+(${this.escapeText(companyName.length > 18 ? companyName.substring(0, 18) + '...' : companyName)}) Tj
 ET
 
 BT
-/F1 8 Tf
+/F1 7 Tf
 0.4 0.4 0.4 rg
-108 676 Td
+88 667 Td
 (${this.escapeText('NIT: ' + companyNit)}) Tj
 ET
 
-${companyAddress ? `
-BT
-/F1 8 Tf
-0.4 0.4 0.4 rg
-108 662 Td
-(${this.escapeText(companyAddress)}) Tj
-ET
-` : ''}
-
-% ===== CARD 2: EMPLEADO - Center Position =====
+% CARD 2: EMPLEADO - Centrada
 q
-0.953 0.969 0.988 rg
-270 640 200 90 re
+0.95 0.97 0.99 rg
+221 630 170 80 re
 f
 Q
 
 q
 0.118 0.165 0.478 rg
-270 640 5 90 re
+221 630 4 80 re
+f
+Q
+
+% Sombra
+q
+0.85 0.85 0.85 rg
+223 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+221 630 170 80 re
 f
 Q
 
 BT
-/F2 10 Tf
+/F2 9 Tf
 0.118 0.165 0.478 rg
-280 705 Td
+230 695 Td
 (${this.escapeText('EMPLEADO')}) Tj
 ET
 
 BT
-/F1 9 Tf
+/F1 8 Tf
 0.2 0.2 0.2 rg
-280 690 Td
-(${this.escapeText(employee.name || 'N/A')}) Tj
+230 680 Td
+(${this.escapeText((employee.name || 'N/A').length > 20 ? (employee.name || 'N/A').substring(0, 20) + '...' : (employee.name || 'N/A'))}) Tj
 ET
 
 BT
-/F1 8 Tf
+/F1 7 Tf
 0.4 0.4 0.4 rg
-280 676 Td
+230 667 Td
 (${this.escapeText('CC: ' + (employee.cedula || 'N/A'))}) Tj
 ET
 
-${employee.position ? `
 BT
-/F1 8 Tf
+/F1 7 Tf
 0.4 0.4 0.4 rg
-280 662 Td
-(${this.escapeText('Cargo: ' + employee.position)}) Tj
+230 654 Td
+(${this.escapeText('Cargo: ' + (employee.position || 'N/A'))}) Tj
 ET
-` : ''}
 
-% ===== CARD 3: PERÍODO - Right Position =====
+% CARD 3: PERÍODO - Derecha
 q
-0.953 0.969 0.988 rg
-490 640 200 90 re
+0.95 0.97 0.99 rg
+402 630 170 80 re
 f
 Q
 
 q
 0.118 0.165 0.478 rg
-490 640 5 90 re
+402 630 4 80 re
+f
+Q
+
+% Sombra
+q
+0.85 0.85 0.85 rg
+404 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+402 630 170 80 re
 f
 Q
 
 BT
-/F2 10 Tf
+/F2 9 Tf
 0.118 0.165 0.478 rg
-500 705 Td
+411 695 Td
 (${this.escapeText('PERÍODO')}) Tj
 ET
 
 BT
-/F1 9 Tf
+/F1 8 Tf
 0.2 0.2 0.2 rg
-500 690 Td
+411 680 Td
 (${this.escapeText('Desde: ' + fechaInicio)}) Tj
 ET
 
 BT
-/F1 8 Tf
+/F1 7 Tf
 0.4 0.4 0.4 rg
-500 676 Td
+411 667 Td
 (${this.escapeText('Hasta: ' + fechaFin)}) Tj
 ET
 
 BT
-/F1 8 Tf
+/F1 7 Tf
 0.4 0.4 0.4 rg
-500 662 Td
-(${this.escapeText('Días: ' + diasTrabajados)}) Tj
+411 654 Td
+(${this.escapeText('Días trabajados: ' + diasTrabajados)}) Tj
 ET
 
-% ===== MAIN PAYMENT TABLE - PREMIUM DESIGN =====
 BT
-/F2 16 Tf
+/F1 7 Tf
+0.4 0.4 0.4 rg
+411 641 Td
+(${this.escapeText('Salario base: ' + formatCurrency(salarioBase))}) Tj
+ET
+
+% ============= TABLA PRINCIPAL DE CONCEPTOS - MODAL EXACTO =============
+% Título de sección
+BT
+/F2 14 Tf
 0.118 0.165 0.478 rg
-50 600 Td
+40 600 Td
 (${this.escapeText('RESUMEN DEL PAGO')}) Tj
 ET
 
-% Table container with premium shadow
+% Contenedor de tabla con borde elegante
 q
 0.98 0.98 0.98 rg
-50 365 640 220 re
+40 320 532 260 re
 f
 Q
 
-% Table border - Professional style
+% Borde de tabla profesional
 q
-0.9 0.9 0.9 RG
+0.85 0.85 0.85 RG
 1 w
-50 365 640 220 re
+40 320 532 260 re
 S
 Q
 
-% Table header - Premium blue background
+% HEADER DE TABLA - Azul premium
 q
 0.118 0.165 0.478 rg
-50 560 640 25 re
+40 555 532 25 re
 f
 Q
 
-% Header text
+% Textos del header
 BT
-/F2 11 Tf
+/F2 10 Tf
 1 1 1 rg
-60 568 Td
+50 563 Td
 (${this.escapeText('CONCEPTO')}) Tj
 ET
 
 BT
-/F2 11 Tf
+/F2 10 Tf
 1 1 1 rg
-580 568 Td
+480 563 Td
 (${this.escapeText('VALOR')}) Tj
 ET
 
-% Table rows with alternating backgrounds
-% Basic Salary
+% ============= FILAS DE CONCEPTOS - TODAS LAS DEL MODAL =============`;
+
+    let yPos = 530;
+    let rowCount = 0;
+
+    // Función para crear una fila
+    const createRow = (concept: string, value: string, isHighlighted = false, bgColorOverride?: string) => {
+      const bgColor = bgColorOverride || (rowCount % 2 === 0 ? '0.98 0.98 0.98' : '1 1 1');
+      const textColor = isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2';
+      const fontType = isHighlighted ? '/F2' : '/F1';
+      
+      let row = `
+% Fila ${rowCount + 1}: ${concept}
 q
-0.988 0.988 0.988 rg
-50 535 640 25 re
+${bgColor} rg
+40 ${yPos} 532 25 re
 f
 Q
 
 q
 0.9 0.9 0.9 RG
 0.5 w
-50 535 640 25 re
+40 ${yPos} 532 25 re
 S
 Q
 
 BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-60 543 Td
-(${this.escapeText('Salario Base')}) Tj
+${fontType} 9 Tf
+${textColor} rg
+50 ${yPos + 8} Td
+(${this.escapeText(concept)}) Tj
 ET
 
 BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-580 543 Td
-(${this.escapeText(formatCurrency(salarioBase))}) Tj
-ET
-
-% Proportional Salary
-q
-1 1 1 rg
-50 510 640 25 re
-f
-Q
-
-q
-0.9 0.9 0.9 RG
-0.5 w
-50 510 640 25 re
-S
-Q
-
-BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-60 518 Td
-(${this.escapeText('Salario Proporcional (' + diasTrabajados + ' días)')}) Tj
-ET
-
-BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-580 518 Td
-(${this.escapeText(formatCurrency(salarioProporcional))}) Tj
+${fontType} 9 Tf
+${textColor} rg
+480 ${yPos + 8} Td
+(${this.escapeText(value)}) Tj
 ET`;
+      
+      yPos -= 25;
+      rowCount++;
+      return row;
+    };
 
-    let yPosition = 485;
-    let content = '';
-    let isAlternate = true;
+    let tableContent = '';
 
-    // Transport Allowance
+    // 1. Salario Base
+    tableContent += createRow('Salario Base', formatCurrency(salarioBase));
+
+    // 2. Salario Proporcional
+    tableContent += createRow(`Salario Proporcional (${diasTrabajados} días)`, formatCurrency(salarioProporcional));
+
+    // 3. Subsidio de Transporte (si > 0)
     if (subsidioTransporte > 0) {
-      const bgColor = isAlternate ? '0.988 0.988 0.988' : '1 1 1';
-      content += `
-q
-${bgColor} rg
-50 ${yPosition} 640 25 re
-f
-Q
-
-q
-0.9 0.9 0.9 RG
-0.5 w
-50 ${yPosition} 640 25 re
-S
-Q
-
-BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-60 ${yPosition + 8} Td
-(${this.escapeText('Subsidio de Transporte')}) Tj
-ET
-
-BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-580 ${yPosition + 8} Td
-(${this.escapeText(formatCurrency(subsidioTransporte))}) Tj
-ET`;
-      yPosition -= 25;
-      isAlternate = !isAlternate;
+      tableContent += createRow('Subsidio de Transporte', formatCurrency(subsidioTransporte));
     }
 
-    // Bonifications
+    // 4. Bonificaciones (si > 0)
     if (bonificaciones > 0) {
-      const bgColor = isAlternate ? '0.988 0.988 0.988' : '1 1 1';
-      content += `
-q
-${bgColor} rg
-50 ${yPosition} 640 25 re
-f
-Q
-
-q
-0.9 0.9 0.9 RG
-0.5 w
-50 ${yPosition} 640 25 re
-S
-Q
-
-BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-60 ${yPosition + 8} Td
-(${this.escapeText('Bonificaciones')}) Tj
-ET
-
-BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-580 ${yPosition + 8} Td
-(${this.escapeText(formatCurrency(bonificaciones))}) Tj
-ET`;
-      yPosition -= 25;
-      isAlternate = !isAlternate;
+      tableContent += createRow('Bonificaciones', formatCurrency(bonificaciones));
     }
 
-    // Extra Hours
+    // 5. Horas Extra (si > 0)
     if (totalHorasExtra > 0) {
-      const bgColor = isAlternate ? '0.988 0.988 0.988' : '1 1 1';
-      content += `
-q
-${bgColor} rg
-50 ${yPosition} 640 25 re
-f
-Q
-
-q
-0.9 0.9 0.9 RG
-0.5 w
-50 ${yPosition} 640 25 re
-S
-Q
-
-BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-60 ${yPosition + 8} Td
-(${this.escapeText('Horas Extras (' + horasExtra + ' hrs)')}) Tj
-ET
-
-BT
-/F1 10 Tf
-0.2 0.2 0.2 rg
-580 ${yPosition + 8} Td
-(${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
-ET`;
-      yPosition -= 25;
-      isAlternate = !isAlternate;
+      tableContent += createRow(`Horas Extra (${horasExtra} hrs x ${formatCurrency(valorHoraExtra)})`, formatCurrency(totalHorasExtra));
     }
 
-    // Deductions - Red styling
-    content += `
-q
-0.996 0.949 0.949 rg
-50 ${yPosition} 640 25 re
-f
-Q
+    // 6. Total Deducciones (rojo)
+    tableContent += createRow('Total Deducciones', '- ' + formatCurrency(totalDeduccionesCalculadas), false, '0.99 0.95 0.95');
 
-q
-0.9 0.9 0.9 RG
-0.5 w
-50 ${yPosition} 640 25 re
-S
-Q
+    // 7. NETO A PAGAR (verde destacado)
+    tableContent += createRow('NETO A PAGAR', formatCurrency(salarioNeto), true, '0.95 0.99 0.95');
 
-BT
-/F1 10 Tf
-0.796 0.196 0.196 rg
-60 ${yPosition + 8} Td
-(${this.escapeText('Total Deducciones')}) Tj
-ET
-
-BT
-/F1 10 Tf
-0.796 0.196 0.196 rg
-580 ${yPosition + 8} Td
-(${this.escapeText('-' + formatCurrency(deducciones))}) Tj
-ET`;
-
-    yPosition -= 25;
-
-    // Net Pay - Green styling with larger font
-    content += `
-q
-0.949 0.996 0.949 rg
-50 ${yPosition} 640 30 re
-f
-Q
-
-q
-0.9 0.9 0.9 RG
-0.5 w
-50 ${yPosition} 640 30 re
-S
-Q
-
-BT
-/F2 12 Tf
-0.196 0.698 0.196 rg
-60 ${yPosition + 10} Td
-(${this.escapeText('NETO A PAGAR')}) Tj
-ET
-
-BT
-/F2 12 Tf
-0.196 0.698 0.196 rg
-580 ${yPosition + 10} Td
-(${this.escapeText(formatCurrency(salarioNeto))}) Tj
-ET`;
-
-    yPosition -= 60;
-
-    // Extra Hours Detail Table (if applicable)
+    // ============= SECCIONES ADICIONALES (CONDICIONALES) =============
+    let extraSections = '';
+    let yPos2 = 280; // Position below main table
+    
+    // TABLA DE HORAS EXTRA (si aplica)
     if (totalHorasExtra > 0) {
-      content += `
+      extraSections += `
+
+% ============= DETALLE HORAS EXTRA =============
 BT
-/F2 14 Tf
+/F2 12 Tf
 0.118 0.165 0.478 rg
-50 ${yPosition} Td
-(${this.escapeText('DETALLE HORAS EXTRAS')}) Tj
+40 ${yPos2} Td
+(${this.escapeText('DETALLE HORAS EXTRA')}) Tj
 ET
 
-% Extra hours table
+% Container
 q
 0.98 0.98 0.98 rg
-50 ${yPosition - 70} 640 60 re
+40 ${yPos2 - 70} 532 60 re
 f
 Q
 
 q
-0.9 0.9 0.9 RG
+0.85 0.85 0.85 RG
 1 w
-50 ${yPosition - 70} 640 60 re
+40 ${yPos2 - 70} 532 60 re
 S
 Q
 
 % Header
 q
 0.118 0.165 0.478 rg
-50 ${yPosition - 25} 640 20 re
+40 ${yPos2 - 25} 532 20 re
 f
 Q
 
 BT
 /F2 9 Tf
 1 1 1 rg
-60 ${yPosition - 18} Td
+50 ${yPos2 - 18} Td
 (${this.escapeText('CONCEPTO')}) Tj
 ET
 
 BT
 /F2 9 Tf
 1 1 1 rg
-300 ${yPosition - 18} Td
+250 ${yPos2 - 18} Td
 (${this.escapeText('CANTIDAD')}) Tj
 ET
 
 BT
 /F2 9 Tf
 1 1 1 rg
-580 ${yPosition - 18} Td
+450 ${yPos2 - 18} Td
 (${this.escapeText('VALOR')}) Tj
 ET
 
-% Content
-BT
-/F1 9 Tf
-0.2 0.2 0.2 rg
-60 ${yPosition - 38} Td
-(${this.escapeText('Horas Extras')}) Tj
-ET
+% Content row
+q
+1 1 1 rg
+40 ${yPos2 - 45} 532 20 re
+f
+Q
 
 BT
-/F1 9 Tf
+/F1 8 Tf
 0.2 0.2 0.2 rg
-300 ${yPosition - 38} Td
-(${this.escapeText(horasExtra + ' horas × ' + formatCurrency(valorHoraExtra))}) Tj
-ET
-
-BT
-/F1 9 Tf
-0.2 0.2 0.2 rg
-580 ${yPosition - 38} Td
-(${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
-ET`;
-      yPosition -= 90;
-    }
-
-    // Professional Footer
-    content += `
-BT
-/F1 9 Tf
-0.4 0.4 0.4 rg
-50 ${yPosition} Td
-(${this.escapeText('Este documento constituye el comprobante oficial de pago de nómina según la legislación laboral vigente.')}) Tj
+50 ${yPos2 - 38} Td
+(${this.escapeText('Horas Extra')}) Tj
 ET
 
 BT
 /F1 8 Tf
+0.2 0.2 0.2 rg
+250 ${yPos2 - 38} Td
+(${this.escapeText(horasExtra + ' hrs × ' + formatCurrency(valorHoraExtra))}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+450 ${yPos2 - 38} Td
+(${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
+ET`;
+      yPos2 -= 85;
+    }
+
+    // SECCIÓN DE DEDUCCIONES DETALLADAS
+    extraSections += `
+
+% ============= DETALLE DEDUCCIONES =============
+BT
+/F2 12 Tf
+0.118 0.165 0.478 rg
+40 ${yPos2} Td
+(${this.escapeText('DETALLE DEDUCCIONES')}) Tj
+ET
+
+% Container
+q
+0.98 0.98 0.98 rg
+40 ${yPos2 - 100} 532 85 re
+f
+Q
+
+q
+0.85 0.85 0.85 RG
+1 w
+40 ${yPos2 - 100} 532 85 re
+S
+Q
+
+% Header
+q
+0.796 0.196 0.196 rg
+40 ${yPos2 - 25} 532 20 re
+f
+Q
+
+BT
+/F2 9 Tf
+1 1 1 rg
+50 ${yPos2 - 18} Td
+(${this.escapeText('CONCEPTO')}) Tj
+ET
+
+BT
+/F2 9 Tf
+1 1 1 rg
+250 ${yPos2 - 18} Td
+(${this.escapeText('PORCENTAJE')}) Tj
+ET
+
+BT
+/F2 9 Tf
+1 1 1 rg
+450 ${yPos2 - 18} Td
+(${this.escapeText('VALOR')}) Tj
+ET
+
+% Salud 4%
+q
+0.99 0.95 0.95 rg
+40 ${yPos2 - 45} 532 20 re
+f
+Q
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+50 ${yPos2 - 38} Td
+(${this.escapeText('Salud (EPS)')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+250 ${yPos2 - 38} Td
+(${this.escapeText('4.00%')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+450 ${yPos2 - 38} Td
+(${this.escapeText(formatCurrency(saludEmpleado))}) Tj
+ET
+
+% Pensión 4%
+q
+1 1 1 rg
+40 ${yPos2 - 65} 532 20 re
+f
+Q
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+50 ${yPos2 - 58} Td
+(${this.escapeText('Pensión (AFP)')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+250 ${yPos2 - 58} Td
+(${this.escapeText('4.00%')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+450 ${yPos2 - 58} Td
+(${this.escapeText(formatCurrency(pensionEmpleado))}) Tj
+ET
+
+% Total deducciones
+q
+0.99 0.95 0.95 rg
+40 ${yPos2 - 85} 532 20 re
+f
+Q
+
+BT
+/F2 9 Tf
+0.796 0.196 0.196 rg
+50 ${yPos2 - 78} Td
+(${this.escapeText('TOTAL DEDUCCIONES')}) Tj
+ET
+
+BT
+/F2 9 Tf
+0.796 0.196 0.196 rg
+450 ${yPos2 - 78} Td
+(${this.escapeText(formatCurrency(totalDeduccionesCalculadas))}) Tj
+ET`;
+
+    yPos2 -= 120;
+
+    // ============= FOOTER PROFESIONAL =============
+    extraSections += `
+
+% ============= FOOTER PROFESIONAL =============
+BT
+/F1 8 Tf
+0.4 0.4 0.4 rg
+40 ${yPos2} Td
+(${this.escapeText('Este documento constituye el comprobante oficial de pago de nómina según la legislación laboral colombiana vigente.')}) Tj
+ET
+
+BT
+/F1 7 Tf
 0.5 0.5 0.5 rg
-50 ${yPosition - 18} Td
+40 ${yPos2 - 15} Td
 (${this.escapeText('Documento generado automáticamente el ' + new Date().toLocaleDateString('es-CO') + ' a las ' + new Date().toLocaleTimeString('es-CO'))}) Tj
 ET
 
 BT
-/F1 8 Tf
+/F1 7 Tf
 0.5 0.5 0.5 rg
-50 ${yPosition - 33} Td
-(${this.escapeText('Para consultas contactar al departamento de recursos humanos.')}) Tj
+40 ${yPos2 - 28} Td
+(${this.escapeText('Para consultas contactar al departamento de recursos humanos de ' + companyName + '.')}) Tj
+ET
+
+% Logo/firma placeholder
+q
+0.9 0.9 0.9 RG
+1 w
+450 ${yPos2 - 50} 120 35 re
+S
+Q
+
+BT
+/F1 7 Tf
+0.6 0.6 0.6 rg
+470 ${yPos2 - 35} Td
+(${this.escapeText('Firma Autorizada')}) Tj
 ET`;
 
-    return content;
+    return tableContent + extraSections;
   }
 
   // KISS: Remove complex logo processing - causes failures
