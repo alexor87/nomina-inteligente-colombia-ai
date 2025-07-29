@@ -148,285 +148,425 @@ endstream`);
             salarioProporcional, totalHorasExtra, valorHoraExtra,
             saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas } = data;
 
-    const companyName = company?.razon_social || 'Mi Empresa S.A.S.';
-    const companyNit = company?.nit || '900123456-1';
-    const companyAddress = company?.direccion || 'Dirección no disponible';
-    const companyCity = company?.ciudad || 'Ciudad no disponible';
+    const companyName = company?.razon_social || 'Mi Empresa';
+    const companyNit = company?.nit || 'N/A';
+    const companyAddress = company?.direccion || '';
+    const companyCity = company?.ciudad || '';
+    const companyPhone = company?.telefono || '';
 
-    // KISS: Simple header without logo complexity
-    const companyTextPosition = 50;
-
+    // SYNCHRONIZED WITH MODAL: Replicate exact visual layout
     return `
+% ===== BLUE HEADER TITLE =====
 BT
-/F2 20 Tf
-50 750 Td
-(${this.escapeText('COMPROBANTE DE NOMINA')}) Tj
+/F2 18 Tf
+0.12 0.31 0.75 rg
+220 750 Td
+(${this.escapeText('Comprobante de Nómina')}) Tj
 ET
 
+% ===== CARD 1: EMPRESA (Replicating modal card layout) =====
+% Card background (gray)
+0.94 0.94 0.94 rg
+50 650 180 80 re f
+% Left blue border
+0.12 0.31 0.75 rg
+50 650 4 80 re f
+
+% Company logo circle (blue background with white letter)
+0.12 0.31 0.75 rg
+70 700 30 30 re f
 BT
-/F2 12 Tf
-${companyTextPosition} 710 Td
-(${this.escapeText('EMPRESA:')}) Tj
+/F2 16 Tf
+1 1 1 rg
+80 710 Td
+(${this.escapeText((companyName).charAt(0))}) Tj
 ET
 
+% EMPRESA label (same as modal)
 BT
-/F1 11 Tf
-${companyTextPosition} 695 Td
+/F2 8 Tf
+0.4 0.4 0.4 rg
+55 685 Td
+(${this.escapeText('EMPRESA')}) Tj
+ET
+
+% Company name and details
+BT
+/F2 10 Tf
+0 0 0 rg
+55 670 Td
 (${this.escapeText(companyName)}) Tj
 ET
 
 BT
-/F1 10 Tf
-${companyTextPosition} 680 Td
+/F1 8 Tf
+0.3 0.3 0.3 rg
+55 657 Td
 (${this.escapeText('NIT: ' + companyNit)}) Tj
 ET
 
+${companyAddress ? `
 BT
-/F1 10 Tf
-${companyTextPosition} 665 Td
-(${this.escapeText(companyAddress + ' - ' + companyCity)}) Tj
+/F1 8 Tf
+0.3 0.3 0.3 rg
+55 644 Td
+(${this.escapeText('Dirección: ' + companyAddress)}) Tj
+ET
+` : ''}
+
+% ===== CARD 2: EMPLEADO (Center card) =====
+% Card background
+0.94 0.94 0.94 rg
+250 650 180 80 re f
+% Left blue border  
+0.12 0.31 0.75 rg
+250 650 4 80 re f
+
+% EMPLEADO label
+BT
+/F2 8 Tf
+0.4 0.4 0.4 rg
+255 715 Td
+(${this.escapeText('EMPLEADO')}) Tj
 ET
 
+% Employee details
 BT
-/F2 12 Tf
-300 710 Td
-(${this.escapeText('EMPLEADO:')}) Tj
-ET
-
-BT
-/F1 11 Tf
-300 695 Td
+/F2 10 Tf
+0 0 0 rg
+255 700 Td
 (${this.escapeText(employee.name || 'N/A')}) Tj
 ET
 
 BT
-/F1 10 Tf
-300 680 Td
-(${this.escapeText('CC: ' + (employee.cedula || employee.id?.slice(0, 8) || 'N/A'))}) Tj
+/F1 8 Tf
+0.3 0.3 0.3 rg
+255 687 Td
+(${this.escapeText('CC: ' + (employee.cedula || 'N/A'))}) Tj
 ET
 
+${employee.position ? `
 BT
-/F1 10 Tf
-300 665 Td
-(${this.escapeText('Cargo: ' + (employee.position || 'N/A'))}) Tj
+/F1 8 Tf
+0.3 0.3 0.3 rg
+255 674 Td
+(${this.escapeText('Cargo: ' + employee.position)}) Tj
+ET
+` : ''}
+
+% ===== CARD 3: PERÍODO (Right card) =====
+% Card background
+0.94 0.94 0.94 rg
+450 650 180 80 re f
+% Left blue border
+0.12 0.31 0.75 rg
+450 650 4 80 re f
+
+% PERÍODO label
+BT
+/F2 8 Tf
+0.4 0.4 0.4 rg
+455 715 Td
+(${this.escapeText('PERÍODO DE PAGO')}) Tj
 ET
 
+% Period details
 BT
-/F2 12 Tf
-450 710 Td
-(${this.escapeText('PERIODO:')}) Tj
-ET
-
-BT
-/F1 11 Tf
-450 695 Td
+/F2 10 Tf
+0 0 0 rg
+455 700 Td
 (${this.escapeText(fechaInicio + ' - ' + fechaFin)}) Tj
 ET
 
 BT
-/F1 10 Tf
-450 680 Td
-(${this.escapeText('Dias: ' + diasTrabajados)}) Tj
+/F1 8 Tf
+0.3 0.3 0.3 rg
+455 687 Td
+(${this.escapeText('Días trabajados: ' + diasTrabajados)}) Tj
 ET
 
 BT
-/F1 10 Tf
-450 665 Td
-(${this.escapeText('Tipo: ' + (period.type || 'mensual'))}) Tj
+/F1 8 Tf
+0.3 0.3 0.3 rg
+455 674 Td
+(${this.escapeText('Salario Base: ' + this.formatCurrency(salarioBase))}) Tj
 ET
 
-50 645 m
-550 645 l
-S
-
+% ===== PAYMENT SUMMARY TABLE (Exact replica of modal table) =====
 BT
-/F2 16 Tf
-50 615 Td
-(${this.escapeText('RESUMEN DEL PAGO')}) Tj
+/F2 14 Tf
+0.12 0.31 0.75 rg
+50 600 Td
+(${this.escapeText('💵 Resumen del Pago')}) Tj
+ET
+
+% Main table background (white with border)
+1 1 1 rg
+50 380 540 210 re f
+% Table border
+0.8 0.8 0.8 RG
+0.5 w
+50 380 540 210 re S
+
+% Table header background (gray)
+0.96 0.96 0.96 rg
+50 570 540 20 re f
+
+% Header border
+0.8 0.8 0.8 RG
+0.3 w
+50 570 540 20 re S
+
+% Table headers
+BT
+/F2 9 Tf
+0.3 0.3 0.3 rg
+55 576 Td
+(${this.escapeText('Concepto')}) Tj
 ET
 
 BT
-/F2 12 Tf
-50 585 Td
-(${this.escapeText('DEVENGADOS')}) Tj
+/F2 9 Tf
+0.3 0.3 0.3 rg
+500 576 Td
+(${this.escapeText('Valor')}) Tj
+ET
+
+% Table rows with borders (same structure as modal)
+q
+0.8 0.8 0.8 RG
+0.2 w
+% Row borders
+50 550 540 0 m S
+50 530 540 0 m S  
+50 510 540 0 m S
+50 490 540 0 m S
+${subsidioTransporte > 0 ? '50 470 540 0 m S' : ''}
+${bonificaciones > 0 ? '50 450 540 0 m S' : ''}
+${totalHorasExtra > 0 ? '50 430 540 0 m S' : ''}
+50 410 540 0 m S
+50 390 540 0 m S
+Q
+
+% Table content (matching modal exactly)
+BT
+/F1 9 Tf
+0 0 0 rg
+55 555 Td
+(${this.escapeText('Salario Base')}) Tj
 ET
 
 BT
-/F1 10 Tf
-50 565 Td
-(${this.escapeText('Salario Base:')}) Tj
-ET
-
-BT
-/F1 10 Tf
-400 565 Td
+/F1 9 Tf
+0 0 0 rg
+520 555 Td
 (${this.escapeText(this.formatCurrency(salarioBase))}) Tj
 ET
 
 BT
-/F1 10 Tf
-50 545 Td
-(${this.escapeText('Dias Trabajados: ' + diasTrabajados + ' dias')}) Tj
+/F1 9 Tf
+0 0 0 rg
+55 535 Td
+(${this.escapeText('Días Trabajados')}) Tj
 ET
 
 BT
-/F1 10 Tf
-50 525 Td
-(${this.escapeText('Salario Proporcional:')}) Tj
+/F1 9 Tf
+0 0 0 rg
+520 535 Td
+(${this.escapeText(diasTrabajados + ' días')}) Tj
 ET
 
 BT
-/F1 10 Tf
-400 525 Td
+/F1 9 Tf
+0 0 0 rg
+55 515 Td
+(${this.escapeText('Salario Proporcional')}) Tj
+ET
+
+BT
+/F1 9 Tf
+0 0 0 rg
+520 515 Td
 (${this.escapeText(this.formatCurrency(salarioProporcional))}) Tj
 ET
 
 ${subsidioTransporte > 0 ? `
 BT
-/F1 10 Tf
-50 505 Td
-(${this.escapeText('Subsidio Transporte:')}) Tj
+/F1 9 Tf
+0 0 0 rg
+55 495 Td
+(${this.escapeText('Subsidio de Transporte')}) Tj
 ET
 
 BT
-/F1 10 Tf
-400 505 Td
+/F1 9 Tf
+0 0 0 rg
+520 495 Td
 (${this.escapeText(this.formatCurrency(subsidioTransporte))}) Tj
 ET
 ` : ''}
 
 ${bonificaciones > 0 ? `
 BT
-/F1 10 Tf
-50 485 Td
-(${this.escapeText('Bonificaciones:')}) Tj
+/F1 9 Tf
+0 0 0 rg
+55 475 Td
+(${this.escapeText('Bonificaciones')}) Tj
 ET
 
 BT
-/F1 10 Tf
-400 485 Td
+/F1 9 Tf
+0 0 0 rg
+520 475 Td
 (${this.escapeText(this.formatCurrency(bonificaciones))}) Tj
 ET
 ` : ''}
 
-${horasExtra > 0 ? `
+${totalHorasExtra > 0 ? `
 BT
-/F1 10 Tf
-50 465 Td
-(${this.escapeText('Horas Extra (' + horasExtra + ' hrs):')}) Tj
+/F1 9 Tf
+0 0 0 rg
+55 455 Td
+(${this.escapeText('Horas Extras (' + horasExtra + ' hrs)')}) Tj
 ET
 
 BT
-/F1 10 Tf
-400 465 Td
+/F1 9 Tf
+0 0 0 rg
+520 455 Td
 (${this.escapeText(this.formatCurrency(totalHorasExtra))}) Tj
-ET
-
-BT
-/F1 10 Tf
-50 445 Td
-(${this.escapeText('Valor por hora: ' + this.formatCurrency(valorHoraExtra))}) Tj
 ET
 ` : ''}
 
-BT
-/F2 12 Tf
-50 435 Td
-(${this.escapeText('RETENCIONES')}) Tj
-ET
+% Deductions row (red background like modal)
+1 0.94 0.94 rg
+50 410 540 20 re f
 
-${deducciones > 0 ? `
 BT
-/F1 10 Tf
-1 0 0 rg
-50 415 Td
-(${this.escapeText('Salud (4%):')}) Tj
+/F2 9 Tf
+0.8 0.2 0.2 rg
+55 415 Td
+(${this.escapeText('Total Deducciones')}) Tj
 ET
 
 BT
-/F1 10 Tf
-1 0 0 rg
-400 415 Td
-(${this.escapeText('-' + this.formatCurrency(saludEmpleado))}) Tj
-ET
-
-BT
-/F1 10 Tf
-1 0 0 rg
-50 395 Td
-(${this.escapeText('Pension (4%):')}) Tj
-ET
-
-BT
-/F1 10 Tf
-1 0 0 rg
-400 395 Td
-(${this.escapeText('-' + this.formatCurrency(pensionEmpleado))}) Tj
-ET
-
-BT
-/F1 10 Tf
-1 0 0 rg
-50 375 Td
-(${this.escapeText('Total Deducciones:')}) Tj
-ET
-
-BT
-/F1 10 Tf
-1 0 0 rg
-400 375 Td
+/F2 9 Tf
+0.8 0.2 0.2 rg
+520 415 Td
 (${this.escapeText('-' + this.formatCurrency(deducciones))}) Tj
 ET
 
-0 0 0 rg
-` : ''}
-
-50 355 m
-550 355 l
-S
+% Net pay row (green background like modal)
+0.94 1 0.94 rg
+50 390 540 20 re f
 
 BT
-/F2 18 Tf
-0 0.6 0 rg
-50 325 Td
-(${this.escapeText('NETO A PAGAR:')}) Tj
+/F2 10 Tf
+0.2 0.6 0.2 rg
+55 395 Td
+(${this.escapeText('NETO A PAGAR')}) Tj
 ET
 
 BT
-/F2 18 Tf
-0 0.6 0 rg
-350 325 Td
+/F2 10 Tf
+0.2 0.6 0.2 rg
+520 395 Td
 (${this.escapeText(this.formatCurrency(salarioNeto))}) Tj
 ET
 
+${totalHorasExtra > 0 ? `
+% ===== EXTRA HOURS TABLE (Same as modal) =====
+BT
+/F2 14 Tf
+0.12 0.31 0.75 rg
+50 340 Td
+(${this.escapeText('⏱ Horas Extras, Ordinarias y Recargos')}) Tj
+ET
+
+% Extra hours table background
+1 1 1 rg
+50 250 540 80 re f
+0.8 0.8 0.8 RG
+0.5 w
+50 250 540 80 re S
+
+% Extra hours header
+0.96 0.96 0.96 rg
+50 310 540 20 re f
+
+BT
+/F2 9 Tf
+0.3 0.3 0.3 rg
+55 316 Td
+(${this.escapeText('Concepto')}) Tj
+ET
+
+BT
+/F2 9 Tf
+0.3 0.3 0.3 rg
+280 316 Td
+(${this.escapeText('Cantidad')}) Tj
+ET
+
+BT
+/F2 9 Tf
+0.3 0.3 0.3 rg
+500 316 Td
+(${this.escapeText('Valor')}) Tj
+ET
+
+% Extra hours row border
+q
+0.8 0.8 0.8 RG
+0.2 w
+50 310 540 0 m S
+50 290 540 0 m S
+Q
+
+% Extra hours content
+BT
+/F1 9 Tf
 0 0 0 rg
-
-50 300 m
-550 300 l
-S
+55 295 Td
+(${this.escapeText('Horas Extra (' + horasExtra + ' hrs)')}) Tj
+ET
 
 BT
+/F1 9 Tf
+0 0 0 rg
+280 295 Td
+(${this.escapeText('Valor por hora: ' + this.formatCurrency(valorHoraExtra))}) Tj
+ET
+
+BT
+/F1 9 Tf
+0 0 0 rg
+520 295 Td
+(${this.escapeText(this.formatCurrency(totalHorasExtra))}) Tj
+ET
+` : ''}
+
+% Footer (legal text)
+BT
 /F1 8 Tf
+0.4 0.4 0.4 rg
 50 150 Td
-(${this.escapeText('Este comprobante se genera electronicamente y tiene validez legal.')}) Tj
+(${this.escapeText('Este comprobante se genera electrónicamente y tiene validez legal.')}) Tj
 ET
 
 BT
 /F1 8 Tf
+0.4 0.4 0.4 rg
 50 135 Td
-(${this.escapeText('Generado con Finppi - Sistema de Nomina Profesional')}) Tj
+(${this.escapeText('Generado con Finppi - Sistema de Nómina Profesional')}) Tj
 ET
 
 BT
 /F1 8 Tf
+0.4 0.4 0.4 rg
 50 120 Td
-(${this.escapeText('Fecha de generacion: ' + new Date().toLocaleDateString('es-CO'))}) Tj
-ET
-
-BT
-/F1 8 Tf
-50 105 Td
-(${this.escapeText('Hora de generacion: ' + new Date().toLocaleTimeString('es-CO'))}) Tj
+(${this.escapeText('Fecha: ' + new Date().toLocaleDateString('es-CO') + ' - Hora: ' + new Date().toLocaleTimeString('es-CO'))}) Tj
 ET`;
   }
 
