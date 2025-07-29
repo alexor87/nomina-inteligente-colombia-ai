@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload } from 'lucide-react';
+import { Upload, X, Eye } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { useLogoUpload } from '@/hooks/useLogoUpload';
+import { useCompanyDetails } from '@/hooks/useCompanyDetails';
 
 interface GeneralInfoSectionProps {
   companyData: any;
@@ -12,6 +15,28 @@ interface GeneralInfoSectionProps {
 }
 
 export const GeneralInfoSection = ({ companyData, onInputChange }: GeneralInfoSectionProps) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const { uploadLogo, uploading } = useLogoUpload();
+  const { companyDetails } = useCompanyDetails();
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !companyDetails?.id) return;
+
+    const logoUrl = await uploadLogo(file, companyDetails.id);
+    if (logoUrl) {
+      onInputChange('logo_url', logoUrl);
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveLogo = () => {
+    onInputChange('logo_url', '');
+  };
   return (
     <Card className="p-6">
       <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
@@ -93,16 +118,67 @@ export const GeneralInfoSection = ({ companyData, onInputChange }: GeneralInfoSe
 
         <div className="md:col-span-2">
           <Label htmlFor="logo_url">Logo de la empresa</Label>
-          <div className="flex gap-2">
-            <Input
-              id="logo_url"
-              value={companyData.logo_url}
-              onChange={(e) => onInputChange('logo_url', e.target.value)}
-              placeholder="URL del logo o subir archivo"
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                id="logo_url"
+                value={companyData.logo_url || ''}
+                onChange={(e) => onInputChange('logo_url', e.target.value)}
+                placeholder="URL del logo"
+              />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleUploadClick}
+                disabled={uploading}
+              >
+                <Upload className="h-4 w-4" />
+                {uploading ? 'Subiendo...' : 'Subir'}
+              </Button>
+              {companyData.logo_url && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPreview(!showPreview)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemoveLogo}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+            
+            {/* Logo Preview */}
+            {companyData.logo_url && showPreview && (
+              <div className="p-4 border rounded-lg bg-gray-50">
+                <p className="text-sm text-gray-600 mb-2">Vista previa del logo:</p>
+                <img
+                  src={companyData.logo_url}
+                  alt="Logo de la empresa"
+                  className="max-h-24 max-w-48 object-contain"
+                  onError={(e) => {
+                    console.error('Error loading logo image');
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
             />
-            <Button variant="outline" size="sm">
-              <Upload className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>

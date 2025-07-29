@@ -48,7 +48,22 @@ export class CompanyConfigurationService {
     try {
       const { data: company, error } = await supabase
         .from('companies')
-        .select('*')
+        .select(`
+          id,
+          nit,
+          razon_social,
+          email,
+          telefono,
+          direccion,
+          ciudad,
+          representante_legal,
+          actividad_economica,
+          plan,
+          estado,
+          logo_url,
+          created_at,
+          updated_at
+        `)
         .eq('id', companyId)
         .single();
 
@@ -59,6 +74,25 @@ export class CompanyConfigurationService {
     } catch (error) {
       console.error('Error loading company data:', error);
       return null;
+    }
+  }
+
+  static async updateCompanyData(companyId: string, data: any) {
+    try {
+      const { data: company, error } = await supabase
+        .from('companies')
+        .update(data)
+        .eq('id', companyId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('Empresa actualizada:', company);
+      return company;
+    } catch (error) {
+      console.error('Error updating company data:', error);
+      throw error;
     }
   }
 

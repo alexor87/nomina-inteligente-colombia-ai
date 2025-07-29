@@ -38,6 +38,7 @@ interface CompanyData {
   nombre_ciiu: string;
   clase_riesgo_arl: string;
   tamano_empresa: string;
+  actividad_economica: string;
 }
 
 export const useCompanySettings = () => {
@@ -77,7 +78,8 @@ export const useCompanySettings = () => {
     codigo_ciiu: '',
     nombre_ciiu: '',
     clase_riesgo_arl: '',
-    tamano_empresa: ''
+    tamano_empresa: '',
+    actividad_economica: ''
   });
 
   const loadCompanyData = async () => {
@@ -93,7 +95,10 @@ export const useCompanySettings = () => {
             email: company.email || '',
             telefono: company.telefono || '',
             direccion: company.direccion || '',
-            ciudad: company.ciudad || ''
+            ciudad: company.ciudad || '',
+            representante_legal: company.representante_legal || '',
+            actividad_economica: company.actividad_economica || '',
+            logo_url: company.logo_url || ''
           }));
         }
 
@@ -145,9 +150,27 @@ export const useCompanySettings = () => {
         return;
       }
 
+      // Update company basic data including logo
+      await CompanyConfigurationService.updateCompanyData(companyId, {
+        razon_social: companyData.razon_social,
+        nit: companyData.nit,
+        email: companyData.email,
+        telefono: companyData.telefono,
+        direccion: companyData.direccion,
+        ciudad: companyData.ciudad,
+        representante_legal: companyData.representante_legal,
+        actividad_economica: companyData.actividad_economica,
+        logo_url: companyData.logo_url
+      });
+
+      // Update company settings (periodicity)
       await CompanyConfigurationService.saveCompanyConfiguration(companyId, companyData.periodicidad);
 
       console.log('✅ Configuración guardada exitosamente');
+      toast({
+        title: "✅ Configuración guardada",
+        description: "Los datos de la empresa han sido actualizados exitosamente",
+      });
     } catch (error) {
       console.error('Error saving configuration:', error);
       toast({

@@ -130,6 +130,7 @@ export type Database = {
           email: string
           estado: string | null
           id: string
+          logo_url: string | null
           nit: string
           plan: string | null
           razon_social: string
@@ -145,6 +146,7 @@ export type Database = {
           email: string
           estado?: string | null
           id?: string
+          logo_url?: string | null
           nit: string
           plan?: string | null
           razon_social: string
@@ -160,6 +162,7 @@ export type Database = {
           email?: string
           estado?: string | null
           id?: string
+          logo_url?: string | null
           nit?: string
           plan?: string | null
           razon_social?: string
