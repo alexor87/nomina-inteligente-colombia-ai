@@ -248,7 +248,7 @@ S
 BT
 /F2 16 Tf
 50 615 Td
-(${this.escapeText('DETALLE DE LIQUIDACION')}) Tj
+(${this.escapeText('RESUMEN DEL PAGO')}) Tj
 ET
 
 BT
@@ -269,16 +269,34 @@ BT
 (${this.escapeText(this.formatCurrency(salarioBase))}) Tj
 ET
 
-${subsidioTransporte > 0 ? `
 BT
 /F1 10 Tf
 50 545 Td
+(${this.escapeText('Dias Trabajados: ' + diasTrabajados + ' dias')}) Tj
+ET
+
+BT
+/F1 10 Tf
+50 525 Td
+(${this.escapeText('Salario Proporcional:')}) Tj
+ET
+
+BT
+/F1 10 Tf
+400 525 Td
+(${this.escapeText(this.formatCurrency(Math.round((salarioBase * diasTrabajados) / 30)))}) Tj
+ET
+
+${subsidioTransporte > 0 ? `
+BT
+/F1 10 Tf
+50 505 Td
 (${this.escapeText('Subsidio Transporte:')}) Tj
 ET
 
 BT
 /F1 10 Tf
-400 545 Td
+400 505 Td
 (${this.escapeText(this.formatCurrency(subsidioTransporte))}) Tj
 ET
 ` : ''}
@@ -286,13 +304,13 @@ ET
 ${bonificaciones > 0 ? `
 BT
 /F1 10 Tf
-50 525 Td
+50 485 Td
 (${this.escapeText('Bonificaciones:')}) Tj
 ET
 
 BT
 /F1 10 Tf
-400 525 Td
+400 485 Td
 (${this.escapeText(this.formatCurrency(bonificaciones))}) Tj
 ET
 ` : ''}
@@ -300,21 +318,21 @@ ET
 ${horasExtra > 0 ? `
 BT
 /F1 10 Tf
-50 505 Td
+50 465 Td
 (${this.escapeText('Horas Extra (' + horasExtra + ' hrs):')}) Tj
 ET
 
 BT
 /F1 10 Tf
-400 505 Td
+400 465 Td
 (${this.escapeText(this.formatCurrency(horasExtra * Math.round((salarioBase / 240) * 1.25)))}) Tj
 ET
 ` : ''}
 
 BT
 /F2 12 Tf
-50 475 Td
-(${this.escapeText('DEDUCCIONES')}) Tj
+50 435 Td
+(${this.escapeText('RETENCIONES')}) Tj
 ET
 
 ${deducciones > 0 ? `

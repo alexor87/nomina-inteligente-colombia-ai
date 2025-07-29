@@ -242,14 +242,26 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     }
   };
 
-  // Cálculos detallados usando valores exactos de la liquidación
-  const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
-  const saludEmpleado = employee.healthDeduction || 0;
-  const pensionEmpleado = employee.pensionDeduction || 0;
-  const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0;
-  const otrasDeduccionesCalculadas = Math.max(0, employee.deductions - saludEmpleado - pensionEmpleado - fondoSolidaridad);
-  const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25);
-  const totalHorasExtra = employee.extraHours * valorHoraExtra;
+  // Synchronized calculations with PDF generator
+  const salarioBase = Number(employee.baseSalary) || 0;
+  const diasTrabajados = Number(employee.workedDays) || 30;
+  const salarioNeto = Number(employee.netPay) || 0;
+  const deducciones = Number(employee.deductions) || 0;
+  const horasExtra = Number(employee.extraHours) || 0;
+  const bonificaciones = Number(employee.bonuses) || 0;
+  const subsidioTransporte = Number(employee.transportAllowance) || 0;
+  
+  // Proportional salary calculation (same as PDF)
+  const salarioProporcional = Math.round((salarioBase * diasTrabajados) / 30);
+  
+  // Extra hours calculation (same as PDF)
+  const valorHoraExtra = Math.round((salarioBase / 240) * 1.25);
+  const totalHorasExtra = horasExtra > 0 ? horasExtra * valorHoraExtra : 0;
+  
+  // Deductions calculation (same as PDF)
+  const saludEmpleado = Math.round(salarioBase * 0.04);
+  const pensionEmpleado = Math.round(salarioBase * 0.04);
+  const totalDeduccionesCalculadas = saludEmpleado + pensionEmpleado;
 
   return (
     <CustomModal 
@@ -351,36 +363,42 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
               </thead>
               <tbody className="divide-y divide-gray-200">
                 <tr>
+                  <td className="px-4 py-3 text-sm text-gray-900">Salario Base</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(salarioBase)}</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 text-sm text-gray-900">Días Trabajados</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{diasTrabajados} días</td>
+                </tr>
+                <tr>
                   <td className="px-4 py-3 text-sm text-gray-900">Salario Proporcional</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(salarioProporcional)}</td>
                 </tr>
-                {employee.transportAllowance > 0 && (
+                {subsidioTransporte > 0 && (
                   <tr>
                     <td className="px-4 py-3 text-sm text-gray-900">Subsidio de Transporte</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(employee.transportAllowance)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(subsidioTransporte)}</td>
                   </tr>
                 )}
-                {employee.bonuses > 0 && (
+                {bonificaciones > 0 && (
                   <tr>
                     <td className="px-4 py-3 text-sm text-gray-900">Bonificaciones</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(employee.bonuses)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(bonificaciones)}</td>
                   </tr>
                 )}
                 {totalHorasExtra > 0 && (
                   <tr>
-                    <td className="px-4 py-3 text-sm text-gray-900">Horas Extras y Recargos</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">Horas Extras ({horasExtra} hrs)</td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(totalHorasExtra)}</td>
                   </tr>
                 )}
-                {employee.deductions > 0 && (
-                  <tr>
-                    <td className="px-4 py-3 text-sm text-red-600">Deducciones</td>
-                    <td className="px-4 py-3 text-sm text-red-600 text-right">-{formatCurrency(employee.deductions)}</td>
-                  </tr>
-                )}
-                <tr className="bg-blue-50">
-                  <td className="px-4 py-3 text-sm font-semibold text-blue-800">Total Neto a Pagar</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-blue-800 text-right">{formatCurrency(employee.netPay)}</td>
+                <tr className="bg-red-50">
+                  <td className="px-4 py-3 text-sm font-semibold text-red-700">Total Deducciones</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-red-700 text-right">-{formatCurrency(deducciones)}</td>
+                </tr>
+                <tr className="bg-green-50">
+                  <td className="px-4 py-3 text-sm font-semibold text-green-700">NETO A PAGAR</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-green-700 text-right">{formatCurrency(salarioNeto)}</td>
                 </tr>
               </tbody>
             </table>
@@ -404,8 +422,8 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   <tr>
-                    <td className="px-4 py-3 text-sm text-gray-900">Hora Extra Ordinaria</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{employee.extraHours} horas</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">Horas Extra ({horasExtra} hrs)</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-center">Valor por hora: {formatCurrency(valorHoraExtra)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(totalHorasExtra)}</td>
                   </tr>
                   <tr className="bg-blue-50">
@@ -445,20 +463,6 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
                       <td className="px-4 py-3 text-sm text-gray-900">Pensión</td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-center">4%</td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(pensionEmpleado)}</td>
-                    </tr>
-                  )}
-                  {fondoSolidaridad > 0 && (
-                    <tr>
-                      <td className="px-4 py-3 text-sm text-gray-900">Fondo de Solidaridad</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-center">1%</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(fondoSolidaridad)}</td>
-                    </tr>
-                  )}
-                  {otrasDeduccionesCalculadas > 0 && (
-                    <tr>
-                      <td className="px-4 py-3 text-sm text-gray-900">Otros</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-center">-</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(otrasDeduccionesCalculadas)}</td>
                     </tr>
                   )}
                   <tr className="bg-blue-50">
