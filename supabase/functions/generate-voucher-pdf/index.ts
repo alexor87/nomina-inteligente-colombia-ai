@@ -49,7 +49,7 @@ class NativePDFGenerator {
   async generateVoucher(employee: any, period: any, company: any): Promise<Uint8Array> {
     console.log('🔧 Generando PDF para:', employee.name);
 
-    // Calculated data
+    // SYNCHRONIZED CALCULATIONS (same as modal)
     const salarioBase = Number(employee.baseSalary) || 0;
     const diasTrabajados = Number(employee.workedDays) || 30;
     const salarioNeto = Number(employee.netPay) || 0;
@@ -57,23 +57,29 @@ class NativePDFGenerator {
     const horasExtra = Number(employee.extraHours) || 0;
     const bonificaciones = Number(employee.bonuses) || 0;
     const subsidioTransporte = Number(employee.transportAllowance) || 0;
+    
+    // Proportional salary calculation (same as modal)
+    const salarioProporcional = Math.round((salarioBase * diasTrabajados) / 30);
+    
+    // Extra hours calculation (same as modal)
+    const valorHoraExtra = Math.round((salarioBase / 240) * 1.25);
+    const totalHorasExtra = horasExtra > 0 ? horasExtra * valorHoraExtra : 0;
+    
+    // Deductions calculation (same as modal)
+    const saludEmpleado = Math.round(salarioBase * 0.04);
+    const pensionEmpleado = Math.round(salarioBase * 0.04);
+    const totalDeduccionesCalculadas = saludEmpleado + pensionEmpleado;
 
     const fechaInicio = this.formatDate(period.startDate);
     const fechaFin = this.formatDate(period.endDate);
 
-    // Process logo with improved error handling
-    let logoImageObject = null;
-    if (company?.logo_url) {
-      try {
-        logoImageObject = await this.processCompanyLogo(company.logo_url);
-        if (logoImageObject) {
-          console.log('✅ Logo procesado correctamente');
-        }
-      } catch (error) {
-        console.warn('⚠️ Error procesando logo, continuando sin logo:', error.message);
-        logoImageObject = null;
-      }
-    }
+    console.log('📊 Valores calculados sincronizados:');
+    console.log('- Salario proporcional:', salarioProporcional);
+    console.log('- Total horas extra:', totalHorasExtra);
+    console.log('- Deducciones calculadas:', totalDeduccionesCalculadas);
+
+    // KISS: Remove logo processing for reliability
+    console.log('📋 KISS: Generando PDF sin logo para máxima confiabilidad');
 
     // Create fonts first (objects 1 and 2)
     const fontRegularId = this.addObject(`<<
@@ -88,17 +94,14 @@ class NativePDFGenerator {
 /BaseFont /Helvetica-Bold
 >>`);
 
-    // Add logo if exists
-    let logoObjectId = null;
-    if (logoImageObject) {
-      logoObjectId = this.addObject(logoImageObject);
-    }
-
-    // Create content stream
+    // KISS: No logo processing - simple and reliable
+    
+    // Create content stream with synchronized data
     const contentStream = this.generateContentStream(employee, period, company, {
       salarioBase, diasTrabajados, salarioNeto, deducciones,
       horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
-      logoObjectId
+      salarioProporcional, totalHorasExtra, valorHoraExtra,
+      saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas
     });
 
     const contentStreamId = this.addObject(`<<
@@ -119,7 +122,6 @@ endstream`);
     /F1 ${fontRegularId} 0 R
     /F2 ${fontBoldId} 0 R
   >>
-  ${logoObjectId ? `/XObject <</Logo ${logoObjectId} 0 R>>` : ''}
 >>
 >>`);
 
@@ -142,27 +144,19 @@ endstream`);
 
   private generateContentStream(employee: any, period: any, company: any, data: any): string {
     const { salarioBase, diasTrabajados, salarioNeto, deducciones, 
-            horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin, logoObjectId } = data;
+            horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
+            salarioProporcional, totalHorasExtra, valorHoraExtra,
+            saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas } = data;
 
     const companyName = company?.razon_social || 'Mi Empresa S.A.S.';
     const companyNit = company?.nit || '900123456-1';
     const companyAddress = company?.direccion || 'Dirección no disponible';
     const companyCity = company?.ciudad || 'Ciudad no disponible';
 
-    // Create professional header with logo
-    let logoContent = '';
-    let companyTextPosition = 50;
-    
-    if (logoObjectId) {
-      logoContent = `q
-80 0 0 40 50 710 cm
-/Logo Do
-Q
-`;
-      companyTextPosition = 150; // Move company text to the right of logo
-    }
+    // KISS: Simple header without logo complexity
+    const companyTextPosition = 50;
 
-    return `${logoContent}
+    return `
 BT
 /F2 20 Tf
 50 750 Td
@@ -284,7 +278,7 @@ ET
 BT
 /F1 10 Tf
 400 525 Td
-(${this.escapeText(this.formatCurrency(Math.round((salarioBase * diasTrabajados) / 30)))}) Tj
+(${this.escapeText(this.formatCurrency(salarioProporcional))}) Tj
 ET
 
 ${subsidioTransporte > 0 ? `
@@ -325,7 +319,13 @@ ET
 BT
 /F1 10 Tf
 400 465 Td
-(${this.escapeText(this.formatCurrency(horasExtra * Math.round((salarioBase / 240) * 1.25)))}) Tj
+(${this.escapeText(this.formatCurrency(totalHorasExtra))}) Tj
+ET
+
+BT
+/F1 10 Tf
+50 445 Td
+(${this.escapeText('Valor por hora: ' + this.formatCurrency(valorHoraExtra))}) Tj
 ET
 ` : ''}
 
@@ -339,70 +339,70 @@ ${deducciones > 0 ? `
 BT
 /F1 10 Tf
 1 0 0 rg
-50 455 Td
+50 415 Td
 (${this.escapeText('Salud (4%):')}) Tj
 ET
 
 BT
 /F1 10 Tf
 1 0 0 rg
-400 455 Td
-(${this.escapeText('-' + this.formatCurrency(salarioBase * 0.04))}) Tj
+400 415 Td
+(${this.escapeText('-' + this.formatCurrency(saludEmpleado))}) Tj
 ET
 
 BT
 /F1 10 Tf
 1 0 0 rg
-50 435 Td
+50 395 Td
 (${this.escapeText('Pension (4%):')}) Tj
 ET
 
 BT
 /F1 10 Tf
 1 0 0 rg
-400 435 Td
-(${this.escapeText('-' + this.formatCurrency(salarioBase * 0.04))}) Tj
+400 395 Td
+(${this.escapeText('-' + this.formatCurrency(pensionEmpleado))}) Tj
 ET
 
 BT
 /F1 10 Tf
 1 0 0 rg
-50 415 Td
+50 375 Td
 (${this.escapeText('Total Deducciones:')}) Tj
 ET
 
 BT
 /F1 10 Tf
 1 0 0 rg
-400 415 Td
+400 375 Td
 (${this.escapeText('-' + this.formatCurrency(deducciones))}) Tj
 ET
 
 0 0 0 rg
 ` : ''}
 
-50 395 m
-550 395 l
+50 355 m
+550 355 l
 S
 
 BT
 /F2 18 Tf
 0 0.6 0 rg
-50 365 Td
+50 325 Td
 (${this.escapeText('NETO A PAGAR:')}) Tj
 ET
 
 BT
 /F2 18 Tf
 0 0.6 0 rg
-350 365 Td
+350 325 Td
 (${this.escapeText(this.formatCurrency(salarioNeto))}) Tj
 ET
 
 0 0 0 rg
 
-50 340 m
-550 340 l
+50 300 m
+550 300 l
 S
 
 BT
@@ -430,63 +430,8 @@ BT
 ET`;
   }
 
-  private async processCompanyLogo(logoUrl: string): Promise<string | null> {
-    try {
-      console.log('🖼️ Procesando logo:', logoUrl);
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
-      
-      const response = await fetch(logoUrl, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PDFGenerator/1.0)'
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        console.warn('⚠️ Logo download failed:', response.status);
-        return null;
-      }
-      
-      const arrayBuffer = await response.arrayBuffer();
-      
-      if (arrayBuffer.byteLength === 0 || arrayBuffer.byteLength > 1500000) { // 1.5MB limit
-        console.warn('⚠️ Logo size invalid:', arrayBuffer.byteLength);
-        return null;
-      }
-      
-      // Convert to binary string for PDF
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binaryData = '';
-      for (let i = 0; i < uint8Array.length; i++) {
-        binaryData += String.fromCharCode(uint8Array[i]);
-      }
-      
-      console.log(`✅ Logo processed: ${arrayBuffer.byteLength} bytes`);
-      
-      return `<<
-/Type /XObject
-/Subtype /Image
-/Width 120
-/Height 60
-/ColorSpace /DeviceRGB
-/BitsPerComponent 8
-/Filter /DCTDecode
-/Length ${arrayBuffer.byteLength}
->>
-stream
-${binaryData}
-endstream`;
-      
-    } catch (error) {
-      console.warn('⚠️ Logo processing error:', error.message);
-      return null;
-    }
-  }
+  // KISS: Remove complex logo processing - causes failures
+  // Simple and reliable PDF generation without logos
 
   private buildPDFWithCorrectStructure(catalogId: number): Uint8Array {
     console.log('🏗️ Building PDF structure...');
