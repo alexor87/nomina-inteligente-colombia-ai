@@ -18,6 +18,11 @@ import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/Confirm
 import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
+import { 
+  transformPayrollHistoryToEmployee, 
+  validateEmployeeForVoucher, 
+  type PayrollHistoryData 
+} from '@/utils/payrollDataTransformer';
 
 interface PeriodDetail {
   id: string;
@@ -173,43 +178,47 @@ export const PayrollHistoryDetailPage = () => {
       return;
     }
 
-    // Map to expected format for VoucherPreviewModal using PayrollEmployee interface
-    const emp = employeePayroll.completeEmployeeData;
-    const mappedEmployee = {
-      id: employeePayroll.employee_id,
-      name: `${employeePayroll.employee_name} ${employeePayroll.employee_lastname}`,
-      position: emp?.cargo || 'Sin cargo definido',
-      baseSalary: employeePayroll.salario_base,
-      workedDays: employeePayroll.dias_trabajados || 30,
-      extraHours: 0,
-      disabilities: 0,
-      bonuses: 0,
-      absences: 0,
-      grossPay: employeePayroll.total_devengado,
-      deductions: employeePayroll.total_deducciones,
-      netPay: employeePayroll.neto_pagado,
-      status: 'valid' as const,
-      errors: [],
-      eps: emp?.eps || '',
-      afp: emp?.afp || '',
-      transportAllowance: 0,
-      employerContributions: 0,
-      ibc: employeePayroll.ibc || employeePayroll.salario_base,
-      healthDeduction: employeePayroll.total_deducciones * 0.4,
-      pensionDeduction: employeePayroll.total_deducciones * 0.4,
-      // Additional employee data for PDF generation
-      cedula: emp?.cedula || '',
-      email: emp?.email || '',
-      telefono: emp?.telefono || '',
-      banco: emp?.banco || '',
-      tipo_cuenta: emp?.tipo_cuenta || '',
-      numero_cuenta: emp?.numero_cuenta || '',
-      arl: emp?.arl || '',
-      caja_compensacion: emp?.caja_compensacion || ''
-    };
+    try {
+      // Transform historical data to PayrollEmployee format using data transformer
+      const historyData: PayrollHistoryData = {
+        employee_id: employeePayroll.employee_id,
+        employee_name: employeePayroll.employee_name,
+        employee_lastname: employeePayroll.employee_lastname,
+        total_devengado: employeePayroll.total_devengado,
+        total_deducciones: employeePayroll.total_deducciones,
+        neto_pagado: employeePayroll.neto_pagado,
+        salario_base: employeePayroll.salario_base,
+        dias_trabajados: employeePayroll.dias_trabajados,
+        ibc: employeePayroll.ibc,
+        completeEmployeeData: employeePayroll.completeEmployeeData
+      };
 
-    setSelectedVoucherEmployee(mappedEmployee);
-    setIsVoucherModalOpen(true);
+      const transformedEmployee = transformPayrollHistoryToEmployee(historyData);
+      
+      // Validate employee data before opening modal
+      const validation = validateEmployeeForVoucher(transformedEmployee);
+      if (!validation.isValid) {
+        console.error('❌ Employee data validation failed:', validation.errors);
+        toast({
+          title: "Error en datos del empleado",
+          description: `No se puede generar el comprobante: ${validation.errors.join(', ')}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('✅ Employee data transformed successfully:', transformedEmployee);
+      setSelectedVoucherEmployee(transformedEmployee);
+      setIsVoucherModalOpen(true);
+      
+    } catch (error) {
+      console.error('❌ Error transforming employee data:', error);
+      toast({
+        title: "Error de transformación",
+        description: "Error al procesar los datos del empleado para el comprobante",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleAdjustmentSuccess = () => {
