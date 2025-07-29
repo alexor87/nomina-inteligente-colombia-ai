@@ -43,6 +43,7 @@ interface EmployeePayroll {
   salario_base: number;
   ibc?: number;
   dias_trabajados?: number;
+  completeEmployeeData?: any;
 }
 
 
@@ -99,12 +100,28 @@ export const PayrollHistoryDetailPage = () => {
       if (periodError) throw periodError;
       setPeriod(periodData);
 
-      // Load employees payroll data
+      // Load employees payroll data with complete employee information
       const { data: payrollData, error: payrollError } = await supabase
         .from('payrolls')
         .select(`
           *,
-          employees!inner(nombre, apellido)
+          employees!inner(
+            id,
+            nombre, 
+            apellido, 
+            cedula, 
+            email, 
+            telefono, 
+            cargo, 
+            salario_base,
+            banco,
+            tipo_cuenta,
+            numero_cuenta,
+            eps,
+            afp,
+            arl,
+            caja_compensacion
+          )
         `)
         .eq('period_id', periodId);
       
@@ -120,7 +137,9 @@ export const PayrollHistoryDetailPage = () => {
         neto_pagado: p.neto_pagado || 0,
         salario_base: p.salario_base || 0,
         ibc: p.salario_base || 0,
-        dias_trabajados: 30
+        dias_trabajados: 30,
+        // Complete employee data for voucher
+        completeEmployeeData: p.employees
       })) || [];
       
       setEmployees(employeesWithNames);
@@ -154,17 +173,39 @@ export const PayrollHistoryDetailPage = () => {
       return;
     }
 
-    // Map to expected format for VoucherPreviewModal
+    // Map to expected format for VoucherPreviewModal using PayrollEmployee interface
+    const emp = employeePayroll.completeEmployeeData;
     const mappedEmployee = {
       id: employeePayroll.employee_id,
-      nombre: employeePayroll.employee_name,
-      apellido: employeePayroll.employee_lastname,
-      salario_base: employeePayroll.salario_base,
-      total_devengado: employeePayroll.total_devengado,
-      total_deducciones: employeePayroll.total_deducciones,
-      neto_pagado: employeePayroll.neto_pagado,
+      name: `${employeePayroll.employee_name} ${employeePayroll.employee_lastname}`,
+      position: emp?.cargo || 'Sin cargo definido',
+      baseSalary: employeePayroll.salario_base,
+      workedDays: employeePayroll.dias_trabajados || 30,
+      extraHours: 0,
+      disabilities: 0,
+      bonuses: 0,
+      absences: 0,
+      grossPay: employeePayroll.total_devengado,
+      deductions: employeePayroll.total_deducciones,
+      netPay: employeePayroll.neto_pagado,
+      status: 'valid' as const,
+      errors: [],
+      eps: emp?.eps || '',
+      afp: emp?.afp || '',
+      transportAllowance: 0,
+      employerContributions: 0,
       ibc: employeePayroll.ibc || employeePayroll.salario_base,
-      dias_trabajados: employeePayroll.dias_trabajados || 30
+      healthDeduction: employeePayroll.total_deducciones * 0.4,
+      pensionDeduction: employeePayroll.total_deducciones * 0.4,
+      // Additional employee data for PDF generation
+      cedula: emp?.cedula || '',
+      email: emp?.email || '',
+      telefono: emp?.telefono || '',
+      banco: emp?.banco || '',
+      tipo_cuenta: emp?.tipo_cuenta || '',
+      numero_cuenta: emp?.numero_cuenta || '',
+      arl: emp?.arl || '',
+      caja_compensacion: emp?.caja_compensacion || ''
     };
 
     setSelectedVoucherEmployee(mappedEmployee);
