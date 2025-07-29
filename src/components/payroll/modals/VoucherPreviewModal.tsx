@@ -16,13 +16,22 @@ interface VoucherPreviewModalProps {
     endDate: string;
     type: string;
   } | null;
+  companyInfo?: {
+    razon_social: string;
+    nit: string;
+    direccion?: string;
+    ciudad?: string;
+    telefono?: string;
+    email?: string;
+  } | null;
 }
 
 export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
   isOpen,
   onClose,
   employee,
-  period
+  period,
+  companyInfo
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
@@ -65,6 +74,10 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           startDate: period.startDate,
           endDate: period.endDate,
           type: period.type
+        },
+        company: companyInfo || {
+          razon_social: 'Mi Empresa',
+          nit: 'N/A'
         }
       };
 
@@ -256,8 +269,17 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           <Card className="border-l-4 border-l-blue-500 bg-slate-50">
             <CardContent className="pt-4">
               <h3 className="text-sm font-semibold text-gray-600 mb-2">EMPRESA</h3>
-              <p className="font-semibold text-gray-900">Mi Empresa</p>
-              <p className="text-sm text-gray-700">NIT: N/A</p>
+              <p className="font-semibold text-gray-900">{companyInfo?.razon_social || 'Mi Empresa'}</p>
+              <p className="text-sm text-gray-700">NIT: {companyInfo?.nit || 'N/A'}</p>
+              {companyInfo?.direccion && (
+                <p className="text-sm text-gray-700">Dirección: {companyInfo.direccion}</p>
+              )}
+              {companyInfo?.ciudad && (
+                <p className="text-sm text-gray-700">Ciudad: {companyInfo.ciudad}</p>
+              )}
+              {companyInfo?.telefono && (
+                <p className="text-sm text-gray-700">Teléfono: {companyInfo.telefono}</p>
+              )}
             </CardContent>
           </Card>
           

@@ -23,6 +23,7 @@ import {
   validateEmployeeForVoucher, 
   type PayrollHistoryData 
 } from '@/utils/payrollDataTransformer';
+import { useCompanyDetails } from '@/hooks/useCompanyDetails';
 
 interface PeriodDetail {
   id: string;
@@ -88,6 +89,9 @@ export const PayrollHistoryDetailPage = () => {
   
   // Hook para obtener company_id
   useCompanyId(setCompanyId);
+  
+  // Hook para obtener datos completos de la empresa
+  const { companyDetails } = useCompanyDetails();
 
   const loadPeriodDetail = async () => {
     if (!periodId) return;
@@ -789,6 +793,7 @@ export const PayrollHistoryDetailPage = () => {
           endDate: period.fecha_fin,
           type: period.tipo_periodo
         } : null}
+        companyInfo={companyDetails}
       />
     </div>
   );
