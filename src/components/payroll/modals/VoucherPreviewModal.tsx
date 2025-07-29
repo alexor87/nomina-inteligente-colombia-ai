@@ -443,14 +443,14 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
                 <p className="text-xs text-gray-600">Firma del Empleado</p>
               </div>
               <p className="font-semibold text-sm">{employee.name}</p>
-              <p className="text-xs text-gray-600">CC: {employee.id?.slice(0, 8) || 'N/A'}</p>
+              <p className="text-xs text-gray-600">CC: {employee.cedula || 'N/A'}</p>
             </div>
             <div className="text-center">
               <div className="border-t border-gray-400 pt-2 mb-2 w-64">
                 <p className="text-xs text-gray-600">Firma del Representante Legal</p>
               </div>
-              <p className="font-semibold text-sm">Mi Empresa</p>
-              <p className="text-xs text-gray-600">NIT: N/A</p>
+              <p className="font-semibold text-sm">{companyInfo?.razon_social || 'Mi Empresa'}</p>
+              <p className="text-xs text-gray-600">NIT: {companyInfo?.nit || 'N/A'}</p>
             </div>
           </div>
           

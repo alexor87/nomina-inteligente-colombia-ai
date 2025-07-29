@@ -50,6 +50,8 @@ export interface PayrollEmployee {
   // ✅ NUEVOS CAMPOS: Deducciones separadas para persistencia correcta
   healthDeduction: number;
   pensionDeduction: number;
+  // ✅ NUEVO CAMPO: Cédula del empleado
+  cedula?: string;
 }
 
 export interface PayrollSummary {
