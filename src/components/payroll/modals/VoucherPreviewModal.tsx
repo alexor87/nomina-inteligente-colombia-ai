@@ -287,7 +287,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
             <CardContent className="pt-4">
               <h3 className="text-sm font-semibold text-gray-600 mb-2">EMPLEADO</h3>
               <p className="font-semibold text-gray-900">{employee.name}</p>
-              <p className="text-sm text-gray-700">CC: {employee.id?.slice(0, 8) || 'N/A'}</p>
+              <p className="text-sm text-gray-700">CC: {employee.cedula || 'N/A'}</p>
               {employee.position && <p className="text-sm text-gray-700">Cargo: {employee.position}</p>}
             </CardContent>
           </Card>
