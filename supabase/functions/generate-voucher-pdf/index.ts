@@ -148,15 +148,17 @@ endstream`);
     
     if (logoObjectId) {
       // Posicionar logo elegantemente en la esquina superior izquierda
-      logoContent = `q
-80 0 0 40 50 710 cm
+      logoContent = `
+q
+60 0 0 60 50 720 cm
 /Logo Do
 Q
 `;
-      companyTextPosition = 150; // Mover texto de empresa a la derecha del logo
+      companyTextPosition = 130; // Mover texto de empresa a la derecha del logo
     }
 
     return `${logoContent}
+
 BT
 /F2 20 Tf
 50 750 Td
@@ -416,10 +418,7 @@ ET`;
       
       const response = await fetch(logoUrl, {
         method: 'GET',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PDFGenerator/1.0)'
-        }
+        signal: controller.signal
       });
       
       clearTimeout(timeoutId);
@@ -430,27 +429,23 @@ ET`;
       }
       
       const imageData = await response.arrayBuffer();
+      const uint8Array = new Uint8Array(imageData);
       
       if (imageData.byteLength === 0) {
         console.warn('⚠️ Logo vacío');
         return null;
       }
       
-      if (imageData.byteLength > 2000000) { // 2MB limit
-        console.warn('⚠️ Logo muy grande:', imageData.byteLength);
-        return null;
-      }
+      // Convertir a base64
+      const base64 = btoa(String.fromCharCode(...uint8Array));
       
-      // Convertir directamente a string binario para PDF
-      const uint8Array = new Uint8Array(imageData);
-      let binaryString = '';
-      for (let i = 0; i < uint8Array.length; i++) {
-        binaryString += String.fromCharCode(uint8Array[i]);
-      }
+      // Detectar tipo de imagen
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const isJPEG = contentType.includes('jpeg') || contentType.includes('jpg');
       
-      console.log(`✅ Logo procesado: ${imageData.byteLength} bytes`);
+      console.log(`✅ Logo procesado: ${imageData.byteLength} bytes, tipo: ${contentType}`);
       
-      // Crear objeto de imagen PDF con datos binarios directos
+      // Crear objeto de imagen PDF
       return `<<
 /Type /XObject
 /Subtype /Image
@@ -458,11 +453,11 @@ ET`;
 /Height 60
 /ColorSpace /DeviceRGB
 /BitsPerComponent 8
-/Filter /DCTDecode
+/Filter [/DCTDecode]
 /Length ${imageData.byteLength}
 >>
 stream
-${binaryString}
+${base64}
 endstream`;
       
     } catch (error) {
@@ -512,21 +507,12 @@ endstream`;
     console.log(`📊 Objetos creados: ${this.objects.length - 1}`);
     console.log(`📏 Posición xref: ${xrefPos}`);
     
-    // Para imágenes binarias, usar Uint8Array directo en lugar de TextEncoder
-    const pdfStringLength = pdf.length;
-    const hasLogo = this.objects.some(obj => obj.includes('/XObject'));
+    const encoder = new TextEncoder();
+    const pdfBytes = encoder.encode(pdf);
     
-    if (hasLogo) {
-      // Si hay logo, construir manualmente el PDF con datos binarios
-      const headerBytes = new TextEncoder().encode(pdf);
-      console.log(`📋 PDF construido con logo: ${headerBytes.length} bytes`);
-      return headerBytes;
-    } else {
-      // Sin logo, usar construcción estándar
-      const pdfBytes = new TextEncoder().encode(pdf);
-      console.log(`📋 Tamaño final del PDF: ${pdfBytes.length} bytes`);
-      return pdfBytes;
-    }
+    console.log(`📋 Tamaño final del PDF: ${pdfBytes.length} bytes`);
+    
+    return pdfBytes;
   }
 }
 
