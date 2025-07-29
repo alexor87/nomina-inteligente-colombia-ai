@@ -753,7 +753,259 @@ BT
 (${this.escapeText('Firma Autorizada')}) Tj
 ET`;
 
-    return tableContent + extraSections;
+    // CRITICAL FIX: Return complete PDF content with all sections
+    const fullPDFContent = `
+% ============= PREMIUM HEADER - PERFECTAMENTE CENTRADO =============
+% Título principal centrado dinámicamente
+BT
+/F2 22 Tf
+0.118 0.165 0.478 rg
+${titleX} 750 Td
+(${this.escapeText(titleText)}) Tj
+ET
+
+% Subtítulo del período - elegante y sutil
+BT
+/F1 12 Tf
+0.3 0.3 0.3 rg
+${titleX} 725 Td
+(${this.escapeText('Período: ' + fechaInicio + ' - ' + fechaFin)}) Tj
+ET
+
+% Separador horizontal elegante
+q
+0.118 0.165 0.478 rg
+50 710 512 1 re
+f
+Q
+
+% ============= INFORMACIÓN CARDS - DISEÑO MODAL EXACTO =============
+
+% CARD 1: EMPRESA - Diseño Premium con sombra
+q
+0.95 0.97 0.99 rg
+40 630 170 80 re
+f
+Q
+
+% Borde izquierdo azul distintivo
+q
+0.118 0.165 0.478 rg
+40 630 4 80 re
+f
+Q
+
+% Sombra sutil de la card
+q
+0.85 0.85 0.85 rg
+42 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+40 630 170 80 re
+f
+Q
+
+% Logo circular de empresa - profesional
+q
+0.118 0.165 0.478 rg
+55 680 24 24 re
+f
+Q
+
+% Inicial de empresa en blanco
+BT
+/F2 12 Tf
+1 1 1 rg
+64 689 Td
+(${this.escapeText(companyInitial)}) Tj
+ET
+
+% Labels y datos de empresa
+BT
+/F2 9 Tf
+0.118 0.165 0.478 rg
+88 695 Td
+(${this.escapeText('EMPRESA')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+88 680 Td
+(${this.escapeText(companyName.length > 18 ? companyName.substring(0, 18) + '...' : companyName)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+88 667 Td
+(${this.escapeText('NIT: ' + companyNit)}) Tj
+ET
+
+% CARD 2: EMPLEADO - Centrada
+q
+0.95 0.97 0.99 rg
+221 630 170 80 re
+f
+Q
+
+q
+0.118 0.165 0.478 rg
+221 630 4 80 re
+f
+Q
+
+% Sombra
+q
+0.85 0.85 0.85 rg
+223 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+221 630 170 80 re
+f
+Q
+
+BT
+/F2 9 Tf
+0.118 0.165 0.478 rg
+230 695 Td
+(${this.escapeText('EMPLEADO')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+230 680 Td
+(${this.escapeText((employee.name || 'N/A').length > 20 ? (employee.name || 'N/A').substring(0, 20) + '...' : (employee.name || 'N/A'))}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+230 667 Td
+(${this.escapeText('CC: ' + (employee.cedula || 'N/A'))}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+230 654 Td
+(${this.escapeText('Cargo: ' + (employee.position || 'N/A'))}) Tj
+ET
+
+% CARD 3: PERÍODO - Derecha
+q
+0.95 0.97 0.99 rg
+402 630 170 80 re
+f
+Q
+
+q
+0.118 0.165 0.478 rg
+402 630 4 80 re
+f
+Q
+
+% Sombra
+q
+0.85 0.85 0.85 rg
+404 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+402 630 170 80 re
+f
+Q
+
+BT
+/F2 9 Tf
+0.118 0.165 0.478 rg
+411 695 Td
+(${this.escapeText('PERÍODO')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+411 680 Td
+(${this.escapeText('Desde: ' + fechaInicio)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+411 667 Td
+(${this.escapeText('Hasta: ' + fechaFin)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+411 654 Td
+(${this.escapeText('Días trabajados: ' + diasTrabajados)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+411 641 Td
+(${this.escapeText('Salario base: ' + formatCurrency(salarioBase))}) Tj
+ET
+
+% ============= TABLA PRINCIPAL DE CONCEPTOS - MODAL EXACTO =============
+% Título de sección
+BT
+/F2 14 Tf
+0.118 0.165 0.478 rg
+40 600 Td
+(${this.escapeText('RESUMEN DEL PAGO')}) Tj
+ET
+
+% Contenedor de tabla con borde elegante
+q
+0.98 0.98 0.98 rg
+40 320 532 260 re
+f
+Q
+
+% Borde de tabla profesional
+q
+0.85 0.85 0.85 RG
+1 w
+40 320 532 260 re
+S
+Q
+
+% HEADER DE TABLA - Azul premium
+q
+0.118 0.165 0.478 rg
+40 555 532 25 re
+f
+Q
+
+% Textos del header
+BT
+/F2 10 Tf
+1 1 1 rg
+50 563 Td
+(${this.escapeText('CONCEPTO')}) Tj
+ET
+
+BT
+/F2 10 Tf
+1 1 1 rg
+480 563 Td
+(${this.escapeText('VALOR')}) Tj
+ET
+
+% ============= FILAS DE CONCEPTOS - TODAS LAS DEL MODAL =============` + tableContent + extraSections;
+
+    return fullPDFContent;
   }
 
   // KISS: Remove complex logo processing - causes failures
