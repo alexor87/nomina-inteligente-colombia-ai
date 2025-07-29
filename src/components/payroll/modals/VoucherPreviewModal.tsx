@@ -269,20 +269,33 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
           <Card className="border-l-4 border-l-blue-500 bg-slate-50">
             <CardContent className="pt-4">
-              <div className="flex items-start gap-3 mb-3">
-                {companyInfo?.logo_url && (
-                  <img
-                    src={companyInfo.logo_url}
-                    alt="Logo empresa"
-                    className="h-12 w-auto object-contain flex-shrink-0"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+              {/* Header elegante con logo prominente */}
+              <div className="space-y-4">
+                {companyInfo?.logo_url ? (
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={companyInfo.logo_url}
+                      alt="Logo empresa"
+                      className="h-20 w-auto max-w-[200px] object-contain flex-shrink-0 rounded-lg shadow-sm border border-gray-200"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                    <div className="hidden bg-gradient-to-br from-blue-500 to-blue-600 text-white h-20 w-20 rounded-lg items-center justify-center shadow-sm">
+                      <span className="text-2xl font-bold">{companyInfo.razon_social.charAt(0)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex bg-gradient-to-br from-blue-500 to-blue-600 text-white h-20 w-20 rounded-lg items-center justify-center shadow-sm">
+                    <span className="text-2xl font-bold">{companyInfo?.razon_social?.charAt(0) || 'E'}</span>
+                  </div>
                 )}
+                
                 <div>
                   <h3 className="text-sm font-semibold text-gray-600 mb-2">EMPRESA</h3>
-                  <p className="font-semibold text-gray-900">{companyInfo?.razon_social || 'Mi Empresa'}</p>
+                  <p className="font-semibold text-gray-900 text-lg">{companyInfo?.razon_social || 'Mi Empresa'}</p>
                 </div>
               </div>
               <p className="text-sm text-gray-700">NIT: {companyInfo?.nit || 'N/A'}</p>
