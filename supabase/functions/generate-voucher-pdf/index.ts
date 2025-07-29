@@ -47,7 +47,7 @@ class NativePDFGenerator {
     }
   }
 
-  async generateVoucher(employee: any, period: any, company: any): Promise<Uint8Array> {
+  generateVoucher(employee: any, period: any, company: any): Uint8Array {
     console.log('🔧 Generando PDF profesional para:', employee.name);
 
     // Datos calculados
@@ -62,12 +62,6 @@ class NativePDFGenerator {
     const fechaInicio = this.formatDate(period.startDate);
     const fechaFin = this.formatDate(period.endDate);
 
-    // Procesar logo si existe
-    let logoImageObject = null;
-    if (company?.logo_url) {
-      logoImageObject = await this.processCompanyLogo(company.logo_url);
-    }
-
     // PASO 1: Crear fuentes primero (objetos 1 y 2)
     const fontRegularId = this.addObject(`<<
 /Type /Font
@@ -81,17 +75,10 @@ class NativePDFGenerator {
 /BaseFont /Helvetica-Bold
 >>`);
 
-    // PASO 2: Agregar logo si existe
-    let logoObjectId = null;
-    if (logoImageObject) {
-      logoObjectId = this.addObject(logoImageObject);
-    }
-
-    // PASO 3: Crear contenido del stream
+    // PASO 2: Crear contenido del stream
     const contentStream = this.generateContentStream(employee, period, company, {
       salarioBase, diasTrabajados, salarioNeto, deducciones,
-      horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
-      logoObjectId
+      horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin
     });
 
     const contentStreamId = this.addObject(`<<
@@ -101,7 +88,7 @@ stream
 ${contentStream}
 endstream`);
 
-    // PASO 4: Crear página con referencias correctas incluyendo logo
+    // PASO 3: Crear página con referencias correctas
     const pageId = this.addObject(`<<
 /Type /Page
 /Parent 5 0 R
@@ -112,18 +99,17 @@ endstream`);
     /F1 ${fontRegularId} 0 R
     /F2 ${fontBoldId} 0 R
   >>
-  ${logoObjectId ? `/XObject <</Logo ${logoObjectId} 0 R>>` : ''}
 >>
 >>`);
 
-    // PASO 5: Crear catálogo de páginas
+    // PASO 4: Crear catálogo de páginas
     const pagesId = this.addObject(`<<
 /Type /Pages
 /Kids [${pageId} 0 R]
 /Count 1
 >>`);
 
-    // PASO 6: Crear catálogo raíz
+    // PASO 5: Crear catálogo raíz
     const catalogId = this.addObject(`<<
 /Type /Catalog
 /Pages ${pagesId} 0 R
@@ -135,31 +121,14 @@ endstream`);
 
   private generateContentStream(employee: any, period: any, company: any, data: any): string {
     const { salarioBase, diasTrabajados, salarioNeto, deducciones, 
-            horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin, logoObjectId } = data;
+            horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin } = data;
 
     const companyName = company?.razon_social || 'Mi Empresa S.A.S.';
     const companyNit = company?.nit || '900123456-1';
     const companyAddress = company?.direccion || 'Dirección no disponible';
     const companyCity = company?.ciudad || 'Ciudad no disponible';
 
-    // Crear header profesional con logo
-    let logoContent = '';
-    let companyTextPosition = 50;
-    
-    if (logoObjectId) {
-      // Posicionar logo elegantemente en la esquina superior izquierda
-      logoContent = `
-q
-60 0 0 60 50 720 cm
-/Logo Do
-Q
-`;
-      companyTextPosition = 130; // Mover texto de empresa a la derecha del logo
-    }
-
-    return `${logoContent}
-
-BT
+    return `BT
 /F2 20 Tf
 50 750 Td
 (${this.escapeText('COMPROBANTE DE NOMINA')}) Tj
@@ -167,25 +136,25 @@ ET
 
 BT
 /F2 12 Tf
-${companyTextPosition} 710 Td
+50 710 Td
 (${this.escapeText('EMPRESA:')}) Tj
 ET
 
 BT
 /F1 11 Tf
-${companyTextPosition} 695 Td
+50 695 Td
 (${this.escapeText(companyName)}) Tj
 ET
 
 BT
 /F1 10 Tf
-${companyTextPosition} 680 Td
+50 680 Td
 (${this.escapeText('NIT: ' + companyNit)}) Tj
 ET
 
 BT
 /F1 10 Tf
-${companyTextPosition} 665 Td
+50 665 Td
 (${this.escapeText(companyAddress + ' - ' + companyCity)}) Tj
 ET
 
@@ -408,64 +377,6 @@ BT
 ET`;
   }
 
-  private async processCompanyLogo(logoUrl: string): Promise<string | null> {
-    try {
-      console.log('🖼️ Procesando logo de empresa:', logoUrl);
-      
-      // Descargar imagen con timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
-      
-      const response = await fetch(logoUrl, {
-        method: 'GET',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        console.warn('⚠️ No se pudo descargar el logo:', response.status);
-        return null;
-      }
-      
-      const imageData = await response.arrayBuffer();
-      const uint8Array = new Uint8Array(imageData);
-      
-      if (imageData.byteLength === 0) {
-        console.warn('⚠️ Logo vacío');
-        return null;
-      }
-      
-      // Convertir a base64
-      const base64 = btoa(String.fromCharCode(...uint8Array));
-      
-      // Detectar tipo de imagen
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
-      const isJPEG = contentType.includes('jpeg') || contentType.includes('jpg');
-      
-      console.log(`✅ Logo procesado: ${imageData.byteLength} bytes, tipo: ${contentType}`);
-      
-      // Crear objeto de imagen PDF
-      return `<<
-/Type /XObject
-/Subtype /Image
-/Width 120
-/Height 60
-/ColorSpace /DeviceRGB
-/BitsPerComponent 8
-/Filter [/DCTDecode]
-/Length ${imageData.byteLength}
->>
-stream
-${base64}
-endstream`;
-      
-    } catch (error) {
-      console.warn('⚠️ Error procesando logo:', error.message);
-      return null;
-    }
-  }
-
   private buildPDFWithCorrectStructure(catalogId: number): Uint8Array {
     console.log('🏗️ Construyendo PDF con estructura profesional...');
 
@@ -576,10 +487,9 @@ serve(async (req) => {
     console.log('👤 Empleado:', employee.name);
     console.log('📅 Período:', period.startDate, '-', period.endDate);
     console.log('🏢 Empresa:', company?.razon_social || 'No especificada');
-    console.log('🖼️ Logo empresa:', company?.logo_url ? 'Sí' : 'No');
     
     const generator = new NativePDFGenerator();
-    const pdfBytes = await generator.generateVoucher(employee, period, company);
+    const pdfBytes = generator.generateVoucher(employee, period, company);
     
     console.log(`✅ PDF profesional generado - Tamaño: ${pdfBytes.length} bytes`);
     
