@@ -751,14 +751,8 @@ BT
 0.6 0.6 0.6 rg
 470 ${yPos2 - 35} Td
 (${this.escapeText('Firma Autorizada')}) Tj
-ET`;
-
-    // ✅ CRITICAL FIX: Return complete PDF structure
-    // Main content (header + cards + table setup) is in the template literal that starts at line 173
-    // We need to close that template literal and add the dynamic table content + extra sections
-    
-    // Complete the main template literal with table setup and return everything
-    ` + tableContent + extraSections;
+ET
+` + tableContent + extraSections;
   }
 
   // KISS: Remove complex logo processing - causes failures
