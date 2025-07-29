@@ -91,13 +91,20 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         console.error('❌ Timeout en generador nativo');
       }, 30000); // 30 segundos es suficiente para generador nativo
 
+      // Get current user session for auth
+      const { data: { session } } = await import('@/integrations/supabase/client').then(m => m.supabase.auth.getSession());
+      
+      if (!session?.access_token) {
+        throw new Error('No hay sesión activa. Por favor inicia sesión nuevamente.');
+      }
+
       const response = await fetch(
-        'https://xrmolrlkakwujyozgmilf.supabase.co/functions/v1/generate-voucher-pdf',
+        'https://xrmorlkakwujyozgmilf.supabase.co/functions/v1/generate-voucher-pdf',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhybW9ybGtha3d1anlvemdtaWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1NzMxNDYsImV4cCI6MjA2NjE0OTE0Nn0.JSKbniDUkbNEAVCxCkrG_J5NQTt0yHc7W5PPheJ8X_U`
+            'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify(requestBody),
           signal: controller.signal

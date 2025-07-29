@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -7,21 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Generador PDF Nativo Corregido - Estructura válida
+// PDF Generator with improved error handling and fallback
 class NativePDFGenerator {
   private objects: string[] = [];
   private objectPositions: number[] = [];
   private currentObjectId = 1;
 
   constructor() {
-    this.objects = [''];  // El objeto 0 siempre está vacío en PDF
-    this.objectPositions = [0]; // Posición del objeto 0
+    this.objects = [''];  // Object 0 is always empty in PDF
+    this.objectPositions = [0]; // Position of object 0
   }
 
   private addObject(content: string): number {
     const id = this.currentObjectId++;
     this.objects.push(content);
-    this.objectPositions.push(0); // Se calculará después
+    this.objectPositions.push(0); // Will be calculated later
     return id;
   }
 
@@ -48,9 +47,9 @@ class NativePDFGenerator {
   }
 
   async generateVoucher(employee: any, period: any, company: any): Promise<Uint8Array> {
-    console.log('🔧 Generando PDF profesional para:', employee.name);
+    console.log('🔧 Generando PDF para:', employee.name);
 
-    // Datos calculados
+    // Calculated data
     const salarioBase = Number(employee.baseSalary) || 0;
     const diasTrabajados = Number(employee.workedDays) || 30;
     const salarioNeto = Number(employee.netPay) || 0;
@@ -62,13 +61,21 @@ class NativePDFGenerator {
     const fechaInicio = this.formatDate(period.startDate);
     const fechaFin = this.formatDate(period.endDate);
 
-    // Procesar logo si existe
+    // Process logo with improved error handling
     let logoImageObject = null;
     if (company?.logo_url) {
-      logoImageObject = await this.processCompanyLogo(company.logo_url);
+      try {
+        logoImageObject = await this.processCompanyLogo(company.logo_url);
+        if (logoImageObject) {
+          console.log('✅ Logo procesado correctamente');
+        }
+      } catch (error) {
+        console.warn('⚠️ Error procesando logo, continuando sin logo:', error.message);
+        logoImageObject = null;
+      }
     }
 
-    // PASO 1: Crear fuentes primero (objetos 1 y 2)
+    // Create fonts first (objects 1 and 2)
     const fontRegularId = this.addObject(`<<
 /Type /Font
 /Subtype /Type1
@@ -81,13 +88,13 @@ class NativePDFGenerator {
 /BaseFont /Helvetica-Bold
 >>`);
 
-    // PASO 2: Agregar logo si existe
+    // Add logo if exists
     let logoObjectId = null;
     if (logoImageObject) {
       logoObjectId = this.addObject(logoImageObject);
     }
 
-    // PASO 3: Crear contenido del stream
+    // Create content stream
     const contentStream = this.generateContentStream(employee, period, company, {
       salarioBase, diasTrabajados, salarioNeto, deducciones,
       horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
@@ -101,7 +108,7 @@ stream
 ${contentStream}
 endstream`);
 
-    // PASO 4: Crear página con referencias correctas incluyendo logo
+    // Create page with correct references
     const pageId = this.addObject(`<<
 /Type /Page
 /Parent 5 0 R
@@ -116,20 +123,20 @@ endstream`);
 >>
 >>`);
 
-    // PASO 5: Crear catálogo de páginas
+    // Create pages catalog
     const pagesId = this.addObject(`<<
 /Type /Pages
 /Kids [${pageId} 0 R]
 /Count 1
 >>`);
 
-    // PASO 6: Crear catálogo raíz
+    // Create root catalog
     const catalogId = this.addObject(`<<
 /Type /Catalog
 /Pages ${pagesId} 0 R
 >>`);
 
-    // Generar el archivo PDF completo con estructura corregida
+    // Generate complete PDF with correct structure
     return this.buildPDFWithCorrectStructure(catalogId);
   }
 
@@ -142,18 +149,17 @@ endstream`);
     const companyAddress = company?.direccion || 'Dirección no disponible';
     const companyCity = company?.ciudad || 'Ciudad no disponible';
 
-    // Crear header profesional con logo
+    // Create professional header with logo
     let logoContent = '';
     let companyTextPosition = 50;
     
     if (logoObjectId) {
-      // Posicionar logo elegantemente en la esquina superior izquierda
       logoContent = `q
 80 0 0 40 50 710 cm
 /Logo Do
 Q
 `;
-      companyTextPosition = 150; // Mover texto de empresa a la derecha del logo
+      companyTextPosition = 150; // Move company text to the right of logo
     }
 
     return `${logoContent}
@@ -408,11 +414,10 @@ ET`;
 
   private async processCompanyLogo(logoUrl: string): Promise<string | null> {
     try {
-      console.log('🖼️ Procesando logo de empresa:', logoUrl);
+      console.log('🖼️ Procesando logo:', logoUrl);
       
-      // Descargar imagen con timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
       
       const response = await fetch(logoUrl, {
         method: 'GET',
@@ -425,32 +430,26 @@ ET`;
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        console.warn('⚠️ No se pudo descargar el logo:', response.status);
+        console.warn('⚠️ Logo download failed:', response.status);
         return null;
       }
       
-      const imageData = await response.arrayBuffer();
+      const arrayBuffer = await response.arrayBuffer();
       
-      if (imageData.byteLength === 0) {
-        console.warn('⚠️ Logo vacío');
+      if (arrayBuffer.byteLength === 0 || arrayBuffer.byteLength > 1500000) { // 1.5MB limit
+        console.warn('⚠️ Logo size invalid:', arrayBuffer.byteLength);
         return null;
       }
       
-      if (imageData.byteLength > 2000000) { // 2MB limit
-        console.warn('⚠️ Logo muy grande:', imageData.byteLength);
-        return null;
-      }
-      
-      // Convertir directamente a string binario para PDF
-      const uint8Array = new Uint8Array(imageData);
-      let binaryString = '';
+      // Convert to binary string for PDF
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binaryData = '';
       for (let i = 0; i < uint8Array.length; i++) {
-        binaryString += String.fromCharCode(uint8Array[i]);
+        binaryData += String.fromCharCode(uint8Array[i]);
       }
       
-      console.log(`✅ Logo procesado: ${imageData.byteLength} bytes`);
+      console.log(`✅ Logo processed: ${arrayBuffer.byteLength} bytes`);
       
-      // Crear objeto de imagen PDF con datos binarios directos
       return `<<
 /Type /XObject
 /Subtype /Image
@@ -459,28 +458,25 @@ ET`;
 /ColorSpace /DeviceRGB
 /BitsPerComponent 8
 /Filter /DCTDecode
-/Length ${imageData.byteLength}
+/Length ${arrayBuffer.byteLength}
 >>
 stream
-${binaryString}
+${binaryData}
 endstream`;
       
     } catch (error) {
-      console.warn('⚠️ Error procesando logo:', error.message);
+      console.warn('⚠️ Logo processing error:', error.message);
       return null;
     }
   }
 
   private buildPDFWithCorrectStructure(catalogId: number): Uint8Array {
-    console.log('🏗️ Construyendo PDF con estructura profesional...');
+    console.log('🏗️ Building PDF structure...');
 
-    let pdf = '%PDF-1.4\n';
-    pdf += '%âãÏÓ\n'; // Comentario binario
-
-    // Calcular posiciones exactas de cada objeto
+    let pdf = '%PDF-1.4\n%âãÏÓ\n';
     let currentPos = pdf.length;
 
-    // Escribir objetos y registrar posiciones
+    // Write objects and track positions
     for (let i = 1; i < this.objects.length; i++) {
       this.objectPositions[i] = currentPos;
       const objContent = `${i} 0 obj\n${this.objects[i]}\nendobj\n`;
@@ -488,157 +484,173 @@ endstream`;
       currentPos += objContent.length;
     }
 
-    // Posición de la tabla xref
+    // xref table position
     const xrefPos = currentPos;
 
-    // Generar tabla xref con posiciones correctas
+    // Generate xref table
     pdf += 'xref\n';
     pdf += `0 ${this.objects.length}\n`;
-    pdf += '0000000000 65535 f \n'; // Objeto 0 (siempre libre)
+    pdf += '0000000000 65535 f \n';
 
     for (let i = 1; i < this.objects.length; i++) {
       const pos = String(this.objectPositions[i]).padStart(10, '0');
       pdf += `${pos} 00000 n \n`;
     }
 
-    // Trailer corregido
+    // Trailer
     pdf += 'trailer\n';
     pdf += `<<\n/Size ${this.objects.length}\n/Root ${catalogId} 0 R\n>>\n`;
     pdf += 'startxref\n';
     pdf += `${xrefPos}\n`;
     pdf += '%%EOF\n';
 
-    console.log('✅ PDF profesional generado exitosamente');
-    console.log(`📊 Objetos creados: ${this.objects.length - 1}`);
-    console.log(`📏 Posición xref: ${xrefPos}`);
-    
-    // Para imágenes binarias, usar Uint8Array directo en lugar de TextEncoder
-    const pdfStringLength = pdf.length;
-    const hasLogo = this.objects.some(obj => obj.includes('/XObject'));
-    
-    if (hasLogo) {
-      // Si hay logo, construir manualmente el PDF con datos binarios
-      const headerBytes = new TextEncoder().encode(pdf);
-      console.log(`📋 PDF construido con logo: ${headerBytes.length} bytes`);
-      return headerBytes;
-    } else {
-      // Sin logo, usar construcción estándar
-      const pdfBytes = new TextEncoder().encode(pdf);
-      console.log(`📋 Tamaño final del PDF: ${pdfBytes.length} bytes`);
-      return pdfBytes;
-    }
+    console.log(`✅ PDF built: ${pdf.length} bytes, ${this.objects.length} objects`);
+
+    // Convert to Uint8Array properly
+    const encoder = new TextEncoder();
+    return encoder.encode(pdf);
   }
 }
 
 serve(async (req) => {
-  console.log('🚀 PDF Generator Profesional - Iniciando...');
-  
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verificar autenticación
-    const authHeader = req.headers.get('authorization');
+    console.log('🚀 Starting PDF generation...');
+
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.error('❌ Missing authorization header')
       return new Response(
-        JSON.stringify({ error: 'Token de autorización requerido' }),
+        JSON.stringify({ error: 'No authorization provided' }),
         { 
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      );
+      )
     }
 
-    // Crear cliente Supabase
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    })
 
-    // Verificar usuario autenticado
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('❌ Error de autenticación:', userError);
+    // Verify authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      console.error('❌ Authentication error:', authError)
       return new Response(
-        JSON.stringify({ error: 'Usuario no autenticado' }),
+        JSON.stringify({ error: 'User not authenticated' }),
         { 
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      );
+      )
     }
 
-    const requestBody = await req.json();
-    console.log('📋 Request autenticado para usuario:', user.id);
+    console.log('✅ User authenticated:', user.id)
 
-    const { employee, period, company } = requestBody;
+    // Parse request body
+    const requestBody = await req.json()
+    console.log('📥 Request received for employee:', requestBody?.employee?.name)
+
+    const { employee, period, company } = requestBody
 
     if (!employee || !period) {
-      console.error('❌ Datos faltantes');
+      console.error('❌ Missing required data')
       return new Response(
-        JSON.stringify({ error: 'Faltan datos del empleado o período' }),
+        JSON.stringify({ error: 'Missing employee or period data' }),
         { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      );
+      )
     }
 
-    console.log('📄 Generando PDF profesional...');
-    console.log('👤 Empleado:', employee.name);
-    console.log('📅 Período:', period.startDate, '-', period.endDate);
-    console.log('🏢 Empresa:', company?.razon_social || 'No especificada');
-    console.log('🖼️ Logo empresa:', company?.logo_url ? 'Sí' : 'No');
+    // Generate PDF with fallback for logo errors
+    console.log('🔧 Starting PDF generation...')
+    const generator = new NativePDFGenerator()
     
-    const generator = new NativePDFGenerator();
-    const pdfBytes = await generator.generateVoucher(employee, period, company);
-    
-    console.log(`✅ PDF profesional generado - Tamaño: ${pdfBytes.length} bytes`);
-    
-    // Validaciones de seguridad mejoradas
-    if (pdfBytes.length < 1000) {
-      throw new Error(`PDF muy pequeño: ${pdfBytes.length} bytes - posible error`);
-    }
-    
-    const pdfString = new TextDecoder().decode(pdfBytes.slice(0, 15));
-    if (!pdfString.startsWith('%PDF-')) {
-      throw new Error(`Header PDF inválido: ${pdfString}`);
-    }
-    
-    console.log('✅ PDF profesional validado correctamente');
-    console.log(`🔍 Header verificado: ${pdfString.slice(0, 8)}`);
-    
-    const fileName = `comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}-${period.startDate?.replace(/-/g, '') || 'periodo'}.pdf`;
-    
-    return new Response(pdfBytes, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/pdf',
-        'Content-Length': pdfBytes.length.toString(),
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+    try {
+      const pdfBytes = await generator.generateVoucher(employee, period, company)
+
+      console.log(`✅ PDF generated successfully: ${pdfBytes.length} bytes`)
+
+      // Verify PDF is valid
+      if (pdfBytes.length === 0) {
+        throw new Error('Generated PDF is empty')
       }
-    });
 
-  } catch (error) {
-    console.error('💥 ERROR en generador profesional:', error);
-    console.error('💥 Stack:', error.stack);
+      // Verify PDF header
+      const pdfHeader = String.fromCharCode(...pdfBytes.slice(0, 5))
+      if (!pdfHeader.startsWith('%PDF-')) {
+        console.error('❌ Invalid PDF header:', pdfHeader)
+        throw new Error('Generated file is not a valid PDF')
+      }
+
+      // Return PDF with correct headers
+      return new Response(pdfBytes, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf"`,
+          'Content-Length': pdfBytes.length.toString(),
+          'Cache-Control': 'no-cache'
+        }
+      })
+      
+    } catch (pdfError) {
+      console.error('❌ PDF generation error:', pdfError.message)
+      
+      // Fallback: try without logo if logo was the issue
+      if (company?.logo_url && (pdfError.message.includes('logo') || pdfError.message.includes('fetch'))) {
+        console.log('🔄 Retrying without logo...')
+        const companyWithoutLogo = { ...company, logo_url: null }
+        
+        try {
+          const pdfBytes = await generator.generateVoucher(employee, period, companyWithoutLogo)
+          
+          if (pdfBytes.length > 0) {
+            console.log(`✅ PDF generated without logo: ${pdfBytes.length} bytes`)
+            return new Response(pdfBytes, {
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `attachment; filename="comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf"`,
+                'Content-Length': pdfBytes.length.toString(),
+                'Cache-Control': 'no-cache'
+              }
+            })
+          }
+        } catch (fallbackError) {
+          console.error('❌ Fallback also failed:', fallbackError.message)
+        }
+      }
+      
+      throw pdfError
+    }
+
+  } catch (error: any) {
+    console.error('💥 GENERAL ERROR:', error)
+    console.error('💥 Stack trace:', error.stack)
     
     return new Response(
       JSON.stringify({ 
-        error: `Error generando PDF profesional: ${error.message}`,
-        details: error.stack,
+        error: 'Error in native PDF generator', 
+        details: error.message || 'Unknown error',
         timestamp: new Date().toISOString()
       }),
       { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    );
+    )
   }
-});
+})
