@@ -11,6 +11,20 @@ export interface PayrollHistoryData {
   salario_base: number;
   dias_trabajados?: number;
   ibc?: number;
+  // Campos específicos de la tabla payrolls
+  auxilio_transporte?: number;
+  salud_empleado?: number;
+  pension_empleado?: number;
+  horas_extra?: number;
+  bonificaciones?: number;
+  comisiones?: number;
+  cesantias?: number;
+  prima?: number;
+  vacaciones?: number;
+  incapacidades?: number;
+  otros_devengos?: number;
+  otros_descuentos?: number;
+  retencion_fuente?: number;
   completeEmployeeData?: {
     id: string;
     nombre: string;
@@ -44,10 +58,10 @@ export function transformPayrollHistoryToEmployee(
     throw new Error(`Datos de empleado incompletos para ID: ${historyData.employee_id}`);
   }
 
-  // Calcular deducciones separadas (aproximación basada en proporciones estándar)
+  // Usar valores exactos de la tabla payrolls en lugar de aproximaciones
   const totalDeductions = historyData.total_deducciones || 0;
-  const healthDeduction = totalDeductions * 0.4; // 40% salud
-  const pensionDeduction = totalDeductions * 0.4; // 40% pensión
+  const healthDeduction = historyData.salud_empleado || 0;
+  const pensionDeduction = historyData.pension_empleado || 0;
   
   // Calcular aportes patronales (aproximación)
   const baseSalary = historyData.salario_base || 0;
@@ -59,10 +73,10 @@ export function transformPayrollHistoryToEmployee(
     position: emp.cargo || 'Sin cargo definido',
     baseSalary: historyData.salario_base || 0,
     workedDays: historyData.dias_trabajados || 30,
-    extraHours: 0, // No disponible en historial
-    disabilities: 0, // No disponible en historial
-    bonuses: 0, // No disponible en historial  
-    absences: 0, // No disponible en historial
+    extraHours: historyData.horas_extra || 0,
+    disabilities: historyData.incapacidades || 0,
+    bonuses: historyData.bonificaciones || 0,
+    absences: 0, // Calculado desde novedades si es necesario
     grossPay: historyData.total_devengado || 0,
     deductions: totalDeductions,
     netPay: historyData.neto_pagado || 0,
@@ -70,7 +84,7 @@ export function transformPayrollHistoryToEmployee(
     errors: [],
     eps: emp.eps || '',
     afp: emp.afp || '',
-    transportAllowance: 0, // No disponible en historial
+    transportAllowance: historyData.auxilio_transporte || 0,
     employerContributions,
     ibc: historyData.ibc || historyData.salario_base || 0,
     healthDeduction,

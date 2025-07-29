@@ -142,7 +142,21 @@ export const PayrollHistoryDetailPage = () => {
         neto_pagado: p.neto_pagado || 0,
         salario_base: p.salario_base || 0,
         ibc: p.salario_base || 0,
-        dias_trabajados: 30,
+        dias_trabajados: p.dias_trabajados || 30,
+        // Campos específicos de payrolls para conceptos exactos
+        auxilio_transporte: p.auxilio_transporte || 0,
+        salud_empleado: p.salud_empleado || 0,
+        pension_empleado: p.pension_empleado || 0,
+        horas_extra: p.horas_extra || 0,
+        bonificaciones: p.bonificaciones || 0,
+        comisiones: p.comisiones || 0,
+        cesantias: p.cesantias || 0,
+        prima: p.prima || 0,
+        vacaciones: p.vacaciones || 0,
+        incapacidades: p.incapacidades || 0,
+        otros_devengos: p.otros_devengos || 0,
+        otros_descuentos: p.descuentos_varios || 0,
+        retencion_fuente: p.retencion_fuente || 0,
         // Complete employee data for voucher
         completeEmployeeData: p.employees
       })) || [];
@@ -190,6 +204,20 @@ export const PayrollHistoryDetailPage = () => {
         salario_base: employeePayroll.salario_base,
         dias_trabajados: employeePayroll.dias_trabajados,
         ibc: employeePayroll.ibc,
+        // Pasar todos los campos específicos de payrolls
+        auxilio_transporte: (employeePayroll as any).auxilio_transporte,
+        salud_empleado: (employeePayroll as any).salud_empleado,
+        pension_empleado: (employeePayroll as any).pension_empleado,
+        horas_extra: (employeePayroll as any).horas_extra,
+        bonificaciones: (employeePayroll as any).bonificaciones,
+        comisiones: (employeePayroll as any).comisiones,
+        cesantias: (employeePayroll as any).cesantias,
+        prima: (employeePayroll as any).prima,
+        vacaciones: (employeePayroll as any).vacaciones,
+        incapacidades: (employeePayroll as any).incapacidades,
+        otros_devengos: (employeePayroll as any).otros_devengos,
+        otros_descuentos: (employeePayroll as any).otros_descuentos,
+        retencion_fuente: (employeePayroll as any).retencion_fuente,
         completeEmployeeData: employeePayroll.completeEmployeeData
       };
 
