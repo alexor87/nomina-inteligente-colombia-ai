@@ -221,10 +221,10 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     }
   };
 
-  // Cálculos detallados igual que en el PDF
+  // Cálculos detallados usando valores exactos de la liquidación
   const salarioProporcional = Math.round((employee.baseSalary / 30) * employee.workedDays);
-  const saludEmpleado = Math.round(employee.baseSalary * 0.04);
-  const pensionEmpleado = Math.round(employee.baseSalary * 0.04);
+  const saludEmpleado = employee.healthDeduction || 0;
+  const pensionEmpleado = employee.pensionDeduction || 0;
   const fondoSolidaridad = employee.baseSalary > 4000000 ? Math.round(employee.baseSalary * 0.01) : 0;
   const otrasDeduccionesCalculadas = Math.max(0, employee.deductions - saludEmpleado - pensionEmpleado - fondoSolidaridad);
   const valorHoraExtra = Math.round((employee.baseSalary / 240) * 1.25);
