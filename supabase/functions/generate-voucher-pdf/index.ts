@@ -1049,26 +1049,7 @@ ET`;
     
     tableContent += createRow('SUBTOTAL DEDUCCIONES', '', `-${formatCurrency(totalDeducciones)}`, true, '1 0.9 0.9');
 
-    // SECTION 3: APORTES PATRONALES (INFORMATIVO)
-    tableContent += createRow('APORTES PATRONALES', '(Informativo)', '', true, '0.9 1 0.9');
-    
-    const salud_empleador = Math.round(salarioBase * 0.085);
-    const pension_empleador = Math.round(salarioBase * 0.12);
-    const arl_empleador = Math.round(salarioBase * 0.00522);
-    const ccf_empleador = Math.round(salarioBase * 0.04);
-    const icbf_empleador = Math.round(salarioBase * 0.03);
-    const sena_empleador = Math.round(salarioBase * 0.02);
-    
-    tableContent += createRow('Salud Empleador (8.5%)', '8.5%', formatCurrency(salud_empleador));
-    tableContent += createRow('Pensión Empleador (12%)', '12%', formatCurrency(pension_empleador));
-    tableContent += createRow('ARL (0.522%)', '0.522%', formatCurrency(arl_empleador));
-    tableContent += createRow('CCF (4%)', '4%', formatCurrency(ccf_empleador));
-    tableContent += createRow('ICBF (3%)', '3%', formatCurrency(icbf_empleador));
-    tableContent += createRow('SENA (2%)', '2%', formatCurrency(sena_empleador));
-    
-    tableContent += createRow('TOTAL COSTO EMPLEADOR', '', formatCurrency(salarioBase + totalEmpleadorContrib), true, '0.9 1 0.9');
-
-    // SECTION 4: NETO A PAGAR
+    // SECTION 3: NETO A PAGAR
     tableContent += createRow('NETO A PAGAR', '', formatCurrency(netoAPagar), true, '0.8 1 0.8');
 
     return tableContent;
