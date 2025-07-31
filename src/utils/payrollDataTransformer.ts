@@ -2,6 +2,7 @@ import { PayrollEmployee } from '@/types/payroll';
 
 // Interface para los datos que vienen del historial (payrolls + employees)
 export interface PayrollHistoryData {
+  payroll_id?: string; // Add payroll ID
   employee_id: string;
   employee_name: string;
   employee_lastname: string;
@@ -69,6 +70,7 @@ export function transformPayrollHistoryToEmployee(
 
   return {
     id: historyData.employee_id,
+    payrollId: historyData.payroll_id, // Include payroll ID
     name: `${historyData.employee_name} ${historyData.employee_lastname}`,
     position: emp.cargo || 'Sin cargo definido',
     baseSalary: historyData.salario_base || 0,

@@ -54,10 +54,12 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     try {
       console.log('🚀 INICIANDO DESCARGA PDF NATIVO para:', employee.name);
       
-      // FASE 2: Send only payrollId instead of calculated data
+      // FASE 2: Send correct payrollId from employee data
       const requestBody = {
-        payrollId: employee.id // Use employee.id as payrollId
+        payrollId: employee.payrollId || employee.id // Use actual payrollId if available
       };
+
+      console.log('📋 Using payroll ID:', employee.payrollId || employee.id);
 
       console.log('📤 Enviando request al generador nativo:', requestBody);
 

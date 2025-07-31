@@ -199,6 +199,7 @@ export const PayrollHistoryDetailPage = () => {
     try {
       // Transform historical data to PayrollEmployee format using data transformer
       const historyData: PayrollHistoryData = {
+        payroll_id: employeePayroll.id, // Add the actual payroll ID
         employee_id: employeePayroll.employee_id,
         employee_name: employeePayroll.employee_name,
         employee_lastname: employeePayroll.employee_lastname,

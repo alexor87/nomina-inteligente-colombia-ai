@@ -890,44 +890,13 @@ serve(async (req) => {
       )
     }
 
-    // FASE 1: Query real data from database instead of using frontend calculations
+    // PHASE 1: Simplified queries to avoid JOIN issues
     console.log('🔍 Fetching real payroll data from database for ID:', payrollId)
     
-    // Get payroll data with employee and company information
+    // First get the payroll data
     const { data: payrollData, error: payrollError } = await supabase
       .from('payrolls')
-      .select(`
-        *,
-        employees!inner(
-          cedula,
-          nombre,
-          apellido,
-          email,
-          telefono,
-          cargo,
-          tipo_documento,
-          salario_base,
-          eps,
-          afp,
-          arl,
-          caja_compensacion
-        ),
-        payroll_periods_real!inner(
-          periodo,
-          fecha_inicio,
-          fecha_fin,
-          tipo_periodo,
-          companies!inner(
-            nit,
-            razon_social,
-            email,
-            telefono,
-            direccion,
-            ciudad,
-            logo_url
-          )
-        )
-      `)
+      .select('*')
       .eq('id', payrollId)
       .single()
 
@@ -942,40 +911,82 @@ serve(async (req) => {
       )
     }
 
-    console.log('✅ Real payroll data fetched:', {
-      employee: payrollData.employees.nombre + ' ' + payrollData.employees.apellido,
-      period: payrollData.payroll_periods_real.periodo,
-      grossPay: payrollData.total_devengado,
-      deductions: payrollData.total_deducciones,
-      netPay: payrollData.neto_pagado
-    })
+    // Then get employee data
+    const { data: employeeData, error: employeeError } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('id', payrollData.employee_id)
+      .single()
 
-    // Transform database data to PDF format
+    if (employeeError || !employeeData) {
+      console.error('❌ Error fetching employee data:', employeeError)
+      return new Response(
+        JSON.stringify({ error: 'Employee record not found' }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Finally get company data
+    const { data: companyData, error: companyError } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', payrollData.company_id)
+      .single()
+
+    if (companyError || !companyData) {
+      console.error('❌ Error fetching company data:', companyError)
+      return new Response(
+        JSON.stringify({ error: 'Company record not found' }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    console.log('✅ Payroll data fetched successfully:', {
+      employee: employeeData?.nombre,
+      period: payrollData?.periodo,
+      company: companyData?.razon_social
+    });
+
+    // Transform data to match PDF generator expectations using REAL database values
     const employee = {
-      id: payrollData.employee_id,
-      name: `${payrollData.employees.nombre} ${payrollData.employees.apellido}`,
-      cedula: payrollData.employees.cedula,
-      position: payrollData.employees.cargo,
+      id: employeeData.id,
+      name: employeeData.nombre + ' ' + (employeeData.apellido || ''),
+      cedula: employeeData.cedula,
+      position: employeeData.cargo,
       baseSalary: payrollData.salario_base,
       workedDays: payrollData.dias_trabajados,
-      extraHours: payrollData.horas_extra || 0,
-      bonuses: payrollData.bonificaciones || 0,
-      disabilities: payrollData.incapacidades || 0,
       grossPay: payrollData.total_devengado,
       deductions: payrollData.total_deducciones,
       netPay: payrollData.neto_pagado,
-      eps: payrollData.employees.eps,
-      afp: payrollData.employees.afp,
-      transportAllowance: payrollData.auxilio_transporte || 0
-    }
+      extraHours: payrollData.horas_extra || 0,
+      bonuses: payrollData.bonificaciones || 0,
+      transportAllowance: payrollData.subsidio_transporte || 0,
+      eps: employeeData.eps,
+      afp: employeeData.afp
+    };
 
+    // Get period data from payroll record (simplified)
     const period = {
-      startDate: payrollData.payroll_periods_real.fecha_inicio,
-      endDate: payrollData.payroll_periods_real.fecha_fin,
-      type: payrollData.payroll_periods_real.tipo_periodo
-    }
+      startDate: payrollData.periodo, // Use period name as fallback
+      endDate: payrollData.periodo,
+      type: 'mensual'
+    };
 
-    const company = payrollData.payroll_periods_real.companies
+    const company = {
+      razon_social: companyData.razon_social,
+      nit: companyData.nit,
+      direccion: companyData.direccion,
+      ciudad: companyData.ciudad,
+      telefono: companyData.telefono,
+      email: companyData.email,
+      logo_url: companyData.logo_url
+    };
 
     // Generate PDF with fallback for logo errors
     console.log('🔧 Starting PDF generation...')

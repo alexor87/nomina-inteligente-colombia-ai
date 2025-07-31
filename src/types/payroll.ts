@@ -26,6 +26,7 @@ export interface NovedadForIBC {
 
 export interface PayrollEmployee {
   id: string;
+  payrollId?: string; // Add payroll ID field
   name: string;
   position: string;
   baseSalary: number;
