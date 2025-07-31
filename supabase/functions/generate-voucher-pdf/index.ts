@@ -317,32 +317,40 @@ endstream`);
       return `$ ${formatted}`;
     };
 
+    // Generate simplified voucher number (format: NOM-YYYY-NNNN)
+    const shortVoucherNumber = `NOM-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`;
+    
     // Calculate title positioning for perfect centering
     const titleText = 'COMPROBANTE DE NÓMINA';
-    const titleWidth = titleText.length * 8.5; // More accurate width calculation for 18pt font
+    const titleWidth = titleText.length * 8.5;
     const pageWidth = 612;
     const titleX = (pageWidth - titleWidth) / 2;
+    
+    // Calculate period subtitle positioning
+    const periodSubtitle = periodLabel;
+    const periodWidth = periodSubtitle.length * 6;
+    const periodX = (pageWidth - periodWidth) / 2;
 
-    // CARTA SIZE OPTIMIZED VOUCHER - Professional header layout
+    // PROFESSIONAL HEADER LAYOUT - PM Optimized
     return `
-% ============= PROFESSIONAL HEADER LAYOUT =============
-% Voucher number - right aligned
+% ============= OPTIMIZED PROFESSIONAL HEADER =============
+% Voucher number - simplified and subtle
 BT
-/F1 8 Tf
-0.5 0.5 0.5 rg
-450 770 Td
-(${this.escapeText('No. ' + voucherNumber)}) Tj
+/F1 7 Tf
+0.6 0.6 0.6 rg
+480 770 Td
+(${this.escapeText(shortVoucherNumber)}) Tj
 ET
 
 % Generation date - right aligned under number
 BT
-/F1 8 Tf
-0.5 0.5 0.5 rg
-450 758 Td
+/F1 7 Tf
+0.6 0.6 0.6 rg
+480 760 Td
 (${this.escapeText('Generado: ' + generationDate)}) Tj
 ET
 
-% Main title - perfectly centered
+% Main title - enhanced hierarchy
 BT
 /F2 18 Tf
 0.118 0.165 0.478 rg
@@ -350,18 +358,18 @@ ${Math.round(titleX)} 740 Td
 (${this.escapeText('COMPROBANTE DE NOMINA')}) Tj
 ET
 
-% Period subtitle - centered
+% Period subtitle - clear and centered
 BT
-/F1 10 Tf
-0.3 0.3 0.3 rg
-${Math.round((pageWidth - (periodLabel.length * 6)) / 2)} 722 Td
-(${this.escapeText('Período: ' + periodLabel)}) Tj
+/F1 12 Tf
+0.2 0.2 0.2 rg
+${Math.round(periodX)} 720 Td
+(${this.escapeText(periodSubtitle)}) Tj
 ET
 
-% Thin separator with better spacing
+% Professional separator
 q
 0.118 0.165 0.478 rg
-50 715 512 0.5 re
+50 705 512 0.3 re
 f
 Q
 
@@ -445,30 +453,30 @@ BT
 ET
 
 % ============= ENHANCED EMPLOYEE INFORMATION CARD =============
-% Employee card with complete details
+% Employee card with complete details - optimized height
 q
 0.95 0.97 0.99 rg
-221 625 170 100 re
+221 675 170 35 re
 f
 Q
 
 q
 0.118 0.165 0.478 rg
-221 625 4 100 re
+221 675 4 35 re
 f
 Q
 
 BT
-/F2 9 Tf
+/F2 8 Tf
 0.118 0.165 0.478 rg
-230 710 Td
+230 695 Td
 (${this.escapeText('EMPLEADO')}) Tj
 ET
 
 BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-230 695 Td
+/F2 9 Tf
+0 0 0 rg
+230 685 Td
 (${this.escapeText(employeeFullName.length > 18 ? employeeFullName.substring(0, 18) + '...' : employeeFullName)}) Tj
 ET
 
@@ -511,21 +519,21 @@ ET
 % Period card with bank information
 q
 0.95 0.97 0.99 rg
-402 625 170 100 re
+402 675 170 35 re
 f
 Q
 
 q
 0.118 0.165 0.478 rg
-402 625 4 100 re
+402 675 4 35 re
 f
 Q
 
 BT
-/F2 9 Tf
+/F2 8 Tf
 0.118 0.165 0.478 rg
-411 710 Td
-(${this.escapeText('PERÍODO Y PAGO')}) Tj
+411 695 Td
+(${this.escapeText('DATOS DE PAGO')}) Tj
 ET
 
 BT
