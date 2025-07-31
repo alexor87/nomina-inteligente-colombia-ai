@@ -1052,82 +1052,128 @@ ET`;
   }
 
   private generateTableRowsFromDB(salarioBase: number, totalDevengado: number, auxilioTransporte: number, bonificaciones: number, horasExtra: number, totalDeducciones: number, netoAPagar: number, diasTrabajados: number, saludEmpleado: number, pensionEmpleado: number, formatCurrency: (value: number) => string): string {
-    let yPos = 530;
+    let yPos = 500;
     let rowCount = 0;
 
-    // Función para crear una fila
-    const createRow = (concept: string, value: string, isHighlighted = false, bgColorOverride?: string) => {
-      const bgColor = bgColorOverride || (rowCount % 2 === 0 ? '0.98 0.98 0.98' : '1 1 1');
-      const textColor = isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2';
-      const fontType = isHighlighted ? '/F2' : '/F1';
+    // IMPROVED: Enhanced row creator with better spacing and typography
+    const createRow = (concept: string, value: string, quantity: string = '', isHeader = false, isHighlighted = false, bgColorOverride?: string) => {
+      const bgColor = isHeader ? '0.118 0.165 0.478' : 
+                     bgColorOverride || (rowCount % 2 === 0 ? '0.97 0.97 0.97' : '1 1 1');
+      const textColor = isHeader ? '1 1 1' : (isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2');
+      const fontType = (isHeader || isHighlighted) ? '/F2' : '/F1';
+      const fontSize = isHeader ? '11' : (isHighlighted ? '10' : '9');
       
       let row = `
-% Fila ${rowCount + 1}: ${concept}
+% Row ${rowCount + 1}: ${concept}
 q
 ${bgColor} rg
-40 ${yPos} 532 25 re
+40 ${yPos} 532 22 re
 f
 Q
 
+% Subtle borders for better definition
 q
-0.9 0.9 0.9 RG
-0.5 w
-40 ${yPos} 532 25 re
+0.85 0.85 0.85 RG
+0.3 w
+40 ${yPos} 532 22 re
 S
 Q
 
-BT
-${fontType} 9 Tf
-${textColor} rg
-50 ${yPos + 8} Td
-(${this.escapeText(concept)}) Tj
-ET
+% Vertical separators
+q
+0.9 0.9 0.9 RG
+0.3 w
+300 ${yPos} 0 22 re
+S
+425 ${yPos} 0 22 re
+S
+Q
 
+% Concept text (60% width)
 BT
-${fontType} 9 Tf
+${fontType} ${fontSize} Tf
 ${textColor} rg
-480 ${yPos + 8} Td
+50 ${yPos + 7} Td
+(${this.escapeText(concept)}) Tj
+ET`;
+
+      // Quantity column (15% width) - only if provided
+      if (quantity) {
+        row += `
+% Quantity
+BT
+${fontType} ${fontSize} Tf
+${textColor} rg
+320 ${yPos + 7} Td
+(${this.escapeText(quantity)}) Tj
+ET`;
+      }
+
+      // Value column (25% width) - right aligned
+      row += `
+% Value - right aligned
+BT
+${fontType} ${fontSize} Tf
+${textColor} rg
+520 ${yPos + 7} Td
 (${this.escapeText(value)}) Tj
 ET`;
       
-      yPos -= 25;
+      yPos -= 22;
       rowCount++;
       return row;
     };
 
     let tableContent = '';
 
-    // 1. Salario Base
-    tableContent += createRow('Salario Base', formatCurrency(salarioBase));
+    // HEADER ROW
+    tableContent += createRow('CONCEPTO', 'VALOR', 'DÍAS/HORAS', true);
 
-    // 2. Días Trabajados
-    tableContent += createRow(`Días Trabajados`, `${diasTrabajados} días`);
+    // SECTION 1: DEVENGADOS
+    tableContent += createRow('── DEVENGADOS ──', '', '', false, true, '0.9 0.95 1');
+    
+    // Basic salary
+    tableContent += createRow('Salario Base', formatCurrency(salarioBase), `${diasTrabajados} días`);
 
-    // 3. Auxilio de Transporte (si > 0)
+    // Transportation allowance
     if (auxilioTransporte > 0) {
       tableContent += createRow('Auxilio de Transporte', formatCurrency(auxilioTransporte));
     }
 
-    // 4. Bonificaciones (si > 0)
+    // Bonuses
     if (bonificaciones > 0) {
       tableContent += createRow('Bonificaciones', formatCurrency(bonificaciones));
     }
 
-    // 5. Horas Extra (si > 0)
+    // Overtime
     if (horasExtra > 0) {
-      tableContent += createRow('Horas Extra', formatCurrency(horasExtra));
+      const overtimeValue = Math.round((salarioBase / 240) * 1.25 * horasExtra);
+      tableContent += createRow('Horas Extra', formatCurrency(overtimeValue), `${horasExtra} hrs`);
     }
 
-    // 6. Total Devengado (destacado)
-    tableContent += createRow('TOTAL DEVENGADO', formatCurrency(totalDevengado), true, '0.9 0.95 1');
+    // Total earned (highlighted)
+    tableContent += createRow('TOTAL DEVENGADO', formatCurrency(totalDevengado), '', false, true, '0.85 0.95 0.85');
 
-    // 7. Deducciones (destacado)
+    // SECTION 2: DEDUCCIONES
     if (totalDeducciones > 0) {
-      tableContent += createRow('TOTAL DEDUCCIONES', `-${formatCurrency(totalDeducciones)}`, true, '1 0.9 0.9');
+      tableContent += createRow('── DEDUCCIONES ──', '', '', false, true, '1 0.9 0.9');
+      
+      // Health contribution
+      if (saludEmpleado > 0) {
+        tableContent += createRow('Salud (4%)', `-${formatCurrency(saludEmpleado)}`);
+      }
+      
+      // Pension contribution
+      if (pensionEmpleado > 0) {
+        tableContent += createRow('Pensión (4%)', `-${formatCurrency(pensionEmpleado)}`);
+      }
+      
+      // Total deductions
+      tableContent += createRow('TOTAL DEDUCCIONES', `-${formatCurrency(totalDeducciones)}`, '', false, true, '1 0.85 0.85');
     }
 
-    // 8. Neto a Pagar (destacado)
-    tableContent += createRow('NETO A PAGAR', formatCurrency(netoAPagar), true, '0.9 1 0.9');
+    // NET PAY (most highlighted)
+    tableContent += createRow('NETO A PAGAR', formatCurrency(netoAPagar), '', false, true, '0.9 1 0.9');
 
     return tableContent;
   }
