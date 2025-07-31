@@ -512,7 +512,7 @@ ET`;
     }
 
     // 6. Total Deducciones (rojo)
-    tableContent += createRow('Total Deducciones', '- ' + formatCurrency(totalDeduccionesCalculadas), false, '0.99 0.95 0.95');
+    tableContent += createRow('Total Deducciones', '- ' + formatCurrency(deducciones), false, '0.99 0.95 0.95');
 
     // 7. NETO A PAGAR (verde destacado)
     tableContent += createRow('NETO A PAGAR', formatCurrency(salarioNeto), true, '0.95 0.99 0.95');
