@@ -1609,7 +1609,6 @@ serve(async (req) => {
           dias_trabajados,
           auxilio_transporte,
           horas_extra,
-          horas_extra_valor,
           bonificaciones,
           salud_empleado,
           pension_empleado,
