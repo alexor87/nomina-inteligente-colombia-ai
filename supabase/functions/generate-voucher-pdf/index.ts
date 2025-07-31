@@ -164,7 +164,7 @@ endstream`);
     };
 
     // Calculo del ancho del título para centrarlo perfectamente
-    const titleText = 'COMPROBANTE DE NÓMINA';
+    const titleText = 'COMPROBANTE DE NOMINA';
     const titleWidth = titleText.length * 12; // Aproximación
     const pageWidth = 612;
     const titleX = (pageWidth - titleWidth) / 2;
@@ -420,10 +420,10 @@ BT
 ET
 
 % ============= FILAS DE CONCEPTOS - TODAS LAS DEL MODAL =============
-` + this.generateTableRows(salarioBase, salarioProporcional, subsidioTransporte, bonificaciones, totalHorasExtra, horasExtra, valorHoraExtra, totalDeduccionesCalculadas, salarioNeto, formatCurrency) + this.generateExtraSections(totalHorasExtra, horasExtra, valorHoraExtra, saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas, companyName, formatCurrency);
+` + this.generateTableRows(salarioBase, salarioProporcional, subsidioTransporte, bonificaciones, totalHorasExtra, horasExtra, valorHoraExtra, totalDeduccionesCalculadas, salarioNeto, diasTrabajados, formatCurrency) + this.generateExtraSections(totalHorasExtra, horasExtra, valorHoraExtra, saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas, companyName, formatCurrency);
   }
 
-  private generateTableRows(salarioBase: number, salarioProporcional: number, subsidioTransporte: number, bonificaciones: number, totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, totalDeduccionesCalculadas: number, salarioNeto: number, formatCurrency: (value: number) => string): string {
+  private generateTableRows(salarioBase: number, salarioProporcional: number, subsidioTransporte: number, bonificaciones: number, totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, totalDeduccionesCalculadas: number, salarioNeto: number, diasTrabajados: number, formatCurrency: (value: number) => string): string {
     let yPos = 530;
     let rowCount = 0;
 
@@ -468,7 +468,6 @@ ET`;
     };
 
     let tableContent = '';
-    const diasTrabajados = 15; // Assuming quincenal
 
     // 1. Salario Base
     tableContent += createRow('Salario Base', formatCurrency(salarioBase));
@@ -502,7 +501,7 @@ ET`;
 
   private generateExtraSections(totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, saludEmpleado: number, pensionEmpleado: number, totalDeduccionesCalculadas: number, companyName: string, formatCurrency: (value: number) => string): string {
     let extraSections = '';
-    let yPos2 = 280; // Position below main table
+    let yPos2 = 420; // Position immediately after main table
     
     // TABLA DE HORAS EXTRA (si aplica)
     if (totalHorasExtra > 0) {
