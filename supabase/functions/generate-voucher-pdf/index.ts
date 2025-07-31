@@ -25,12 +25,30 @@ class NativePDFGenerator {
   }
 
   private escapeText(text: string): string {
+    // Map Spanish special characters to their PDF octal representation
+    const spanishCharMap: { [key: string]: string } = {
+      'á': '\\341', 'à': '\\340', 'ä': '\\344', 'â': '\\342',
+      'é': '\\351', 'è': '\\350', 'ë': '\\353', 'ê': '\\352',
+      'í': '\\355', 'ì': '\\354', 'ï': '\\357', 'î': '\\356',
+      'ó': '\\363', 'ò': '\\362', 'ö': '\\366', 'ô': '\\364',
+      'ú': '\\372', 'ù': '\\371', 'ü': '\\374', 'û': '\\373',
+      'ñ': '\\361',
+      'Á': '\\301', 'À': '\\300', 'Ä': '\\304', 'Â': '\\302',
+      'É': '\\311', 'È': '\\310', 'Ë': '\\313', 'Ê': '\\312',
+      'Í': '\\315', 'Ì': '\\314', 'Ï': '\\317', 'Î': '\\316',
+      'Ó': '\\323', 'Ò': '\\322', 'Ö': '\\326', 'Ô': '\\324',
+      'Ú': '\\332', 'Ù': '\\331', 'Ü': '\\334', 'Û': '\\333',
+      'Ñ': '\\321'
+    };
+
     return text
       .replace(/\\/g, '\\\\')
       .replace(/\(/g, '\\(')
       .replace(/\)/g, '\\)')
       .replace(/\r/g, '\\r')
-      .replace(/\n/g, '\\n');
+      .replace(/\n/g, '\\n')
+      // Replace Spanish special characters with their PDF octal representation
+      .replace(/[áàäâéèëêíìïîóòöôúùüûñÁÀÄÂÉÈËÊÍÌÏÎÓÒÖÔÚÙÜÛÑ]/g, (match) => spanishCharMap[match] || match);
   }
 
   private formatCurrency(amount: number): string {
