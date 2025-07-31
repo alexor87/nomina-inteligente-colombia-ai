@@ -52,7 +52,17 @@ class NativePDFGenerator {
   }
 
   private formatCurrency(amount: number): string {
-    return '$' + amount.toLocaleString('es-CO');
+    if (!Number.isFinite(amount) || amount === null || value === undefined) {
+      return '$ 0';
+    }
+    
+    // Use en-US locale for clean thousand separators
+    const formatted = amount.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+    
+    return `$ ${formatted}`;
   }
 
   private formatDate(dateStr: string): string {
@@ -294,11 +304,17 @@ endstream`);
     const totalEmpleadorContrib = salud_empleador + pension_empleador + arl_empleador + ccf_empleador + icbf_empleador + sena_empleador;
 
     const formatCurrency = (amount: number) => {
-      return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0
-      }).format(amount);
+      if (!Number.isFinite(amount) || amount === null || amount === undefined) {
+        return '$ 0';
+      }
+      
+      // Use en-US locale for clean thousand separators
+      const formatted = amount.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+      
+      return `$ ${formatted}`;
     };
 
     // Calculate title positioning for perfect centering
@@ -666,11 +682,17 @@ ET
     const companyInitial = companyName.charAt(0).toUpperCase();
 
     const formatCurrency = (amount: number) => {
-      return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0
-      }).format(amount);
+      if (!Number.isFinite(amount) || amount === null || amount === undefined) {
+        return '$ 0';
+      }
+      
+      // Use en-US locale for clean thousand separators
+      const formatted = amount.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+      
+      return `$ ${formatted}`;
     };
 
     // Calculo del ancho del título para centrarlo perfectamente
