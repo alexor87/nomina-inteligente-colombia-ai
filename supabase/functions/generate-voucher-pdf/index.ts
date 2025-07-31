@@ -57,13 +57,97 @@ class NativePDFGenerator {
 
   private formatDate(dateStr: string): string {
     try {
+      // Handle both ISO string and date objects
       const date = new Date(dateStr);
-      return `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
+      if (isNaN(date.getTime())) return dateStr;
+      
+      return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
     } catch {
       return dateStr;
     }
   }
 
+  // NEW METHOD: Generate voucher directly from database data
+  async generateVoucherFromDB(payrollData: any, companyData: any): Promise<Uint8Array> {
+    console.log('🔧 Generando PDF para:', payrollData.employees.nombre);
+
+    // Use REAL DATABASE VALUES - no calculations
+    const salarioBase = Number(payrollData.salario_base) || 0;
+    const diasTrabajados = Number(payrollData.dias_trabajados) || 15;
+    const totalDevengado = Number(payrollData.total_devengado) || 0;
+    const totalDeducciones = Number(payrollData.total_deducciones) || 0;
+    const netoAPagar = Number(payrollData.neto_pagado) || 0;
+    const auxilioTransporte = Number(payrollData.auxilio_transporte) || 0;
+    const horasExtra = Number(payrollData.horas_extra) || 0;
+    const bonificaciones = Number(payrollData.bonificaciones) || 0;
+    const saludEmpleado = Number(payrollData.salud_empleado) || 0;
+    const pensionEmpleado = Number(payrollData.pension_empleado) || 0;
+
+    // Use REAL PERIOD DATES from database
+    const fechaInicio = this.formatDate(payrollData.payroll_periods_real.fecha_inicio);
+    const fechaFin = this.formatDate(payrollData.payroll_periods_real.fecha_fin);
+
+    console.log('📋 KISS: Generando PDF sin logo para máxima confiabilidad');
+
+    // Create fonts first (objects 1 and 2)
+    const fontRegularId = this.addObject(`<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+>>`);
+
+    const fontBoldId = this.addObject(`<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica-Bold
+>>`);
+
+    // Create content stream with REAL database data
+    const contentStream = this.generateContentStreamFromDB(payrollData, companyData, {
+      salarioBase, diasTrabajados, totalDevengado, totalDeducciones, netoAPagar,
+      auxilioTransporte, horasExtra, bonificaciones, fechaInicio, fechaFin,
+      saludEmpleado, pensionEmpleado
+    });
+
+    const contentStreamId = this.addObject(`<<
+/Length ${contentStream.length}
+>>
+stream
+${contentStream}
+endstream`);
+
+    // Create page with correct references
+    const pageId = this.addObject(`<<
+/Type /Page
+/Parent 5 0 R
+/MediaBox [0 0 612 792]
+/Contents ${contentStreamId} 0 R
+/Resources <<
+  /Font <<
+    /F1 ${fontRegularId} 0 R
+    /F2 ${fontBoldId} 0 R
+  >>
+>>
+>>`);
+
+    // Create pages catalog
+    const pagesId = this.addObject(`<<
+/Type /Pages
+/Kids [${pageId} 0 R]
+/Count 1
+>>`);
+
+    // Create root catalog
+    const catalogId = this.addObject(`<<
+/Type /Catalog
+/Pages ${pagesId} 0 R
+>>`);
+
+    // Generate complete PDF with correct structure
+    return this.buildPDFWithCorrectStructure(catalogId);
+  }
+
+  // LEGACY METHOD: For backward compatibility
   async generateVoucher(employee: any, period: any, company: any): Promise<Uint8Array> {
     console.log('🔧 Generando PDF para:', employee.name);
 
@@ -158,6 +242,289 @@ endstream`);
 
     // Generate complete PDF with correct structure
     return this.buildPDFWithCorrectStructure(catalogId);
+  }
+
+  // NEW METHOD: Generate content stream from real database data
+  private generateContentStreamFromDB(payrollData: any, companyData: any, data: any): string {
+    console.log('🎨 UX DESIGNER MODE: Creating PDF with REAL DATABASE values...');
+    
+    const { salarioBase, diasTrabajados, totalDevengado, totalDeducciones, netoAPagar,
+            auxilioTransporte, horasExtra, bonificaciones, fechaInicio, fechaFin,
+            saludEmpleado, pensionEmpleado } = data;
+
+    const companyName = companyData?.razon_social || 'Mi Empresa';
+    const companyNit = companyData?.nit || 'N/A';
+    const companyAddress = companyData?.direccion || '';
+    const companyInitial = companyName.charAt(0).toUpperCase();
+    const employeeName = `${payrollData.employees.nombre} ${payrollData.employees.apellido}`.trim();
+    const periodLabel = payrollData.payroll_periods_real.periodo;
+
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0
+      }).format(amount);
+    };
+
+    // Calculo del ancho del título para centrarlo perfectamente
+    const titleText = 'COMPROBANTE DE NOMINA';
+    const titleWidth = titleText.length * 12; // Aproximación
+    const pageWidth = 612;
+    const titleX = (pageWidth - titleWidth) / 2;
+
+    // PREMIUM PDF - Using REAL DATABASE VALUES
+    return `
+% ============= PREMIUM HEADER - PERFECTAMENTE CENTRADO =============
+% Título principal centrado dinámicamente
+BT
+/F2 22 Tf
+0.118 0.165 0.478 rg
+${titleX} 750 Td
+(${this.escapeText(titleText)}) Tj
+ET
+
+% Subtítulo del período - elegante y sutil
+BT
+/F1 12 Tf
+0.3 0.3 0.3 rg
+${titleX} 725 Td
+(${this.escapeText('Período: ' + fechaInicio + ' - ' + fechaFin)}) Tj
+ET
+
+% Separador horizontal elegante
+q
+0.118 0.165 0.478 rg
+50 710 512 1 re
+f
+Q
+
+% ============= INFORMACIÓN CARDS - DISEÑO MODAL EXACTO =============
+
+% CARD 1: EMPRESA - Diseño Premium con sombra
+q
+0.95 0.97 0.99 rg
+40 630 170 80 re
+f
+Q
+
+% Borde izquierdo azul distintivo
+q
+0.118 0.165 0.478 rg
+40 630 4 80 re
+f
+Q
+
+% Sombra sutil de la card
+q
+0.85 0.85 0.85 rg
+42 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+40 630 170 80 re
+f
+Q
+
+% Logo circular de empresa - profesional
+q
+0.118 0.165 0.478 rg
+55 680 24 24 re
+f
+Q
+
+% Inicial de empresa en blanco
+BT
+/F2 12 Tf
+1 1 1 rg
+64 689 Td
+(${this.escapeText(companyInitial)}) Tj
+ET
+
+% Labels y datos de empresa
+BT
+/F2 9 Tf
+0.118 0.165 0.478 rg
+88 695 Td
+(${this.escapeText('EMPRESA')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+88 680 Td
+(${this.escapeText(companyName.length > 18 ? companyName.substring(0, 18) + '...' : companyName)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+88 667 Td
+(${this.escapeText('NIT: ' + companyNit)}) Tj
+ET
+
+% CARD 2: EMPLEADO - Centrada
+q
+0.95 0.97 0.99 rg
+221 630 170 80 re
+f
+Q
+
+q
+0.118 0.165 0.478 rg
+221 630 4 80 re
+f
+Q
+
+% Sombra
+q
+0.85 0.85 0.85 rg
+223 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+221 630 170 80 re
+f
+Q
+
+BT
+/F2 9 Tf
+0.118 0.165 0.478 rg
+230 695 Td
+(${this.escapeText('EMPLEADO')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+230 680 Td
+(${this.escapeText(employeeName.length > 20 ? employeeName.substring(0, 20) + '...' : employeeName)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+230 667 Td
+(${this.escapeText('CC: ' + (payrollData.employees.cedula || 'N/A'))}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+230 654 Td
+(${this.escapeText('Cargo: ' + (payrollData.employees.cargo || 'N/A'))}) Tj
+ET
+
+% CARD 3: PERÍODO - Derecha
+q
+0.95 0.97 0.99 rg
+402 630 170 80 re
+f
+Q
+
+q
+0.118 0.165 0.478 rg
+402 630 4 80 re
+f
+Q
+
+% Sombra
+q
+0.85 0.85 0.85 rg
+404 628 170 80 re
+f
+Q
+q
+0.95 0.97 0.99 rg
+402 630 170 80 re
+f
+Q
+
+BT
+/F2 9 Tf
+0.118 0.165 0.478 rg
+411 695 Td
+(${this.escapeText('PERÍODO')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+411 680 Td
+(${this.escapeText('Desde: ' + fechaInicio)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+411 667 Td
+(${this.escapeText('Hasta: ' + fechaFin)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+411 654 Td
+(${this.escapeText('Días trabajados: ' + diasTrabajados)}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.4 0.4 0.4 rg
+411 641 Td
+(${this.escapeText('Salario base: ' + formatCurrency(salarioBase))}) Tj
+ET
+
+% ============= TABLA PRINCIPAL DE CONCEPTOS - CON DATOS REALES DB =============
+% Título de sección
+BT
+/F2 14 Tf
+0.118 0.165 0.478 rg
+40 600 Td
+(${this.escapeText('RESUMEN DEL PAGO')}) Tj
+ET
+
+% Contenedor de tabla con borde elegante
+q
+0.98 0.98 0.98 rg
+40 320 532 260 re
+f
+Q
+
+% Borde de tabla profesional
+q
+0.85 0.85 0.85 RG
+1 w
+40 320 532 260 re
+S
+Q
+
+% HEADER DE TABLA - Azul premium
+q
+0.118 0.165 0.478 rg
+40 555 532 25 re
+f
+Q
+
+% Textos del header
+BT
+/F2 10 Tf
+1 1 1 rg
+50 563 Td
+(${this.escapeText('CONCEPTO')}) Tj
+ET
+
+BT
+/F2 10 Tf
+1 1 1 rg
+480 563 Td
+(${this.escapeText('VALOR')}) Tj
+ET
+
+% ============= FILAS CON DATOS REALES DE LA BASE DE DATOS =============
+` + this.generateTableRowsFromDB(salarioBase, totalDevengado, auxilioTransporte, bonificaciones, horasExtra, totalDeducciones, netoAPagar, diasTrabajados, saludEmpleado, pensionEmpleado, formatCurrency) + this.generateExtraSection(companyName, formatCurrency);
   }
 
   private generateContentStream(employee: any, period: any, company: any, data: any): string {
@@ -441,6 +808,88 @@ ET
 ` + this.generateTableRows(salarioBase, salarioProporcional, subsidioTransporte, bonificaciones, totalHorasExtra, horasExtra, valorHoraExtra, totalDeduccionesCalculadas, salarioNeto, diasTrabajados, formatCurrency) + this.generateExtraSections(totalHorasExtra, horasExtra, valorHoraExtra, saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas, companyName, formatCurrency);
   }
 
+  // NEW METHOD: Generate table rows from real database data
+  private generateTableRowsFromDB(salarioBase: number, totalDevengado: number, auxilioTransporte: number, bonificaciones: number, horasExtra: number, totalDeducciones: number, netoAPagar: number, diasTrabajados: number, saludEmpleado: number, pensionEmpleado: number, formatCurrency: (value: number) => string): string {
+    let yPos = 530;
+    let rowCount = 0;
+
+    // Función para crear una fila
+    const createRow = (concept: string, value: string, isHighlighted = false, bgColorOverride?: string) => {
+      const bgColor = bgColorOverride || (rowCount % 2 === 0 ? '0.98 0.98 0.98' : '1 1 1');
+      const textColor = isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2';
+      const fontType = isHighlighted ? '/F2' : '/F1';
+      
+      let row = `
+% Fila ${rowCount + 1}: ${concept}
+q
+${bgColor} rg
+40 ${yPos} 532 25 re
+f
+Q
+
+q
+0.9 0.9 0.9 RG
+0.5 w
+40 ${yPos} 532 25 re
+S
+Q
+
+BT
+${fontType} 9 Tf
+${textColor} rg
+50 ${yPos + 8} Td
+(${this.escapeText(concept)}) Tj
+ET
+
+BT
+${fontType} 9 Tf
+${textColor} rg
+480 ${yPos + 8} Td
+(${this.escapeText(value)}) Tj
+ET`;
+      
+      yPos -= 25;
+      rowCount++;
+      return row;
+    };
+
+    let tableContent = '';
+
+    // 1. Salario Base
+    tableContent += createRow('Salario Base', formatCurrency(salarioBase));
+
+    // 2. Días Trabajados
+    tableContent += createRow(`Días Trabajados`, `${diasTrabajados} días`);
+
+    // 3. Auxilio de Transporte (si > 0)
+    if (auxilioTransporte > 0) {
+      tableContent += createRow('Auxilio de Transporte', formatCurrency(auxilioTransporte));
+    }
+
+    // 4. Bonificaciones (si > 0)
+    if (bonificaciones > 0) {
+      tableContent += createRow('Bonificaciones', formatCurrency(bonificaciones));
+    }
+
+    // 5. Horas Extra (si > 0)
+    if (horasExtra > 0) {
+      tableContent += createRow('Horas Extra', formatCurrency(horasExtra));
+    }
+
+    // 6. Total Devengado (destacado)
+    tableContent += createRow('TOTAL DEVENGADO', formatCurrency(totalDevengado), true, '0.9 0.95 1');
+
+    // 7. Deducciones (destacado)
+    if (totalDeducciones > 0) {
+      tableContent += createRow('TOTAL DEDUCCIONES', `-${formatCurrency(totalDeducciones)}`, true, '1 0.9 0.9');
+    }
+
+    // 8. Neto a Pagar (destacado)
+    tableContent += createRow('NETO A PAGAR', formatCurrency(netoAPagar), true, '0.9 1 0.9');
+
+    return tableContent;
+  }
+
   private generateTableRows(salarioBase: number, salarioProporcional: number, subsidioTransporte: number, bonificaciones: number, totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, totalDeduccionesCalculadas: number, salarioNeto: number, diasTrabajados: number, formatCurrency: (value: number) => string): string {
     let yPos = 530;
     let rowCount = 0;
@@ -505,318 +954,179 @@ ET`;
 
     // 5. Horas Extra (si > 0)
     if (totalHorasExtra > 0) {
-      tableContent += createRow(`Horas Extra (${horasExtra} hrs x ${formatCurrency(valorHoraExtra)})`, formatCurrency(totalHorasExtra));
+      tableContent += createRow('Horas Extra', formatCurrency(totalHorasExtra));
     }
 
-    // 6. Total Deducciones (rojo)
-    tableContent += createRow('Total Deducciones', '- ' + formatCurrency(totalDeduccionesCalculadas), false, '0.99 0.95 0.95');
+    // 6. Total Devengado (destacado)
+    const totalDevengado = salarioProporcional + subsidioTransporte + bonificaciones + totalHorasExtra;
+    tableContent += createRow('TOTAL DEVENGADO', formatCurrency(totalDevengado), true, '0.9 0.95 1');
 
-    // 7. NETO A PAGAR (verde destacado)
-    tableContent += createRow('NETO A PAGAR', formatCurrency(salarioNeto), true, '0.95 0.99 0.95');
+    // 7. Deducciones (destacado)
+    if (totalDeduccionesCalculadas > 0) {
+      tableContent += createRow('TOTAL DEDUCCIONES', `-${formatCurrency(totalDeduccionesCalculadas)}`, true, '1 0.9 0.9');
+    }
+
+    // 8. Neto a Pagar (destacado)
+    tableContent += createRow('NETO A PAGAR', formatCurrency(salarioNeto), true, '0.9 1 0.9');
 
     return tableContent;
   }
 
-  private generateExtraSections(totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, saludEmpleado: number, pensionEmpleado: number, totalDeduccionesCalculadas: number, companyName: string, formatCurrency: (value: number) => string): string {
-    let extraSections = '';
-    let yPos2 = 420; // Position immediately after main table
-    
-    // TABLA DE HORAS EXTRA (si aplica)
-    if (totalHorasExtra > 0) {
-      extraSections += `
+  private generateExtraSection(companyName: string, formatCurrency: (value: number) => string): string {
+    return `
+% ============= SECCIÓN DE FIRMAS Y PIE DE PÁGINA =============
+% Separador entre tabla y firmas
+q
+0.85 0.85 0.85 rg
+40 280 532 1 re
+f
+Q
 
-% ============= DETALLE HORAS EXTRA =============
-BT
-/F2 12 Tf
-0.118 0.165 0.478 rg
-40 ${yPos2} Td
-(${this.escapeText('DETALLE HORAS EXTRA')}) Tj
-ET
-
-% Container
+% Cuadros para firmas - lado a lado
 q
 0.98 0.98 0.98 rg
-40 ${yPos2 - 70} 532 60 re
+40 180 250 90 re
 f
 Q
 
 q
 0.85 0.85 0.85 RG
 1 w
-40 ${yPos2 - 70} 532 60 re
+40 180 250 90 re
 S
 Q
 
-% Header
-q
-0.118 0.165 0.478 rg
-40 ${yPos2 - 25} 532 20 re
-f
-Q
-
-BT
-/F2 9 Tf
-1 1 1 rg
-50 ${yPos2 - 18} Td
-(${this.escapeText('CONCEPTO')}) Tj
-ET
-
-BT
-/F2 9 Tf
-1 1 1 rg
-250 ${yPos2 - 18} Td
-(${this.escapeText('CANTIDAD')}) Tj
-ET
-
-BT
-/F2 9 Tf
-1 1 1 rg
-450 ${yPos2 - 18} Td
-(${this.escapeText('VALOR')}) Tj
-ET
-
-% Content row
-q
-1 1 1 rg
-40 ${yPos2 - 45} 532 20 re
-f
-Q
-
-BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-50 ${yPos2 - 38} Td
-(${this.escapeText('Horas Extra')}) Tj
-ET
-
-BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-250 ${yPos2 - 38} Td
-(${this.escapeText(horasExtra + ' hrs × ' + formatCurrency(valorHoraExtra))}) Tj
-ET
-
-BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-450 ${yPos2 - 38} Td
-(${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
-ET`;
-      yPos2 -= 85;
-    }
-
-    // SECCIÓN DE DEDUCCIONES DETALLADAS
-    extraSections += `
-
-% ============= DETALLE DEDUCCIONES =============
-BT
-/F2 12 Tf
-0.118 0.165 0.478 rg
-40 ${yPos2} Td
-(${this.escapeText('DETALLE DEDUCCIONES')}) Tj
-ET
-
-% Container
 q
 0.98 0.98 0.98 rg
-40 ${yPos2 - 100} 532 85 re
+322 180 250 90 re
 f
 Q
 
 q
 0.85 0.85 0.85 RG
 1 w
-40 ${yPos2 - 100} 532 85 re
+322 180 250 90 re
 S
 Q
 
-% Header
-q
-0.796 0.196 0.196 rg
-40 ${yPos2 - 25} 532 20 re
-f
-Q
-
+% Labels de firmas
 BT
-/F2 9 Tf
-1 1 1 rg
-50 ${yPos2 - 18} Td
-(${this.escapeText('CONCEPTO')}) Tj
-ET
-
-BT
-/F2 9 Tf
-1 1 1 rg
-250 ${yPos2 - 18} Td
-(${this.escapeText('PORCENTAJE')}) Tj
-ET
-
-BT
-/F2 9 Tf
-1 1 1 rg
-450 ${yPos2 - 18} Td
-(${this.escapeText('VALOR')}) Tj
-ET
-
-% Salud 4%
-q
-0.99 0.95 0.95 rg
-40 ${yPos2 - 45} 532 20 re
-f
-Q
-
-BT
-/F1 8 Tf
+/F2 8 Tf
 0.2 0.2 0.2 rg
-50 ${yPos2 - 38} Td
-(${this.escapeText('Salud (EPS)')}) Tj
+50 190 Td
+(${this.escapeText('EMPLEADO')}) Tj
 ET
 
 BT
-/F1 8 Tf
+/F1 7 Tf
+0.5 0.5 0.5 rg
+50 240 Td
+(${this.escapeText('Nombre:')}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.5 0.5 0.5 rg
+50 225 Td
+(${this.escapeText('CC:')}) Tj
+ET
+
+BT
+/F1 7 Tf
+0.5 0.5 0.5 rg
+50 210 Td
+(${this.escapeText('Firma:')}) Tj
+ET
+
+BT
+/F2 8 Tf
 0.2 0.2 0.2 rg
-250 ${yPos2 - 38} Td
-(${this.escapeText('4.00%')}) Tj
+332 190 Td
+(${this.escapeText('EMPRESA')}) Tj
 ET
 
 BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-450 ${yPos2 - 38} Td
-(${this.escapeText(formatCurrency(saludEmpleado))}) Tj
-ET
-
-% Pensión 4%
-q
-1 1 1 rg
-40 ${yPos2 - 65} 532 20 re
-f
-Q
-
-BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-50 ${yPos2 - 58} Td
-(${this.escapeText('Pensión (AFP)')}) Tj
+/F1 7 Tf
+0.5 0.5 0.5 rg
+332 240 Td
+(${this.escapeText('Representante Legal:')}) Tj
 ET
 
 BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-250 ${yPos2 - 58} Td
-(${this.escapeText('4.00%')}) Tj
+/F1 7 Tf
+0.5 0.5 0.5 rg
+332 225 Td
+(${this.escapeText(companyName)}) Tj
 ET
 
 BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-450 ${yPos2 - 58} Td
-(${this.escapeText(formatCurrency(pensionEmpleado))}) Tj
+/F1 7 Tf
+0.5 0.5 0.5 rg
+332 210 Td
+(${this.escapeText('Firma:')}) Tj
 ET
 
-% Total deducciones
-q
-0.99 0.95 0.95 rg
-40 ${yPos2 - 85} 532 20 re
-f
-Q
-
+% Nota al pie
 BT
-/F2 9 Tf
-0.796 0.196 0.196 rg
-50 ${yPos2 - 78} Td
-(${this.escapeText('TOTAL DEDUCCIONES')}) Tj
-ET
-
-BT
-/F2 9 Tf
-0.796 0.196 0.196 rg
-450 ${yPos2 - 78} Td
-(${this.escapeText(formatCurrency(totalDeduccionesCalculadas))}) Tj
-ET`;
-
-    yPos2 -= 120;
-
-    // ============= FOOTER PROFESIONAL =============
-    extraSections += `
-
-% ============= FOOTER PROFESIONAL =============
-BT
-/F1 8 Tf
+/F1 6 Tf
 0.4 0.4 0.4 rg
-40 ${yPos2} Td
-(${this.escapeText('Este documento constituye el comprobante oficial de pago de nómina según la legislación laboral colombiana vigente.')}) Tj
+40 150 Td
+(${this.escapeText('Este comprobante de pago ha sido generado electrónicamente y certifica el pago de salario correspondiente al período indicado.')}) Tj
 ET
 
 BT
-/F1 7 Tf
-0.5 0.5 0.5 rg
-40 ${yPos2 - 15} Td
-(${this.escapeText('Documento generado automáticamente el ' + new Date().toLocaleDateString('es-CO') + ' a las ' + new Date().toLocaleTimeString('es-CO'))}) Tj
+/F1 6 Tf
+0.4 0.4 0.4 rg
+40 140 Td
+(${this.escapeText('Para dudas o aclaraciones, contactar al departamento de nómina.')}) Tj
 ET
 
+% Footer con fecha de generación
 BT
-/F1 7 Tf
-0.5 0.5 0.5 rg
-40 ${yPos2 - 28} Td
-(${this.escapeText('Para consultas contactar al departamento de recursos humanos de ' + companyName + '.')}) Tj
-ET
-
-% Logo/firma placeholder
-q
-0.9 0.9 0.9 RG
-1 w
-450 ${yPos2 - 50} 120 35 re
-S
-Q
-
-BT
-/F1 7 Tf
+/F1 5 Tf
 0.6 0.6 0.6 rg
-470 ${yPos2 - 35} Td
-(${this.escapeText('Firma Autorizada')}) Tj
+450 50 Td
+(${this.escapeText('Generado: ' + new Date().toLocaleDateString('es-CO'))}) Tj
 ET`;
-
-    return extraSections;
   }
 
-  // KISS: Remove complex logo processing - causes failures
-  // Simple and reliable PDF generation without logos
+  private generateExtraSections(totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, saludEmpleado: number, pensionEmpleado: number, totalDeduccionesCalculadas: number, companyName: string, formatCurrency: (value: number) => string): string {
+    return this.generateExtraSection(companyName, formatCurrency);
+  }
 
   private buildPDFWithCorrectStructure(catalogId: number): Uint8Array {
     console.log('🏗️ Building PDF structure...');
-
-    let pdf = '%PDF-1.4\n%âãÏÓ\n';
+    
+    // Build PDF header
+    let pdf = '%PDF-1.4\n';
+    
+    // Calculate object positions
     let currentPos = pdf.length;
-
-    // Write objects and track positions
+    
     for (let i = 1; i < this.objects.length; i++) {
       this.objectPositions[i] = currentPos;
-      const objContent = `${i} 0 obj\n${this.objects[i]}\nendobj\n`;
-      pdf += objContent;
-      currentPos += objContent.length;
+      const objectDef = `${i} 0 obj\n${this.objects[i]}\nendobj\n`;
+      pdf += objectDef;
+      currentPos += objectDef.length;
     }
-
-    // xref table position
+    
+    // Build xref table
     const xrefPos = currentPos;
-
-    // Generate xref table
     pdf += 'xref\n';
     pdf += `0 ${this.objects.length}\n`;
-    pdf += '0000000000 65535 f \n';
-
-    for (let i = 1; i < this.objects.length; i++) {
-      const pos = String(this.objectPositions[i]).padStart(10, '0');
-      pdf += `${pos} 00000 n \n`;
+    
+    for (let i = 0; i < this.objects.length; i++) {
+      const pos = this.objectPositions[i];
+      pdf += `${pos.toString().padStart(10, '0')} 00000 ${i === 0 ? 'f' : 'n'} \n`;
     }
-
-    // Trailer
+    
+    // Build trailer
     pdf += 'trailer\n';
     pdf += `<<\n/Size ${this.objects.length}\n/Root ${catalogId} 0 R\n>>\n`;
     pdf += 'startxref\n';
     pdf += `${xrefPos}\n`;
     pdf += '%%EOF\n';
-
+    
     console.log(`✅ PDF built: ${pdf.length} bytes, ${this.objects.length} objects`);
 
     // Convert to Uint8Array properly
@@ -872,82 +1182,173 @@ serve(async (req) => {
 
     // Parse request body
     const requestBody = await req.json()
-    console.log('📥 Request received for employee:', requestBody?.employee?.name)
-
-    const { employee, period, company } = requestBody
-
-    if (!employee || !period) {
-      console.error('❌ Missing required data')
-      return new Response(
-        JSON.stringify({ error: 'Missing employee or period data' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Generate PDF with fallback for logo errors
-    console.log('🔧 Starting PDF generation...')
-    const generator = new NativePDFGenerator()
     
-    try {
-      const pdfBytes = await generator.generateVoucher(employee, period, company)
-
-      console.log(`✅ PDF generated successfully: ${pdfBytes.length} bytes`)
-
-      // Verify PDF is valid
-      if (pdfBytes.length === 0) {
-        throw new Error('Generated PDF is empty')
+    // Check if we received a payrollId (NEW FORMAT) or old format
+    if (requestBody.payrollId) {
+      console.log('📥 Request received with payload:', { payrollId: requestBody.payrollId });
+      console.log('🔍 Fetching real payroll data from database for ID:', requestBody.payrollId);
+      
+      // PHASE 1: DIRECT DATABASE QUERY - Get real liquidated data
+      const { data: payrollData, error: payrollError } = await supabase
+        .from('payrolls')
+        .select(`
+          id,
+          employee_id,
+          period_id,
+          salario_base,
+          total_devengado,
+          total_deducciones,
+          neto_pagado,
+          dias_trabajados,
+          auxilio_transporte,
+          horas_extra,
+          bonificaciones,
+          salud_empleado,
+          pension_empleado,
+          employees!inner(
+            id,
+            nombre,
+            apellido,
+            cedula,
+            cargo,
+            eps,
+            afp
+          ),
+          payroll_periods_real!inner(
+            id,
+            periodo,
+            fecha_inicio,
+            fecha_fin,
+            tipo_periodo
+          )
+        `)
+        .eq('id', requestBody.payrollId)
+        .single();
+      
+      if (payrollError) {
+        console.error('❌ Error fetching payroll data:', payrollError);
+        throw new Error('No se encontraron datos de nómina para el ID proporcionado');
       }
 
-      // Verify PDF header
-      const pdfHeader = String.fromCharCode(...pdfBytes.slice(0, 5))
-      if (!pdfHeader.startsWith('%PDF-')) {
-        console.error('❌ Invalid PDF header:', pdfHeader)
-        throw new Error('Generated file is not a valid PDF')
+      // Get company data
+      const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('*')
+        .single();
+
+      if (companyError) {
+        console.error('❌ Error fetching company data:', companyError);
       }
 
-      // Return PDF with correct headers
+      console.log('✅ Payroll data fetched successfully:', {
+        employee: payrollData.employees.nombre,
+        period: payrollData.payroll_periods_real.periodo,
+        company: companyData?.razon_social || 'TechSolutions Colombia S.A.S'
+      });
+
+      console.log('📊 Valores reales desde base de datos:');
+      console.log('- Días trabajados:', payrollData.dias_trabajados);
+      console.log('- Total devengado DB:', payrollData.total_devengado);
+      console.log('- Deducciones DB:', payrollData.total_deducciones);
+      console.log('- Neto a pagar DB:', payrollData.neto_pagado);
+      console.log('- Horas extra:', payrollData.horas_extra);
+
+      // Initialize PDF generator
+      const generator = new NativePDFGenerator();
+      console.log('🎨 UX DESIGNER MODE: Creating PDF with REAL DATABASE values...');
+      
+      // Generate PDF with real DB data
+      const pdfBytes = await generator.generateVoucherFromDB(payrollData, companyData);
+      
+      console.log('✅ PDF generated successfully:', pdfBytes.length, 'bytes');
+
       return new Response(pdfBytes, {
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf"`,
+          'Content-Disposition': `attachment; filename="comprobante-${payrollData.employees.nombre}-${payrollData.payroll_periods_real.periodo}.pdf"`,
           'Content-Length': pdfBytes.length.toString(),
-          'Cache-Control': 'no-cache'
-        }
-      })
+        },
+      });
       
-    } catch (pdfError) {
-      console.error('❌ PDF generation error:', pdfError.message)
-      
-      // Fallback: try without logo if logo was the issue
-      if (company?.logo_url && (pdfError.message.includes('logo') || pdfError.message.includes('fetch'))) {
-        console.log('🔄 Retrying without logo...')
-        const companyWithoutLogo = { ...company, logo_url: null }
-        
-        try {
-          const pdfBytes = await generator.generateVoucher(employee, period, companyWithoutLogo)
-          
-          if (pdfBytes.length > 0) {
-            console.log(`✅ PDF generated without logo: ${pdfBytes.length} bytes`)
-            return new Response(pdfBytes, {
-              headers: {
-                ...corsHeaders,
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf"`,
-                'Content-Length': pdfBytes.length.toString(),
-                'Cache-Control': 'no-cache'
-              }
-            })
+    } else {
+      // OLD FORMAT - backward compatibility
+      console.log('📥 Request received for employee:', requestBody?.employee?.name)
+      const { employee, period, company } = requestBody
+
+      if (!employee || !period) {
+        console.error('❌ Missing required data')
+        return new Response(
+          JSON.stringify({ error: 'Missing employee or period data' }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
-        } catch (fallbackError) {
-          console.error('❌ Fallback also failed:', fallbackError.message)
-        }
+        )
       }
+
+      // Generate PDF with fallback for logo errors
+      console.log('🔧 Starting PDF generation...')
+      const generator = new NativePDFGenerator()
       
-      throw pdfError
+      try {
+        const pdfBytes = await generator.generateVoucher(employee, period, company)
+
+        console.log(`✅ PDF generated successfully: ${pdfBytes.length} bytes`)
+
+        // Verify PDF is valid
+        if (pdfBytes.length === 0) {
+          throw new Error('Generated PDF is empty')
+        }
+
+        // Verify PDF header
+        const pdfHeader = String.fromCharCode(...pdfBytes.slice(0, 5))
+        if (!pdfHeader.startsWith('%PDF-')) {
+          console.error('❌ Invalid PDF header:', pdfHeader)
+          throw new Error('Generated file is not a valid PDF')
+        }
+
+        // Return PDF with correct headers
+        return new Response(pdfBytes, {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf"`,
+            'Content-Length': pdfBytes.length.toString(),
+            'Cache-Control': 'no-cache'
+          }
+        })
+        
+      } catch (pdfError) {
+        console.error('❌ PDF generation error:', pdfError.message)
+        
+        // Fallback: try without logo if logo was the issue
+        if (company?.logo_url && (pdfError.message.includes('logo') || pdfError.message.includes('fetch'))) {
+          console.log('🔄 Retrying without logo...')
+          const companyWithoutLogo = { ...company, logo_url: null }
+          
+          try {
+            const pdfBytes = await generator.generateVoucher(employee, period, companyWithoutLogo)
+            
+            if (pdfBytes.length > 0) {
+              console.log(`✅ PDF generated without logo: ${pdfBytes.length} bytes`)
+              return new Response(pdfBytes, {
+                headers: {
+                  ...corsHeaders,
+                  'Content-Type': 'application/pdf',
+                  'Content-Disposition': `attachment; filename="comprobante-${employee.name?.replace(/\s+/g, '-') || 'empleado'}.pdf"`,
+                  'Content-Length': pdfBytes.length.toString(),
+                  'Cache-Control': 'no-cache'
+                }
+              })
+            }
+          } catch (fallbackError) {
+            console.error('❌ Fallback also failed:', fallbackError.message)
+          }
+        }
+        
+        throw pdfError
+      }
     }
 
   } catch (error: any) {

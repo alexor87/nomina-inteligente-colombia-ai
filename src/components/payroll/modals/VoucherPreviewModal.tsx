@@ -54,32 +54,9 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     try {
       console.log('🚀 INICIANDO DESCARGA PDF NATIVO para:', employee.name);
       
+      // NEW FORMAT: Send payrollId to get real database data
       const requestBody = {
-        employee: {
-          id: employee.id,
-          name: employee.name,
-          position: employee.position,
-          baseSalary: employee.baseSalary,
-          workedDays: employee.workedDays,
-          extraHours: employee.extraHours,
-          bonuses: employee.bonuses,
-          disabilities: employee.disabilities,
-          grossPay: employee.grossPay,
-          deductions: employee.deductions,
-          netPay: employee.netPay,
-          eps: employee.eps,
-          afp: employee.afp,
-          transportAllowance: employee.transportAllowance
-        },
-        period: {
-          startDate: period.startDate,
-          endDate: period.endDate,
-          type: period.type
-        },
-        company: companyInfo || {
-          razon_social: 'Mi Empresa',
-          nit: 'N/A'
-        }
+        payrollId: employee.id // This should be the payroll record ID, not employee ID
       };
 
       console.log('📤 Enviando request al generador nativo:', requestBody);

@@ -197,57 +197,41 @@ export const PayrollHistoryDetailPage = () => {
     }
 
     try {
-      // Transform historical data to PayrollEmployee format using data transformer
-      const historyData: PayrollHistoryData = {
+      // NEW APPROACH: Use the payroll record ID directly for PDF generation
+      console.log('✅ Opening voucher modal with payroll ID:', employeePayroll.id);
+      
+      // Create a simplified employee object with the payroll ID
+      const employeeForVoucher = {
+        id: employeePayroll.id, // This is the payroll record ID - what we need for the PDF
+        name: `${employeePayroll.employee_name} ${employeePayroll.employee_lastname}`.trim(),
         employee_id: employeePayroll.employee_id,
-        employee_name: employeePayroll.employee_name,
-        employee_lastname: employeePayroll.employee_lastname,
-        total_devengado: employeePayroll.total_devengado,
-        total_deducciones: employeePayroll.total_deducciones,
-        neto_pagado: employeePayroll.neto_pagado,
-        salario_base: employeePayroll.salario_base,
-        dias_trabajados: employeePayroll.dias_trabajados,
-        ibc: employeePayroll.ibc,
-        // Pasar todos los campos específicos de payrolls
-        auxilio_transporte: (employeePayroll as any).auxilio_transporte,
-        salud_empleado: (employeePayroll as any).salud_empleado,
-        pension_empleado: (employeePayroll as any).pension_empleado,
-        horas_extra: (employeePayroll as any).horas_extra,
-        bonificaciones: (employeePayroll as any).bonificaciones,
-        comisiones: (employeePayroll as any).comisiones,
-        cesantias: (employeePayroll as any).cesantias,
-        prima: (employeePayroll as any).prima,
-        vacaciones: (employeePayroll as any).vacaciones,
-        incapacidades: (employeePayroll as any).incapacidades,
-        otros_devengos: (employeePayroll as any).otros_devengos,
-        otros_descuentos: (employeePayroll as any).otros_descuentos,
-        retencion_fuente: (employeePayroll as any).retencion_fuente,
-        completeEmployeeData: employeePayroll.completeEmployeeData
+        baseSalary: employeePayroll.salario_base,
+        workedDays: employeePayroll.dias_trabajados,
+        grossPay: employeePayroll.total_devengado,
+        deductions: employeePayroll.total_deducciones,
+        netPay: employeePayroll.neto_pagado,
+        // Additional fields from the database
+        transportAllowance: (employeePayroll as any).auxilio_transporte || 0,
+        extraHours: (employeePayroll as any).horas_extra || 0,
+        bonuses: (employeePayroll as any).bonificaciones || 0,
+        position: employeePayroll.completeEmployeeData?.cargo || '',
+        cedula: employeePayroll.completeEmployeeData?.cedula || '',
+        eps: employeePayroll.completeEmployeeData?.eps || '',
+        afp: employeePayroll.completeEmployeeData?.afp || '',
+        disabilities: 0,
+        absences: 0,
+        employerContributions: 0
       };
 
-      const transformedEmployee = transformPayrollHistoryToEmployee(historyData);
-      
-      // Validate employee data before opening modal
-      const validation = validateEmployeeForVoucher(transformedEmployee);
-      if (!validation.isValid) {
-        console.error('❌ Employee data validation failed:', validation.errors);
-        toast({
-          title: "Error en datos del empleado",
-          description: `No se puede generar el comprobante: ${validation.errors.join(', ')}`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      console.log('✅ Employee data transformed successfully:', transformedEmployee);
-      setSelectedVoucherEmployee(transformedEmployee);
+      console.log('✅ Employee data prepared for voucher:', employeeForVoucher);
+      setSelectedVoucherEmployee(employeeForVoucher);
       setIsVoucherModalOpen(true);
       
     } catch (error) {
-      console.error('❌ Error transforming employee data:', error);
+      console.error('❌ Error preparing employee data:', error);
       toast({
-        title: "Error de transformación",
-        description: "Error al procesar los datos del empleado para el comprobante",
+        title: "Error de preparación",
+        description: "Error al preparar los datos del empleado para el comprobante",
         variant: "destructive"
       });
     }
