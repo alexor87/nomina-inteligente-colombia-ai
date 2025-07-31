@@ -307,60 +307,59 @@ endstream`);
     const pageWidth = 612;
     const titleX = (pageWidth - titleWidth) / 2;
 
-    // PROFESSIONAL COMPLETE VOUCHER - All phases implemented
+    // CARTA SIZE OPTIMIZED VOUCHER - Ultra compact layout
     return `
-% ============= PROFESSIONAL HEADER WITH COMPLIANCE INFO =============
+% ============= CARTA SIZE HEADER - ULTRA COMPACT =============
 % Voucher number in top right corner
 BT
-/F1 8 Tf
+/F1 7 Tf
 0.4 0.4 0.4 rg
-450 770 Td
+480 770 Td
 (${this.escapeText('No. ' + voucherNumber)}) Tj
 ET
 
 % Generation date in top right corner
 BT
-/F1 8 Tf
+/F1 7 Tf
 0.4 0.4 0.4 rg
-450 758 Td
+480 760 Td
 (${this.escapeText('Generado: ' + generationDate)}) Tj
 ET
 
-% Main title - perfectly centered
+% Main title - reduced size
 BT
-/F2 22 Tf
+/F2 16 Tf
 0.118 0.165 0.478 rg
-${titleX} 750 Td
-(${this.escapeText(titleText)}) Tj
+180 740 Td
+(${this.escapeText('COMPROBANTE DE NOMINA')}) Tj
 ET
 
-% Period subtitle
+% Period subtitle - compact
 BT
-/F1 12 Tf
+/F1 9 Tf
 0.3 0.3 0.3 rg
-${titleX} 725 Td
+220 725 Td
 (${this.escapeText('Período: ' + fechaInicio + ' - ' + fechaFin)}) Tj
 ET
 
-% Professional separator
+% Thin separator
 q
 0.118 0.165 0.478 rg
-50 710 512 1 re
+50 715 512 0.5 re
 f
 Q
 
-% ============= ENHANCED COMPANY INFORMATION CARD =============
-% Company card with complete information
+% ============= COMPANY CARD - COMPACTED TO 40PT =============
 q
 0.95 0.97 0.99 rg
-40 625 170 100 re
+40 675 170 40 re
 f
 Q
 
-% Blue left border
+% Thin left border
 q
 0.118 0.165 0.478 rg
-40 625 4 100 re
+40 675 2 40 re
 f
 Q
 
@@ -1049,6 +1048,202 @@ ET`;
     tableContent += createRow('NETO A PAGAR', '', formatCurrency(netoAPagar), true, '0.8 1 0.8');
 
     return tableContent;
+  }
+
+  private generateUltraCompactTableRowsFromDB(salarioBase: number, totalDevengado: number, auxilioTransporte: number, bonificaciones: number, horasExtra: number, totalDeducciones: number, netoAPagar: number, diasTrabajados: number, saludEmpleado: number, pensionEmpleado: number, totalEmpleadorContrib: number, formatCurrency: (value: number) => string): string {
+    let yPos = 620;
+    let rowCount = 0;
+
+    // Ultra compact row creator - 15pt height
+    const createRow = (concept: string, value: string, quantity: string = '', isHeader = false, isHighlighted = false, bgColor?: string) => {
+      const backgroundColor = isHeader ? '0.118 0.165 0.478' : 
+                              bgColor || (rowCount % 2 === 0 ? '0.98 0.98 0.98' : '1 1 1');
+      const textColor = isHeader ? '1 1 1' : (isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2');
+      const fontType = (isHeader || isHighlighted) ? '/F2' : '/F1';
+      const fontSize = isHeader ? '8' : (isHighlighted ? '8' : '7');
+      
+      let row = `
+% Row ${rowCount + 1}: ${concept}
+q
+${backgroundColor} rg
+40 ${yPos} 532 15 re
+f
+Q
+
+% Concept text (60% width)
+BT
+${fontType} ${fontSize} Tf
+${textColor} rg
+45 ${yPos + 4} Td
+(${this.escapeText(concept)}) Tj
+ET`;
+
+      // Quantity column (15% width) - only if provided
+      if (quantity) {
+        row += `
+% Quantity
+BT
+${fontType} ${fontSize} Tf
+${textColor} rg
+340 ${yPos + 4} Td
+(${this.escapeText(quantity)}) Tj
+ET`;
+      }
+
+      // Value column (25% width) - right aligned
+      row += `
+% Value - right aligned
+BT
+${fontType} ${fontSize} Tf
+${textColor} rg
+520 ${yPos + 4} Td
+(${this.escapeText(value)}) Tj
+ET`;
+      
+      yPos -= 15;
+      rowCount++;
+      return row;
+    };
+
+    let tableContent = '';
+
+    // SECTION 1: DEVENGADOS
+    tableContent += createRow('DEVENGADOS', '', '', false, true, '0.85 0.95 1');
+    tableContent += createRow('Salario Base', formatCurrency(salarioBase), `${diasTrabajados}d`);
+    
+    if (auxilioTransporte > 0) {
+      tableContent += createRow('Auxilio Transporte', formatCurrency(auxilioTransporte));
+    }
+    
+    if (bonificaciones > 0) {
+      tableContent += createRow('Bonificaciones', formatCurrency(bonificaciones));
+    }
+    
+    if (horasExtra > 0) {
+      const overtimeValue = Math.round((salarioBase / 240) * 1.25 * horasExtra);
+      tableContent += createRow('Horas Extra', formatCurrency(overtimeValue), `${horasExtra}h`);
+    }
+    
+    tableContent += createRow('TOTAL DEVENGADO', formatCurrency(totalDevengado), '', false, true, '0.85 0.95 0.85');
+
+    // SECTION 2: DEDUCCIONES
+    if (totalDeducciones > 0) {
+      tableContent += createRow('DEDUCCIONES', '', '', false, true, '1 0.85 0.85');
+      
+      if (saludEmpleado > 0) {
+        tableContent += createRow('Salud (4%)', `-${formatCurrency(saludEmpleado)}`);
+      }
+      
+      if (pensionEmpleado > 0) {
+        tableContent += createRow('Pensión (4%)', `-${formatCurrency(pensionEmpleado)}`);
+      }
+      
+      tableContent += createRow('TOTAL DEDUCCIONES', `-${formatCurrency(totalDeducciones)}`, '', false, true, '1 0.85 0.85');
+    }
+
+    // NET PAY (highlighted)
+    tableContent += createRow('NETO A PAGAR', formatCurrency(netoAPagar), '', false, true, '0.85 1 0.85');
+
+    return tableContent;
+  }
+
+  private generateUltraCompactFooterSection(companyName: string, companyData: any, voucherNumber: string, generationDate: string, legalRep: string, formatCurrency: (value: number) => string): string {
+    return `
+% ============= ULTRA COMPACT SIGNATURE SECTION =============
+% Employee signature box - reduced to 45pt
+q
+0.95 0.95 0.95 rg
+50 130 220 45 re
+f
+Q
+
+BT
+/F2 7 Tf
+0.2 0.2 0.2 rg
+60 165 Td
+(${this.escapeText('FIRMA DEL EMPLEADO')}) Tj
+ET
+
+BT
+/F1 6 Tf
+0.4 0.4 0.4 rg
+60 155 Td
+(${this.escapeText('Firma y sello')}) Tj
+ET
+
+BT
+/F1 6 Tf
+0.4 0.4 0.4 rg
+60 140 Td
+(${this.escapeText('Fecha: ________________')}) Tj
+ET
+
+% Company signature box - reduced to 45pt
+q
+0.95 0.95 0.95 rg
+320 130 220 45 re
+f
+Q
+
+BT
+/F2 7 Tf
+0.2 0.2 0.2 rg
+330 165 Td
+(${this.escapeText('REPRESENTANTE LEGAL')}) Tj
+ET
+
+BT
+/F1 6 Tf
+0.4 0.4 0.4 rg
+330 155 Td
+(${this.escapeText(legalRep.length > 25 ? legalRep.substring(0, 25) + '...' : legalRep)}) Tj
+ET
+
+BT
+/F1 6 Tf
+0.4 0.4 0.4 rg
+330 140 Td
+(${this.escapeText('Fecha: ________________')}) Tj
+ET
+
+% ============= COMPACT LEGAL DISCLAIMER =============
+BT
+/F1 5 Tf
+0.5 0.5 0.5 rg
+50 115 Td
+(${this.escapeText('Este comprobante de pago es válido para efectos laborales y tributarios según normativa vigente.')}) Tj
+ET
+
+BT
+/F1 5 Tf
+0.5 0.5 0.5 rg
+50 105 Td
+(${this.escapeText('Generado: ' + generationDate + ' | No: ' + voucherNumber + ' | ' + companyName)}) Tj
+ET
+
+endstream
+endobj
+
+% Cross-reference table
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000074 00000 n 
+0000000120 00000 n 
+0000000179 00000 n 
+0000000238 00000 n 
+0000000285 00000 n 
+0000000336 00000 n 
+
+% Trailer
+trailer
+<<
+/Size 8
+/Root 1 0 R
+>>
+startxref
+`;
   }
 
   private generateTableRowsFromDB(salarioBase: number, totalDevengado: number, auxilioTransporte: number, bonificaciones: number, horasExtra: number, totalDeducciones: number, netoAPagar: number, diasTrabajados: number, saludEmpleado: number, pensionEmpleado: number, formatCurrency: (value: number) => string): string {
