@@ -939,49 +939,51 @@ ET
     let yPos = 490;
     let rowCount = 0;
 
-    // Function to create enhanced rows
+    // ULTRA-OPTIMIZED: Function to create compact rows for Carta format
     const createRow = (concept: string, quantity: string, value: string, isHighlighted = false, bgColorOverride?: string) => {
       const bgColor = bgColorOverride || (rowCount % 2 === 0 ? '0.98 0.98 0.98' : '1 1 1');
       const textColor = isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2';
       const fontType = isHighlighted ? '/F2' : '/F1';
       
       let row = `
-% Enhanced Row ${rowCount + 1}: ${concept}
+% Ultra-Compact Row ${rowCount + 1}: ${concept}
 q
 ${bgColor} rg
-40 ${yPos} 532 25 re
+40 ${yPos} 532 14 re
 f
 Q
 
+% Minimal separator line only between sections
+${rowCount > 0 && isHighlighted ? `
 q
-0.9 0.9 0.9 RG
-0.5 w
-40 ${yPos} 532 25 re
+0.85 0.85 0.85 RG
+0.3 w
+40 ${yPos + 14} 532 0 re
 S
-Q
+Q` : ''}
 
 BT
-${fontType} 9 Tf
+${fontType} 6.5 Tf
 ${textColor} rg
-50 ${yPos + 8} Td
+45 ${yPos + 4} Td
 (${this.escapeText(concept)}) Tj
 ET
 
 BT
-${fontType} 9 Tf
+${fontType} 6.5 Tf
 ${textColor} rg
-360 ${yPos + 8} Td
+330 ${yPos + 4} Td
 (${this.escapeText(quantity)}) Tj
 ET
 
 BT
-${fontType} 9 Tf
+${fontType} 6.5 Tf
 ${textColor} rg
-480 ${yPos + 8} Td
+515 ${yPos + 4} Td
 (${this.escapeText(value)}) Tj
 ET`;
       
-      yPos -= 25;
+      yPos -= 14; // Reduced from 25pt to 14pt (44% reduction)
       rowCount++;
       return row;
     };
@@ -1149,76 +1151,34 @@ ET`;
 
   private generateUltraCompactFooterSection(companyName: string, companyData: any, voucherNumber: string, generationDate: string, legalRep: string, formatCurrency: (value: number) => string): string {
     return `
-% ============= ULTRA COMPACT SIGNATURE SECTION =============
-% Employee signature box - reduced to 45pt
+% ============= ULTRA-MINIMIZED SIGNATURE SECTION - 20pt =============
+% Single line signature layout
 q
-0.95 0.95 0.95 rg
-50 130 220 45 re
+0.97 0.97 0.97 rg
+50 150 460 20 re
 f
 Q
 
 BT
-/F2 7 Tf
-0.2 0.2 0.2 rg
-60 165 Td
-(${this.escapeText('FIRMA DEL EMPLEADO')}) Tj
-ET
-
-BT
-/F1 6 Tf
+/F1 5.5 Tf
 0.4 0.4 0.4 rg
-60 155 Td
-(${this.escapeText('Firma y sello')}) Tj
+55 158 Td
+(${this.escapeText('EMPLEADO: ____________')}) Tj
 ET
 
 BT
-/F1 6 Tf
+/F1 5.5 Tf
 0.4 0.4 0.4 rg
-60 140 Td
-(${this.escapeText('Fecha: ________________')}) Tj
+250 158 Td
+(${this.escapeText('REPRESENTANTE LEGAL: ____________')}) Tj
 ET
 
-% Company signature box - reduced to 45pt
-q
-0.95 0.95 0.95 rg
-320 130 220 45 re
-f
-Q
-
+% ============= SINGLE LEGAL LINE =============
 BT
-/F2 7 Tf
-0.2 0.2 0.2 rg
-330 165 Td
-(${this.escapeText('REPRESENTANTE LEGAL')}) Tj
-ET
-
-BT
-/F1 6 Tf
-0.4 0.4 0.4 rg
-330 155 Td
-(${this.escapeText(legalRep.length > 25 ? legalRep.substring(0, 25) + '...' : legalRep)}) Tj
-ET
-
-BT
-/F1 6 Tf
-0.4 0.4 0.4 rg
-330 140 Td
-(${this.escapeText('Fecha: ________________')}) Tj
-ET
-
-% ============= COMPACT LEGAL DISCLAIMER =============
-BT
-/F1 5 Tf
-0.5 0.5 0.5 rg
-50 115 Td
-(${this.escapeText('Este comprobante de pago es válido para efectos laborales y tributarios según normativa vigente.')}) Tj
-ET
-
-BT
-/F1 5 Tf
-0.5 0.5 0.5 rg
-50 105 Td
-(${this.escapeText('Generado: ' + generationDate + ' | No: ' + voucherNumber + ' | ' + companyName)}) Tj
+/F1 4 Tf
+0.6 0.6 0.6 rg
+55 135 Td
+(${this.escapeText('Comprobante válido • ' + generationDate + ' • No: ' + voucherNumber + ' • ' + companyName.substring(0, 15))}) Tj
 ET
 
 endstream
@@ -1250,71 +1210,61 @@ startxref
     let yPos = 500;
     let rowCount = 0;
 
-    // IMPROVED: Enhanced row creator with better spacing and typography
+    // ULTRA-COMPACT: Row creator optimized for Carta format
     const createRow = (concept: string, value: string, quantity: string = '', isHeader = false, isHighlighted = false, bgColorOverride?: string) => {
       const bgColor = isHeader ? '0.118 0.165 0.478' : 
-                     bgColorOverride || (rowCount % 2 === 0 ? '0.97 0.97 0.97' : '1 1 1');
+                     bgColorOverride || (rowCount % 2 === 0 ? '0.98 0.98 0.98' : '1 1 1');
       const textColor = isHeader ? '1 1 1' : (isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2');
       const fontType = (isHeader || isHighlighted) ? '/F2' : '/F1';
-      const fontSize = isHeader ? '11' : (isHighlighted ? '10' : '9');
+      const fontSize = isHeader ? '8' : (isHighlighted ? '7' : '6.5');
       
       let row = `
-% Row ${rowCount + 1}: ${concept}
+% Compact Row ${rowCount + 1}: ${concept}
 q
 ${bgColor} rg
-40 ${yPos} 532 22 re
+40 ${yPos} 532 15 re
 f
 Q
 
-% Subtle borders for better definition
+${isHeader ? `% Header separator
 q
-0.85 0.85 0.85 RG
-0.3 w
-40 ${yPos} 532 22 re
+0.2 0.2 0.2 RG
+0.5 w
+40 ${yPos} 532 0 re
 S
-Q
+Q` : ''}
 
-% Vertical separators
-q
-0.9 0.9 0.9 RG
-0.3 w
-300 ${yPos} 0 22 re
-S
-425 ${yPos} 0 22 re
-S
-Q
-
-% Concept text (60% width)
+% Concept text (65% width)
 BT
 ${fontType} ${fontSize} Tf
 ${textColor} rg
-50 ${yPos + 7} Td
+45 ${yPos + 4} Td
 (${this.escapeText(concept)}) Tj
 ET`;
 
-      // Quantity column (15% width) - only if provided
+      // Quantity column (12% width) - only if provided
       if (quantity) {
         row += `
 % Quantity
 BT
 ${fontType} ${fontSize} Tf
 ${textColor} rg
-320 ${yPos + 7} Td
+330 ${yPos + 4} Td
 (${this.escapeText(quantity)}) Tj
 ET`;
       }
 
-      // Value column (25% width) - right aligned
+      // Value column (23% width) - right aligned
       row += `
 % Value - right aligned
 BT
 ${fontType} ${fontSize} Tf
 ${textColor} rg
-520 ${yPos + 7} Td
+515 ${yPos + 4} Td
 (${this.escapeText(value)}) Tj
 ET`;
       
-      yPos -= 22;
+      yPos -= 15; // Reduced from 22pt to 15pt (32% reduction)
       rowCount++;
       return row;
     };
