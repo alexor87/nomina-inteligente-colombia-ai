@@ -57,45 +57,44 @@ class NativePDFGenerator {
 
   private formatDate(dateStr: string): string {
     try {
-      // Handle ISO date format from database
-      if (dateStr.includes('-')) {
-        const date = new Date(dateStr + 'T00:00:00.000Z');
-        return `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
-      }
-      return dateStr;
+      const date = new Date(dateStr);
+      return `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
     } catch {
       return dateStr;
     }
   }
 
   async generateVoucher(employee: any, period: any, company: any): Promise<Uint8Array> {
-    console.log('🔧 Generando PDF para:', employee.nombre);
+    console.log('🔧 Generando PDF para:', employee.name);
 
-    // 🚀 USAR VALORES REALES DE LA BASE DE DATOS (sin recalcular)
-    const salarioBase = Number(employee.salario_base) || 0;
-    const diasTrabajados = Number(employee.dias_trabajados) || 15;
-    const salarioNeto = Number(employee.neto_pagado) || 0;
-    const totalDeducciones = Number(employee.total_deducciones) || 0;
-    const totalDevengado = Number(employee.total_devengado) || 0;
-    const auxilioTransporte = Number(employee.auxilio_transporte) || 0;
-    const bonificaciones = Number(employee.bonificaciones) || 0;
-    const horasExtra = Number(employee.horas_extra) || 0;
+    // SYNCHRONIZED CALCULATIONS (same as modal)
+    const salarioBase = Number(employee.baseSalary) || 0;
+    const diasTrabajados = Number(employee.workedDays) || 30;
+    const salarioNeto = Number(employee.netPay) || 0;
+    const deducciones = Number(employee.deductions) || 0;
+    const horasExtra = Number(employee.extraHours) || 0;
+    const bonificaciones = Number(employee.bonuses) || 0;
+    const subsidioTransporte = Number(employee.transportAllowance) || 0;
     
-    // 📊 USAR DEDUCCIONES REALES DE LA DB (no recalcular)
-    const saludEmpleado = Number(employee.salud_empleado) || 0;
-    const pensionEmpleado = Number(employee.pension_empleado) || 0;
+    // Proportional salary calculation (same as modal)
+    const salarioProporcional = Math.round((salarioBase * diasTrabajados) / 30);
     
-    // 📅 USAR FECHAS REALES DEL PERÍODO
-    const fechaInicio = this.formatDate(period.fecha_inicio);
-    const fechaFin = this.formatDate(period.fecha_fin);
+    // Extra hours calculation (same as modal)
+    const valorHoraExtra = Math.round((salarioBase / 240) * 1.25);
+    const totalHorasExtra = horasExtra > 0 ? horasExtra * valorHoraExtra : 0;
+    
+    // Deductions calculation (same as modal)
+    const saludEmpleado = Math.round(salarioBase * 0.04);
+    const pensionEmpleado = Math.round(salarioBase * 0.04);
+    const totalDeduccionesCalculadas = saludEmpleado + pensionEmpleado;
 
-    console.log('🎨 UX DESIGNER MODE: Creating PDF with REAL DATABASE values...');
-    console.log('📊 Valores reales desde base de datos:');
-    console.log('- Total devengado DB:', totalDevengado);
-    console.log('- Deducciones DB:', totalDeducciones);
-    console.log('- Neto a pagar DB:', salarioNeto);
-    console.log('- Horas extra:', horasExtra);
-    console.log('- Días trabajados:', diasTrabajados);
+    const fechaInicio = this.formatDate(period.startDate);
+    const fechaFin = this.formatDate(period.endDate);
+
+    console.log('📊 Valores calculados sincronizados:');
+    console.log('- Salario proporcional:', salarioProporcional);
+    console.log('- Total horas extra:', totalHorasExtra);
+    console.log('- Deducciones calculadas:', totalDeduccionesCalculadas);
 
     // KISS: Remove logo processing for reliability
     console.log('📋 KISS: Generando PDF sin logo para máxima confiabilidad');
@@ -115,11 +114,12 @@ class NativePDFGenerator {
 
     // KISS: No logo processing - simple and reliable
     
-    // Create content stream with REAL database data
+    // Create content stream with synchronized data
     const contentStream = this.generateContentStream(employee, period, company, {
-      salarioBase, diasTrabajados, salarioNeto, totalDeducciones,
-      horasExtra, bonificaciones, auxilioTransporte, fechaInicio, fechaFin,
-      totalDevengado, saludEmpleado, pensionEmpleado
+      salarioBase, diasTrabajados, salarioNeto, deducciones,
+      horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
+      salarioProporcional, totalHorasExtra, valorHoraExtra,
+      saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas
     });
 
     const contentStreamId = this.addObject(`<<
@@ -161,11 +161,12 @@ endstream`);
   }
 
   private generateContentStream(employee: any, period: any, company: any, data: any): string {
-    console.log('🎨 UX DESIGNER MODE: Creating PDF with REAL DATABASE values...');
+    console.log('🎨 UX DESIGNER MODE: Creating pixel-perfect PDF...');
     
-    const { salarioBase, diasTrabajados, salarioNeto, totalDeducciones, 
-            horasExtra, bonificaciones, auxilioTransporte, fechaInicio, fechaFin,
-            totalDevengado, saludEmpleado, pensionEmpleado } = data;
+    const { salarioBase, diasTrabajados, salarioNeto, deducciones, 
+            horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
+            salarioProporcional, totalHorasExtra, valorHoraExtra,
+            saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas } = data;
 
     const companyName = company?.razon_social || 'Mi Empresa';
     const companyNit = company?.nit || 'N/A';
@@ -390,19 +391,19 @@ BT
 (${this.escapeText('Salario base: ' + formatCurrency(salarioBase))}) Tj
 ET
 
-% ============= TABLA PRINCIPAL DE CONCEPTOS - VALORES REALES DE BD =============
+% ============= TABLA PRINCIPAL DE CONCEPTOS - MODAL EXACTO =============
 % Título de sección
 BT
 /F2 14 Tf
 0.118 0.165 0.478 rg
-40 580 Td
+40 600 Td
 (${this.escapeText('RESUMEN DEL PAGO')}) Tj
 ET
 
-% Contenedor de tabla con borde elegante y ajustado
+% Contenedor de tabla con borde elegante
 q
 0.98 0.98 0.98 rg
-40 350 532 210 re
+40 320 532 260 re
 f
 Q
 
@@ -410,14 +411,14 @@ Q
 q
 0.85 0.85 0.85 RG
 1 w
-40 350 532 210 re
+40 320 532 260 re
 S
 Q
 
 % HEADER DE TABLA - Azul premium
 q
 0.118 0.165 0.478 rg
-40 535 532 25 re
+40 555 532 25 re
 f
 Q
 
@@ -425,23 +426,23 @@ Q
 BT
 /F2 10 Tf
 1 1 1 rg
-50 543 Td
+50 563 Td
 (${this.escapeText('CONCEPTO')}) Tj
 ET
 
 BT
 /F2 10 Tf
 1 1 1 rg
-450 543 Td
+480 563 Td
 (${this.escapeText('VALOR')}) Tj
 ET
 
-% ============= FILAS DE CONCEPTOS - VALORES REALES BD =============
-` + this.generateTableRows(salarioBase, totalDevengado, auxilioTransporte, bonificaciones, horasExtra, totalDeducciones, salarioNeto, diasTrabajados, formatCurrency) + this.generateExtraSections(horasExtra, saludEmpleado, pensionEmpleado, totalDeducciones, companyName, formatCurrency);
+% ============= FILAS DE CONCEPTOS - TODAS LAS DEL MODAL =============
+` + this.generateTableRows(salarioBase, salarioProporcional, subsidioTransporte, bonificaciones, totalHorasExtra, horasExtra, valorHoraExtra, totalDeduccionesCalculadas, salarioNeto, diasTrabajados, formatCurrency) + this.generateExtraSections(totalHorasExtra, horasExtra, valorHoraExtra, saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas, companyName, formatCurrency);
   }
 
-  private generateTableRows(salarioBase: number, totalDevengado: number, auxilioTransporte: number, bonificaciones: number, horasExtra: number, totalDeducciones: number, salarioNeto: number, diasTrabajados: number, formatCurrency: (value: number) => string): string {
-    let yPos = 510; // Adjusted Y position
+  private generateTableRows(salarioBase: number, salarioProporcional: number, subsidioTransporte: number, bonificaciones: number, totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, totalDeduccionesCalculadas: number, salarioNeto: number, diasTrabajados: number, formatCurrency: (value: number) => string): string {
+    let yPos = 530;
     let rowCount = 0;
 
     // Función para crear una fila
@@ -475,7 +476,7 @@ ET
 BT
 ${fontType} 9 Tf
 ${textColor} rg
-450 ${yPos + 8} Td
+480 ${yPos + 8} Td
 (${this.escapeText(value)}) Tj
 ET`;
       
@@ -489,12 +490,12 @@ ET`;
     // 1. Salario Base
     tableContent += createRow('Salario Base', formatCurrency(salarioBase));
 
-    // 2. Total Devengado (real database value)
-    tableContent += createRow(`Total Devengado (${diasTrabajados} días)`, formatCurrency(totalDevengado));
+    // 2. Salario Proporcional
+    tableContent += createRow(`Salario Proporcional (${diasTrabajados} días)`, formatCurrency(salarioProporcional));
 
-    // 3. Auxilio de Transporte (si > 0)
-    if (auxilioTransporte > 0) {
-      tableContent += createRow('Auxilio de Transporte', formatCurrency(auxilioTransporte));
+    // 3. Subsidio de Transporte (si > 0)
+    if (subsidioTransporte > 0) {
+      tableContent += createRow('Subsidio de Transporte', formatCurrency(subsidioTransporte));
     }
 
     // 4. Bonificaciones (si > 0)
@@ -503,12 +504,12 @@ ET`;
     }
 
     // 5. Horas Extra (si > 0)
-    if (horasExtra > 0) {
-      tableContent += createRow(`Horas Extra (${horasExtra} hrs)`, formatCurrency(horasExtra));
+    if (totalHorasExtra > 0) {
+      tableContent += createRow(`Horas Extra (${horasExtra} hrs x ${formatCurrency(valorHoraExtra)})`, formatCurrency(totalHorasExtra));
     }
 
     // 6. Total Deducciones (rojo)
-    tableContent += createRow('Total Deducciones', '- ' + formatCurrency(totalDeducciones), false, '0.99 0.95 0.95');
+    tableContent += createRow('Total Deducciones', '- ' + formatCurrency(totalDeduccionesCalculadas), false, '0.99 0.95 0.95');
 
     // 7. NETO A PAGAR (verde destacado)
     tableContent += createRow('NETO A PAGAR', formatCurrency(salarioNeto), true, '0.95 0.99 0.95');
@@ -516,11 +517,93 @@ ET`;
     return tableContent;
   }
 
-  private generateExtraSections(horasExtra: number, saludEmpleado: number, pensionEmpleado: number, totalDeducciones: number, companyName: string, formatCurrency: (value: number) => string): string {
+  private generateExtraSections(totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, saludEmpleado: number, pensionEmpleado: number, totalDeduccionesCalculadas: number, companyName: string, formatCurrency: (value: number) => string): string {
     let extraSections = '';
     let yPos2 = 420; // Position immediately after main table
     
-    // Skip extra hours section for now - will be improved later if needed
+    // TABLA DE HORAS EXTRA (si aplica)
+    if (totalHorasExtra > 0) {
+      extraSections += `
+
+% ============= DETALLE HORAS EXTRA =============
+BT
+/F2 12 Tf
+0.118 0.165 0.478 rg
+40 ${yPos2} Td
+(${this.escapeText('DETALLE HORAS EXTRA')}) Tj
+ET
+
+% Container
+q
+0.98 0.98 0.98 rg
+40 ${yPos2 - 70} 532 60 re
+f
+Q
+
+q
+0.85 0.85 0.85 RG
+1 w
+40 ${yPos2 - 70} 532 60 re
+S
+Q
+
+% Header
+q
+0.118 0.165 0.478 rg
+40 ${yPos2 - 25} 532 20 re
+f
+Q
+
+BT
+/F2 9 Tf
+1 1 1 rg
+50 ${yPos2 - 18} Td
+(${this.escapeText('CONCEPTO')}) Tj
+ET
+
+BT
+/F2 9 Tf
+1 1 1 rg
+250 ${yPos2 - 18} Td
+(${this.escapeText('CANTIDAD')}) Tj
+ET
+
+BT
+/F2 9 Tf
+1 1 1 rg
+450 ${yPos2 - 18} Td
+(${this.escapeText('VALOR')}) Tj
+ET
+
+% Content row
+q
+1 1 1 rg
+40 ${yPos2 - 45} 532 20 re
+f
+Q
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+50 ${yPos2 - 38} Td
+(${this.escapeText('Horas Extra')}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+250 ${yPos2 - 38} Td
+(${this.escapeText(horasExtra + ' hrs × ' + formatCurrency(valorHoraExtra))}) Tj
+ET
+
+BT
+/F1 8 Tf
+0.2 0.2 0.2 rg
+450 ${yPos2 - 38} Td
+(${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
+ET`;
+      yPos2 -= 85;
+    }
 
     // SECCIÓN DE DEDUCCIONES DETALLADAS
     extraSections += `
@@ -649,7 +732,7 @@ BT
 /F2 9 Tf
 0.796 0.196 0.196 rg
 450 ${yPos2 - 78} Td
-(${this.escapeText(formatCurrency(totalDeducciones))}) Tj
+(${this.escapeText(formatCurrency(totalDeduccionesCalculadas))}) Tj
 ET`;
 
     yPos2 -= 120;
@@ -787,121 +870,22 @@ serve(async (req) => {
 
     console.log('✅ User authenticated:', user.id)
 
-    // Parse request body - now expecting payrollId instead of calculated data
+    // Parse request body
     const requestBody = await req.json()
-    console.log('📥 Request received with payload:', requestBody)
+    console.log('📥 Request received for employee:', requestBody?.employee?.name)
 
-    const { payrollId } = requestBody
+    const { employee, period, company } = requestBody
 
-    if (!payrollId) {
-      console.error('❌ Missing payrollId')
+    if (!employee || !period) {
+      console.error('❌ Missing required data')
       return new Response(
-        JSON.stringify({ error: 'Missing payrollId parameter' }),
+        JSON.stringify({ error: 'Missing employee or period data' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
-
-    // PHASE 1: Simplified queries to avoid JOIN issues
-    console.log('🔍 Fetching real payroll data from database for ID:', payrollId)
-    
-    // First get the payroll data
-    const { data: payrollData, error: payrollError } = await supabase
-      .from('payrolls')
-      .select('*')
-      .eq('id', payrollId)
-      .single()
-
-    if (payrollError || !payrollData) {
-      console.error('❌ Error fetching payroll data:', payrollError)
-      return new Response(
-        JSON.stringify({ error: 'Payroll record not found or access denied' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Then get employee data
-    const { data: employeeData, error: employeeError } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('id', payrollData.employee_id)
-      .single()
-
-    if (employeeError || !employeeData) {
-      console.error('❌ Error fetching employee data:', employeeError)
-      return new Response(
-        JSON.stringify({ error: 'Employee record not found' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Finally get company data
-    const { data: companyData, error: companyError } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', payrollData.company_id)
-      .single()
-
-    if (companyError || !companyData) {
-      console.error('❌ Error fetching company data:', companyError)
-      return new Response(
-        JSON.stringify({ error: 'Company record not found' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    console.log('✅ Payroll data fetched successfully:', {
-      employee: employeeData?.nombre,
-      period: payrollData?.periodo,
-      company: companyData?.razon_social
-    });
-
-    // Transform data to match PDF generator expectations using REAL database values
-    const employee = {
-      id: employeeData.id,
-      name: employeeData.nombre + ' ' + (employeeData.apellido || ''),
-      cedula: employeeData.cedula,
-      position: employeeData.cargo,
-      baseSalary: payrollData.salario_base,
-      workedDays: payrollData.dias_trabajados,
-      grossPay: payrollData.total_devengado,
-      deductions: payrollData.total_deducciones,
-      netPay: payrollData.neto_pagado,
-      extraHours: payrollData.horas_extra || 0,
-      bonuses: payrollData.bonificaciones || 0,
-      transportAllowance: payrollData.subsidio_transporte || 0,
-      eps: employeeData.eps,
-      afp: employeeData.afp
-    };
-
-    // Get period data with real dates
-    const period = {
-      fecha_inicio: payrollData.fecha_inicio,
-      fecha_fin: payrollData.fecha_fin,
-      periodo: payrollData.periodo,
-      type: 'quincenal'
-    };
-
-    const company = {
-      razon_social: companyData.razon_social,
-      nit: companyData.nit,
-      direccion: companyData.direccion,
-      ciudad: companyData.ciudad,
-      telefono: companyData.telefono,
-      email: companyData.email,
-      logo_url: companyData.logo_url
-    };
 
     // Generate PDF with fallback for logo errors
     console.log('🔧 Starting PDF generation...')
