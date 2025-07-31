@@ -419,8 +419,11 @@ BT
 (${this.escapeText('VALOR')}) Tj
 ET
 
-% ============= FILAS DE CONCEPTOS - TODAS LAS DEL MODAL =============`;
+% ============= FILAS DE CONCEPTOS - TODAS LAS DEL MODAL =============
+` + this.generateTableRows(salarioBase, salarioProporcional, subsidioTransporte, bonificaciones, totalHorasExtra, horasExtra, valorHoraExtra, totalDeduccionesCalculadas, salarioNeto, formatCurrency) + this.generateExtraSections(totalHorasExtra, horasExtra, valorHoraExtra, saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas, companyName, formatCurrency);
+  }
 
+  private generateTableRows(salarioBase: number, salarioProporcional: number, subsidioTransporte: number, bonificaciones: number, totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, totalDeduccionesCalculadas: number, salarioNeto: number, formatCurrency: (value: number) => string): string {
     let yPos = 530;
     let rowCount = 0;
 
@@ -465,6 +468,7 @@ ET`;
     };
 
     let tableContent = '';
+    const diasTrabajados = 15; // Assuming quincenal
 
     // 1. Salario Base
     tableContent += createRow('Salario Base', formatCurrency(salarioBase));
@@ -493,7 +497,10 @@ ET`;
     // 7. NETO A PAGAR (verde destacado)
     tableContent += createRow('NETO A PAGAR', formatCurrency(salarioNeto), true, '0.95 0.99 0.95');
 
-    // ============= SECCIONES ADICIONALES (CONDICIONALES) =============
+    return tableContent;
+  }
+
+  private generateExtraSections(totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, saludEmpleado: number, pensionEmpleado: number, totalDeduccionesCalculadas: number, companyName: string, formatCurrency: (value: number) => string): string {
     let extraSections = '';
     let yPos2 = 280; // Position below main table
     
@@ -751,8 +758,9 @@ BT
 0.6 0.6 0.6 rg
 470 ${yPos2 - 35} Td
 (${this.escapeText('Firma Autorizada')}) Tj
-ET
-` + tableContent + extraSections;
+ET`;
+
+    return extraSections;
   }
 
   // KISS: Remove complex logo processing - causes failures
