@@ -1182,10 +1182,11 @@ serve(async (req) => {
 
     // Parse request body
     const requestBody = await req.json()
+    console.log('📥 Full request body received:', JSON.stringify(requestBody, null, 2));
     
     // Check if we received a payrollId (NEW FORMAT) or old format
     if (requestBody.payrollId) {
-      console.log('📥 Request received with payload:', { payrollId: requestBody.payrollId });
+      console.log('✅ PayrollId found in request:', requestBody.payrollId);
       console.log('🔍 Fetching real payroll data from database for ID:', requestBody.payrollId);
       
       // PHASE 1: DIRECT DATABASE QUERY - Get real liquidated data
