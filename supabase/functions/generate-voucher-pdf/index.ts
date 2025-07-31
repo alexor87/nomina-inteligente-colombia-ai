@@ -57,44 +57,42 @@ class NativePDFGenerator {
 
   private formatDate(dateStr: string): string {
     try {
-      const date = new Date(dateStr);
-      return `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
+      // Handle ISO date format from database
+      if (dateStr.includes('-')) {
+        const date = new Date(dateStr + 'T00:00:00.000Z');
+        return `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
+      }
+      return dateStr;
     } catch {
       return dateStr;
     }
   }
 
   async generateVoucher(employee: any, period: any, company: any): Promise<Uint8Array> {
-    console.log('🔧 Generando PDF para:', employee.name);
+    console.log('🔧 Generando PDF para:', employee.nombre);
 
-    // USE REAL DATABASE VALUES (not frontend calculations)
-    const salarioBase = Number(employee.baseSalary) || 0;
-    const diasTrabajados = Number(employee.workedDays) || 30;
-    const salarioNeto = Number(employee.netPay) || 0;
-    const deducciones = Number(employee.deductions) || 0;
-    const horasExtra = Number(employee.extraHours) || 0;
-    const bonificaciones = Number(employee.bonuses) || 0;
-    const subsidioTransporte = Number(employee.transportAllowance) || 0;
-    const totalDevengado = Number(employee.grossPay) || 0;
+    // 🚀 USAR VALORES REALES DE LA BASE DE DATOS (sin recalcular)
+    const salarioBase = Number(employee.salario_base) || 0;
+    const diasTrabajados = Number(employee.dias_trabajados) || 15;
+    const salarioNeto = Number(employee.neto_pagado) || 0;
+    const totalDeducciones = Number(employee.total_deducciones) || 0;
+    const totalDevengado = Number(employee.total_devengado) || 0;
+    const auxilioTransporte = Number(employee.auxilio_transporte) || 0;
+    const bonificaciones = Number(employee.bonificaciones) || 0;
+    const horasExtra = Number(employee.horas_extra) || 0;
     
-    // Use database values for calculations instead of recalculating
-    const salarioProporcional = totalDevengado; // Use actual total devengado from DB
+    // 📊 USAR DEDUCCIONES REALES DE LA DB (no recalcular)
+    const saludEmpleado = Number(employee.salud_empleado) || 0;
+    const pensionEmpleado = Number(employee.pension_empleado) || 0;
     
-    // Extra hours calculation based on real data
-    const valorHoraExtra = horasExtra > 0 ? Math.round((salarioBase / 240) * 1.25) : 0;
-    const totalHorasExtra = horasExtra > 0 ? horasExtra * valorHoraExtra : 0;
-    
-    // Use actual deductions from database
-    const saludEmpleado = Math.round(salarioBase * 0.04);
-    const pensionEmpleado = Math.round(salarioBase * 0.04);
-    const totalDeduccionesCalculadas = deducciones; // Use real deductions from DB
+    // 📅 USAR FECHAS REALES DEL PERÍODO
+    const fechaInicio = this.formatDate(period.fecha_inicio);
+    const fechaFin = this.formatDate(period.fecha_fin);
 
-    const fechaInicio = this.formatDate(period.startDate);
-    const fechaFin = this.formatDate(period.endDate);
-
+    console.log('🎨 UX DESIGNER MODE: Creating PDF with REAL DATABASE values...');
     console.log('📊 Valores reales desde base de datos:');
     console.log('- Total devengado DB:', totalDevengado);
-    console.log('- Deducciones DB:', deducciones);
+    console.log('- Deducciones DB:', totalDeducciones);
     console.log('- Neto a pagar DB:', salarioNeto);
     console.log('- Horas extra:', horasExtra);
     console.log('- Días trabajados:', diasTrabajados);
@@ -119,10 +117,9 @@ class NativePDFGenerator {
     
     // Create content stream with REAL database data
     const contentStream = this.generateContentStream(employee, period, company, {
-      salarioBase, diasTrabajados, salarioNeto, deducciones,
-      horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
-      salarioProporcional, totalHorasExtra, valorHoraExtra,
-      saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas, totalDevengado
+      salarioBase, diasTrabajados, salarioNeto, totalDeducciones,
+      horasExtra, bonificaciones, auxilioTransporte, fechaInicio, fechaFin,
+      totalDevengado, saludEmpleado, pensionEmpleado
     });
 
     const contentStreamId = this.addObject(`<<
@@ -166,10 +163,9 @@ endstream`);
   private generateContentStream(employee: any, period: any, company: any, data: any): string {
     console.log('🎨 UX DESIGNER MODE: Creating PDF with REAL DATABASE values...');
     
-    const { salarioBase, diasTrabajados, salarioNeto, deducciones, 
-            horasExtra, bonificaciones, subsidioTransporte, fechaInicio, fechaFin,
-            salarioProporcional, totalHorasExtra, valorHoraExtra,
-            saludEmpleado, pensionEmpleado, totalDeduccionesCalculadas, totalDevengado } = data;
+    const { salarioBase, diasTrabajados, salarioNeto, totalDeducciones, 
+            horasExtra, bonificaciones, auxilioTransporte, fechaInicio, fechaFin,
+            totalDevengado, saludEmpleado, pensionEmpleado } = data;
 
     const companyName = company?.razon_social || 'Mi Empresa';
     const companyNit = company?.nit || 'N/A';
@@ -441,10 +437,10 @@ BT
 ET
 
 % ============= FILAS DE CONCEPTOS - VALORES REALES BD =============
-` + this.generateTableRows(salarioBase, totalDevengado, subsidioTransporte, bonificaciones, totalHorasExtra, horasExtra, valorHoraExtra, deducciones, salarioNeto, diasTrabajados, formatCurrency) + this.generateExtraSections(totalHorasExtra, horasExtra, valorHoraExtra, saludEmpleado, pensionEmpleado, deducciones, companyName, formatCurrency);
+` + this.generateTableRows(salarioBase, totalDevengado, auxilioTransporte, bonificaciones, horasExtra, totalDeducciones, salarioNeto, diasTrabajados, formatCurrency) + this.generateExtraSections(horasExtra, saludEmpleado, pensionEmpleado, totalDeducciones, companyName, formatCurrency);
   }
 
-  private generateTableRows(salarioBase: number, totalDevengado: number, subsidioTransporte: number, bonificaciones: number, totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, deducciones: number, salarioNeto: number, diasTrabajados: number, formatCurrency: (value: number) => string): string {
+  private generateTableRows(salarioBase: number, totalDevengado: number, auxilioTransporte: number, bonificaciones: number, horasExtra: number, totalDeducciones: number, salarioNeto: number, diasTrabajados: number, formatCurrency: (value: number) => string): string {
     let yPos = 510; // Adjusted Y position
     let rowCount = 0;
 
@@ -496,9 +492,9 @@ ET`;
     // 2. Total Devengado (real database value)
     tableContent += createRow(`Total Devengado (${diasTrabajados} días)`, formatCurrency(totalDevengado));
 
-    // 3. Subsidio de Transporte (si > 0)
-    if (subsidioTransporte > 0) {
-      tableContent += createRow('Subsidio de Transporte', formatCurrency(subsidioTransporte));
+    // 3. Auxilio de Transporte (si > 0)
+    if (auxilioTransporte > 0) {
+      tableContent += createRow('Auxilio de Transporte', formatCurrency(auxilioTransporte));
     }
 
     // 4. Bonificaciones (si > 0)
@@ -507,12 +503,12 @@ ET`;
     }
 
     // 5. Horas Extra (si > 0)
-    if (totalHorasExtra > 0) {
-      tableContent += createRow(`Horas Extra (${horasExtra} hrs x ${formatCurrency(valorHoraExtra)})`, formatCurrency(totalHorasExtra));
+    if (horasExtra > 0) {
+      tableContent += createRow(`Horas Extra (${horasExtra} hrs)`, formatCurrency(horasExtra));
     }
 
     // 6. Total Deducciones (rojo)
-    tableContent += createRow('Total Deducciones', '- ' + formatCurrency(deducciones), false, '0.99 0.95 0.95');
+    tableContent += createRow('Total Deducciones', '- ' + formatCurrency(totalDeducciones), false, '0.99 0.95 0.95');
 
     // 7. NETO A PAGAR (verde destacado)
     tableContent += createRow('NETO A PAGAR', formatCurrency(salarioNeto), true, '0.95 0.99 0.95');
@@ -520,93 +516,11 @@ ET`;
     return tableContent;
   }
 
-  private generateExtraSections(totalHorasExtra: number, horasExtra: number, valorHoraExtra: number, saludEmpleado: number, pensionEmpleado: number, totalDeduccionesCalculadas: number, companyName: string, formatCurrency: (value: number) => string): string {
+  private generateExtraSections(horasExtra: number, saludEmpleado: number, pensionEmpleado: number, totalDeducciones: number, companyName: string, formatCurrency: (value: number) => string): string {
     let extraSections = '';
     let yPos2 = 420; // Position immediately after main table
     
-    // TABLA DE HORAS EXTRA (si aplica)
-    if (totalHorasExtra > 0) {
-      extraSections += `
-
-% ============= DETALLE HORAS EXTRA =============
-BT
-/F2 12 Tf
-0.118 0.165 0.478 rg
-40 ${yPos2} Td
-(${this.escapeText('DETALLE HORAS EXTRA')}) Tj
-ET
-
-% Container
-q
-0.98 0.98 0.98 rg
-40 ${yPos2 - 70} 532 60 re
-f
-Q
-
-q
-0.85 0.85 0.85 RG
-1 w
-40 ${yPos2 - 70} 532 60 re
-S
-Q
-
-% Header
-q
-0.118 0.165 0.478 rg
-40 ${yPos2 - 25} 532 20 re
-f
-Q
-
-BT
-/F2 9 Tf
-1 1 1 rg
-50 ${yPos2 - 18} Td
-(${this.escapeText('CONCEPTO')}) Tj
-ET
-
-BT
-/F2 9 Tf
-1 1 1 rg
-250 ${yPos2 - 18} Td
-(${this.escapeText('CANTIDAD')}) Tj
-ET
-
-BT
-/F2 9 Tf
-1 1 1 rg
-450 ${yPos2 - 18} Td
-(${this.escapeText('VALOR')}) Tj
-ET
-
-% Content row
-q
-1 1 1 rg
-40 ${yPos2 - 45} 532 20 re
-f
-Q
-
-BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-50 ${yPos2 - 38} Td
-(${this.escapeText('Horas Extra')}) Tj
-ET
-
-BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-250 ${yPos2 - 38} Td
-(${this.escapeText(horasExtra + ' hrs × ' + formatCurrency(valorHoraExtra))}) Tj
-ET
-
-BT
-/F1 8 Tf
-0.2 0.2 0.2 rg
-450 ${yPos2 - 38} Td
-(${this.escapeText(formatCurrency(totalHorasExtra))}) Tj
-ET`;
-      yPos2 -= 85;
-    }
+    // Skip extra hours section for now - will be improved later if needed
 
     // SECCIÓN DE DEDUCCIONES DETALLADAS
     extraSections += `
@@ -735,7 +649,7 @@ BT
 /F2 9 Tf
 0.796 0.196 0.196 rg
 450 ${yPos2 - 78} Td
-(${this.escapeText(formatCurrency(totalDeduccionesCalculadas))}) Tj
+(${this.escapeText(formatCurrency(totalDeducciones))}) Tj
 ET`;
 
     yPos2 -= 120;
@@ -971,11 +885,12 @@ serve(async (req) => {
       afp: employeeData.afp
     };
 
-    // Get period data from payroll record (simplified)
+    // Get period data with real dates
     const period = {
-      startDate: payrollData.periodo, // Use period name as fallback
-      endDate: payrollData.periodo,
-      type: 'mensual'
+      fecha_inicio: payrollData.fecha_inicio,
+      fecha_fin: payrollData.fecha_fin,
+      periodo: payrollData.periodo,
+      type: 'quincenal'
     };
 
     const company = {
