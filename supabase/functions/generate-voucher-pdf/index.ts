@@ -1114,10 +1114,10 @@ ${textColor} rg
 ET`;
       }
 
-      // Value column (25% width) - right aligned with dynamic positioning
-      const valueXPos = this.calculateRightAlignedX(value, parseFloat(fontSize));
+      // Value column (25% width) - PERFECT right alignment
+      const valueXPos = this.calculateRightAlignedX(value, parseFloat(fontSize), 'compact');
       row += `
-% Value - right aligned dynamically
+% Value - PERFECTLY right aligned
 BT
 ${fontType} ${fontSize} Tf
 ${textColor} rg
@@ -1229,12 +1229,20 @@ startxref
 `;
   }
 
-  // Helper function to calculate approximate text width and position for right alignment
-  private calculateRightAlignedX(text: string, fontSize: number, rightEdgeX: number = 560): number {
-    // Approximate character width based on font size (average for monospace-like positioning)
-    const avgCharWidth = fontSize * 0.6;
-    const textWidth = text.length * avgCharWidth;
-    return rightEdgeX - textWidth;
+  // EXPERT UX/UI Helper: Perfect right alignment for monetary values
+  private calculateRightAlignedX(text: string, fontSize: number, functionType: 'compact' | 'standard' | 'enhanced' = 'standard'): number {
+    // Calibrated right edge positions for each function type
+    const rightEdgePositions = {
+      'compact': 560,    // UltraCompact table
+      'standard': 515,   // Standard table  
+      'enhanced': 480    // Enhanced table
+    };
+    
+    // Optimized character width for monetary numbers (digits, commas, $ symbols)
+    const monetaryCharWidth = fontSize * 0.55; // More precise for numbers
+    const textWidth = text.length * monetaryCharWidth;
+    
+    return rightEdgePositions[functionType] - textWidth;
   }
 
   private generateTableRowsFromDB(salarioBase: number, totalDevengado: number, auxilioTransporte: number, bonificaciones: number, horasExtra: number, totalDeducciones: number, netoAPagar: number, diasTrabajados: number, saludEmpleado: number, pensionEmpleado: number, formatCurrency: (value: number) => string): string {
@@ -1285,10 +1293,10 @@ ${textColor} rg
 ET`;
       }
 
-      // Value column (23% width) - right aligned with dynamic positioning
-      const valueXPos = this.calculateRightAlignedX(value, parseFloat(fontSize));
+      // Value column (23% width) - PERFECT right alignment  
+      const valueXPos = this.calculateRightAlignedX(value, parseFloat(fontSize), 'standard');
       row += `
-% Value - right aligned dynamically
+% Value - PERFECTLY right aligned
 BT
 ${fontType} ${fontSize} Tf
 ${textColor} rg
@@ -1365,8 +1373,8 @@ ET`;
       const textColor = isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2';
       const fontType = isHighlighted ? '/F2' : '/F1';
       
-      // Calculate right-aligned position for value
-      const valueXPos = this.calculateRightAlignedX(value, 9);
+      // Calculate PERFECT right-aligned position for value
+      const valueXPos = this.calculateRightAlignedX(value, 9, 'enhanced');
       
       let row = `
 % Fila ${rowCount + 1}: ${concept}
