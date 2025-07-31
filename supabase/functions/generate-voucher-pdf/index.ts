@@ -1114,13 +1114,14 @@ ${textColor} rg
 ET`;
       }
 
-      // Value column (25% width) - right aligned
+      // Value column (25% width) - right aligned with dynamic positioning
+      const valueXPos = this.calculateRightAlignedX(value, parseFloat(fontSize));
       row += `
-% Value - right aligned
+% Value - right aligned dynamically
 BT
 ${fontType} ${fontSize} Tf
 ${textColor} rg
-520 ${yPos + 4} Td
+${valueXPos} ${yPos + 4} Td
 (${this.escapeText(value)}) Tj
 ET`;
       
@@ -1228,6 +1229,14 @@ startxref
 `;
   }
 
+  // Helper function to calculate approximate text width and position for right alignment
+  private calculateRightAlignedX(text: string, fontSize: number, rightEdgeX: number = 560): number {
+    // Approximate character width based on font size (average for monospace-like positioning)
+    const avgCharWidth = fontSize * 0.6;
+    const textWidth = text.length * avgCharWidth;
+    return rightEdgeX - textWidth;
+  }
+
   private generateTableRowsFromDB(salarioBase: number, totalDevengado: number, auxilioTransporte: number, bonificaciones: number, horasExtra: number, totalDeducciones: number, netoAPagar: number, diasTrabajados: number, saludEmpleado: number, pensionEmpleado: number, formatCurrency: (value: number) => string): string {
     let yPos = 500;
     let rowCount = 0;
@@ -1276,13 +1285,14 @@ ${textColor} rg
 ET`;
       }
 
-      // Value column (23% width) - right aligned
+      // Value column (23% width) - right aligned with dynamic positioning
+      const valueXPos = this.calculateRightAlignedX(value, parseFloat(fontSize));
       row += `
-% Value - right aligned
+% Value - right aligned dynamically
 BT
 ${fontType} ${fontSize} Tf
 ${textColor} rg
-515 ${yPos + 4} Td
+${valueXPos} ${yPos + 4} Td
 (${this.escapeText(value)}) Tj
 ET`;
       
@@ -1355,6 +1365,9 @@ ET`;
       const textColor = isHighlighted ? '0.118 0.165 0.478' : '0.2 0.2 0.2';
       const fontType = isHighlighted ? '/F2' : '/F1';
       
+      // Calculate right-aligned position for value
+      const valueXPos = this.calculateRightAlignedX(value, 9);
+      
       let row = `
 % Fila ${rowCount + 1}: ${concept}
 q
@@ -1380,7 +1393,7 @@ ET
 BT
 ${fontType} 9 Tf
 ${textColor} rg
-480 ${yPos + 8} Td
+${valueXPos} ${yPos + 8} Td
 (${this.escapeText(value)}) Tj
 ET`;
       
