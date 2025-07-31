@@ -660,7 +660,7 @@ ET
 BT
 /F2 10 Tf
 1 1 1 rg
-480 523 Td
+530 523 Td
 (${this.escapeText('VALOR')}) Tj
 ET
 
@@ -947,7 +947,7 @@ ET
 BT
 /F2 10 Tf
 1 1 1 rg
-480 563 Td
+530 563 Td
 (${this.escapeText('VALOR')}) Tj
 ET
 
@@ -1542,14 +1542,14 @@ BT
 /F1 6 Tf
 0.3 0.3 0.3 rg
 40 55 Td
-(${this.escapeText('Este comprobante de nómina electrónico tiene plena validez legal según el Decreto 1625 de 2016')}) Tj
+(${this.escapeText('Este comprobante de nómina electrónico tiene plena validez legal según el Decreto')}) Tj
 ET
 
 BT
 /F1 6 Tf
 0.3 0.3 0.3 rg
 40 47 Td
-(${this.escapeText('y la Resolución 3674 de 2008 del Ministerio de la Protección Social.')}) Tj
+(${this.escapeText('1625 de 2016 y la Resolución 3674 de 2008 del Ministerio de la Protección Social.')}) Tj
 ET
 
 BT
@@ -1564,21 +1564,14 @@ BT
 /F1 5 Tf
 0.4 0.4 0.4 rg
 40 25 Td
-(${this.escapeText('No. Comprobante: ' + voucherNumber + ' | Generado: ' + generationDate)}) Tj
+(${this.escapeText('No. Comprobante: ' + voucherNumber + ' | Generado: ' + generationDate + ' | Sistema de Nómina Electrónica')}) Tj
 ET
 
 BT
 /F1 5 Tf
 0.4 0.4 0.4 rg
 40 18 Td
-(${this.escapeText('Para consultas: ' + (companyData?.email || 'nomina@empresa.com') + ' | Tel: ' + (companyData?.telefono || 'N/A'))}) Tj
-ET
-
-BT
-/F1 5 Tf
-0.4 0.4 0.4 rg
-40 11 Td
-(${this.escapeText('Sistema de Nómina Electrónica - Cumplimiento Normativo Garantizado')}) Tj
+(${this.escapeText('Para consultas: ' + (companyData?.email || 'nomina@empresa.com') + ' | Tel: ' + (companyData?.telefono || 'N/A') + ' | Cumplimiento Normativo Garantizado')}) Tj
 ET
 
 % Security watermark
