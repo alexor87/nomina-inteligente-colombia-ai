@@ -318,47 +318,47 @@ endstream`);
     };
 
     // Calculate title positioning for perfect centering
-    const titleText = 'COMPROBANTE DE NÓMINA ELECTRÓNICO';
-    const titleWidth = titleText.length * 10;
+    const titleText = 'COMPROBANTE DE NÓMINA';
+    const titleWidth = titleText.length * 8.5; // More accurate width calculation for 18pt font
     const pageWidth = 612;
     const titleX = (pageWidth - titleWidth) / 2;
 
-    // CARTA SIZE OPTIMIZED VOUCHER - Ultra compact layout
+    // CARTA SIZE OPTIMIZED VOUCHER - Professional header layout
     return `
-% ============= CARTA SIZE HEADER - ULTRA COMPACT =============
-% Voucher number in top right corner
+% ============= PROFESSIONAL HEADER LAYOUT =============
+% Voucher number - right aligned
 BT
-/F1 7 Tf
-0.4 0.4 0.4 rg
-480 770 Td
+/F1 8 Tf
+0.5 0.5 0.5 rg
+450 770 Td
 (${this.escapeText('No. ' + voucherNumber)}) Tj
 ET
 
-% Generation date in top right corner
+% Generation date - right aligned under number
 BT
-/F1 7 Tf
-0.4 0.4 0.4 rg
-480 760 Td
+/F1 8 Tf
+0.5 0.5 0.5 rg
+450 758 Td
 (${this.escapeText('Generado: ' + generationDate)}) Tj
 ET
 
-% Main title - reduced size
+% Main title - perfectly centered
 BT
-/F2 16 Tf
+/F2 18 Tf
 0.118 0.165 0.478 rg
-180 740 Td
+${Math.round(titleX)} 740 Td
 (${this.escapeText('COMPROBANTE DE NOMINA')}) Tj
 ET
 
-% Period subtitle - compact
+% Period subtitle - centered
 BT
-/F1 9 Tf
+/F1 10 Tf
 0.3 0.3 0.3 rg
-220 725 Td
-(${this.escapeText('Período: ' + fechaInicio + ' - ' + fechaFin)}) Tj
+${Math.round((pageWidth - (periodLabel.length * 6)) / 2)} 722 Td
+(${this.escapeText('Período: ' + periodLabel)}) Tj
 ET
 
-% Thin separator
+% Thin separator with better spacing
 q
 0.118 0.165 0.478 rg
 50 715 512 0.5 re
