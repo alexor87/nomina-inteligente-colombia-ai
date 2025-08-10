@@ -86,61 +86,52 @@ const PayrollLiquidationPageSimplified = () => {
     markCurrentPeriodAsLiquidated
   } = useSimplePeriodSelection(companyId || '');
 
-  // Helper: obtener resumen real desde la BD por periodId
-  const fetchSummaryFromDB = async (periodId: string): Promise<PayrollSummary> => {
-    try {
-      const { data, error } = await supabase
-        .from('payroll_periods_real')
-        .select('empleados_count,total_devengado,total_deducciones,total_neto')
-        .eq('id', periodId)
-        .maybeSingle();
+  // Helper: sumar directamente desde payrolls por periodId, con pequeño retry para evitar carrera
+  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+  const fetchSummaryFromDB = async (periodId: string, attempt = 1): Promise<PayrollSummary> => {
+    const { data, error } = await supabase
+      .from('payrolls')
+      .select('total_devengado,total_deducciones,neto_pagado')
+      .eq('period_id', periodId);
 
-      if (error || !data) {
-        // Fallback usando estado actual si falla la lectura
-        const totalNetPay = employees.reduce((s, e) => s + (e.netPay || 0), 0);
-        const totalGrossPay = employees.reduce((s, e) => s + (e.grossPay || 0), 0);
-        const totalDeductions = employees.reduce((s, e) => s + (e.deductions || 0), 0);
-        const validEmployees = employees.length;
-        return {
-          totalEmployees: validEmployees,
-          validEmployees,
-          totalGrossPay,
-          totalDeductions,
-          totalNetPay,
-          employerContributions: totalGrossPay * 0.205,
-          totalPayrollCost: totalGrossPay + totalGrossPay * 0.205,
-        };
+    if (error) {
+      console.error('Error fetching payrolls summary:', error);
+      if (attempt < 2) {
+        await sleep(400);
+        return fetchSummaryFromDB(periodId, attempt + 1);
       }
-
-      const totalGrossPay = Number(data.total_devengado) || 0;
-      const totalDeductions = Number(data.total_deducciones) || 0;
-      const totalNetPay = Number(data.total_neto) || 0;
-      const validEmployees = Number(data.empleados_count) || 0;
-
       return {
-        totalEmployees: validEmployees,
-        validEmployees,
-        totalGrossPay,
-        totalDeductions,
-        totalNetPay,
-        employerContributions: totalGrossPay * 0.205,
-        totalPayrollCost: totalGrossPay + totalGrossPay * 0.205,
-      };
-    } catch (e) {
-      const totalNetPay = employees.reduce((s, e) => s + (e.netPay || 0), 0);
-      const totalGrossPay = employees.reduce((s, e) => s + (e.grossPay || 0), 0);
-      const totalDeductions = employees.reduce((s, e) => s + (e.deductions || 0), 0);
-      const validEmployees = employees.length;
-      return {
-        totalEmployees: validEmployees,
-        validEmployees,
-        totalGrossPay,
-        totalDeductions,
-        totalNetPay,
-        employerContributions: totalGrossPay * 0.205,
-        totalPayrollCost: totalGrossPay + totalGrossPay * 0.205,
+        totalEmployees: 0,
+        validEmployees: 0,
+        totalGrossPay: 0,
+        totalDeductions: 0,
+        totalNetPay: 0,
+        employerContributions: 0,
+        totalPayrollCost: 0,
       };
     }
+
+    const rows = data || [];
+    const validEmployees = rows.length;
+    const totalGrossPay = rows.reduce((s, r: any) => s + Number(r.total_devengado ?? 0), 0);
+    const totalDeductions = rows.reduce((s, r: any) => s + Number(r.total_deducciones ?? 0), 0);
+    const totalNetPay = rows.reduce((s, r: any) => s + Number(r.neto_pagado ?? 0), 0);
+
+    // Si aún no hay filas (replicación/actualización), reintentar una vez
+    if (validEmployees === 0 && attempt < 2) {
+      await sleep(400);
+      return fetchSummaryFromDB(periodId, attempt + 1);
+    }
+
+    return {
+      totalEmployees: validEmployees,
+      validEmployees,
+      totalGrossPay,
+      totalDeductions,
+      totalNetPay,
+      employerContributions: totalGrossPay * 0.205,
+      totalPayrollCost: totalGrossPay + totalGrossPay * 0.205,
+    };
   };
 
   // Limpiar períodos abandonados al montar
@@ -191,9 +182,9 @@ const PayrollLiquidationPageSimplified = () => {
       await markCurrentPeriodAsLiquidated();
       
       // Refrescar empleados desde BD y construir resumen real desde BD
-      await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
-      const pid = currentPeriodId || selectedPeriod.id;
-      const summary = pid ? await fetchSummaryFromDB(pid) : await fetchSummaryFromDB(selectedPeriod.id);
+      const loadedPid = await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
+      const pid = loadedPid || currentPeriodId || selectedPeriod.id;
+      const summary = await fetchSummaryFromDB(pid);
 
       setLiquidationResult({
         periodData: {
@@ -223,9 +214,9 @@ const PayrollLiquidationPageSimplified = () => {
       setPeriodAlreadyLiquidated(false);
       
       // Refrescar empleados y construir resumen real desde BD
-      await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
-      const pid = currentPeriodId || selectedPeriod.id;
-      const summary = pid ? await fetchSummaryFromDB(pid) : await fetchSummaryFromDB(selectedPeriod.id);
+      const loadedPid = await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
+      const pid = loadedPid || currentPeriodId || selectedPeriod.id;
+      const summary = await fetchSummaryFromDB(pid);
 
       setLiquidationResult({
         periodData: {
