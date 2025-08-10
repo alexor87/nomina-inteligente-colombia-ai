@@ -23,7 +23,8 @@ import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessM
 import { NewYearConfigurationModal } from '@/components/payroll/modals/NewYearConfigurationModal';
 import { EndOfYearDetectionService, EndOfYearSituation } from '@/services/EndOfYearDetectionService';
 import { useNavigate } from 'react-router-dom';
-import { calculatePayrollSummary } from '@/utils/payrollCalculations';
+import { supabase } from '@/integrations/supabase/client';
+import type { PayrollSummary } from '@/types/payroll';
 
 const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -85,6 +86,63 @@ const PayrollLiquidationPageSimplified = () => {
     markCurrentPeriodAsLiquidated
   } = useSimplePeriodSelection(companyId || '');
 
+  // Helper: obtener resumen real desde la BD por periodId
+  const fetchSummaryFromDB = async (periodId: string): Promise<PayrollSummary> => {
+    try {
+      const { data, error } = await supabase
+        .from('payroll_periods_real')
+        .select('empleados_count,total_devengado,total_deducciones,total_neto')
+        .eq('id', periodId)
+        .maybeSingle();
+
+      if (error || !data) {
+        // Fallback usando estado actual si falla la lectura
+        const totalNetPay = employees.reduce((s, e) => s + (e.netPay || 0), 0);
+        const totalGrossPay = employees.reduce((s, e) => s + (e.grossPay || 0), 0);
+        const totalDeductions = employees.reduce((s, e) => s + (e.deductions || 0), 0);
+        const validEmployees = employees.length;
+        return {
+          totalEmployees: validEmployees,
+          validEmployees,
+          totalGrossPay,
+          totalDeductions,
+          totalNetPay,
+          employerContributions: totalGrossPay * 0.205,
+          totalPayrollCost: totalGrossPay + totalGrossPay * 0.205,
+        };
+      }
+
+      const totalGrossPay = Number(data.total_devengado) || 0;
+      const totalDeductions = Number(data.total_deducciones) || 0;
+      const totalNetPay = Number(data.total_neto) || 0;
+      const validEmployees = Number(data.empleados_count) || 0;
+
+      return {
+        totalEmployees: validEmployees,
+        validEmployees,
+        totalGrossPay,
+        totalDeductions,
+        totalNetPay,
+        employerContributions: totalGrossPay * 0.205,
+        totalPayrollCost: totalGrossPay + totalGrossPay * 0.205,
+      };
+    } catch (e) {
+      const totalNetPay = employees.reduce((s, e) => s + (e.netPay || 0), 0);
+      const totalGrossPay = employees.reduce((s, e) => s + (e.grossPay || 0), 0);
+      const totalDeductions = employees.reduce((s, e) => s + (e.deductions || 0), 0);
+      const validEmployees = employees.length;
+      return {
+        totalEmployees: validEmployees,
+        validEmployees,
+        totalGrossPay,
+        totalDeductions,
+        totalNetPay,
+        employerContributions: totalGrossPay * 0.205,
+        totalPayrollCost: totalGrossPay + totalGrossPay * 0.205,
+      };
+    }
+  };
+
   // Limpiar períodos abandonados al montar
   useEffect(() => {
     PayrollCleanupService.cleanupAbandonedPeriods();
@@ -132,8 +190,11 @@ const PayrollLiquidationPageSimplified = () => {
       await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
       await markCurrentPeriodAsLiquidated();
       
-      // Show success modal with results after successful liquidation
-      const summary = calculatePayrollSummary(employees);
+      // Refrescar empleados desde BD y construir resumen real desde BD
+      await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
+      const pid = currentPeriodId || selectedPeriod.id;
+      const summary = pid ? await fetchSummaryFromDB(pid) : await fetchSummaryFromDB(selectedPeriod.id);
+
       setLiquidationResult({
         periodData: {
           startDate: selectedPeriod.startDate,
@@ -141,7 +202,7 @@ const PayrollLiquidationPageSimplified = () => {
           type: 'mensual'
         },
         summary,
-        periodId: selectedPeriod.id
+        periodId: pid || selectedPeriod.id
       });
       setShowSuccessModal(true);
       
@@ -161,8 +222,11 @@ const PayrollLiquidationPageSimplified = () => {
       await markCurrentPeriodAsLiquidated();
       setPeriodAlreadyLiquidated(false);
       
-      // Show success modal with re-liquidation results
-      const summary = calculatePayrollSummary(employees);
+      // Refrescar empleados y construir resumen real desde BD
+      await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
+      const pid = currentPeriodId || selectedPeriod.id;
+      const summary = pid ? await fetchSummaryFromDB(pid) : await fetchSummaryFromDB(selectedPeriod.id);
+
       setLiquidationResult({
         periodData: {
           startDate: selectedPeriod.startDate,
@@ -170,7 +234,7 @@ const PayrollLiquidationPageSimplified = () => {
           type: 'mensual'
         },
         summary,
-        periodId: selectedPeriod.id
+        periodId: pid || selectedPeriod.id
       });
       setShowSuccessModal(true);
       
