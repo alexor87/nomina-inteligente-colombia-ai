@@ -5,6 +5,7 @@ import { CheckCircle, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollSummary } from '@/types/payroll';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PayrollSuccessModalProps {
   isOpen: boolean;
@@ -27,6 +28,38 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  // Load authoritative summary directly from DB (KISS: by periodId if available)
+  const [loadingSummary, setLoadingSummary] = React.useState(false);
+  const [dbSummary, setDbSummary] = React.useState<{ employeesCount: number; totalNet: number } | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchSummary = async () => {
+      if (!isOpen || !periodId) {
+        setDbSummary(null);
+        return;
+      }
+      setLoadingSummary(true);
+      try {
+        const { data, error } = await supabase
+          .from('payrolls')
+          .select('neto_pagado')
+          .eq('period_id', periodId);
+        if (error) throw error;
+        const totalNet = (data as any[] | null)?.reduce((acc, row) => acc + Number(row.neto_pagado || 0), 0) ?? 0;
+        const employeesCount = (data as any[] | null)?.length ?? 0;
+        if (isMounted) setDbSummary({ employeesCount, totalNet });
+      } catch (e) {
+        console.error('Error fetching payroll summary', e);
+        if (isMounted) setDbSummary(null);
+      } finally {
+        if (isMounted) setLoadingSummary(false);
+      }
+    };
+    fetchSummary();
+    return () => { isMounted = false; };
+  }, [isOpen, periodId]);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CO', {
       year: 'numeric',
@@ -39,7 +72,6 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
     onClose();
     navigate(periodId ? `/app/payroll-history/${periodId}` : '/app/payroll-history');
   };
-
   return (
     <CustomModal 
       isOpen={isOpen} 
@@ -77,11 +109,15 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Empleados procesados</span>
-              <div className="font-medium">{summary.validEmployees}</div>
+              <div className="font-medium">
+                {loadingSummary && periodId ? 'Consolidando...' : (dbSummary?.employeesCount ?? summary.validEmployees)}
+              </div>
             </div>
             <div>
               <span className="text-muted-foreground">Neto a pagar</span>
-              <div className="font-medium">{formatCurrency(summary.totalNetPay || 0)}</div>
+              <div className="font-medium">
+                {loadingSummary && periodId ? 'Consolidando...' : formatCurrency((dbSummary?.totalNet ?? summary.totalNetPay) || 0)}
+              </div>
             </div>
           </div>
         </div>
