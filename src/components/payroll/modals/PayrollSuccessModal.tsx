@@ -28,7 +28,7 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  // Load authoritative summary directly from DB (KISS: by periodId if available)
+  // Load authoritative summary directly from DB - NO FALLBACKS TO PARENT DATA
   const [loadingSummary, setLoadingSummary] = React.useState(false);
   const [dbSummary, setDbSummary] = React.useState<{ employeesCount: number; totalNet: number } | null>(null);
 
@@ -36,26 +36,40 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
     let isMounted = true;
     const fetchSummary = async () => {
       if (!isOpen || !periodId) {
+        console.log('Modal not open or no periodId, clearing summary');
         setDbSummary(null);
         return;
       }
+      
+      console.log(`🔍 Fetching authoritative summary for periodId: ${periodId}`);
       setLoadingSummary(true);
+      
       try {
+        // Query with company_id for precision and add detailed logging
         const { data, error } = await supabase
           .from('payrolls')
-          .select('neto_pagado')
+          .select('neto_pagado, company_id')
           .eq('period_id', periodId);
-        if (error) throw error;
+          
+        if (error) {
+          console.error('❌ Error fetching payroll summary:', error);
+          throw error;
+        }
+        
         const totalNet = (data as any[] | null)?.reduce((acc, row) => acc + Number(row.neto_pagado || 0), 0) ?? 0;
         const employeesCount = (data as any[] | null)?.length ?? 0;
+        
+        console.log(`✅ DB Summary: ${employeesCount} employees, Total: ${totalNet}`);
+        
         if (isMounted) setDbSummary({ employeesCount, totalNet });
       } catch (e) {
-        console.error('Error fetching payroll summary', e);
+        console.error('❌ Error fetching payroll summary:', e);
         if (isMounted) setDbSummary(null);
       } finally {
         if (isMounted) setLoadingSummary(false);
       }
     };
+    
     fetchSummary();
     return () => { isMounted = false; };
   }, [isOpen, periodId]);
@@ -110,13 +124,17 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
             <div>
               <span className="text-muted-foreground">Empleados procesados</span>
               <div className="font-medium">
-                {loadingSummary && periodId ? 'Consolidando...' : (dbSummary?.employeesCount ?? summary.validEmployees)}
+                {loadingSummary ? 'Consolidando...' : 
+                 dbSummary ? dbSummary.employeesCount : 
+                 'Sin datos disponibles'}
               </div>
             </div>
             <div>
               <span className="text-muted-foreground">Neto a pagar</span>
               <div className="font-medium">
-                {loadingSummary && periodId ? 'Consolidando...' : formatCurrency((dbSummary?.totalNet ?? summary.totalNetPay) || 0)}
+                {loadingSummary ? 'Consolidando...' : 
+                 dbSummary ? formatCurrency(dbSummary.totalNet) : 
+                 'Sin datos disponibles'}
               </div>
             </div>
           </div>
