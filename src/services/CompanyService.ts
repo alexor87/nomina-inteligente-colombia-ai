@@ -1,20 +1,20 @@
 
-import { CompanyRegistrationService, CompanyRegistrationData, CompanyRegistrationWithUser } from './CompanyRegistrationService';
+import { CompanyRegistrationService, CompanyRegistrationData } from './CompanyRegistrationService';
 import { CompanyManagementService, Company } from './CompanyManagementService';
 import { CompanyTestingService } from './CompanyTestingService';
 
 // Re-export types for backward compatibility
-export type { Company, CompanyRegistrationData, CompanyRegistrationWithUser };
+export type { Company, CompanyRegistrationData };
 
 // Main CompanyService acts as a facade
 export class CompanyService {
   // Registration methods
-  static async createCompanyWithUser(data: CompanyRegistrationWithUser): Promise<string> {
-    return CompanyRegistrationService.createCompanyWithUser(data);
-  }
-
   static async createCompany(data: CompanyRegistrationData): Promise<string> {
-    return CompanyRegistrationService.createCompany(data);
+    const result = await CompanyRegistrationService.registerCompany(data);
+    if (!result.success) {
+      throw new Error(result.message || 'Error creating company');
+    }
+    return result.company?.id || '';
   }
 
   // Management methods

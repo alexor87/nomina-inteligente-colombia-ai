@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { CompanyRegistrationWizard } from '@/components/auth/CompanyRegistrationWizard';
-import { CompanyService } from '@/services/CompanyService';
+import { CompanyRegistrationService } from '@/services/CompanyRegistrationService';
 import { useCompanyRegistrationStore } from '@/components/auth/hooks/useCompanyRegistrationStore';
 
 const AuthPage = () => {
@@ -88,20 +88,17 @@ const AuthPage = () => {
         razon_social: data.identificationNumber || 'Mi Empresa',
         email: data.invitedMember?.email || 'contacto@empresa.com',
         telefono: '',
-        ciudad: 'Bogotá',
+        direccion: 'Bogotá', // Using direccion instead of ciudad
         plan: 'profesional' as const,
       };
 
-      const companyId = await CompanyService.createCompany({
-        nit: registrationData.nit,
-        razon_social: registrationData.razon_social,
-        email: registrationData.email,
-        telefono: registrationData.telefono,
-        ciudad: registrationData.ciudad,
-        plan: registrationData.plan,
-      });
+      const result = await CompanyRegistrationService.registerCompany(registrationData);
       
-      console.log('Company created successfully:', companyId);
+      if (!result.success) {
+        throw new Error(result.message || 'Error registrando empresa');
+      }
+      
+      console.log('Company created successfully:', result.company?.id);
       
       // Refresh user data to ensure roles and profile are loaded
       await refreshUserData();
