@@ -292,7 +292,7 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
   // Horas extra solo si existen
   if (totalHorasExtra > 0) {
     doc.setFont('helvetica', 'bold');
-    doc.text(normalizeText(`Horas Extra (${horasExtra}):'), margin, leftColumnY);
+    doc.text(normalizeText('Horas Extra (' + horasExtra + '):'), margin, leftColumnY);
     doc.setFont('helvetica', 'normal');
     doc.text(formatCurrency(totalHorasExtra), margin + 50, leftColumnY);
     leftColumnY += lineHeight;
@@ -377,7 +377,7 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
   doc.setFont('helvetica', 'normal');
   
   const fechaGeneracion = new Date().toLocaleDateString('es-CO');
-  const footerText1 = normalizeText(`Generado: ${fechaGeneracion}`);
+  const footerText1 = normalizeText('Generado: ' + fechaGeneracion);
   const footerText2 = normalizeText('Software de Nomina Profesional - Finppi');
   const footerText3 = normalizeText('Este comprobante es valido sin firma autografa');
   
