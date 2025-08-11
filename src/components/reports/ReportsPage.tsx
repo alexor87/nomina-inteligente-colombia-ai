@@ -154,6 +154,18 @@ export const ReportsPage = () => {
           title: 'Reporte de Novedades',
           description: 'Todas las novedades procesadas en el período',
           icon: FileBarChart
+        },
+        {
+          id: 'dian-status',
+          title: 'DIAN: Estado Nómina Electrónica',
+          description: 'Seguimiento de envío, estado y CUFE por empleado',
+          icon: FileText
+        },
+        {
+          id: 'pila-preliquidation',
+          title: 'PILA: Preliquidación Aportes',
+          description: 'Consolidados por EPS, AFP, ARL y Caja de Compensación',
+          icon: UserCheck
         }
       ]
     },

@@ -39,7 +39,9 @@ export const ReportTable: React.FC<ReportTableProps> = ({
     getSocialSecurityReport,
     getNoveltyHistoryReport,
     getAccountingExports,
-    getIncomeRetentionCertificates
+    getIncomeRetentionCertificates,
+    getDianStatusReport,
+    getPilaPreliquidation
   } = useReports();
 
   const pagination = usePagination(data, {
@@ -110,6 +112,16 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           };
           reportData = await getNoveltyHistoryReport(absenceFilters);
           break;
+
+        case 'dian-status':
+          console.log('📊 Loading DIAN electronic payroll status...');
+          reportData = await getDianStatusReport(filters);
+          break;
+
+        case 'pila-preliquidation':
+          console.log('📊 Loading PILA preliquidation aggregates...');
+          reportData = await getPilaPreliquidation(filters);
+          break;
           
         default:
           console.warn('⚠️ Unknown report type:', reportType);
@@ -150,7 +162,9 @@ export const ReportTable: React.FC<ReportTableProps> = ({
       'hr-absences': 'Ausentismos de Personal',
       'ugpp-social-security': 'Seguridad Social - UGPP',
       'ugpp-novelties': 'Novedades Relevantes - UGPP',
-      'ugpp-contracts': 'Contratos - UGPP'
+      'ugpp-contracts': 'Contratos - UGPP',
+      'dian-status': 'DIAN - Estado Nómina Electrónica',
+      'pila-preliquidation': 'PILA - Preliquidación'
     };
     
     return titles[reportType] || 'Reporte';
@@ -213,6 +227,29 @@ export const ReportTable: React.FC<ReportTableProps> = ({
             <TableHead className="text-right">Horas</TableHead>
             <TableHead>Fecha</TableHead>
             <TableHead>Estado</TableHead>
+          </TableRow>
+        );
+        
+      
+      case 'dian-status':
+        return (
+          <TableRow>
+            <TableHead>Empleado</TableHead>
+            <TableHead>Período</TableHead>
+            <TableHead>Estado DIAN</TableHead>
+            <TableHead>Enviado</TableHead>
+            <TableHead>CUFE</TableHead>
+            <TableHead>PDF</TableHead>
+          </TableRow>
+        );
+
+      case 'pila-preliquidation':
+        return (
+          <TableRow>
+            <TableHead>Entidad</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Empleados</TableHead>
+            <TableHead className="text-right">Total Aportes</TableHead>
           </TableRow>
         );
         
@@ -298,6 +335,38 @@ export const ReportTable: React.FC<ReportTableProps> = ({
               <TableCell>
                 <Badge variant="default">{item.status}</Badge>
               </TableCell>
+            </TableRow>
+          );
+          
+        case 'dian-status':
+          return (
+            <TableRow key={index}>
+              <TableCell className="font-medium">{item.employeeName}</TableCell>
+              <TableCell>{item.period}</TableCell>
+              <TableCell>
+                <Badge variant="outline">{item.status || 'pendiente'}</Badge>
+              </TableCell>
+              <TableCell>{item.sentDate ? new Date(item.sentDate).toLocaleString('es-ES') : '-'}</TableCell>
+              <TableCell className="truncate max-w-[200px]">{item.cufe || '-'}</TableCell>
+              <TableCell>
+                {item.pdfUrl ? (
+                  <a href={item.pdfUrl} target="_blank" rel="noreferrer" className="underline text-blue-600">PDF</a>
+                ) : (
+                  '-'
+                )}
+              </TableCell>
+            </TableRow>
+          );
+
+        case 'pila-preliquidation':
+          return (
+            <TableRow key={index}>
+              <TableCell className="font-medium">{item.entity}</TableCell>
+              <TableCell>
+                <Badge variant="outline">{item.entityType}</Badge>
+              </TableCell>
+              <TableCell>{item.employeesCount}</TableCell>
+              <TableCell className="text-right font-semibold">{formatCurrency(item.total)}</TableCell>
             </TableRow>
           );
           

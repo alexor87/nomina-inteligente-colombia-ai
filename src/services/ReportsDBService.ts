@@ -39,6 +39,14 @@ export class ReportsDBService {
       query = query.in('employees.centro_costos', filters.costCenters);
     }
 
+    if (filters.periodId) {
+      query = query.eq('period_id', filters.periodId);
+    }
+
+    if (filters.period) {
+      query = query.eq('periodo', filters.period);
+    }
+
     const { data, error } = await query;
 
     if (error) {
@@ -96,6 +104,14 @@ export class ReportsDBService {
 
     if (filters.costCenters && filters.costCenters.length > 0) {
       query = query.in('employees.centro_costos', filters.costCenters);
+    }
+
+    if (filters.periodId) {
+      query = query.eq('period_id', filters.periodId);
+    }
+
+    if (filters.period) {
+      query = query.eq('periodo', filters.period);
     }
 
     const { data, error } = await query;
@@ -331,6 +347,14 @@ export class ReportsDBService {
       query = query.lte('created_at', filters.dateRange.to);
     }
 
+    if (filters.period) {
+      query = query.eq('periodo', filters.period);
+    }
+
+    if (filters.periodId) {
+      query = query.eq('period_id', filters.periodId);
+    }
+
     const { data, error } = await query;
 
     if (error) {
@@ -378,6 +402,124 @@ export class ReportsDBService {
         }
       ]
     }));
+  }
+
+  // Estado de Nómina Electrónica (DIAN) desde payroll_vouchers
+  static async getDianStatusReport(filters: ReportFilters) {
+    console.log('🔍 ReportsDBService: Fetching DIAN status with filters:', filters);
+
+    let query = supabase
+      .from('payroll_vouchers')
+      .select(`
+        employee_id,
+        periodo,
+        sent_date,
+        dian_status,
+        pdf_url,
+        xml_url,
+        dian_cufe,
+        employees!inner(
+          nombre,
+          apellido
+        )
+      `)
+      .eq('company_id', await this.getCurrentCompanyId());
+
+    if (filters.dateRange?.from) {
+      query = query.gte('created_at', filters.dateRange.from);
+    }
+    if (filters.dateRange?.to) {
+      query = query.lte('created_at', filters.dateRange.to);
+    }
+    if (filters.period) {
+      query = query.eq('periodo', filters.period);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('❌ Error fetching DIAN status:', error);
+      throw error;
+    }
+
+    return (
+      data?.map((row) => ({
+        employeeId: row.employee_id,
+        employeeName: `${row.employees?.nombre} ${row.employees?.apellido}`,
+        period: row.periodo,
+        status: row.dian_status || 'pendiente',
+        sentDate: row.sent_date,
+        cufe: row.dian_cufe,
+        pdfUrl: row.pdf_url,
+        xmlUrl: row.xml_url,
+      })) || []
+    );
+  }
+
+  // PILA Preliquidación (consolidados por entidad)
+  static async getPilaPreliquidation(filters: ReportFilters) {
+    console.log('🔍 ReportsDBService: Fetching PILA preliquidation with filters:', filters);
+
+    let query = supabase
+      .from('payrolls')
+      .select(`
+        employee_id,
+        salario_base,
+        periodo,
+        created_at,
+        employees!inner(
+          eps,
+          afp,
+          arl,
+          caja_compensacion,
+          nombre,
+          apellido
+        )
+      `)
+      .eq('company_id', await this.getCurrentCompanyId());
+
+    if (filters.dateRange?.from) {
+      query = query.gte('created_at', filters.dateRange.from);
+    }
+    if (filters.dateRange?.to) {
+      query = query.lte('created_at', filters.dateRange.to);
+    }
+    if (filters.period) {
+      query = query.eq('periodo', filters.period);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('❌ Error fetching PILA preliquidation:', error);
+      throw error;
+    }
+
+    type BucketKey = string;
+    const buckets = new Map<BucketKey, { entityType: 'EPS'|'AFP'|'ARL'|'Caja'; entity: string; employeesCount: number; total: number }>();
+
+    data?.forEach((row) => {
+      const base = Number(row.salario_base) || 0;
+      // Cálculos básicos por entidad
+      const healthTotal = base * (0.04 + 0.085); // empleado + empleador
+      const pensionTotal = base * (0.04 + 0.12);
+      const arlTotal = base * 0.00522; // aproximado mínimo
+      const cajaTotal = base * 0.04;
+
+      const add = (entityType: 'EPS'|'AFP'|'ARL'|'Caja', entity: string | null | undefined, value: number) => {
+        const e = (entity || 'SIN_ENTIDAD').toString();
+        const key = `${entityType}__${e}`;
+        const b = buckets.get(key) || { entityType, entity: e, employeesCount: 0, total: 0 };
+        b.employeesCount += 1;
+        b.total += value;
+        buckets.set(key, b);
+      };
+
+      add('EPS', row.employees?.eps, healthTotal);
+      add('AFP', row.employees?.afp, pensionTotal);
+      add('ARL', row.employees?.arl, arlTotal);
+      add('Caja', row.employees?.caja_compensacion, cajaTotal);
+    });
+
+    return Array.from(buckets.values());
   }
 
   // Obtener ID de la empresa actual

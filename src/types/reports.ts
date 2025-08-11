@@ -4,6 +4,8 @@ export interface ReportFilters {
     from: string;
     to: string;
   };
+  period?: string; // etiqueta del período (e.g., "Enero 2025" o "01-2025")
+  periodId?: string; // id del período en payroll_periods_real si está disponible
   employeeIds?: string[];
   costCenters?: string[];
   contractTypes?: string[];

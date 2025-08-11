@@ -137,6 +137,47 @@ export const useReports = () => {
     }
   };
 
+  // DIAN - Estado Nómina Electrónica
+  const getDianStatusReport = async (filters: ReportFilters) => {
+    console.log('📊 useReports: Getting DIAN status with real data');
+    setIsLoading(true);
+    try {
+      const data = await ReportsDBService.getDianStatusReport(filters);
+      console.log('✅ useReports: DIAN status data received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ useReports: Error getting DIAN status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el estado de nómina electrónica",
+        variant: "destructive"
+      });
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // PILA - Preliquidación
+  const getPilaPreliquidation = async (filters: ReportFilters) => {
+    console.log('📊 useReports: Getting PILA preliquidation with real data');
+    setIsLoading(true);
+    try {
+      const data = await ReportsDBService.getPilaPreliquidation(filters);
+      console.log('✅ useReports: PILA preliquidation data received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ useReports: Error getting PILA preliquidation:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la preliquidación PILA",
+        variant: "destructive"
+      });
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // EXPORTACIÓN A EXCEL
   const exportToExcel = async (reportType: string, data: any[], fileName: string) => {
     try {
@@ -316,6 +357,8 @@ export const useReports = () => {
     getNoveltyHistoryReport,
     getAccountingExports,
     getIncomeRetentionCertificates,
+    getDianStatusReport,
+    getPilaPreliquidation,
     exportToExcel,
     exportToPDF,
     saveFilter,
