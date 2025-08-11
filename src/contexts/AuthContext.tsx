@@ -1,8 +1,7 @@
+
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { performCompleteRoleCheck } from '@/utils/roleUtils';
-import { AutoRoleAssignmentService } from '@/services/AutoRoleAssignmentService';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
@@ -46,7 +45,7 @@ export const useAuth = () => {
   return context;
 };
 
-// Matriz de permisos por rol - ACTUALIZADA con historial
+// Enhanced role permissions matrix
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
   administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences'],
   rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
@@ -63,11 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
-  // Refs to prevent redundant calls
   const isRefreshingUserData = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const retryAttempts = useRef(0);
-  const maxRetryAttempts = 3;
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     if (roles.length === 0) {
@@ -107,37 +103,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔄 [AUTH] Refreshing user data for:', currentUser.email);
 
     try {
-      // Fetch profile
-      console.log('🔍 [AUTH] Fetching profile...');
+      // Fetch profile first
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', currentUser.id)
         .single();
       
-      console.log('🔍 [AUTH] Profile result:', { profileData, profileError });
-      
       if (!profileError && profileData) {
         setProfile(profileData);
-        console.log('👤 [AUTH] User profile fetched successfully, company_id:', profileData.company_id);
-        
-        // Only run role check if user has a company
-        if (profileData.company_id) {
-          console.log('🔧 [AUTH] Running role check for company:', profileData.company_id);
-          await performCompleteRoleCheck(currentUser.id);
-        }
+        console.log('👤 [AUTH] Profile loaded, company_id:', profileData.company_id);
       } else {
-        console.error('❌ [AUTH] Error fetching user profile:', profileError);
+        console.error('❌ [AUTH] Error fetching profile:', profileError);
         setProfile(null);
       }
 
-      // Fetch roles with fallback and auto-assignment
-      console.log('🔍 [AUTH] Fetching roles...');
+      // Fetch roles with enhanced error handling
       try {
+        // Try RPC first
         const { data: userRoles, error: rolesError } = await supabase
           .rpc('get_user_companies_simple', { _user_id: currentUser.id });
-        
-        console.log('🔍 [AUTH] RPC roles result:', { userRoles, rolesError });
         
         if (!rolesError && userRoles && userRoles.length > 0) {
           const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
@@ -145,18 +130,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             company_id: role.company_id
           }));
           setRoles(transformedRoles);
-          console.log('👥 [AUTH] User roles fetched:', transformedRoles.length, 'roles');
-          retryAttempts.current = 0; // Reset retry counter on success
+          console.log('👥 [AUTH] Roles loaded:', transformedRoles.length, 'roles');
         } else {
-          console.warn('❌ [AUTH] No roles found via RPC, trying direct query...');
+          console.log('⚠️ [AUTH] No roles from RPC, trying direct query...');
           
-          // Fallback: direct query to user_roles table
+          // Fallback to direct query
           const { data: directRoles, error: directError } = await supabase
             .from('user_roles')
             .select('role, company_id')
             .eq('user_id', currentUser.id);
-          
-          console.log('🔍 [AUTH] Direct roles result:', { directRoles, directError });
           
           if (!directError && directRoles && directRoles.length > 0) {
             const fallbackRoles: UserRole[] = directRoles.map((role: any) => ({
@@ -164,35 +146,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               company_id: role.company_id
             }));
             setRoles(fallbackRoles);
-            console.log('👥 [AUTH] User roles fetched via fallback:', fallbackRoles.length, 'roles');
-            retryAttempts.current = 0; // Reset retry counter on success
+            console.log('👥 [AUTH] Roles loaded via fallback:', fallbackRoles.length, 'roles');
           } else {
-            // Si aún no hay roles y el usuario tiene empresa, intentar auto-asignación
-            if (profileData?.company_id && retryAttempts.current < maxRetryAttempts) {
-              console.log('🔧 [AUTH] No roles found, attempting auto-assignment...');
-              retryAttempts.current++;
-              
-              const autoAssigned = await AutoRoleAssignmentService.attemptAutoAdminAssignment();
-              if (autoAssigned) {
-                console.log('✅ [AUTH] Auto-assignment successful, retrying role fetch...');
-                // Retry fetching roles after auto-assignment
-                setTimeout(() => {
-                  if (!isRefreshingUserData.current) {
-                    refreshUserData();
-                  }
-                }, 1000);
-              } else {
-                console.error('❌ [AUTH] Auto-assignment failed');
-                setRoles([]);
-              }
-            } else {
-              console.warn('❌ [AUTH] No roles available and max retries reached or no company');
-              setRoles([]);
-            }
+            console.log('⚠️ [AUTH] No roles found in direct query');
+            setRoles([]);
           }
         }
       } catch (rolesFetchError) {
-        console.error('❌ [AUTH] Critical error fetching roles:', rolesFetchError);
+        console.error('❌ [AUTH] Error fetching roles:', rolesFetchError);
         setRoles([]);
       }
 
@@ -237,12 +198,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Clear any existing timeout
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
     }
 
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Auth state changed:', event, session?.user?.email);
@@ -250,16 +209,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Reset retry attempts on new session
-          retryAttempts.current = 0;
-          
-          // Debounce user data refresh
+          // Immediate refresh for login/signup
           setTimeout(async () => {
             if (!isRefreshingUserData.current) {
               await refreshUserData();
             }
             setLoading(false);
-          }, 300);
+          }, 200);
         } else {
           setRoles([]);
           setProfile(null);
@@ -276,21 +232,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        retryAttempts.current = 0;
         setTimeout(async () => {
           if (!isRefreshingUserData.current) {
             await refreshUserData();
           }
           setLoading(false);
-        }, 300);
+        }, 200);
       } else {
         setLoading(false);
       }
     });
 
-    // Timeout for safety
+    // Safety timeout
     loadingTimeoutRef.current = setTimeout(() => {
-      console.warn('⚠️ Auth loading timeout reached, setting loading to false');
+      console.warn('⚠️ Auth loading timeout reached');
       setLoading(false);
     }, 5000);
 

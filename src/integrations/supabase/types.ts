@@ -2036,6 +2036,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      fix_missing_admin_roles: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       force_sync_existing_novedades: {
         Args: Record<PropertyKey, never>
         Returns: string

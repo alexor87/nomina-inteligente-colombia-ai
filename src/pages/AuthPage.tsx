@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { CompanyRegistrationWizard } from '@/components/auth/CompanyRegistrationWizard';
@@ -12,282 +13,260 @@ import { CompanyRegistrationService } from '@/services/CompanyRegistrationServic
 import { useCompanyRegistrationStore } from '@/components/auth/hooks/useCompanyRegistrationStore';
 
 const AuthPage = () => {
-  const { signIn, user, refreshUserData } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showRegistrationWizard, setShowRegistrationWizard] = useState(false);
-  const [processingRegistration, setProcessingRegistration] = useState(false);
-  const { data } = useCompanyRegistrationStore();
+  const [loading, setLoading] = useState(false);
+  const [showCompanyWizard, setShowCompanyWizard] = useState(false);
+  
+  const { signIn, signUp, refreshUserData } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { data: wizardData } = useCompanyRegistrationStore();
 
-  // Redirigir si ya está autenticado
-  React.useEffect(() => {
-    if (user) {
-      navigate('/app/dashboard');
-    }
-  }, [user, navigate]);
-
-  const [loginForm, setLoginForm] = useState({
-    email: '',
-    password: ''
-  });
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await signIn(loginForm.email, loginForm.password);
-      
-      if (error) {
-        console.error('Login error:', error);
-        let errorMessage = 'Ocurrió un error inesperado.';
-        
-        if (error.message === 'Invalid login credentials') {
-          errorMessage = 'Credenciales inválidas. Verifica tu email y contraseña.';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Por favor confirma tu email antes de iniciar sesión.';
-        } else if (error.message) {
-          errorMessage = error.message;
+      if (isLogin) {
+        const { error } = await signIn(email, password);
+        if (error) {
+          toast({
+            title: "Error de autenticación",
+            description: error.message,
+            variant: "destructive",
+          });
+          return;
         }
-        
+
         toast({
-          title: "Error de inicio de sesión",
-          description: errorMessage,
-          variant: "destructive"
+          title: "Inicio de sesión exitoso",
+          description: "Bienvenido de vuelta",
         });
-      } else {
-        toast({
-          title: "Bienvenido",
-          description: "Has iniciado sesión correctamente."
-        });
+
         navigate('/app/dashboard');
+      } else {
+        const { error } = await signUp(email, password, firstName, lastName);
+        if (error) {
+          toast({
+            title: "Error en el registro",
+            description: error.message,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        toast({
+          title: "Cuenta creada exitosamente",
+          description: "Por favor verifica tu email para continuar",
+        });
+
+        // Auto-configure company if wizard data exists
+        if (wizardData && Object.keys(wizardData).length > 0) {
+          await handleQuickCompanySetup();
+        } else {
+          setShowCompanyWizard(true);
+        }
       }
-    } catch (error) {
-      console.error('Unexpected login error:', error);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Ocurrió un error inesperado.",
-        variant: "destructive"
+        description: error.message || "Ocurrió un error inesperado",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRegistrationComplete = async () => {
-    setProcessingRegistration(true);
-    
+  const handleQuickCompanySetup = async () => {
     try {
-      console.log('Processing company registration:', data);
+      console.log('🚀 Setting up company with wizard data:', wizardData);
       
-      // Convert wizard data to company registration format
+      // Create company with wizard data
       const registrationData = {
-        nit: `${data.identificationNumber}-${data.verificationDigit}`,
-        razon_social: data.identificationNumber || 'Mi Empresa',
-        email: data.invitedMember?.email || 'contacto@empresa.com',
+        nit: wizardData.identificationNumber || '900000000-1',
+        razon_social: wizardData.identificationNumber || 'Mi Empresa',
+        email: wizardData.invitedMember?.email || email,
         telefono: '',
-        direccion: 'Bogotá', // Using direccion instead of ciudad
+        direccion: 'Bogotá',
         plan: 'profesional' as const,
       };
 
+      console.log('📝 Company registration data:', registrationData);
+      
       const result = await CompanyRegistrationService.registerCompany(registrationData);
       
       if (!result.success) {
         throw new Error(result.message || 'Error registrando empresa');
       }
       
-      console.log('Company created successfully:', result.company?.id);
+      console.log('✅ Company created successfully:', result.company?.id);
       
       // Refresh user data to ensure roles and profile are loaded
       await refreshUserData();
       
       toast({
-        title: "¡Bienvenido a NóminaFácil!",
-        description: "Tu empresa ha sido registrada exitosamente. ¡Comienza tu prueba gratuita!",
+        title: "¡Empresa configurada exitosamente!",
+        description: "Tu plataforma está lista. Acceso completo habilitado.",
       });
-
-      // Navigate to dashboard
+      
+      // Navigate to dashboard with full access
       setTimeout(() => {
         navigate('/app/dashboard');
       }, 1500);
       
     } catch (error: any) {
-      console.error('Error creating company:', error);
-      
-      let errorMessage = "Ha ocurrido un error inesperado";
-      
-      if (error.message) {
-        errorMessage = error.message;
-      }
-      
+      console.error('❌ Error in quick company setup:', error);
       toast({
-        title: "Error al registrar empresa",
-        description: errorMessage,
-        variant: "destructive"
+        title: "Error configurando empresa",
+        description: error.message || "Error en la configuración automática",
+        variant: "destructive",
       });
-    } finally {
-      setProcessingRegistration(false);
-      setShowRegistrationWizard(false);
+      
+      // Fallback to wizard
+      setShowCompanyWizard(true);
     }
   };
 
-  const handleCancelRegistration = () => {
-    setShowRegistrationWizard(false);
+  const handleCompanyWizardComplete = async () => {
+    setShowCompanyWizard(false);
+    
+    // Refresh user data to get the new company and roles
+    await refreshUserData();
+    
+    toast({
+      title: "¡Configuración completada!",
+      description: "Tu empresa ha sido configurada exitosamente. Acceso completo habilitado.",
+    });
+    
+    navigate('/app/dashboard');
   };
 
-  if (processingRegistration) {
+  if (showCompanyWizard) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Configurando tu empresa...</p>
-        </div>
-      </div>
+      <CompanyRegistrationWizard 
+        onComplete={handleCompanyWizardComplete}
+        onCancel={() => {
+          setShowCompanyWizard(false);
+          navigate('/app/dashboard');
+        }}
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Registration Wizard Overlay */}
-      {showRegistrationWizard && (
-        <CompanyRegistrationWizard 
-          onComplete={handleRegistrationComplete} 
-          onCancel={handleCancelRegistration}
-        />
-      )}
-
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-blue-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <button
-              onClick={() => navigate('/')}
-              className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Volver al inicio
-            </button>
-            
-            <div className="flex items-center">
-              <Building2 className="h-8 w-8 text-blue-600 mr-2" />
-              <h1 className="text-xl font-bold text-blue-600">Finppi Nómina</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Building2 className="h-6 w-6 text-white" />
             </div>
           </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-4">
-        <div className="w-full max-w-md">
-          <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
-            <CardHeader className="text-center pb-8">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Building2 className="h-8 w-8 text-blue-600" />
-              </div>
-              <CardTitle className="text-2xl text-gray-900">Iniciar Sesión</CardTitle>
-              <p className="text-gray-600 mt-2">
-                Accede a tu plataforma de gestión de nómina
-              </p>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-700 font-medium">
-                    Correo electrónico
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <CardTitle className="text-2xl font-bold text-center">
+            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+          </CardTitle>
+          <CardDescription className="text-center">
+            {isLogin 
+              ? 'Accede a tu plataforma de nómina' 
+              : 'Crea tu cuenta y configura tu empresa'
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">Nombre</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      value={loginForm.email}
-                      onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="ejemplo@empresa.com"
-                      className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      required
+                      id="firstName"
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required={!isLogin}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Apellido</Label>
+                    <Input
+                      id="lastName"
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required={!isLogin}
                     />
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-700 font-medium">
-                    Contraseña
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={loginForm.password}
-                      onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="Tu contraseña"
-                      className="pl-10 pr-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Iniciando sesión...
-                    </div>
-                  ) : (
-                    'Iniciar Sesión'
-                  )}
-                </Button>
-              </form>
-
+              </>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
               <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">¿No tienes cuenta?</span>
-                </div>
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10"
+                  required
+                />
               </div>
-
-              <Button
-                onClick={() => setShowRegistrationWizard(true)}
-                variant="outline"
-                className="w-full h-12 border-blue-200 text-blue-600 hover:bg-blue-50 font-medium"
-              >
-                Registrar mi empresa
-              </Button>
-
-              <div className="text-center">
-                <button className="text-sm text-blue-600 hover:text-blue-700 hover:underline">
-                  ¿Olvidaste tu contraseña?
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <div className="text-center mt-8">
-            <p className="text-gray-600 text-sm">
-              Al iniciar sesión, aceptas nuestros{' '}
-              <a href="#" className="text-blue-600 hover:underline">Términos de Servicio</a>{' '}
-              y{' '}
-              <a href="#" className="text-blue-600 hover:underline">Política de Privacidad</a>
-            </p>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Procesando...' : (isLogin ? 'Iniciar Sesión' : 'Crear Cuenta')}
+            </Button>
+          </form>
+
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              {isLogin 
+                ? '¿No tienes cuenta? Crear una nueva' 
+                : '¿Ya tienes cuenta? Iniciar sesión'
+              }
+            </button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

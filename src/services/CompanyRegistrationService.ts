@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { AutoRoleAssignmentService } from './AutoRoleAssignmentService';
 
 export interface CompanyRegistrationData {
   nit: string;
@@ -12,7 +11,7 @@ export interface CompanyRegistrationData {
 }
 
 /**
- * Servicio mejorado para registro de empresas con auto-asignación de roles
+ * Enhanced service for company registration with guaranteed role assignment
  */
 export class CompanyRegistrationService {
   
@@ -25,7 +24,7 @@ export class CompanyRegistrationService {
         throw new Error('Usuario no autenticado');
       }
 
-      // 1. Crear empresa
+      // 1. Create company
       const { data: company, error: companyError } = await supabase
         .from('companies')
         .insert({
@@ -47,7 +46,7 @@ export class CompanyRegistrationService {
 
       console.log('✅ Empresa creada:', company.id);
 
-      // 2. Actualizar perfil del usuario con la empresa
+      // 2. Update profile with company (this will trigger the role assignment)
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
@@ -63,7 +62,11 @@ export class CompanyRegistrationService {
 
       console.log('✅ Perfil actualizado con company_id:', company.id);
 
-      // 3. Crear configuración inicial de la empresa
+      // 3. Wait for role assignment with polling
+      console.log('⏳ Esperando asignación de rol...');
+      await this.waitForRoleAssignment(user.id, company.id);
+
+      // 4. Create company settings
       const { error: settingsError } = await supabase
         .from('company_settings')
         .insert({
@@ -74,17 +77,16 @@ export class CompanyRegistrationService {
 
       if (settingsError) {
         console.error('⚠️ Error creando configuración empresa:', settingsError);
-        // No es crítico, continuamos
       }
 
-      // 4. Crear suscripción inicial
+      // 5. Create subscription
       const { error: subscriptionError } = await supabase
         .from('company_subscriptions')
         .insert({
           company_id: company.id,
           plan_type: data.plan,
           status: 'trial',
-          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           max_employees: data.plan === 'basico' ? 10 : data.plan === 'profesional' ? 25 : 100,
           max_payrolls_per_month: 12,
           created_at: new Date().toISOString()
@@ -92,44 +94,12 @@ export class CompanyRegistrationService {
 
       if (subscriptionError) {
         console.error('⚠️ Error creando suscripción:', subscriptionError);
-        // No es crítico, continuamos
-      }
-
-      // 5. AUTO-ASIGNACIÓN CRÍTICA: Asignar rol de administrador
-      console.log('🔧 Intentando auto-asignación de rol administrador...');
-      
-      // Esperar un poco para que se propague la actualización del perfil
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const roleAssigned = await AutoRoleAssignmentService.attemptAutoAdminAssignment();
-      
-      if (!roleAssigned) {
-        console.warn('⚠️ Auto-asignación de rol falló, intentando método directo...');
-        
-        // Fallback: asignación directa
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: user.id,
-            role: 'administrador',
-            company_id: company.id,
-            assigned_by: user.id
-          });
-
-        if (roleError && roleError.code !== '23505') { // Ignorar duplicados
-          console.error('❌ Error asignando rol directo:', roleError);
-          // No lanzar error, el usuario puede intentar más tarde
-        } else {
-          console.log('✅ Rol administrador asignado por método directo');
-        }
-      } else {
-        console.log('✅ Rol administrador auto-asignado exitosamente');
       }
 
       return {
         success: true,
         company,
-        message: 'Empresa registrada exitosamente'
+        message: 'Empresa registrada exitosamente con acceso completo'
       };
 
     } catch (error) {
@@ -140,5 +110,58 @@ export class CompanyRegistrationService {
         message: 'Error registrando empresa'
       };
     }
+  }
+
+  /**
+   * Wait for admin role assignment with polling
+   */
+  private static async waitForRoleAssignment(userId: string, companyId: string): Promise<void> {
+    const maxAttempts = 10;
+    const delayMs = 500;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`🔍 Verificando roles (intento ${attempt}/${maxAttempts})...`);
+      
+      const { data: roles, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('company_id', companyId)
+        .eq('role', 'administrador');
+
+      if (error) {
+        console.error('❌ Error verificando roles:', error);
+        throw error;
+      }
+
+      if (roles && roles.length > 0) {
+        console.log('✅ Rol de administrador confirmado');
+        return;
+      }
+
+      if (attempt < maxAttempts) {
+        console.log(`⏳ Rol no encontrado, esperando ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+
+    // If we get here, role assignment failed - try manual assignment
+    console.warn('⚠️ Asignación automática falló, intentando asignación manual...');
+    
+    const { error: manualAssignError } = await supabase
+      .from('user_roles')
+      .insert({
+        user_id: userId,
+        role: 'administrador',
+        company_id: companyId,
+        assigned_by: userId
+      });
+
+    if (manualAssignError && manualAssignError.code !== '23505') {
+      console.error('❌ Error en asignación manual:', manualAssignError);
+      throw new Error('No se pudo asignar el rol de administrador');
+    }
+
+    console.log('✅ Rol de administrador asignado manualmente');
   }
 }
