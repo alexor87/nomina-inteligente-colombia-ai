@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { AutoRoleAssignmentService } from '@/services/AutoRoleAssignmentService';
 import { 
   LayoutDashboard, 
   Users, 
@@ -15,7 +16,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  Calendar
+  Calendar,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 
 const navigation = [
@@ -35,26 +38,45 @@ interface SidebarProps {
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
-  const { hasModuleAccess, isSuperAdmin, roles, loading } = useAuth();
+  const { hasModuleAccess, isSuperAdmin, roles, loading, refreshUserData } = useAuth();
+  const [isRetrying, setIsRetrying] = useState(false);
 
   console.log('🧭 Sidebar Debug:', {
     currentPath: location.pathname,
     collapsed,
     loading,
     isSuperAdmin,
-    totalNavigationItems: navigation.length
+    rolesCount: roles.length,
+    hasModuleAccessFunction: !!hasModuleAccess
   });
+
+  // Función para intentar recuperar acceso
+  const handleRetryAccess = async () => {
+    if (isRetrying) return;
+    
+    setIsRetrying(true);
+    console.log('🔄 Intentando recuperar acceso...');
+    
+    try {
+      // 1. Intentar auto-asignación de rol
+      await AutoRoleAssignmentService.attemptAutoAdminAssignment();
+      
+      // 2. Refrescar datos del usuario
+      await refreshUserData();
+      
+      console.log('✅ Reintento completado');
+    } catch (error) {
+      console.error('❌ Error en reintento:', error);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   // Mostrar elementos básicos mientras carga
   const getFilteredNavigation = () => {
     if (loading) {
-      // Mientras carga, mostrar al menos dashboard
-      return [navigation[0]]; // Solo Dashboard
-    }
-
-    if (!hasModuleAccess) {
-      // Si no hay función de acceso, mostrar navegación básica incluyendo vacaciones
-      return navigation.filter(item => ['dashboard', 'employees', 'vacations-absences'].includes(item.module));
+      // Mientras carga, mostrar solo dashboard
+      return [navigation[0]];
     }
 
     // SuperAdmin ve todo
@@ -62,14 +84,21 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       return navigation;
     }
 
+    // Si no hay función de acceso o no hay roles, mostrar navegación mínima
+    if (!hasModuleAccess || roles.length === 0) {
+      return navigation.filter(item => ['dashboard', 'employees'].includes(item.module));
+    }
+
     // Filtrar por acceso a módulos
     return navigation.filter(item => hasModuleAccess(item.module));
   };
 
   const filteredNavigation = getFilteredNavigation();
+  const hasNoRoles = !loading && roles.length === 0 && !isSuperAdmin;
 
   console.log('🔍 Filtered Navigation:', {
     totalFiltered: filteredNavigation.length,
+    hasNoRoles,
     items: filteredNavigation.map(n => ({ name: n.name, module: n.module }))
   });
 
@@ -110,12 +139,36 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         </button>
       </div>
 
+      {/* Alerta de "Sin acceso a módulos" */}
+      {hasNoRoles && !collapsed && (
+        <div className="mx-3 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-amber-800">
+                Sin acceso a módulos
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                Configurando permisos...
+              </p>
+              <button
+                onClick={handleRetryAccess}
+                disabled={isRetrying}
+                className="mt-2 inline-flex items-center space-x-1 text-xs text-amber-800 hover:text-amber-900 disabled:opacity-50"
+              >
+                <RefreshCw className={cn("h-3 w-3", isRetrying && "animate-spin")} />
+                <span>{isRetrying ? 'Reintentando...' : 'Reintentar'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {filteredNavigation.length > 0 ? (
           filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href;
-            console.log(`📍 Navigation item: ${item.name}, isActive: ${isActive}, path: ${item.href}`);
             
             return (
               <Link
@@ -159,7 +212,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
           // Fallback cuando no hay navegación disponible
           <div className="text-center py-8">
             <div className="text-gray-400 text-sm">
-              {loading ? 'Cargando menú...' : 'Sin acceso a módulos'}
+              {loading ? 'Cargando menú...' : 'Configurando acceso...'}
             </div>
           </div>
         )}

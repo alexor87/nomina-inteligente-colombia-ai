@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { performCompleteRoleCheck } from '@/utils/roleUtils';
+import { AutoRoleAssignmentService } from '@/services/AutoRoleAssignmentService';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
@@ -65,6 +66,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Refs to prevent redundant calls
   const isRefreshingUserData = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryAttempts = useRef(0);
+  const maxRetryAttempts = 3;
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     if (roles.length === 0) {
@@ -128,7 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       }
 
-      // Fetch roles with fallback
+      // Fetch roles with fallback and auto-assignment
       console.log('🔍 [AUTH] Fetching roles...');
       try {
         const { data: userRoles, error: rolesError } = await supabase
@@ -136,15 +139,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         console.log('🔍 [AUTH] RPC roles result:', { userRoles, rolesError });
         
-        if (!rolesError && userRoles) {
+        if (!rolesError && userRoles && userRoles.length > 0) {
           const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
             role: role.role_name as AppRole,
             company_id: role.company_id
           }));
           setRoles(transformedRoles);
           console.log('👥 [AUTH] User roles fetched:', transformedRoles.length, 'roles');
+          retryAttempts.current = 0; // Reset retry counter on success
         } else {
-          console.error('❌ [AUTH] Error fetching user roles via RPC, trying direct query:', rolesError);
+          console.warn('❌ [AUTH] No roles found via RPC, trying direct query...');
           
           // Fallback: direct query to user_roles table
           const { data: directRoles, error: directError } = await supabase
@@ -154,16 +158,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           console.log('🔍 [AUTH] Direct roles result:', { directRoles, directError });
           
-          if (!directError && directRoles) {
+          if (!directError && directRoles && directRoles.length > 0) {
             const fallbackRoles: UserRole[] = directRoles.map((role: any) => ({
               role: role.role as AppRole,
               company_id: role.company_id
             }));
             setRoles(fallbackRoles);
             console.log('👥 [AUTH] User roles fetched via fallback:', fallbackRoles.length, 'roles');
+            retryAttempts.current = 0; // Reset retry counter on success
           } else {
-            console.error('❌ [AUTH] Error with direct roles query:', directError);
-            setRoles([]);
+            // Si aún no hay roles y el usuario tiene empresa, intentar auto-asignación
+            if (profileData?.company_id && retryAttempts.current < maxRetryAttempts) {
+              console.log('🔧 [AUTH] No roles found, attempting auto-assignment...');
+              retryAttempts.current++;
+              
+              const autoAssigned = await AutoRoleAssignmentService.attemptAutoAdminAssignment();
+              if (autoAssigned) {
+                console.log('✅ [AUTH] Auto-assignment successful, retrying role fetch...');
+                // Retry fetching roles after auto-assignment
+                setTimeout(() => {
+                  if (!isRefreshingUserData.current) {
+                    refreshUserData();
+                  }
+                }, 1000);
+              } else {
+                console.error('❌ [AUTH] Auto-assignment failed');
+                setRoles([]);
+              }
+            } else {
+              console.warn('❌ [AUTH] No roles available and max retries reached or no company');
+              setRoles([]);
+            }
           }
         }
       } catch (rolesFetchError) {
@@ -225,6 +250,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Reset retry attempts on new session
+          retryAttempts.current = 0;
+          
           // Debounce user data refresh
           setTimeout(async () => {
             if (!isRefreshingUserData.current) {
@@ -248,6 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        retryAttempts.current = 0;
         setTimeout(async () => {
           if (!isRefreshingUserData.current) {
             await refreshUserData();
