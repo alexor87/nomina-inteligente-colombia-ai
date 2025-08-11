@@ -13,7 +13,7 @@ export const useCompanyId = (setCompanyId: (id: string | null) => void) => {
           .from('profiles')
           .select('company_id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (profile?.company_id) {
           setCompanyId(profile.company_id);

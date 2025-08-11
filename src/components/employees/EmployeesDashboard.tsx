@@ -14,6 +14,7 @@ import {
 import { EmployeeList } from './EmployeeList';
 import { CriticalRepairPanel } from '../system/CriticalRepairPanel';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
+import { useActiveEmployeeCount } from '@/hooks/useActiveEmployeeCount';
 
 /**
  * Dashboard principal de empleados con diagnóstico integrado
@@ -27,8 +28,9 @@ export const EmployeesDashboard = () => {
     error 
   } = useEmployeeList();
 
-  const activeEmployees = employees.filter(emp => emp.estado === 'activo').length;
-  const hasEmployeeIssues = totalEmployees === 0 || activeEmployees === 0 || error;
+  const { count: activeEmployeeCount, isLoading: isActiveCountLoading } = useActiveEmployeeCount();
+  const activeEmployees = (activeEmployeeCount ?? employees.filter(emp => emp.estado === 'activo').length);
+  const hasEmployeeIssues = totalEmployees === 0 || ((activeEmployees === 0) && !isActiveCountLoading) || error;
 
   return (
     <div className="space-y-6">
