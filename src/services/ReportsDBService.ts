@@ -577,4 +577,26 @@ export class ReportsDBService {
       name: cc.name
     })) || [];
   }
+
+  // Obtener períodos disponibles para filtros
+  static async getPeriodsForFilters() {
+    const { data, error } = await supabase
+      .from('payroll_periods_real')
+      .select('id, periodo, fecha_inicio, fecha_fin')
+      .eq('company_id', await this.getCurrentCompanyId())
+      .order('fecha_inicio', { ascending: false });
+
+    if (error) {
+      console.error('❌ Error fetching periods for filters:', error);
+      return [];
+    }
+
+    return data?.map((p: any) => ({
+      id: p.id,
+      label: p.periodo,
+      startDate: p.fecha_inicio,
+      endDate: p.fecha_fin,
+    })) || [];
+  }
 }
+

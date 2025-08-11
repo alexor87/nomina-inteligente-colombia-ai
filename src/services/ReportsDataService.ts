@@ -125,7 +125,20 @@ export class ReportsDataService {
       return [];
     }
   }
+
+  static async getPeriodsForFilters() {
+    console.log('🔄 ReportsDataService: Fetching periods for filters');
+    try {
+      const data = await ReportsDBService.getPeriodsForFilters();
+      console.log('✅ ReportsDataService: Periods for filters received:', data.length, 'records');
+      return data;
+    } catch (error) {
+      console.error('❌ ReportsDataService: Error fetching periods for filters:', error);
+      return [];
+    }
+  }
 }
+
 
 /**
  * MIGRACIÓN COMPLETADA ✅

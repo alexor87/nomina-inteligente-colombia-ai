@@ -12,7 +12,7 @@ import { CalendarIcon, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ReportFilters as ReportFiltersType } from '@/types/reports';
-import { supabase } from '@/integrations/supabase/client';
+import { ReportsDataService } from '@/services/ReportsDataService';
 
 interface ReportFiltersProps {
   filters: ReportFiltersType;
@@ -27,6 +27,36 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
 }) => {
   const [dateFromOpen, setDateFromOpen] = React.useState(false);
   const [dateToOpen, setDateToOpen] = React.useState(false);
+  const [periods, setPeriods] = React.useState<Array<{ id: string; label: string }>>([]);
+  const [employees, setEmployees] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [costCentersData, setCostCentersData] = React.useState<Array<{ code: string; name: string }>>([]);
+  const [employeeQuery, setEmployeeQuery] = React.useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = React.useState(false);
+
+  React.useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const [periodsRes, employeesRes, costCentersRes] = await Promise.all([
+          (ReportsDataService as any).getPeriodsForFilters?.() ?? [],
+          ReportsDataService.getEmployeesForFilters(),
+          ReportsDataService.getCostCentersForFilters(),
+        ]);
+        if (Array.isArray(periodsRes)) {
+          setPeriods(periodsRes.map((p: any) => ({ id: p.id, label: p.label ?? p.period ?? p.periodo ?? '' })).filter((p: any) => p.id && p.label));
+        }
+        setEmployees(employeesRes);
+        setCostCentersData(costCentersRes);
+        if (filters.employeeIds?.[0]) {
+          const emp = employeesRes.find((e: any) => e.id === filters.employeeIds![0]);
+          if (emp) setEmployeeQuery(emp.name);
+        }
+      } catch (e) {
+        console.error('Error loading filter options', e);
+      }
+    };
+    loadOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDateRangeChange = (field: 'from' | 'to', date: Date | undefined) => {
     if (!date) return;
@@ -84,6 +114,15 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
     });
   };
 
+  const handlePeriodChange = (periodId: string) => {
+    const selected = periods.find(p => p.id === periodId);
+    onFiltersChange({
+      ...filters,
+      periodId: selected?.id,
+      period: selected?.label
+    });
+  };
+
   const clearFilters = () => {
     onFiltersChange({});
   };
@@ -92,10 +131,9 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
     return !!(filters.dateRange?.from || filters.dateRange?.to || 
              filters.employeeIds?.length || filters.costCenters?.length ||
              filters.contractTypes?.length || filters.employeeStatus?.length ||
-             filters.noveltyTypes?.length);
+             filters.noveltyTypes?.length || filters.period || filters.periodId);
   };
 
-  const costCenters = ['Administración', 'Ventas', 'Operaciones', 'Sistemas', 'Marketing'];
   const contractTypes = ['indefinido', 'termino_fijo', 'obra_labor', 'prestacion_servicios'];
   const employeeStatuses = ['activo', 'inactivo', 'vacaciones', 'licencia'];
   const noveltyTypes = ['overtime', 'bonus', 'incapacity', 'license', 'advance', 'absence'];
@@ -117,6 +155,21 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Period Selector */}
+        <div className="space-y-2">
+          <Label>Período</Label>
+          <Select value={filters.periodId || ''} onValueChange={handlePeriodChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar período" />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              {periods.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Date Range */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -181,27 +234,59 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
         </div>
 
         {/* Employee Search */}
-        <div className="space-y-2">
+        <div className="space-y-2 relative">
           <Label>Buscar empleado</Label>
           <Input
             placeholder="Nombre del empleado..."
-            value={filters.employeeIds?.[0] || ''}
-            onChange={(e) => handleEmployeeSearch(e.target.value)}
+            value={employeeQuery}
+            onChange={(e) => {
+              const q = e.target.value;
+              setEmployeeQuery(q);
+              setShowEmployeeDropdown(!!q);
+              if (!q) {
+                onFiltersChange({ ...filters, employeeIds: undefined });
+              }
+            }}
+            onFocus={() => setShowEmployeeDropdown(!!employeeQuery)}
           />
+          {showEmployeeDropdown && (
+            <div className="absolute z-50 w-full bg-popover text-popover-foreground border shadow-md rounded-md mt-1 max-h-60 overflow-auto">
+              {employees
+                .filter(e => e.name.toLowerCase().includes(employeeQuery.toLowerCase()))
+                .slice(0, 8)
+                .map(e => (
+                  <div
+                    key={e.id}
+                    className="px-3 py-2 cursor-pointer hover:bg-accent"
+                    onMouseDown={(ev) => ev.preventDefault()}
+                    onClick={() => {
+                      onFiltersChange({ ...filters, employeeIds: [e.id] });
+                      setEmployeeQuery(e.name);
+                      setShowEmployeeDropdown(false);
+                    }}
+                  >
+                    {e.name}
+                  </div>
+                ))}
+              {employees.filter(e => e.name.toLowerCase().includes(employeeQuery.toLowerCase())).length === 0 && (
+                <div className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Cost Centers */}
         <div className="space-y-2">
           <Label>Centros de costo</Label>
           <div className="flex flex-wrap gap-2">
-            {costCenters.map((center) => (
+            {costCentersData.map((cc) => (
               <Badge
-                key={center}
-                variant={filters.costCenters?.includes(center) ? 'default' : 'outline'}
+                key={cc.code}
+                variant={filters.costCenters?.includes(cc.name) ? 'default' : 'outline'}
                 className="cursor-pointer"
-                onClick={() => handleCostCenterChange(center)}
+                onClick={() => handleCostCenterChange(cc.name)}
               >
-                {center}
+                {cc.name}
               </Badge>
             ))}
           </div>
