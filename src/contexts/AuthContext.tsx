@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useRoleManagement } from '@/hooks/useRoleManagement';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
@@ -27,6 +28,7 @@ interface AuthContextType {
   roles: UserRole[];
   profile: UserProfile | null;
   isSuperAdmin: boolean;
+  isLoadingRoles: boolean;
   hasRole: (role: AppRole, companyId?: string) => boolean;
   hasModuleAccess: (module: string) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
@@ -58,12 +60,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [roles, setRoles] = useState<UserRole[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
   const isRefreshingUserData = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Use the new role management hook
+  const { roles, isLoadingRoles, refetchRoles } = useRoleManagement(user, profile);
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     if (roles.length === 0) {
@@ -103,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔄 [AUTH] Refreshing user data for:', currentUser.email);
 
     try {
-      // Fetch profile first
+      // Fetch profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -116,45 +120,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         console.error('❌ [AUTH] Error fetching profile:', profileError);
         setProfile(null);
-      }
-
-      // Fetch roles with enhanced error handling
-      try {
-        // Try RPC first
-        const { data: userRoles, error: rolesError } = await supabase
-          .rpc('get_user_companies_simple', { _user_id: currentUser.id });
-        
-        if (!rolesError && userRoles && userRoles.length > 0) {
-          const transformedRoles: UserRole[] = userRoles.map((role: any) => ({
-            role: role.role_name as AppRole,
-            company_id: role.company_id
-          }));
-          setRoles(transformedRoles);
-          console.log('👥 [AUTH] Roles loaded:', transformedRoles.length, 'roles');
-        } else {
-          console.log('⚠️ [AUTH] No roles from RPC, trying direct query...');
-          
-          // Fallback to direct query
-          const { data: directRoles, error: directError } = await supabase
-            .from('user_roles')
-            .select('role, company_id')
-            .eq('user_id', currentUser.id);
-          
-          if (!directError && directRoles && directRoles.length > 0) {
-            const fallbackRoles: UserRole[] = directRoles.map((role: any) => ({
-              role: role.role as AppRole,
-              company_id: role.company_id
-            }));
-            setRoles(fallbackRoles);
-            console.log('👥 [AUTH] Roles loaded via fallback:', fallbackRoles.length, 'roles');
-          } else {
-            console.log('⚠️ [AUTH] No roles found in direct query');
-            setRoles([]);
-          }
-        }
-      } catch (rolesFetchError) {
-        console.error('❌ [AUTH] Error fetching roles:', rolesFetchError);
-        setRoles([]);
       }
 
       console.log('✅ [AUTH] User data refresh complete');
@@ -192,7 +157,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    setRoles([]);
     setProfile(null);
     setIsSuperAdmin(false);
   };
@@ -217,7 +181,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
           }, 200);
         } else {
-          setRoles([]);
           setProfile(null);
           setIsSuperAdmin(false);
           setLoading(false);
@@ -264,12 +227,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     roles,
     profile,
     isSuperAdmin,
+    isLoadingRoles,
     hasRole,
     hasModuleAccess,
     signIn,
     signUp,
     signOut,
-    refreshUserData,
+    refreshUserData: useCallback(async () => {
+      await refreshUserData();
+      await refetchRoles();
+    }, [refreshUserData, refetchRoles]),
   };
 
   return (

@@ -13,7 +13,8 @@ import {
   History,
   ChevronLeft,
   Menu,
-  Calendar
+  Calendar,
+  Loader2
 } from 'lucide-react';
 
 const navigation = [
@@ -33,12 +34,13 @@ interface SidebarProps {
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
-  const { hasModuleAccess, isSuperAdmin, roles, loading, refreshUserData } = useAuth();
+  const { hasModuleAccess, isSuperAdmin, roles, loading, isLoadingRoles } = useAuth();
 
   console.log('🧭 Sidebar Debug:', {
     currentPath: location.pathname,
     collapsed,
     loading,
+    isLoadingRoles,
     isSuperAdmin,
     rolesCount: roles.length,
     hasModuleAccessFunction: !!hasModuleAccess
@@ -56,6 +58,13 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     // SuperAdmin sees everything
     if (isSuperAdmin) {
       return navigation;
+    }
+
+    // If roles are still loading, show basic modules
+    if (isLoadingRoles) {
+      return navigation.filter(item => 
+        ['dashboard', 'employees', 'payroll-history'].includes(item.module)
+      );
     }
 
     // If user has roles, filter by module access
@@ -161,9 +170,16 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
           })
         ) : (
           <div className="text-center py-8">
-            <div className="text-gray-400 text-sm">
-              {loading ? 'Cargando menú...' : 'Configurando acceso...'}
-            </div>
+            {isLoadingRoles ? (
+              <div className="flex flex-col items-center gap-2 text-gray-400 text-sm">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Configurando acceso...</span>
+              </div>
+            ) : (
+              <div className="text-gray-400 text-sm">
+                {loading ? 'Cargando menú...' : 'Verificando permisos...'}
+              </div>
+            )}
           </div>
         )}
       </nav>
