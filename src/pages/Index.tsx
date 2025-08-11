@@ -7,9 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowRight, Calculator, Users, BarChart3, FileText, Shield, CheckCircle2, Clock3 } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import landing1 from '@/assets/landing-1.jpg';
-import landing2 from '@/assets/landing-2.jpg';
-import landing3 from '@/assets/landing-3.jpg';
 export const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -149,13 +146,13 @@ export const Index = () => {
         <Carousel className="w-full">
           <CarouselContent>
             <CarouselItem>
-              <img src={landing1} alt="Finppi Nómina - Dashboard de nómina y análisis" loading="lazy" className="w-full rounded-lg border border-border shadow" />
+              <img src="/screens/dashboard.webp" alt="Finppi Nómina – captura del Dashboard de nómina y análisis" loading="lazy" decoding="async" className="w-full rounded-lg border border-border shadow" />
             </CarouselItem>
             <CarouselItem>
-              <img src={landing2} alt="Finppi Nómina - Cálculo de nómina con desgloses" loading="lazy" className="w-full rounded-lg border border-border shadow" />
+              <img src="/screens/payroll.webp" alt="Finppi Nómina – captura del cálculo de nómina con desgloses" loading="lazy" decoding="async" className="w-full rounded-lg border border-border shadow" />
             </CarouselItem>
             <CarouselItem>
-              <img src={landing3} alt="Finppi Nómina - Directorio de empleados" loading="lazy" className="w-full rounded-lg border border-border shadow" />
+              <img src="/screens/employees.webp" alt="Finppi Nómina – captura del directorio de empleados" loading="lazy" decoding="async" className="w-full rounded-lg border border-border shadow" />
             </CarouselItem>
           </CarouselContent>
           <div className="flex items-center justify-between mt-4">
