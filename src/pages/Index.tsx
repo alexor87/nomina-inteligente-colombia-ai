@@ -4,9 +4,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Calculator, Users, BarChart3, FileText } from 'lucide-react';
+import { ArrowRight, Calculator, Users, BarChart3, FileText, Shield, CheckCircle2, Clock3 } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
-
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import landing1 from '@/assets/landing-1.jpg';
+import landing2 from '@/assets/landing-2.jpg';
+import landing3 from '@/assets/landing-3.jpg';
 export const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -42,7 +45,7 @@ export const Index = () => {
               <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
                 <Calculator className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xl font-bold text-foreground">NóminaApp</span>
+              <span className="text-xl font-bold text-foreground">Finppi Nómina</span>
             </div>
             <div className="flex items-center space-x-4">
               <Link to="/login">
@@ -87,8 +90,83 @@ export const Index = () => {
         </div>
       </div>
 
+      {/* Trust Bar */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-sm text-muted-foreground">
+          <div><span className="font-semibold text-foreground">+5.000</span> empleados gestionados</div>
+          <div><span className="font-semibold text-foreground">Cumplimiento</span> UGPP y DIAN</div>
+          <div><span className="font-semibold text-foreground">99.9%</span> disponibilidad</div>
+          <div><span className="font-semibold text-foreground">Soporte</span> dedicado</div>
+        </div>
+      </section>
+
+      {/* Cómo funciona */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-foreground mb-3">¿Cómo funciona Finppi Nómina?</h2>
+          <p className="text-lg text-muted-foreground">En tres pasos estás listo para liquidar tu nómina</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow hover-scale">
+            <CardHeader className="text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Shield className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle>Configura tu empresa</CardTitle>
+              <CardDescription>Datos básicos, centros de costo y reglas de liquidación.</CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow hover-scale">
+            <CardHeader className="text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Users className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle>Importa empleados</CardTitle>
+              <CardDescription>Carga masiva con Excel o crea registros individuales.</CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow hover-scale">
+            <CardHeader className="text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Clock3 className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle>Liquida y paga</CardTitle>
+              <CardDescription>Calcula nómina, genera comprobantes y exporta PILA/contabilidad.</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+        <div className="mt-10 text-center">
+          <Link to="/register"><Button size="lg">Probar gratis ahora<ArrowRight className="ml-2 h-5 w-5" /></Button></Link>
+        </div>
+      </section>
+
+      {/* Screenshots Carousel */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        <div className="mb-6 text-center">
+          <h3 className="text-2xl font-bold text-foreground">Vistas de la plataforma</h3>
+          <p className="text-muted-foreground">Explora el dashboard, cálculo y directorio de empleados</p>
+        </div>
+        <Carousel className="w-full">
+          <CarouselContent>
+            <CarouselItem>
+              <img src={landing1} alt="Finppi Nómina - Dashboard de nómina y análisis" loading="lazy" className="w-full rounded-lg border border-border shadow" />
+            </CarouselItem>
+            <CarouselItem>
+              <img src={landing2} alt="Finppi Nómina - Cálculo de nómina con desgloses" loading="lazy" className="w-full rounded-lg border border-border shadow" />
+            </CarouselItem>
+            <CarouselItem>
+              <img src={landing3} alt="Finppi Nómina - Directorio de empleados" loading="lazy" className="w-full rounded-lg border border-border shadow" />
+            </CarouselItem>
+          </CarouselContent>
+          <div className="flex items-center justify-between mt-4">
+            <CarouselPrevious />
+            <CarouselNext />
+          </div>
+        </Carousel>
+      </section>
+
       {/* Features Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold text-foreground mb-4">
             Todo lo que necesitas para gestionar tu nómina
@@ -155,7 +233,13 @@ export const Index = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
+
+        <div className="mt-12 text-center">
+          <Link to="/login?demo=1">
+            <Button variant="outline" size="lg">Ver demo guiada</Button>
+          </Link>
+        </div>
+      </section>
 
       {/* FAQ Section */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -201,7 +285,7 @@ export const Index = () => {
             ¿Listo para simplificar tu gestión de nómina?
           </h2>
           <p className="text-xl mb-8 text-primary-foreground/80">
-            Únete a cientos de empresas que ya confían en NóminaApp
+            Únete a cientos de empresas que ya confían en Finppi Nómina
           </p>
           <Link to="/register">
             <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
@@ -220,10 +304,10 @@ export const Index = () => {
               <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
                 <Calculator className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xl font-bold text-foreground">NóminaApp</span>
+              <span className="text-xl font-bold text-foreground">Finppi Nómina</span>
             </div>
             <div className="text-gray-400 text-sm">
-              © 2024 NóminaApp. Todos los derechos reservados.
+              © 2024 Finppi. Todos los derechos reservados.
             </div>
           </div>
         </div>
