@@ -27,6 +27,7 @@ import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
 import { PayrollHistoryPage } from "./pages/PayrollHistoryPage";
 import { PayrollHistoryDetailPage } from "./pages/PayrollHistoryDetailPage";
 import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ function AppContent() {
         <Route path="/register/company" element={<CompanyRegistrationPage />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/logout" element={<LogoutPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         {/* Rutas protegidas con Layout */}
         <Route path="/app" element={<Layout />}>
           <Route path="dashboard" element={<DashboardPage />} />

@@ -43,14 +43,56 @@ export const PasswordChange = () => {
       return;
     }
 
+    if (!formData.currentPassword) {
+      toast({
+        title: "Error",
+        description: "Debes ingresar tu contraseña actual",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // First, verify current password by trying to reauthenticate
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        throw new Error('No se pudo obtener información del usuario');
+      }
+
+      // Try to sign in with current password to verify it
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: formData.currentPassword
+      });
+
+      if (signInError) {
+        toast({
+          title: "Error",
+          description: "La contraseña actual es incorrecta",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Now update the password
       const { error } = await supabase.auth.updateUser({
         password: formData.newPassword
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('New password should be different')) {
+          toast({
+            title: "Error",
+            description: "La nueva contraseña debe ser diferente a la actual",
+            variant: "destructive"
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
 
       setFormData({
         currentPassword: '',

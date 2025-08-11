@@ -1,272 +1,401 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Building2, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { CompanyRegistrationWizard } from '@/components/auth/CompanyRegistrationWizard';
-import { CompanyRegistrationService } from '@/services/CompanyRegistrationService';
-import { useCompanyRegistrationStore } from '@/components/auth/hooks/useCompanyRegistrationStore';
+import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 
 const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showCompanyWizard, setShowCompanyWizard] = useState(false);
-  
-  const { signIn, signUp, refreshUserData } = useAuth();
-  const { toast } = useToast();
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [signupForm, setSignupForm] = useState({ 
+    email: '', 
+    password: '', 
+    confirmPassword: '', 
+    firstName: '', 
+    lastName: '' 
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    login: false,
+    signup: false,
+    confirm: false
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
-  const { data: wizardData } = useCompanyRegistrationStore();
+  const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsLoading(true);
 
     try {
-      if (isLogin) {
-        const { error } = await signIn(email, password);
-        if (error) {
-          toast({
-            title: "Error de autenticación",
-            description: error.message,
-            variant: "destructive",
-          });
-          return;
+      const { error } = await signIn(loginForm.email, loginForm.password);
+      
+      if (error) {
+        let errorMessage = "Error al iniciar sesión";
+        
+        if (error.message?.includes('Invalid login credentials')) {
+          errorMessage = "Email o contraseña incorrectos";
+        } else if (error.message?.includes('Email not confirmed')) {
+          errorMessage = "Debes confirmar tu email antes de iniciar sesión";
+        } else if (error.message?.includes('too many requests')) {
+          errorMessage = "Demasiados intentos. Intenta nuevamente en unos minutos";
+        } else if (error.message) {
+          errorMessage = error.message;
         }
-
+        
         toast({
-          title: "Inicio de sesión exitoso",
-          description: "Bienvenido de vuelta",
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive"
         });
-
-        navigate('/app/dashboard');
-      } else {
-        const { error } = await signUp(email, password, firstName, lastName);
-        if (error) {
-          toast({
-            title: "Error en el registro",
-            description: error.message,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        toast({
-          title: "Cuenta creada exitosamente",
-          description: "Por favor verifica tu email para continuar",
-        });
-
-        // Auto-configure company if wizard data exists
-        if (wizardData && Object.keys(wizardData).length > 0) {
-          await handleQuickCompanySetup();
-        } else {
-          setShowCompanyWizard(true);
-        }
+        return;
       }
+      
+      navigate('/app/dashboard');
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Ocurrió un error inesperado",
-        variant: "destructive",
+        title: "Error inesperado",
+        description: "Ha ocurrido un error inesperado. Por favor intenta nuevamente.",
+        variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleQuickCompanySetup = async () => {
-    try {
-      console.log('🚀 Setting up company with wizard data:', wizardData);
-      
-      // Create company with wizard data
-      const registrationData = {
-        nit: wizardData.identificationNumber || '900000000-1',
-        razon_social: wizardData.identificationNumber || 'Mi Empresa',
-        email: wizardData.invitedMember?.email || email,
-        telefono: '',
-        direccion: 'Bogotá',
-        plan: 'profesional' as const,
-      };
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (signupForm.password !== signupForm.confirmPassword) {
+      toast({
+        title: "Las contraseñas no coinciden",
+        description: "Por favor verifica que ambas contraseñas sean iguales",
+        variant: "destructive"
+      });
+      return;
+    }
 
-      console.log('📝 Company registration data:', registrationData);
+    if (signupForm.password.length < 6) {
+      toast({
+        title: "Contraseña muy corta",
+        description: "La contraseña debe tener al menos 6 caracteres",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+
+    try {
+      const { error } = await signUp(
+        signupForm.email, 
+        signupForm.password, 
+        signupForm.firstName, 
+        signupForm.lastName
+      );
       
-      const result = await CompanyRegistrationService.registerCompany(registrationData);
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Error registrando empresa');
+      if (error) {
+        let errorMessage = "Error al crear la cuenta";
+        
+        if (error.message?.includes('User already registered') || error.message?.includes('already been registered')) {
+          errorMessage = "Ya existe un usuario con este email";
+        } else if (error.message?.includes('Invalid email')) {
+          errorMessage = "El formato del email no es válido";
+        } else if (error.message?.includes('Password should be at least 6 characters')) {
+          errorMessage = "La contraseña debe tener al menos 6 caracteres";
+        } else if (error.message?.includes('Signup is disabled')) {
+          errorMessage = "El registro está temporalmente deshabilitado";
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        toast({
+          title: "Error al registrarse",
+          description: errorMessage,
+          variant: "destructive"
+        });
+        return;
       }
       
-      console.log('✅ Company created successfully:', result.company?.id);
-      
-      // Refresh user data to ensure roles and profile are loaded
-      await refreshUserData();
-      
       toast({
-        title: "¡Empresa configurada exitosamente!",
-        description: "Tu plataforma está lista. Acceso completo habilitado.",
+        title: "¡Registro exitoso!",
+        description: "Revisa tu email para confirmar tu cuenta y luego inicia sesión",
       });
-      
-      // Navigate to dashboard with full access
+
+      // Clear form and switch to login tab
+      setSignupForm({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '' });
       setTimeout(() => {
-        navigate('/app/dashboard');
-      }, 1500);
+        setLoginForm({ email: signupForm.email, password: '' });
+      }, 1000);
       
     } catch (error: any) {
-      console.error('❌ Error in quick company setup:', error);
       toast({
-        title: "Error configurando empresa",
-        description: error.message || "Error en la configuración automática",
-        variant: "destructive",
+        title: "Error inesperado",
+        description: "Ha ocurrido un error inesperado. Por favor intenta nuevamente.",
+        variant: "destructive"
       });
-      
-      // Fallback to wizard
-      setShowCompanyWizard(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleCompanyWizardComplete = async () => {
-    setShowCompanyWizard(false);
-    
-    // Refresh user data to get the new company and roles
-    await refreshUserData();
-    
-    toast({
-      title: "¡Configuración completada!",
-      description: "Tu empresa ha sido configurada exitosamente. Acceso completo habilitado.",
-    });
-    
-    navigate('/app/dashboard');
+  const togglePasswordVisibility = (field: 'login' | 'signup' | 'confirm') => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
   };
 
-  if (showCompanyWizard) {
+  if (showForgotPassword) {
     return (
-      <CompanyRegistrationWizard 
-        onComplete={handleCompanyWizardComplete}
-        onCancel={() => {
-          setShowCompanyWizard(false);
-          navigate('/app/dashboard');
-        }}
-      />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <Building2 className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900">Sistema de Nómina</h1>
+          </div>
+          <ForgotPasswordForm onBackToLogin={() => setShowForgotPassword(false)} />
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-white" />
-            </div>
-          </div>
-          <CardTitle className="text-2xl font-bold text-center">
-            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
-          </CardTitle>
-          <CardDescription className="text-center">
-            {isLogin 
-              ? 'Accede a tu plataforma de nómina' 
-              : 'Crea tu cuenta y configura tu empresa'
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Nombre</Label>
-                    <Input
-                      id="firstName"
-                      type="text"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required={!isLogin}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Apellido</Label>
-                    <Input
-                      id="lastName"
-                      type="text"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required={!isLogin}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-            </div>
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <Building2 className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900">Sistema de Nómina</h1>
+          <p className="text-gray-600 mt-2">Gestiona la nómina de tu empresa</p>
+        </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Procesando...' : (isLogin ? 'Iniciar Sesión' : 'Crear Cuenta')}
-            </Button>
-          </form>
+        <Tabs defaultValue="login" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
+            <TabsTrigger value="signup">Registrarse</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="login">
+            <Card>
+              <CardHeader>
+                <CardTitle>Iniciar Sesión</CardTitle>
+                <CardDescription>
+                  Ingresa tus credenciales para acceder al sistema
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="tu@email.com"
+                        className="pl-10"
+                        value={loginForm.email}
+                        onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Contraseña</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="password"
+                        type={showPasswords.login ? "text" : "password"}
+                        placeholder="Tu contraseña"
+                        className="pl-10 pr-10"
+                        value={loginForm.password}
+                        onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => togglePasswordVisibility('login')}
+                      >
+                        {showPasswords.login ? (
+                          <EyeOff className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-500" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Iniciando sesión...
+                      </>
+                    ) : (
+                      'Iniciar Sesión'
+                    )}
+                  </Button>
+                  
+                  <div className="text-center">
+                    <Button 
+                      type="button" 
+                      variant="link" 
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="signup">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <User className="h-5 w-5" />
+                  <span>Crear Cuenta</span>
+                </CardTitle>
+                <CardDescription>
+                  Regístrate para comenzar a usar el sistema
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="firstName">Nombre</Label>
+                      <Input
+                        id="firstName"
+                        placeholder="Juan"
+                        value={signupForm.firstName}
+                        onChange={(e) => setSignupForm(prev => ({ ...prev, firstName: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Apellido</Label>
+                      <Input
+                        id="lastName"
+                        placeholder="Pérez"
+                        value={signupForm.lastName}
+                        onChange={(e) => setSignupForm(prev => ({ ...prev, lastName: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="signup-email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signup-email"
+                        type="email"
+                        placeholder="tu@email.com"
+                        className="pl-10"
+                        value={signupForm.email}
+                        onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="signup-password">Contraseña</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signup-password"
+                        type={showPasswords.signup ? "text" : "password"}
+                        placeholder="Mínimo 6 caracteres"
+                        className="pl-10 pr-10"
+                        value={signupForm.password}
+                        onChange={(e) => setSignupForm(prev => ({ ...prev, password: e.target.value }))}
+                        required
+                        minLength={6}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => togglePasswordVisibility('signup')}
+                      >
+                        {showPasswords.signup ? (
+                          <EyeOff className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-500" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="confirm-password"
+                        type={showPasswords.confirm ? "text" : "password"}
+                        placeholder="Confirma tu contraseña"
+                        className="pl-10 pr-10"
+                        value={signupForm.confirmPassword}
+                        onChange={(e) => setSignupForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                        required
+                        minLength={6}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => togglePasswordVisibility('confirm')}
+                      >
+                        {showPasswords.confirm ? (
+                          <EyeOff className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-500" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creando cuenta...
+                      </>
+                    ) : (
+                      'Crear Cuenta'
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              {isLogin 
-                ? '¿No tienes cuenta? Crear una nueva' 
-                : '¿Ya tienes cuenta? Iniciar sesión'
-              }
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+        <div className="text-center mt-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/')}
+            className="text-gray-600"
+          >
+            ← Volver al inicio
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
