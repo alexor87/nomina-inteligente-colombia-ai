@@ -14,6 +14,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Index } from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import LogoutPage from "./pages/LogoutPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
@@ -42,6 +43,7 @@ function AppContent() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
+        <Route path="/logout" element={<LogoutPage />} />
         {/* Rutas protegidas con Layout */}
         <Route path="/app" element={<Layout />}>
           <Route path="dashboard" element={<DashboardPage />} />

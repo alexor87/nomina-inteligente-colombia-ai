@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { LogOut, User, Settings, Crown } from 'lucide-react';
 
 export const UserMenu = () => {
-  const { user, profile, signOut, roles, isSuperAdmin } = useAuth();
+  const { user, profile, roles, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
 
   if (!user || !profile) return null;
 
@@ -25,12 +27,8 @@ export const UserMenu = () => {
   // Mostrar el rol más alto o SuperAdmin
   const displayRole = isSuperAdmin ? 'SuperAdmin' : (roles[0]?.role || 'Sin rol');
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
+  const handleSignOut = () => {
+    navigate('/logout');
   };
 
   return (

@@ -1,9 +1,10 @@
 
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-
+import { useNavigate } from 'react-router-dom';
 export const useInactivityTimeout = (timeoutMinutes = 10) => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
 
@@ -15,7 +16,7 @@ export const useInactivityTimeout = (timeoutMinutes = 10) => {
     if (user) {
       timeoutRef.current = setTimeout(() => {
         console.log('🔐 Auto logout due to inactivity');
-        signOut();
+        navigate('/logout');
       }, timeoutMinutes * 60 * 1000);
     }
   };
@@ -50,7 +51,7 @@ export const useInactivityTimeout = (timeoutMinutes = 10) => {
         document.removeEventListener(event, handleActivity, true);
       });
     };
-  }, [user, timeoutMinutes]);
+  }, [user, timeoutMinutes, navigate]);
 
   return { resetTimeout };
 };
