@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -78,7 +77,7 @@ export const UserRegistrationForm = () => {
       });
       return;
     }
-
+    
     setIsLoading(true);
 
     try {
@@ -122,12 +121,12 @@ export const UserRegistrationForm = () => {
       
       toast({
         title: "¡Registro exitoso!",
-        description: "Tu cuenta ha sido creada exitosamente. Ya puedes acceder al dashboard.",
+        description: "Ahora configuremos tu empresa para completar el proceso.",
       });
 
-      // Esperar un momento para que se procese el registro
+      // Redirigir al asistente de configuración de empresa
       setTimeout(() => {
-        navigate('/app/dashboard');
+        navigate('/register/company');
       }, 1500);
       
     } catch (error: any) {

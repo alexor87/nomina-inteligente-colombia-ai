@@ -25,6 +25,7 @@ import PayrollLiquidationPageSimplified from "./pages/PayrollLiquidationPageSimp
 import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
 import { PayrollHistoryPage } from "./pages/PayrollHistoryPage";
 import { PayrollHistoryDetailPage } from "./pages/PayrollHistoryDetailPage";
+import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ function AppContent() {
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register/company" element={<CompanyRegistrationPage />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/logout" element={<LogoutPage />} />
         {/* Rutas protegidas con Layout */}

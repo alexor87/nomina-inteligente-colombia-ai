@@ -6,6 +6,9 @@ import { FunctionalAreaStep } from './registration-steps/FunctionalAreaStep';
 import { TeamInvitationStep } from './registration-steps/TeamInvitationStep';
 import { FinalStep } from './registration-steps/FinalStep';
 import { useCompanyRegistrationStore } from './hooks/useCompanyRegistrationStore';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 interface CompanyRegistrationWizardProps {
   onComplete: () => void;
@@ -17,6 +20,21 @@ export type WizardStep = 'welcome' | 'company-data' | 'functional-area' | 'team-
 export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegistrationWizardProps) => {
   const [currentStep, setCurrentStep] = useState<WizardStep>('welcome');
   const { clearStore } = useCompanyRegistrationStore();
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Verificar que el usuario esté autenticado
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "Acceso denegado",
+        description: "Debes crear una cuenta primero para configurar tu empresa.",
+        variant: "destructive"
+      });
+      navigate('/register');
+    }
+  }, [user, loading, navigate, toast]);
 
   useEffect(() => {
     // Load saved progress on mount
@@ -50,6 +68,11 @@ export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegis
       onCancel();
     }
   };
+
+  // No renderizar nada si el usuario no está autenticado o aún está cargando
+  if (loading || !user) {
+    return null;
+  }
 
   const renderStep = () => {
     switch (currentStep) {
