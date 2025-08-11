@@ -13,20 +13,39 @@ interface UserRole {
 export const useRoleManagement = (user: User | null, profile: any) => {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
-  const retryAttempts = useRef(0);
-  const maxRetries = 3;
+  const [hasOptimisticRole, setHasOptimisticRole] = useState(false);
+  const fetchAttempts = useRef(0);
+  const maxAttempts = 3;
+  const fetchTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Crear rol optimista de administrador si el usuario tiene empresa pero no roles aún
+  const createOptimisticRole = useCallback(() => {
+    if (user && profile?.company_id && roles.length === 0 && !hasOptimisticRole) {
+      console.log('🎯 [ROLES] Creating optimistic admin role for immediate access');
+      const optimisticRole: UserRole = {
+        role: 'administrador',
+        company_id: profile.company_id
+      };
+      setRoles([optimisticRole]);
+      setHasOptimisticRole(true);
+      setIsLoadingRoles(false);
+      return true;
+    }
+    return false;
+  }, [user, profile?.company_id, roles.length, hasOptimisticRole]);
 
   const fetchUserRoles = useCallback(async () => {
     if (!user) {
       setRoles([]);
       setIsLoadingRoles(false);
+      setHasOptimisticRole(false);
       return;
     }
 
-    console.log('🔍 [ROLES] Fetching roles for user:', user.email);
+    console.log(`🔍 [ROLES] Fetching roles for user (attempt ${fetchAttempts.current + 1}):`, user.email);
     
     try {
-      // Try RPC first
+      // Intentar RPC primero
       const { data: rpcRoles, error: rpcError } = await supabase
         .rpc('get_user_companies_simple', { _user_id: user.id });
       
@@ -35,14 +54,16 @@ export const useRoleManagement = (user: User | null, profile: any) => {
           role: role.role_name as AppRole,
           company_id: role.company_id
         }));
+        
+        console.log('✅ [ROLES] Successfully loaded via RPC:', transformedRoles);
         setRoles(transformedRoles);
         setIsLoadingRoles(false);
-        retryAttempts.current = 0;
-        console.log('✅ [ROLES] Successfully loaded via RPC:', transformedRoles);
+        setHasOptimisticRole(false);
+        fetchAttempts.current = 0;
         return;
       }
 
-      // Fallback to direct query
+      // Fallback a consulta directa
       console.log('⚠️ [ROLES] RPC failed, trying direct query...');
       const { data: directRoles, error: directError } = await supabase
         .from('user_roles')
@@ -54,50 +75,85 @@ export const useRoleManagement = (user: User | null, profile: any) => {
           role: role.role as AppRole,
           company_id: role.company_id
         }));
+        
+        console.log('✅ [ROLES] Successfully loaded via direct query:', fallbackRoles);
         setRoles(fallbackRoles);
         setIsLoadingRoles(false);
-        retryAttempts.current = 0;
-        console.log('✅ [ROLES] Successfully loaded via direct query:', fallbackRoles);
+        setHasOptimisticRole(false);
+        fetchAttempts.current = 0;
         return;
       }
 
-      // If no roles found and user has company_id, try auto-assignment
-      if (profile?.company_id && retryAttempts.current < maxRetries) {
-        console.log('🔄 [ROLES] No roles found, attempting auto-assignment...');
+      // Si no hay roles y el usuario tiene empresa, crear rol optimista mientras esperamos
+      if (profile?.company_id) {
+        const createdOptimistic = createOptimisticRole();
         
-        const { error: assignError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: user.id,
-            role: 'administrador',
-            company_id: profile.company_id,
-            assigned_by: user.id
-          })
-          .select()
-          .single();
+        // Reintentar después de un delay solo si no hemos alcanzado el máximo
+        if (fetchAttempts.current < maxAttempts && !createdOptimistic) {
+          fetchAttempts.current++;
+          const delay = [100, 300, 700][fetchAttempts.current - 1] || 1000;
+          
+          console.log(`🔄 [ROLES] No roles found, retrying in ${delay}ms (attempt ${fetchAttempts.current}/${maxAttempts})`);
+          
+          fetchTimeout.current = setTimeout(() => {
+            fetchUserRoles();
+          }, delay);
+          return;
+        }
 
-        if (!assignError) {
-          console.log('✅ [ROLES] Auto-assigned admin role');
-          retryAttempts.current++;
-          // Retry fetching after assignment
-          setTimeout(() => fetchUserRoles(), 500);
+        // Último intento: ejecutar fix_missing_admin_roles y reintentar
+        if (fetchAttempts.current >= maxAttempts && profile?.company_id) {
+          console.log('🛠️ [ROLES] Triggering role fix as last resort...');
+          
+          try {
+            await supabase.rpc('fix_missing_admin_roles');
+            // Esperar un poco y reintentar una vez más
+            setTimeout(() => {
+              fetchAttempts.current = 0; // Reset para permitir nuevo intento
+              fetchUserRoles();
+            }, 500);
+          } catch (fixError) {
+            console.error('❌ [ROLES] Error fixing roles:', fixError);
+            // Mantener rol optimista si la corrección falla
+            createOptimisticRole();
+          }
           return;
         }
       }
 
-      // No roles found after all attempts
-      console.log('⚠️ [ROLES] No roles found after all attempts');
+      // No hay empresa o no se pudo crear rol optimista
+      console.log('⚠️ [ROLES] No roles found and no company assigned');
       setRoles([]);
       setIsLoadingRoles(false);
+      setHasOptimisticRole(false);
 
     } catch (error) {
       console.error('❌ [ROLES] Error fetching roles:', error);
-      setRoles([]);
-      setIsLoadingRoles(false);
+      
+      // En caso de error, crear rol optimista si es posible
+      if (profile?.company_id) {
+        createOptimisticRole();
+      } else {
+        setRoles([]);
+        setIsLoadingRoles(false);
+        setHasOptimisticRole(false);
+      }
     }
-  }, [user, profile?.company_id]);
+  }, [user, profile?.company_id, createOptimisticRole]);
 
-  // Set up real-time subscription to user_roles
+  // Timeout de seguridad para evitar carga infinita
+  useEffect(() => {
+    const safetyTimeout = setTimeout(() => {
+      if (isLoadingRoles && user && profile?.company_id) {
+        console.log('⏰ [ROLES] Safety timeout reached, creating optimistic role');
+        createOptimisticRole();
+      }
+    }, 10000); // 10 segundos máximo
+
+    return () => clearTimeout(safetyTimeout);
+  }, [isLoadingRoles, user, profile?.company_id, createOptimisticRole]);
+
+  // Configurar suscripción en tiempo real
   useEffect(() => {
     if (!user) return;
 
@@ -115,7 +171,15 @@ export const useRoleManagement = (user: User | null, profile: any) => {
         },
         (payload) => {
           console.log('🔔 [ROLES] Real-time update received:', payload);
-          fetchUserRoles();
+          
+          // Si recibimos una actualización en tiempo real, resetear attempts y refetch
+          fetchAttempts.current = 0;
+          setHasOptimisticRole(false); // Limpiar optimistic role cuando llegan datos reales
+          
+          // Delay pequeño para permitir que la transacción se complete
+          setTimeout(() => {
+            fetchUserRoles();
+          }, 200);
         }
       )
       .subscribe();
@@ -126,18 +190,32 @@ export const useRoleManagement = (user: User | null, profile: any) => {
     };
   }, [user, fetchUserRoles]);
 
-  // Initial fetch when user or profile changes
+  // Fetch inicial cuando cambia el usuario o profile
   useEffect(() => {
     if (user) {
       setIsLoadingRoles(true);
-      retryAttempts.current = 0;
+      fetchAttempts.current = 0;
+      setHasOptimisticRole(false);
+      
+      // Limpiar timeout anterior si existe
+      if (fetchTimeout.current) {
+        clearTimeout(fetchTimeout.current);
+      }
+      
       fetchUserRoles();
     }
+
+    return () => {
+      if (fetchTimeout.current) {
+        clearTimeout(fetchTimeout.current);
+      }
+    };
   }, [user, profile?.company_id, fetchUserRoles]);
 
   return {
     roles,
     isLoadingRoles,
+    hasOptimisticRole,
     refetchRoles: fetchUserRoles
   };
 };

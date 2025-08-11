@@ -13,8 +13,7 @@ import {
   History,
   ChevronLeft,
   Menu,
-  Calendar,
-  Loader2
+  Calendar
 } from 'lucide-react';
 
 const navigation = [
@@ -34,49 +33,42 @@ interface SidebarProps {
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
-  const { hasModuleAccess, isSuperAdmin, roles, loading, isLoadingRoles } = useAuth();
+  const { hasModuleAccess, isSuperAdmin, roles, loading } = useAuth();
 
   console.log('🧭 Sidebar Debug:', {
     currentPath: location.pathname,
     collapsed,
     loading,
-    isLoadingRoles,
     isSuperAdmin,
     rolesCount: roles.length,
     hasModuleAccessFunction: !!hasModuleAccess
   });
 
-  // Enhanced navigation filtering with better fallbacks
+  // Lógica simplificada de navegación - siempre mostrar módulos básicos
   const getFilteredNavigation = () => {
-    // Always show dashboard
+    // Siempre mostrar dashboard
     const mandatoryItems = [navigation[0]]; // Dashboard
     
+    // Si está cargando auth, mostrar solo dashboard
     if (loading) {
       return mandatoryItems;
     }
 
-    // SuperAdmin sees everything
+    // SuperAdmin ve todo
     if (isSuperAdmin) {
       return navigation;
     }
 
-    // If roles are still loading, show basic modules
-    if (isLoadingRoles) {
-      return navigation.filter(item => 
-        ['dashboard', 'employees', 'payroll-history'].includes(item.module)
-      );
-    }
-
-    // If user has roles, filter by module access
+    // Si tiene roles, filtrar por acceso a módulos
     if (roles.length > 0 && hasModuleAccess) {
       return navigation.filter(item => 
         item.module === 'dashboard' || hasModuleAccess(item.module)
       );
     }
 
-    // Fallback: show essential modules while roles load
+    // Por defecto, mostrar módulos esenciales (incluye rol optimista)
     return navigation.filter(item => 
-      ['dashboard', 'employees', 'payroll-history'].includes(item.module)
+      ['dashboard', 'employees', 'payroll-history', 'reports'].includes(item.module)
     );
   };
 
@@ -126,62 +118,47 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {filteredNavigation.length > 0 ? (
-          filteredNavigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
-                  "hover:bg-gray-50 active:scale-[0.98]",
-                  isActive
-                    ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100"
-                    : "text-gray-700 hover:text-gray-900",
-                  collapsed ? "justify-center" : "justify-start"
-                )}
-                title={collapsed ? item.name : undefined}
-              >
-                <div className={cn(
-                  "flex items-center justify-center rounded-md transition-colors duration-200",
-                  collapsed ? "w-8 h-8" : "w-6 h-6 mr-3",
-                  isActive 
-                    ? "text-blue-600" 
-                    : "text-gray-500 group-hover:text-gray-700"
-                )}>
-                  <item.icon className="h-4 w-4" />
+        {filteredNavigation.map((item) => {
+          const isActive = location.pathname === item.href;
+          
+          return (
+            <Link
+              key={item.name}
+              to={item.href}
+              className={cn(
+                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
+                "hover:bg-gray-50 active:scale-[0.98]",
+                isActive
+                  ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100"
+                  : "text-gray-700 hover:text-gray-900",
+                collapsed ? "justify-center" : "justify-start"
+              )}
+              title={collapsed ? item.name : undefined}
+            >
+              <div className={cn(
+                "flex items-center justify-center rounded-md transition-colors duration-200",
+                collapsed ? "w-8 h-8" : "w-6 h-6 mr-3",
+                isActive 
+                  ? "text-blue-600" 
+                  : "text-gray-500 group-hover:text-gray-700"
+              )}>
+                <item.icon className="h-4 w-4" />
+              </div>
+              
+              {!collapsed && (
+                <span className="truncate font-medium">{item.name}</span>
+              )}
+              
+              {/* Tooltip for collapsed sidebar */}
+              {collapsed && (
+                <div className="absolute left-full ml-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                  {item.name}
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 rotate-45"></div>
                 </div>
-                
-                {!collapsed && (
-                  <span className="truncate font-medium">{item.name}</span>
-                )}
-                
-                {/* Tooltip for collapsed sidebar */}
-                {collapsed && (
-                  <div className="absolute left-full ml-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                    {item.name}
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 rotate-45"></div>
-                  </div>
-                )}
-              </Link>
-            );
-          })
-        ) : (
-          <div className="text-center py-8">
-            {isLoadingRoles ? (
-              <div className="flex flex-col items-center gap-2 text-gray-400 text-sm">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Configurando acceso...</span>
-              </div>
-            ) : (
-              <div className="text-gray-400 text-sm">
-                {loading ? 'Cargando menú...' : 'Verificando permisos...'}
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Footer */}

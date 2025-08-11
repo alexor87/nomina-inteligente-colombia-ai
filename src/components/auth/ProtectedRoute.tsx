@@ -19,7 +19,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredModule,
   companyId
 }) => {
-  const { user, loading, hasRole, hasModuleAccess, isSuperAdmin, roles } = useAuth();
+  const { user, loading, hasRole, hasModuleAccess, isSuperAdmin, roles, hasOptimisticRole } = useAuth();
 
   console.log('🛡️ ProtectedRoute check:', {
     user: user?.email,
@@ -28,16 +28,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     requiredModule,
     userRoles: roles,
     isSuperAdmin,
+    hasOptimisticRole,
     hasRequiredRole: requiredRole ? hasRole(requiredRole, companyId) : 'no role required',
     hasModuleAccess: requiredModule ? hasModuleAccess(requiredModule) : 'no module required'
   });
 
-  // SIEMPRE mostrar loading mientras se cargan los datos
+  // Mostrar loading solo mientras se cargan los datos de auth iniciales
   if (loading) {
-    console.log('⏳ ProtectedRoute: Still loading...');
+    console.log('⏳ ProtectedRoute: Still loading auth...');
     return (
       <LoadingWithTimeout 
-        message="Verificando permisos..."
+        message="Verificando autenticación..."
         timeout={7}
         redirectTo="/error"
       />
@@ -49,24 +50,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/auth" replace />;
   }
 
-  // SuperAdmin tiene acceso a todo - NO necesita verificación adicional
+  // SuperAdmin tiene acceso a todo inmediatamente
   if (isSuperAdmin) {
     console.log('👑 ProtectedRoute: SuperAdmin access granted');
     return <>{children}</>;
   }
 
-  // Si hay roles pero no se han cargado completamente, mostrar loading un poco más
-  if (user && roles.length === 0 && !isSuperAdmin) {
-    console.log('⏳ ProtectedRoute: Waiting for roles to load...');
-    return (
-      <LoadingWithTimeout 
-        message="Cargando roles de usuario..."
-        timeout={5}
-        redirectTo="/error"
-      />
-    );
-  }
-
+  // Si tiene roles (reales o optimistas), proceder con verificación de permisos
+  const effectiveRoles = roles.length > 0 ? roles : [];
+  
   // Verificar rol específico si se requiere
   if (requiredRole && !hasRole(requiredRole, companyId)) {
     console.log('❌ ProtectedRoute: User lacks required role:', requiredRole);
@@ -76,7 +68,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Acceso Denegado</h1>
           <p className="text-gray-600">No tienes permisos para acceder a esta página.</p>
           <p className="text-xs text-gray-400 mt-2">
-            Rol requerido: {requiredRole} | Tus roles: {roles.map(r => r.role).join(', ') || 'ninguno'}
+            Rol requerido: {requiredRole} | Tus roles: {effectiveRoles.map(r => r.role).join(', ') || 'ninguno'}
           </p>
         </div>
       </div>
@@ -92,13 +84,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Acceso Denegado</h1>
           <p className="text-gray-600">No tienes permisos para acceder a este módulo.</p>
           <p className="text-xs text-gray-400 mt-2">
-            Módulo requerido: {requiredModule} | Tus roles: {roles.map(r => r.role).join(', ') || 'ninguno'}
+            Módulo requerido: {requiredModule} | Tus roles: {effectiveRoles.map(r => r.role).join(', ') || 'ninguno'}
           </p>
         </div>
       </div>
     );
   }
 
-  console.log('✅ ProtectedRoute: Access granted');
+  console.log('✅ ProtectedRoute: Access granted' + (hasOptimisticRole ? ' (with optimistic role)' : ''));
   return <>{children}</>;
 };

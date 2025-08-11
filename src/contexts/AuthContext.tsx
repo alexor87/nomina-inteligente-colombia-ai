@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +28,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   isSuperAdmin: boolean;
   isLoadingRoles: boolean;
+  hasOptimisticRole: boolean;
   hasRole: (role: AppRole, companyId?: string) => boolean;
   hasModuleAccess: (module: string) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
@@ -66,8 +66,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isRefreshingUserData = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Use the new role management hook
-  const { roles, isLoadingRoles, refetchRoles } = useRoleManagement(user, profile);
+  // Use the optimized role management hook
+  const { roles, isLoadingRoles, hasOptimisticRole, refetchRoles } = useRoleManagement(user, profile);
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     if (roles.length === 0) {
@@ -228,6 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     isSuperAdmin,
     isLoadingRoles,
+    hasOptimisticRole,
     hasRole,
     hasModuleAccess,
     signIn,
