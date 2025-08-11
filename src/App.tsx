@@ -21,6 +21,7 @@ import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
 import EditEmployeePage from "./pages/EditEmployeePage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
+import ProfilePage from "./pages/ProfilePage";
 import PayrollLiquidationPageSimplified from "./pages/PayrollLiquidationPageSimplified";
 import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
 import { PayrollHistoryPage } from "./pages/PayrollHistoryPage";
@@ -58,6 +59,7 @@ function AppContent() {
           <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </div>
