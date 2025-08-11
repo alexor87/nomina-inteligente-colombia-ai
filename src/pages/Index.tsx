@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Calculator, Users, BarChart3, FileText, Shield, CheckCircle2, Clock3 } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+
 export const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -137,30 +137,6 @@ export const Index = () => {
         </div>
       </section>
 
-      {/* Screenshots Carousel */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        <div className="mb-6 text-center">
-          <h3 className="text-2xl font-bold text-foreground">Vistas de la plataforma</h3>
-          <p className="text-muted-foreground">Explora el dashboard, cálculo y directorio de empleados</p>
-        </div>
-        <Carousel className="w-full">
-          <CarouselContent>
-            <CarouselItem>
-              <img src="/screens/dashboard.webp" alt="Finppi Nómina – captura del Dashboard de nómina y análisis" loading="lazy" decoding="async" className="w-full rounded-lg border border-border shadow" />
-            </CarouselItem>
-            <CarouselItem>
-              <img src="/screens/payroll.webp" alt="Finppi Nómina – captura del cálculo de nómina con desgloses" loading="lazy" decoding="async" className="w-full rounded-lg border border-border shadow" />
-            </CarouselItem>
-            <CarouselItem>
-              <img src="/screens/employees.webp" alt="Finppi Nómina – captura del directorio de empleados" loading="lazy" decoding="async" className="w-full rounded-lg border border-border shadow" />
-            </CarouselItem>
-          </CarouselContent>
-          <div className="flex items-center justify-between mt-4">
-            <CarouselPrevious />
-            <CarouselNext />
-          </div>
-        </Carousel>
-      </section>
 
       {/* Features Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">

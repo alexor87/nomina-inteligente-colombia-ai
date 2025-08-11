@@ -175,7 +175,7 @@ const AuthPage = () => {
             
             <div className="flex items-center">
               <Building2 className="h-8 w-8 text-blue-600 mr-2" />
-              <h1 className="text-xl font-bold text-blue-600">NóminaFácil</h1>
+              <h1 className="text-xl font-bold text-blue-600">Finppi Nómina</h1>
             </div>
           </div>
         </div>
