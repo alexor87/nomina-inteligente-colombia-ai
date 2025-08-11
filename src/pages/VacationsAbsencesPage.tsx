@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { VacationAbsenceForm } from '@/components/vacations/VacationAbsenceForm'
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
 import { useUnifiedVacationsAbsences } from '@/hooks/useUnifiedVacationsAbsences';
 import { VacationAbsence, VacationAbsenceFilters } from '@/types/vacations';
-import { Plus, Calendar, Users, Clock, CheckCircle, RefreshCw, Database } from 'lucide-react';
+import { Plus, Calendar, Users, Clock, CheckCircle, RefreshCw } from 'lucide-react';
 
 const VacationsAbsencesPage = () => {
   const [filters, setFilters] = useState<VacationAbsenceFilters>({});
@@ -200,22 +199,6 @@ const VacationsAbsencesPage = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Información de Integración */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="pt-4">
-          <div className="flex items-center space-x-2">
-            <Database className="h-5 w-5 text-blue-600" />
-            <div>
-              <h3 className="font-medium text-blue-800">Integración Automática Activa</h3>
-              <p className="text-blue-700 text-sm">
-                Los registros creados aquí aparecen automáticamente en el módulo de novedades. 
-                Solo pasan a estado "liquidada" cuando se cierre el período de nómina.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <VacationAbsenceFiltersComponent
         filters={filters}
