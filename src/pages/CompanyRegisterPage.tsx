@@ -1,5 +1,5 @@
 
-import { CompanyRegistrationPage } from './CompanyRegistrationPage';
+import CompanyRegistrationPage from './CompanyRegistrationPage';
 
 const CompanyRegisterPage = () => {
   return <CompanyRegistrationPage />;
