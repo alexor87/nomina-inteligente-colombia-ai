@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ReportFilters } from './ReportFilters';
 import { ReportTable } from './ReportTable';
+import { SavedFiltersBar } from './SavedFiltersBar';
 import { useReports } from '@/hooks/useReports';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,7 +43,8 @@ export const ReportsPage = () => {
     getSocialSecurityReport,
     getNoveltyHistoryReport,
     exportToExcel,
-    exportToPDF
+    exportToPDF,
+    exportHistory
   } = useReports();
 
   useEffect(() => {
@@ -338,11 +340,14 @@ export const ReportsPage = () => {
               </div>
             </div>
 
-            <ReportFilters 
-              filters={filters}
-              onFiltersChange={setFilters}
-              reportType={activeReportType}
-            />
+            <div className="space-y-4">
+              <SavedFiltersBar />
+              <ReportFilters 
+                filters={filters}
+                onFiltersChange={setFilters}
+                reportType={activeReportType}
+              />
+            </div>
             
             <ReportTable 
               reportType={activeReportType}

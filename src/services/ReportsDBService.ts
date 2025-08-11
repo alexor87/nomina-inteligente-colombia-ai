@@ -408,7 +408,7 @@ export class ReportsDBService {
   static async getDianStatusReport(filters: ReportFilters) {
     console.log('🔍 ReportsDBService: Fetching DIAN status with filters:', filters);
 
-    let query = supabase
+    let query: any = supabase
       .from('payroll_vouchers')
       .select(`
         employee_id,
@@ -434,8 +434,11 @@ export class ReportsDBService {
     if (filters.period) {
       query = query.eq('periodo', filters.period);
     }
+    if (filters.periodId) {
+      query = query.eq('period_id', filters.periodId);
+    }
 
-    const { data, error } = await query;
+    const { data, error } = await (query as any);
     if (error) {
       console.error('❌ Error fetching DIAN status:', error);
       throw error;
@@ -459,7 +462,7 @@ export class ReportsDBService {
   static async getPilaPreliquidation(filters: ReportFilters) {
     console.log('🔍 ReportsDBService: Fetching PILA preliquidation with filters:', filters);
 
-    let query = supabase
+    let query: any = supabase
       .from('payrolls')
       .select(`
         employee_id,
@@ -485,6 +488,9 @@ export class ReportsDBService {
     }
     if (filters.period) {
       query = query.eq('periodo', filters.period);
+    }
+    if (filters.periodId) {
+      query = query.eq('period_id', filters.periodId);
     }
 
     const { data, error } = await query;

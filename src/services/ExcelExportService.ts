@@ -63,4 +63,27 @@ export class ExcelExportService {
 
     this.exportToExcel(formattedData, filename, 'Seguridad Social');
   }
+
+  static exportDianStatusExcel(data: any[], filename: string): void {
+    const formatted = data.map(item => ({
+      'Empleado': item.employeeName,
+      'Período': item.period,
+      'Estado DIAN': item.status,
+      'Fecha Envío': item.sentDate,
+      'CUFE': item.cufe,
+      'PDF': item.pdfUrl,
+      'XML': item.xmlUrl,
+    }));
+    this.exportToExcel(formatted, filename, 'DIAN Estado');
+  }
+
+  static exportPilaPreliquidationExcel(data: any[], filename: string): void {
+    const formatted = data.map(item => ({
+      'Entidad Tipo': item.entityType,
+      'Entidad': item.entity,
+      'Empleados': item.employeesCount,
+      'Total Aportes': item.total,
+    }));
+    this.exportToExcel(formatted, filename, 'PILA Preliquidación');
+  }
 }

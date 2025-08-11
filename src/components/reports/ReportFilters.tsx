@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ReportFilters as ReportFiltersType } from '@/types/reports';
 import { ReportsDataService } from '@/services/ReportsDataService';
+import { cn } from '@/lib/utils';
 
 interface ReportFiltersProps {
   filters: ReportFiltersType;
@@ -197,6 +198,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
                     setDateFromOpen(false);
                   }}
                   initialFocus
+                  className={cn("p-3 pointer-events-auto")}
                 />
               </PopoverContent>
             </Popover>
@@ -227,6 +229,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
                     setDateToOpen(false);
                   }}
                   initialFocus
+                  className={cn("p-3 pointer-events-auto")}
                 />
               </PopoverContent>
             </Popover>

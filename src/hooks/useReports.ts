@@ -212,6 +212,12 @@ export const useReports = () => {
         case 'ugpp-social-security':
           ExcelExportService.exportSocialSecurityExcel(data, finalFileName);
           break;
+        case 'dian-status':
+          ExcelExportService.exportDianStatusExcel(data, finalFileName);
+          break;
+        case 'pila-preliquidation':
+          ExcelExportService.exportPilaPreliquidationExcel(data, finalFileName);
+          break;
         default:
           ExcelExportService.exportToExcel(data, finalFileName, 'Reporte');
       }
