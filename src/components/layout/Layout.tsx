@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,18 +8,25 @@ import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
 
-  console.log('🏗️ Layout rendered with sidebar collapsed:', sidebarCollapsed);
+  console.log('🏗️ Layout rendered with sidebar collapsed:', sidebarCollapsed, 'user:', user?.email);
 
+  // Mostrar loading mientras se verifica la autenticación
   if (loading) {
     return (
       <LoadingWithTimeout 
-        message="Cargando aplicación..."
-        timeout={10}
+        message="Verificando autenticación..."
+        timeout={7}
         redirectTo="/login"
       />
     );
+  }
+
+  // Redirigir a login si no hay usuario autenticado
+  if (!user) {
+    console.log('🚫 Layout: No authenticated user, redirecting to login');
+    return <Navigate to="/login" replace />;
   }
 
   return (
