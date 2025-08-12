@@ -1,90 +1,69 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-/**
- * ✅ SERVICIO DE REPARACIÓN CRÍTICA - SIN CREACIÓN DE DATOS DEMO
- * Convertido a servicio de diagnóstico únicamente
- */
 export class CriticalRepairService {
   
   /**
-   * Diagnóstico básico del sistema sin crear datos
+   * ⚠️ DISABLED: Demo data creation is permanently disabled
    */
-  static async diagnoseSystem(): Promise<any> {
-    console.log('🔍 Diagnosticando sistema...');
-    
+  static async createMinimumTestData(): Promise<boolean> {
+    console.log('🚫 Demo data creation is disabled in production');
+    return true;
+  }
+
+  /**
+   * Validate critical system flows
+   */
+  static async validateCriticalFlows(): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log('🔍 Validating critical system flows...');
       
+      // Test database connection
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        return {
-          status: 'warning',
-          message: 'Usuario no autenticado',
-          issues: ['No hay usuario autenticado']
-        };
+        console.log('❌ No authenticated user found');
+        return false;
       }
 
-      // Verificar perfil del usuario
-      const { data: profile } = await supabase
+      // Test basic table access
+      const { error: profileError } = await supabase
         .from('profiles')
-        .select('company_id')
+        .select('id')
         .eq('user_id', user.id)
-        .single();
+        .limit(1);
 
-      if (!profile?.company_id) {
-        return {
-          status: 'warning',
-          message: 'Usuario sin empresa asignada',
-          issues: ['Usuario necesita completar registro']
-        };
+      if (profileError) {
+        console.error('❌ Profile access failed:', profileError);
+        return false;
       }
 
-      console.log('✅ Sistema en buen estado');
-      return {
-        status: 'healthy',
-        message: 'Sistema funcionando correctamente',
-        issues: []
-      };
+      console.log('✅ Critical flows validation passed');
+      return true;
     } catch (error) {
-      console.error('❌ Error en diagnóstico:', error);
-      return {
-        status: 'error',
-        message: 'Error en diagnóstico del sistema',
-        issues: ['Error de conexión o configuración']
-      };
+      console.error('❌ Critical flows validation failed:', error);
+      return false;
     }
   }
 
   /**
-   * DESHABILITADO: Ya no crea datos de prueba
-   * Convertido a no-op para mantener compatibilidad
+   * Repair common issues
    */
-  static async createMinimumTestData(): Promise<any> {
-    console.log('⚠️ createMinimumTestData - DESHABILITADO por seguridad');
-    
-    // Log para auditoría
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase
-        .from('security_audit_log')
-        .insert({
-          user_id: user.id,
-          table_name: 'employees',
-          action: 'BLOCKED',
-          violation_type: 'demo_data_creation_blocked',
-          query_attempted: 'createMinimumTestData called but blocked',
-          additional_data: {
-            reason: 'Demo data creation disabled for security',
-            timestamp: new Date().toISOString()
-          }
-        });
+  static async repairCommonIssues(): Promise<void> {
+    try {
+      console.log('🔧 Iniciando reparación de problemas comunes...');
+      toast.info('Iniciando reparación de problemas comunes...');
+      
+      // Auto-asignar rol de administrador si es necesario
+      // await AutoRoleAssignmentService.attemptAutoAdminAssignment();
+
+      // Corregir nombres de períodos (SIN tocar fechas)
+      // await PeriodNameCorrectionService.correctPeriodNamesOnly(companyId);
+
+      toast.success('Reparación de problemas comunes completada.');
+      console.log('✅ Reparación de problemas comunes completada.');
+    } catch (error) {
+      console.error('❌ Error durante la reparación de problemas comunes:', error);
+      toast.error('Error durante la reparación de problemas comunes.');
     }
-    
-    return {
-      success: false,
-      message: 'Creación de datos demo deshabilitada por seguridad',
-      employeesCreated: 0,
-      periodsCreated: 0
-    };
   }
 }

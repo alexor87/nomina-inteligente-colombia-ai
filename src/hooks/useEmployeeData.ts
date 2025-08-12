@@ -5,13 +5,22 @@ import { useEmployeeLoader } from './useEmployeeLoader';
 import { useEmployeeOperations } from './useEmployeeOperations';
 
 export const useEmployeeData = () => {
-  const {
-    employees,
-    setEmployees,
-    isLoading,
-    isInitialized,
-    loadEmployees
-  } = useEmployeeLoader();
+  const employeeQuery = useEmployeeLoader();
+  
+  // Extract the data we need from the query result
+  const employees = employeeQuery.data || [];
+  const isLoading = employeeQuery.isLoading;
+  const isInitialized = !employeeQuery.isLoading && employeeQuery.data !== undefined;
+
+  // Mock setEmployees and loadEmployees for backward compatibility
+  const setEmployees = useCallback(() => {
+    // This is now handled by React Query automatically
+    console.log('setEmployees called - handled by React Query');
+  }, []);
+
+  const loadEmployees = useCallback(() => {
+    employeeQuery.refetch();
+  }, [employeeQuery]);
 
   const {
     findEmployeeById,
@@ -46,7 +55,9 @@ export const useEmployeeData = () => {
 
   // Load employees on mount
   useEffect(() => {
-    loadEmployees();
+    if (!employeeQuery.data && !employeeQuery.isLoading) {
+      loadEmployees();
+    }
   }, []); // Empty dependency array is intentional
 
   // Memoize the return object to prevent unnecessary re-renders

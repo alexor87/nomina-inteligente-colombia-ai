@@ -1,90 +1,70 @@
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { AuthProvider } from '@/components/auth/AuthProvider';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { ThemeProvider } from '@/components/theme/theme-provider';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { Dashboard } from '@/pages/Dashboard';
+import { Employees } from '@/pages/Employees';
+import { EmployeeForm } from '@/pages/EmployeeForm';
+import { Payroll } from '@/pages/Payroll';
+import Index from './pages/Index'; // Fixed: default import
+import { Settings } from '@/pages/Settings';
+import { PayrollPeriods } from '@/pages/PayrollPeriods';
+import { PayrollModern } from '@/pages/PayrollModern';
+import { VoucherGenerator } from '@/pages/VoucherGenerator';
+import { Reports } from '@/pages/Reports';
+import { Login } from '@/pages/Login';
+import { Register } from '@/pages/Register';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
-import { YearProvider } from "@/contexts/YearContext";
-import { useSystemInitialization } from "@/hooks/useSystemInitialization";
-import { Layout } from "@/components/layout/Layout";
-
-// Components and pages
-import { Index } from "./pages/Index";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import LogoutPage from "./pages/LogoutPage";
-import DashboardPage from "./pages/DashboardPage";
-import EmployeesPage from "./pages/EmployeesPage";
-import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
-import EditEmployeePage from "./pages/EditEmployeePage";
-import ReportsPage from "./pages/ReportsPage";
-import SettingsPage from "./pages/SettingsPage";
-import ProfilePage from "./pages/ProfilePage";
-import PayrollLiquidationPageSimplified from "./pages/PayrollLiquidationPageSimplified";
-import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
-import { PayrollHistoryPage } from "./pages/PayrollHistoryPage";
-import { PayrollHistoryDetailPage } from "./pages/PayrollHistoryDetailPage";
-import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-
-const queryClient = new QueryClient();
-
-/**
- * ✅ APLICACIÓN PRINCIPAL DE NÓMINA
- * Sistema simplificado de gestión de nómina
- */
-function AppContent() {
-  // Inicialización automática del sistema
-  const { isInitializing, systemStatus } = useSystemInitialization();
-
-  return (
-    <div className="min-h-screen bg-background">
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/register/company" element={<CompanyRegistrationPage />} />
-        <Route path="/auth" element={<Navigate to="/login" replace />} />
-        <Route path="/logout" element={<LogoutPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        {/* Rutas protegidas con Layout */}
-        <Route path="/app" element={<Layout />}>
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="employees" element={<EmployeesPage />} />
-          <Route path="employees/create" element={<CreateEmployeeModernPage />} />
-          <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
-          <Route path="payroll" element={<PayrollLiquidationPageSimplified />} />
-          <Route path="payroll-history" element={<PayrollHistoryPage />} />
-          <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
-          <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="profile" element={<ProfilePage />} />
-        </Route>
-      </Routes>
-    </div>
-  );
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+    <ThemeProvider defaultTheme="system" storageKey="vite-react-theme">
+      <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <SubscriptionProvider>
-            <YearProvider>
-            <BrowserRouter>
-              <AppContent />
-              <Toaster />
-              <Sonner />
-              </BrowserRouter>
-            </YearProvider>
-          </SubscriptionProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/" element={<Index />} />
+
+              <Route
+                path="/app/*"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Routes>
+                        <Route path="dashboard" element={<Dashboard />} />
+                        <Route path="employees" element={<Employees />} />
+                        <Route path="employees/create" element={<EmployeeForm />} />
+                        <Route path="employees/edit/:id" element={<EmployeeForm />} />
+                        <Route path="payroll" element={<Payroll />} />
+                        <Route path="payroll/modern" element={<PayrollModern />} />
+                        <Route path="payroll/periods" element={<PayrollPeriods />} />
+                        <Route path="vouchers" element={<VoucherGenerator />} />
+                        <Route path="reports" element={<Reports />} />
+                        <Route path="settings" element={<Settings />} />
+                        <Route path="*" element={<Navigate to="dashboard" />} />
+                      </Routes>
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Router>
+          <Toaster />
         </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
