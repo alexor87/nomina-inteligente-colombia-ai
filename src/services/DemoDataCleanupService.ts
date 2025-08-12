@@ -2,6 +2,17 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
+ * Interface for the RPC response from verify_demo_data_cleanup
+ */
+interface CleanupRPCPayload {
+  cleanup_completed: boolean;
+  remaining_demo_employees: number;
+  companies_cleaned: number;
+  verification_timestamp: string;
+  status: 'SUCCESS' | 'INCOMPLETE';
+}
+
+/**
  * 🧹 SERVICIO DE LIMPIEZA DE DATOS DEMO
  * Maneja la verificación y limpieza de datos demo residuales
  */
@@ -28,14 +39,25 @@ export class DemoDataCleanupService {
         throw error;
       }
 
+      // Safely parse the RPC response
+      let cleanupData: CleanupRPCPayload;
+      
+      if (typeof data === 'string') {
+        cleanupData = JSON.parse(data) as CleanupRPCPayload;
+      } else if (data && typeof data === 'object') {
+        cleanupData = data as CleanupRPCPayload;
+      } else {
+        throw new Error('Invalid RPC response format');
+      }
+
       const result = {
-        success: data.cleanup_completed,
-        remainingDemoEmployees: data.remaining_demo_employees,
-        companiesCleaned: data.companies_cleaned,
-        status: data.status,
-        message: data.cleanup_completed 
+        success: cleanupData.cleanup_completed,
+        remainingDemoEmployees: cleanupData.remaining_demo_employees,
+        companiesCleaned: cleanupData.companies_cleaned,
+        status: cleanupData.status,
+        message: cleanupData.cleanup_completed 
           ? '✨ Limpieza completada exitosamente - No quedan datos demo'
-          : `⚠️ Limpieza incompleta - Quedan ${data.remaining_demo_employees} empleados demo`
+          : `⚠️ Limpieza incompleta - Quedan ${cleanupData.remaining_demo_employees} empleados demo`
       };
 
       console.log('📊 Resultado de verificación:', result);
@@ -67,10 +89,22 @@ export class DemoDataCleanupService {
         throw new Error('Usuario no autenticado');
       }
 
-      // Obtener estadísticas generales de empleados
+      // Obtener company_id del usuario
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) {
+        throw new Error('Usuario sin empresa asignada');
+      }
+
+      // Obtener estadísticas de empleados para la empresa del usuario
       const { data: employees, error: employeesError } = await supabase
         .from('employees')
-        .select('id, estado, company_id');
+        .select('id, estado, company_id')
+        .eq('company_id', profile.company_id);
 
       if (employeesError) {
         throw employeesError;
@@ -78,7 +112,7 @@ export class DemoDataCleanupService {
 
       const totalEmployees = employees?.length || 0;
       const activeEmployees = employees?.filter(emp => emp.estado === 'activo').length || 0;
-      const companiesWithEmployees = new Set(employees?.map(emp => emp.company_id)).size;
+      const companiesWithEmployees = employees && employees.length > 0 ? 1 : 0;
 
       return {
         totalEmployees,
