@@ -11,7 +11,7 @@ import { useSystemInitialization } from "@/hooks/useSystemInitialization";
 import { Layout } from "@/components/layout/Layout";
 
 // Components and pages
-import { Index } from "./pages/Index";
+import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import LogoutPage from "./pages/LogoutPage";

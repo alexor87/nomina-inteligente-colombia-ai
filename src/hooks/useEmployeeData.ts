@@ -5,18 +5,13 @@ import { useEmployeeLoader } from './useEmployeeLoader';
 import { useEmployeeOperations } from './useEmployeeOperations';
 
 export const useEmployeeData = () => {
-  const {
-    employees,
-    setEmployees,
-    isLoading,
-    isInitialized,
-    loadEmployees
-  } = useEmployeeLoader();
+  const { data: employees = [], isLoading, refetch: loadEmployees } = useEmployeeLoader();
+  const isInitialized = !isLoading;
 
   const {
     findEmployeeById,
     updateEmployeeInList
-  } = useEmployeeOperations(employees, setEmployees, isInitialized, isLoading);
+  } = useEmployeeOperations(employees, () => {}, isInitialized, isLoading);
 
   // Retry function for finding employees
   const retryFindEmployeeById = useCallback(async (employeeId: string): Promise<EmployeeWithStatus | undefined> => {
