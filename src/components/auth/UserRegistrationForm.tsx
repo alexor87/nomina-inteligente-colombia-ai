@@ -249,25 +249,14 @@ export const UserRegistrationForm = () => {
               </Button>
             </form>
 
-            <div className="text-center mt-6 space-y-2">
+            <div className="text-center mt-6">
               <Button 
                 variant="ghost" 
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/login')}
                 className="text-gray-600"
               >
                 ¿Ya tienes cuenta? Inicia sesión
               </Button>
-              
-              <div className="text-sm text-gray-500">
-                ¿Necesitas registrar una empresa?{' '}
-                <Button 
-                  variant="link" 
-                  onClick={() => navigate('/register/company')}
-                  className="text-blue-600 p-0 h-auto"
-                >
-                  Registro empresarial
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
