@@ -53,8 +53,8 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
 
     setIsSending(true);
     try {
-      // First generate the voucher
-      const { data: voucherData, error: voucherError } = await supabase.functions.invoke('generate-voucher-pdf', {
+      // Generar PDF en base64 desde la Edge Function (modo simple)
+      const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-voucher-pdf', {
         body: {
           employee: {
             id: employee.id,
@@ -74,14 +74,19 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
           period: {
             startDate: period.startDate,
             endDate: period.endDate,
-            type: period.type
-          }
+            type: period.type,
+            periodo: `${period.startDate} - ${period.endDate}`
+          },
+          returnBase64: true
         }
       });
 
-      if (voucherError) throw voucherError;
+      if (pdfError || !pdfData) {
+        console.error('Error generating PDF:', pdfError);
+        throw new Error('No se pudo generar el PDF del comprobante');
+      }
 
-      // Then send the email
+      // Enviar el email con Resend adjuntando el PDF
       const { error: emailError } = await supabase.functions.invoke('send-voucher-email', {
         body: {
           employeeEmail: email,
@@ -89,10 +94,15 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
           period: {
             startDate: period.startDate,
             endDate: period.endDate,
-            type: period.type
+            type: period.type,
+            periodo: `${period.startDate} - ${period.endDate}`
           },
           netPay: employee.netPay,
-          voucherData: voucherData
+          attachment: {
+            fileName: pdfData.fileName || `comprobante-${employee.name}.pdf`,
+            base64: pdfData.base64,
+            mimeType: pdfData.mimeType || 'application/pdf'
+          }
         }
       });
 
@@ -153,7 +163,7 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
             disabled={isSending}
           />
           <p className="text-xs text-gray-500">
-            Se enviará el comprobante de pago en formato PDF
+            Se enviará el comprobante de pago en formato PDF como adjunto.
           </p>
         </div>
       </div>

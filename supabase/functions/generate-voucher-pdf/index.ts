@@ -1,6 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,10 +55,7 @@ serve(async (req) => {
     const requestBody = await req.json();
     console.log('📥 Full request body received:', JSON.stringify(requestBody, null, 2));
 
-    // Validate request
-    if (!requestBody.payrollId) {
-      throw new Error('payrollId is required');
-    }
+    const returnBase64: boolean = !!requestBody.returnBase64;
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -68,102 +65,151 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify user authentication
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
     if (authError || !user) {
       throw new Error('Authentication failed');
     }
-
     console.log('✅ User authenticated:', user.id);
-    console.log('✅ PayrollId found in request:', requestBody.payrollId);
 
-    console.log('🔍 Fetching real payroll data from database for ID:', requestBody.payrollId);
+    // Permitir dos modos:
+    // A) Con payrollId -> datos reales desde DB (modo existente)
+    // B) Con employee + period -> datos directos del request (modo simple)
+    let payrollData: any = null;
+    let fileNameBase = 'comprobante';
 
-    // Fetch real payroll data
-    const { data: payrollData, error: payrollError } = await supabase
-      .from('payrolls')
-      .select(`
-        *,
-        employees!inner(
-          id,
-          nombre,
-          apellido,
-          cedula,
-          cargo,
-          eps,
-          afp,
-          salario_base,
-          estado
-        ),
-        payroll_periods_real!inner(
-          id,
-          periodo,
-          fecha_inicio,
-          fecha_fin,
-          tipo_periodo
-        ),
-        companies!inner(
-          id,
-          razon_social,
-          nit,
-          direccion,
-          ciudad,
-          telefono,
-          email,
-          logo_url
-        )
-      `)
-      .eq('id', requestBody.payrollId)
-      .single();
+    if (requestBody.payrollId) {
+      console.log('✅ PayrollId found in request:', requestBody.payrollId);
+      console.log('🔍 Fetching real payroll data from database for ID:', requestBody.payrollId);
 
-    if (payrollError || !payrollData) {
-      console.error('❌ Error fetching payroll data:', payrollError);
-      throw new Error('Payroll data not found');
+      const { data, error: payrollError } = await supabase
+        .from('payrolls')
+        .select(`
+          *,
+          employees!inner(
+            id,
+            nombre,
+            apellido,
+            cedula,
+            cargo,
+            eps,
+            afp,
+            salario_base,
+            estado
+          ),
+          payroll_periods_real!inner(
+            id,
+            periodo,
+            fecha_inicio,
+            fecha_fin,
+            tipo_periodo
+          ),
+          companies!inner(
+            id,
+            razon_social,
+            nit,
+            direccion,
+            ciudad,
+            telefono,
+            email,
+            logo_url
+          )
+        `)
+        .eq('id', requestBody.payrollId)
+        .single();
+
+      if (payrollError || !data) {
+        console.error('❌ Error fetching payroll data:', payrollError);
+        throw new Error('Payroll data not found');
+      }
+      payrollData = data;
+      fileNameBase = `comprobante-${(data.employees.nombre || 'empleado').replace(/\s+/g, '-')}`;
+      console.log('✅ Payroll data fetched successfully');
+    } else if (requestBody.employee && requestBody.period) {
+      // Modo simple: construir estructura mínima compatible
+      console.log('ℹ️ Using simple payload (employee + period) to build PDF');
+      const emp = requestBody.employee;
+      const per = requestBody.period;
+      const companyName = requestBody.companyName || 'Mi Empresa';
+      const companyNit = requestBody.companyNit || 'N/A';
+
+      const totalDevengado = Number(emp.grossPay ?? emp.baseSalary ?? 0);
+      const totalDeducciones = Number(emp.deductions ?? 0);
+      const netoPagado = Number(emp.netPay ?? (totalDevengado - totalDeducciones));
+
+      payrollData = {
+        employees: {
+          id: emp.id,
+          nombre: emp.name || 'Empleado',
+          apellido: '',
+          cedula: emp.id || 'N/A',
+          cargo: emp.position || '',
+          eps: emp.eps || '',
+          afp: emp.afp || '',
+          salario_base: Number(emp.baseSalary ?? 0),
+          estado: 'activo',
+        },
+        payroll_periods_real: {
+          id: 'temp',
+          periodo: per.periodo || `${per.startDate} - ${per.endDate}`,
+          fecha_inicio: per.startDate,
+          fecha_fin: per.endDate,
+          tipo_periodo: per.type || 'quincenal',
+        },
+        companies: {
+          id: 'temp',
+          razon_social: companyName,
+          nit: companyNit,
+          direccion: '',
+          ciudad: '',
+          telefono: '',
+          email: '',
+          logo_url: null,
+        },
+        dias_trabajados: Number(emp.workedDays ?? 15),
+        horas_extra: Number(emp.extraHours ?? 0),
+        total_devengado: totalDevengado,
+        total_deducciones: totalDeducciones,
+        neto_pagado: netoPagado,
+      };
+      fileNameBase = `comprobante-${(emp.name || 'empleado').replace(/\s+/g, '-')}`;
+    } else {
+      throw new Error('Provide payrollId or { employee, period }');
     }
 
-    console.log('✅ Payroll data fetched successfully: {');
-    console.log('  employee: "' + payrollData.employees.nombre + '",');
-    console.log('  period: "' + payrollData.payroll_periods_real.periodo + '",');
-    console.log('  company: "' + payrollData.companies.razon_social + '"');
-    console.log('}');
-
-    console.log('🎨 UX DESIGNER MODE: Creating PDF with REAL DATABASE values...');
-    console.log('📊 Valores reales desde base de datos:');
-    console.log('- Total devengado DB:', payrollData.total_devengado);
-    console.log('- Deducciones DB:', payrollData.total_deducciones);
-    console.log('- Neto a pagar DB:', payrollData.neto_pagado);
-    console.log('- Días trabajados:', payrollData.dias_trabajados);
-    console.log('- Horas extra:', payrollData.horas_extra);
-
-    console.log('🔧 Generando PDF para:', payrollData.employees.nombre);
-    console.log('📋 KISS: Generando PDF sin logo para máxima confiabilidad');
-
-    console.log('🎨 PROFESSIONAL MODE: Creating complete voucher with all required elements...');
-
-    // Generate professional PDF
+    // === Generación de PDF ===
     const pdfBytes = await generateProfessionalVoucherPDF(payrollData);
-
-    console.log('🏗️ Building PDF structure...');
-    console.log('✅ PDF built: ' + pdfBytes.length + ' bytes, 7 objects');
     console.log('✅ PDF generated successfully: ' + pdfBytes.length + ' bytes');
 
+    // Responder como JSON base64 si se solicita
+    if (returnBase64) {
+      const base64 = base64Encode(pdfBytes);
+      const fileName = `${fileNameBase}.pdf`;
+      return new Response(JSON.stringify({
+        fileName,
+        mimeType: 'application/pdf',
+        base64,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Respuesta binaria (descarga)
     return new Response(pdfBytes, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="comprobante-${payrollData.employees.nombre.replace(/\s+/g, '-')}.pdf"`,
+        'Content-Disposition': `attachment; filename="${fileNameBase}.pdf"`,
       },
     });
 
   } catch (error) {
     console.error('❌ Error generating PDF:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as any).message }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
