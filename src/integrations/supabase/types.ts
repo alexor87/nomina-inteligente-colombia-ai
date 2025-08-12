@@ -126,6 +126,7 @@ export type Database = {
           actividad_economica: string | null
           ciudad: string | null
           created_at: string
+          created_by: string | null
           direccion: string | null
           email: string
           estado: string | null
@@ -142,6 +143,7 @@ export type Database = {
           actividad_economica?: string | null
           ciudad?: string | null
           created_at?: string
+          created_by?: string | null
           direccion?: string | null
           email: string
           estado?: string | null
@@ -158,6 +160,7 @@ export type Database = {
           actividad_economica?: string | null
           ciudad?: string | null
           created_at?: string
+          created_by?: string | null
           direccion?: string | null
           email?: string
           estado?: string | null
