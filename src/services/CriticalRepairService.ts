@@ -1,17 +1,18 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { DemoDataCleanupService } from './DemoDataCleanupService';
 
 /**
- * ✅ SERVICIO DE REPARACIÓN CRÍTICA - SIN CREACIÓN DE DATOS DEMO
- * Convertido a servicio de diagnóstico únicamente
+ * ✅ SERVICIO DE REPARACIÓN CRÍTICA - ACTUALIZADO POST-LIMPIEZA
+ * Diagnóstico del sistema con verificación de limpieza de datos demo
  */
 export class CriticalRepairService {
   
   /**
-   * Diagnóstico básico del sistema sin crear datos
+   * Diagnóstico completo del sistema incluyendo verificación de limpieza demo
    */
   static async diagnoseSystem(): Promise<any> {
-    console.log('🔍 Diagnosticando sistema...');
+    console.log('🔍 Diagnosticando sistema post-limpieza...');
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -39,11 +40,40 @@ export class CriticalRepairService {
         };
       }
 
-      console.log('✅ Sistema en buen estado');
+      // Verificar limpieza de datos demo
+      const cleanupVerification = await DemoDataCleanupService.verifyCleanup();
+      const demoPatterns = await DemoDataCleanupService.checkForDemoPatterns();
+      
+      const issues = [];
+      
+      // Evaluar estado de limpieza
+      if (!cleanupVerification.success) {
+        issues.push(`${cleanupVerification.remainingDemoEmployees} empleados demo restantes`);
+      }
+      
+      if (demoPatterns.hasDemoEmails) {
+        issues.push(`${demoPatterns.demoEmailCount} empleados con emails @test.com`);
+      }
+      
+      if (demoPatterns.hasDemoNames) {
+        issues.push(`${demoPatterns.demoNameCount} empleados con nombres demo`);
+      }
+
+      // Determinar estado general
+      const isClean = issues.length === 0;
+      
+      console.log('✅ Diagnóstico completado:', { isClean, issues });
+      
       return {
-        status: 'healthy',
-        message: 'Sistema funcionando correctamente',
-        issues: []
+        status: isClean ? 'healthy' : 'warning',
+        message: isClean 
+          ? 'Sistema completamente limpio y funcionando correctamente' 
+          : 'Sistema funcional pero con datos residuales detectados',
+        issues,
+        cleanupDetails: {
+          ...cleanupVerification,
+          demoPatterns
+        }
       };
     } catch (error) {
       console.error('❌ Error en diagnóstico:', error);
@@ -58,8 +88,8 @@ export class CriticalRepairService {
   /**
    * Validación de flujos críticos del sistema
    */
-  static async validateCriticalFlows(): Promise<{ liquidationFlow: boolean; historyFlow: boolean }> {
-    console.log('🔍 Validando flujos críticos...');
+  static async validateCriticalFlows(): Promise<{ liquidationFlow: boolean; historyFlow: boolean; dataIntegrity: boolean }> {
+    console.log('🔍 Validando flujos críticos post-limpieza...');
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -67,10 +97,15 @@ export class CriticalRepairService {
       if (!user) {
         return {
           liquidationFlow: false,
-          historyFlow: false
+          historyFlow: false,
+          dataIntegrity: false
         };
       }
 
+      // Validar integridad de datos (sin empleados demo)
+      const demoPatterns = await DemoDataCleanupService.checkForDemoPatterns();
+      const dataIntegrity = !demoPatterns.hasDemoEmails && !demoPatterns.hasDemoNames;
+      
       // Validar flujo de liquidación
       const liquidationFlow = true; // Simplified validation
       
@@ -79,25 +114,27 @@ export class CriticalRepairService {
       
       return {
         liquidationFlow,
-        historyFlow
+        historyFlow,
+        dataIntegrity
       };
     } catch (error) {
       console.error('❌ Error validando flujos:', error);
       return {
         liquidationFlow: false,
-        historyFlow: false
+        historyFlow: false,
+        dataIntegrity: false
       };
     }
   }
 
   /**
-   * DESHABILITADO: Ya no crea datos de prueba
-   * Convertido a no-op para mantener compatibilidad
+   * DESHABILITADO PERMANENTEMENTE: Creación de datos demo
+   * Mantiene compatibilidad pero bloquea operación
    */
   static async createMinimumTestData(): Promise<any> {
-    console.log('⚠️ createMinimumTestData - DESHABILITADO por seguridad');
+    console.log('🚫 createMinimumTestData - BLOQUEADO PERMANENTEMENTE');
     
-    // Log para auditoría
+    // Log para auditoría de seguridad
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase
@@ -107,19 +144,21 @@ export class CriticalRepairService {
           table_name: 'employees',
           action: 'BLOCKED',
           violation_type: 'demo_data_creation_blocked',
-          query_attempted: 'createMinimumTestData called but blocked',
+          query_attempted: 'createMinimumTestData called but permanently blocked',
           additional_data: {
-            reason: 'Demo data creation disabled for security',
-            timestamp: new Date().toISOString()
+            reason: 'Demo data creation permanently disabled for security',
+            timestamp: new Date().toISOString(),
+            post_cleanup_protection: true
           }
         });
     }
     
     return {
       success: false,
-      message: 'Creación de datos demo deshabilitada por seguridad',
+      message: '🚫 Creación de datos demo bloqueada permanentemente por seguridad',
       employeesCreated: 0,
-      periodsCreated: 0
+      periodsCreated: 0,
+      details: ['Sistema protegido contra creación de datos demo']
     };
   }
 }

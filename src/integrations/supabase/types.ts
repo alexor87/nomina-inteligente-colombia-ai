@@ -2175,6 +2175,10 @@ export type Database = {
         Args: { p_user_id: string; p_company_id: string }
         Returns: boolean
       }
+      verify_demo_data_cleanup: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
     }
     Enums: {
       app_role:
