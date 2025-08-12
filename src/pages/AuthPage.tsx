@@ -27,6 +27,7 @@ const AuthPage = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState('login');
   const navigate = useNavigate();
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
@@ -43,8 +44,6 @@ const AuthPage = () => {
         
         if (error.message?.includes('Invalid login credentials')) {
           errorMessage = "Email o contraseña incorrectos";
-        } else if (error.message?.includes('Email not confirmed')) {
-          errorMessage = "Debes confirmar tu email antes de iniciar sesión";
         } else if (error.message?.includes('too many requests')) {
           errorMessage = "Demasiados intentos. Intenta nuevamente en unos minutos";
         } else if (error.message) {
@@ -126,15 +125,14 @@ const AuthPage = () => {
       }
       
       toast({
-        title: "¡Registro exitoso!",
-        description: "Revisa tu email para confirmar tu cuenta y luego inicia sesión",
+        title: "¡Cuenta creada exitosamente!",
+        description: "Ya puedes iniciar sesión con tus credenciales",
       });
 
-      // Clear form and switch to login tab
+      // Clear signup form and switch to login tab
       setSignupForm({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '' });
-      setTimeout(() => {
-        setLoginForm({ email: signupForm.email, password: '' });
-      }, 1000);
+      setLoginForm({ email: signupForm.email, password: '' });
+      setActiveTab('login');
       
     } catch (error: any) {
       toast({
@@ -177,7 +175,7 @@ const AuthPage = () => {
           <p className="text-gray-600 mt-2">Gestiona la nómina de tu empresa</p>
         </div>
 
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
             <TabsTrigger value="signup">Registrarse</TabsTrigger>
