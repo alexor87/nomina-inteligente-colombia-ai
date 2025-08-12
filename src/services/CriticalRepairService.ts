@@ -1,136 +1,90 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-interface DiagnosisResult {
-  issues: string[];
-  status: 'healthy' | 'warning' | 'critical';
-}
-
-interface RepairResult {
-  success: boolean;
-  message: string;
-  employeesCreated: number;
-  periodsCreated: number;
-  details: string[];
-}
-
-interface ValidationResult {
-  liquidationFlow: boolean;
-  historyFlow: boolean;
-}
-
+/**
+ * ✅ SERVICIO DE REPARACIÓN CRÍTICA - SIN CREACIÓN DE DATOS DEMO
+ * Convertido a servicio de diagnóstico únicamente
+ */
 export class CriticalRepairService {
   
   /**
-   * Diagnose system issues
+   * Diagnóstico básico del sistema sin crear datos
    */
-  static async diagnoseSystem(): Promise<DiagnosisResult> {
+  static async diagnoseSystem(): Promise<any> {
+    console.log('🔍 Diagnosticando sistema...');
+    
     try {
-      console.log('🔍 Running system diagnosis...');
-      
-      const issues: string[] = [];
-      
-      // Test database connection
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        issues.push('No authenticated user found');
-      }
-
-      // Test basic table access
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user?.id)
-        .limit(1);
-
-      if (profileError) {
-        issues.push(`Profile access failed: ${profileError.message}`);
-      }
-
-      const status = issues.length === 0 ? 'healthy' : issues.length < 3 ? 'warning' : 'critical';
       
-      return {
-        issues,
-        status
-      };
-    } catch (error) {
-      console.error('❌ System diagnosis failed:', error);
-      return {
-        issues: [`System diagnosis failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
-        status: 'critical'
-      };
-    }
-  }
-
-  /**
-   * ⚠️ DISABLED: Demo data creation is permanently disabled
-   */
-  static async createMinimumTestData(): Promise<RepairResult> {
-    console.log('🚫 Demo data creation is disabled in production');
-    return {
-      success: true,
-      message: 'Demo data creation is disabled in production environment',
-      employeesCreated: 0,
-      periodsCreated: 0,
-      details: ['Demo data creation has been permanently disabled for security reasons']
-    };
-  }
-
-  /**
-   * Validate critical system flows
-   */
-  static async validateCriticalFlows(): Promise<ValidationResult> {
-    try {
-      console.log('🔍 Validating critical system flows...');
-      
-      // Test database connection
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.log('❌ No authenticated user found');
         return {
-          liquidationFlow: false,
-          historyFlow: false
+          status: 'warning',
+          message: 'Usuario no autenticado',
+          issues: ['No hay usuario autenticado']
         };
       }
 
-      // Test basic table access
-      const { error: profileError } = await supabase
+      // Verificar perfil del usuario
+      const { data: profile } = await supabase
         .from('profiles')
-        .select('id')
+        .select('company_id')
         .eq('user_id', user.id)
-        .limit(1);
+        .single();
 
-      if (profileError) {
-        console.error('❌ Profile access failed:', profileError);
+      if (!profile?.company_id) {
         return {
-          liquidationFlow: false,
-          historyFlow: false
+          status: 'warning',
+          message: 'Usuario sin empresa asignada',
+          issues: ['Usuario necesita completar registro']
         };
       }
 
-      console.log('✅ Critical flows validation passed');
+      console.log('✅ Sistema en buen estado');
       return {
-        liquidationFlow: true,
-        historyFlow: true
+        status: 'healthy',
+        message: 'Sistema funcionando correctamente',
+        issues: []
       };
     } catch (error) {
-      console.error('❌ Critical flows validation failed:', error);
+      console.error('❌ Error en diagnóstico:', error);
       return {
-        liquidationFlow: false,
-        historyFlow: false
+        status: 'error',
+        message: 'Error en diagnóstico del sistema',
+        issues: ['Error de conexión o configuración']
       };
     }
   }
 
   /**
-   * Repair common issues
+   * DESHABILITADO: Ya no crea datos de prueba
+   * Convertido a no-op para mantener compatibilidad
    */
-  static async repairCommonIssues(): Promise<void> {
-    try {
-      console.log('🔧 Starting repair of common issues...');
-      console.log('✅ Common issues repair completed.');
-    } catch (error) {
-      console.error('❌ Error during common issues repair:', error);
+  static async createMinimumTestData(): Promise<any> {
+    console.log('⚠️ createMinimumTestData - DESHABILITADO por seguridad');
+    
+    // Log para auditoría
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('security_audit_log')
+        .insert({
+          user_id: user.id,
+          table_name: 'employees',
+          action: 'BLOCKED',
+          violation_type: 'demo_data_creation_blocked',
+          query_attempted: 'createMinimumTestData called but blocked',
+          additional_data: {
+            reason: 'Demo data creation disabled for security',
+            timestamp: new Date().toISOString()
+          }
+        });
     }
+    
+    return {
+      success: false,
+      message: 'Creación de datos demo deshabilitada por seguridad',
+      employeesCreated: 0,
+      periodsCreated: 0
+    };
   }
 }

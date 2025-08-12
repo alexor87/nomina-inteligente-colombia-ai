@@ -54,16 +54,18 @@ const Index = () => {
               <span className="ml-2 text-xl font-bold text-gray-900">Nómina Inteligente</span>
             </div>
             <div className="flex items-center space-x-4">
-              <AuthDialog>
-                <Button variant="ghost">
-                  Iniciar Sesión
-                </Button>
-              </AuthDialog>
-              <AuthDialog>
-                <Button className="bg-blue-600 hover:bg-blue-700">
-                  Comenzar Gratis
-                </Button>
-              </AuthDialog>
+              <Button 
+                variant="ghost" 
+                onClick={() => setShowAuthDialog(true)}
+              >
+                Iniciar Sesión
+              </Button>
+              <Button 
+                onClick={() => setShowAuthDialog(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Comenzar Gratis
+              </Button>
             </div>
           </div>
         </div>
@@ -81,23 +83,21 @@ const Index = () => {
             en Colombia. Automatiza procesos y cumple con todas las normativas laborales.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <AuthDialog>
-              <Button 
-                size="lg" 
-                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
-              >
-                Comenzar Prueba Gratuita
-              </Button>
-            </AuthDialog>
-            <AuthDialog>
-              <Button 
-                size="lg" 
-                variant="outline"
-                className="text-lg px-8 py-3"
-              >
-                Ver Características
-              </Button>
-            </AuthDialog>
+            <Button 
+              size="lg" 
+              onClick={() => setShowAuthDialog(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
+            >
+              Comenzar Prueba Gratuita
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline"
+              onClick={() => setShowAuthDialog(true)}
+              className="text-lg px-8 py-3"
+            >
+              Ver Características
+            </Button>
           </div>
         </div>
       </section>
@@ -139,14 +139,13 @@ const Index = () => {
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
             Únete a cientos de empresas que ya confían en nuestra plataforma
           </p>
-          <AuthDialog>
-            <Button 
-              size="lg" 
-              className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
-            >
-              Comenzar Ahora
-            </Button>
-          </AuthDialog>
+          <Button 
+            size="lg" 
+            onClick={() => setShowAuthDialog(true)}
+            className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
+          >
+            Comenzar Ahora
+          </Button>
         </div>
       </section>
 
@@ -162,6 +161,11 @@ const Index = () => {
           </p>
         </div>
       </footer>
+
+      <AuthDialog 
+        isOpen={showAuthDialog} 
+        onClose={() => setShowAuthDialog(false)} 
+      />
     </div>
   );
 };

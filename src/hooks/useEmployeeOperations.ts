@@ -4,19 +4,40 @@ import { EmployeeWithStatus } from '@/types/employee-extended';
 
 export const useEmployeeOperations = (
   employees: EmployeeWithStatus[],
-  setEmployees: () => void,
+  setEmployees: React.Dispatch<React.SetStateAction<EmployeeWithStatus[]>>,
   isInitialized: boolean,
   isLoading: boolean
 ) => {
-  
+  // Find employee by ID
   const findEmployeeById = useCallback((employeeId: string): EmployeeWithStatus | undefined => {
-    return employees.find(emp => emp.id === employeeId);
-  }, [employees]);
+    console.log('🔍 Finding employee by ID:', employeeId);
+    console.log('📋 Available employees count:', employees.length);
+    
+    if (!isInitialized || isLoading) {
+      console.log('⚠️ Data not ready yet, returning undefined');
+      return undefined;
+    }
 
+    const foundEmployee = employees.find(emp => emp.id === employeeId);
+    
+    if (foundEmployee) {
+      console.log('✅ Found employee:', foundEmployee.nombre, foundEmployee.apellido);
+    } else {
+      console.log('❌ Employee not found with ID:', employeeId);
+    }
+    
+    return foundEmployee;
+  }, [employees, isInitialized, isLoading]);
+
+  // Update employee in list
   const updateEmployeeInList = useCallback((updatedEmployee: EmployeeWithStatus) => {
-    // This would typically update the employee in the list
-    // For now, just call setEmployees which is a no-op
-    setEmployees();
+    console.log('🔄 Updating employee in list:', updatedEmployee.id);
+    
+    setEmployees(prevEmployees => 
+      prevEmployees.map(emp => 
+        emp.id === updatedEmployee.id ? updatedEmployee : emp
+      )
+    );
   }, [setEmployees]);
 
   return {
