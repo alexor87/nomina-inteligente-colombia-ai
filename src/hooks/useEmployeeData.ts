@@ -3,12 +3,17 @@ import { useEffect, useCallback, useMemo } from 'react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { useEmployeeLoader } from './useEmployeeLoader';
 import { useEmployeeOperations } from './useEmployeeOperations';
+import { EmployeeTransformationService } from '@/services/EmployeeTransformationService';
 
 export const useEmployeeData = () => {
   const employeeQuery = useEmployeeLoader();
   
-  // Extract the data we need from the query result
-  const employees = (employeeQuery.data || []) as EmployeeWithStatus[];
+  // Transform raw database data to EmployeeWithStatus format
+  const employees = useMemo(() => {
+    if (!employeeQuery.data) return [];
+    return EmployeeTransformationService.transformEmployeeData(employeeQuery.data);
+  }, [employeeQuery.data]);
+  
   const isLoading = employeeQuery.isLoading;
   const isInitialized = !employeeQuery.isLoading && employeeQuery.data !== undefined;
 
