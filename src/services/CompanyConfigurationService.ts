@@ -56,7 +56,6 @@ export class CompanyConfigurationService {
           telefono,
           direccion,
           ciudad,
-          departamento,
           representante_legal,
           actividad_economica,
           plan,

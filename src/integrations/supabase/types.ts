@@ -127,7 +127,6 @@ export type Database = {
           ciudad: string | null
           created_at: string
           created_by: string | null
-          departamento: string | null
           direccion: string | null
           email: string
           estado: string | null
@@ -145,7 +144,6 @@ export type Database = {
           ciudad?: string | null
           created_at?: string
           created_by?: string | null
-          departamento?: string | null
           direccion?: string | null
           email: string
           estado?: string | null
@@ -163,7 +161,6 @@ export type Database = {
           ciudad?: string | null
           created_at?: string
           created_by?: string | null
-          departamento?: string | null
           direccion?: string | null
           email?: string
           estado?: string | null
