@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { Layout } from '@/components/layout/Layout';
 import AuthPage from '@/pages/AuthPage';
 import DashboardPage from '@/pages/DashboardPage';
 import EmployeesPage from '@/pages/EmployeesPage';
@@ -35,15 +36,17 @@ function App() {
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               
-              {/* Protected routes */}
+              {/* Protected routes wrapped with Layout */}
               <Route path="/app" element={<ProtectedRoute />}>
-                <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="employees" element={<EmployeesPage />} />
-                <Route path="employees/create" element={<CreateEmployeePage />} />
-                <Route path="employees/new" element={<CreateEmployeeModernPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="company-registration" element={<CompanyRegistrationPage />} />
-                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route element={<Layout />}>
+                  <Route path="dashboard" element={<DashboardPage />} />
+                  <Route path="employees" element={<EmployeesPage />} />
+                  <Route path="employees/create" element={<CreateEmployeePage />} />
+                  <Route path="employees/new" element={<CreateEmployeeModernPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="company-registration" element={<CompanyRegistrationPage />} />
+                  <Route index element={<Navigate to="dashboard" replace />} />
+                </Route>
               </Route>
               
               {/* Fallback */}
