@@ -3,7 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { Layout } from '@/components/layout/Layout';
 import AuthPage from '@/pages/AuthPage';
 import DashboardPage from '@/pages/DashboardPage';
 import EmployeesPage from '@/pages/EmployeesPage';
@@ -36,7 +37,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               
               {/* Protected routes */}
-              <Route path="/app" element={<ProtectedRoute />}>
+              <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="employees/create" element={<CreateEmployeePage />} />
