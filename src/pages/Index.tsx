@@ -1,14 +1,11 @@
 
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, Users, Calculator, FileText, TrendingUp, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { AuthDialog } from '@/components/auth/AuthDialog';
 
 const Index = () => {
   const navigate = useNavigate();
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   const features = [
     {
@@ -43,6 +40,13 @@ const Index = () => {
     }
   ];
 
+  const scrollToFeatures = () => {
+    const featuresSection = document.getElementById('features');
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -56,12 +60,12 @@ const Index = () => {
             <div className="flex items-center space-x-4">
               <Button 
                 variant="ghost" 
-                onClick={() => setShowAuthDialog(true)}
+                onClick={() => navigate('/login')}
               >
                 Iniciar Sesión
               </Button>
               <Button 
-                onClick={() => setShowAuthDialog(true)}
+                onClick={() => navigate('/register')}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 Comenzar Gratis
@@ -85,7 +89,7 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
               size="lg" 
-              onClick={() => setShowAuthDialog(true)}
+              onClick={() => navigate('/register')}
               className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
             >
               Comenzar Prueba Gratuita
@@ -93,7 +97,7 @@ const Index = () => {
             <Button 
               size="lg" 
               variant="outline"
-              onClick={() => setShowAuthDialog(true)}
+              onClick={scrollToFeatures}
               className="text-lg px-8 py-3"
             >
               Ver Características
@@ -103,7 +107,7 @@ const Index = () => {
       </section>
 
       {/* Features Grid */}
-      <section className="py-20 bg-white">
+      <section id="features" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
@@ -141,7 +145,7 @@ const Index = () => {
           </p>
           <Button 
             size="lg" 
-            onClick={() => setShowAuthDialog(true)}
+            onClick={() => navigate('/register')}
             className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
           >
             Comenzar Ahora
@@ -161,11 +165,6 @@ const Index = () => {
           </p>
         </div>
       </footer>
-
-      <AuthDialog 
-        open={showAuthDialog} 
-        onOpenChange={setShowAuthDialog} 
-      />
     </div>
   );
 };
