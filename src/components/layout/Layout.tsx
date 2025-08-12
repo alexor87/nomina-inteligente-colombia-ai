@@ -18,15 +18,15 @@ export const Layout = () => {
       <LoadingWithTimeout 
         message="Verificando autenticación..."
         timeout={7}
-        redirectTo="/auth"
+        redirectTo="/login"
       />
     );
   }
 
-  // Redirigir a auth si no hay usuario autenticado
+  // Redirigir a login si no hay usuario autenticado
   if (!user) {
-    console.log('🚫 Layout: No authenticated user, redirecting to auth');
-    return <Navigate to="/auth" replace />;
+    console.log('🚫 Layout: No authenticated user, redirecting to login');
+    return <Navigate to="/login" replace />;
   }
 
   return (

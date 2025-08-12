@@ -1,18 +1,20 @@
 
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 
 type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
 
 interface ProtectedRouteProps {
+  children: React.ReactNode;
   requiredRole?: AppRole;
   requiredModule?: string;
   companyId?: string;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+  children, 
   requiredRole,
   requiredModule,
   companyId
@@ -51,7 +53,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // SuperAdmin tiene acceso a todo inmediatamente
   if (isSuperAdmin) {
     console.log('👑 ProtectedRoute: SuperAdmin access granted');
-    return <Outlet />;
+    return <>{children}</>;
   }
 
   // Si tiene roles (reales o optimistas), proceder con verificación de permisos
@@ -90,5 +92,5 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   console.log('✅ ProtectedRoute: Access granted' + (hasOptimisticRole ? ' (with optimistic role)' : ''));
-  return <Outlet />;
+  return <>{children}</>;
 };
