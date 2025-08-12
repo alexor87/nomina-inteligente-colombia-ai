@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,9 +19,18 @@ interface CompanyDataStepProps {
 export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
   const { data, updateData } = useCompanyRegistrationStore();
   const [formData, setFormData] = useState({
+    // Información básica de la empresa
+    companyName: data.companyName || '',
+    companyEmail: data.companyEmail || '',
+    companyPhone: data.companyPhone || '',
+    companyAddress: data.companyAddress || '',
+    
+    // Identificación
     identificationType: data.identificationType || 'NIT',
     identificationNumber: data.identificationNumber || '',
     verificationDigit: data.verificationDigit || '',
+    
+    // Clasificación
     industry: data.industry || '',
     ciiuCode: data.ciiuCode || '',
     employeeCount: data.employeeCount || '',
@@ -55,6 +65,14 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
+
+    if (!formData.companyName) {
+      newErrors.companyName = 'Nombre de la empresa es requerido';
+    }
+
+    if (!formData.companyEmail) {
+      newErrors.companyEmail = 'Email de la empresa es requerido';
+    }
 
     if (!formData.identificationNumber) {
       newErrors.identificationNumber = 'Número de identificación es requerido';
@@ -99,6 +117,60 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Información básica de la empresa */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="companyName">Nombre de la empresa *</Label>
+            <Input
+              id="companyName"
+              value={formData.companyName}
+              onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+              placeholder="Ej: Mi Empresa S.A.S"
+              className={errors.companyName ? 'border-red-500' : ''}
+            />
+            {errors.companyName && (
+              <p className="text-red-500 text-sm mt-1">{errors.companyName}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="companyEmail">Email de la empresa *</Label>
+            <Input
+              id="companyEmail"
+              type="email"
+              value={formData.companyEmail}
+              onChange={(e) => setFormData(prev => ({ ...prev, companyEmail: e.target.value }))}
+              placeholder="contacto@empresa.com"
+              className={errors.companyEmail ? 'border-red-500' : ''}
+            />
+            {errors.companyEmail && (
+              <p className="text-red-500 text-sm mt-1">{errors.companyEmail}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="companyPhone">Teléfono de la empresa</Label>
+            <Input
+              id="companyPhone"
+              value={formData.companyPhone}
+              onChange={(e) => setFormData(prev => ({ ...prev, companyPhone: e.target.value }))}
+              placeholder="+57 300 123 4567"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="companyAddress">Dirección</Label>
+            <Input
+              id="companyAddress"
+              value={formData.companyAddress}
+              onChange={(e) => setFormData(prev => ({ ...prev, companyAddress: e.target.value }))}
+              placeholder="Dirección de la empresa"
+            />
+          </div>
+        </div>
+
         {/* Identification */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -121,7 +193,7 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
           </div>
 
           <div>
-            <Label htmlFor="identificationNumber">Número de identificación</Label>
+            <Label htmlFor="identificationNumber">Número de identificación *</Label>
             <Input
               id="identificationNumber"
               value={formData.identificationNumber}
@@ -149,7 +221,7 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
 
         {/* Industry */}
         <div>
-          <Label>Industria</Label>
+          <Label>Industria *</Label>
           <Select value={formData.industry} onValueChange={handleIndustrySelect}>
             <SelectTrigger className={errors.industry ? 'border-red-500' : ''}>
               <SelectValue placeholder="Selecciona tu industria" />
@@ -174,7 +246,7 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
 
         {/* Employee Count */}
         <div>
-          <Label>Número de empleados</Label>
+          <Label>Número de empleados *</Label>
           <div className="flex flex-wrap gap-2 mt-2">
             {employeeRanges.map((range) => (
               <Badge

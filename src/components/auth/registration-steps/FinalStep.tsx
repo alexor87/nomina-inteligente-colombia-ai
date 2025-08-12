@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, X } from 'lucide-react';
+import { useCompanyRegistrationStore } from '../hooks/useCompanyRegistrationStore';
+import { CompanyRegistrationService } from '@/services/CompanyRegistrationService';
+import { useToast } from '@/hooks/use-toast';
 
 interface FinalStepProps {
   onComplete: () => void;
@@ -11,12 +14,65 @@ interface FinalStepProps {
 
 export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const { data, clearStore } = useCompanyRegistrationStore();
+  const { toast } = useToast();
 
   useEffect(() => {
     setShowConfetti(true);
     const timer = setTimeout(() => setShowConfetti(false), 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleComplete = async () => {
+    if (isRegistering) return;
+    
+    setIsRegistering(true);
+    
+    try {
+      // Map wizard data to CompanyRegistrationService format
+      const registrationData = {
+        nit: data.identificationNumber + (data.verificationDigit ? `-${data.verificationDigit}` : ''),
+        razon_social: data.companyName || '',
+        email: data.companyEmail || '',
+        telefono: data.companyPhone,
+        direccion: data.companyAddress,
+        plan: 'profesional' as const, // Default plan
+      };
+
+      console.log('🏢 Registrando empresa con datos:', registrationData);
+
+      const result = await CompanyRegistrationService.registerCompany(registrationData);
+
+      if (result.success) {
+        console.log('✅ Empresa registrada exitosamente');
+        toast({
+          title: "¡Empresa registrada exitosamente!",
+          description: "Tu empresa ha sido configurada y ya puedes comenzar a gestionar empleados.",
+        });
+        
+        // Clear the store after successful registration
+        clearStore();
+        onComplete();
+      } else {
+        console.error('❌ Error registrando empresa:', result.error);
+        toast({
+          title: "Error al registrar empresa",
+          description: result.message || "Hubo un problema al registrar tu empresa. Intenta nuevamente.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error inesperado registrando empresa:', error);
+      toast({
+        title: "Error inesperado",
+        description: "Hubo un problema inesperado. Intenta nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRegistering(false);
+    }
+  };
 
   return (
     <Card className="w-full max-w-lg mx-4 animate-scale-in relative overflow-hidden">
@@ -59,7 +115,11 @@ export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
             <h3 className="text-lg font-semibold mb-2">🎉 ¡Todo está listo!</h3>
             <p className="text-gray-600">
-              Tienes <strong>15 días de prueba gratuita</strong> para explorar 
+              Tu empresa <strong>{data.companyName}</strong> será registrada con NIT{' '}
+              <strong>{data.identificationNumber}-{data.verificationDigit}</strong>
+            </p>
+            <p className="text-gray-600 mt-2">
+              Tendrás <strong>15 días de prueba gratuita</strong> para explorar 
               todas las funcionalidades del plan de Nómina para empresas
             </p>
           </div>
@@ -84,16 +144,18 @@ export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
               onClick={onCancel}
               variant="outline"
               className="flex-1"
+              disabled={isRegistering}
             >
               Cancelar
             </Button>
           )}
           <Button 
-            onClick={onComplete}
+            onClick={handleComplete}
             className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3"
             size="lg"
+            disabled={isRegistering}
           >
-            Comencemos 🚀
+            {isRegistering ? 'Registrando empresa...' : 'Comencemos 🚀'}
           </Button>
         </div>
       </CardContent>
