@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Table,
   TableBody,
@@ -115,6 +115,7 @@ const AUDIT_KEY = 'empresa_auditoria';
 
 export const UsuariosRolesSettings = () => {
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   
   // Estados principales
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -141,6 +142,15 @@ export const UsuariosRolesSettings = () => {
   // Estados de validación
   const [erroresValidacion, setErroresValidacion] = useState<Record<string, string>>({});
 
+  // Función para obtener el usuario actual
+  const getCurrentUserEmail = () => user?.email || '';
+  const getCurrentUserName = () => {
+    if (profile?.first_name || profile?.last_name) {
+      return `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+    }
+    return getCurrentUserEmail();
+  };
+
   // Cargar datos al montar el componente
   useEffect(() => {
     cargarDatos();
@@ -151,28 +161,68 @@ export const UsuariosRolesSettings = () => {
       // Cargar usuarios
       const usuariosGuardados = localStorage.getItem(STORAGE_KEY);
       if (usuariosGuardados) {
-        setUsuarios(JSON.parse(usuariosGuardados));
+        let usuarios = JSON.parse(usuariosGuardados);
+        
+        // Migrar datos: reemplazar admin@empresa.com con usuario actual
+        const currentUserEmail = getCurrentUserEmail();
+        if (currentUserEmail) {
+          usuarios = usuarios.map((u: Usuario) => {
+            if (u.email === 'admin@empresa.com') {
+              return {
+                ...u,
+                email: currentUserEmail,
+                nombreCompleto: getCurrentUserName()
+              };
+            }
+            return u;
+          });
+          
+          // Guardar los datos migrados
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(usuarios));
+        }
+        
+        setUsuarios(usuarios);
       } else {
-        // Datos iniciales si no existen
-        const usuariosIniciales: Usuario[] = [
-          {
-            id: '1',
-            nombreCompleto: 'Admin Usuario',
-            email: 'admin@empresa.com',
-            rol: 'administrador',
-            estado: 'Activo',
-            ultimoAcceso: new Date().toISOString().split('T')[0],
-            fechaRegistro: '2024-01-01'
-          }
-        ];
-        setUsuarios(usuariosIniciales);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(usuariosIniciales));
+        // Datos iniciales con el usuario actual
+        const currentUserEmail = getCurrentUserEmail();
+        const currentUserName = getCurrentUserName();
+        
+        if (currentUserEmail) {
+          const usuariosIniciales: Usuario[] = [
+            {
+              id: '1',
+              nombreCompleto: currentUserName,
+              email: currentUserEmail,
+              rol: 'administrador',
+              estado: 'Activo',
+              ultimoAcceso: new Date().toISOString().split('T')[0],
+              fechaRegistro: new Date().toISOString().split('T')[0]
+            }
+          ];
+          setUsuarios(usuariosIniciales);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(usuariosIniciales));
+        }
       }
 
-      // Cargar auditoría
+      // Cargar auditoría y migrar registros
       const auditoriaGuardada = localStorage.getItem(AUDIT_KEY);
       if (auditoriaGuardada) {
-        setHistorialAuditoria(JSON.parse(auditoriaGuardada));
+        let auditoria = JSON.parse(auditoriaGuardada);
+        
+        // Migrar registros de auditoría
+        const currentUserEmail = getCurrentUserEmail();
+        if (currentUserEmail) {
+          auditoria = auditoria.map((a: ActividadAuditoria) => {
+            if (a.usuario === 'admin@empresa.com') {
+              return { ...a, usuario: currentUserEmail };
+            }
+            return a;
+          });
+          
+          localStorage.setItem(AUDIT_KEY, JSON.stringify(auditoria));
+        }
+        
+        setHistorialAuditoria(auditoria);
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -205,7 +255,8 @@ export const UsuariosRolesSettings = () => {
       const nuevaActividad: ActividadAuditoria = {
         ...actividad,
         id: Date.now().toString(),
-        fecha: new Date().toLocaleString('es-ES')
+        fecha: new Date().toLocaleString('es-ES'),
+        usuario: actividad.usuario || getCurrentUserEmail() // Usar usuario actual si no se especifica
       };
       
       const nuevaAuditoria = [nuevaActividad, ...historialAuditoria].slice(0, 100); // Mantener últimas 100
@@ -263,7 +314,7 @@ export const UsuariosRolesSettings = () => {
       await simularEnvioInvitacion(nuevoUsuario.email);
 
       agregarActividad({
-        usuario: 'admin@empresa.com', // En producción sería el usuario actual
+        usuario: getCurrentUserEmail(),
         accion: `Invitó a nuevo usuario: ${nuevoUsuario.email}`,
         resultado: 'Éxito',
         detalles: `Rol asignado: ${getRolLabel(nuevoUsuario.rol)}`
@@ -296,7 +347,6 @@ export const UsuariosRolesSettings = () => {
   const cambiarEstadoUsuario = (id: string, nuevoEstado: Usuario['estado']) => {
     const usuariosActualizados = usuarios.map(usuario => {
       if (usuario.id === id) {
-        const estadoAnterior = usuario.estado;
         return { 
           ...usuario, 
           estado: nuevoEstado,
@@ -312,7 +362,7 @@ export const UsuariosRolesSettings = () => {
     if (usuario) {
       const accion = nuevoEstado === 'Suspendido' ? 'suspendió' : 'activó';
       agregarActividad({
-        usuario: 'admin@empresa.com',
+        usuario: getCurrentUserEmail(),
         accion: `${accion.charAt(0).toUpperCase() + accion.slice(1)} usuario: ${usuario.email}`,
         resultado: 'Éxito'
       });
@@ -343,7 +393,7 @@ export const UsuariosRolesSettings = () => {
     guardarUsuarios(usuariosActualizados);
 
     agregarActividad({
-      usuario: 'admin@empresa.com',
+      usuario: getCurrentUserEmail(),
       accion: `Eliminó usuario: ${usuario.email}`,
       resultado: 'Éxito'
     });
@@ -362,7 +412,7 @@ export const UsuariosRolesSettings = () => {
       await simularEnvioInvitacion(usuario.email);
       
       agregarActividad({
-        usuario: 'admin@empresa.com',
+        usuario: getCurrentUserEmail(),
         accion: `Reenvió invitación a: ${usuario.email}`,
         resultado: 'Éxito'
       });
@@ -409,7 +459,7 @@ export const UsuariosRolesSettings = () => {
     const usuario = usuarios.find(u => u.id === usuarioEditando.id);
     if (usuario) {
       agregarActividad({
-        usuario: 'admin@empresa.com',
+        usuario: getCurrentUserEmail(),
         accion: `Modificó usuario: ${usuario.email}`,
         resultado: 'Éxito',
         detalles: `Nuevo rol: ${getRolLabel(usuarioEditando.rol)}`

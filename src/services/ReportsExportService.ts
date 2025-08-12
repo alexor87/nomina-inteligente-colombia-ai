@@ -7,9 +7,9 @@ export class ReportsExportService {
     data: any[], 
     fileName: string, 
     filters: ReportFilters,
+    generatedBy: string,
     onExportCreated: (exportItem: ExportHistory) => void
   ): Promise<ExportHistory> {
-    // Simular exportación con procesamiento
     console.log('Exporting to Excel:', { reportType, fileName, recordCount: data.length });
     
     // Simular tiempo de procesamiento
@@ -20,15 +20,13 @@ export class ReportsExportService {
       reportType,
       fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`,
       format: 'excel',
-      generatedBy: 'admin@empresa.com',
+      generatedBy,
       generatedAt: new Date().toISOString(),
       parameters: filters,
       downloadUrl: `#/download/${Date.now()}.xlsx`
     };
     
-    // En producción aquí se generaría el archivo real usando una librería como xlsx o similar
     console.log('Excel export completed:', newExport);
-    
     onExportCreated(newExport);
     return newExport;
   }
@@ -38,11 +36,11 @@ export class ReportsExportService {
     data: any[], 
     fileName: string, 
     filters: ReportFilters,
+    generatedBy: string,
     onExportCreated: (exportItem: ExportHistory) => void
   ): Promise<ExportHistory> {
     console.log('Exporting to PDF:', { reportType, fileName, recordCount: data.length });
     
-    // Simular tiempo de procesamiento
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     const newExport: ExportHistory = {
@@ -50,15 +48,13 @@ export class ReportsExportService {
       reportType,
       fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.pdf`,
       format: 'pdf',
-      generatedBy: 'admin@empresa.com',
+      generatedBy,
       generatedAt: new Date().toISOString(),
       parameters: filters,
       downloadUrl: `#/download/${Date.now()}.pdf`
     };
     
-    // En producción aquí se generaría el PDF usando una librería como jsPDF o puppeteer
     console.log('PDF export completed:', newExport);
-    
     onExportCreated(newExport);
     return newExport;
   }
@@ -68,11 +64,11 @@ export class ReportsExportService {
     data: any[], 
     fileName: string, 
     filters: ReportFilters,
+    generatedBy: string,
     onExportCreated: (exportItem: ExportHistory) => void
   ): Promise<ExportHistory> {
     console.log('Exporting to CSV:', { reportType, fileName, recordCount: data.length });
     
-    // Simular procesamiento
     await new Promise(resolve => setTimeout(resolve, 800));
     
     const newExport: ExportHistory = {
@@ -80,7 +76,7 @@ export class ReportsExportService {
       reportType,
       fileName: `${fileName}_${new Date().toISOString().split('T')[0]}.csv`,
       format: 'csv',
-      generatedBy: 'admin@empresa.com',
+      generatedBy,
       generatedAt: new Date().toISOString(),
       parameters: filters,
       downloadUrl: `#/download/${Date.now()}.csv`
@@ -99,7 +95,6 @@ export class ReportsExportService {
       ...data.map(row => 
         headers.map(header => {
           const value = row[header];
-          // Escapar valores que contengan comas o comillas
           if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
             return `"${value.replace(/"/g, '""')}"`;
           }
