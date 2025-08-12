@@ -1,11 +1,10 @@
 
 import { useEffect, useState } from 'react';
-import { CriticalRepairService } from '@/services/CriticalRepairService';
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * ✅ HOOK DE INICIALIZACIÓN CRÍTICA - REPARADO
- * Inicialización automática con diagnóstico y reparación
+ * ✅ HOOK DE INICIALIZACIÓN SEGURA - SIN DATOS DEMO
+ * Inicialización básica sin creación automática de datos
  */
 export const useSystemInitialization = () => {
   const [isInitializing, setIsInitializing] = useState(false);
@@ -19,39 +18,20 @@ export const useSystemInitialization = () => {
       
       try {
         setIsInitializing(true);
-        console.log('🚀 INICIALIZACIÓN CRÍTICA - Diagnosticando sistema...');
+        console.log('🚀 INICIALIZACIÓN SEGURA - Sistema iniciando...');
         
-        // Diagnóstico completo del sistema
-        const diagnosis = await CriticalRepairService.diagnoseSystem();
-        setSystemStatus(diagnosis);
-        
-        // Si hay problemas críticos, intentar reparación automática
-        if (diagnosis.issues.length > 0) {
-          console.log('🔧 Problemas detectados, ejecutando reparación automática...');
-          
-          const repairResult = await CriticalRepairService.createMinimumTestData();
-          
-          if (repairResult.success) {
-            toast({
-              title: "🔧 Sistema reparado automáticamente",
-              description: `${repairResult.employeesCreated} empleados y ${repairResult.periodsCreated} períodos creados`,
-              className: "border-green-200 bg-green-50"
-            });
-            
-            // Re-diagnosticar después de la reparación
-            const newDiagnosis = await CriticalRepairService.diagnoseSystem();
-            setSystemStatus(newDiagnosis);
-          } else {
-            console.warn('⚠️ Reparación automática falló:', repairResult.message);
-          }
-        } else {
-          console.log('✅ Sistema en buen estado');
-        }
+        // Sistema básico sin creación automática de datos
+        setSystemStatus({
+          initialized: true,
+          secure: true,
+          issues: []
+        });
         
         setIsInitialized(true);
+        console.log('✅ Sistema inicializado correctamente - Sin datos demo');
         
       } catch (error) {
-        console.error('❌ Error en inicialización crítica:', error);
+        console.error('❌ Error en inicialización:', error);
         toast({
           title: "Error en inicialización",
           description: "Algunos componentes pueden no funcionar correctamente",
