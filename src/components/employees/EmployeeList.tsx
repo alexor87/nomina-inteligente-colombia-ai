@@ -295,7 +295,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                 <Filter className="w-4 h-4 mr-2" />
                 Filtros
               </Button>
-              <Button onClick={() => navigate('/app/employees/new')}>
+              <Button onClick={() => navigate('/app/employees/create')}>
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Empleado
               </Button>

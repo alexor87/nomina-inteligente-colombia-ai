@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,7 +24,7 @@ export const QuickActions: React.FC = () => {
     {
       title: 'Nuevo Empleado',
       icon: <Plus className="h-5 w-5" />,
-      action: () => navigate('/app/employees/new'),
+      action: () => navigate('/app/employees/create'),
       color: 'bg-green-600 hover:bg-green-700',
     },
     {
