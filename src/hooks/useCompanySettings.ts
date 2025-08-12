@@ -107,6 +107,7 @@ export const useCompanySettings = () => {
             telefono: company.telefono || '',
             direccion: company.direccion || '',
             ciudad: company.ciudad || '',
+            departamento: company.departamento || '',
             representante_legal: company.representante_legal || '',
             actividad_economica: company.actividad_economica || '',
             logo_url: company.logo_url || ''
@@ -167,7 +168,7 @@ export const useCompanySettings = () => {
         nitCompleto = `${companyData.nit}-${companyData.dv}`;
       }
 
-      // Update company basic data including logo
+      // Update company basic data including logo and departamento
       await CompanyConfigurationService.updateCompanyData(companyId, {
         razon_social: companyData.razon_social,
         nit: nitCompleto,
@@ -175,6 +176,7 @@ export const useCompanySettings = () => {
         telefono: companyData.telefono,
         direccion: companyData.direccion,
         ciudad: companyData.ciudad,
+        departamento: companyData.departamento,
         representante_legal: companyData.representante_legal,
         actividad_economica: companyData.actividad_economica,
         logo_url: companyData.logo_url

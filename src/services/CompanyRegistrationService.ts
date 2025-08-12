@@ -8,6 +8,7 @@ export interface CompanyRegistrationData {
   telefono?: string;
   direccion?: string;
   ciudad?: string;
+  departamento?: string;
   plan: 'basico' | 'profesional' | 'empresarial';
 }
 
@@ -48,6 +49,7 @@ export class CompanyRegistrationService {
           telefono: data.telefono,
           direccion: data.direccion,
           ciudad: data.ciudad,
+          departamento: data.departamento,
           estado: 'activa',
           plan: data.plan
         })

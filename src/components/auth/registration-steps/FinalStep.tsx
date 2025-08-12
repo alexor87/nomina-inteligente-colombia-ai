@@ -81,6 +81,7 @@ export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
         telefono: data.companyPhone,
         direccion: data.companyAddress,
         ciudad: data.companyCity,
+        departamento: data.companyDepartment,
         plan: 'profesional' as const,
       };
 
