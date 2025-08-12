@@ -8,6 +8,8 @@ export interface CompanyRegistrationData {
   companyEmail: string;
   companyPhone?: string;
   companyAddress?: string;
+  companyDepartment?: string;
+  companyCity?: string;
   
   // Company data
   identificationType: 'NIT' | 'CC' | 'CE';
