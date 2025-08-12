@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -10,6 +11,21 @@ interface CleanupRPCPayload {
   companies_cleaned: number;
   verification_timestamp: string;
   status: 'SUCCESS' | 'INCOMPLETE';
+}
+
+/**
+ * Type guard to check if data matches CleanupRPCPayload structure
+ */
+function isCleanupRPCPayload(data: any): data is CleanupRPCPayload {
+  return (
+    data &&
+    typeof data === 'object' &&
+    typeof data.cleanup_completed === 'boolean' &&
+    typeof data.remaining_demo_employees === 'number' &&
+    typeof data.companies_cleaned === 'number' &&
+    typeof data.verification_timestamp === 'string' &&
+    (data.status === 'SUCCESS' || data.status === 'INCOMPLETE')
+  );
 }
 
 /**
@@ -39,15 +55,25 @@ export class DemoDataCleanupService {
         throw error;
       }
 
-      // Safely parse the RPC response
+      // Safely parse the RPC response with proper type checking
       let cleanupData: CleanupRPCPayload;
       
       if (typeof data === 'string') {
-        cleanupData = JSON.parse(data) as CleanupRPCPayload;
-      } else if (data && typeof data === 'object') {
-        cleanupData = data as CleanupRPCPayload;
+        try {
+          const parsedData = JSON.parse(data);
+          if (isCleanupRPCPayload(parsedData)) {
+            cleanupData = parsedData;
+          } else {
+            throw new Error('Parsed JSON does not match expected structure');
+          }
+        } catch (parseError) {
+          throw new Error('Invalid JSON response from RPC');
+        }
+      } else if (isCleanupRPCPayload(data)) {
+        cleanupData = data;
       } else {
-        throw new Error('Invalid RPC response format');
+        console.error('❌ Invalid RPC response structure:', data);
+        throw new Error('Invalid RPC response format - expected CleanupRPCPayload structure');
       }
 
       const result = {
@@ -89,15 +115,25 @@ export class DemoDataCleanupService {
         throw new Error('Usuario no autenticado');
       }
 
-      // Obtener company_id del usuario
-      const { data: profile } = await supabase
+      // Obtener company_id del usuario usando maybeSingle() para evitar errores
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('❌ Error obteniendo perfil:', profileError);
+        throw profileError;
+      }
 
       if (!profile?.company_id) {
-        throw new Error('Usuario sin empresa asignada');
+        console.warn('⚠️ Usuario sin empresa asignada');
+        return {
+          totalEmployees: 0,
+          activeEmployees: 0,
+          companiesWithEmployees: 0
+        };
       }
 
       // Obtener estadísticas de empleados para la empresa del usuario
@@ -107,12 +143,15 @@ export class DemoDataCleanupService {
         .eq('company_id', profile.company_id);
 
       if (employeesError) {
+        console.error('❌ Error obteniendo empleados:', employeesError);
         throw employeesError;
       }
 
       const totalEmployees = employees?.length || 0;
       const activeEmployees = employees?.filter(emp => emp.estado === 'activo').length || 0;
       const companiesWithEmployees = employees && employees.length > 0 ? 1 : 0;
+
+      console.log('📊 Estadísticas obtenidas:', { totalEmployees, activeEmployees, companiesWithEmployees });
 
       return {
         totalEmployees,
@@ -145,15 +184,26 @@ export class DemoDataCleanupService {
         throw new Error('Usuario no autenticado');
       }
 
-      // Obtener company_id del usuario
-      const { data: profile } = await supabase
+      // Obtener company_id del usuario usando maybeSingle() para evitar errores
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('❌ Error obteniendo perfil:', profileError);
+        throw profileError;
+      }
 
       if (!profile?.company_id) {
-        throw new Error('Usuario sin empresa asignada');
+        console.warn('⚠️ Usuario sin empresa asignada para verificar patrones demo');
+        return {
+          hasDemoEmails: false,
+          hasDemoNames: false,
+          demoEmailCount: 0,
+          demoNameCount: 0
+        };
       }
 
       // Buscar empleados con emails demo
@@ -163,7 +213,10 @@ export class DemoDataCleanupService {
         .eq('company_id', profile.company_id)
         .like('email', '%@test.com');
 
-      if (emailError) throw emailError;
+      if (emailError) {
+        console.error('❌ Error verificando emails demo:', emailError);
+        throw emailError;
+      }
 
       // Buscar empleados con nombres demo
       const { data: demoNames, error: nameError } = await supabase
@@ -172,14 +225,20 @@ export class DemoDataCleanupService {
         .eq('company_id', profile.company_id)
         .in('nombre', ['Juan Demo', 'María Demo', 'Carlos Demo', 'Ana Demo', 'Luis Demo']);
 
-      if (nameError) throw nameError;
+      if (nameError) {
+        console.error('❌ Error verificando nombres demo:', nameError);
+        throw nameError;
+      }
 
-      return {
+      const result = {
         hasDemoEmails: (demoEmails?.length || 0) > 0,
         hasDemoNames: (demoNames?.length || 0) > 0,
         demoEmailCount: demoEmails?.length || 0,
         demoNameCount: demoNames?.length || 0
       };
+
+      console.log('🔍 Patrones demo verificados:', result);
+      return result;
     } catch (error) {
       console.error('❌ Error verificando patrones demo:', error);
       return {
@@ -191,3 +250,4 @@ export class DemoDataCleanupService {
     }
   }
 }
+
