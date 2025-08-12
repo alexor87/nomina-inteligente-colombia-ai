@@ -208,10 +208,10 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
           <div>
             <Label htmlFor="companyDepartment">Departamento</Label>
             <Select value={formData.companyDepartment} onValueChange={handleDepartmentChange}>
-              <SelectTrigger className="bg-white border border-gray-300 z-50">
+              <SelectTrigger>
                 <SelectValue placeholder="Seleccione departamento" />
               </SelectTrigger>
-              <SelectContent className="bg-white border border-gray-300 z-50 max-h-60 overflow-y-auto">
+              <SelectContent>
                 {departments.map((departamento) => (
                   <SelectItem key={departamento.value} value={departamento.value}>
                     {departamento.label}
@@ -228,14 +228,14 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
               onValueChange={handleCityChange}
               disabled={!selectedDepartment || municipalities.length === 0}
             >
-              <SelectTrigger className="bg-white border border-gray-300 z-40">
+              <SelectTrigger>
                 <SelectValue placeholder={
                   !selectedDepartment 
                     ? "Primero seleccione un departamento" 
                     : "Seleccione ciudad/municipio"
                 } />
               </SelectTrigger>
-              <SelectContent className="bg-white border border-gray-300 z-40 max-h-60 overflow-y-auto">
+              <SelectContent>
                 {municipalities.map((ciudad) => (
                   <SelectItem key={ciudad.value} value={ciudad.value}>
                     {ciudad.label}
