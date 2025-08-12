@@ -7,20 +7,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthDialogProps {
   children: React.ReactNode;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export const AuthDialog = ({ children }: AuthDialogProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const AuthDialog = ({ children, isOpen, onClose }: AuthDialogProps) => {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleLogin = async (formData: FormData) => {
+  const dialogOpen = isOpen !== undefined ? isOpen : internalOpen;
+  const setDialogOpen = onClose ? (open: boolean) => !open && onClose() : setInternalOpen;
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsLoading(true);
     try {
+      const formData = new FormData(e.currentTarget);
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
 
@@ -31,19 +39,28 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
 
       if (error) throw error;
 
-      toast.success('¡Bienvenido!');
-      setIsOpen(false);
+      toast({
+        title: '¡Bienvenido!',
+        description: 'Has iniciado sesión correctamente',
+      });
+      setDialogOpen(false);
       navigate('/app/dashboard');
     } catch (error: any) {
-      toast.error(error.message || 'Error al iniciar sesión');
+      toast({
+        title: 'Error al iniciar sesión',
+        description: error.message || 'Error desconocido',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRegister = async (formData: FormData) => {
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsLoading(true);
     try {
+      const formData = new FormData(e.currentTarget);
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
 
@@ -54,17 +71,24 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
 
       if (error) throw error;
 
-      toast.success('Cuenta creada. Revisa tu email para confirmar.');
-      setIsOpen(false);
+      toast({
+        title: 'Cuenta creada',
+        description: 'Revisa tu email para confirmar la cuenta',
+      });
+      setDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.message || 'Error al crear cuenta');
+      toast({
+        title: 'Error al crear cuenta',
+        description: error.message || 'Error desconocido',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
@@ -79,7 +103,7 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
           </TabsList>
           
           <TabsContent value="login">
-            <form action={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="login-email">Email</Label>
                 <Input
@@ -106,7 +130,7 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
           </TabsContent>
           
           <TabsContent value="register">
-            <form action={handleRegister} className="space-y-4">
+            <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="register-email">Email</Label>
                 <Input

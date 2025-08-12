@@ -8,7 +8,7 @@ export const useEmployeeData = () => {
   const employeeQuery = useEmployeeLoader();
   
   // Extract the data we need from the query result
-  const employees = employeeQuery.data || [];
+  const employees = (employeeQuery.data || []) as EmployeeWithStatus[];
   const isLoading = employeeQuery.isLoading;
   const isInitialized = !employeeQuery.isLoading && employeeQuery.data !== undefined;
 
