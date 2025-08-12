@@ -9,6 +9,7 @@ import { useCompanyRegistrationStore } from './hooks/useCompanyRegistrationStore
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CompanyRegistrationWizardProps {
   onComplete: () => void;
@@ -19,7 +20,7 @@ export type WizardStep = 'welcome' | 'company-data' | 'functional-area' | 'team-
 
 export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegistrationWizardProps) => {
   const [currentStep, setCurrentStep] = useState<WizardStep>('welcome');
-  const { clearStore } = useCompanyRegistrationStore();
+  const { clearStore, data } = useCompanyRegistrationStore();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -53,7 +54,92 @@ export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegis
     setCurrentStep(nextStep);
   };
 
-  const handleFinalComplete = () => {
+  const persistRegistrationData = async () => {
+    try {
+      if (!user) throw new Error('Usuario no autenticado');
+
+      // Get current profile to find company_id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) {
+        throw new Error('No se encontró la empresa del usuario');
+      }
+
+      // Update company with the registration data
+      const updateData: any = {};
+      
+      if (data.identificationNumber) {
+        // Format NIT properly (add verification digit if provided)
+        const nit = data.verificationDigit 
+          ? `${data.identificationNumber}-${data.verificationDigit}`
+          : data.identificationNumber;
+        updateData.nit = nit;
+      }
+
+      if (data.industry) {
+        updateData.actividad_economica = data.industry;
+      }
+
+      if (data.ciiuCode) {
+        updateData.codigo_ciiu = data.ciiuCode;
+      }
+
+      // Only update if we have data to update
+      if (Object.keys(updateData).length > 0) {
+        const { error: companyError } = await supabase
+          .from('companies')
+          .update(updateData)
+          .eq('id', profile.company_id);
+
+        if (companyError) {
+          console.error('Error updating company:', companyError);
+          throw companyError;
+        }
+
+        console.log('✅ Company data updated successfully:', updateData);
+      }
+
+      // Update company settings with payroll frequency
+      if (data.payrollFrequency) {
+        const { error: settingsError } = await supabase
+          .from('company_settings')
+          .update({ 
+            periodicity: data.payrollFrequency,
+            updated_at: new Date().toISOString()
+          })
+          .eq('company_id', profile.company_id);
+
+        if (settingsError) {
+          console.error('Error updating company settings:', settingsError);
+          // Don't throw here, as this is not critical
+        } else {
+          console.log('✅ Company settings updated successfully');
+        }
+      }
+
+      toast({
+        title: "Configuración guardada",
+        description: "Los datos de tu empresa han sido actualizados correctamente.",
+      });
+
+    } catch (error) {
+      console.error('❌ Error persisting registration data:', error);
+      toast({
+        title: "Error al guardar",
+        description: "Hubo un problema al guardar la configuración de tu empresa.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFinalComplete = async () => {
+    // Persist registration data before completing
+    await persistRegistrationData();
+    
     // Clear saved progress
     localStorage.removeItem('company-registration-step');
     clearStore();
