@@ -163,8 +163,8 @@ const Index = () => {
       </footer>
 
       <AuthDialog 
-        isOpen={showAuthDialog} 
-        onClose={() => setShowAuthDialog(false)} 
+        open={showAuthDialog} 
+        onOpenChange={setShowAuthDialog} 
       />
     </div>
   );
