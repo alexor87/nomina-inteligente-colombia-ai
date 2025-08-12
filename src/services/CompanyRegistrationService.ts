@@ -7,6 +7,7 @@ export interface CompanyRegistrationData {
   email: string;
   telefono?: string;
   direccion?: string;
+  ciudad?: string;
   plan: 'basico' | 'profesional' | 'empresarial';
 }
 
@@ -18,6 +19,19 @@ export class CompanyRegistrationService {
   static async registerCompany(data: CompanyRegistrationData) {
     try {
       console.log('🏢 Iniciando registro de empresa:', data.razon_social);
+
+      // Validación defensiva de campos obligatorios
+      if (!data.razon_social?.trim()) {
+        throw new Error('El nombre de la empresa es obligatorio');
+      }
+
+      if (!data.email?.trim()) {
+        throw new Error('El email de la empresa es obligatorio');
+      }
+
+      if (!data.nit?.trim()) {
+        throw new Error('El NIT es obligatorio');
+      }
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -33,6 +47,7 @@ export class CompanyRegistrationService {
           email: data.email,
           telefono: data.telefono,
           direccion: data.direccion,
+          ciudad: data.ciudad,
           estado: 'activa',
           plan: data.plan
         })

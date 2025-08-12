@@ -24,6 +24,11 @@ export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegis
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Generar clave específica del usuario para localStorage
+  const getUserSpecificKey = (key: string) => {
+    return user ? `${key}-${user.id}` : key;
+  };
+
   // Verificar que el usuario esté autenticado
   useEffect(() => {
     if (!loading && !user) {
@@ -37,32 +42,43 @@ export const CompanyRegistrationWizard = ({ onComplete, onCancel }: CompanyRegis
   }, [user, loading, navigate, toast]);
 
   useEffect(() => {
-    // Load saved progress on mount
-    const savedStep = localStorage.getItem('company-registration-step');
-    if (savedStep && ['welcome', 'company-data', 'functional-area', 'team-invitation', 'final'].includes(savedStep)) {
-      setCurrentStep(savedStep as WizardStep);
+    if (user) {
+      // Load saved progress on mount - específico del usuario
+      const savedStep = localStorage.getItem(getUserSpecificKey('company-registration-step'));
+      if (savedStep && ['welcome', 'company-data', 'functional-area', 'team-invitation', 'final'].includes(savedStep)) {
+        setCurrentStep(savedStep as WizardStep);
+      } else {
+        // Si no hay progreso guardado, empezar desde welcome
+        setCurrentStep('welcome');
+      }
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    // Save progress on step change
-    localStorage.setItem('company-registration-step', currentStep);
-  }, [currentStep]);
+    if (user) {
+      // Save progress on step change - específico del usuario
+      localStorage.setItem(getUserSpecificKey('company-registration-step'), currentStep);
+    }
+  }, [currentStep, user]);
 
   const handleStepComplete = (nextStep: WizardStep) => {
     setCurrentStep(nextStep);
   };
 
   const handleFinalComplete = () => {
-    // Clear saved progress
-    localStorage.removeItem('company-registration-step');
+    if (user) {
+      // Clear saved progress - específico del usuario
+      localStorage.removeItem(getUserSpecificKey('company-registration-step'));
+    }
     clearStore();
     onComplete();
   };
 
   const handleCancel = () => {
-    // Clear saved progress
-    localStorage.removeItem('company-registration-step');
+    if (user) {
+      // Clear saved progress - específico del usuario
+      localStorage.removeItem(getUserSpecificKey('company-registration-step'));
+    }
     clearStore();
     if (onCancel) {
       onCancel();

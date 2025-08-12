@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, X } from 'lucide-react';
 import { useCompanyRegistrationStore } from '../hooks/useCompanyRegistrationStore';
 import { CompanyRegistrationService } from '@/services/CompanyRegistrationService';
+import { CompanyConfigurationService } from '@/services/CompanyConfigurationService';
 import { useToast } from '@/hooks/use-toast';
+import { calculateVerificationDigit } from '../utils/digitVerification';
 
 interface FinalStepProps {
   onComplete: () => void;
@@ -24,28 +26,84 @@ export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Validación estricta de campos obligatorios
+  const validateRequiredFields = () => {
+    const errors: string[] = [];
+
+    if (!data.companyName?.trim()) {
+      errors.push('Nombre de la empresa');
+    }
+
+    if (!data.companyEmail?.trim()) {
+      errors.push('Email de la empresa');
+    }
+
+    if (!data.identificationNumber?.trim()) {
+      errors.push('Número de identificación');
+    }
+
+    if (errors.length > 0) {
+      toast({
+        title: "Campos obligatorios faltantes",
+        description: `Por favor complete: ${errors.join(', ')}`,
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleComplete = async () => {
     if (isRegistering) return;
+    
+    // Validación estricta antes de proceder
+    if (!validateRequiredFields()) {
+      return;
+    }
     
     setIsRegistering(true);
     
     try {
+      // Construir NIT correctamente con dígito de verificación
+      let nitCompleto = data.identificationNumber || '';
+      
+      if (data.identificationType === 'NIT') {
+        const dv = data.verificationDigit || calculateVerificationDigit(data.identificationNumber || '');
+        nitCompleto = `${data.identificationNumber}-${dv}`;
+      }
+
       // Map wizard data to CompanyRegistrationService format
       const registrationData = {
-        nit: data.identificationNumber + (data.verificationDigit ? `-${data.verificationDigit}` : ''),
+        nit: nitCompleto,
         razon_social: data.companyName || '',
         email: data.companyEmail || '',
         telefono: data.companyPhone,
         direccion: data.companyAddress,
-        plan: 'profesional' as const, // Default plan
+        ciudad: data.companyCity,
+        plan: 'profesional' as const,
       };
 
       console.log('🏢 Registrando empresa con datos:', registrationData);
 
       const result = await CompanyRegistrationService.registerCompany(registrationData);
 
-      if (result.success) {
+      if (result.success && result.company) {
         console.log('✅ Empresa registrada exitosamente');
+
+        // Guardar la frecuencia de nómina en company_settings
+        if (data.payrollFrequency) {
+          try {
+            await CompanyConfigurationService.saveCompanyConfiguration(
+              result.company.id, 
+              data.payrollFrequency
+            );
+            console.log('✅ Frecuencia de nómina guardada:', data.payrollFrequency);
+          } catch (configError) {
+            console.warn('⚠️ Error guardando configuración de nómina:', configError);
+          }
+        }
+
         toast({
           title: "¡Empresa registrada exitosamente!",
           description: "Tu empresa ha sido configurada y ya puedes comenzar a gestionar empleados.",

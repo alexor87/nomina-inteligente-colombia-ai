@@ -88,10 +88,21 @@ export const useCompanySettings = () => {
       if (companyId) {
         const company = await CompanyConfigurationService.getCompanyData(companyId);
         if (company) {
+          // Separar NIT y DV si vienen juntos
+          let nitPart = company.nit || '';
+          let dvPart = '';
+          
+          if (nitPart.includes('-')) {
+            const parts = nitPart.split('-');
+            nitPart = parts[0];
+            dvPart = parts[1] || '';
+          }
+
           setCompanyData(prev => ({
             ...prev,
             razon_social: company.razon_social || '',
-            nit: company.nit || '',
+            nit: nitPart,
+            dv: dvPart,
             email: company.email || '',
             telefono: company.telefono || '',
             direccion: company.direccion || '',
@@ -150,10 +161,16 @@ export const useCompanySettings = () => {
         return;
       }
 
+      // Construir NIT completo (con DV si existe)
+      let nitCompleto = companyData.nit;
+      if (companyData.dv) {
+        nitCompleto = `${companyData.nit}-${companyData.dv}`;
+      }
+
       // Update company basic data including logo
       await CompanyConfigurationService.updateCompanyData(companyId, {
         razon_social: companyData.razon_social,
-        nit: companyData.nit,
+        nit: nitCompleto,
         email: companyData.email,
         telefono: companyData.telefono,
         direccion: companyData.direccion,
