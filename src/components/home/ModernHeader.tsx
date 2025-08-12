@@ -21,7 +21,7 @@ const ModernHeader = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Calculator className="h-8 w-8 text-blue-600" />
-            <span className="ml-2 text-xl font-bold text-gray-900">Nómina Pro</span>
+            <span className="ml-2 text-xl font-bold text-gray-900">Finppi Nómina</span>
           </div>
           
           {/* Desktop Navigation */}

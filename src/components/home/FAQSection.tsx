@@ -11,7 +11,7 @@ const FAQSection = () => {
   const faqs = [
     {
       question: "¿Qué tan fácil es migrar mi nómina actual?",
-      answer: "Súper fácil. Nuestro equipo te ayuda a importar todos tus datos en menos de 24 horas. Solo necesitas enviar tu base de datos actual y nosotros nos encargamos del resto. Sin interrupciones en tu operación."
+      answer: "Súper fácil. Puedes importar tu información en minutos con nuestra guía paso a paso, sin interrumpir tu operación."
     },
     {
       question: "¿Cumple con todas las normas colombianas?",
