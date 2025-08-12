@@ -223,6 +223,70 @@ export const useReports = () => {
     }
   }, []);
 
+  const getDianStatusReport = useCallback(async (reportFilters: ReportFilters): Promise<any[]> => {
+    setLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const mockData = [
+        {
+          employeeId: '1',
+          employeeName: 'Juan Pérez',
+          period: 'Enero 2025',
+          status: 'enviado',
+          sentDate: '2025-01-15T10:00:00Z',
+          cufe: 'abc123def456ghi789',
+          pdfUrl: '/documents/payroll-1.pdf'
+        },
+        {
+          employeeId: '2',
+          employeeName: 'María García',
+          period: 'Enero 2025',
+          status: 'pendiente',
+          sentDate: null,
+          cufe: null,
+          pdfUrl: null
+        }
+      ];
+      
+      return mockData;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getPilaPreliquidation = useCallback(async (reportFilters: ReportFilters): Promise<any[]> => {
+    setLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const mockData = [
+        {
+          entity: 'EPS Sanitas',
+          entityType: 'EPS',
+          employeesCount: 10,
+          total: 850000
+        },
+        {
+          entity: 'Fondo de Pensiones Porvenir',
+          entityType: 'Pensión',
+          employeesCount: 10,
+          total: 1200000
+        },
+        {
+          entity: 'ARL Positiva',
+          entityType: 'ARL',
+          employeesCount: 10,
+          total: 104400
+        }
+      ];
+      
+      return mockData;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const exportToExcel = useCallback(async (reportType: string, data: any[], fileName: string) => {
     if (!user?.email) return;
     
@@ -266,6 +330,8 @@ export const useReports = () => {
     getNoveltyHistoryReport,
     getIncomeRetentionCertificates,
     getAccountingExports,
+    getDianStatusReport,
+    getPilaPreliquidation,
     exportToExcel,
     exportToPDF
   };
