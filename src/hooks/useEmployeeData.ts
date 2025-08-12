@@ -3,9 +3,17 @@ import { useEffect, useCallback, useMemo } from 'react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { useEmployeeLoader } from './useEmployeeLoader';
 import { useEmployeeOperations } from './useEmployeeOperations';
+import { EmployeeTransformationService } from '@/services/EmployeeTransformationService';
 
 export const useEmployeeData = () => {
-  const { data: employees = [], isLoading, refetch: loadEmployees } = useEmployeeLoader();
+  const { data: rawEmployees = [], isLoading, refetch: loadEmployees } = useEmployeeLoader();
+  
+  // Transform raw data to EmployeeWithStatus
+  const employees = useMemo(() => {
+    if (!rawEmployees || rawEmployees.length === 0) return [];
+    return EmployeeTransformationService.transformEmployeeData(rawEmployees);
+  }, [rawEmployees]);
+
   const isInitialized = !isLoading;
 
   const {

@@ -9,16 +9,17 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export const AuthDialog = ({ isOpen, onClose }: AuthDialogProps) => {
+export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleLogin = async (formData: FormData) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsLoading(true);
     try {
       // TODO: Implement login logic
@@ -26,7 +27,7 @@ export const AuthDialog = ({ isOpen, onClose }: AuthDialogProps) => {
         title: "Login",
         description: "Funcionalidad de login en desarrollo",
       });
-      onClose();
+      onOpenChange(false);
       navigate('/app/dashboard');
     } catch (error) {
       toast({
@@ -39,7 +40,8 @@ export const AuthDialog = ({ isOpen, onClose }: AuthDialogProps) => {
     }
   };
 
-  const handleRegister = async (formData: FormData) => {
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsLoading(true);
     try {
       // TODO: Implement register logic
@@ -47,7 +49,7 @@ export const AuthDialog = ({ isOpen, onClose }: AuthDialogProps) => {
         title: "Registro",
         description: "Funcionalidad de registro en desarrollo",
       });
-      onClose();
+      onOpenChange(false);
       navigate('/register/company');
     } catch (error) {
       toast({
@@ -61,7 +63,7 @@ export const AuthDialog = ({ isOpen, onClose }: AuthDialogProps) => {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Acceder a la plataforma</DialogTitle>
@@ -74,7 +76,7 @@ export const AuthDialog = ({ isOpen, onClose }: AuthDialogProps) => {
           </TabsList>
           
           <TabsContent value="login">
-            <form action={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -101,7 +103,7 @@ export const AuthDialog = ({ isOpen, onClose }: AuthDialogProps) => {
           </TabsContent>
           
           <TabsContent value="register">
-            <form action={handleRegister} className="space-y-4">
+            <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="reg-email">Email</Label>
                 <Input
