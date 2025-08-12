@@ -3,6 +3,8 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useColombianGeography } from '@/hooks/useColombianGeography';
+import { useEffect } from 'react';
 
 interface AddressSectionProps {
   companyData: any;
@@ -10,6 +12,33 @@ interface AddressSectionProps {
 }
 
 export const AddressSection = ({ companyData, onInputChange }: AddressSectionProps) => {
+  const { 
+    departments, 
+    municipalities, 
+    selectedDepartment, 
+    setSelectedDepartment 
+  } = useColombianGeography();
+
+  // Set the selected department when component loads or when companyData.departamento changes
+  useEffect(() => {
+    if (companyData.departamento && companyData.departamento !== selectedDepartment) {
+      setSelectedDepartment(companyData.departamento);
+    }
+  }, [companyData.departamento, selectedDepartment, setSelectedDepartment]);
+
+  const handleDepartmentChange = (value: string) => {
+    setSelectedDepartment(value);
+    onInputChange('departamento', value);
+    // Reset city when department changes
+    if (companyData.ciudad) {
+      onInputChange('ciudad', '');
+    }
+  };
+
+  const handleCityChange = (value: string) => {
+    onInputChange('ciudad', value);
+  };
+
   return (
     <Card className="p-6">
       <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
@@ -28,30 +57,41 @@ export const AddressSection = ({ companyData, onInputChange }: AddressSectionPro
         </div>
 
         <div>
-          <Label htmlFor="ciudad">Ciudad / Municipio *</Label>
-          <Input
-            id="ciudad"
-            value={companyData.ciudad}
-            onChange={(e) => onInputChange('ciudad', e.target.value)}
-            placeholder="Bogotá"
-            required
-          />
+          <Label htmlFor="departamento">Departamento *</Label>
+          <Select value={companyData.departamento} onValueChange={handleDepartmentChange}>
+            <SelectTrigger className="bg-white border border-gray-300 z-50">
+              <SelectValue placeholder="Seleccione departamento" />
+            </SelectTrigger>
+            <SelectContent className="bg-white border border-gray-300 z-50 max-h-60 overflow-y-auto">
+              {departments.map((departamento) => (
+                <SelectItem key={departamento.value} value={departamento.value}>
+                  {departamento.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
-          <Label htmlFor="departamento">Departamento *</Label>
-          <Select value={companyData.departamento} onValueChange={(value) => onInputChange('departamento', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione departamento" />
+          <Label htmlFor="ciudad">Ciudad / Municipio *</Label>
+          <Select 
+            value={companyData.ciudad} 
+            onValueChange={handleCityChange}
+            disabled={!selectedDepartment || municipalities.length === 0}
+          >
+            <SelectTrigger className="bg-white border border-gray-300 z-40">
+              <SelectValue placeholder={
+                !selectedDepartment 
+                  ? "Primero seleccione un departamento" 
+                  : "Seleccione ciudad/municipio"
+              } />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Cundinamarca">Cundinamarca</SelectItem>
-              <SelectItem value="Antioquia">Antioquia</SelectItem>
-              <SelectItem value="Valle del Cauca">Valle del Cauca</SelectItem>
-              <SelectItem value="Atlántico">Atlántico</SelectItem>
-              <SelectItem value="Santander">Santander</SelectItem>
-              <SelectItem value="Bolívar">Bolívar</SelectItem>
-              <SelectItem value="Otro">Otro</SelectItem>
+            <SelectContent className="bg-white border border-gray-300 z-40 max-h-60 overflow-y-auto">
+              {municipalities.map((ciudad) => (
+                <SelectItem key={ciudad.value} value={ciudad.value}>
+                  {ciudad.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

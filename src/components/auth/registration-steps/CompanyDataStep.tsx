@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +9,7 @@ import { Building2, X } from 'lucide-react';
 import { useCompanyRegistrationStore } from '../hooks/useCompanyRegistrationStore';
 import { calculateVerificationDigit } from '../utils/digitVerification';
 import { industryCategories } from '../utils/industryData';
+import { useColombianGeography } from '@/hooks/useColombianGeography';
 
 interface CompanyDataStepProps {
   onNext: () => void;
@@ -18,12 +18,21 @@ interface CompanyDataStepProps {
 
 export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
   const { data, updateData } = useCompanyRegistrationStore();
+  const { 
+    departments, 
+    municipalities, 
+    selectedDepartment, 
+    setSelectedDepartment 
+  } = useColombianGeography();
+
   const [formData, setFormData] = useState({
     // Información básica de la empresa
     companyName: data.companyName || '',
     companyEmail: data.companyEmail || '',
     companyPhone: data.companyPhone || '',
     companyAddress: data.companyAddress || '',
+    companyDepartment: data.companyDepartment || '',
+    companyCity: data.companyCity || '',
     
     // Identificación
     identificationType: data.identificationType || 'NIT',
@@ -38,6 +47,13 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Set the selected department when component loads or when formData changes
+  useEffect(() => {
+    if (formData.companyDepartment && formData.companyDepartment !== selectedDepartment) {
+      setSelectedDepartment(formData.companyDepartment);
+    }
+  }, [formData.companyDepartment, selectedDepartment, setSelectedDepartment]);
 
   useEffect(() => {
     if (formData.identificationNumber && formData.identificationType === 'NIT') {
@@ -60,6 +76,22 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
       ...prev,
       industry,
       ciiuCode: selectedIndustry?.ciiuCode || ''
+    }));
+  };
+
+  const handleDepartmentChange = (value: string) => {
+    setSelectedDepartment(value);
+    setFormData(prev => ({
+      ...prev,
+      companyDepartment: value,
+      companyCity: '' // Reset city when department changes
+    }));
+  };
+
+  const handleCityChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      companyCity: value
     }));
   };
 
@@ -168,6 +200,49 @@ export const CompanyDataStep = ({ onNext, onCancel }: CompanyDataStepProps) => {
               onChange={(e) => setFormData(prev => ({ ...prev, companyAddress: e.target.value }))}
               placeholder="Dirección de la empresa"
             />
+          </div>
+        </div>
+
+        {/* New Location Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="companyDepartment">Departamento</Label>
+            <Select value={formData.companyDepartment} onValueChange={handleDepartmentChange}>
+              <SelectTrigger className="bg-white border border-gray-300 z-50">
+                <SelectValue placeholder="Seleccione departamento" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border border-gray-300 z-50 max-h-60 overflow-y-auto">
+                {departments.map((departamento) => (
+                  <SelectItem key={departamento.value} value={departamento.value}>
+                    {departamento.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="companyCity">Ciudad / Municipio</Label>
+            <Select 
+              value={formData.companyCity} 
+              onValueChange={handleCityChange}
+              disabled={!selectedDepartment || municipalities.length === 0}
+            >
+              <SelectTrigger className="bg-white border border-gray-300 z-40">
+                <SelectValue placeholder={
+                  !selectedDepartment 
+                    ? "Primero seleccione un departamento" 
+                    : "Seleccione ciudad/municipio"
+                } />
+              </SelectTrigger>
+              <SelectContent className="bg-white border border-gray-300 z-40 max-h-60 overflow-y-auto">
+                {municipalities.map((ciudad) => (
+                  <SelectItem key={ciudad.value} value={ciudad.value}>
+                    {ciudad.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
