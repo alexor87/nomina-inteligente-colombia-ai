@@ -2182,6 +2182,18 @@ export type Database = {
           salario_base: number
         }[]
       }
+      get_employees_limited: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          nombre: string
+          apellido: string
+          cargo: string
+          estado: string
+          fecha_ingreso: string
+          company_id: string
+        }[]
+      }
       get_novedad_audit_history: {
         Args: { p_novedad_id: string }
         Returns: {
