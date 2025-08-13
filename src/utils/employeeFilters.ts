@@ -27,7 +27,7 @@ export const filterEmployees = (employees: EmployeeWithStatus[], filters: Employ
 
     // Cost center filter
     if (filters.centroCosto && 
-        (employee.centroCostos || employee.centrosocial || '') !== filters.centroCosto) {
+        (employee.centroCostos || '') !== filters.centroCosto) {
       return false;
     }
 

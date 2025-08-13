@@ -1,205 +1,179 @@
-
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Circle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { PersonalInfoSection } from './PersonalInfoSection';
+import { LaborInfoSection } from './LaborInfoSection';
+import { BankingInfoSection } from './BankingInfoSection';
+import { AffiliationsSection } from './AffiliationsSection';
+import { CustomFieldsSection } from './CustomFieldsSection';
+import { EmployeeFormData, EmployeeValidationEnhancedSchema } from './types';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { PersonalInfoSection } from './form/PersonalInfoSection';
-import { LaborInfoSection } from './form/LaborInfoSection';
-import { BankingInfoSection } from './form/BankingInfoSection';
-import { AffiliationsSection } from './form/AffiliationsSection';
-import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
-import { useToast } from '@/hooks/use-toast';
+import { useARLRiskLevels } from './useARLRiskLevels';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface EmployeeFormWizardProps {
-  employee?: EmployeeUnified;
-  onSuccess?: (employee: EmployeeUnified) => void;
-  onCancel?: () => void;
+  employee?: EmployeeUnified | null;
+  onSuccess: () => void;
+  onCancel: () => void;
 }
 
-const steps = [
-  { id: 'personal', title: 'Información Personal', icon: Circle },
-  { id: 'labor', title: 'Información Laboral', icon: Circle },
-  { id: 'banking', title: 'Información Bancaria', icon: Circle },
-  { id: 'affiliations', title: 'Afiliaciones', icon: Circle }
-];
+type SectionKey = 'personal' | 'laboral' | 'bancaria' | 'afiliaciones' | 'personalizados';
 
-export const EmployeeFormWizard = ({ 
-  employee, 
-  onSuccess, 
-  onCancel 
-}: EmployeeFormWizardProps) => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<Partial<EmployeeUnified>>(
-    employee || {
-      empresaId: '',
-      cedula: '',
-      tipoDocumento: 'CC',
-      nombre: '',
-      apellido: '',
-      email: '',
-      telefono: '',
-      salarioBase: 0,
-      tipoContrato: 'indefinido',
-      fechaIngreso: new Date().toISOString().split('T')[0],
-      periodicidadPago: 'mensual',
-      cargo: '',
-      estado: 'activo',
-      banco: '',
-      tipoCuenta: 'ahorros',
-      numeroCuenta: '',
-      titularCuenta: '',
-      eps: '',
-      afp: '',
-      arl: '',
-      cajaCompensacion: '',
-      regimenSalud: 'contributivo',
-      estadoAfiliacion: 'pendiente',
-      tipoJornada: 'completa',
-      formaPago: 'dispersion',
-      custom_fields: {}
-    }
-  );
-  
-  const { createEmployee, updateEmployee, isCreating, isUpdating } = useEmployeeCRUD();
-  const { toast } = useToast();
+export const EmployeeFormWizard = ({ employee, onSuccess, onCancel }: EmployeeFormWizardProps) => {
+  const [currentSection, setCurrentSection] = useState<SectionKey>('personal');
+  const { arlRiskLevels } = useARLRiskLevels();
 
-  const updateFormData = (section: string, data: Partial<EmployeeUnified>) => {
-    setFormData(prev => ({ ...prev, ...data }));
-  };
+  const form = useForm<EmployeeFormData>({
+    resolver: zodResolver(EmployeeValidationEnhancedSchema),
+    defaultValues: {
+      cedula: employee?.cedula || '',
+      tipoDocumento: employee?.tipoDocumento || 'CC',
+      nombre: employee?.nombre || '',
+      segundoNombre: employee?.segundoNombre || '',
+      apellido: employee?.apellido || '',
+      email: employee?.email || '',
+      telefono: employee?.telefono || '',
+      sexo: employee?.sexo,
+      fechaNacimiento: employee?.fechaNacimiento || '',
+      direccion: employee?.direccion || '',
+      ciudad: employee?.ciudad || '',
+      departamento: employee?.departamento || '',
+      salarioBase: employee?.salarioBase || 0,
+      tipoContrato: employee?.tipoContrato || 'indefinido',
+      fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
+      periodicidadPago: employee?.periodicidadPago || 'mensual',
+      cargo: employee?.cargo || '',
+      codigoCIIU: employee?.codigoCIIU || '',
+      nivelRiesgoARL: employee?.nivelRiesgoARL || '1',
+      estado: (employee?.estado && ['activo', 'inactivo', 'vacaciones', 'incapacidad'].includes(employee.estado) ? employee.estado : 'activo'),
+      centroCostos: employee?.centroCostos || '',
+      fechaFirmaContrato: employee?.fechaFirmaContrato || '',
+      fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
+      tipoJornada: employee?.tipoJornada || 'completa',
+      diasTrabajo: employee?.diasTrabajo || 30,
+      horasTrabajo: employee?.horasTrabajo || 8,
+      beneficiosExtralegales: employee?.beneficiosExtralegales || false,
+      clausulasEspeciales: employee?.clausulasEspeciales || '',
+      banco: employee?.banco || '',
+      tipoCuenta: employee?.tipoCuenta || 'ahorros',
+      numeroCuenta: employee?.numeroCuenta || '',
+      titularCuenta: employee?.titularCuenta || '',
+      formaPago: employee?.formaPago || 'dispersion',
+      eps: employee?.eps || '',
+      afp: employee?.afp || '',
+      arl: employee?.arl || '',
+      cajaCompensacion: employee?.cajaCompensacion || '',
+      tipoCotizanteId: employee?.tipoCotizanteId || '',
+      subtipoCotizanteId: employee?.subtipoCotizanteId || '',
+      regimenSalud: employee?.regimenSalud || 'contributivo',
+      estadoAfiliacion: employee?.estadoAfiliacion || 'pendiente',
+      custom_fields: employee?.custom_fields || {}
+    },
+    mode: 'onChange',
+    reValidateMode: 'onChange',
+    shouldFocusError: true
+  });
 
-  const validateStep = (stepIndex: number): boolean => {
-    switch (stepIndex) {
-      case 0: // Personal
-        return !!(formData.cedula && formData.nombre && formData.apellido);
-      case 1: // Labor
-        return !!(formData.salarioBase && formData.fechaIngreso && formData.cargo);
-      case 2: // Banking
-        return !!(formData.banco && formData.tipoCuenta);
-      case 3: // Affiliations
-        return !!(formData.eps && formData.afp);
+  const { register, handleSubmit, formState, setValue, watch, trigger, reset, control } = form;
+  const { errors, isValid, isDirty, isSubmitting } = formState;
+  const watchedValues = watch();
+
+  const nextSection = () => {
+    switch (currentSection) {
+      case 'personal':
+        return setCurrentSection('laboral');
+      case 'laboral':
+        return setCurrentSection('bancaria');
+      case 'bancaria':
+        return setCurrentSection('afiliaciones');
+      case 'afiliaciones':
+        return setCurrentSection('personalizados');
+      case 'personalizados':
+        return setCurrentSection('personal');
       default:
-        return false;
+        return setCurrentSection('personal');
     }
   };
 
-  const handleNext = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
+  const prevSection = () => {
+    switch (currentSection) {
+      case 'personal':
+        return setCurrentSection('personalizados');
+      case 'laboral':
+        return setCurrentSection('personal');
+      case 'bancaria':
+        return setCurrentSection('laboral');
+      case 'afiliaciones':
+        return setCurrentSection('bancaria');
+      case 'personalizados':
+        return setCurrentSection('afiliaciones');
+      default:
+        return setCurrentSection('personal');
     }
   };
 
-  const handlePrev = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 0));
-  };
-
-  const handleSubmit = async () => {
-    if (!validateStep(currentStep)) return;
-
-    try {
-      // Ensure all required fields are present
-      const employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> = {
-        empresaId: formData.empresaId || '',
-        cedula: formData.cedula || '',
-        tipoDocumento: formData.tipoDocumento || 'CC',
-        nombre: formData.nombre || '',
-        segundoNombre: formData.segundoNombre,
-        apellido: formData.apellido || '',
-        email: formData.email,
-        telefono: formData.telefono,
-        sexo: formData.sexo,
-        fechaNacimiento: formData.fechaNacimiento,
-        direccion: formData.direccion,
-        ciudad: formData.ciudad,
-        departamento: formData.departamento,
-        salarioBase: formData.salarioBase || 0,
-        tipoContrato: formData.tipoContrato || 'indefinido',
-        fechaIngreso: formData.fechaIngreso || new Date().toISOString().split('T')[0],
-        periodicidadPago: formData.periodicidadPago || 'mensual',
-        cargo: formData.cargo,
-        codigoCIIU: formData.codigoCIIU,
-        nivelRiesgoARL: formData.nivelRiesgoARL,
-        estado: formData.estado || 'activo',
-        centroCostos: formData.centroCostos,
-        fechaFirmaContrato: formData.fechaFirmaContrato,
-        fechaFinalizacionContrato: formData.fechaFinalizacionContrato,
-        tipoJornada: formData.tipoJornada || 'completa',
-        diasTrabajo: formData.diasTrabajo,
-        horasTrabajo: formData.horasTrabajo,
-        beneficiosExtralegales: formData.beneficiosExtralegales,
-        clausulasEspeciales: formData.clausulasEspeciales,
-        banco: formData.banco,
-        tipoCuenta: formData.tipoCuenta || 'ahorros',
-        numeroCuenta: formData.numeroCuenta,
-        titularCuenta: formData.titularCuenta,
-        formaPago: formData.formaPago || 'dispersion',
-        eps: formData.eps,
-        afp: formData.afp,
-        arl: formData.arl,
-        cajaCompensacion: formData.cajaCompensacion,
-        tipoCotizanteId: formData.tipoCotizanteId,
-        subtipoCotizanteId: formData.subtipoCotizanteId,
-        regimenSalud: formData.regimenSalud || 'contributivo',
-        estadoAfiliacion: formData.estadoAfiliacion || 'pendiente',
-        custom_fields: formData.custom_fields || {}
-      };
-
-      let result;
-      if (employee?.id) {
-        result = await updateEmployee(employee.id, employeeData);
-      } else {
-        result = await createEmployee(employeeData);
-      }
-
-      if (result) {
-        toast({
-          title: "Empleado guardado exitosamente",
-          description: employee ? "Los datos se actualizaron correctamente" : "El empleado se creó correctamente"
-        });
-        onSuccess?.(result);
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Ocurrió un error al guardar el empleado",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 0:
+  const renderCurrentSection = () => {
+    switch (currentSection) {
+      case 'personal':
         return (
-          <PersonalInfoSection
-            formData={formData}
-            updateFormData={(data) => updateFormData('personal', data)}
-            errors={{}}
+          <PersonalInfoSection 
+            control={control}
+            errors={errors}
+            watchedValues={watchedValues}
+            watch={watch}
           />
         );
-      case 1:
+      case 'laboral':
         return (
           <LaborInfoSection
-            formData={formData}
-            updateFormData={(data) => updateFormData('labor', data)}
-            errors={{}}
+            control={control}
+            errors={errors}
+            watchedValues={watchedValues}
+            setValue={setValue}
+            watch={watch}
+            arlRiskLevels={arlRiskLevels}
+            register={register}
           />
         );
-      case 2:
+      case 'bancaria':
         return (
           <BankingInfoSection
-            formData={formData}
-            updateFormData={(data) => updateFormData('banking', data)}
-            errors={{}}
+            control={control}
+            errors={errors}
+            watchedValues={watchedValues}
+            setValue={setValue}
+            watch={watch}
+            register={register}
           />
         );
-      case 3:
+      case 'afiliaciones':
         return (
           <AffiliationsSection
-            formData={formData}
-            updateFormData={(data) => updateFormData('affiliations', data)}
-            errors={{}}
+            control={control}
+            errors={errors}
+            watchedValues={watchedValues}
+            setValue={setValue}
+          />
+        );
+      case 'personalizados':
+        return (
+          <CustomFieldsSection
+            control={control}
+            errors={errors}
+            setValue={setValue}
+            customFields={[]}
           />
         );
       default:
@@ -207,83 +181,28 @@ export const EmployeeFormWizard = ({
     }
   };
 
-  const isLastStep = currentStep === steps.length - 1;
-  const canProceed = validateStep(currentStep);
+  const onSubmit = (data: EmployeeFormData) => {
+    console.log('Form data submitted:', data);
+    onSuccess();
+  };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Step indicators */}
-      <div className="flex items-center justify-between">
-        {steps.map((step, index) => {
-          const isCompleted = index < currentStep;
-          const isCurrent = index === currentStep;
-          const isValid = validateStep(index);
-          
-          return (
-            <div key={step.id} className="flex items-center">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
-                isCompleted 
-                  ? 'bg-green-500 border-green-500 text-white' 
-                  : isCurrent 
-                    ? isValid 
-                      ? 'bg-blue-500 border-blue-500 text-white'
-                      : 'bg-white border-red-500 text-red-500'
-                    : 'bg-white border-gray-300 text-gray-500'
-              }`}>
-                {isCompleted ? (
-                  <CheckCircle className="w-5 h-5" />
-                ) : (
-                  <span className="text-sm font-medium">{index + 1}</span>
-                )}
-              </div>
-              <span className={`ml-2 text-sm font-medium ${
-                isCurrent ? 'text-gray-900' : 'text-gray-500'
-              }`}>
-                {step.title}
-              </span>
-              {index < steps.length - 1 && (
-                <div className="w-8 h-px bg-gray-300 mx-4" />
-              )}
-            </div>
-          );
-        })}
-      </div>
+    <Form {...form}>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        {renderCurrentSection()}
 
-      {/* Step content */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            {steps[currentStep].title}
-            <Badge variant="outline">
-              {currentStep + 1} de {steps.length}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderStepContent()}
-        </CardContent>
-      </Card>
-
-      {/* Navigation */}
-      <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={currentStep === 0 ? onCancel : handlePrev}
-          className="flex items-center"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {currentStep === 0 ? 'Cancelar' : 'Anterior'}
-        </Button>
-
-        <Button
-          onClick={isLastStep ? handleSubmit : handleNext}
-          disabled={!canProceed || isCreating || isUpdating}
-          className="flex items-center"
-        >
-          {isLastStep ? 'Guardar' : 'Siguiente'}
-          {!isLastStep && <ArrowRight className="w-4 h-4 ml-2" />}
-        </Button>
-      </div>
-    </div>
+        <div className="flex justify-between">
+          <Button variant="secondary" onClick={prevSection}>
+            Anterior
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Enviando...' : 'Enviar'}
+          </Button>
+          <Button variant="secondary" onClick={nextSection}>
+            Siguiente
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 };
