@@ -8,8 +8,7 @@ import { useCompanyDetails } from '@/hooks/useCompanyDetails';
 import { ProfileForm } from '@/components/profile/ProfileForm';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { PasswordChange } from '@/components/profile/PasswordChange';
-import { ProfilePreferences } from '@/components/profile/ProfilePreferences';
-import { User, Building, Shield, Settings } from 'lucide-react';
+import { User, Building, Shield } from 'lucide-react';
 
 const ProfilePage = () => {
   const { user, profile, roles, isSuperAdmin } = useAuth();
@@ -95,7 +94,7 @@ const ProfilePage = () => {
 
       {/* Profile Management Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="personal" className="flex items-center space-x-2">
             <User className="h-4 w-4" />
             <span>Personal</span>
@@ -103,10 +102,6 @@ const ProfilePage = () => {
           <TabsTrigger value="security" className="flex items-center space-x-2">
             <Shield className="h-4 w-4" />
             <span>Seguridad</span>
-          </TabsTrigger>
-          <TabsTrigger value="preferences" className="flex items-center space-x-2">
-            <Settings className="h-4 w-4" />
-            <span>Preferencias</span>
           </TabsTrigger>
           <TabsTrigger value="company" className="flex items-center space-x-2">
             <Building className="h-4 w-4" />
@@ -120,10 +115,6 @@ const ProfilePage = () => {
 
         <TabsContent value="security" className="space-y-6">
           <PasswordChange />
-        </TabsContent>
-
-        <TabsContent value="preferences" className="space-y-6">
-          <ProfilePreferences />
         </TabsContent>
 
         <TabsContent value="company" className="space-y-6">
