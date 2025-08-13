@@ -13,6 +13,7 @@ export const personalInfoSchema = z.object({
 export const laborInfoSchema = z.object({
   cargo: z.string().optional(),
   salarioBase: z.number().min(0, 'El salario debe ser mayor a 0'),
+  tipoSalario: z.enum(['mensual', 'integral', 'medio_tiempo']).optional(), // ✅ NUEVO
   tipoContrato: z.string().optional(),
   fechaIngreso: z.string().min(1, 'La fecha de ingreso es requerida'),
   centroCostos: z.string().optional(),
@@ -53,6 +54,7 @@ export const employeeFormSchema = z.object({
   // Labor Info
   cargo: z.string().optional(),
   salarioBase: z.number().min(0, 'El salario debe ser mayor a 0'),
+  tipoSalario: z.enum(['mensual', 'integral', 'medio_tiempo']).optional(), // ✅ NUEVO
   tipoContrato: z.enum(['indefinido', 'fijo', 'obra', 'aprendizaje']).optional(),
   fechaIngreso: z.string().min(1, 'La fecha de ingreso es requerida'),
   periodicidadPago: z.enum(['mensual', 'quincenal']).optional(),

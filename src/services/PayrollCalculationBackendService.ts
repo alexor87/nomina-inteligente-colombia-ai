@@ -1,41 +1,33 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadForIBC } from '@/types/payroll';
 import { ConfigurationService } from './ConfigurationService';
 
 export interface PayrollCalculationInput {
   baseSalary: number;
+  tipoSalario?: 'mensual' | 'integral' | 'medio_tiempo'; // ✅ NUEVO: Tipo de salario
   workedDays: number;
   extraHours: number;
   disabilities: number;
   bonuses: number;
   absences: number;
   periodType: 'quincenal' | 'mensual';
-  // ✅ NUEVO CAMPO: novedades para cálculo correcto de IBC
-  novedades?: NovedadForIBC[];
-  // ✅ NUEVO CAMPO: año para configuración específica
-  year?: string;
+  novedades?: any[];
 }
 
 export interface PayrollCalculationResult {
-  regularPay: number;
-  extraPay: number;
-  transportAllowance: number;
   grossPay: number;
-  healthDeduction: number;
-  pensionDeduction: number;
   totalDeductions: number;
   netPay: number;
-  employerHealth: number;
-  employerPension: number;
-  employerArl: number;
-  employerCaja: number;
-  employerIcbf: number;
-  employerSena: number;
+  transportAllowance: number;
   employerContributions: number;
-  totalPayrollCost: number;
-  // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades constitutivas
   ibc: number;
+  healthDeduction: number;
+  pensionDeduction: number;
+  salaryBreakdown?: {
+    factorSalarial?: number; // Para salario integral
+    factorPrestacional?: number; // Para salario integral
+    proportionalSalary?: number; // Para medio tiempo
+  };
 }
 
 export interface ValidationResult {
@@ -45,39 +37,33 @@ export interface ValidationResult {
 }
 
 export class PayrollCalculationBackendService {
-  static async calculatePayroll(input: PayrollCalculationInput): Promise<PayrollCalculationResult> {
-    try {
-      console.log('🔍 PayrollCalculationBackendService: Calculando nómina con novedades:', {
-        baseSalary: input.baseSalary,
-        novedadesCount: input.novedades?.length || 0,
-        novedades: input.novedades
-      });
+  private static readonly FUNCTION_NAME = 'payroll-calculations';
 
-      const { data, error } = await supabase.functions.invoke('payroll-calculations', {
+  static async calculatePayroll(input: PayrollCalculationInput): Promise<PayrollCalculationResult> {
+    console.log('🔍 PayrollCalculationBackendService: Iniciando cálculo con tipo de salario:', input.tipoSalario);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke(this.FUNCTION_NAME, {
         body: {
           action: 'calculate',
-          data: input
+          ...input
         }
       });
 
       if (error) {
-        console.error('Error calling payroll calculation function:', error);
-        throw new Error('Error en el cálculo de nómina');
+        console.error('❌ Error en edge function:', error);
+        throw new Error(`Error en el cálculo: ${error.message}`);
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Error desconocido en el cálculo');
+      if (!data || !data.success) {
+        console.error('❌ Respuesta inválida del servicio:', data);
+        throw new Error(data?.error || 'Error desconocido en el cálculo');
       }
 
-      console.log('✅ PayrollCalculationBackendService: Resultado del cálculo:', {
-        ibc: data.data.ibc,
-        healthDeduction: data.data.healthDeduction,
-        pensionDeduction: data.data.pensionDeduction
-      });
-
-      return data.data;
+      console.log('✅ Cálculo completado exitosamente:', data.result);
+      return data.result;
     } catch (error) {
-      console.error('Error in calculatePayroll:', error);
+      console.error('❌ Error en PayrollCalculationBackendService:', error);
       throw error;
     }
   }

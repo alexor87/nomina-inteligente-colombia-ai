@@ -20,13 +20,14 @@ export interface EmployeeUnified {
   
   // Labor Information
   salarioBase: number;
+  tipoSalario: 'mensual' | 'integral' | 'medio_tiempo'; // ✅ NUEVO: Tipo de salario
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
   periodicidadPago: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // ✅ ADDED eliminado
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado';
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
@@ -61,7 +62,7 @@ export interface EmployeeUnified {
   updatedAt?: string;
 }
 
-// ✅ KEEP: Mapping functions remain the same
+// ✅ UPDATED: Mapping functions with tipoSalario support
 export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
   return {
     id: dbData.id,
@@ -80,6 +81,7 @@ export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
     ciudad: dbData.ciudad || undefined,
     departamento: dbData.departamento || undefined,
     salarioBase: Number(dbData.salario_base || 0),
+    tipoSalario: dbData.tipo_salario || 'mensual', // ✅ NUEVO: Mapear tipo de salario
     tipoContrato: dbData.tipo_contrato || 'indefinido',
     fechaIngreso: dbData.fecha_ingreso || new Date().toISOString().split('T')[0],
     periodicidadPago: dbData.periodicidad_pago || 'mensual',
@@ -130,6 +132,7 @@ export const mapUnifiedToDatabase = (unified: EmployeeUnified) => {
     ciudad: unified.ciudad || null,
     departamento: unified.departamento || null,
     salario_base: unified.salarioBase,
+    tipo_salario: unified.tipoSalario, // ✅ NUEVO: Mapear tipo de salario
     tipo_contrato: unified.tipoContrato,
     fecha_ingreso: unified.fechaIngreso,
     periodicidad_pago: unified.periodicidadPago,

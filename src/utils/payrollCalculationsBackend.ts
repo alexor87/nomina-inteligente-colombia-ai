@@ -7,22 +7,24 @@ export const calculateEmployeeBackend = async (
   baseEmployee: BaseEmployeeData, 
   periodType: 'quincenal' | 'mensual'
 ): Promise<PayrollEmployee> => {
-  console.log('🔍 calculateEmployeeBackend: Procesando empleado con novedades:', {
+  console.log('🔍 calculateEmployeeBackend: Procesando empleado con tipo de salario:', {
     employeeId: baseEmployee.id,
     name: baseEmployee.name,
+    tipoSalario: (baseEmployee as any).tipoSalario || 'mensual', // ✅ NUEVO
     novedadesCount: baseEmployee.novedades?.length || 0,
     novedades: baseEmployee.novedades
   });
 
   const input: PayrollCalculationInput = {
     baseSalary: baseEmployee.baseSalary,
+    tipoSalario: (baseEmployee as any).tipoSalario || 'mensual', // ✅ NUEVO: Incluir tipo de salario
     workedDays: baseEmployee.workedDays,
     extraHours: 0, // No longer used directly
     disabilities: baseEmployee.disabilities,
     bonuses: baseEmployee.bonuses, // Now includes all positive novedades
     absences: baseEmployee.absences,
     periodType,
-    // ✅ NUEVO: Incluir novedades para cálculo correcto de IBC
+    // ✅ EXISTING: Incluir novedades para cálculo correcto de IBC
     novedades: baseEmployee.novedades || []
   };
 
@@ -36,7 +38,8 @@ export const calculateEmployeeBackend = async (
       employeeId: baseEmployee.id,
       ibc: calculation.ibc,
       healthDeduction: calculation.healthDeduction,
-      pensionDeduction: calculation.pensionDeduction
+      pensionDeduction: calculation.pensionDeduction,
+      salaryBreakdown: calculation.salaryBreakdown // ✅ NUEVO: Desglose por tipo de salario
     });
 
     return {
@@ -46,7 +49,7 @@ export const calculateEmployeeBackend = async (
       netPay: calculation.netPay,
       transportAllowance: calculation.transportAllowance,
       employerContributions: calculation.employerContributions,
-      // ✅ NUEVO: Incluir IBC calculado
+      // ✅ EXISTING: Incluir IBC calculado
       ibc: calculation.ibc,
       status: validation.isValid ? 'valid' : 'error',
       errors: [...validation.errors, ...validation.warnings],

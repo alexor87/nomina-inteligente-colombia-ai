@@ -883,6 +883,7 @@ export type Database = {
           tipo_cuenta: string | null
           tipo_documento: string | null
           tipo_jornada: string | null
+          tipo_salario: string | null
           titular_cuenta: string | null
           updated_at: string
         }
@@ -931,6 +932,7 @@ export type Database = {
           tipo_cuenta?: string | null
           tipo_documento?: string | null
           tipo_jornada?: string | null
+          tipo_salario?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
@@ -979,6 +981,7 @@ export type Database = {
           tipo_cuenta?: string | null
           tipo_documento?: string | null
           tipo_jornada?: string | null
+          tipo_salario?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
