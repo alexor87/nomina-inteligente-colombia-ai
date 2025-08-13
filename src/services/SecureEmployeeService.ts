@@ -195,16 +195,31 @@ export class SecureEmployeeService extends SecureBaseService {
   static async updateEmployee(id: string, updates: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     try {
       console.log('🔒 SecureEmployeeService: Updating employee:', id);
+      console.log('📝 Update data received:', updates);
+      
+      // ✅ IMPROVED: Clean the updates data before mapping
+      const cleanUpdates = { ...updates };
+      
+      // Remove fields that shouldn't be updated or are handled specially
+      delete cleanUpdates.id; // Never update the ID
+      delete cleanUpdates.createdAt; // Never update creation timestamp
+      delete cleanUpdates.created_at; // Never update creation timestamp
+      
+      console.log('📝 Cleaned update data:', cleanUpdates);
       
       // Map to database format, but only the fields that are being updated
       const dbUpdates = mapUnifiedToDatabase({
-        ...updates,
-        id: id,
-        empresaId: updates.empresaId || updates.company_id || ''
+        ...cleanUpdates,
+        id: id, // Temporary ID for mapping, will be removed
+        empresaId: cleanUpdates.empresaId || cleanUpdates.company_id || ''
       } as EmployeeUnified);
 
-      // Remove fields that shouldn't be updated
+      // ✅ IMPROVED: Remove fields that shouldn't be updated after mapping
+      delete dbUpdates.id; // Remove ID from update data
       delete dbUpdates.company_id; // This shouldn't change
+      delete dbUpdates.created_at; // Never update creation timestamp
+      
+      console.log('📤 Sending to database:', dbUpdates);
       
       const { data, error } = await this.secureUpdate(
         'employees', 
@@ -224,8 +239,19 @@ export class SecureEmployeeService extends SecureBaseService {
         throw error;
       }
 
+      // ✅ IMPROVED: Better error handling for no data returned
       if (!data || !Array.isArray(data) || data.length === 0) {
-        throw new Error('No data returned from employee update');
+        console.error('❌ SecureEmployeeService: No data returned from update');
+        console.error('❌ Query conditions:', { id, estado: { neq: 'eliminado' } });
+        console.error('❌ Update data sent:', dbUpdates);
+        
+        // Try to fetch the employee to see if it exists
+        const existingEmployee = await this.getEmployeeById(id);
+        if (!existingEmployee) {
+          throw new Error('Empleado no encontrado o no tienes permisos para actualizarlo');
+        }
+        
+        throw new Error('Error al actualizar empleado: No se retornaron datos actualizados');
       }
 
       const employee = mapDatabaseToUnified(data[0]);
