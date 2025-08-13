@@ -37,6 +37,12 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('employeeEmail is required');
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(employeeEmail)) {
+      throw new Error('Invalid email format');
+    }
+
     // Si viene voucherId, intentar obtener datos de DB (compatibilidad con versión anterior)
     let companyDisplayName = companyName;
     let periodLabel = period?.periodo || (period ? `${period.startDate} - ${period.endDate}` : undefined);
@@ -88,17 +94,35 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Adjuntar PDF si viene en el payload
     if (attachment?.base64 && attachment?.fileName) {
+      // Clean base64 content (remove any data URL prefix if present)
+      let cleanBase64 = attachment.base64;
+      if (cleanBase64.includes(',')) {
+        cleanBase64 = cleanBase64.split(',')[1];
+      }
+      
       sendOptions.attachments = [
         {
           filename: attachment.fileName,
-          content: attachment.base64,
+          content: cleanBase64,
         },
       ];
       console.log(`📎 Adjuntando archivo: ${attachment.fileName}`);
     }
 
-    const emailResponse = await resend.emails.send(sendOptions);
-    console.log('✅ Email sent:', emailResponse.data?.id);
+    console.log('📤 Sending email with Resend...');
+    const { data: emailData, error: emailError } = await resend.emails.send(sendOptions);
+    
+    if (emailError) {
+      console.error('❌ Resend error:', emailError);
+      throw new Error(`Failed to send email: ${emailError.message || 'Unknown Resend error'}`);
+    }
+
+    if (!emailData || !emailData.id) {
+      console.error('❌ No email ID returned from Resend');
+      throw new Error('Email was not sent - no confirmation ID received from Resend');
+    }
+
+    console.log('✅ Email sent successfully:', emailData.id);
 
     // Actualizar el estado del comprobante si tenemos voucherId
     if (voucherId) {
@@ -114,14 +138,19 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      emailId: emailResponse.data?.id 
+      emailId: emailData.id,
+      message: `Email sent successfully to ${employeeEmail}`
     }), {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
 
   } catch (error: any) {
-    console.error('Error sending email:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('❌ Error sending email:', error);
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message || 'Failed to send email',
+      details: error.stack || 'No additional details'
+    }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });

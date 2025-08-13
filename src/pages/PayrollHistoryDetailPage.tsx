@@ -207,6 +207,17 @@ export const PayrollHistoryDetailPage = () => {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(employeeEmail)) {
+      toast({
+        title: "Email inválido",
+        description: `El email ${employeeEmail} no tiene un formato válido`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Prevent multiple sends for same employee
     if (sendingEmails.has(employeeId)) {
       toast({
@@ -229,8 +240,14 @@ export const PayrollHistoryDetailPage = () => {
         }
       });
 
-      if (pdfError || !pdfData) {
-        throw new Error(`Error generando PDF: ${pdfError?.message || 'Unknown error'}`);
+      if (pdfError) {
+        console.error('❌ PDF generation error:', pdfError);
+        throw new Error(`Error generando PDF: ${pdfError.message}`);
+      }
+
+      if (!pdfData || !pdfData.base64) {
+        console.error('❌ No PDF data returned');
+        throw new Error('No se pudo generar el PDF del comprobante');
       }
 
       console.log('✅ PDF generated successfully');
@@ -248,9 +265,9 @@ export const PayrollHistoryDetailPage = () => {
         companyName: companyDetails?.razon_social || 'Mi Empresa',
         subject: `Comprobante de Pago - ${period?.periodo || ''}`,
         attachment: {
-          fileName: pdfData.fileName,
+          fileName: pdfData.fileName || `comprobante-${employeeName.replace(/\s+/g, '-')}.pdf`,
           base64: pdfData.base64,
-          mimeType: pdfData.mimeType
+          mimeType: pdfData.mimeType || 'application/pdf'
         }
       };
 
@@ -261,14 +278,27 @@ export const PayrollHistoryDetailPage = () => {
       });
 
       if (emailError) {
+        console.error('❌ Email sending error:', emailError);
         throw new Error(`Error enviando email: ${emailError.message}`);
       }
 
-      console.log('✅ Email sent successfully:', emailResult);
+      // Check if email was actually sent successfully
+      if (!emailResult || !emailResult.success) {
+        console.error('❌ Email service returned failure:', emailResult);
+        throw new Error(emailResult?.error || 'El servicio de email no pudo enviar el correo');
+      }
+
+      if (!emailResult.emailId) {
+        console.error('❌ No email ID returned');
+        throw new Error('Email no confirmado - no se recibió ID de confirmación');
+      }
+
+      console.log('✅ Email sent successfully:', emailResult.emailId);
 
       toast({
-        title: "Comprobante enviado",
-        description: `El comprobante de pago fue enviado a ${employeeEmail}`,
+        title: "✅ Comprobante enviado",
+        description: `El comprobante de pago fue enviado exitosamente a ${employeeEmail}`,
+        className: "border-green-200 bg-green-50"
       });
 
     } catch (error) {
