@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileText, Plus, Calendar, Users, DollarSign, History } from 'lucide-react';
+import { ArrowLeft, FileText, Plus, Calendar, Users, DollarSign, History, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -52,7 +52,6 @@ interface EmployeePayroll {
   completeEmployeeData?: any;
 }
 
-
 interface PendingNovedad {
   employee_id: string;
   employee_name: string;
@@ -83,6 +82,7 @@ export const PayrollHistoryDetailPage = () => {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [selectedVoucherEmployee, setSelectedVoucherEmployee] = useState<any>(null);
+  const [sendingEmails, setSendingEmails] = useState<Set<string>>(new Set());
   
   // Hook para gestionar novedades
   const { createNovedad } = usePayrollNovedadesUnified(periodId || '');
@@ -183,6 +183,109 @@ export const PayrollHistoryDetailPage = () => {
   useEffect(() => {
     loadPeriodDetail();
   }, [periodId]);
+
+  const handleSendVoucherEmail = async (employeeId: string, employeeName: string) => {
+    // Find the employee in current data
+    const employeePayroll = employees.find(emp => emp.employee_id === employeeId);
+    if (!employeePayroll) {
+      toast({
+        title: "Error",
+        description: "No se encontraron datos del empleado",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if employee has email
+    const employeeEmail = employeePayroll.completeEmployeeData?.email;
+    if (!employeeEmail) {
+      toast({
+        title: "Email no disponible",
+        description: `${employeeName} no tiene un email registrado`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Prevent multiple sends for same employee
+    if (sendingEmails.has(employeeId)) {
+      toast({
+        title: "Enviando...",
+        description: "Ya se está enviando el comprobante a este empleado",
+      });
+      return;
+    }
+
+    try {
+      setSendingEmails(prev => new Set(prev).add(employeeId));
+
+      // Step 1: Generate PDF with base64 return
+      console.log('🚀 Generating PDF for employee:', employeePayroll.id);
+      
+      const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-voucher-pdf', {
+        body: {
+          payrollId: employeePayroll.id, // Use payroll record ID
+          returnBase64: true
+        }
+      });
+
+      if (pdfError || !pdfData) {
+        throw new Error(`Error generando PDF: ${pdfError?.message || 'Unknown error'}`);
+      }
+
+      console.log('✅ PDF generated successfully');
+
+      // Step 2: Send email with PDF attachment
+      const emailPayload = {
+        employeeEmail,
+        employeeName,
+        period: {
+          periodo: period?.periodo,
+          startDate: period?.fecha_inicio,
+          endDate: period?.fecha_fin
+        },
+        netPay: employeePayroll.neto_pagado,
+        companyName: companyDetails?.razon_social || 'Mi Empresa',
+        subject: `Comprobante de Pago - ${period?.periodo || ''}`,
+        attachment: {
+          fileName: pdfData.fileName,
+          base64: pdfData.base64,
+          mimeType: pdfData.mimeType
+        }
+      };
+
+      console.log('📧 Sending email to:', employeeEmail);
+
+      const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-voucher-email', {
+        body: emailPayload
+      });
+
+      if (emailError) {
+        throw new Error(`Error enviando email: ${emailError.message}`);
+      }
+
+      console.log('✅ Email sent successfully:', emailResult);
+
+      toast({
+        title: "Comprobante enviado",
+        description: `El comprobante de pago fue enviado a ${employeeEmail}`,
+      });
+
+    } catch (error) {
+      console.error('❌ Error sending voucher email:', error);
+      toast({
+        title: "Error al enviar",
+        description: error instanceof Error ? error.message : "No se pudo enviar el comprobante por email",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingEmails(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
+    }
+  };
 
   const handleDownloadVoucher = async (employeeId: string, employeeName: string) => {
     // Find the employee in current data
@@ -591,7 +694,7 @@ export const PayrollHistoryDetailPage = () => {
                       <TableHead className="min-w-[140px] bg-blue-100 text-right font-semibold">
                         Neto Pagado
                       </TableHead>
-                      <TableHead className="min-w-[100px] sticky right-0 bg-background z-10 text-center">
+                      <TableHead className="min-w-[140px] sticky right-0 bg-background z-10 text-center">
                         Acciones
                       </TableHead>
                     </TableRow>
@@ -599,6 +702,9 @@ export const PayrollHistoryDetailPage = () => {
                   <TableBody>
                     {employees.map((employee) => {
                       const preview = calculateEmployeePreview(employee);
+                      const isSendingEmail = sendingEmails.has(employee.employee_id);
+                      const hasEmail = !!employee.completeEmployeeData?.email;
+                      
                       return (
                         <TableRow key={employee.id}>
                           <TableCell className="sticky left-0 bg-background z-10 min-w-[200px] font-medium">
@@ -608,7 +714,7 @@ export const PayrollHistoryDetailPage = () => {
                                   {employee.employee_name} {employee.employee_lastname}
                                 </div>
                                 <div className="text-sm text-gray-500">
-                                  Sin cargo definido
+                                  {employee.completeEmployeeData?.email || 'Sin email'}
                                 </div>
                               </div>
                             </div>
@@ -704,15 +810,32 @@ export const PayrollHistoryDetailPage = () => {
                              )}
                           </TableCell>
                           <TableCell className="sticky right-0 bg-background z-10 text-center font-medium">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
-                              aria-label="Descargar comprobante"
-                              title="Descargar comprobante"
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
+                                aria-label="Descargar comprobante"
+                                title="Descargar comprobante"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSendVoucherEmail(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
+                                disabled={isSendingEmail || !hasEmail}
+                                aria-label="Enviar por email"
+                                title={hasEmail ? "Enviar comprobante por email" : "Empleado sin email registrado"}
+                                className={!hasEmail ? "opacity-50 cursor-not-allowed" : ""}
+                              >
+                                {isSendingEmail ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
+                                ) : (
+                                  <Mail className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -723,7 +846,6 @@ export const PayrollHistoryDetailPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
-
 
         <TabsContent value="audit">
           <PeriodAuditSummaryComponent 
