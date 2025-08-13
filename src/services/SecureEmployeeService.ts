@@ -202,8 +202,7 @@ export class SecureEmployeeService extends SecureBaseService {
       
       // Remove fields that shouldn't be updated or are handled specially
       delete cleanUpdates.id; // Never update the ID
-      delete cleanUpdates.createdAt; // Never update creation timestamp
-      delete cleanUpdates.created_at; // Never update creation timestamp
+      delete cleanUpdates.createdAt; // Never update creation timestamp (correct camelCase property)
       
       console.log('📝 Cleaned update data:', cleanUpdates);
       
@@ -215,9 +214,8 @@ export class SecureEmployeeService extends SecureBaseService {
       } as EmployeeUnified);
 
       // ✅ IMPROVED: Remove fields that shouldn't be updated after mapping
-      delete dbUpdates.id; // Remove ID from update data
+      // Note: mapUnifiedToDatabase doesn't return 'id' or 'created_at' properties, so we don't need to delete them
       delete dbUpdates.company_id; // This shouldn't change
-      delete dbUpdates.created_at; // Never update creation timestamp
       
       console.log('📤 Sending to database:', dbUpdates);
       
