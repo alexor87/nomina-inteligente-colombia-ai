@@ -983,6 +983,13 @@ export type Database = {
             referencedRelation: "tipos_cotizante"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_employees_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       eps_entities: {
@@ -2176,6 +2183,10 @@ export type Database = {
       }
       user_has_access_to_company: {
         Args: { p_user_id: string; p_company_id: string }
+        Returns: boolean
+      }
+      validate_employee_company_access: {
+        Args: { p_employee_id: string }
         Returns: boolean
       }
       verify_demo_data_cleanup: {

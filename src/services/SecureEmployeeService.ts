@@ -1,6 +1,7 @@
 import { SecureBaseService } from './SecureBaseService';
 import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 import { EmployeeSoftDeleteService } from './EmployeeSoftDeleteService';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * 🔒 SECURE EMPLOYEE SERVICE
@@ -66,11 +67,32 @@ export class SecureEmployeeService extends SecureBaseService {
 
   /**
    * Get employee by ID (excluding soft deleted)
-   * 🔒 SECURITY: Automatically validates company access
+   * 🔒 SECURITY: Automatically validates company access with enhanced validation
    */
   static async getEmployeeById(id: string): Promise<EmployeeUnified | null> {
     try {
-      console.log('🔒 SecureEmployeeService: Fetching employee by ID:', id);
+      console.log('🔒 SecureEmployeeService: Fetching employee by ID with enhanced security:', id);
+      
+      // Enhanced security: validate employee company access first
+      const { data: hasAccess, error: accessError } = await (supabase as any)
+        .rpc('validate_employee_company_access', { p_employee_id: id });
+      
+      if (accessError) {
+        console.error('❌ SecureEmployeeService: Access validation error:', accessError);
+        await this.logSecurityViolation('employees', 'access_validation', 'validation_error', { 
+          employeeId: id, 
+          error: accessError.message 
+        });
+        return null;
+      }
+      
+      if (!hasAccess) {
+        console.warn('🔒 SecureEmployeeService: Access denied for employee:', id);
+        await this.logSecurityViolation('employees', 'select_by_id', 'unauthorized_access_attempt', { 
+          employeeId: id 
+        });
+        return null;
+      }
       
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
