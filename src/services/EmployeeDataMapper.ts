@@ -1,3 +1,4 @@
+
 import { EmployeeFormData } from '@/components/employees/form/types';
 import { EmployeeUnified } from '@/types/employee-unified';
 
@@ -73,8 +74,14 @@ export class EmployeeDataMapper {
     // Convert ARL risk level from roman numerals to numbers for form
     const convertARLLevelBack = (level?: string) => {
       if (!level) return undefined;
-      // Keep as roman numerals for EmployeeUnified type compatibility
-      return level as 'I' | 'II' | 'III' | 'IV' | 'V';
+      const romanToNumber: { [key: string]: string } = {
+        'I': '1',
+        'II': '2',
+        'III': '3',
+        'IV': '4',
+        'V': '5'
+      };
+      return romanToNumber[level] || level as '1' | '2' | '3' | '4' | '5';
     };
 
     return {
@@ -110,18 +117,18 @@ export class EmployeeDataMapper {
       beneficiosExtralegales: Boolean(dbData.beneficios_extralegales),
       clausulasEspeciales: dbData.clausulas_especiales || undefined,
       banco: dbData.banco || undefined,
-      tipoCuenta: dbData.tipo_cuenta || undefined,
+      tipoCuenta: dbData.tipo_cuenta || 'ahorros',
       numeroCuenta: dbData.numero_cuenta || undefined,
       titularCuenta: dbData.titular_cuenta || undefined,
-      formaPago: dbData.forma_pago || undefined,
+      formaPago: dbData.forma_pago || 'dispersion',
       eps: dbData.eps || undefined,
       afp: dbData.afp || undefined,
       arl: dbData.arl || undefined,
       cajaCompensacion: dbData.caja_compensacion || undefined,
       tipoCotizanteId: dbData.tipo_cotizante_id || undefined,
       subtipoCotizanteId: dbData.subtipo_cotizante_id || undefined,
-      regimenSalud: dbData.regimen_salud || undefined,
-      estadoAfiliacion: dbData.estado_afiliacion || undefined,
+      regimenSalud: dbData.regimen_salud || 'contributivo',
+      estadoAfiliacion: dbData.estado_afiliacion || 'pendiente',
       custom_fields: dbData.custom_fields || {},
       createdAt: dbData.created_at,
       updatedAt: dbData.updated_at

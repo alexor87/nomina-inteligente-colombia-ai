@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -53,7 +52,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       apellido: employee?.apellido || '',
       email: employee?.email || '',
       telefono: employee?.telefono || '',
-      sexo: employee?.sexo || 'M',
+      sexo: employee?.sexo || undefined, // Fixed: allow undefined or proper type
       fechaNacimiento: employee?.fechaNacimiento || '',
       direccion: employee?.direccion || '',
       ciudad: employee?.ciudad || '',
@@ -64,12 +63,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       periodicidadPago: employee?.periodicidadPago || 'mensual',
       cargo: employee?.cargo || '',
       codigoCIIU: employee?.codigoCIIU || '',
-      nivelRiesgoARL: employee?.nivelRiesgoARL ? 
-        (employee.nivelRiesgoARL === 'I' ? '1' :
-         employee.nivelRiesgoARL === 'II' ? '2' :
-         employee.nivelRiesgoARL === 'III' ? '3' :
-         employee.nivelRiesgoARL === 'IV' ? '4' :
-         employee.nivelRiesgoARL === 'V' ? '5' : '1') : '1',
+      nivelRiesgoARL: employee?.nivelRiesgoARL || '1', // Fixed: use number string
       estado: (employee?.estado === 'eliminado' ? 'inactivo' : employee?.estado) || 'activo',
       centroCostos: employee?.centroCostos || '',
       fechaFirmaContrato: employee?.fechaFirmaContrato || '',
@@ -151,12 +145,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       periodicidadPago: data.periodicidadPago,
       cargo: data.cargo,
       codigoCIIU: data.codigoCIIU,
-      nivelRiesgoARL: data.nivelRiesgoARL ? 
-        (data.nivelRiesgoARL === '1' ? 'I' :
-         data.nivelRiesgoARL === '2' ? 'II' :
-         data.nivelRiesgoARL === '3' ? 'III' :
-         data.nivelRiesgoARL === '4' ? 'IV' :
-         data.nivelRiesgoARL === '5' ? 'V' : 'I') as 'I' | 'II' | 'III' | 'IV' | 'V' : 'I',
+      nivelRiesgoARL: data.nivelRiesgoARL, // Fixed: use number string directly
       estado: data.estado,
       centroCostos: data.centroCostos,
       fechaFirmaContrato: data.fechaFirmaContrato,
@@ -286,6 +275,21 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
               />
             </div>
           </div>
+        </div>
+
+        {/* Updated sexo field */}
+        <div>
+          <Label htmlFor="sexo">Sexo</Label>
+          <Select onValueChange={(value) => setValue('sexo', value as 'M' | 'F' | 'O')}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar sexo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="M">Masculino</SelectItem>
+              <SelectItem value="F">Femenino</SelectItem>
+              <SelectItem value="O">Otro</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Información Laboral */}

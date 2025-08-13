@@ -1,4 +1,3 @@
-
 import { EmployeeFormData } from './types';
 import { EmployeeUnified } from '@/types/employee-unified';
 
@@ -23,12 +22,7 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     periodicidadPago: employee?.periodicidadPago || 'mensual',
     cargo: employee?.cargo || '',
     codigoCIIU: employee?.codigoCIIU || '',
-    nivelRiesgoARL: employee?.nivelRiesgoARL ? 
-      (employee.nivelRiesgoARL === 'I' ? '1' :
-       employee.nivelRiesgoARL === 'II' ? '2' :
-       employee.nivelRiesgoARL === 'III' ? '3' :
-       employee.nivelRiesgoARL === 'IV' ? '4' :
-       employee.nivelRiesgoARL === 'V' ? '5' : '1') : '1',
+    nivelRiesgoARL: employee?.nivelRiesgoARL || '1',
     estado: (employee?.estado === 'eliminado' ? 'inactivo' : employee?.estado) || 'activo',
     centroCostos: employee?.centroCostos || '',
     fechaFirmaContrato: employee?.fechaFirmaContrato || '',
