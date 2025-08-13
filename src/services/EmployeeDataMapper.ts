@@ -72,9 +72,9 @@ export class EmployeeDataMapper {
    */
   static mapDatabaseToUnified(dbData: any): EmployeeUnified {
     // Convert ARL risk level from roman numerals to numbers for form
-    const convertARLLevelBack = (level?: string) => {
+    const convertARLLevelBack = (level?: string): '1' | '2' | '3' | '4' | '5' | undefined => {
       if (!level) return undefined;
-      const romanToNumber: { [key: string]: string } = {
+      const romanToNumber: { [key: string]: '1' | '2' | '3' | '4' | '5' } = {
         'I': '1',
         'II': '2',
         'III': '3',

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeFormData } from '@/components/employees/form/types';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeCRUD } from './useEmployeeCRUD';
 
 export const useEmployeeFormSubmission = () => {
@@ -10,7 +10,7 @@ export const useEmployeeFormSubmission = () => {
   const { toast } = useToast();
   const { createEmployee, updateEmployee } = useEmployeeCRUD();
 
-  const mapFormDataToEmployee = (formData: EmployeeFormData, companyId: string): Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> => {
+  const mapFormDataToEmployee = (formData: EmployeeFormData, companyId: string): Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> => {
     return {
       empresaId: companyId,
       cedula: formData.cedula,
@@ -20,7 +20,7 @@ export const useEmployeeFormSubmission = () => {
       apellido: formData.apellido,
       email: formData.email,
       telefono: formData.telefono,
-      sexo: formData.sexo, // Fixed: allow 'O' type
+      sexo: formData.sexo,
       fechaNacimiento: formData.fechaNacimiento,
       direccion: formData.direccion,
       ciudad: formData.ciudad,
@@ -30,8 +30,8 @@ export const useEmployeeFormSubmission = () => {
       fechaIngreso: formData.fechaIngreso,
       periodicidadPago: formData.periodicidadPago,
       cargo: formData.cargo,
-      codigoCIIU: formData.codigoCIIU, // Fixed: use correct field name
-      nivelRiesgoARL: formData.nivelRiesgoARL, // Fixed: use number string directly
+      codigoCIIU: formData.codigoCIIU,
+      nivelRiesgoARL: formData.nivelRiesgoARL,
       estado: formData.estado,
       centroCostos: formData.centroCostos,
       fechaFirmaContrato: formData.fechaFirmaContrato,
@@ -60,7 +60,7 @@ export const useEmployeeFormSubmission = () => {
   const submitEmployeeForm = async (
     formData: EmployeeFormData,
     companyId: string,
-    existingEmployee?: Employee
+    existingEmployee?: EmployeeUnified
   ) => {
     setIsSubmitting(true);
     
@@ -69,7 +69,7 @@ export const useEmployeeFormSubmission = () => {
       
       let result;
       if (existingEmployee) {
-        result = await updateEmployee(existingEmployee.id, employeeData as Partial<Employee>);
+        result = await updateEmployee(existingEmployee.id!, employeeData as Partial<EmployeeUnified>);
       } else {
         result = await createEmployee(employeeData);
       }

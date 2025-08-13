@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -52,7 +53,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       apellido: employee?.apellido || '',
       email: employee?.email || '',
       telefono: employee?.telefono || '',
-      sexo: employee?.sexo || undefined, // Fixed: allow undefined or proper type
+      sexo: employee?.sexo || undefined,
       fechaNacimiento: employee?.fechaNacimiento || '',
       direccion: employee?.direccion || '',
       ciudad: employee?.ciudad || '',
@@ -63,8 +64,8 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       periodicidadPago: employee?.periodicidadPago || 'mensual',
       cargo: employee?.cargo || '',
       codigoCIIU: employee?.codigoCIIU || '',
-      nivelRiesgoARL: employee?.nivelRiesgoARL || '1', // Fixed: use number string
-      estado: (employee?.estado === 'eliminado' ? 'inactivo' : employee?.estado) || 'activo',
+      nivelRiesgoARL: employee?.nivelRiesgoARL || '1',
+      estado: (employee?.estado && ['activo', 'inactivo', 'vacaciones', 'incapacidad'].includes(employee.estado) ? employee.estado : 'activo'),
       centroCostos: employee?.centroCostos || '',
       fechaFirmaContrato: employee?.fechaFirmaContrato || '',
       fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
@@ -145,7 +146,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       periodicidadPago: data.periodicidadPago,
       cargo: data.cargo,
       codigoCIIU: data.codigoCIIU,
-      nivelRiesgoARL: data.nivelRiesgoARL, // Fixed: use number string directly
+      nivelRiesgoARL: data.nivelRiesgoARL,
       estado: data.estado,
       centroCostos: data.centroCostos,
       fechaFirmaContrato: data.fechaFirmaContrato,

@@ -1,3 +1,4 @@
+
 import { EmployeeFormData } from './types';
 import { EmployeeUnified } from '@/types/employee-unified';
 
@@ -23,7 +24,7 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     cargo: employee?.cargo || '',
     codigoCIIU: employee?.codigoCIIU || '',
     nivelRiesgoARL: employee?.nivelRiesgoARL || '1',
-    estado: (employee?.estado === 'eliminado' ? 'inactivo' : employee?.estado) || 'activo',
+    estado: (employee?.estado && ['activo', 'inactivo', 'vacaciones', 'incapacidad'].includes(employee.estado) ? employee.estado : 'activo'),
     centroCostos: employee?.centroCostos || '',
     fechaFirmaContrato: employee?.fechaFirmaContrato || '',
     fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',

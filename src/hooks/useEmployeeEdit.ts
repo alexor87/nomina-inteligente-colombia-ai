@@ -1,11 +1,11 @@
 
 import { useEffect, useState } from 'react';
-import { Employee } from '@/types';
+import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 import { useToast } from '@/hooks/use-toast';
 
 export const useEmployeeEdit = (employeeId?: string) => {
-  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [employee, setEmployee] = useState<EmployeeUnified | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
