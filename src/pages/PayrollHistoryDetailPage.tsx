@@ -295,11 +295,21 @@ export const PayrollHistoryDetailPage = () => {
 
       console.log('✅ Email sent successfully:', emailResult.emailId);
 
-      toast({
-        title: "✅ Comprobante enviado",
-        description: `El comprobante de pago fue enviado exitosamente a ${employeeEmail}`,
-        className: "border-green-200 bg-green-50"
-      });
+      // Handle test mode vs normal mode responses
+      if (emailResult.testMode) {
+        toast({
+          title: "📧 Comprobante enviado (Modo Prueba)",
+          description: `El comprobante fue enviado a ${emailResult.actualRecipient} en modo de pruebas. Original: ${emailResult.originalRecipient}`,
+          className: "border-orange-200 bg-orange-50",
+          duration: 8000
+        });
+      } else {
+        toast({
+          title: "✅ Comprobante enviado",
+          description: `El comprobante de pago fue enviado exitosamente a ${employeeEmail}`,
+          className: "border-green-200 bg-green-50"
+        });
+      }
 
     } catch (error) {
       console.error('❌ Error sending voucher email:', error);

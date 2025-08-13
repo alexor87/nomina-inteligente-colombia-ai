@@ -68,81 +68,151 @@ const handler = async (req: Request): Promise<Response> => {
     const effectiveCompany = companyDisplayName || 'Mi Empresa';
     const effectiveSubject = subject || `Comprobante de Pago - ${periodLabel || ''}`.trim();
 
-    // Construir HTML simple por defecto
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333; margin-bottom: 16px;">Comprobante de Pago</h2>
-        <p>Estimado/a <strong>${employeeName || ''}</strong>,</p>
-        <p>Adjunto encontrarás tu comprobante de pago${periodLabel ? ` correspondiente al período <strong>${periodLabel}</strong>` : ''}.</p>
-        ${typeof netPay === 'number' ? `
-          <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:16px 0;">
-            <strong>Neto a pagar:</strong> ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(netPay)}
-          </div>
-        ` : ''}
-        <p>Saludos,<br/><strong>${effectiveCompany}</strong></p>
-        <hr style="margin-top: 24px; border: none; border-top: 1px solid #eee;">
-        <p style="font-size: 12px; color: #666;">Este es un mensaje automático, por favor no responder.</p>
-      </div>
-    `;
+    // Function to build email content with optional test mode indicator
+    const buildEmailContent = (isTestMode = false) => {
+      const testModeNotice = isTestMode ? `
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 12px; margin: 16px 0;">
+          <strong>⚠️ MODO PRUEBA:</strong> Este email fue enviado en modo de pruebas de Resend. 
+          El comprobante original era para <strong>${employeeName}</strong> (${employeeEmail}).
+        </div>
+      ` : '';
 
-    const sendOptions: any = {
-      from: `${effectiveCompany} <onboarding@resend.dev>`,
-      to: [employeeEmail],
-      subject: effectiveSubject,
-      html,
+      return `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${testModeNotice}
+          <h2 style="color: #333; margin-bottom: 16px;">Comprobante de Pago</h2>
+          <p>Estimado/a <strong>${employeeName || ''}</strong>,</p>
+          <p>Adjunto encontrarás tu comprobante de pago${periodLabel ? ` correspondiente al período <strong>${periodLabel}</strong>` : ''}.</p>
+          ${typeof netPay === 'number' ? `
+            <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:16px 0;">
+              <strong>Neto a pagar:</strong> ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(netPay)}
+            </div>
+          ` : ''}
+          <p>Saludos,<br/><strong>${effectiveCompany}</strong></p>
+          <hr style="margin-top: 24px; border: none; border-top: 1px solid #eee;">
+          <p style="font-size: 12px; color: #666;">Este es un mensaje automático, por favor no responder.</p>
+        </div>
+      `;
     };
 
-    // Adjuntar PDF si viene en el payload
-    if (attachment?.base64 && attachment?.fileName) {
-      // Clean base64 content (remove any data URL prefix if present)
-      let cleanBase64 = attachment.base64;
-      if (cleanBase64.includes(',')) {
-        cleanBase64 = cleanBase64.split(',')[1];
-      }
+    // Function to send email
+    const sendEmail = async (toEmail: string, isTestMode = false) => {
+      const emailSubject = isTestMode ? `[MODO PRUEBA] ${effectiveSubject}` : effectiveSubject;
       
-      sendOptions.attachments = [
-        {
-          filename: attachment.fileName,
-          content: cleanBase64,
-        },
-      ];
-      console.log(`📎 Adjuntando archivo: ${attachment.fileName}`);
-    }
+      const sendOptions: any = {
+        from: `${effectiveCompany} <onboarding@resend.dev>`,
+        to: [toEmail],
+        subject: emailSubject,
+        html: buildEmailContent(isTestMode),
+      };
+
+      // Adjuntar PDF si viene en el payload
+      if (attachment?.base64 && attachment?.fileName) {
+        // Clean base64 content (remove any data URL prefix if present)
+        let cleanBase64 = attachment.base64;
+        if (cleanBase64.includes(',')) {
+          cleanBase64 = cleanBase64.split(',')[1];
+        }
+        
+        sendOptions.attachments = [
+          {
+            filename: attachment.fileName,
+            content: cleanBase64,
+          },
+        ];
+        console.log(`📎 Adjuntando archivo: ${attachment.fileName}`);
+      }
+
+      return await resend.emails.send(sendOptions);
+    };
 
     console.log('📤 Sending email with Resend...');
-    const { data: emailData, error: emailError } = await resend.emails.send(sendOptions);
     
-    if (emailError) {
-      console.error('❌ Resend error:', emailError);
-      throw new Error(`Failed to send email: ${emailError.message || 'Unknown Resend error'}`);
+    try {
+      // First attempt: send to the original email
+      const { data: emailData, error: emailError } = await sendEmail(employeeEmail, false);
+      
+      if (emailError) {
+        console.error('❌ Resend error:', emailError);
+        
+        // Check if it's a 403 error (test mode restriction)
+        if (emailError.statusCode === 403 && emailError.error && emailError.error.includes('You can only send testing emails to your own email address')) {
+          console.log('🔄 Detected test mode restriction, attempting to send to allowed email...');
+          
+          // Extract the allowed email from the error message
+          const errorMessage = emailError.error;
+          const emailMatch = errorMessage.match(/\(([^)]+@[^)]+)\)/);
+          const allowedEmail = emailMatch ? emailMatch[1] : null;
+          
+          if (allowedEmail) {
+            console.log(`📧 Retrying with allowed email: ${allowedEmail}`);
+            
+            // Second attempt: send to the allowed email in test mode
+            const { data: testEmailData, error: testEmailError } = await sendEmail(allowedEmail, true);
+            
+            if (testEmailError) {
+              console.error('❌ Test email also failed:', testEmailError);
+              throw new Error(`Failed to send test email: ${testEmailError.message || 'Unknown error'}`);
+            }
+            
+            if (!testEmailData || !testEmailData.id) {
+              console.error('❌ No email ID returned from test email');
+              throw new Error('Test email was not sent - no confirmation ID received');
+            }
+            
+            console.log('✅ Test email sent successfully:', testEmailData.id);
+            
+            // Return success with test mode indicator
+            return new Response(JSON.stringify({ 
+              success: true, 
+              emailId: testEmailData.id,
+              testMode: true,
+              originalRecipient: employeeEmail,
+              actualRecipient: allowedEmail,
+              message: `Email sent in test mode to ${allowedEmail} (original recipient: ${employeeEmail})`
+            }), {
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          } else {
+            throw new Error('Could not extract allowed email from Resend error message');
+          }
+        } else {
+          throw new Error(`Failed to send email: ${emailError.message || 'Unknown Resend error'}`);
+        }
+      }
+
+      if (!emailData || !emailData.id) {
+        console.error('❌ No email ID returned from Resend');
+        throw new Error('Email was not sent - no confirmation ID received from Resend');
+      }
+
+      console.log('✅ Email sent successfully:', emailData.id);
+
+      // Actualizar el estado del comprobante si tenemos voucherId
+      if (voucherId) {
+        await supabase
+          .from('payroll_vouchers')
+          .update({ 
+            sent_to_employee: true,
+            sent_date: new Date().toISOString(),
+            voucher_status: 'enviado'
+          })
+          .eq('id', voucherId);
+      }
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        emailId: emailData.id,
+        testMode: false,
+        message: `Email sent successfully to ${employeeEmail}`
+      }), {
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+
+    } catch (error: any) {
+      // If it's not a Resend error, throw it up
+      throw error;
     }
-
-    if (!emailData || !emailData.id) {
-      console.error('❌ No email ID returned from Resend');
-      throw new Error('Email was not sent - no confirmation ID received from Resend');
-    }
-
-    console.log('✅ Email sent successfully:', emailData.id);
-
-    // Actualizar el estado del comprobante si tenemos voucherId
-    if (voucherId) {
-      await supabase
-        .from('payroll_vouchers')
-        .update({ 
-          sent_to_employee: true,
-          sent_date: new Date().toISOString(),
-          voucher_status: 'enviado'
-        })
-        .eq('id', voucherId);
-    }
-
-    return new Response(JSON.stringify({ 
-      success: true, 
-      emailId: emailData.id,
-      message: `Email sent successfully to ${employeeEmail}`
-    }), {
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
 
   } catch (error: any) {
     console.error('❌ Error sending email:', error);
