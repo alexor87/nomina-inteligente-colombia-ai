@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { EmployeeFormData } from '@/components/employees/form/types';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeDataMapper } from '@/services/EmployeeDataMapper';
+import { EmployeeUniqueValidationService } from '@/services/EmployeeUniqueValidationService';
+import { validateEmployeeDataEnhanced } from '@/schemas/employeeValidationEnhanced';
 
 export const useEmployeeFormSubmissionRobust = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -13,7 +15,14 @@ export const useEmployeeFormSubmissionRobust = () => {
     setIsSubmitting(true);
     
     try {
-      console.log('🚀 Iniciando envío de empleado con datos:', data);
+      console.log('🚀 Iniciando envío de empleado con validación mejorada:', data);
+
+      // First, validate the data with enhanced schema
+      const validationResult = validateEmployeeDataEnhanced(data);
+      if (!validationResult.success) {
+        console.error('❌ Validation failed:', validationResult.errors);
+        throw new Error('Datos del formulario inválidos');
+      }
 
       // Obtener company_id del usuario actual
       const { data: profile, error: profileError } = await supabase
@@ -26,7 +35,35 @@ export const useEmployeeFormSubmissionRobust = () => {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // ✅ KISS: Use EmployeeDataMapper for proper field conversion
+      // Check cedula uniqueness
+      const uniqueCheck = await EmployeeUniqueValidationService.isCedulaUnique(
+        data.cedula,
+        profile.company_id,
+        data.id // Exclude current employee if updating
+      );
+
+      if (!uniqueCheck.isUnique) {
+        const existingEmployee = uniqueCheck.existingEmployee;
+        throw new Error(
+          `La cédula ${data.cedula} ya está registrada para ${existingEmployee.nombre} ${existingEmployee.apellido}`
+        );
+      }
+
+      // Validate affiliation entities
+      const affiliationValidation = await EmployeeUniqueValidationService.validateAffiliationEntities({
+        eps: data.eps,
+        afp: data.afp,
+        arl: data.arl,
+        cajaCompensacion: data.cajaCompensacion,
+        tipoCotizanteId: data.tipoCotizanteId,
+        subtipoCotizanteId: data.subtipoCotizanteId
+      });
+
+      if (!affiliationValidation.isValid) {
+        throw new Error(`Errores en afiliaciones: ${affiliationValidation.errors.join(', ')}`);
+      }
+
+      // Use EmployeeDataMapper for proper field conversion
       const mappedData = EmployeeDataMapper.mapFormToDatabase(data, profile.company_id);
       
       console.log('📝 Datos mapeados para base de datos:', mappedData);
@@ -80,7 +117,7 @@ export const useEmployeeFormSubmissionRobust = () => {
       const errorMessage = error.message || 'Error desconocido al procesar empleado';
       
       toast({
-        title: "Error",
+        title: "Error de validación",
         description: errorMessage,
         variant: "destructive"
       });
