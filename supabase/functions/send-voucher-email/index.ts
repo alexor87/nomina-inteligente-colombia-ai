@@ -68,6 +68,12 @@ const handler = async (req: Request): Promise<Response> => {
     const effectiveCompany = companyDisplayName || 'Mi Empresa';
     const effectiveSubject = subject || `Comprobante de Pago - ${periodLabel || ''}`.trim();
 
+    // Get the configured FROM address from environment
+    const resendFrom = Deno.env.get("RESEND_FROM");
+    const defaultFrom = resendFrom || `${effectiveCompany} <onboarding@resend.dev>`;
+    
+    console.log('📤 Using FROM address:', defaultFrom);
+
     // Function to build email content with optional test mode indicator
     const buildEmailContent = (isTestMode = false) => {
       const testModeNotice = isTestMode ? `
@@ -96,11 +102,11 @@ const handler = async (req: Request): Promise<Response> => {
     };
 
     // Function to send email
-    const sendEmail = async (toEmail: string, isTestMode = false) => {
+    const sendEmail = async (toEmail: string, fromEmail: string, isTestMode = false) => {
       const emailSubject = isTestMode ? `[MODO PRUEBA] ${effectiveSubject}` : effectiveSubject;
       
       const sendOptions: any = {
-        from: `${effectiveCompany} <onboarding@resend.dev>`,
+        from: fromEmail,
         to: [toEmail],
         subject: emailSubject,
         html: buildEmailContent(isTestMode),
@@ -129,8 +135,8 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('📤 Sending email with Resend...');
     
     try {
-      // First attempt: send to the original email
-      const { data: emailData, error: emailError } = await sendEmail(employeeEmail, false);
+      // First attempt: send to the original email using configured FROM address
+      const { data: emailData, error: emailError } = await sendEmail(employeeEmail, defaultFrom, false);
       
       if (emailError) {
         console.error('❌ Resend error:', emailError);
@@ -147,8 +153,9 @@ const handler = async (req: Request): Promise<Response> => {
           if (allowedEmail) {
             console.log(`📧 Retrying with allowed email: ${allowedEmail}`);
             
-            // Second attempt: send to the allowed email in test mode
-            const { data: testEmailData, error: testEmailError } = await sendEmail(allowedEmail, true);
+            // Second attempt: send to the allowed email in test mode with fallback FROM
+            const testFrom = `${effectiveCompany} <onboarding@resend.dev>`;
+            const { data: testEmailData, error: testEmailError } = await sendEmail(allowedEmail, testFrom, true);
             
             if (testEmailError) {
               console.error('❌ Test email also failed:', testEmailError);
@@ -169,6 +176,7 @@ const handler = async (req: Request): Promise<Response> => {
               testMode: true,
               originalRecipient: employeeEmail,
               actualRecipient: allowedEmail,
+              fromAddress: testFrom,
               message: `Email sent in test mode to ${allowedEmail} (original recipient: ${employeeEmail})`
             }), {
               headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -187,6 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       console.log('✅ Email sent successfully:', emailData.id);
+      console.log('📧 FROM address used:', defaultFrom);
 
       // Actualizar el estado del comprobante si tenemos voucherId
       if (voucherId) {
@@ -204,6 +213,7 @@ const handler = async (req: Request): Promise<Response> => {
         success: true, 
         emailId: emailData.id,
         testMode: false,
+        fromAddress: defaultFrom,
         message: `Email sent successfully to ${employeeEmail}`
       }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
