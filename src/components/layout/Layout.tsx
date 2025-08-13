@@ -15,7 +15,7 @@ export const Layout = () => {
   // Constants for consistent spacing
   const SIDEBAR_WIDTH_COLLAPSED = 64; // 16 * 4px
   const SIDEBAR_WIDTH_EXPANDED = 256; // 64 * 4px
-  const GAP = 8; // 2 * 4px
+  const GAP = 16; // Increased from 8 to 16 (4 * 4px)
 
   // Mostrar loading mientras se verifica la autenticación
   if (loading) {
@@ -48,7 +48,7 @@ export const Layout = () => {
         }}
       >
         <Header />
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 pt-6">
           <Outlet />
         </div>
       </main>
