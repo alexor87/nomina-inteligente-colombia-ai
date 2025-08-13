@@ -38,7 +38,7 @@ export const Layout = () => {
       
       <main 
         className={`flex-1 transition-all duration-300 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
+          sidebarCollapsed ? 'ml-[72px]' : 'ml-[272px]'
         }`}
       >
         <Header />
