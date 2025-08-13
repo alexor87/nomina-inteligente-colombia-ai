@@ -53,7 +53,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       apellido: employee?.apellido || '',
       email: employee?.email || '',
       telefono: employee?.telefono || '',
-      sexo: employee?.sexo || undefined,
+      sexo: employee?.sexo || 'M',
       fechaNacimiento: employee?.fechaNacimiento || '',
       direccion: employee?.direccion || '',
       ciudad: employee?.ciudad || '',
@@ -63,9 +63,9 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
       periodicidadPago: employee?.periodicidadPago || 'mensual',
       cargo: employee?.cargo || '',
-      codigoCIIU: employee?.codigoCIIU || '',
-      nivelRiesgoARL: employee?.nivelRiesgoARL || '1',
-      estado: (employee?.estado && ['activo', 'inactivo', 'vacaciones', 'incapacidad'].includes(employee.estado) ? employee.estado : 'activo'),
+      codigo_ciiu: employee?.codigoCIIU || '',
+      nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
+      estado: employee?.estado || 'activo',
       centroCostos: employee?.centroCostos || '',
       fechaFirmaContrato: employee?.fechaFirmaContrato || '',
       fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
@@ -145,7 +145,7 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       fechaIngreso: data.fechaIngreso,
       periodicidadPago: data.periodicidadPago,
       cargo: data.cargo,
-      codigoCIIU: data.codigoCIIU,
+      codigoCIIU: data.codigo_ciiu,
       nivelRiesgoARL: data.nivelRiesgoARL,
       estado: data.estado,
       centroCostos: data.centroCostos,
@@ -276,21 +276,6 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
               />
             </div>
           </div>
-        </div>
-
-        {/* Updated sexo field */}
-        <div>
-          <Label htmlFor="sexo">Sexo</Label>
-          <Select onValueChange={(value) => setValue('sexo', value as 'M' | 'F' | 'O')}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar sexo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="M">Masculino</SelectItem>
-              <SelectItem value="F">Femenino</SelectItem>
-              <SelectItem value="O">Otro</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Información Laboral */}

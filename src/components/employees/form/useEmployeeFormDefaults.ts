@@ -12,7 +12,7 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     apellido: employee?.apellido || '',
     email: employee?.email || '',
     telefono: employee?.telefono || '',
-    sexo: employee?.sexo,
+    sexo: employee?.sexo, // ✅ FIXED: No conversion needed, both use 'M' | 'F'
     fechaNacimiento: employee?.fechaNacimiento || '',
     direccion: employee?.direccion || '',
     ciudad: employee?.ciudad || '',
@@ -22,9 +22,9 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
     periodicidadPago: employee?.periodicidadPago || 'mensual',
     cargo: employee?.cargo || '',
-    codigoCIIU: employee?.codigoCIIU || '',
-    nivelRiesgoARL: employee?.nivelRiesgoARL || '1',
-    estado: (employee?.estado && ['activo', 'inactivo', 'vacaciones', 'incapacidad'].includes(employee.estado) ? employee.estado : 'activo'),
+    codigo_ciiu: employee?.codigoCIIU || '',
+    nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
+    estado: employee?.estado || 'activo',
     centroCostos: employee?.centroCostos || '',
     fechaFirmaContrato: employee?.fechaFirmaContrato || '',
     fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
@@ -50,12 +50,12 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
   };
 };
 
-// Export default form values function
+// ✅ NEW: Export default form values function
 export const getEmployeeFormDefaults = (): EmployeeFormData => {
   return useEmployeeFormDefaults();
 };
 
-// Export function for populating form with employee data
+// ✅ NEW: Export function for populating form with employee data
 export const populateFormWithEmployee = async (employee: EmployeeUnified): Promise<EmployeeFormData> => {
   return useEmployeeFormDefaults(employee);
 };

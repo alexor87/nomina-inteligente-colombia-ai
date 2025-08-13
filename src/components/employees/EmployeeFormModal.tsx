@@ -1,12 +1,12 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { EmployeeFormWizard } from './EmployeeFormWizard';
-import { EmployeeUnified } from '@/types/employee-unified';
+import { Employee } from '@/types';
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  employee?: EmployeeUnified | null;
+  employee?: Employee | null;
   onSuccess: () => void;
 }
 

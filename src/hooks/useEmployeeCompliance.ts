@@ -1,3 +1,4 @@
+
 import { EmployeeWithStatus, ComplianceIndicator } from '@/types/employee-extended';
 
 export const useEmployeeCompliance = () => {
@@ -28,8 +29,8 @@ export const useEmployeeCompliance = () => {
       });
     }
 
-    if (employee.fechaFinalizacionContrato) {
-      const vencimiento = new Date(employee.fechaFinalizacionContrato);
+    if (employee.contratoVencimiento || employee.fechaFinalizacionContrato) {
+      const vencimiento = new Date(employee.contratoVencimiento || employee.fechaFinalizacionContrato || '');
       const hoy = new Date();
       const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 3600 * 24));
       

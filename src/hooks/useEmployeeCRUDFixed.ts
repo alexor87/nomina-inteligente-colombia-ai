@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { EmployeeUnified } from '@/types/employee-unified';
+import { Employee } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 
@@ -8,7 +8,7 @@ export const useEmployeeCRUDFixed = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const createEmployee = async (employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const createEmployee = async (employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
     setIsLoading(true);
     try {
       console.log('🚀 useEmployeeCRUDFixed: Creating employee with data:', employeeData);
@@ -39,7 +39,7 @@ export const useEmployeeCRUDFixed = () => {
     }
   };
 
-  const updateEmployee = async (id: string, updates: Partial<EmployeeUnified>) => {
+  const updateEmployee = async (id: string, updates: Partial<Employee>) => {
     setIsLoading(true);
     try {
       console.log('🔄 useEmployeeCRUDFixed: Updating employee with data:', { id, updates });

@@ -3,6 +3,7 @@ import { PersonalInfoSection } from './PersonalInfoSection';
 import { LaborInfoSection } from './LaborInfoSection';
 import { BankingInfoSection } from './BankingInfoSection';
 import { AffiliationsSection } from './AffiliationsSection';
+import { VacationInfoSection } from './VacationInfoSection';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { Control, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { EmployeeFormData } from './types';
@@ -73,6 +74,14 @@ export const EmployeeFormContent = ({
             errors={errors}
             watchedValues={watchedValues}
             setValue={setValue}
+          />
+        </div>
+
+        {/* Vacation Information Section */}
+        <div id="section-vacaciones" className="scroll-mt-8">
+          <VacationInfoSection
+            control={control}
+            errors={errors}
           />
         </div>
 

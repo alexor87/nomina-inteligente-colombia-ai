@@ -1,8 +1,7 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeFormData } from '@/components/employees/form/types';
-import { EmployeeUnified } from '@/types/employee-unified';
+import { Employee } from '@/types';
 import { useEmployeeCRUD } from './useEmployeeCRUD';
 
 export const useEmployeeFormSubmission = () => {
@@ -10,7 +9,7 @@ export const useEmployeeFormSubmission = () => {
   const { toast } = useToast();
   const { createEmployee, updateEmployee } = useEmployeeCRUD();
 
-  const mapFormDataToEmployee = (formData: EmployeeFormData, companyId: string): Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> => {
+  const mapFormDataToEmployee = (formData: EmployeeFormData, companyId: string): Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> => {
     return {
       empresaId: companyId,
       cedula: formData.cedula,
@@ -26,17 +25,17 @@ export const useEmployeeFormSubmission = () => {
       ciudad: formData.ciudad,
       departamento: formData.departamento,
       salarioBase: Number(formData.salarioBase),
-      tipoContrato: formData.tipoContrato,
+      tipoContrato: formData.tipoContrato, // ✅ FIXED: Direct assignment
       fechaIngreso: formData.fechaIngreso,
-      periodicidadPago: formData.periodicidadPago,
+      periodicidadPago: formData.periodicidadPago, // ✅ FIXED: Direct assignment
       cargo: formData.cargo,
-      codigoCIIU: formData.codigoCIIU,
-      nivelRiesgoARL: formData.nivelRiesgoARL,
-      estado: formData.estado,
+      codigoCIIU: formData.codigo_ciiu,
+      nivelRiesgoARL: formData.nivelRiesgoARL || 'I', // ✅ FIXED: Ensure valid ARL level
+      estado: formData.estado, // ✅ FIXED: Direct assignment
       centroCostos: formData.centroCostos,
       fechaFirmaContrato: formData.fechaFirmaContrato,
       fechaFinalizacionContrato: formData.fechaFinalizacionContrato,
-      tipoJornada: formData.tipoJornada,
+      tipoJornada: formData.tipoJornada, // ✅ FIXED: Direct assignment
       diasTrabajo: formData.diasTrabajo,
       horasTrabajo: formData.horasTrabajo,
       beneficiosExtralegales: formData.beneficiosExtralegales,
@@ -45,7 +44,7 @@ export const useEmployeeFormSubmission = () => {
       tipoCuenta: formData.tipoCuenta,
       numeroCuenta: formData.numeroCuenta,
       titularCuenta: formData.titularCuenta,
-      formaPago: formData.formaPago,
+      formaPago: formData.formaPago, // ✅ FIXED: Direct assignment
       eps: formData.eps,
       afp: formData.afp,
       arl: formData.arl,
@@ -53,14 +52,14 @@ export const useEmployeeFormSubmission = () => {
       tipoCotizanteId: formData.tipoCotizanteId,
       subtipoCotizanteId: formData.subtipoCotizanteId,
       regimenSalud: formData.regimenSalud,
-      estadoAfiliacion: formData.estadoAfiliacion
+      estadoAfiliacion: formData.estadoAfiliacion // ✅ FIXED: Direct assignment
     };
   };
 
   const submitEmployeeForm = async (
     formData: EmployeeFormData,
     companyId: string,
-    existingEmployee?: EmployeeUnified
+    existingEmployee?: Employee
   ) => {
     setIsSubmitting(true);
     
@@ -69,7 +68,7 @@ export const useEmployeeFormSubmission = () => {
       
       let result;
       if (existingEmployee) {
-        result = await updateEmployee(existingEmployee.id!, employeeData as Partial<EmployeeUnified>);
+        result = await updateEmployee(existingEmployee.id, employeeData as Partial<Employee>);
       } else {
         result = await createEmployee(employeeData);
       }

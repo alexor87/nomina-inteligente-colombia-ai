@@ -1,9 +1,8 @@
 
-// Updated EmployeeUnified type to match EmployeeValidationEnhancedSchema
 export interface EmployeeUnified {
-  id?: string;
+  id: string;
   company_id?: string;
-  empresaId?: string;
+  empresaId: string;
   
   // Personal Information
   cedula: string;
@@ -13,7 +12,7 @@ export interface EmployeeUnified {
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F' | 'O';
+  sexo?: 'M' | 'F';
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
@@ -23,28 +22,26 @@ export interface EmployeeUnified {
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: 'quincenal' | 'mensual';
+  periodicidadPago: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
-  nivelRiesgoARL?: '1' | '2' | '3' | '4' | '5';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad';
+  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // ✅ ADDED eliminado
   centroCostos?: string;
-  
-  // Contract Details
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
   tipoJornada: 'completa' | 'parcial' | 'horas';
-  diasTrabajo: number;
-  horasTrabajo: number;
-  beneficiosExtralegales: boolean;
+  diasTrabajo?: number;
+  horasTrabajo?: number;
+  beneficiosExtralegales?: boolean;
   clausulasEspeciales?: string;
   
   // Banking Information
   banco?: string;
-  tipoCuenta: 'ahorros' | 'corriente';
+  tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
-  formaPago: 'dispersion' | 'manual';
+  formaPago?: 'dispersion' | 'manual';
   
   // Affiliations
   eps?: string;
@@ -53,32 +50,19 @@ export interface EmployeeUnified {
   cajaCompensacion?: string;
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
-  regimenSalud: 'contributivo' | 'subsidiado';
-  estadoAfiliacion: 'completa' | 'pendiente' | 'inconsistente';
+  regimenSalud?: 'contributivo' | 'subsidiado';
+  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   
   // Custom fields
   custom_fields?: Record<string, any>;
-  customFields?: Record<string, any>;
   
-  // Timestamps
+  // Metadata
   createdAt?: string;
   updatedAt?: string;
 }
 
-// Helper functions for mapping between database and unified format
+// ✅ KEEP: Mapping functions remain the same
 export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
-  const convertARLLevel = (level?: string): '1' | '2' | '3' | '4' | '5' | undefined => {
-    if (!level) return undefined;
-    const romanToNumber: { [key: string]: '1' | '2' | '3' | '4' | '5' } = {
-      'I': '1',
-      'II': '2',
-      'III': '3',
-      'IV': '4',
-      'V': '5'
-    };
-    return romanToNumber[level] || level as '1' | '2' | '3' | '4' | '5';
-  };
-
   return {
     id: dbData.id,
     company_id: dbData.company_id,
@@ -101,7 +85,7 @@ export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
     periodicidadPago: dbData.periodicidad_pago || 'mensual',
     cargo: dbData.cargo || undefined,
     codigoCIIU: dbData.codigo_ciiu || undefined,
-    nivelRiesgoARL: convertARLLevel(dbData.nivel_riesgo_arl),
+    nivelRiesgoARL: dbData.nivel_riesgo_arl || undefined,
     estado: dbData.estado || 'activo',
     centroCostos: dbData.centro_costos || undefined,
     fechaFirmaContrato: dbData.fecha_firma_contrato || undefined,
@@ -112,80 +96,68 @@ export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
     beneficiosExtralegales: Boolean(dbData.beneficios_extralegales),
     clausulasEspeciales: dbData.clausulas_especiales || undefined,
     banco: dbData.banco || undefined,
-    tipoCuenta: dbData.tipo_cuenta || 'ahorros',
+    tipoCuenta: dbData.tipo_cuenta || undefined,
     numeroCuenta: dbData.numero_cuenta || undefined,
     titularCuenta: dbData.titular_cuenta || undefined,
-    formaPago: dbData.forma_pago || 'dispersion',
+    formaPago: dbData.forma_pago || undefined,
     eps: dbData.eps || undefined,
     afp: dbData.afp || undefined,
     arl: dbData.arl || undefined,
     cajaCompensacion: dbData.caja_compensacion || undefined,
     tipoCotizanteId: dbData.tipo_cotizante_id || undefined,
     subtipoCotizanteId: dbData.subtipo_cotizante_id || undefined,
-    regimenSalud: dbData.regimen_salud || 'contributivo',
-    estadoAfiliacion: dbData.estado_afiliacion || 'pendiente',
+    regimenSalud: dbData.regimen_salud || undefined,
+    estadoAfiliacion: dbData.estado_afiliacion || undefined,
     custom_fields: dbData.custom_fields || {},
     createdAt: dbData.created_at,
     updatedAt: dbData.updated_at
   };
 };
 
-export const mapUnifiedToDatabase = (employeeData: EmployeeUnified) => {
-  const convertARLLevel = (level?: string) => {
-    if (!level) return null;
-    const numberToRoman: { [key: string]: string } = {
-      '1': 'I',
-      '2': 'II',
-      '3': 'III',
-      '4': 'IV',
-      '5': 'V'
-    };
-    return numberToRoman[level] || level;
-  };
-
+export const mapUnifiedToDatabase = (unified: EmployeeUnified) => {
   return {
-    company_id: employeeData.company_id || employeeData.empresaId,
-    cedula: employeeData.cedula,
-    tipo_documento: employeeData.tipoDocumento,
-    nombre: employeeData.nombre,
-    segundo_nombre: employeeData.segundoNombre || null,
-    apellido: employeeData.apellido,
-    email: employeeData.email || null,
-    telefono: employeeData.telefono || null,
-    sexo: employeeData.sexo || null,
-    fecha_nacimiento: employeeData.fechaNacimiento || null,
-    direccion: employeeData.direccion || null,
-    ciudad: employeeData.ciudad || null,
-    departamento: employeeData.departamento || null,
-    salario_base: employeeData.salarioBase,
-    tipo_contrato: employeeData.tipoContrato,
-    fecha_ingreso: employeeData.fechaIngreso,
-    periodicidad_pago: employeeData.periodicidadPago,
-    cargo: employeeData.cargo || null,
-    codigo_ciiu: employeeData.codigoCIIU || null,
-    nivel_riesgo_arl: convertARLLevel(employeeData.nivelRiesgoARL),
-    estado: employeeData.estado,
-    centro_costos: employeeData.centroCostos || null,
-    fecha_firma_contrato: employeeData.fechaFirmaContrato || null,
-    fecha_finalizacion_contrato: employeeData.fechaFinalizacionContrato || null,
-    tipo_jornada: employeeData.tipoJornada,
-    dias_trabajo: employeeData.diasTrabajo,
-    horas_trabajo: employeeData.horasTrabajo,
-    beneficios_extralegales: employeeData.beneficiosExtralegales,
-    clausulas_especiales: employeeData.clausulasEspeciales || null,
-    banco: employeeData.banco || null,
-    tipo_cuenta: employeeData.tipoCuenta,
-    numero_cuenta: employeeData.numeroCuenta || null,
-    titular_cuenta: employeeData.titularCuenta || null,
-    forma_pago: employeeData.formaPago,
-    eps: employeeData.eps || null,
-    afp: employeeData.afp || null,
-    arl: employeeData.arl || null,
-    caja_compensacion: employeeData.cajaCompensacion || null,
-    tipo_cotizante_id: employeeData.tipoCotizanteId || null,
-    subtipo_cotizante_id: employeeData.subtipoCotizanteId || null,
-    regimen_salud: employeeData.regimenSalud,
-    estado_afiliacion: employeeData.estadoAfiliacion,
-    custom_fields: employeeData.custom_fields || {}
+    company_id: unified.company_id || unified.empresaId,
+    cedula: unified.cedula,
+    tipo_documento: unified.tipoDocumento,
+    nombre: unified.nombre,
+    segundo_nombre: unified.segundoNombre || null,
+    apellido: unified.apellido,
+    email: unified.email || null,
+    telefono: unified.telefono || null,
+    sexo: unified.sexo || null,
+    fecha_nacimiento: unified.fechaNacimiento || null,
+    direccion: unified.direccion || null,
+    ciudad: unified.ciudad || null,
+    departamento: unified.departamento || null,
+    salario_base: unified.salarioBase,
+    tipo_contrato: unified.tipoContrato,
+    fecha_ingreso: unified.fechaIngreso,
+    periodicidad_pago: unified.periodicidadPago,
+    cargo: unified.cargo || null,
+    codigo_ciiu: unified.codigoCIIU || null,
+    nivel_riesgo_arl: unified.nivelRiesgoARL || null,
+    estado: unified.estado,
+    centro_costos: unified.centroCostos || null,
+    fecha_firma_contrato: unified.fechaFirmaContrato || null,
+    fecha_finalizacion_contrato: unified.fechaFinalizacionContrato || null,
+    tipo_jornada: unified.tipoJornada,
+    dias_trabajo: unified.diasTrabajo || 30,
+    horas_trabajo: unified.horasTrabajo || 8,
+    beneficios_extralegales: unified.beneficiosExtralegales || false,
+    clausulas_especiales: unified.clausulasEspeciales || null,
+    banco: unified.banco || null,
+    tipo_cuenta: unified.tipoCuenta || null,
+    numero_cuenta: unified.numeroCuenta || null,
+    titular_cuenta: unified.titularCuenta || null,
+    forma_pago: unified.formaPago || null,
+    eps: unified.eps || null,
+    afp: unified.afp || null,
+    arl: unified.arl || null,
+    caja_compensacion: unified.cajaCompensacion || null,
+    tipo_cotizante_id: unified.tipoCotizanteId || null,
+    subtipo_cotizante_id: unified.subtipoCotizanteId || null,
+    regimen_salud: unified.regimenSalud || null,
+    estado_afiliacion: unified.estadoAfiliacion || null,
+    custom_fields: unified.custom_fields || {}
   };
 };

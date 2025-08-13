@@ -7,19 +7,6 @@ export class EmployeeDataMapper {
    * Maps form data to database format for employee creation/update
    */
   static mapFormToDatabase(formData: EmployeeFormData, companyId: string) {
-    // Convert ARL risk level from numbers to roman numerals for database
-    const convertARLLevel = (level?: string) => {
-      if (!level) return null;
-      const numberToRoman: { [key: string]: string } = {
-        '1': 'I',
-        '2': 'II',
-        '3': 'III',
-        '4': 'IV',
-        '5': 'V'
-      };
-      return numberToRoman[level] || level;
-    };
-
     return {
       company_id: companyId,
       cedula: formData.cedula,
@@ -39,8 +26,8 @@ export class EmployeeDataMapper {
       fecha_ingreso: formData.fechaIngreso,
       periodicidad_pago: formData.periodicidadPago,
       cargo: formData.cargo || null,
-      codigo_ciiu: formData.codigoCIIU || null,
-      nivel_riesgo_arl: convertARLLevel(formData.nivelRiesgoARL),
+      codigo_ciiu: formData.codigo_ciiu || null,
+      nivel_riesgo_arl: formData.nivelRiesgoARL || null,
       estado: formData.estado,
       centro_costos: formData.centroCostos || null,
       fecha_firma_contrato: formData.fechaFirmaContrato || null,
@@ -71,19 +58,6 @@ export class EmployeeDataMapper {
    * Maps database data to EmployeeUnified format
    */
   static mapDatabaseToUnified(dbData: any): EmployeeUnified {
-    // Convert ARL risk level from roman numerals to numbers for form
-    const convertARLLevelBack = (level?: string): '1' | '2' | '3' | '4' | '5' | undefined => {
-      if (!level) return undefined;
-      const romanToNumber: { [key: string]: '1' | '2' | '3' | '4' | '5' } = {
-        'I': '1',
-        'II': '2',
-        'III': '3',
-        'IV': '4',
-        'V': '5'
-      };
-      return romanToNumber[level] || level as '1' | '2' | '3' | '4' | '5';
-    };
-
     return {
       id: dbData.id,
       company_id: dbData.company_id,
@@ -106,7 +80,7 @@ export class EmployeeDataMapper {
       periodicidadPago: dbData.periodicidad_pago || 'mensual',
       cargo: dbData.cargo || undefined,
       codigoCIIU: dbData.codigo_ciiu || undefined,
-      nivelRiesgoARL: convertARLLevelBack(dbData.nivel_riesgo_arl),
+      nivelRiesgoARL: dbData.nivel_riesgo_arl || undefined,
       estado: dbData.estado || 'activo',
       centroCostos: dbData.centro_costos || undefined,
       fechaFirmaContrato: dbData.fecha_firma_contrato || undefined,
@@ -117,18 +91,18 @@ export class EmployeeDataMapper {
       beneficiosExtralegales: Boolean(dbData.beneficios_extralegales),
       clausulasEspeciales: dbData.clausulas_especiales || undefined,
       banco: dbData.banco || undefined,
-      tipoCuenta: dbData.tipo_cuenta || 'ahorros',
+      tipoCuenta: dbData.tipo_cuenta || undefined,
       numeroCuenta: dbData.numero_cuenta || undefined,
       titularCuenta: dbData.titular_cuenta || undefined,
-      formaPago: dbData.forma_pago || 'dispersion',
+      formaPago: dbData.forma_pago || undefined,
       eps: dbData.eps || undefined,
       afp: dbData.afp || undefined,
       arl: dbData.arl || undefined,
       cajaCompensacion: dbData.caja_compensacion || undefined,
       tipoCotizanteId: dbData.tipo_cotizante_id || undefined,
       subtipoCotizanteId: dbData.subtipo_cotizante_id || undefined,
-      regimenSalud: dbData.regimen_salud || 'contributivo',
-      estadoAfiliacion: dbData.estado_afiliacion || 'pendiente',
+      regimenSalud: dbData.regimen_salud || undefined,
+      estadoAfiliacion: dbData.estado_afiliacion || undefined,
       custom_fields: dbData.custom_fields || {},
       createdAt: dbData.created_at,
       updatedAt: dbData.updated_at
