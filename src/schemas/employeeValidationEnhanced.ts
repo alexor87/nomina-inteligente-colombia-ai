@@ -37,8 +37,8 @@ const calculateAge = (birthDate: string): number => {
   return age;
 };
 
-// Enhanced validation schema
-export const EmployeeValidationEnhancedSchema = z.object({
+// Base schema without refinements
+const EmployeeValidationBaseSchema = z.object({
   // ID field for editing
   id: z.string().optional(),
   
@@ -202,7 +202,10 @@ export const EmployeeValidationEnhancedSchema = z.object({
   // Custom fields
   custom_fields: z.record(z.any()).optional(),
   customFields: z.record(z.any()).optional()
-}).refine(
+});
+
+// Enhanced validation schema with refinements
+export const EmployeeValidationEnhancedSchema = EmployeeValidationBaseSchema.refine(
   (data) => {
     // Conditional validation: if formaPago is 'dispersion', banking info is required
     if (data.formaPago === 'dispersion') {
@@ -271,7 +274,7 @@ export const validateEmployeeDataEnhanced = (data: any): { success: boolean; dat
 
 export const validatePartialEmployeeDataEnhanced = (data: any): { success: boolean; data?: Partial<ValidatedEmployeeDataEnhanced>; errors?: any } => {
   try {
-    const validatedData = EmployeeValidationEnhancedSchema.partial().parse(data);
+    const validatedData = EmployeeValidationBaseSchema.partial().parse(data);
     return { success: true, data: validatedData };
   } catch (error) {
     if (error instanceof z.ZodError) {

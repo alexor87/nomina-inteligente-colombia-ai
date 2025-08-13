@@ -12,7 +12,7 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     apellido: employee?.apellido || '',
     email: employee?.email || '',
     telefono: employee?.telefono || '',
-    sexo: employee?.sexo, // ✅ FIXED: No conversion needed, both use 'M' | 'F'
+    sexo: employee?.sexo,
     fechaNacimiento: employee?.fechaNacimiento || '',
     direccion: employee?.direccion || '',
     ciudad: employee?.ciudad || '',
@@ -22,9 +22,14 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
     periodicidadPago: employee?.periodicidadPago || 'mensual',
     cargo: employee?.cargo || '',
-    codigo_ciiu: employee?.codigoCIIU || '',
-    nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
-    estado: employee?.estado || 'activo',
+    codigoCIIU: employee?.codigoCIIU || '',
+    nivelRiesgoARL: employee?.nivelRiesgoARL ? 
+      (employee.nivelRiesgoARL === 'I' ? '1' :
+       employee.nivelRiesgoARL === 'II' ? '2' :
+       employee.nivelRiesgoARL === 'III' ? '3' :
+       employee.nivelRiesgoARL === 'IV' ? '4' :
+       employee.nivelRiesgoARL === 'V' ? '5' : '1') : '1',
+    estado: (employee?.estado === 'eliminado' ? 'inactivo' : employee?.estado) || 'activo',
     centroCostos: employee?.centroCostos || '',
     fechaFirmaContrato: employee?.fechaFirmaContrato || '',
     fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
@@ -50,12 +55,12 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
   };
 };
 
-// ✅ NEW: Export default form values function
+// Export default form values function
 export const getEmployeeFormDefaults = (): EmployeeFormData => {
   return useEmployeeFormDefaults();
 };
 
-// ✅ NEW: Export function for populating form with employee data
+// Export function for populating form with employee data
 export const populateFormWithEmployee = async (employee: EmployeeUnified): Promise<EmployeeFormData> => {
   return useEmployeeFormDefaults(employee);
 };

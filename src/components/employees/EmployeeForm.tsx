@@ -63,9 +63,14 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
       periodicidadPago: employee?.periodicidadPago || 'mensual',
       cargo: employee?.cargo || '',
-      codigo_ciiu: employee?.codigoCIIU || '',
-      nivelRiesgoARL: employee?.nivelRiesgoARL || 'I',
-      estado: employee?.estado || 'activo',
+      codigoCIIU: employee?.codigoCIIU || '',
+      nivelRiesgoARL: employee?.nivelRiesgoARL ? 
+        (employee.nivelRiesgoARL === 'I' ? '1' :
+         employee.nivelRiesgoARL === 'II' ? '2' :
+         employee.nivelRiesgoARL === 'III' ? '3' :
+         employee.nivelRiesgoARL === 'IV' ? '4' :
+         employee.nivelRiesgoARL === 'V' ? '5' : '1') : '1',
+      estado: (employee?.estado === 'eliminado' ? 'inactivo' : employee?.estado) || 'activo',
       centroCostos: employee?.centroCostos || '',
       fechaFirmaContrato: employee?.fechaFirmaContrato || '',
       fechaFinalizacionContrato: employee?.fechaFinalizacionContrato || '',
@@ -145,8 +150,13 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       fechaIngreso: data.fechaIngreso,
       periodicidadPago: data.periodicidadPago,
       cargo: data.cargo,
-      codigoCIIU: data.codigo_ciiu,
-      nivelRiesgoARL: data.nivelRiesgoARL,
+      codigoCIIU: data.codigoCIIU,
+      nivelRiesgoARL: data.nivelRiesgoARL ? 
+        (data.nivelRiesgoARL === '1' ? 'I' :
+         data.nivelRiesgoARL === '2' ? 'II' :
+         data.nivelRiesgoARL === '3' ? 'III' :
+         data.nivelRiesgoARL === '4' ? 'IV' :
+         data.nivelRiesgoARL === '5' ? 'V' : 'I') as 'I' | 'II' | 'III' | 'IV' | 'V' : 'I',
       estado: data.estado,
       centroCostos: data.centroCostos,
       fechaFirmaContrato: data.fechaFirmaContrato,

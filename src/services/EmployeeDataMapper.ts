@@ -1,4 +1,3 @@
-
 import { EmployeeFormData } from '@/components/employees/form/types';
 import { EmployeeUnified } from '@/types/employee-unified';
 
@@ -7,18 +6,17 @@ export class EmployeeDataMapper {
    * Maps form data to database format for employee creation/update
    */
   static mapFormToDatabase(formData: EmployeeFormData, companyId: string) {
-    // Normalize ARL risk level to string numbers
-    const normalizeARLLevel = (level?: string) => {
+    // Convert ARL risk level from numbers to roman numerals for database
+    const convertARLLevel = (level?: string) => {
       if (!level) return null;
-      // Convert 'I', 'II', etc. to '1', '2', etc.
-      const romanToNumber: { [key: string]: string } = {
-        'I': '1',
-        'II': '2',
-        'III': '3',
-        'IV': '4',
-        'V': '5'
+      const numberToRoman: { [key: string]: string } = {
+        '1': 'I',
+        '2': 'II',
+        '3': 'III',
+        '4': 'IV',
+        '5': 'V'
       };
-      return romanToNumber[level] || level;
+      return numberToRoman[level] || level;
     };
 
     return {
@@ -40,8 +38,8 @@ export class EmployeeDataMapper {
       fecha_ingreso: formData.fechaIngreso,
       periodicidad_pago: formData.periodicidadPago,
       cargo: formData.cargo || null,
-      codigo_ciiu: formData.codigoCIIU || null, // Unified field name
-      nivel_riesgo_arl: normalizeARLLevel(formData.nivelRiesgoARL),
+      codigo_ciiu: formData.codigoCIIU || null,
+      nivel_riesgo_arl: convertARLLevel(formData.nivelRiesgoARL),
       estado: formData.estado,
       centro_costos: formData.centroCostos || null,
       fecha_firma_contrato: formData.fechaFirmaContrato || null,
@@ -72,17 +70,11 @@ export class EmployeeDataMapper {
    * Maps database data to EmployeeUnified format
    */
   static mapDatabaseToUnified(dbData: any): EmployeeUnified {
-    // Normalize ARL risk level back to roman numerals for display
-    const normalizeARLLevelBack = (level?: string) => {
+    // Convert ARL risk level from roman numerals to numbers for form
+    const convertARLLevelBack = (level?: string) => {
       if (!level) return undefined;
-      const numberToRoman: { [key: string]: string } = {
-        '1': 'I',
-        '2': 'II',
-        '3': 'III',
-        '4': 'IV',
-        '5': 'V'
-      };
-      return numberToRoman[level] || level;
+      // Keep as roman numerals for EmployeeUnified type compatibility
+      return level as 'I' | 'II' | 'III' | 'IV' | 'V';
     };
 
     return {
@@ -106,8 +98,8 @@ export class EmployeeDataMapper {
       fechaIngreso: dbData.fecha_ingreso || new Date().toISOString().split('T')[0],
       periodicidadPago: dbData.periodicidad_pago || 'mensual',
       cargo: dbData.cargo || undefined,
-      codigoCIIU: dbData.codigo_ciiu || undefined, // Unified field name
-      nivelRiesgoARL: normalizeARLLevelBack(dbData.nivel_riesgo_arl),
+      codigoCIIU: dbData.codigo_ciiu || undefined,
+      nivelRiesgoARL: convertARLLevelBack(dbData.nivel_riesgo_arl),
       estado: dbData.estado || 'activo',
       centroCostos: dbData.centro_costos || undefined,
       fechaFirmaContrato: dbData.fecha_firma_contrato || undefined,
