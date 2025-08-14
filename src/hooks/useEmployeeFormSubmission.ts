@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeFormData } from '@/components/employees/form/types';
@@ -28,7 +29,7 @@ export const useEmployeeFormSubmission = () => {
       tipoSalario: formData.tipoSalario || 'mensual', // Add this required field
       tipoContrato: formData.tipoContrato || 'indefinido', // Ensure it's always set
       fechaIngreso: formData.fechaIngreso,
-      periodicidadPago: formData.periodicidadPago,
+      periodicidadPago: formData.periodicidadPago || 'mensual', // ✅ FIXED: Added default
       cargo: formData.cargo,
       codigoCIIU: formData.codigo_ciiu,
       nivelRiesgoARL: formData.nivelRiesgoARL || 'I',

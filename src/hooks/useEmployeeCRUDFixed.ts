@@ -13,6 +13,7 @@ export const useEmployeeCRUD = () => {
       tipoDocumento: employeeData.tipoDocumento || 'CC', // Ensure it's set
       tipoSalario: employeeData.tipoSalario || 'mensual', // Ensure it's set
       tipoContrato: employeeData.tipoContrato || 'indefinido', // Ensure it's set
+      periodicidadPago: employeeData.periodicidadPago || 'mensual', // ✅ FIXED: Added default
       company_id: employeeData.empresaId
     });
     

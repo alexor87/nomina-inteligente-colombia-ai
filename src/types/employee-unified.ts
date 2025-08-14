@@ -23,7 +23,7 @@ export interface EmployeeUnified {
   tipoSalario: 'mensual' | 'integral' | 'medio_tiempo'; // ✅ NUEVO: Tipo de salario
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: 'mensual' | 'quincenal';
+  periodicidadPago?: 'mensual' | 'quincenal'; // ✅ FIXED: Made optional
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';

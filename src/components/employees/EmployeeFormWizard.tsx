@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +41,7 @@ export const EmployeeFormWizard = ({
       email: '',
       telefono: '',
       salarioBase: 0,
-      tipoSalario: 'mensual',
+      tipoSalario: 'mensual', // ✅ FIXED: Added missing field
       tipoContrato: 'indefinido',
       fechaIngreso: new Date().toISOString().split('T')[0],
       periodicidadPago: 'mensual',
@@ -114,6 +115,7 @@ export const EmployeeFormWizard = ({
         ciudad: formData.ciudad,
         departamento: formData.departamento,
         salarioBase: formData.salarioBase || 0,
+        tipoSalario: formData.tipoSalario || 'mensual', // ✅ FIXED: Added missing field
         tipoContrato: formData.tipoContrato || 'indefinido',
         fechaIngreso: formData.fechaIngreso || new Date().toISOString().split('T')[0],
         periodicidadPago: formData.periodicidadPago || 'mensual',

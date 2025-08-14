@@ -155,6 +155,7 @@ export interface DashboardMetrics {
   gastosNomina: number; // Payroll expenses
   tendenciaMensual: number; // Monthly trend
   pendingPayrolls: number; // Added missing property
+  monthlyPayrollTotal: number; // ✅ FIXED: Added missing property
 }
 
 // Payroll types
@@ -171,6 +172,7 @@ export interface PayrollCalculation {
   recargoNocturno: number;
   recargoDominical: number;
   bonificaciones: number;
+  auxilioTransporte: number; // ✅ FIXED: Added missing property
 }
 
 export interface LegalValidation {
