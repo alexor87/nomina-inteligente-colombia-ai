@@ -66,10 +66,10 @@ export const UNIFIED_STATUS_MAPPING = {
   }
 };
 
-// ✅ Configuración de mapeo visual
+// ✅ CORREGIDO: Configuración de mapeo visual con cálculo correcto de incapacidades
 export const VACATION_VISUAL_CONFIG: Record<VacationAbsenceType, {
   badge: { icon: string; label: string; color: string };
-  calculation: (salarioBase: number, dias: number) => number;
+  calculation: (salarioBase: number, dias: number, subtipo?: string) => number;
   isDeduction: boolean;
 }> = {
   vacaciones: {
@@ -89,9 +89,58 @@ export const VACATION_VISUAL_CONFIG: Record<VacationAbsenceType, {
   },
   incapacidad: {
     badge: { icon: '🏥', label: 'Incapacidad', color: 'bg-purple-100 text-purple-800' },
-    calculation: (salarioBase, dias) => {
-      const diasPagados = Math.max(0, dias - 2);
-      return (salarioBase / 30) * diasPagados * 0.6667;
+    calculation: (salarioBase, dias, subtipo = 'general') => {
+      // ✅ LÓGICA CORREGIDA: Implementar cálculo completo según normativa colombiana
+      console.log('💡 Calculating incapacity with correct logic:', { salarioBase, dias, subtipo });
+      
+      // Configuraciones según tipo de incapacidad
+      const incapacityConfig = {
+        general: {
+          waitingDays: 3,
+          percentage: 0.6667,
+          useMinimumWage: true
+        },
+        laboral: {
+          waitingDays: 0,
+          percentage: 1.0,
+          useMinimumWage: false
+        }
+      };
+      
+      const config = incapacityConfig[subtipo as 'general' | 'laboral'] || incapacityConfig.general;
+      
+      // Calcular días pagados (después del período de carencia)
+      const payableDays = Math.max(0, dias - config.waitingDays);
+      
+      if (payableDays <= 0) {
+        console.log('⚠️ No payable days after waiting period');
+        return 0;
+      }
+      
+      // Calcular salario diario base
+      let dailySalary = salarioBase / 30;
+      
+      // Para incapacidades generales, aplicar SMLDV como tope mínimo
+      if (config.useMinimumWage) {
+        const SMLDV_2025 = 43333; // $1,300,000 / 30 días
+        dailySalary = Math.max(dailySalary, SMLDV_2025);
+        console.log('💰 Applied SMLDV minimum:', { originalDaily: salarioBase / 30, adjustedDaily: dailySalary });
+      }
+      
+      // Calcular valor final
+      const totalValue = dailySalary * payableDays * config.percentage;
+      
+      console.log('✅ Incapacity calculation result:', {
+        type: subtipo,
+        totalDays: dias,
+        waitingDays: config.waitingDays,
+        payableDays,
+        dailySalary,
+        percentage: config.percentage,
+        totalValue: Math.round(totalValue)
+      });
+      
+      return Math.round(totalValue);
     },
     isDeduction: false
   },
@@ -106,7 +155,7 @@ export const NOVEDAD_VISUAL_CONFIG = {
   badge: { icon: '📋', label: 'Novedad', color: 'bg-blue-100 text-blue-800' }
 };
 
-// ✅ ACTUALIZADO: Convertir ausencias con fragmentación inteligente
+// ✅ ACTUALIZADO: Convertir ausencias con cálculo correcto para incapacidades
 export const convertVacationToDisplay = (
   vacation: any, 
   employeeSalary: number,
@@ -137,7 +186,8 @@ export const convertVacationToDisplay = (
     });
   }
   
-  const valor = config.calculation(employeeSalary, displayDays);
+  // ✅ CORREGIDO: Pasar subtipo para cálculo correcto de incapacidades
+  const valor = config.calculation(employeeSalary, displayDays, vacation.subtipo);
   
   // ✅ Determinar estado unificado
   const unifiedStatus = vacation.status === 'liquidada' ? 'procesada' : vacation.status;
