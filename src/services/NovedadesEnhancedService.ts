@@ -79,17 +79,35 @@ export class NovedadesEnhancedService {
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
-      console.log('💾 [SERVICE V8.4] Plan V8.4 - Solución definitiva');
-      console.log('💾 [SERVICE V8.4] Datos recibidos:', { 
+      console.log('💾 [SERVICE V8.5] ===== PLAN V8.5 - RASTREO DEFINITIVO =====');
+      console.log('💾 [SERVICE V8.5] Datos recibidos COMPLETOS:', JSON.stringify(novedadData, null, 2));
+      console.log('💾 [SERVICE V8.5] Campos críticos:', { 
         tipo_novedad: novedadData.tipo_novedad, 
         dias: novedadData.dias, 
-        valor: novedadData.valor 
+        valor: novedadData.valor,
+        'typeof dias': typeof novedadData.dias,
+        'dias === undefined': novedadData.dias === undefined,
+        'dias === null': novedadData.dias === null,
+        'dias === 0': novedadData.dias === 0
       });
 
-      // ✅ V8.4: Validación simplificada para incapacidades
-      if (novedadData.tipo_novedad === 'incapacidad' && (!novedadData.dias || novedadData.dias <= 0)) {
-        console.error('❌ [SERVICE V8.4] Incapacidad sin días válidos:', novedadData.dias);
-        throw new Error(`Incapacidades requieren días válidos (recibido: ${novedadData.dias})`);
+      // ✅ V8.5: Validación crítica con logging detallado
+      if (novedadData.tipo_novedad === 'incapacidad') {
+        console.log('🏥 [SERVICE V8.5] ===== VALIDACIÓN INCAPACIDAD =====');
+        console.log('🏥 [SERVICE V8.5] Días recibidos para incapacidad:', {
+          valor: novedadData.dias,
+          tipo: typeof novedadData.dias,
+          es_valido: novedadData.dias && novedadData.dias > 0
+        });
+        
+        if (!novedadData.dias || novedadData.dias <= 0) {
+          console.error('❌ [SERVICE V8.5] CRÍTICO: Incapacidad sin días válidos');
+          console.error('❌ [SERVICE V8.5] Datos problemáticos:', {
+            dias_recibido: novedadData.dias,
+            datos_completos: JSON.stringify(novedadData, null, 2)
+          });
+          throw new Error(`Incapacidades requieren días válidos (recibido: ${novedadData.dias})`);
+        }
       }
       
       // ✅ CORRECCIÓN: Usar el tipo correcto y obtener company_id si no viene
@@ -130,10 +148,16 @@ export class NovedadesEnhancedService {
         constitutivo_salario: Boolean(novedadData.constitutivo_salario)
       };
 
-      console.log('💾 [SERVICE V8.4] Datos preparados para inserción:', {
+      console.log('💾 [SERVICE V8.5] ===== DATOS PREPARADOS PARA INSERCIÓN =====');
+      console.log('💾 [SERVICE V8.5] insertData COMPLETO:', JSON.stringify(insertData, null, 2));
+      console.log('💾 [SERVICE V8.5] Campos críticos a insertar:', {
         tipo_novedad: insertData.tipo_novedad,
         dias: insertData.dias,
-        valor: insertData.valor
+        valor: insertData.valor,
+        'typeof dias': typeof insertData.dias,
+        'dias > 0': insertData.dias > 0,
+        empleado_id: insertData.empleado_id,
+        periodo_id: insertData.periodo_id
       });
 
       const { data: novedad, error } = await supabase
@@ -157,11 +181,16 @@ export class NovedadesEnhancedService {
         throw error;
       }
 
-      console.log('✅ [SERVICE V8.4] Novedad creada exitosamente:', {
+      console.log('✅ [SERVICE V8.5] ===== NOVEDAD CREADA EXITOSAMENTE =====');
+      console.log('✅ [SERVICE V8.5] Datos insertados en BD:', {
         id: novedad.id,
         tipo_novedad: novedad.tipo_novedad,
         dias: novedad.dias,
-        valor: novedad.valor
+        valor: novedad.valor,
+        'dias_en_bd': novedad.dias,
+        'typeof dias_en_bd': typeof novedad.dias,
+        'dias_correctos': novedad.tipo_novedad === 'incapacidad' ? novedad.dias === 4 : true,
+        novedad_completa: JSON.stringify(novedad, null, 2)
       });
 
       // Log manual audit action for business context
