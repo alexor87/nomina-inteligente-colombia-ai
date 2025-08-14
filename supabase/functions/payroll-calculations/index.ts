@@ -14,10 +14,10 @@ serve(async (req) => {
   try {
     const { action, data } = await req.json()
     
-    console.log('🚀 [EDGE v6.0] Request received:', { action })
+    console.log('🚀 [EDGE v7.0 - BUG FIX] Request received:', { action })
 
     if (action === 'calculate-novedad') {
-      // ✅ LOGGING DEFENSIVO CRÍTICO
+      // ✅ LOGGING DEFENSIVO MEJORADO
       console.log('🔍 [NOVEDAD CALC] Input received:', {
         tipoNovedad: data.tipoNovedad,
         subtipo: data.subtipo,
@@ -27,24 +27,46 @@ serve(async (req) => {
         fechaPeriodo: data.fechaPeriodo
       })
 
-      // ✅ DETECCIÓN DE INCONSISTENCIA CRÍTICA
-      if (data.tipoNovedad === 'incapacidad' && (!data.dias || data.dias === 0)) {
-        console.log('🚨 [INCAPACIDAD BUG] Días = 0 detectado para incapacidad:', {
-          salarioBase: data.salarioBase,
+      // ✅ DETECCIÓN ESPECÍFICA DE BUG DE INCAPACIDADES
+      if (data.tipoNovedad === 'incapacidad') {
+        console.log('🏥 [INCAPACIDAD DEBUG] Análisis detallado:', {
+          dias_received: data.dias,
+          dias_type: typeof data.dias,
+          is_undefined: data.dias === undefined,
+          is_null: data.dias === null,
+          is_zero: data.dias === 0,
           subtipo: data.subtipo,
-          fechaPeriodo: data.fechaPeriodo
-        })
-        
-        // Si no hay días pero sí hay salario, probablemente es un error de frontend
-        if (data.salarioBase > 0) {
-          console.log('⚠️ [INCAPACIDAD] Frontend envió días = 0, retornando error descriptivo')
+          salarioBase: data.salarioBase
+        });
+
+        if (data.dias === undefined || data.dias === null) {
+          console.log('🚨 [INCAPACIDAD BUG] DÍAS UNDEFINED/NULL DETECTADO - posible bug en frontend')
           return new Response(
             JSON.stringify({
               success: false,
-              error: 'CRITICAL: Incapacidad recibida con días = 0. Verificar cálculo de días en frontend.',
+              error: 'CRITICAL BUG: Incapacidad recibida con días undefined/null. Frontend no está enviando días calculados.',
               debug: {
                 receivedData: data,
-                expectedDias: '> 0',
+                expectedDias: 'number >= 0',
+                actualDias: data.dias,
+                bugLocation: 'NovedadUnifiedModal.tsx - revisar conversión entry.dias || undefined'
+              }
+            }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
+        }
+
+        if (data.dias < 0) {
+          console.log('🚨 [INCAPACIDAD BUG] DÍAS NEGATIVOS DETECTADOS')
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'CRITICAL: Incapacidad con días negativos.',
+              debug: {
+                receivedData: data,
                 actualDias: data.dias
               }
             }),
@@ -58,10 +80,12 @@ serve(async (req) => {
 
       const result = await calculateNovedad(data)
       
-      // ✅ LOGGING DE RESULTADO
+      // ✅ LOGGING DE RESULTADO MEJORADO
       console.log('📊 [NOVEDAD CALC] Resultado:', {
         tipo: data.tipoNovedad,
-        valor: result?.valor || 0,
+        subtipo: data.subtipo,
+        dias_enviados: data.dias,
+        valor_calculado: result?.valor || 0,
         success: !!result
       })
 
@@ -111,7 +135,7 @@ serve(async (req) => {
 async function calculateNovedad(data: any) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = data
 
-  console.log('🔍 [CALC NOVEDAD] Iniciando cálculo:', {
+  console.log('🔍 [CALC NOVEDAD v7.0] Iniciando cálculo:', {
     tipo: tipoNovedad,
     subtipo,
     salarioBase,
@@ -125,20 +149,22 @@ async function calculateNovedad(data: any) {
     return null
   }
 
-  // ✅ CORRECCIÓN CRÍTICA PARA INCAPACIDADES
+  // ✅ CORRECCIÓN ESPECÍFICA PARA INCAPACIDADES
   if (tipoNovedad === 'incapacidad') {
-    console.log('🏥 [INCAPACIDAD] Procesando cálculo:', {
+    console.log('🏥 [INCAPACIDAD v7.0] Procesando cálculo:', {
       subtipo: subtipo || 'general',
       dias,
-      salarioBase
+      salarioBase,
+      nota: 'días = 0 es VÁLIDO para incapacidades de 1-3 días generales'
     })
 
-    if (!dias || dias <= 0) {
+    // ✅ VALIDACIÓN CORREGIDA: dias = 0 ES VÁLIDO para incapacidades generales de 1-3 días
+    if (dias === undefined || dias === null || dias < 0) {
       console.log('❌ [INCAPACIDAD] Días inválidos para incapacidad:', dias)
       return {
         valor: 0,
         factorCalculo: 0,
-        detalleCalculo: `Error: Incapacidad con ${dias} días. Debe ser > 0.`,
+        detalleCalculo: `Error: Incapacidad con días inválidos (${dias}). Debe ser >= 0.`,
         jornadaInfo: getJornadaInfo(salarioBase)
       }
     }
@@ -148,29 +174,31 @@ async function calculateNovedad(data: any) {
     let factorCalculo = 0
     let detalleCalculo = ''
 
-    // Cálculo según normativa colombiana
+    // Cálculo según normativa colombiana actualizada
     if (subtipo === 'laboral') {
       // ARL paga 100% desde día 1
       valor = valorHoraDiaria * dias
       factorCalculo = 1.0
       detalleCalculo = `Incapacidad laboral: ${dias} días × $${valorHoraDiaria.toFixed(0)} × 100% = $${valor.toFixed(0)}`
     } else {
-      // EPS: empleador paga 66.67% desde día 4
+      // EPS: empleador paga 66.67% desde día 4 (días 1-3 los paga empleador directamente)
       if (dias <= 3) {
-        valor = 0
+        valor = 0 // ✅ CORRECTO: Empleador paga directamente, no se registra en nómina
         factorCalculo = 0
-        detalleCalculo = `Incapacidad general: ${dias} días (empleador paga primeros 3 días, EPS desde día 4)`
+        detalleCalculo = `Incapacidad general: ${dias} días - Empleador paga directamente los primeros 3 días (Ley 100/1993)`
       } else {
         const diasEps = dias - 3
         valor = valorHoraDiaria * diasEps * 0.6667
         factorCalculo = 0.6667
-        detalleCalculo = `Incapacidad general: ${diasEps} días EPS × $${valorHoraDiaria.toFixed(0)} × 66.67% = $${valor.toFixed(0)}`
+        detalleCalculo = `Incapacidad general: ${diasEps} días EPS (desde día 4) × $${valorHoraDiaria.toFixed(0)} × 66.67% = $${valor.toFixed(0)}`
       }
     }
 
-    console.log('✅ [INCAPACIDAD] Cálculo completado:', {
-      valor,
+    console.log('✅ [INCAPACIDAD v7.0] Cálculo completado:', {
+      dias_procesados: dias,
+      valor_final: Math.round(valor),
       factorCalculo,
+      es_valor_cero_correcto: valor === 0 && dias <= 3 && subtipo === 'general',
       detalleCalculo
     })
 

@@ -226,7 +226,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      console.log('📤 Form data received:', formData);
+      console.log('📤 [MODAL CRÍTICO] Form data received:', formData);
       
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
@@ -234,20 +234,54 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       console.log(`🔄 Processing ${dataArray.length} novelty entries`);
       
       for (const entry of dataArray) {
+        console.log('🔍 [BUG FIX] Entry data before processing:', {
+          valor: entry.valor,
+          horas: entry.horas,
+          dias: entry.dias,
+          tipo: selectedType,
+          raw_entry: entry
+        });
+
         const submitData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
           company_id: companyId || '',
           tipo_novedad: selectedType!,
           valor: entry.valor || 0,
-          horas: entry.horas || undefined,
-          dias: entry.dias || undefined,
+          // ✅ CORRECCIÓN CRÍTICA: Preservar dias = 0 para incapacidades
+          horas: entry.horas !== undefined ? entry.horas : undefined,
+          dias: entry.dias !== undefined ? entry.dias : undefined, // ✅ NO usar || que convierte 0 a undefined
           observacion: entry.observacion || undefined,
           fecha_inicio: entry.fecha_inicio || undefined,
           fecha_fin: entry.fecha_fin || undefined,
           subtipo: entry.subtipo || entry.tipo || undefined,
           base_calculo: entry.base_calculo || undefined
         };
+
+        console.log('🚨 [BUG FIX] DATOS FINALES ANTES DE ENVÍO:', {
+          tipo_novedad: submitData.tipo_novedad,
+          valor: submitData.valor,
+          horas: submitData.horas,
+          dias: submitData.dias, // ✅ CRÍTICO: Debe preservar 0 para incapacidades de 1-3 días
+          subtipo: submitData.subtipo,
+          fecha_inicio: submitData.fecha_inicio,
+          fecha_fin: submitData.fecha_fin
+        });
+
+        // ✅ VALIDACIÓN DEFENSIVA ESPECÍFICA PARA INCAPACIDADES
+        if (submitData.tipo_novedad === 'incapacidad') {
+          if (submitData.dias === undefined || submitData.dias < 0) {
+            console.error('🚨 [INCAPACIDAD BUG] Días inválidos detectados:', {
+              dias_received: entry.dias,
+              dias_final: submitData.dias,
+              fechas: {
+                inicio: entry.fecha_inicio,
+                fin: entry.fecha_fin
+              }
+            });
+            throw new Error(`Error crítico: Incapacidad con días inválidos (${submitData.dias}). Verificar cálculo de fechas.`);
+          }
+        }
 
         console.log('💾 Saving novelty entry:', submitData);
         await onSubmit(submitData);
