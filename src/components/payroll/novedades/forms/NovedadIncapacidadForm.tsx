@@ -54,10 +54,10 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
-  // ✅ V5.0: Cálculo de días con logging exhaustivo
+  // ✅ V8.0: Cálculo de días con logging exhaustivo ACTIVADO
   const calculatedDays = React.useMemo(() => {
-    console.log('🎯 [INCAP FORM V5.0] ===== CALCULANDO DÍAS =====');
-    console.log('🎯 [INCAP FORM V5.0] Fechas para cálculo:', {
+    console.log('🔍 [FORM V8.0] ===== CALCULANDO DÍAS (DEBUGGING ACTIVADO) =====');
+    console.log('🔍 [FORM V8.0] Input para cálculo:', {
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
       timestamp: new Date().toISOString()
@@ -65,10 +65,12 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     
     const days = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
     
-    console.log('🎯 [INCAP FORM V5.0] Días calculados:', {
+    console.log('🔍 [FORM V8.0] Resultado calculateDaysBetween:', {
       resultado: days,
-      esTest_5_a_8_agosto: formData.fecha_inicio === '2025-08-05' && formData.fecha_fin === '2025-08-08',
-      deberiaSerCuatro: formData.fecha_inicio === '2025-08-05' && formData.fecha_fin === '2025-08-08' ? 'SÍ' : 'NO',
+      tipo: typeof days,
+      es_numero: !isNaN(days),
+      es_positivo: days > 0,
+      caso_test: formData.fecha_inicio === '2025-08-05' && formData.fecha_fin === '2025-08-08' ? `CASO TEST - debería ser 4, obtuvo: ${days}` : 'otro caso',
       timestamp: new Date().toISOString()
     });
     
@@ -77,8 +79,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   const isValidRange = isValidDateRange(formData.fecha_inicio, formData.fecha_fin);
 
-  // ✅ V5.0: Logging exhaustivo del estado del formulario
-  console.log('🔍 [INCAP FORM V5.0] Estado actual del formulario:', {
+  // ✅ V8.0: Logging exhaustivo del estado
+  console.log('🔍 [FORM V8.0] Estado actual completo:', {
     subtipo: formData.subtipo,
     fechaInicio: formData.fecha_inicio,
     fechaFin: formData.fecha_fin,
@@ -90,9 +92,9 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     timestamp: new Date().toISOString()
   });
 
-  // ✅ V5.0: useEffect mejorado con validación específica
+  // ✅ V8.0: useEffect mejorado con validación específica
   useEffect(() => {
-    console.log('🚀 [INCAP FORM V5.0] useEffect cálculo disparado:', {
+    console.log('🚀 [FORM V8.0] useEffect cálculo disparado:', {
       hasStartDate: !!formData.fecha_inicio,
       hasEndDate: !!formData.fecha_fin,
       isValidRange,
@@ -104,32 +106,32 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
     // Validaciones críticas
     if (!formData.fecha_inicio || !formData.fecha_fin) {
-      console.log('⏳ [INCAP V5.0] Esperando fechas completas');
+      console.log('⏳ [FORM V8.0] Esperando fechas completas');
       return;
     }
 
     if (!isValidRange) {
-      console.log('❌ [INCAP V5.0] Rango de fechas inválido');
+      console.log('❌ [FORM V8.0] Rango de fechas inválido');
       setFormData(prev => ({ ...prev, valor: 0 }));
       return;
     }
 
     if (calculatedDays < 0) {
-      console.log('❌ [INCAP V5.0] Días calculados < 0:', calculatedDays);
+      console.log('❌ [FORM V8.0] Días calculados < 0:', calculatedDays);
       setFormData(prev => ({ ...prev, valor: 0 }));
       return;
     }
 
     if (!employeeSalary || employeeSalary <= 0) {
-      console.log('❌ [INCAP V5.0] Salario inválido:', employeeSalary);
+      console.log('❌ [FORM V8.0] Salario inválido:', employeeSalary);
       setFormData(prev => ({ ...prev, valor: 0 }));
       return;
     }
 
-    // ✅ V5.0: Formateo correcto de fecha
+    // ✅ V8.0: Formateo correcto de fecha
     const fechaPeriodoISO = periodoFecha ? periodoFecha.toISOString() : new Date().toISOString();
     
-    console.log('🎯 [INCAP V5.0] ENVIANDO AL BACKEND (corregido):', {
+    console.log('🎯 [FORM V8.0] ENVIANDO AL BACKEND (corregido):', {
       tipoNovedad: 'incapacidad',
       subtipo: formData.subtipo,
       salarioBase: employeeSalary,
@@ -139,17 +141,17 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       timestamp: new Date().toISOString()
     });
     
-    // ✅ V5.0: ENVÍO INMEDIATO con días corregidos
+    // ✅ V8.0: ENVÍO INMEDIATO con días corregidos
     calculateNovedadDebounced(
       {
         tipoNovedad: 'incapacidad' as NovedadType,
         subtipo: formData.subtipo,
         salarioBase: employeeSalary,
-        dias: calculatedDays, // ✅ V5.0: días calculados correctamente
+        dias: calculatedDays, // ✅ V8.0: días calculados correctamente
         fechaPeriodo: fechaPeriodoISO
       },
       (result) => {
-        console.log('📊 [INCAP V5.0] RESULTADO DEL BACKEND (corregido):', {
+        console.log('📊 [FORM V8.0] RESULTADO DEL BACKEND (corregido):', {
           result,
           diasEnviados: calculatedDays,
           valorRecibido: result?.valor,
@@ -159,13 +161,13 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         });
         
         if (result && typeof result.valor === 'number') {
-          console.log('✅ [INCAP V5.0] Valor calculado exitoso:', result.valor);
+          console.log('✅ [FORM V8.0] Valor calculado exitoso:', result.valor);
           setFormData(prev => ({ 
             ...prev, 
             valor: result.valor 
           }));
         } else {
-          console.log('❌ [INCAP V5.0] Error en cálculo:', result);
+          console.log('❌ [FORM V8.0] Error en cálculo:', result);
           setFormData(prev => ({ 
             ...prev, 
             valor: 0 
@@ -177,14 +179,14 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha]);
 
   const handleInputChange = (field: string, value: any) => {
-    console.log('🔄 [INCAP V5.0] Campo actualizado:', field, '=', value, 'timestamp:', new Date().toISOString());
+    console.log('🔄 [FORM V8.0] Campo actualizado:', field, '=', value, 'timestamp:', new Date().toISOString());
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // ✅ V5.0: handleSubmit corregido con calculatedDays explícito
+  // ✅ V8.0: handleSubmit con logging exhaustivo CRÍTICO
   const handleSubmit = () => {
-    console.log('📤 [INCAP V5.0] ===== INICIANDO ENVÍO =====');
-    console.log('📤 [INCAP V5.0] Estado del formulario:', {
+    console.log('📤 [FORM V8.0] ===== INICIANDO ENVÍO CON DEBUGGING EXHAUSTIVO =====');
+    console.log('📤 [FORM V8.0] Estado del formulario PRE-VALIDACIÓN:', {
       formData,
       calculatedDays,
       isValidRange,
@@ -193,57 +195,73 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
     // Validaciones básicas
     if (!formData.fecha_inicio) {
-      console.error('❌ [INCAP V5.0] Falta fecha de inicio');
+      console.error('❌ [FORM V8.0] Falta fecha de inicio');
       alert('Por favor seleccione la fecha de inicio');
       return;
     }
 
     if (!formData.fecha_fin) {
-      console.error('❌ [INCAP V5.0] Falta fecha de fin');
+      console.error('❌ [FORM V8.0] Falta fecha de fin');
       alert('Por favor seleccione la fecha de fin');
       return;
     }
 
     if (!isValidRange) {
-      console.error('❌ [INCAP V5.0] Rango inválido');
+      console.error('❌ [FORM V8.0] Rango inválido');
       alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
       return;
     }
 
     if (calculatedDays < 0) {
-      console.error('❌ [INCAP V5.0] Días calculados inválidos:', calculatedDays);
+      console.error('❌ [FORM V8.0] Días calculados inválidos:', calculatedDays);
       alert('El rango de fechas debe generar días válidos');
       return;
     }
 
-    // ✅ V5.0: ENVÍO CON calculatedDays EXPLÍCITO
+    // ✅ V8.0: CONSTRUCCIÓN DE DATOS CON LOGGING CRÍTICO
     const submitData = {
       tipo_novedad: 'incapacidad',
       subtipo: formData.subtipo,
-      dias: calculatedDays, // ✅ V5.0: días calculados correctamente
-      calculatedDays: calculatedDays, // ✅ V5.0: CLAVE - Incluir calculatedDays explícitamente
+      dias: calculatedDays, // ✅ V8.0: Valor calculado correctamente
+      calculatedDays: calculatedDays, // ✅ V8.0: BACKUP explícito
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
       valor: formData.valor,
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 [INCAP V5.0] ===== DATOS FINALES DE ENVÍO =====');
-    console.log('📤 [INCAP V5.0] submitData completo:', JSON.stringify(submitData, null, 2));
-    console.log('📤 [INCAP V5.0] Verificación crítica V5.0:', {
+    console.log('📤 [FORM V8.0] ===== DATOS FINALES CONSTRUIDOS =====');
+    console.log('📤 [FORM V8.0] submitData COMPLETO:', JSON.stringify(submitData, null, 2));
+    console.log('📤 [FORM V8.0] VERIFICACIÓN CRÍTICA V8.0:', {
       'submitData.dias': submitData.dias,
       'submitData.calculatedDays': submitData.calculatedDays,
-      'calculatedDays': calculatedDays,
-      'son_todos_iguales': submitData.dias === calculatedDays && submitData.calculatedDays === calculatedDays,
+      'calculatedDays_original': calculatedDays,
+      'todos_son_iguales': submitData.dias === calculatedDays && submitData.calculatedDays === calculatedDays,
       'tipo_submitData_dias': typeof submitData.dias,
       'tipo_calculatedDays': typeof calculatedDays,
-      'valor_esperado_para_4_dias': calculatedDays === 4 ? 'Valor > 0 (EPS 66.7%)' : calculatedDays <= 3 ? '$0 (Empleador directo)' : 'Otros',
-      'valor_actual': submitData.valor,
+      'valor_numerico': !isNaN(submitData.dias),
+      'valor_positivo': submitData.dias > 0,
+      'test_case_validation': calculatedDays === 4 ? '✅ CASO TEST CORRECTO' : `⚠️ No es caso test (${calculatedDays} días)`,
       timestamp: new Date().toISOString()
     });
+
+    // ✅ V8.0: VALIDACIÓN FINAL ANTES DE ENVÍO
+    if (submitData.dias === undefined || submitData.dias === null || submitData.dias <= 0) {
+      console.error('🚨 [FORM V8.0] VALIDACIÓN FINAL FALLÓ:', {
+        dias: submitData.dias,
+        calculatedDays: calculatedDays,
+        error: 'Días inválidos detectados en formulario antes de envío',
+        timestamp: new Date().toISOString()
+      });
+      
+      alert(`Error crítico: Días calculados inválidos (${submitData.dias}). Verificar cálculo de fechas.`);
+      return;
+    }
     
-    console.log('📤 [INCAP V5.0] ===== LLAMANDO A onSubmit CON calculatedDays =====');
+    console.log('📤 [FORM V8.0] ===== ENVIANDO A MODAL =====');
+    console.log('📤 [FORM V8.0] Llamando onSubmit con:', submitData);
     onSubmit(submitData);
+    console.log('📤 [FORM V8.0] ===== onSubmit EJECUTADO =====');
   };
 
   const getCurrentSubtipoInfo = () => {
@@ -262,10 +280,10 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         <h3 className="text-lg font-semibold text-gray-900">Incapacidad</h3>
       </div>
 
-      {/* ✅ V4.0: Debug panel mejorado con información crítica */}
-      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-        <h4 className="text-blue-800 font-medium text-sm mb-2">🔍 Debug V4.0 - Corrección de calculateDaysBetween</h4>
-        <div className="text-xs text-blue-700 space-y-1">
+      {/* ✅ V8.0: Debug panel con información crítica actualizada */}
+      <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+        <h4 className="text-red-800 font-medium text-sm mb-2">🔍 Debug V8.0 ACTIVO - Logging Exhaustivo</h4>
+        <div className="text-xs text-red-700 space-y-1">
           <div>Fecha inicio: <strong>{formData.fecha_inicio || 'No seleccionada'}</strong></div>
           <div>Fecha fin: <strong>{formData.fecha_fin || 'No seleccionada'}</strong></div>
           <div>Días calculados: <strong className={calculatedDays >= 0 ? calculatedDays === 4 ? 'text-green-600' : 'text-blue-600' : 'text-red-600'}>{calculatedDays}</strong></div>
@@ -277,6 +295,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
               'N/A'
             }
           </strong></div>
+          <div className="text-red-800 font-bold">📊 DEBUGGING: Revisa la consola para logs detallados</div>
         </div>
       </div>
 

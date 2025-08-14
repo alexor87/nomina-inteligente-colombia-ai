@@ -22,8 +22,8 @@ export interface CreateNovedadData {
 }
 
 /**
- * ✅ SERVICIO DE NOVEDADES REPARADO - FASE 3 CRÍTICA
- * Implementación real para conectar con base de datos
+ * ✅ SERVICIO DE NOVEDADES REPARADO - FASE V8.0 CRÍTICA
+ * Implementación con logging exhaustivo para debugging
  */
 export class NovedadesEnhancedService {
   
@@ -78,42 +78,59 @@ export class NovedadesEnhancedService {
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
-      console.log('🚨 [SERVICE V6.0] ===== LOGGING DEFENSIVO ACTIVADO =====');
-      console.log('🚨 [SERVICE V6.0] Datos RAW recibidos en createNovedad:', JSON.stringify(novedadData, null, 2));
-      console.log('🚨 [SERVICE V6.0] Análisis específico V6.0:', {
+      console.log('🚨 [SERVICE V8.0] ===== LOGGING DEFENSIVO MÁXIMO ACTIVADO =====');
+      console.log('🚨 [SERVICE V8.0] Datos RAW recibidos en createNovedad:', JSON.stringify(novedadData, null, 2));
+      console.log('🚨 [SERVICE V8.0] Análisis específico V8.0 CRÍTICO:', {
         'tipo_novedad': novedadData.tipo_novedad,
         'dias_recibidos': novedadData.dias,
         'dias_type': typeof novedadData.dias,
         'dias_is_zero': novedadData.dias === 0,
         'dias_is_undefined': novedadData.dias === undefined,
+        'dias_is_null': novedadData.dias === null,
+        'dias_is_positive': novedadData.dias > 0,
         'valor_recibido': novedadData.valor,
         'empleado_id': novedadData.empleado_id,
         'periodo_id': novedadData.periodo_id,
         'fecha_inicio': novedadData.fecha_inicio,
         'fecha_fin': novedadData.fecha_fin,
+        'company_id': novedadData.company_id,
         timestamp: new Date().toISOString()
       });
 
-      // ✅ V6.0 VALIDACIÓN CRÍTICA ANTES DE INSERTAR
+      // ✅ V8.0 VALIDACIÓN CRÍTICA ANTES DE INSERTAR
       if (novedadData.tipo_novedad === 'incapacidad') {
-        console.log('🏥 [SERVICE V6.0] INCAPACIDAD DETECTADA - Validación pre-inserción');
+        console.log('🏥 [SERVICE V8.0] ===== INCAPACIDAD DETECTADA EN SERVICIO =====');
+        console.log('🏥 [SERVICE V8.0] Validación pre-inserción exhaustiva:', {
+          dias_recibidos: novedadData.dias,
+          es_undefined: novedadData.dias === undefined,
+          es_null: novedadData.dias === null,
+          es_zero: novedadData.dias === 0,
+          es_negativo: novedadData.dias < 0,
+          es_positivo: novedadData.dias > 0,
+          tipo_datos: typeof novedadData.dias,
+          valor_recibido: novedadData.valor,
+          fechas: `${novedadData.fecha_inicio} - ${novedadData.fecha_fin}`,
+          timestamp: new Date().toISOString()
+        });
         
         if (novedadData.dias === undefined || novedadData.dias === null || novedadData.dias <= 0) {
-          console.error('🚨 [SERVICE V6.0] CRÍTICO: Incapacidad llegó al servicio con días inválidos:', {
+          console.error('🚨 [SERVICE V8.0] CRÍTICO: Incapacidad llegó al servicio con días inválidos:', {
             dias_recibidos: novedadData.dias,
             valor_recibido: novedadData.valor,
             fechas: `${novedadData.fecha_inicio} - ${novedadData.fecha_fin}`,
-            error_location: 'NovedadesEnhancedService.createNovedad',
+            error_location: 'NovedadesEnhancedService.createNovedad V8.0',
+            datos_completos: novedadData,
             timestamp: new Date().toISOString()
           });
           
-          throw new Error(`[V6.0] CRÍTICO: Incapacidad recibida en servicio con días inválidos (${novedadData.dias}). Verificar sincronización modal-servicio.`);
+          throw new Error(`[V8.0 CRÍTICO] Incapacidad recibida en servicio con días inválidos (${novedadData.dias}). Datos completos: ${JSON.stringify({dias: novedadData.dias, fechas: {inicio: novedadData.fecha_inicio, fin: novedadData.fecha_fin}})}`);
         }
 
-        console.log('✅ [SERVICE V6.0] Incapacidad validada en servicio:', {
+        console.log('✅ [SERVICE V8.0] Incapacidad validada correctamente en servicio:', {
           dias: novedadData.dias,
           valor: novedadData.valor,
-          fechas: `${novedadData.fecha_inicio} - ${novedadData.fecha_fin}`
+          fechas: `${novedadData.fecha_inicio} - ${novedadData.fecha_fin}`,
+          paso_validacion: true
         });
       }
       
@@ -153,16 +170,29 @@ export class NovedadesEnhancedService {
         constitutivo_salario: novedadData.constitutivo_salario || false
       };
 
-      console.log('💾 [SERVICE V6.0] ===== DATOS FINALES PARA INSERCIÓN =====');
-      console.log('💾 [SERVICE V6.0] insertData completo:', JSON.stringify(insertData, null, 2));
-      console.log('💾 [SERVICE V6.0] Verificación final pre-inserción:', {
+      console.log('💾 [SERVICE V8.0] ===== DATOS FINALES PARA INSERCIÓN BD =====');
+      console.log('💾 [SERVICE V8.0] insertData COMPLETO:', JSON.stringify(insertData, null, 2));
+      console.log('💾 [SERVICE V8.0] Verificación final pre-inserción CRÍTICA:', {
         'tipo_novedad_final': insertData.tipo_novedad,
         'dias_final': insertData.dias,
+        'dias_final_type': typeof insertData.dias,
+        'dias_final_positive': insertData.dias > 0,
         'valor_final': insertData.valor,
         'fechas_finales': `${insertData.fecha_inicio} - ${insertData.fecha_fin}`,
         'company_id_final': insertData.company_id,
+        'validation_pass': insertData.tipo_novedad === 'incapacidad' ? (insertData.dias > 0) : true,
         timestamp: new Date().toISOString()
       });
+
+      // ✅ V8.0: VALIDACIÓN FINAL ANTES DE INSERT
+      if (insertData.tipo_novedad === 'incapacidad' && insertData.dias <= 0) {
+        console.error('🚨 [SERVICE V8.0] ÚLTIMA VALIDACIÓN FALLÓ:', {
+          insertData_dias: insertData.dias,
+          error: 'Días <= 0 detectados justo antes del INSERT',
+          timestamp: new Date().toISOString()
+        });
+        throw new Error(`Error crítico V8.0: Incapacidad a punto de insertar con días <= 0 (${insertData.dias})`);
+      }
 
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
@@ -171,18 +201,20 @@ export class NovedadesEnhancedService {
         .single();
 
       if (error) {
-        console.error('❌ [SERVICE V6.0] Error insertando en BD:', error);
-        console.error('❌ [SERVICE V6.0] Datos que causaron error:', insertData);
+        console.error('❌ [SERVICE V8.0] Error insertando en BD:', error);
+        console.error('❌ [SERVICE V8.0] Datos que causaron error:', insertData);
         throw error;
       }
 
-      console.log('✅ [SERVICE V6.0] ===== INSERCIÓN EXITOSA =====');
-      console.log('✅ [SERVICE V6.0] Novedad guardada en BD:', JSON.stringify(novedad, null, 2));
-      console.log('✅ [SERVICE V6.0] Verificación post-inserción:', {
+      console.log('✅ [SERVICE V8.0] ===== INSERCIÓN EXITOSA =====');
+      console.log('✅ [SERVICE V8.0] Novedad guardada en BD:', JSON.stringify(novedad, null, 2));
+      console.log('✅ [SERVICE V8.0] Verificación post-inserción CRÍTICA:', {
         'id_generado': novedad.id,
         'dias_en_bd': novedad.dias,
         'valor_en_bd': novedad.valor,
         'tipo_en_bd': novedad.tipo_novedad,
+        'fechas_en_bd': `${novedad.fecha_inicio} - ${novedad.fecha_fin}`,
+        'success_validation': novedad.tipo_novedad === 'incapacidad' ? (novedad.dias > 0) : true,
         timestamp: new Date().toISOString()
       });
 
@@ -202,12 +234,12 @@ export class NovedadesEnhancedService {
         console.warn('⚠️ No se pudo registrar acción de auditoría:', auditError);
       }
 
-      console.log('✅ [SERVICE V6.0] Novedad creada exitosamente con logging defensivo');
+      console.log('✅ [SERVICE V8.0] Novedad creada exitosamente con logging defensivo máximo');
       return novedad as PayrollNovedad;
       
     } catch (error) {
-      console.error('💥 [SERVICE V6.0] Error crítico creando novedad:', error);
-      console.error('💥 [SERVICE V6.0] Stack trace:', error.stack);
+      console.error('💥 [SERVICE V8.0] Error crítico creando novedad:', error);
+      console.error('💥 [SERVICE V8.0] Stack trace:', error.stack);
       throw error;
     }
   }
