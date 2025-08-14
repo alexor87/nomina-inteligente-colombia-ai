@@ -20,7 +20,7 @@ export interface EmployeeUnified {
   
   // Labor Information
   salarioBase: number;
-  tipoSalario: 'mensual' | 'integral' | 'medio_tiempo'; // ✅ NUEVO: Tipo de salario
+  tipoSalario?: 'mensual' | 'integral' | 'medio_tiempo'; // ✅ NUEVO: Tipo de salario
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
   periodicidadPago: 'mensual' | 'quincenal';

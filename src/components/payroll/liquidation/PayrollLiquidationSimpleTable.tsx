@@ -158,8 +158,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             bonuses: 0,
             absences: 0,
             periodType: periodType, // ✅ Usar tipo de período correcto
-            novedades: novedadesForIBC,
-            year: year // ✅ AGREGAR EL AÑO PARA CÁLCULOS ESPECÍFICOS
+            novedades: novedadesForIBC
           });
 
           newCalculations[employee.id] = {
