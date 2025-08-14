@@ -57,6 +57,10 @@ export interface EmployeeUnified {
   // Custom fields
   custom_fields?: Record<string, any>;
   
+  // Vacation fields (stored in custom_fields)
+  initialVacationBalance?: number;
+  lastVacationCalculation?: string;
+  
   // Metadata
   createdAt?: string;
   updatedAt?: string;
@@ -111,6 +115,9 @@ export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
     regimenSalud: dbData.regimen_salud || undefined,
     estadoAfiliacion: dbData.estado_afiliacion || undefined,
     custom_fields: dbData.custom_fields || {},
+    // Extract vacation fields from custom_fields
+    initialVacationBalance: dbData.custom_fields?.initialVacationBalance || undefined,
+    lastVacationCalculation: dbData.custom_fields?.lastVacationCalculation || undefined,
     createdAt: dbData.created_at,
     updatedAt: dbData.updated_at
   };
@@ -161,6 +168,11 @@ export const mapUnifiedToDatabase = (unified: EmployeeUnified) => {
     subtipo_cotizante_id: unified.subtipoCotizanteId || null,
     regimen_salud: unified.regimenSalud || null,
     estado_afiliacion: unified.estadoAfiliacion || null,
-    custom_fields: unified.custom_fields || {}
+    custom_fields: {
+      ...unified.custom_fields,
+      // Ensure vacation fields are stored in custom_fields
+      ...(unified.initialVacationBalance !== undefined && { initialVacationBalance: unified.initialVacationBalance }),
+      ...(unified.lastVacationCalculation && { lastVacationCalculation: unified.lastVacationCalculation })
+    }
   };
 };

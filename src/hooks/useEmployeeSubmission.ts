@@ -84,7 +84,16 @@ export const useEmployeeSubmission = ({ employee, onSuccess }: UseEmployeeSubmis
       telefono: data.telefono?.trim() || null,
       // Garantizar company_id
       company_id: data.company_id || data.empresaId,
-      empresaId: data.empresaId || data.company_id
+      empresaId: data.empresaId || data.company_id,
+      // Manejar campos de vacaciones
+      initialVacationBalance: data.initialVacationBalance ? Number(data.initialVacationBalance) : undefined,
+      lastVacationCalculation: data.lastVacationCalculation || undefined,
+      // Preservar custom_fields existentes y agregar campos de vacaciones
+      custom_fields: {
+        ...data.custom_fields,
+        ...(data.initialVacationBalance !== undefined && { initialVacationBalance: Number(data.initialVacationBalance) }),
+        ...(data.lastVacationCalculation && { lastVacationCalculation: data.lastVacationCalculation })
+      }
     };
 
     // Eliminar campos undefined
