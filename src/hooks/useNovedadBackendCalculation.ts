@@ -33,13 +33,13 @@ export const useNovedadBackendCalculation = () => {
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
 
-  // ✅ KISS: Cálculo directo optimizado
+  // ✅ CORRECCIÓN: Mejorar validación y logging para incapacidades
   const calculateNovedad = useCallback(async (
     input: NovedadCalculationInput
   ): Promise<NovedadCalculationResult | null> => {
     
     if (!input.salarioBase || input.salarioBase <= 0) {
-      console.log('❌ Invalid salary for calculation');
+      console.log('❌ Invalid salary for calculation:', input.salarioBase);
       return null;
     }
 
@@ -56,34 +56,38 @@ export const useNovedadBackendCalculation = () => {
       return null;
     }
 
+    // ✅ NUEVO: Logging específico para incapacidades
+    if (input.tipoNovedad === 'incapacidad') {
+      console.log('🏥 INCAPACIDAD CALCULATION:', {
+        tipo: input.tipoNovedad,
+        subtipo: input.subtipo || 'general',
+        salarioBase: input.salarioBase,
+        dias: input.dias,
+        fechaPeriodo: input.fechaPeriodo
+      });
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      // ✅ KISS: Formateo UTC simple
+      // ✅ CORRECCIÓN: Formateo UTC simple
       let fechaParaCalculo: string | undefined;
       
       if (input.fechaPeriodo) {
         fechaParaCalculo = input.fechaPeriodo.split('T')[0];
-        
-        console.log('🎯 HOOK: Calculando novedad:', {
-          tipo: input.tipoNovedad,
-          subtipo: input.subtipo,
-          fecha: fechaParaCalculo,
-          salario: input.salarioBase,
-          horas: input.horas,
-          dias: input.dias
-        });
       }
 
       const requestData = {
         tipoNovedad: input.tipoNovedad,
-        subtipo: input.subtipo,
+        subtipo: input.subtipo || (input.tipoNovedad === 'incapacidad' ? 'general' : undefined),
         salarioBase: input.salarioBase,
         horas: input.horas || undefined,
         dias: input.dias || undefined,
         fechaPeriodo: fechaParaCalculo
       };
+
+      console.log('🚀 HOOK: Enviando request al backend:', requestData);
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
@@ -98,6 +102,7 @@ export const useNovedadBackendCalculation = () => {
       }
 
       if (!data.success) {
+        console.error('❌ Backend calculation failed:', data.error);
         throw new Error(data.error || 'Error desconocido en el cálculo');
       }
 
@@ -110,6 +115,15 @@ export const useNovedadBackendCalculation = () => {
         detalle: result.detalleCalculo
       });
 
+      // ✅ NUEVO: Logging específico para incapacidades
+      if (input.tipoNovedad === 'incapacidad') {
+        console.log('🏥 INCAPACIDAD RESULT:', {
+          valorCalculado: result.valor,
+          detalleCalculo: result.detalleCalculo,
+          subtipo: input.subtipo || 'general'
+        });
+      }
+
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
@@ -121,7 +135,7 @@ export const useNovedadBackendCalculation = () => {
     }
   }, []);
 
-  // ✅ CORRECCIÓN SINCRONIZACIÓN: Debounce mejorado con callback inmediato
+  // ✅ CORRECCIÓN: Debounce mejorado con callback inmediato
   const calculateNovedadDebounced = useCallback((
     input: NovedadCalculationInput,
     callback: (result: NovedadCalculationResult | null) => void,
@@ -132,18 +146,20 @@ export const useNovedadBackendCalculation = () => {
       clearTimeout(debounceRef.current);
     }
 
-    // ✅ KISS: Ejecutar inmediatamente si tenemos todos los datos necesarios
+    // ✅ CORRECCIÓN: Ejecutar inmediatamente si tenemos todos los datos necesarios
     const hasRequiredData = input.salarioBase > 0 && (
       (['horas_extra', 'recargo_nocturno'].includes(input.tipoNovedad) && input.horas && input.horas > 0) ||
-      (['incapacidad', 'vacaciones', 'licencia_remunerada'].includes(input.tipoNovedad) && input.dias && input.dias > 0) ||
-      (!['horas_extra', 'recargo_nocturno', 'incapacidad', 'vacaciones', 'licencia_remunerada'].includes(input.tipoNovedad))
+      (['incapacidad', 'vacaciones', 'licencia_remunerada', 'ausencia'].includes(input.tipoNovedad) && input.dias && input.dias > 0) ||
+      (!['horas_extra', 'recargo_nocturno', 'incapacidad', 'vacaciones', 'licencia_remunerada', 'ausencia'].includes(input.tipoNovedad))
     );
 
     if (hasRequiredData) {
       // ✅ Ejecutar inmediatamente para mejor UX
+      console.log('⚡ IMMEDIATE CALCULATION for:', input.tipoNovedad);
       calculateNovedad(input).then(callback);
     } else {
       // ✅ Usar debounce solo cuando faltan datos
+      console.log('⏳ DEBOUNCED CALCULATION for:', input.tipoNovedad, 'missing data');
       debounceRef.current = setTimeout(async () => {
         const result = await calculateNovedad(input);
         callback(result);
