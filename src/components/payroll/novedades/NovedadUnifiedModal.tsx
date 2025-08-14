@@ -215,8 +215,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
   const handleFormSubmit = async (formData: any) => {
-    console.log('📤 [MODAL V5.0] ===== RECIBIENDO DATOS DEL FORMULARIO =====');
-    console.log('📤 [MODAL V5.0] formData original:', JSON.stringify(formData, null, 2));
+    console.log('📤 [MODAL V6.0] ===== RECIBIENDO DATOS DEL FORMULARIO =====');
+    console.log('📤 [MODAL V6.0] formData original:', JSON.stringify(formData, null, 2));
     
     if (!employeeId || !periodId) {
       toast({
@@ -229,35 +229,94 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      console.log('📤 [MODAL V5.0] Datos del formulario recibidos:', formData);
+      console.log('📤 [MODAL V6.0] Datos del formulario recibidos:', formData);
       
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
       
-      console.log(`🔄 [MODAL V5.0] Procesando ${dataArray.length} entradas de novedad`);
+      console.log(`🔄 [MODAL V6.0] Procesando ${dataArray.length} entradas de novedad`);
       
       for (const entry of dataArray) {
-        console.log('🔍 [MODAL V5.0] ===== PROCESANDO ENTRADA =====');
-        console.log('🔍 [MODAL V5.0] Entry data completo:', JSON.stringify(entry, null, 2));
+        console.log('🔍 [MODAL V6.0] ===== PROCESANDO ENTRADA =====');
+        console.log('🔍 [MODAL V6.0] Entry data completo:', JSON.stringify(entry, null, 2));
         
-        // ✅ V5.0 CORRECCIÓN CRÍTICA: Mapeo específico para incapacidades
+        // ✅ V6.0 CORRECCIÓN CRÍTICA: Mapeo específico mejorado para incapacidades
         let diasFinales = entry.dias;
         
-        if (selectedType === 'incapacidad' && entry.calculatedDays !== undefined) {
-          console.log('🏥 [MODAL V5.0] INCAPACIDAD - Usando calculatedDays:', {
-            dias_original: entry.dias,
-            calculatedDays: entry.calculatedDays,
-            accion: 'override_con_calculatedDays'
+        if (selectedType === 'incapacidad') {
+          console.log('🏥 [MODAL V6.0] INCAPACIDAD DETECTADA - Análisis de días:', {
+            'entry.dias_original': entry.dias,
+            'entry.calculatedDays': entry.calculatedDays,
+            'typeof entry.dias': typeof entry.dias,
+            'typeof entry.calculatedDays': typeof entry.calculatedDays,
+            'entry.dias === 0': entry.dias === 0,
+            'entry.calculatedDays > 0': entry.calculatedDays > 0,
+            timestamp: new Date().toISOString()
           });
-          diasFinales = entry.calculatedDays;
+
+          // ✅ V6.0: PRIORIZAR calculatedDays si existe y es válido
+          if (entry.calculatedDays !== undefined && entry.calculatedDays !== null && entry.calculatedDays > 0) {
+            diasFinales = entry.calculatedDays;
+            console.log('✅ [MODAL V6.0] OVERRIDE APLICADO - Usando calculatedDays:', {
+              dias_originales: entry.dias,
+              dias_finales: diasFinales,
+              source: 'calculatedDays prioritario'
+            });
+          } else if (entry.dias !== undefined && entry.dias !== null && entry.dias > 0) {
+            diasFinales = entry.dias;
+            console.log('⚠️ [MODAL V6.0] FALLBACK - Usando entry.dias:', {
+              dias_originales: entry.dias,
+              dias_finales: diasFinales,
+              calculatedDays: entry.calculatedDays,
+              source: 'entry.dias fallback'
+            });
+          } else {
+            console.error('🚨 [MODAL V6.0] INCAPACIDAD SIN DÍAS VÁLIDOS:', {
+              entry_dias: entry.dias,
+              calculatedDays: entry.calculatedDays,
+              fecha_inicio: entry.fecha_inicio,
+              fecha_fin: entry.fecha_fin,
+              error: 'Ambos campos son inválidos',
+              timestamp: new Date().toISOString()
+            });
+            
+            // ✅ V6.0: CÁLCULO DEFENSIVO DE EMERGENCIA
+            if (entry.fecha_inicio && entry.fecha_fin) {
+              try {
+                const start = new Date(entry.fecha_inicio + 'T00:00:00');
+                const end = new Date(entry.fecha_fin + 'T00:00:00');
+                const diffTime = Math.abs(end.getTime() - start.getTime());
+                const calculatedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                
+                if (calculatedDays > 0) {
+                  diasFinales = calculatedDays;
+                  console.log('🔧 [MODAL V6.0] CÁLCULO DE EMERGENCIA exitoso:', {
+                    fecha_inicio: entry.fecha_inicio,
+                    fecha_fin: entry.fecha_fin,
+                    dias_calculados: diasFinales
+                  });
+                } else {
+                  throw new Error(`Cálculo de emergencia resultó en ${calculatedDays} días`);
+                }
+              } catch (calcError) {
+                console.error('💥 [MODAL V6.0] Error en cálculo de emergencia:', calcError);
+                throw new Error(`Error crítico V6.0: Incapacidad sin días válidos y falló cálculo de emergencia. entry.dias: ${entry.dias}, calculatedDays: ${entry.calculatedDays}`);
+              }
+            } else {
+              throw new Error(`Error crítico V6.0: Incapacidad sin días válidos ni fechas para calcular. Datos: ${JSON.stringify({dias: entry.dias, calculatedDays: entry.calculatedDays, fechas: {inicio: entry.fecha_inicio, fin: entry.fecha_fin}})}`);
+            }
+          }
         }
         
-        console.log('🔍 [MODAL V5.0] Análisis específico de días V5.0:', {
+        console.log('🔍 [MODAL V6.0] Análisis específico de días FINAL:', {
           'entry.dias_original': entry.dias,
           'entry.calculatedDays': entry.calculatedDays,
           'diasFinales_usado': diasFinales,
           'selectedType': selectedType,
           'override_aplicado': selectedType === 'incapacidad' && entry.calculatedDays !== undefined,
+          'metodo_seleccion': selectedType === 'incapacidad' 
+            ? (entry.calculatedDays > 0 ? 'calculatedDays_prioritario' : 'fallback_o_emergencia')
+            : 'dias_normal',
           timestamp: new Date().toISOString()
         });
 
@@ -268,7 +327,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           tipo_novedad: selectedType!,
           valor: entry.valor || 0,
           horas: entry.horas !== undefined ? entry.horas : undefined,
-          dias: diasFinales, // ✅ V5.0: Usar dias corregidos con calculatedDays para incapacidades
+          dias: diasFinales, // ✅ V6.0: Usar dias corregidos con lógica mejorada
           observacion: entry.observacion || undefined,
           fecha_inicio: entry.fecha_inicio || undefined,
           fecha_fin: entry.fecha_fin || undefined,
@@ -276,58 +335,56 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           base_calculo: entry.base_calculo || undefined
         };
 
-        console.log('🚨 [MODAL V5.0] ===== DATOS FINALES ANTES DE ENVÍO =====');
-        console.log('🚨 [MODAL V5.0] submitData completo:', JSON.stringify(submitData, null, 2));
-        console.log('🚨 [MODAL V5.0] Verificación crítica V5.0:', {
+        console.log('🚨 [MODAL V6.0] ===== DATOS FINALES ANTES DE ENVÍO A SERVICIO =====');
+        console.log('🚨 [MODAL V6.0] submitData completo:', JSON.stringify(submitData, null, 2));
+        console.log('🚨 [MODAL V6.0] Verificación crítica V6.0 FINAL:', {
           tipo_novedad: submitData.tipo_novedad,
           valor: submitData.valor,
           horas: submitData.horas,
-          dias: submitData.dias, // ✅ V5.0: Debe ser calculatedDays para incapacidades
+          dias: submitData.dias, // ✅ V6.0: Este valor debe ser correcto ahora
           subtipo: submitData.subtipo,
           fecha_inicio: submitData.fecha_inicio,
           fecha_fin: submitData.fecha_fin,
           'dias_type': typeof submitData.dias,
           'dias_is_zero': submitData.dias === 0,
           'dias_is_undefined': submitData.dias === undefined,
-          'override_success': selectedType === 'incapacidad' ? submitData.dias === entry.calculatedDays : 'N/A',
+          'dias_is_positive': submitData.dias && submitData.dias > 0,
+          'expected_for_incapacidad': selectedType === 'incapacidad' ? 'dias > 0' : 'N/A',
+          'validation_pass': selectedType === 'incapacidad' ? (submitData.dias && submitData.dias > 0) : true,
           timestamp: new Date().toISOString()
         });
 
-        // ✅ V5.0: VALIDACIÓN ESPECÍFICA MEJORADA PARA INCAPACIDADES
+        // ✅ V6.0: VALIDACIÓN FINAL ANTES DE ENVÍO
         if (submitData.tipo_novedad === 'incapacidad') {
-          console.log('🏥 [MODAL V5.0] VALIDANDO INCAPACIDAD...');
-          
-          if (submitData.dias === undefined || submitData.dias === null || submitData.dias < 0) {
-            console.error('🚨 [MODAL V5.0] INCAPACIDAD BUG DETECTADO:', {
-              dias_received: entry.dias,
-              calculatedDays: entry.calculatedDays,
+          if (submitData.dias === undefined || submitData.dias === null || submitData.dias <= 0) {
+            console.error('🚨 [MODAL V6.0] VALIDACIÓN FINAL FALLÓ - Incapacidad con días inválidos:', {
               dias_final: submitData.dias,
-              fechas: {
-                inicio: entry.fecha_inicio,
-                fin: entry.fecha_fin
+              entry_original: {
+                dias: entry.dias,
+                calculatedDays: entry.calculatedDays
               },
-              error: 'Días inválidos para incapacidad',
+              error: 'Días inválidos después de toda la lógica de corrección',
               timestamp: new Date().toISOString()
             });
             
-            throw new Error(`Error crítico V5.0: Incapacidad con días inválidos (${submitData.dias}). Verificar sincronización formulario-modal.`);
+            throw new Error(`Error crítico V6.0: Incapacidad con días inválidos después de correcciones (${submitData.dias}). Verificar lógica de sincronización.`);
           }
           
-          console.log('✅ [MODAL V5.0] Incapacidad validada correctamente:', {
+          console.log('✅ [MODAL V6.0] Incapacidad validada correctamente para envío:', {
             dias: submitData.dias,
             fechas: `${submitData.fecha_inicio} a ${submitData.fecha_fin}`,
             valor: submitData.valor,
-            calculatedDays_usado: entry.calculatedDays !== undefined ? 'SÍ' : 'NO'
+            metodo_obtencion: entry.calculatedDays > 0 ? 'calculatedDays' : 'calculado_internamente'
           });
         }
 
-        console.log('💾 [MODAL V5.0] ===== LLAMANDO A onSubmit =====');
-        console.log('💾 [MODAL V5.0] Datos que se envían a onSubmit:', submitData);
+        console.log('💾 [MODAL V6.0] ===== LLAMANDO A onSubmit =====');
+        console.log('💾 [MODAL V6.0] Enviando a servicio NovedadesEnhancedService:', submitData);
         await onSubmit(submitData);
-        console.log('✅ [MODAL V5.0] onSubmit completado exitosamente');
+        console.log('✅ [MODAL V6.0] onSubmit completado exitosamente');
       }
       
-      console.log('✅ [MODAL V5.0] Todas las entradas de novedad procesadas exitosamente');
+      console.log('✅ [MODAL V6.0] Todas las entradas de novedad procesadas exitosamente');
       
       // En modo ajustes, cerrar el modal directamente
       if (mode === 'ajustes') {
@@ -339,8 +396,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       }
       
     } catch (error: any) {
-      console.error('❌ [MODAL V5.0] ERROR procesando novedades:', error);
-      console.error('❌ [MODAL V5.0] Stack trace:', error.stack);
+      console.error('❌ [MODAL V6.0] ERROR procesando novedades:', error);
+      console.error('❌ [MODAL V6.0] Stack trace:', error.stack);
       toast({
         title: "Error",
         description: error.message || "No se pudieron guardar las novedades",
