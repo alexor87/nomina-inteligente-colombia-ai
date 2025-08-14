@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Plus, Filter, Download, MoreVertical, Edit, Trash2, Undo2 } from 'lucide-react';
+import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2, Undo2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
@@ -488,6 +488,10 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                               <DropdownMenuItem onClick={() => navigate(`/app/employees/${employee.id}/edit`)}>
                                 <Edit className="w-4 h-4 mr-2" />
                                 Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Mail className="w-4 h-4 mr-2" />
+                                Enviar Comprobante
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => handleSoftDelete(employee.id, `${employee.nombre} ${employee.apellido}`)}

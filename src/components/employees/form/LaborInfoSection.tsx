@@ -5,8 +5,6 @@ import { EmployeeFormData } from './types';
 import { FormField } from './FormField';
 import { CONTRACT_TYPES } from '@/types/employee-config';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info, AlertTriangle } from 'lucide-react';
 
 interface LaborInfoSectionProps {
   control?: Control<EmployeeFormData>;
@@ -37,90 +35,20 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
     return null;
   }
 
-  // ✅ NUEVO: Validaciones y alertas para tipos de salario
-  const tipoSalario = watch?.('tipoSalario') || 'mensual';
-  const salarioBase = watch?.('salarioBase') || 0;
-  
-  // Calcular SMLMV para 2024 (ejemplo)
-  const SMLMV_2024 = 1300000; // Este valor debería venir de configuración
-  const is10SMLMV = salarioBase >= (SMLMV_2024 * 10);
-  
-  const getSalarioAlert = () => {
-    if (tipoSalario === 'integral' && salarioBase > 0 && !is10SMLMV) {
-      return (
-        <Alert className="mt-2 border-orange-200 bg-orange-50">
-          <AlertTriangle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-800">
-            <strong>Atención:</strong> El salario integral debe ser mínimo 10 SMLMV ($
-            {(SMLMV_2024 * 10).toLocaleString()}). Valor actual: $
-            {salarioBase.toLocaleString()}
-          </AlertDescription>
-        </Alert>
-      );
-    }
-    
-    if (tipoSalario === 'integral' && is10SMLMV) {
-      return (
-        <Alert className="mt-2 border-blue-200 bg-blue-50">
-          <Info className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
-            <strong>Salario Integral:</strong> 70% factor salarial ($
-            {Math.round(salarioBase * 0.7).toLocaleString()}) + 30% factor prestacional ($
-            {Math.round(salarioBase * 0.3).toLocaleString()})
-          </AlertDescription>
-        </Alert>
-      );
-    }
-    
-    if (tipoSalario === 'medio_tiempo') {
-      return (
-        <Alert className="mt-2 border-blue-200 bg-blue-50">
-          <Info className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
-            <strong>Medio Tiempo:</strong> Salario proporcional a las horas trabajadas. 
-            Verificar configuración de jornada laboral.
-          </AlertDescription>
-        </Alert>
-      );
-    }
-    
-    return null;
-  };
-
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-4">Información Laboral</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* ✅ NUEVO: Tipo de Salario */}
           <FormField
-            name="tipoSalario"
-            label="Tipo de Salario"
-            type="select"
+            name="salarioBase"
+            label="Salario Base"
+            type="number"
             control={control!}
             errors={errors}
             required
-            options={[
-              { value: 'mensual', label: 'Salario Mensual Tradicional' },
-              { value: 'integral', label: 'Salario Integral (mín. 10 SMLMV)' },
-              { value: 'medio_tiempo', label: 'Salario Medio Tiempo' }
-            ]}
-            placeholder="Seleccionar tipo de salario"
+            placeholder="2500000"
           />
-
-          {/* ✅ MODIFICADO: Valor del Salario (antes Salario Base) */}
-          <div>
-            <FormField
-              name="salarioBase"
-              label="Valor del Salario"
-              type="number"
-              control={control!}
-              errors={errors}
-              required
-              placeholder="2500000"
-            />
-            {getSalarioAlert()}
-          </div>
 
           <FormField
             name="tipoContrato"

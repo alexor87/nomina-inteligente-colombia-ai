@@ -10,7 +10,6 @@ import { PayrollDomainService } from '@/services/PayrollDomainService';
 import { usePagination } from '@/hooks/usePagination';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { PageContainer } from '@/components/layout/PageContainer';
 
 interface PayrollPeriod {
   id: string;
@@ -98,236 +97,234 @@ export const PayrollHistoryPage = () => {
 
   if (loading) {
     return (
-      <PageContainer>
+      <div className="px-6 py-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Cargando historial...</p>
           </div>
         </div>
-      </PageContainer>
+      </div>
     );
   }
 
   return (
-    <PageContainer>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col space-y-4">
-          <div>
-            <h1 className="text-2xl font-semibold">Historial de Nómina</h1>
-            <p className="text-sm text-muted-foreground">
-              Consulta períodos liquidados, ajustes y comprobantes generados
-            </p>
-          </div>
-
-          {/* Filters */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar por período o número de empleados..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                
-                <Select value={yearFilter} onValueChange={setYearFilter}>
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Filtrar por año" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-years">Todos los años</SelectItem>
-                    {getAvailableYears().map(year => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Tipo de período" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-types">Todos los tipos</SelectItem>
-                    <SelectItem value="mensual">Mensual</SelectItem>
-                    <SelectItem value="quincenal">Quincenal</SelectItem>
-                    <SelectItem value="semanal">Semanal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+    <div className="px-6 py-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Historial de Nómina</h1>
+          <p className="text-sm text-muted-foreground">
+            Consulta períodos liquidados, ajustes y comprobantes generados
+          </p>
         </div>
 
-        {/* Results */}
-        {filteredPeriods.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Sin períodos liquidados</h3>
-                <p className="text-sm text-muted-foreground">
-                  {periods.length === 0 
-                    ? "Aún no tienes períodos liquidados." 
-                    : "No se encontraron períodos que coincidan con los filtros aplicados."
-                  }
-                </p>
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por período o número de empleados..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Períodos</CardTitle>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">{filteredPeriods.length}</div>
-                </CardContent>
-              </Card>
               
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Empleados</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">
-                    {filteredPeriods.reduce((sum, period) => sum + period.empleados_count, 0)}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Pagado</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">
-                    {formatCurrency(filteredPeriods.reduce((sum, period) => sum + period.total_neto, 0))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+              <Select value={yearFilter} onValueChange={setYearFilter}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Filtrar por año" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all-years">Todos los años</SelectItem>
+                  {getAvailableYears().map(year => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            {/* Table */}
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Tipo de período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all-types">Todos los tipos</SelectItem>
+                  <SelectItem value="mensual">Mensual</SelectItem>
+                  <SelectItem value="quincenal">Quincenal</SelectItem>
+                  <SelectItem value="semanal">Semanal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Results */}
+      {filteredPeriods.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Sin períodos liquidados</h3>
+              <p className="text-sm text-muted-foreground">
+                {periods.length === 0 
+                  ? "Aún no tienes períodos liquidados." 
+                  : "No se encontraron períodos que coincidan con los filtros aplicados."
+                }
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-medium">Períodos Liquidados</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Períodos</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-4 text-sm font-medium text-foreground">Período</th>
-                        <th className="text-left p-4 text-sm font-medium text-foreground">Tipo</th>
-                        <th className="text-left p-4 text-sm font-medium text-foreground">Empleados</th>
-                        <th className="text-left p-4 text-sm font-medium text-foreground">Total Neto</th>
-                        <th className="text-left p-4 text-sm font-medium text-foreground">Estado</th>
-                        <th className="text-left p-4 text-sm font-medium text-foreground">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedItems.map((period) => (
-                        <tr key={period.id} className="border-b hover:bg-muted/50">
-                          <td className="p-4">
-                            <div>
-                              <div className="text-sm font-medium">{period.periodo}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {new Date(period.fecha_inicio).toLocaleDateString()} - {new Date(period.fecha_fin).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <Badge variant="outline" className="capitalize text-xs">
-                              {period.tipo_periodo}
-                            </Badge>
-                          </td>
-                          <td className="p-4 text-sm font-normal">{period.empleados_count}</td>
-                          <td className="p-4 text-sm font-medium">{formatCurrency(period.total_neto)}</td>
-                          <td className="p-4">{getStatusBadge(period)}</td>
-                          <td className="p-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/app/payroll-history/${period.id}`)}
-                              className="flex items-center gap-2 text-sm"
-                            >
-                              <Eye className="h-4 w-4" />
-                              Ver detalle
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-6">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        Mostrando {((currentPage - 1) * pageSize) + 1} a {Math.min(currentPage * pageSize, filteredPeriods.length)} de {filteredPeriods.length} períodos
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={goToPreviousPage}
-                        disabled={!canGoPrevious}
-                      >
-                        Anterior
-                      </Button>
-                      
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                          const page = i + 1;
-                          return (
-                            <Button
-                              key={page}
-                              variant={currentPage === page ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => goToPage(page)}
-                              className="w-8 h-8 p-0"
-                            >
-                              {page}
-                            </Button>
-                          );
-                        })}
-                      </div>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={goToNextPage}
-                        disabled={!canGoNext}
-                      >
-                        Siguiente
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <div className="text-xl font-semibold">{filteredPeriods.length}</div>
               </CardContent>
             </Card>
-          </>
-        )}
-      </div>
-    </PageContainer>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Empleados</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-semibold">
+                  {filteredPeriods.reduce((sum, period) => sum + period.empleados_count, 0)}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Pagado</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-semibold">
+                  {formatCurrency(filteredPeriods.reduce((sum, period) => sum + period.total_neto, 0))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-medium">Períodos Liquidados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Período</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Tipo</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Empleados</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Total Neto</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Estado</th>
+                      <th className="text-left p-4 text-sm font-medium text-foreground">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedItems.map((period) => (
+                      <tr key={period.id} className="border-b hover:bg-muted/50">
+                        <td className="p-4">
+                          <div>
+                            <div className="text-sm font-medium">{period.periodo}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {new Date(period.fecha_inicio).toLocaleDateString()} - {new Date(period.fecha_fin).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline" className="capitalize text-xs">
+                            {period.tipo_periodo}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-sm font-normal">{period.empleados_count}</td>
+                        <td className="p-4 text-sm font-medium">{formatCurrency(period.total_neto)}</td>
+                        <td className="p-4">{getStatusBadge(period)}</td>
+                        <td className="p-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/app/payroll-history/${period.id}`)}
+                            className="flex items-center gap-2 text-sm"
+                          >
+                            <Eye className="h-4 w-4" />
+                            Ver detalle
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      Mostrando {((currentPage - 1) * pageSize) + 1} a {Math.min(currentPage * pageSize, filteredPeriods.length)} de {filteredPeriods.length} períodos
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToPreviousPage}
+                      disabled={!canGoPrevious}
+                    >
+                      Anterior
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                        const page = i + 1;
+                        return (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => goToPage(page)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToNextPage}
+                      disabled={!canGoNext}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
   );
 };

@@ -127,7 +127,6 @@ export type Database = {
           ciudad: string | null
           created_at: string
           created_by: string | null
-          departamento: string | null
           direccion: string | null
           email: string
           estado: string | null
@@ -145,7 +144,6 @@ export type Database = {
           ciudad?: string | null
           created_at?: string
           created_by?: string | null
-          departamento?: string | null
           direccion?: string | null
           email: string
           estado?: string | null
@@ -163,7 +161,6 @@ export type Database = {
           ciudad?: string | null
           created_at?: string
           created_by?: string | null
-          departamento?: string | null
           direccion?: string | null
           email?: string
           estado?: string | null
@@ -687,13 +684,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "employee_notes_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees_limited"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "employee_notes_period_id_fkey"
             columns: ["period_id"]
             isOneToOne: false
@@ -746,13 +736,6 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "employee_vacation_balances_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees_limited"
             referencedColumns: ["id"]
           },
         ]
@@ -822,13 +805,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "employee_vacation_periods_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees_limited"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "employee_vacation_periods_processed_in_period_id_fkey"
             columns: ["processed_in_period_id"]
             isOneToOne: false
@@ -883,7 +859,6 @@ export type Database = {
           tipo_cuenta: string | null
           tipo_documento: string | null
           tipo_jornada: string | null
-          tipo_salario: string | null
           titular_cuenta: string | null
           updated_at: string
         }
@@ -932,7 +907,6 @@ export type Database = {
           tipo_cuenta?: string | null
           tipo_documento?: string | null
           tipo_jornada?: string | null
-          tipo_salario?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
@@ -981,7 +955,6 @@ export type Database = {
           tipo_cuenta?: string | null
           tipo_documento?: string | null
           tipo_jornada?: string | null
-          tipo_salario?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
@@ -1005,13 +978,6 @@ export type Database = {
             columns: ["tipo_cotizante_id"]
             isOneToOne: false
             referencedRelation: "tipos_cotizante"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_employees_company"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1153,13 +1119,6 @@ export type Database = {
             columns: ["empleado_id"]
             isOneToOne: false
             referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payroll_novedades_empleado_id_fkey"
-            columns: ["empleado_id"]
-            isOneToOne: false
-            referencedRelation: "employees_limited"
             referencedColumns: ["id"]
           },
           {
@@ -1528,13 +1487,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "payroll_vouchers_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees_limited"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "payroll_vouchers_payroll_id_fkey"
             columns: ["payroll_id"]
             isOneToOne: false
@@ -1689,13 +1641,6 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payrolls_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees_limited"
             referencedColumns: ["id"]
           },
           {
@@ -2008,51 +1953,7 @@ export type Database = {
       }
     }
     Views: {
-      employees_limited: {
-        Row: {
-          apellido: string | null
-          cargo: string | null
-          company_id: string | null
-          estado: string | null
-          fecha_ingreso: string | null
-          id: string | null
-          nombre: string | null
-        }
-        Insert: {
-          apellido?: string | null
-          cargo?: string | null
-          company_id?: string | null
-          estado?: string | null
-          fecha_ingreso?: string | null
-          id?: string | null
-          nombre?: string | null
-        }
-        Update: {
-          apellido?: string | null
-          cargo?: string | null
-          company_id?: string | null
-          estado?: string | null
-          fecha_ingreso?: string | null
-          id?: string | null
-          nombre?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "employees_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_employees_company"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       calculate_period_intersection_days: {
@@ -2171,32 +2072,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      get_employee_sensitive_data: {
-        Args: { employee_id: string }
-        Returns: {
-          id: string
-          nombre: string
-          apellido: string
-          cedula: string
-          email: string
-          telefono: string
-          banco: string
-          numero_cuenta: string
-          salario_base: number
-        }[]
-      }
-      get_employees_limited: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          id: string
-          nombre: string
-          apellido: string
-          cargo: string
-          estado: string
-          fecha_ingreso: string
-          company_id: string
-        }[]
-      }
       get_novedad_audit_history: {
         Args: { p_novedad_id: string }
         Returns: {
@@ -2298,10 +2173,6 @@ export type Database = {
       }
       user_has_access_to_company: {
         Args: { p_user_id: string; p_company_id: string }
-        Returns: boolean
-      }
-      validate_employee_company_access: {
-        Args: { p_employee_id: string }
         Returns: boolean
       }
       verify_demo_data_cleanup: {

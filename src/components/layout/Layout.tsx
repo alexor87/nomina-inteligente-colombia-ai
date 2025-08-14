@@ -12,11 +12,6 @@ export const Layout = () => {
 
   console.log('🏗️ Layout rendered with sidebar collapsed:', sidebarCollapsed, 'user:', user?.email);
 
-  // Constants for consistent spacing
-  const SIDEBAR_WIDTH_COLLAPSED = 64; // 16 * 4px
-  const SIDEBAR_WIDTH_EXPANDED = 256; // 64 * 4px
-  const GAP = 8; // 2 * 4px
-
   // Mostrar loading mientras se verifica la autenticación
   if (loading) {
     return (
@@ -42,10 +37,9 @@ export const Layout = () => {
       />
       
       <main 
-        className="flex-1 transition-all duration-300"
-        style={{
-          marginLeft: `${sidebarCollapsed ? SIDEBAR_WIDTH_COLLAPSED + GAP : SIDEBAR_WIDTH_EXPANDED + GAP}px`
-        }}
+        className={`flex-1 transition-all duration-300 ${
+          sidebarCollapsed ? 'ml-16' : 'ml-64'
+        }`}
       >
         <Header />
         <div className="min-h-screen bg-gray-50">

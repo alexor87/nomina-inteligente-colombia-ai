@@ -105,7 +105,7 @@ export abstract class SecureBaseService {
   }
 
   /**
-   * Secure update - ensures company_id match and returns updated data
+   * Secure update - ensures company_id match
    */
   protected static async secureUpdate<T = any>(
     tableName: string,
@@ -130,9 +130,6 @@ export abstract class SecureBaseService {
         query = query.eq(key, value);
       }
     });
-
-    // ✅ FIX: Add .select('*') to return updated data
-    query = query.select('*');
 
     console.log(`🔒 [SECURITY] Secure update to ${tableName} for company ${companyId}`);
     return query;

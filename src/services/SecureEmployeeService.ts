@@ -1,7 +1,6 @@
 import { SecureBaseService } from './SecureBaseService';
 import { EmployeeUnified, mapDatabaseToUnified, mapUnifiedToDatabase } from '@/types/employee-unified';
 import { EmployeeSoftDeleteService } from './EmployeeSoftDeleteService';
-import { supabase } from '@/integrations/supabase/client';
 
 /**
  * 🔒 SECURE EMPLOYEE SERVICE
@@ -67,32 +66,11 @@ export class SecureEmployeeService extends SecureBaseService {
 
   /**
    * Get employee by ID (excluding soft deleted)
-   * 🔒 SECURITY: Automatically validates company access with enhanced validation
+   * 🔒 SECURITY: Automatically validates company access
    */
   static async getEmployeeById(id: string): Promise<EmployeeUnified | null> {
     try {
-      console.log('🔒 SecureEmployeeService: Fetching employee by ID with enhanced security:', id);
-      
-      // Enhanced security: validate employee company access first
-      const { data: hasAccess, error: accessError } = await (supabase as any)
-        .rpc('validate_employee_company_access', { p_employee_id: id });
-      
-      if (accessError) {
-        console.error('❌ SecureEmployeeService: Access validation error:', accessError);
-        await this.logSecurityViolation('employees', 'access_validation', 'validation_error', { 
-          employeeId: id, 
-          error: accessError.message 
-        });
-        return null;
-      }
-      
-      if (!hasAccess) {
-        console.warn('🔒 SecureEmployeeService: Access denied for employee:', id);
-        await this.logSecurityViolation('employees', 'select_by_id', 'unauthorized_access_attempt', { 
-          employeeId: id 
-        });
-        return null;
-      }
+      console.log('🔒 SecureEmployeeService: Fetching employee by ID:', id);
       
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
@@ -195,29 +173,16 @@ export class SecureEmployeeService extends SecureBaseService {
   static async updateEmployee(id: string, updates: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     try {
       console.log('🔒 SecureEmployeeService: Updating employee:', id);
-      console.log('📝 Update data received:', updates);
-      
-      // ✅ IMPROVED: Clean the updates data before mapping
-      const cleanUpdates = { ...updates };
-      
-      // Remove fields that shouldn't be updated or are handled specially
-      delete cleanUpdates.id; // Never update the ID
-      delete cleanUpdates.createdAt; // Never update creation timestamp (correct camelCase property)
-      
-      console.log('📝 Cleaned update data:', cleanUpdates);
       
       // Map to database format, but only the fields that are being updated
       const dbUpdates = mapUnifiedToDatabase({
-        ...cleanUpdates,
-        id: id, // Temporary ID for mapping, will be removed
-        empresaId: cleanUpdates.empresaId || cleanUpdates.company_id || ''
+        ...updates,
+        id: id,
+        empresaId: updates.empresaId || updates.company_id || ''
       } as EmployeeUnified);
 
-      // ✅ IMPROVED: Remove fields that shouldn't be updated after mapping
-      // Note: mapUnifiedToDatabase doesn't return 'id' or 'created_at' properties, so we don't need to delete them
+      // Remove fields that shouldn't be updated
       delete dbUpdates.company_id; // This shouldn't change
-      
-      console.log('📤 Sending to database:', dbUpdates);
       
       const { data, error } = await this.secureUpdate(
         'employees', 
@@ -237,19 +202,8 @@ export class SecureEmployeeService extends SecureBaseService {
         throw error;
       }
 
-      // ✅ IMPROVED: Better error handling for no data returned
       if (!data || !Array.isArray(data) || data.length === 0) {
-        console.error('❌ SecureEmployeeService: No data returned from update');
-        console.error('❌ Query conditions:', { id, estado: { neq: 'eliminado' } });
-        console.error('❌ Update data sent:', dbUpdates);
-        
-        // Try to fetch the employee to see if it exists
-        const existingEmployee = await this.getEmployeeById(id);
-        if (!existingEmployee) {
-          throw new Error('Empleado no encontrado o no tienes permisos para actualizarlo');
-        }
-        
-        throw new Error('Error al actualizar empleado: No se retornaron datos actualizados');
+        throw new Error('No data returned from employee update');
       }
 
       const employee = mapDatabaseToUnified(data[0]);
